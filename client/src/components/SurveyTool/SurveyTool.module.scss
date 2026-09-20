@@ -3831,11 +3831,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionAgentKickoffActions {
   display: flex;
   align-items: center;
+  align-self: flex-end;
   justify-content: flex-end;
   flex: 0 1 auto;
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+  margin-inline-start: auto;
 
   .sessionInterviewHeaderButton {
     color: var(--ce-panel-text) !important;
@@ -4266,7 +4268,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .sessionAgentKickoffActions {
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
   .sessionInterviewDraft {
