@@ -21,4 +21,26 @@ describe('SessionInterviewPrompt', () => {
       'Open worker.example/agent/interview-catalog… then return JSON.',
     );
   });
+
+  it('renders the catalog JSON sample as readable code without changing the prose intro', () => {
+    const prompt =
+      'Use catalog values in this compact shape:\n{"version":1,"responses":[{"questionId":"q1","confidence":0.35}]}';
+
+    const { container } = render(<SessionInterviewPrompt prompt={prompt} />);
+
+    expect(screen.getByText('Use catalog values in this compact shape:')).toBeInTheDocument();
+    const code = container.querySelector('pre code');
+    expect(code).toBeInTheDocument();
+    expect(code?.textContent).toContain('\n  "version": 1,');
+    expect(code?.textContent).toContain('"responses": [');
+    expect(container.querySelector('pre')).toHaveTextContent('"questionId": "q1"');
+  });
+
+  it('keeps an unparsable catalog sample as plain code text', () => {
+    const prompt = 'Use catalog values in this compact shape:\n{"version":1,';
+
+    const { container } = render(<SessionInterviewPrompt prompt={prompt} />);
+
+    expect(container.querySelector('pre code')).toHaveTextContent('{"version":1,');
+  });
 });

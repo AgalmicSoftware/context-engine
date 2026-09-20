@@ -3923,6 +3923,27 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   p:last-child {
     margin-bottom: 0;
   }
+
+  .sessionInterviewPromptCodeBlock {
+    max-width: 100%;
+    margin: 0 0 1em;
+    padding: 12px 14px;
+    border: 1px solid var(--ce-card-border);
+    border-radius: var(--ce-radius-8);
+    background: var(--ce-surface-sunken);
+    color: var(--ce-panel-text);
+    font-family: var(--ce-font-mono);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .sessionInterviewPromptCodeBlock code {
+    font-family: inherit;
+    color: inherit;
+    white-space: inherit;
+  }
 }
 
 .sessionAgentKickoffCopied {

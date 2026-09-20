@@ -985,6 +985,10 @@ describe('SessionVoiceModeModal', () => {
         .join(' ')
         .replace(/\s+/g, ' '),
     ).toContain('Fetch this URL: worker.example/agent/interview-catalog…');
+    const codeBlock = displayedPrompt.querySelector('pre code');
+    expect(codeBlock).toBeInTheDocument();
+    expect(codeBlock?.textContent).toContain('\n  "version": 1,');
+    expect(codeBlock?.textContent).toContain('\n  "responses": [');
     const promptLink = displayedPrompt.querySelector('a');
     expect(promptLink).toHaveAttribute(
       'href',
@@ -994,6 +998,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(displayedPrompt);
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(plainPrompt);
+    expect(plainPrompt).toContain('{"version":1,"sessionSlug":');
     expect(plainPrompt).not.toMatch(/<strong>|\*\*/);
 
     expect(promptToggle).toHaveAttribute('aria-expanded', 'true');
