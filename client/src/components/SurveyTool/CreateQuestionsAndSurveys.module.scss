@@ -268,6 +268,62 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
+.optionActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+
+  .addOptionButton {
+    margin-top: 0;
+  }
+}
+.creditsToggle {
+  padding: 8px 12px;
+  border: 1px solid var(--ce-authoring-input-border);
+  border-radius: var(--ce-radius-14);
+  background: var(--ce-authoring-control-bg);
+  color: var(--ce-authoring-control-text);
+  box-shadow: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    border-color: var(--ce-action-accent);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+}
+.creditsPanel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ce-authoring-input-border);
+  border-radius: var(--ce-radius-6);
+  color: var(--ce-authoring-control-text);
+  font-size: 0.85rem;
+
+  p {
+    margin: 4px 0 0;
+  }
+}
+.creditsSliderRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    margin: 12px 0;
+    accent-color: var(--ce-action-accent);
+  }
+}
+
 .addQuestionContainer {
   display: flex;
   justify-content: space-between;
@@ -1068,6 +1124,60 @@ $user-page-background: var(--ce-surface-sunken);
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--ce-color-white);
+}
+
+.quadraticPreview {
+  display: grid;
+  grid-template-columns: auto minmax(64px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 220px);
+  margin-inline: auto;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.quadraticPreviewNegative {
+  color: var(--ce-response-disagree-text);
+}
+.quadraticPreviewPositive {
+  color: var(--ce-response-agree-text);
+}
+.quadraticPreviewChart {
+  position: relative;
+  height: 28px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 50%;
+    width: 1px;
+    background: var(--ce-authoring-control-text);
+    opacity: 0.5;
+  }
+}
+.quadraticPreviewNegativeBar,
+.quadraticPreviewPositiveBar {
+  position: absolute;
+  height: 8px;
+  border-radius: 2px;
+}
+.quadraticPreviewNegativeBar {
+  right: 50%;
+  top: 16px;
+  width: 30%;
+  background: var(--ce-response-disagree-text);
+}
+.quadraticPreviewPositiveBar {
+  left: 50%;
+  top: 4px;
+  width: 42%;
+  background: var(--ce-response-agree-text);
+}
+.quadraticPreviewCaption {
+  color: var(--ce-authoring-control-text);
+  font-size: 0.68rem;
+  line-height: 1.25;
 }
 
 /* ============================

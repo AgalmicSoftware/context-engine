@@ -1287,6 +1287,31 @@ describe('SessionVoiceModeModal', () => {
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q-binary', 'Unsure'));
   });
 
+  it('reviews and submits predicted quadratic votes as an array while retaining the original prediction', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'other' as const, modelId: 'fixture', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [{ questionId: 'q-quadratic', answer: [3, -4], confidence: 0.65 }],
+    };
+    render(<SessionVoiceModeModal {...baseProps} mode="interview"
+      questionPool={[{ id: 'q-quadratic', prompt: 'Allocate project support', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }]}
+      prefillPacket={prefillPacket} />);
+
+    expect(await screen.findByRole('slider', { name: 'Parks' })).toHaveValue('3');
+    expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+    fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q-quadratic', [3, -2]));
+    expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+      expect.any(Array), prefillPacket.source, prefillPacket, true, false, '',
+      [expect.objectContaining({ answer: [3, -2], userEditedFields: ['answer'], original: expect.objectContaining({ answer: [3, -4] }) })],
+    );
+  });
+
   it('removes and restores a proposed draft with compact card controls', async () => {
     const prefillPacket = {
       version: 1 as const,

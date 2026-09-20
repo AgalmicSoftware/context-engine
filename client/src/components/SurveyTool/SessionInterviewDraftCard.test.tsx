@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 import type { InterviewDraftResponse } from './sessionInterview';
 
 describe('SessionInterviewDraftCard sliders', () => {
@@ -42,6 +43,28 @@ describe('SessionInterviewDraftCard sliders', () => {
 });
 
 describe('SessionInterviewDraftCard readable draft editors', () => {
+  it.each([true, false])('preserves numeric quadratic drafts through review controls (injected: %s)', (injected) => {
+    const draft = { questionId: 'q-budget', answer: [3, -4], confidence: 0.6 };
+    const question = { id: 'q-budget', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 };
+    const onEdit = jest.fn();
+    const renderAnswerInput = jest.fn((questionId, value, onChange) =>
+      <QuadraticAllocationInput questionId={questionId} options={question.options} voiceCredits={question.voiceCredits} value={value} onChange={onChange} />);
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
+      return <SessionInterviewDraftCard draft={draft} edited={edited} question={question} selected existing={false} disabled={false} onSelect={jest.fn()}
+        renderAnswerInput={injected ? renderAnswerInput : undefined}
+        onEdit={(patch) => { onEdit(patch); setEdited(current => ({ ...current, ...patch })); }} />;
+    }
+    render(<Review />);
+    expect(screen.getByRole('slider', { name: 'Parks' })).toHaveValue('3');
+    expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+    expect(screen.queryByRole('button', { name: /Draft answer for/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
+    expect(onEdit).toHaveBeenLastCalledWith({ answer: [3, -2], userEditedFields: ['answer'] });
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
+    if (injected) expect(renderAnswerInput).toHaveBeenLastCalledWith('q-budget', [3, -2], expect.any(Function), question);
+  });
+
   it('shows full prose by default and enters edit mode by keyboard without Agent/User labels', () => {
     const draft = {
       questionId: 'q1',

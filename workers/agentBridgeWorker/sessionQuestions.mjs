@@ -845,7 +845,7 @@ function normalizeOptions(payload = {}) {
     ? entry.label || entry.text || entry.value || entry.title || entry.name
     : entry))
     .filter(Boolean)
-    .slice(0, 20);
+    .slice(0, (payload.questionType || payload.type) === 'quadratic' ? Infinity : 20);
 }
 
 function normalizeQuestionType(payload = {}) {
@@ -853,6 +853,7 @@ function normalizeQuestionType(payload = {}) {
     .replace(/\s+/g, '_')
     .replace(/-/g, '_');
   if (['binary', 'boolean', 'yes_no', 'agree_disagree', 'agree_unsure_disagree'].includes(raw)) return 'binary';
+  if (raw === 'quadratic') return 'quadratic';
   if (['rating', 'scale', 'linear_scale'].includes(raw)) return 'rating';
   if ([
     'multichoice',
@@ -904,6 +905,7 @@ function normalizeQuestionPayload(payload = {}, {
     id,
     questionType: type,
     type,
+    ...(type === 'quadratic' ? { voiceCredits: root.voiceCredits ?? 99 } : {}),
     prompt: publicPrompt,
     questionText: publicPrompt,
     title: publicPrompt || (visibility === 'public' ? 'Untitled question' : 'Locked question'),

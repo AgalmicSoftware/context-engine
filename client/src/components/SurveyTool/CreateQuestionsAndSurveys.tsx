@@ -550,6 +550,8 @@ interface CreateQuestionsAndSurveysState {
   surveyLockGateIds: string[];
   openLockKey: string;
   activeTagInputKey: string;
+  activeQuadraticBudgetKey: string;
+  quadraticBudgetSliderMax: number;
   [key: string]: unknown;
 }
 
@@ -746,6 +748,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       surveyLockGateIds: [],
       openLockKey: '',
       activeTagInputKey: '',
+      activeQuadraticBudgetKey: '',
+      quadraticBudgetSliderMax: 999,
     };
 
     let initialQuestions: CreateQuestionsAndSurveysQuestion[] = [];
@@ -3210,7 +3214,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
           <button type="button" className={styles.typeButton} onClick={() => this.quickAdd('quadratic')} aria-label="Add Quadratic allocation question">
             <div className={styles.typeTitle}>Quadratic allocation</div>
-            <div className={styles.typePreviewRow}>99 voice credits · positive or negative votes</div>
+            <div className={styles.quadraticPreview} aria-hidden="true">
+              <span className={styles.quadraticPreviewNegative}>−</span>
+              <span className={styles.quadraticPreviewChart}>
+                <span className={styles.quadraticPreviewNegativeBar} />
+                <span className={styles.quadraticPreviewPositiveBar} />
+              </span>
+              <span className={styles.quadraticPreviewPositive}>+</span>
+            </div>
+            <div className={styles.quadraticPreviewCaption}>99 voice credits per question</div>
           </button>
 
           <button
@@ -3445,6 +3457,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         )}
 
         {renderedQuestions.map((question, qIndex: number) => {
+          const budgetKey = String(question.uiKey || qIndex);
+          const budgetOpen = this.state.activeQuadraticBudgetKey === budgetKey;
+          const voiceCredits = Number(question.voiceCredits ?? 99);
+          const budgetPanelId = `quadratic-budget-panel-${budgetKey}`;
           const questionTags = normalizeTagList(question.tags);
           const aiSourceTags = normalizeTagList(question.aiGeneratedTagsFromSource);
           // Logic to determine if the "Magic Wand" (Generate Tags) button should be visible
@@ -3621,14 +3637,51 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                       </Button>
                     </div>
                   ))}
-                  {(question.type === 'quadratic' || (question.options || []).length < 10) && (
-                    <Button
-                      className={styles.addOptionButton}
-                      data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_OPTION}
-                      onClick={() => this.addOption(qIndex)}
-                    >
-                      <FontAwesomeIcon icon={faPlus} /> Add Option
-                    </Button>
+                  <div className={styles.optionActions}>
+                    {(question.type === 'quadratic' || (question.options || []).length < 10) && (
+                      <Button
+                        className={styles.addOptionButton}
+                        data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_OPTION}
+                        onClick={() => this.addOption(qIndex)}
+                      >
+                        <FontAwesomeIcon icon={faPlus} /> Add Option
+                      </Button>
+                    )}
+                    {question.type === 'quadratic' && (
+                      <button
+                        type="button"
+                        className={styles.creditsToggle}
+                        data-testid="ce-quadratic-author-budget-toggle"
+                        aria-expanded={budgetOpen}
+                        aria-controls={budgetPanelId}
+                        onClick={() => this.setState({
+                          activeQuadraticBudgetKey: budgetOpen ? '' : budgetKey,
+                          quadraticBudgetSliderMax: Math.max(999, voiceCredits),
+                        })}
+                      >
+                        {`Credits: ${voiceCredits}`}
+                      </button>
+                    )}
+                  </div>
+                  {question.type === 'quadratic' && budgetOpen && (
+                    <div id={budgetPanelId} className={styles.creditsPanel}>
+                      <label htmlFor={`quadratic-budget-${budgetKey}`}>Voice credits per respondent for this question</label>
+                      <div className={styles.creditsSliderRow}>
+                        <span aria-hidden="true">1</span>
+                        <input
+                          id={`quadratic-budget-${budgetKey}`}
+                          type="range"
+                          min="1"
+                          max={this.state.quadraticBudgetSliderMax}
+                          step="1"
+                          value={voiceCredits}
+                          data-testid="ce-quadratic-author-budget"
+                          onChange={(event) => this.handleQuestionChange(qIndex, 'voiceCredits', Number(event.target.value))}
+                        />
+                        <span aria-hidden="true">{this.state.quadraticBudgetSliderMax}</span>
+                      </div>
+                      <p>Votes cost their square; unused credits are allowed.</p>
+                    </div>
                   )}
                   {/* Single-select limits multichoice answers to one option. */}
                   {question.type === 'multichoice' && <div className={styles.singleSelectToggle}>
@@ -3656,11 +3709,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                         Single-select limits respondents to one option. Multi-select allows multiple choices.
                       </CETooltip>
                     </label>
-                  </div>}
-                  {question.type === 'quadratic' && <div>
-                    <label htmlFor={`quadratic-budget-${question.uiKey || qIndex}`}>Voice credits per respondent</label>
-                    <Input id={`quadratic-budget-${question.uiKey || qIndex}`} type="number" min="1" step="1" value={Number(question.voiceCredits ?? 99)} data-testid="ce-quadratic-author-budget" onChange={(event: CreateSurveyInputValueEvent) => this.handleQuestionChange(qIndex, 'voiceCredits', Number(event.target.value))} />
-                    <p>At least two distinct options. Votes cost their square; unused credits are allowed.</p>
                   </div>}
                 </div>
               )}

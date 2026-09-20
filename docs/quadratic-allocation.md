@@ -2,8 +2,12 @@
 
 Choose **Quadratic allocation** when creating a standalone question or adding a
 question to a survey. Provide at least two distinct, nonblank option labels and
-set **Voice credits per respondent** to a positive whole number. The default is
-99 credits for each question, independently of every other question.
+use **Credits: 99** beside **Add Option** to reveal the custom-budget slider.
+The default is 99 credits per respondent for each question, independently of every
+other question. The slider selects whole numbers from 1 to 999; existing larger
+budgets extend that range. Click the credits control again to hide the slider.
+The question-type picker previews negative and positive votes with horizontal
+bars around zero. Existing drafts and generated questions retain custom budgets.
 
 Respondents assign signed whole-number votes to each option. Positive votes
 support an option; negative votes oppose it; zero is neutral. An option costs the
@@ -75,8 +79,18 @@ authors a question with the default budget, while the Mini App exposes the budge
 field. Telegram aggregates respect the session's existing results exposure and
 participant-filter settings.
 
-AI-generated custom budgets remain editable in the authoring form. Tag generation
-includes the allocation's option labels. Listening-mode generation includes custom
+AI-generated custom budgets remain editable in the authoring form.
+Interview prediction accepts budget-valid signed vote arrays, including neutral
+allocations. Review uses the same allocation sliders as the question pile and
+preserves numeric votes and the original prediction when the respondent edits and
+submits. When interview question suggestions are enabled, the model can propose
+quadratic questions for competing priorities, with distinct options, tags, and a
+99-credit default (or a requested custom budget). Invalid predicted allocations
+or question budgets are rejected before review.
+Questions discovered during an ongoing interview retain their option order and
+budget in the voice context and review controls, even before the pile cache refreshes.
+
+Tag generation includes the allocation's option labels. Listening-mode generation includes custom
 budgets in question identity. Tag previews, simulated profiles, and demo question
 and response adapters retain ordered options and custom budgets. Telegram draft
 and submitted-answer history restore numeric allocations without converting them

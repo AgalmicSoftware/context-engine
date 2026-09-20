@@ -3312,11 +3312,12 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   if (!engine.props.loginComplete) return { status: 'login-required' as const };
                   return { status: 'failed' as const, message: 'Submission did not complete.' };
                 }}
-                renderAnswerInput={(questionId, value, onAnswerChange) =>
+                renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion) =>
                   engine.renderPileResponseInput({
+                    // The live interview catalog can discover questions before the pile cache does.
                     question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
                       (question: { id: string }) => question.id === questionId,
-                    ) || { id: questionId, type: 'freeform' },
+                    ) || interviewQuestion || { id: questionId, type: 'freeform' },
                     answer: { value },
                     onAnswerChange,
                     inputNamePrefix: 'interview-draft',

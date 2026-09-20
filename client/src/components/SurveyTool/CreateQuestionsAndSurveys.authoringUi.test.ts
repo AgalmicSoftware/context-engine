@@ -286,10 +286,66 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       type: 'quadratic', options, voiceCredits: budget,
       id: instance.generateQuestionId('quadratic', 'Allocate support', options, false, budget),
     });
+    const [budgetToggle] = collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    expect(treeHasText(budgetToggle, `Credits: ${budget}`)).toBe(true);
+    expect(budgetToggle.props['aria-expanded']).toBe(false);
+    expect(collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')).toHaveLength(0);
+    budgetToggle.props.onClick();
     const budgetInputs = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
     expect(budgetInputs).toHaveLength(1);
     expect(budgetInputs[0].props.value).toBe(budget);
+  });
+
+  it('starts each quadratic question from the type picker with its own 99-credit budget', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.setState({ showAutoTool: false, questions: [] });
+    const [button] = collectTreeNodes(instance.renderTypeSelector(),
+      (node) => node?.props?.['aria-label'] === 'Add Quadratic allocation question');
+
+    button.props.onClick();
+    instance.handleQuestionChange(0, 'voiceCredits', 25);
+    button.props.onClick();
+
+    expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 99]);
+    const toggles = collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    expect(treeHasText(toggles[0], 'Credits: 25')).toBe(true);
+    expect(treeHasText(toggles[1], 'Credits: 99')).toBe(true);
+    toggles[1].props.onClick();
+    const [slider] = collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
+    expect(slider.props).toMatchObject({ type: 'range', min: '1', step: '1', value: 99 });
+    slider.props.onChange({ target: { value: '144' } });
+    expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 144]);
+    const updatedToggles = collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    expect(treeHasText(updatedToggles[1], 'Credits: 144')).toBe(true);
+    updatedToggles[1].props.onClick();
+    expect(collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')).toHaveLength(0);
+    expect(instance.state.questions[1].voiceCredits).toBe(144);
+  });
+
+  it('keeps a larger saved budget within a stable slider range while editing', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.setState({ showAutoTool: false, questions: [
+      { uiKey: 'large-budget', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 2500 },
+    ] });
+    const [toggle] = collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    toggle.props.onClick();
+    const getSlider = () => collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')[0];
+    expect(getSlider().props).toMatchObject({ value: 2500, max: 2500 });
+    getSlider().props.onChange({ target: { value: '1200' } });
+    expect(getSlider().props).toMatchObject({ value: 1200, max: 2500 });
   });
 
   it('hides survey/question gate controls when the active session exposes no selectable gates', () => {

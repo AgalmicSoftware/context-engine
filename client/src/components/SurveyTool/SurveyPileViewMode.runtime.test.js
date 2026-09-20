@@ -52,19 +52,22 @@ jest.mock('./SessionListeningPanel', () => {
   };
 });
 
+let mockVoiceModeProps;
 jest.mock('./SessionVoiceModeModal', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: (props) =>
-      props.isOpen
+    default: (props) => {
+      mockVoiceModeProps = props;
+      return props.isOpen
         ? React.createElement('div', {
             'data-testid': 'mock-voice-mode-modal',
             'data-mode': props.mode || 'chooser',
             'data-prefill-model': props.prefillPacket?.source?.modelId || '',
             'data-prefill-confidence': String(props.prefillPacket?.responses?.[0]?.confidence ?? ''),
           })
-        : null,
+        : null;
+    },
   };
 });
 
@@ -447,6 +450,18 @@ describe('SurveyPileViewMode runtime surface', () => {
     renderPile({}, { route: '/session/demo?mode=recordGroup' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'recordGroup');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
+  });
+
+  it('renders newly discovered quadratic interview questions before the pile cache catches up', async () => {
+    renderPile({}, { route: '/session/demo?mode=interview' });
+    await screen.findByTestId('mock-voice-mode-modal');
+    const question = { id: 'live-quadratic', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 };
+    const onChange = jest.fn();
+    render(mockVoiceModeProps.renderAnswerInput(question.id, [3, -4], onChange, question));
+    expect(screen.getByRole('slider', { name: 'Parks' })).toHaveValue('3');
+    expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+    fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
+    expect(onChange).toHaveBeenCalledWith([3, -2]);
   });
 
   it('keeps an imported prefill through initialization and clears it only after mount', async () => {

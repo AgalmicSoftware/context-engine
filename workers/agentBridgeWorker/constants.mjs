@@ -150,6 +150,7 @@ export const QUESTION_TYPES = Object.freeze({
   AGREE_UNSURE_DISAGREE: 'agree_unsure_disagree',
   RATING: 'rating',
   MULTICHOICE: 'multichoice',
+  QUADRATIC: 'quadratic',
 });
 
 export const DEFAULT_RATING_SCALE = Object.freeze({

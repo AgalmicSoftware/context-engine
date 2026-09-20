@@ -1,4 +1,5 @@
 import { callAI } from '../../utilities/ai/aiClient.js';
+import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 jest.mock('../../utilities/ai/aiClient.js', () => ({ callAI: jest.fn() }));
 import {
   buildExternalInterviewKickoff,
@@ -338,7 +339,7 @@ it('returns reviewable novel question drafts only when enabled', async () => {
   });
   expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Session default tags: ["governance"]');
   expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Prefer policy questions.');
-  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('freeform|rating|multichoice|binary');
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('freeform|rating|multichoice|binary|quadratic');
   expect(onSuggestedQuestions).toHaveBeenCalledWith([
     expect.objectContaining({
       type: 'multichoice',
@@ -348,4 +349,46 @@ it('returns reviewable novel question drafts only when enabled', async () => {
     }),
     expect.objectContaining({ type: 'rating', prompt: 'How ready is the team?' }),
   ]);
+});
+
+it('predicts valid quadratic allocations using each question budget and rejects malformed or overspent votes', async () => {
+  const questions = normalizeInterviewQuestions([
+    { id: 'q-budget', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 },
+    { id: 'q-neutral', type: 'quadratic', prompt: 'Other projects', options: ['Housing', 'Roads'] },
+  ]);
+  jest.mocked(callAI).mockResolvedValue(JSON.stringify({ responses: [
+    { questionId: 'q-budget', answer: [3, -4], confidence: 0.6, evidence: 'Priorities expressed in the transcript.' },
+    { questionId: 'q-neutral', answer: [0, 0], confidence: 1 },
+  ] }));
+  const result = await mapInterviewEvidenceToResponses({ questions, transcript: 'Responder: I support parks and oppose transit spending.' });
+  expect(result.map(({ answer }) => answer)).toEqual([[3, -4], [0, 0]]);
+  const prompt = jest.mocked(callAI).mock.calls.at(-1)?.[0];
+  expect(prompt).toContain('signed integer array in option order');
+  expect(prompt).toContain('"voiceCredits":25');
+  expect(prompt).toContain('"voiceCredits":99');
+  for (const answer of [[4, -4], [3.5, 0], ['3', '-4'], [3], '3,-4']) {
+    expect(parseInterviewDraftResponses(JSON.stringify({ responses: [{ questionId: 'q-budget', answer, confidence: 1 }] }), questions)).toEqual([]);
+  }
+});
+
+it('recommends quadratic questions with options, tags, valid budgets, and budget-aware identities', async () => {
+  const onSuggestedQuestions = jest.fn();
+  jest.mocked(callAI).mockResolvedValue(JSON.stringify({ responses: [], questions: [
+    { questionType: 'quadratic', prompt: 'Invalid budget', options: ['A', 'B'], voiceCredits: -1 },
+    { questionType: 'quadratic', prompt: 'Invalid choices', options: ['Only', 'only'], voiceCredits: 99 },
+    { questionType: 'quadratic', prompt: 'Fractional budget', options: ['A', 'B'], voiceCredits: 2.5 },
+    { questionType: 'quadratic', prompt: 'Allocate project support', options: [' Parks ', 'Transit'], tags: [' priorities ', 'priorities'] },
+    { questionType: 'quadratic', prompt: 'Allocate project opposition', options: ['Roads', 'Housing'], voiceCredits: 25, tags: ['planning'] },
+  ] }));
+  await mapInterviewEvidenceToResponses({
+    questions: [{ id: 'q1', type: 'freeform', prompt: 'What matters?', options: [] }],
+    transcript: 'Responder: We should compare support and opposition for local projects.',
+    sessionConfig: { interviewMode: { suggestQuestions: true } },
+    onSuggestedQuestions,
+  });
+  expect(onSuggestedQuestions).toHaveBeenCalledWith([
+    { id: generateQuestionId('quadratic', 'Allocate project support', ['Parks', 'Transit'], false, 99), type: 'quadratic', prompt: 'Allocate project support', options: ['Parks', 'Transit'], voiceCredits: 99, tags: ['priorities'] },
+    { id: generateQuestionId('quadratic', 'Allocate project opposition', ['Roads', 'Housing'], false, 25), type: 'quadratic', prompt: 'Allocate project opposition', options: ['Roads', 'Housing'], voiceCredits: 25, tags: ['planning'] },
+  ]);
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Use quadratic when the responder raises competing priorities');
 });

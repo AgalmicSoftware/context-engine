@@ -332,7 +332,7 @@ function normalizeTelegramAnswer(answer = {}) {
     const value = safeString(source[key]);
     if (value) out[key] = value;
   });
-  if (hasOwn(source, 'value')) out.value = safeJsonScalar(source.value);
+  if (hasOwn(source, 'value')) out.value = source.questionType === 'quadratic' && Array.isArray(source.value) ? source.value.map(safeJsonScalar) : safeJsonScalar(source.value);
   if (Array.isArray(source.values)) {
     out.values = source.values.map(safeJsonScalar).filter((value) => safeString(value));
   }

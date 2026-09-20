@@ -3,6 +3,7 @@ import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faRobot, faTimes } from '@fortawesome/free-solid-svg-icons';
 import BinaryChoiceInput from './BinaryChoiceInput';
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -11,7 +12,7 @@ import type { InterviewDraftResponse, InterviewQuestion } from './sessionIntervi
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
-  renderAnswerInput?: (questionId: string, value: unknown, onChange: (value: unknown) => void) => React.ReactNode;
+  renderAnswerInput?: (questionId: string, value: unknown, onChange: (value: unknown) => void, question?: InterviewQuestion) => React.ReactNode;
   renderAdditionalInput?: (questionId: string, value: string, onChange: (value: string) => void) => React.ReactNode;
   renderFieldLock?: (questionId: string, field: 'answer' | 'additional') => React.ReactNode;
 };
@@ -186,7 +187,7 @@ const DraftEditableText = ({
 
 const isNativeAnswerType = (question?: InterviewQuestion): boolean => {
   const type = String(question?.type || '').toLowerCase();
-  return type === 'binary' || type === 'rating' || type === 'multichoice' || type === 'multiple-choice';
+  return type === 'binary' || type === 'rating' || type === 'multichoice' || type === 'multiple-choice' || type === 'quadratic';
 };
 
 export default function SessionInterviewDraftCard({
@@ -246,7 +247,16 @@ export default function SessionInterviewDraftCard({
       <div className={styles.questionText}>{prompt}</div>
       <div className={styles.editorStack}>
         {useNativeAnswer && renderAnswerInput ? (
-          renderAnswerInput(draft.questionId, answerValue, onAnswerChange)
+          renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question)
+        ) : question?.type === 'quadratic' ? (
+          <QuadraticAllocationInput
+            questionId={draft.questionId}
+            options={question.options}
+            voiceCredits={question.voiceCredits}
+            value={answerValue}
+            onChange={onAnswerChange}
+            disabled={disabled}
+          />
         ) : question?.type === 'binary' ? (
           <BinaryChoiceInput
             questionId={draft.questionId}
