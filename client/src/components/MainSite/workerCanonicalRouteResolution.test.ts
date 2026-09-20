@@ -1,9 +1,12 @@
 import {
   resolveMainSiteAdminWorkerRoute,
+  resolveMainSiteGroupWorkerRoute,
   resolveMainSiteSessionRouteForRender,
 } from './workerCanonicalRouteResolution';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts';
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 const controller: WorkerCanonicalRouteController = {
   getActiveVerifiedConfig: () => null,
@@ -14,8 +17,45 @@ const controller: WorkerCanonicalRouteController = {
 };
 
 describe('workerCanonicalRouteResolution', () => {
+  beforeEach(() => localStorage.clear());
   afterEach(() => {
+    localStorage.clear();
     jest.restoreAllMocks();
+  });
+
+  it('uses only the matching cached Worker as a hint and requires live verification', () => {
+    const workerOrigin = 'https://group-worker.example';
+    const config = {
+      slug: 'group-worker',
+      sessionId: '0x11111111111111111111111111111111',
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    upsertWorkerCanonicalSessionBootstrap({ slug: config.slug, sessionIdHex: config.sessionId, workerOrigin, config });
+    const options = { searchStr: '', workerSessionSlug: config.slug, sessionConfig: null, controller };
+    expect(resolveMainSiteGroupWorkerRoute(options)).toMatchObject({ kind: 'bootstrap', workerOrigin, sessionConfig: null });
+    expect(resolveMainSiteGroupWorkerRoute({ ...options, workerSessionSlug: 'other-session' }).kind).toBe('standard');
+    expect(resolveMainSiteGroupWorkerRoute({ ...options, searchStr: '?worker=' }).kind).toBe('error');
+    expect(resolveMainSiteGroupWorkerRoute({ ...options, searchStr: '?worker=https%3A%2F%2Fexplicit.example' }))
+      .toMatchObject({ kind: 'bootstrap', workerOrigin: 'https://explicit.example' });
+    expect(resolveMainSiteGroupWorkerRoute({ ...options, sessionConfig: { slug: config.slug, __registry: { chainId: 1 } } }).kind)
+      .toBe('standard');
+  });
+
+  it('does not choose between conflicting cached Worker identities for a clean link', () => {
+    const makeRecord = (sessionIdHex: string, workerOrigin: string) => ({
+      slug: 'ambiguous-worker', sessionIdHex, registryChainId: 0, authorityMode: 'worker_canonical',
+      workerOrigin, config: { corsWorkerUrl: workerOrigin }, canonicalConfig: { slug: 'ambiguous-worker' },
+    });
+    localStorage.setItem('ce:sessionWorkerConfigCache:v1', JSON.stringify({
+      v: 3,
+      bySession: {
+        first: makeRecord('0x11111111111111111111111111111111', 'https://first.example'),
+        second: makeRecord('0x22222222222222222222222222222222', 'https://second.example'),
+      },
+    }));
+    expect(resolveMainSiteGroupWorkerRoute({ searchStr: '', workerSessionSlug: 'ambiguous-worker', sessionConfig: null, controller }))
+      .toMatchObject({ kind: 'error', sessionConfig: null });
   });
 
   it('treats an explicit empty Worker discovery record as a Worker error', () => {

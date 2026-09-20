@@ -7,7 +7,7 @@ import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';
 import LazyFallbackRaw from '../Shared/LazyFallback';
-import InitialRouteBoundaryRaw from '../ErrorBoundary/InitialRouteBoundary';
+import InitialRouteBoundaryRaw, { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -74,6 +74,7 @@ import {
   renderMissingMainSiteSessionConfig,
   renderUnresolvedMainSiteSessionId,
   resolveMainSiteAdminWorkerRoute,
+  resolveMainSiteGroupWorkerRoute,
   resolveMainSiteSessionRouteForRender,
 } from './workerCanonicalRouteResolution.js';
 import {
@@ -373,20 +374,27 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const workerGroupId = readWorkerGroupIdFromPath(fullPath);
     const allSessionsMode = !routeSessionSlug;
     let routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
-    if (routeSessionSlug && new URLSearchParams(searchStr).has('worker')) {
-      // Group pages opened in a new tab need the same verified discovery as
-      // their session; an in-memory config from the opener is not available.
-      const controller = getWorkerCanonicalRouteController(host);
-      const workerRoute = resolveMainSiteSessionRouteForRender({
-        sessionTokenRaw: routeSessionSlug,
-        searchStr,
-        controller,
-        resolveSessionSlugFromPathToken: (token) => token,
-      });
-      const interruption =
-        renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
-      if (interruption) return interruption;
-      routeSessionConfig = workerRoute.sessionConfig;
+    const controller = getWorkerCanonicalRouteController(host);
+    const workerRoute = resolveMainSiteGroupWorkerRoute({
+      workerSessionSlug: routeSessionSlug,
+      sessionConfig: routeSessionConfig,
+      searchStr,
+      controller,
+    });
+    const interruption =
+      renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
+    if (interruption) return interruption;
+    if (workerRoute.kind === 'verified') routeSessionConfig = workerRoute.sessionConfig;
+    if (workerGroupId && workerRoute.kind === 'standard') {
+      return (
+        <>
+          <MainSiteRouteStatusView
+            heading="Group unavailable"
+            message="Open this group from its session, or use the full shared link so this browser can find the session."
+          />
+          <BootRecoveryReady />
+        </>
+      );
     }
     return (
       <InitialRouteBoundary fallback={<LazyFallback label={`Loading ${t('sbts')}...`} />} resetKey={fullPath}>

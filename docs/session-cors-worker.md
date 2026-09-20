@@ -1016,6 +1016,13 @@ the expanded Group detail page builds this session link from the actual Group
 ID and includes the validated public `worker` origin so fresh browsers can
 discover the session. Ordinary Group and back-to-list links preserve this public
 Worker origin too, so expanded pages can verify the session in a fresh tab.
+Older Group links without `worker` recover an unambiguous, previously cached
+Worker origin for that exact session and verify its identity again before
+rendering. Cloudflare Group pages use Group loading states, never SBT block-scan
+progress. A named Group with no discoverable session shows an unavailable state
+instead of the on-chain list; a browser that has never opened the session needs
+the full shared link. Cached hints never override an explicit Worker URL or an
+exact configured registry session.
 The ordinary Group link still opens its details without joining. The
 auto-join link contains no credential and is shareable by anyone who can see
 the Group; it is a convenience for open joining, not proof of event attendance

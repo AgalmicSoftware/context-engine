@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
   completed or cancelled intent. A compact notice names the Group
   before sign-in and offers cancellation alongside the status.
   Group detail links preserve public Worker discovery across new tabs.
+  Older clean Group links re-verify cached Worker discovery and show the full
+  Group page instead of falling back to SBT block-scan progress.
 
 - Refreshed About functionality copy with accounts, gated content, and interviews.
   Added collapsible related-work and recognition sections with project-specific

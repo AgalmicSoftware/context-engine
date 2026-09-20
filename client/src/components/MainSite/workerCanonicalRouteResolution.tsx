@@ -8,7 +8,11 @@ import {
   getSessionConfigBySlug,
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
-import { getVerifiedWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache.js';
+import {
+  getVerifiedWorkerCanonicalSessionBootstrap,
+  readSessionWorkerConfigCache,
+} from '../../utilities/session/sessionWorkerConfigCache.js';
+import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection.js';
 import {
   parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
@@ -238,6 +242,36 @@ export const resolveMainSiteAdminWorkerRoute = ({
     requireSessionSlug: true,
     getVerifiedConfig,
   });
+};
+
+export const resolveMainSiteGroupWorkerRoute = ({
+  searchStr,
+  workerSessionSlug,
+  sessionConfig,
+  controller,
+}: ResolveWorkerRouteStateOptions & { sessionConfig: unknown }): WorkerCanonicalRouteState => {
+  const options = { searchStr, workerSessionSlug, controller };
+  if (new URLSearchParams(searchStr).has('worker') || !workerSessionSlug) return resolveWorkerRouteState(options);
+  const slug = normalizeSessionSlug(workerSessionSlug);
+  const exactConfig =
+    isRecord(sessionConfig) && normalizeSessionSlug(sessionConfig.slug) === slug ? sessionConfig : null;
+  // An exact configured registry session takes precedence over old local hints.
+  if (exactConfig && !claimsWorkerCanonicalAuthority(exactConfig)) return emptyWorkerRouteState();
+  const records = Object.values(readSessionWorkerConfigCache().bySession).filter(
+    (record) => record.authorityMode === 'worker_canonical' && normalizeSessionSlug(record.slug) === slug,
+  );
+  if (!exactConfig && records.length > 1) {
+    return {
+      ...emptyWorkerRouteState(),
+      kind: 'error',
+      error: 'Several Workers match this session. Open the original session link to choose the correct one.',
+    };
+  }
+  const origin = exactConfig?.corsWorkerUrl || (records.length === 1 ? records[0].workerOrigin : '');
+  if (!origin && !exactConfig) return emptyWorkerRouteState();
+  // Persisted config is only a discovery hint. Every fresh page must fetch and
+  // verify the Worker identity before rendering groups or authorizing actions.
+  return resolveWorkerRouteState({ ...options, searchStr: `?worker=${encodeURIComponent(String(origin || ''))}` });
 };
 
 export const resolveMainSiteSessionRouteForRender = ({

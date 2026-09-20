@@ -6,8 +6,12 @@ import store from '../store';
 import { LOGIN_ACCOUNT } from '../actions/types';
 import OnePageSession from '../components/OnePageSession/OnePageSession';
 import WorkerGroupAutoJoin from '../components/OnePageSession/WorkerGroupAutoJoinHost';
-import WorkerGroupMembershipPanel from '../components/OnePageSession/WorkerGroupMembershipPanel';
-import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../utilities/session/sessionModeProfile';
+import {
+  cloneSessionModePreset,
+  compileSessionModeProfile,
+  SESSION_MODE_PRESET_IDS,
+} from '../utilities/session/sessionModeProfile';
+import { upsertWorkerCanonicalSessionBootstrap } from '../utilities/session/sessionWorkerConfigCache';
 import { buildTokenCacheEnvelope, buildTokenCacheKey, writeTokenCache } from '../utilities/worker/workerAuthTokenCache';
 import 'assets/css/contextEngine.scss';
 
@@ -15,9 +19,16 @@ const sessionSlug = 'auto-join-smoke';
 const sessionId = '0x11111111111111111111111111111111';
 const account = '0x0000000000000000000000000000000000000001';
 const workerUrl = 'https://auto-join-worker.example';
+const publicProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+publicProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+publicProfile.encryption = { mode: 'none' };
+publicProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+publicProfile.results.visibility = 'public_full_if_storage_public';
+publicProfile.export.scope = 'all_session';
 const sessionConfig = {
   slug: sessionSlug,
   sessionId,
+  configRevision: 'smoke-1',
   sessionName: 'Auto-join smoke',
   corsWorkerUrl: workerUrl,
   defaultTags: [],
@@ -25,9 +36,15 @@ const sessionConfig = {
   defaultFeaturedSBTs: [],
   contracts: {},
   blockLimits: {},
-  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-  storageProfile: { backend: 'cloudflare', resources: { questions: 'active', surveys: 'active', responses: 'active' } },
+  sessionModeProfile: publicProfile,
+  storageProfile: compileSessionModeProfile(publicProfile).storageProfile,
 };
+upsertWorkerCanonicalSessionBootstrap({
+  slug: sessionSlug,
+  sessionIdHex: sessionId,
+  workerOrigin: workerUrl,
+  config: sessionConfig,
+});
 const noop = () => {};
 
 function SmokeSession() {
@@ -67,17 +84,6 @@ function SmokeSession() {
       <Link to="/about">Navigate away before signing in</Link>
       {location.pathname === '/about' ? (
         <p>Another page</p>
-      ) : location.pathname === '/group/participants-2026' ? (
-        <WorkerGroupMembershipPanel
-          allowAnonymousGroupDiscovery={true}
-          canReadGroups={true}
-          workerUrl={workerUrl}
-          sessionId={sessionId}
-          sessionSlug={sessionSlug}
-          sessionConfig={sessionConfig}
-          selectedGroupId="participants-2026"
-          onSignIn={signIn}
-        />
       ) : (
         <OnePageSession
           account={signedIn ? account : ''}
