@@ -2,6 +2,7 @@ import React from 'react';
 
 import { getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
 import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
@@ -270,16 +271,19 @@ export const renderSurveyResultsRenderSurface = ({
     cacheControllerSnapshot.cacheReadinessInput,
   );
   const filterInput = cacheControllerSnapshot.filterInput;
-  const syncStatusNode = renderSurveyResultsSyncStatusPanel({
-    syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
-    syncDetailsOpen: !!state.syncDetailsOpen,
-    syncDetailsStyle: displayStyles.resolveSyncDetailsStyle(state.syncDetailsOpen),
-    onToggleSyncDetails,
-    onManualRefresh: () => handleManualRefresh(),
-    miniBarSpinnerStyle: displayStyles.miniBarSpinnerStyle,
-    miniProgressStyle: displayStyles.miniProgressStyle,
-    remainingSpinnerStyle: displayStyles.remainingSpinnerStyle,
-  });
+  const showBlockSyncStatus = !resolveSessionCapabilityProjection(props.sessionConfig).isWorkerCanonical;
+  const syncStatusNode = showBlockSyncStatus
+    ? renderSurveyResultsSyncStatusPanel({
+        syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
+        syncDetailsOpen: !!state.syncDetailsOpen,
+        syncDetailsStyle: displayStyles.resolveSyncDetailsStyle(state.syncDetailsOpen),
+        onToggleSyncDetails,
+        onManualRefresh: () => handleManualRefresh(),
+        miniBarSpinnerStyle: displayStyles.miniBarSpinnerStyle,
+        miniProgressStyle: displayStyles.miniProgressStyle,
+        remainingSpinnerStyle: displayStyles.remainingSpinnerStyle,
+      })
+    : null;
   const filterControlsNode = (
     <>
       {workerGroupFilterNotice}

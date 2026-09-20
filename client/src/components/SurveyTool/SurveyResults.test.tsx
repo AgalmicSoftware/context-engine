@@ -25,6 +25,7 @@ import { renderSurveyResults } from './surveyResultsTestHarness';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
@@ -831,6 +832,31 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     expect(screen.getByText('Responses:')).toBeInTheDocument();
     expect(screen.queryByText('In Sync')).toBeNull();
     expect(screen.getByLabelText('Refresh sync data')).toBeInTheDocument();
+  });
+
+  it('omits block-sync controls for authoritative Worker-canonical question results', async () => {
+    installCacheFixtures({});
+    mockLatestBlock(0);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+      sessionConfig: {
+        slug: 'edge',
+        networkChainId: 11155420,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+    });
+
+    expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Toggle sync details')).toBeNull();
+    expect(screen.queryByText('Loading...')).toBeNull();
+    expect(screen.queryByText('Questions:')).toBeNull();
+    expect(screen.queryByText('Responses:')).toBeNull();
+    expect(screen.queryByLabelText('Refresh sync data')).toBeNull();
+    expect(screen.queryByText('Refresh Now')).toBeNull();
   });
 
   it('renders question and response tracks while question-mode polling is stale', async () => {
