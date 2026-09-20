@@ -134,8 +134,9 @@ describe('workerCanonicalRouteResolution', () => {
       searchStr: '?mode=interview',
       controller: verifiedController,
       resolveSessionSlugFromPathToken: (token) => token,
-      getVerifiedConfig: ({ slug, workerOrigin }) =>
-        slug === 'demo-interview-5' && workerOrigin === 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev'
+      getVerifiedConfig: (input) =>
+        input?.slug === 'demo-interview-5' &&
+        input.workerOrigin === 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev'
           ? liveConfig
           : null,
     });

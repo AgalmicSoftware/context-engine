@@ -146,6 +146,48 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(instance.state.questions[1]).toMatchObject({ prompt: 'New?', tags: ['new'] });
   });
 
+  it('appends listening-mode preformed questions without undoing edits and removes submitted drafts', () => {
+    const original = { id: 'q1', type: 'freeform', prompt: 'Original?', tags: ['original'] };
+    const removed = { id: 'q2', type: 'freeform', prompt: 'Removed?' };
+    const added = { id: 'q3', type: 'freeform', prompt: 'New?', tags: ['new'] };
+    const instance = makeInstance({
+      appendPreformedQuestions: true,
+      preformedQuestions: [original, removed],
+      preformedMode: 'questions',
+    });
+    instance.setState({
+      questions: [
+        { ...original, prompt: 'My edited question?', tags: ['manual'] },
+        { ...removed, prompt: 'Still visible before upload?' },
+      ],
+      questionsAddedSuccessfully: true,
+      uploadedQuestions: [{ questionId: 'q2' }],
+    });
+    const prevProps = instance.props;
+    const prevState = instance.state;
+    Object.assign(instance, { props: { ...prevProps, preformedQuestions: [original, removed, added] } });
+
+    instance.componentDidUpdate(prevProps, prevState);
+
+    expect(instance.state.questions.map(({ id }) => id)).toEqual(['q1', 'q3']);
+    expect(instance.state.questions[0]).toMatchObject({ prompt: 'My edited question?', tags: ['manual'] });
+    expect(instance.state.questions[1]).toMatchObject({ prompt: 'New?', tags: ['new'] });
+  });
+
+  it('prunes uploaded question IDs from append-mode drafts after submit success', () => {
+    const instance = makeInstance({ appendPreformedQuestions: true, preformedMode: 'questions' });
+    instance.setState({
+      questions: [
+        { id: 'q1', type: 'freeform', prompt: 'Uploaded already?' },
+        { id: 'q2', type: 'freeform', prompt: 'Still a draft?' },
+      ],
+    });
+
+    instance.removeUploadedQuestionDrafts([{ questionId: 'Q1' }]);
+
+    expect(instance.state.questions.map(({ id }) => id)).toEqual(['q2']);
+  });
+
   it('renders the survey/questions toggle immediately on initial load', () => {
     const instance = makeInstance();
 

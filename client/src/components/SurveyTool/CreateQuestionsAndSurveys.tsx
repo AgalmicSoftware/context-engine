@@ -498,6 +498,7 @@ interface CreateQuestionsAndSurveysProps {
   } | null;
   preformedMode?: 'questions' | 'survey';
   interviewQuestionReview?: boolean;
+  appendPreformedQuestions?: boolean;
   questionSubmitLabel?: string;
   submitClassName?: string;
   miniaturized?: boolean;
@@ -1072,7 +1073,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
-    if (this.props.interviewQuestionReview && prevProps.preformedQuestions !== this.props.preformedQuestions) {
+    const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
+    if (shouldAppendPreformedQuestions && prevProps.preformedQuestions !== this.props.preformedQuestions) {
       const previousIds = new Set(
         (prevProps.preformedQuestions || []).map((question) => question.id || question.prompt),
       );
@@ -1081,19 +1083,35 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       );
       if (added.length) {
         // Append new suggestions without resetting edited prompts/tags or restoring removed questions.
-        this.setState((state) => ({
-          questions: [
-            ...state.questions,
-            ...added.map((question) => ({
-              ...question,
-              uiKey: question.uiKey || `interview-${question.id}`,
-              tags: normalizeTagList(question.tags),
-              aiGeneratedTagsFromSource: normalizeTagList(question.tags),
-              currentTagInputValue: '',
-              isGeneratingTags: false,
-            })),
-          ],
-        }));
+        // If the user uploads a batch and then records more, keep the success links while removing
+        // already-uploaded IDs from the editable draft list so the next submit only contains new drafts.
+        this.setState((state) => {
+          const uploadedQuestionIds = new Set(
+            (state.uploadedQuestions || [])
+              .map((entry) =>
+                String(entry?.questionId || '')
+                  .trim()
+                  .toLowerCase(),
+              )
+              .filter(Boolean),
+          );
+          const baseQuestions = uploadedQuestionIds.size
+            ? state.questions.filter((question) => !uploadedQuestionIds.has(String(question?.id || '').toLowerCase()))
+            : state.questions;
+          return {
+            questions: [
+              ...baseQuestions,
+              ...added.map((question) => ({
+                ...question,
+                uiKey: question.uiKey || `preformed-${question.id || question.prompt}`,
+                tags: normalizeTagList(question.tags),
+                aiGeneratedTagsFromSource: normalizeTagList(question.tags),
+                currentTagInputValue: '',
+                isGeneratingTags: false,
+              })),
+            ],
+          };
+        });
       }
     }
     // Keep documentURLs synced from props if they change externally (e.g. AudioSurveyGenerator generation)
@@ -1938,6 +1956,24 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this._cacheWatchCheckNow = null;
   };
 
+  removeUploadedQuestionDrafts = (uploadedQuestions: unknown): void => {
+    const uploadedQuestionIds = new Set(
+      (Array.isArray(uploadedQuestions) ? uploadedQuestions : [])
+        .map((entry) =>
+          String((entry as CreateQuestionsAndSurveysUploadedQuestion)?.questionId || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    );
+    if (!uploadedQuestionIds.size) return;
+    this.setState((state: CreateQuestionsAndSurveysState) => ({
+      questions: state.questions.filter(
+        (question) => !uploadedQuestionIds.has(String(question?.id || '').toLowerCase()),
+      ),
+    }));
+  };
+
   startCacheWatch: () => void = () => {
     this.clearCacheWatch();
 
@@ -2437,6 +2473,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             }),
             () => {
               this.startCacheWatch();
+              if (this.props.appendPreformedQuestions) {
+                this.removeUploadedQuestionDrafts(submittedQuestions);
+              }
               if (this.props.miniaturized && this.props.onUploadComplete) {
                 this.props.onUploadComplete(null);
               }

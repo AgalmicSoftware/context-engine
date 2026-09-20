@@ -3234,6 +3234,136 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionListeningPanelEmbedded .sessionListeningCreateWrap {
+  :global([class*='createSurveyContainer']) {
+    background: transparent !important;
+    color: var(--ce-panel-text) !important;
+    box-shadow: none !important;
+  }
+
+  h3,
+  h4,
+  label,
+  strong,
+  :global([class*='toggleLabel']),
+  :global([class*='inheritToggle']),
+  :global([class*='optionItem']),
+  :global([class*='singleSelectLabel']),
+  :global([class*='questionMetadata']),
+  :global([class*='tagsManagerContainer']),
+  :global([class*='questionId']),
+  :global([class*='surveyIdPreview']),
+  :global([class*='aiPromptMeta']),
+  :global([class*='uploadedQuestionsList']) {
+    color: var(--ce-panel-text) !important;
+    opacity: 1 !important;
+  }
+
+  :global([class*='questionContainer']),
+  :global([class*='typeSelectorBlock']),
+  :global([class*='surveySubmissionConfirmation']) {
+    background: color-mix(in srgb, var(--ce-panel-text) 8%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 18%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--ce-overlay-base) 20%, transparent) !important;
+  }
+
+  :global([class*='surveyTitleInput']),
+  :global([class*='docUrlInput']),
+  :global([class*='questionPromptInput']),
+  :global([class*='optionInput']),
+  :global([class*='questionTypeSelect']),
+  :global([class*='associatedSurveyInput']),
+  :global([class*='tagInputField']),
+  :global([class*='tagsInput']) {
+    background: color-mix(in srgb, var(--ce-overlay-surface) 68%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 22%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+    caret-color: var(--ce-panel-text) !important;
+
+    &::placeholder {
+      color: color-mix(in srgb, var(--ce-panel-text) 62%, transparent) !important;
+    }
+  }
+
+  :global([class*='questionTypeText']),
+  :global([class*='typeSelectorLabel']),
+  :global([class*='typeTitle']) {
+    color: var(--ce-status-info-text) !important;
+    opacity: 1 !important;
+  }
+
+  :global([class*='typeButton']),
+  :global([class*='jsonPromptBar']) button,
+  :global([class*='tagInputGroup']),
+  :global([class*='modeSwitchButton']),
+  :global([class*='copySurveyLinkButton']),
+  :global([class*='copyQuestionIdButton']),
+  :global([class*='bookmarkQuestionButton']),
+  :global([class*='removeQuestionButton']),
+  :global([class*='removeOptionButton']),
+  :global([class*='addOptionButton']),
+  :global([class*='addTagButton']),
+  :global([class*='magicTagButton']),
+  :global([class*='clearFormButton']) {
+    background: color-mix(in srgb, var(--ce-panel-text) 10%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 24%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+    opacity: 1 !important;
+  }
+
+  :global([class*='typeButton']):hover,
+  :global([class*='jsonPromptBar']) button:hover,
+  :global([class*='jsonPromptBar']) button:focus-visible,
+  :global([class*='copySurveyLinkButton']):hover,
+  :global([class*='copyQuestionIdButton']):hover,
+  :global([class*='bookmarkQuestionButton']):hover,
+  :global([class*='addOptionButton']):hover,
+  :global([class*='addTagButton']):hover,
+  :global([class*='magicTagButton']):hover {
+    background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-info-text) 46%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  :global([class*='filterBubble']),
+  :global([class*='pill']) {
+    background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-info-text) 36%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  :global([class*='pillAgree']) {
+    background: color-mix(in srgb, var(--ce-status-success-text) 82%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 46%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
+  }
+
+  :global([class*='pillDisagree']) {
+    background: color-mix(in srgb, var(--ce-status-danger-text) 82%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-error) 44%, transparent) !important;
+    color: var(--ce-status-error) !important;
+  }
+
+  :global([class*='pillUnsure']) {
+    background: color-mix(in srgb, var(--ce-status-warning-text) 90%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-warning) 46%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
+  }
+
+  :global([class*='freeformPreview']),
+  :global([class*='ratingPreviewWrap']),
+  :global([class*='jsonDisplay']) {
+    background: color-mix(in srgb, var(--ce-overlay-surface) 58%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 18%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  a {
+    color: var(--ce-status-info-text) !important;
+  }
+}
+
 .sessionVoiceModeModal {
   display: flex;
   flex-direction: column;

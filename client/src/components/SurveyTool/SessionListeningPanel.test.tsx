@@ -4,10 +4,16 @@ import SessionListeningPanel from './SessionListeningPanel';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
+import type { ListeningQuestionGenerationResult } from './sessionListeningQuestions';
 import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
+
+let mockCreateQuestionsMountCount = 0;
 
 const mockReadThemeToken = readThemeToken as jest.MockedFunction<typeof readThemeToken>;
 const mockSubscribeThemeChanges = subscribeThemeChanges as jest.MockedFunction<typeof subscribeThemeChanges>;
+const mockGenerateQuestionsFromListeningTranscript = generateQuestionsFromListeningTranscript as jest.MockedFunction<
+  typeof generateQuestionsFromListeningTranscript
+>;
 
 jest.mock('../../utilities/audio/useRollingTranscriptionRecorder', () => ({
   useRollingTranscriptionRecorder: jest.fn(),
@@ -23,15 +29,28 @@ jest.mock('../../utilities/ui/themeRuntime', () => ({
   subscribeThemeChanges: jest.fn(() => jest.fn()),
 }));
 
-jest.mock('./CreateQuestionsAndSurveys', () => (props: any) => (
-  <div
-    data-testid="mock-create-questions"
-    data-title={props.preformedSurvey?.title || ''}
-    data-count={props.preformedQuestions?.length || 0}
-    data-mode={props.preformedMode || ''}
-    data-doc-urls={(props.documentURLs || []).join(',')}
-  />
-));
+jest.mock('./CreateQuestionsAndSurveys', () => {
+  const React = require('react');
+  return (props: any) => {
+    const mountId = React.useRef(null as number | null);
+    if (mountId.current === null) {
+      mockCreateQuestionsMountCount += 1;
+      mountId.current = mockCreateQuestionsMountCount;
+    }
+    return (
+      <div
+        data-testid="mock-create-questions"
+        data-title={props.preformedSurvey?.title || ''}
+        data-count={props.preformedQuestions?.length || 0}
+        data-mode={props.preformedMode || ''}
+        data-doc-urls={(props.documentURLs || []).join(',')}
+        data-append={String(Boolean(props.appendPreformedQuestions))}
+        data-mount-id={String(mountId.current)}
+        data-prompts={(props.preformedQuestions || []).map((question: any) => question.prompt).join('|')}
+      />
+    );
+  };
+});
 
 const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
   status: 'idle',
@@ -57,6 +76,7 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
 describe('SessionListeningPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCreateQuestionsMountCount = 0;
     mockReadThemeToken.mockImplementation((_token, fallback = '') => fallback);
     mockSubscribeThemeChanges.mockImplementation(() => jest.fn());
   });
@@ -261,7 +281,7 @@ describe('SessionListeningPanel', () => {
         segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1 }],
       }),
     );
-    (generateQuestionsFromListeningTranscript as jest.Mock).mockResolvedValue({
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
       surveyTitle: 'Listening Follow-up',
       statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
       raw: { questions: [] },
@@ -296,6 +316,195 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-mode', 'questions');
     expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-doc-urls', '');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS)).toBeInTheDocument();
+  });
+
+  it('auto-generates group conversation questions when a completed transcript is ready', async () => {
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1, completedAt: 2 }],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: 'Listening Follow-up',
+      statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
+      raw: { questions: [] },
+    });
+
+    render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+    await waitFor(() => {
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        transcript,
+        expect.objectContaining({
+          existingQuestionPrompts: [],
+          multiSpeakerHintOverride: 'likely_multiple_speakers',
+        }),
+      );
+    });
+    expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '1');
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-append', 'true');
+  });
+
+  it('does not auto-request unchanged group transcripts more than once', async () => {
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, completedAt: 2 }],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: 'Listening Follow-up',
+      statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
+      raw: { questions: [] },
+    });
+
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+    await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await waitFor(() => expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '1'));
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues newer transcript text after an in-flight group generation and appends without remounting', async () => {
+    const firstTranscript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const secondTranscript = `${firstTranscript} Later they debated community trust and accountability thresholds.`;
+    const resolveFirstRef: {
+      current:
+        ((value: ListeningQuestionGenerationResult | PromiseLike<ListeningQuestionGenerationResult>) => void) | null;
+    } = { current: null };
+    mockGenerateQuestionsFromListeningTranscript
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstRef.current = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        surveyTitle: 'Listening Follow-up',
+        statements: [
+          { id: 'q2', type: 'freeform', prompt: 'How should trust be measured?', tags: ['trust'] },
+          { id: 'q1-copy', type: 'freeform', prompt: 'What evidence matters?', tags: [] },
+        ],
+        raw: { questions: [] },
+      });
+
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript: firstTranscript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: firstTranscript, completedAt: 2 }],
+      }),
+    );
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isRecording: true,
+        transcript: secondTranscript,
+        segments: [
+          { id: 's1', index: 0, status: 'complete', text: firstTranscript, completedAt: 2 },
+          { id: 's2', index: 1, status: 'complete', text: 'Later they debated community trust.', completedAt: 5 },
+        ],
+      }),
+    );
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirstRef.current?.({
+        surveyTitle: 'Listening Follow-up',
+        statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
+        raw: { questions: [] },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const firstMountId = screen.getByTestId('mock-create-questions').getAttribute('data-mount-id');
+
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2'));
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-mount-id', firstMountId || '');
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenLastCalledWith(
+      secondTranscript,
+      expect.objectContaining({ existingQuestionPrompts: ['What evidence matters?'] }),
+    );
+  });
+
+  it('keeps cleared transcript state from being repopulated by a stale generation response', async () => {
+    const clearDraft = jest.fn();
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const resolveGenerationRef: {
+      current:
+        ((value: ListeningQuestionGenerationResult | PromiseLike<ListeningQuestionGenerationResult>) => void) | null;
+    } = { current: null };
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        clearDraft,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, completedAt: 2 }],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGenerationRef.current = resolve;
+        }),
+    );
+
+    render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
+
+    await act(async () => {
+      resolveGenerationRef.current?.({
+        surveyTitle: 'Listening Follow-up',
+        statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
+        raw: { questions: [] },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(clearDraft).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('mock-create-questions')).not.toBeInTheDocument();
+  });
+
+  it('shows auto-generation errors once and allows explicit retry for the same transcript', async () => {
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, completedAt: 2 }],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript
+      .mockRejectedValueOnce(new Error('AI unavailable'))
+      .mockResolvedValueOnce({
+        surveyTitle: 'Listening Follow-up',
+        statements: [{ id: 'q1', type: 'freeform', prompt: 'What evidence matters?', tags: [] }],
+        raw: { questions: [] },
+      });
+
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('AI unavailable');
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
+    await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '1');
   });
 
   it('keeps the transcript behind a compact button and clears it from the textarea overlay control', () => {
@@ -349,14 +558,16 @@ describe('SessionListeningPanel', () => {
     jest.useFakeTimers();
     const transcript =
       'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
-    let resolveGeneration: ((value: unknown) => void) | null = null;
+    let resolveGeneration:
+      ((value: ListeningQuestionGenerationResult | PromiseLike<ListeningQuestionGenerationResult>) => void) | null =
+      null;
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
         transcript,
         segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1 }],
       }),
     );
-    (generateQuestionsFromListeningTranscript as jest.Mock).mockImplementation(
+    mockGenerateQuestionsFromListeningTranscript.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveGeneration = resolve;

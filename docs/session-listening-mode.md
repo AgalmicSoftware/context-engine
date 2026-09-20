@@ -93,6 +93,12 @@ deployment bundles the Worker origin or serves the session from that origin.
 
 The interviewer starts directly with a topic-relevant question, without a greeting or preamble. It follows the responder's direction, chooses relevant existing questions, and asks useful follow-ups.
 
+In Group Conversation mode, the recorder keeps the captured transcript when the participant records more.
+When an eligible completed transcript segment is available and no transcription chunk is pending, the client asks
+the configured session AI to draft questions automatically. New drafts append to the existing editor, while exact
+ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
+remains available after a generation error; the client does not auto-retry unchanged transcript text in a loop.
+
 Session `interviewMode` settings are available in the wizard and admin metadata editor:
 
 | Setting | Default | Behavior |

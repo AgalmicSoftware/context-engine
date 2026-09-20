@@ -36,6 +36,42 @@ type BrowserAudioWindow = Window &
     webkitAudioContext?: typeof AudioContext;
   };
 
+type GeneratedQuestionDraft = {
+  id?: unknown;
+  prompt?: unknown;
+  [key: string]: unknown;
+};
+
+const getGeneratedQuestionKey = (question: GeneratedQuestionDraft | null | undefined): string =>
+  String(question?.id || question?.prompt || '')
+    .trim()
+    .toLowerCase();
+
+const getGeneratedQuestionPrompt = (question: GeneratedQuestionDraft | null | undefined): string =>
+  String(question?.prompt || '').trim();
+
+const mergeGeneratedQuestionDrafts = (
+  previous: GeneratedQuestionDraft[],
+  incoming: GeneratedQuestionDraft[],
+): GeneratedQuestionDraft[] => {
+  const seenKeys = new Set(previous.map(getGeneratedQuestionKey).filter(Boolean));
+  const seenPrompts = new Set(
+    previous
+      .map(getGeneratedQuestionPrompt)
+      .map((prompt) => prompt.toLowerCase())
+      .filter(Boolean),
+  );
+  const additions = incoming.filter((question) => {
+    const key = getGeneratedQuestionKey(question);
+    const prompt = getGeneratedQuestionPrompt(question).toLowerCase();
+    if ((!key && !prompt) || (key && seenKeys.has(key)) || (prompt && seenPrompts.has(prompt))) return false;
+    if (key) seenKeys.add(key);
+    if (prompt) seenPrompts.add(prompt);
+    return true;
+  });
+  return additions.length ? [...previous, ...additions] : previous;
+};
+
 export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   const seconds = Math.max(0, Math.floor(Number(secondsRaw || 0)));
   const minutes = Math.floor(seconds / 60);
@@ -307,12 +343,15 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState('');
-  const [generatedQuestions, setGeneratedQuestions] = useState<unknown[]>([]);
+  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestionDraft[]>([]);
   const [generatedTitle, setGeneratedTitle] = useState('');
-  const [generationKey, setGenerationKey] = useState(0);
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const isMountedRef = useRef(true);
+  const lastAutoRequestedTranscriptRef = useRef('');
+  const generationInFlightRef = useRef(false);
+  const activeGenerationRequestRef = useRef(0);
 
   const failedCount = useMemo(
     () => recorder.segments.filter((segment) => segment.status === 'error').length,
@@ -386,6 +425,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const shouldShowMeta = Boolean(statusLabel || hasPendingTranscription || hasTranscript || isGenerating);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isGenerating) {
       setGenerationElapsedSeconds(0);
       return undefined;
@@ -424,37 +470,63 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     }
   };
 
-  const handleGenerateQuestions = async () => {
-    if (!canGenerate) return;
-    setIsGenerating(true);
-    setGenerationError('');
-    try {
-      // Future optional source path is intentionally disabled for now:
-      // generateAudioDiscussionSummary -> uploadMarkdownSummaryToArweave -> documentURLs.
-      const result = await generateQuestionsFromListeningTranscript(recorder.transcript, {
-        sessionSlug,
-        sessionConfig,
-        context,
-        workerUrl,
-        defaultTags,
-        count: LISTENING_QUESTION_COUNT,
-        sessionInstructions: getSessionInstructions(sessionConfig),
-        sourceTypeOverride: 'transcript',
-        multiSpeakerHintOverride: 'likely_multiple_speakers',
-      });
-      setGeneratedQuestions(result.statements);
-      setGeneratedTitle(result.surveyTitle);
-      setGenerationKey((value) => value + 1);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || 'Failed to generate questions.');
-      setGenerationError(message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  const handleGenerateQuestions = useCallback(
+    async ({ auto = false }: { auto?: boolean } = {}) => {
+      const transcriptSnapshot = recorder.transcript.trim();
+      if (!canGenerate || !transcriptSnapshot || generationInFlightRef.current) return;
+      if (auto && lastAutoRequestedTranscriptRef.current === transcriptSnapshot) return;
+      lastAutoRequestedTranscriptRef.current = transcriptSnapshot;
+
+      const requestId = activeGenerationRequestRef.current + 1;
+      activeGenerationRequestRef.current = requestId;
+      generationInFlightRef.current = true;
+      const existingPrompts = generatedQuestions.map(getGeneratedQuestionPrompt).filter(Boolean);
+      setIsGenerating(true);
+      setGenerationError('');
+      try {
+        // Future optional source path is intentionally disabled for now:
+        // generateAudioDiscussionSummary -> uploadMarkdownSummaryToArweave -> documentURLs.
+        const result = await generateQuestionsFromListeningTranscript(transcriptSnapshot, {
+          sessionSlug,
+          sessionConfig,
+          context,
+          workerUrl,
+          defaultTags,
+          count: LISTENING_QUESTION_COUNT,
+          sessionInstructions: getSessionInstructions(sessionConfig),
+          sourceTypeOverride: 'transcript',
+          multiSpeakerHintOverride: 'likely_multiple_speakers',
+          existingQuestionPrompts: existingPrompts,
+        });
+        if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
+        setGeneratedQuestions((previous) => mergeGeneratedQuestionDrafts(previous, result.statements));
+        setGeneratedTitle((previous) => previous || result.surveyTitle);
+      } catch (error) {
+        if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
+        const message = error instanceof Error ? error.message : String(error || 'Failed to generate questions.');
+        setGenerationError(message);
+      } finally {
+        if (isMountedRef.current && activeGenerationRequestRef.current === requestId) {
+          generationInFlightRef.current = false;
+          setIsGenerating(false);
+        }
+      }
+    },
+    [canGenerate, context, defaultTags, generatedQuestions, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
+  );
+
+  useEffect(() => {
+    if (panelMode !== 'recordGroup') return;
+    if (!latestSuccessfulTranscriptAt || !canGenerate) return;
+    void handleGenerateQuestions({ auto: true });
+  }, [canGenerate, handleGenerateQuestions, latestSuccessfulTranscriptAt, panelMode, trimmedTranscript]);
 
   const handleClear = () => {
     recorder.clearDraft();
+    activeGenerationRequestRef.current += 1;
+    generationInFlightRef.current = false;
+    lastAutoRequestedTranscriptRef.current = trimmedTranscript;
+    setIsGenerating(false);
     setGeneratedQuestions([]);
     setGeneratedTitle('');
     setGenerationError('');
@@ -634,7 +706,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           <Button
             type="button"
             className={styles.sessionListeningGenerate}
-            onClick={handleGenerateQuestions}
+            onClick={() => {
+              void handleGenerateQuestions();
+            }}
             disabled={!canGenerate}
             data-testid={E2E_TESTIDS.SESSION_LISTENING_GENERATE}
           >
@@ -648,7 +722,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         <div className={styles.sessionListeningCreateWrap} data-testid={E2E_TESTIDS.SESSION_LISTENING_SUGGESTIONS}>
           <CreateQuestionsAndSurveys
             {...(props as CreateQuestionsAndSurveysPanelProps)}
-            key={`listening-generated-${generationKey}`}
+            appendPreformedQuestions
             preformedQuestions={generatedQuestions as CreateQuestionsAndSurveysPanelProps['preformedQuestions']}
             preformedSurvey={{ title: generatedTitle }}
             preformedMode="questions"

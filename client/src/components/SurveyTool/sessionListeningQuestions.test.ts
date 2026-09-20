@@ -1,10 +1,22 @@
+import { callAI } from '../../utilities/ai/aiClient.js';
 import {
   buildListeningQuestionPrompt,
   buildListeningQuestionStatements,
+  generateQuestionsFromListeningTranscript,
   parseListeningQuestionResponse,
 } from './sessionListeningQuestions';
 
+jest.mock('../../utilities/ai/aiClient.js', () => ({
+  callAI: jest.fn(),
+}));
+
+const mockCallAI = callAI as jest.MockedFunction<typeof callAI>;
+
 describe('sessionListeningQuestions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('builds a transcript-aware generation prompt for listening mode', () => {
     const prompt = buildListeningQuestionPrompt('Speaker A raised budget timing. Speaker B disagreed.', {
       count: 3,
@@ -43,6 +55,36 @@ describe('sessionListeningQuestions', () => {
 
     expect(prompt).toContain('* SourceType: document');
     expect(prompt).toContain('* MultiSpeakerHint: likely_multiple_speakers');
+  });
+
+  it('adds prior generated prompts to the model context and requests the configured thinking tier', async () => {
+    mockCallAI.mockResolvedValue(`{
+      "surveyTitle": "Follow-up",
+      "questions": [
+        { "prompt": "What evidence should the group review next?", "questionType": "freeform", "tags": ["evidence"] }
+      ]
+    }`);
+
+    await generateQuestionsFromListeningTranscript(
+      'The group discussed budget timing, evidence thresholds, operational risk, and accountability tradeoffs in enough detail.',
+      {
+        sessionSlug: 'demo',
+        existingQuestionPrompts: ['Which budget tradeoff matters most?'],
+      },
+    );
+
+    expect(callAI).toHaveBeenCalledWith(
+      expect.stringContaining('Already drafted questions from this conversation:'),
+      expect.objectContaining({
+        sessionSlug: 'demo',
+        taskType: 'generate',
+        thinking: true,
+      }),
+    );
+    expect(callAI).toHaveBeenCalledWith(
+      expect.stringContaining('Which budget tradeoff matters most?'),
+      expect.anything(),
+    );
   });
 
   it('parses AI JSON and builds reviewable question statements', () => {
