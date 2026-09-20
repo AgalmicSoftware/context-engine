@@ -137,8 +137,10 @@ by session time; legacy Realtime sessions use completed input transcriptions.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
 maps the transcript and any responder context imported by an AI prefill link
-to response drafts. Imported context remains editable but the context field
-stays hidden during a normal voice-only interview. Drafts may include comments,
+to response drafts. Imported context remains editable in a collapsed
+**Imported responder context** disclosure; during a normal voice-only interview
+that context editor is absent, keeping the microphone as the primary action.
+Drafts may include comments,
 importance, and conviction only when the evidence explicitly supports them.
 Every generated draft also carries a confidence value from 0 to 1. The review
 panel labels this **AI-estimated confidence**, describing the AI’s estimate of
@@ -169,8 +171,12 @@ selected-state button. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
 response state has rehydrated. Canceling sign-in leaves the review open without
-submitting; after a successful submit the modal remains open so suggested
-questions can still be reviewed or uploaded separately. The **Submit responses**
+submitting; after a successful submit the submit button changes to
+**Responses submitted**, and a **View results** action appears after five seconds
+when a results handler is available. The modal remains open so suggested
+questions can still be reviewed or uploaded separately. Editing a draft after
+submission clears the success/results affordance until the reviewer submits
+again. The **Submit responses**
 and **Upload Questions** actions share the pile view’s submit styling. **Upload
 Questions** remains inside Suggested new questions and uses the normal question
 upload flow. Stopping alone never submits answers.
@@ -179,8 +185,9 @@ imported. When it is retained, submitted response metadata keeps the
 prompt/question-set revision and self-reported source platform/model. A separate
 **Share AI draft changes for research** checkbox appears when imported or
 voice-generated AI drafts or prediction revisions are being reviewed, and it is
-off by default. An **AI prefill metadata · model** or **AI research metadata**
-disclosure explains the included platform, revision, question-set hash, coverage
+off by default. The platform checkbox is labeled **Include platform/model
+provenance**. An **AI prefill metadata** disclosure explains the included
+platform, revision, question-set hash, coverage
 counts, prediction fields, selected/unselected draft counts, and excluded
 metadata according to the visible consent controls.
 Consented research records the original AI prediction, saved prediction
@@ -205,10 +212,12 @@ platform/model provenance choice.
 ## Ordinary ChatGPT or Claude, without MCP
 
 Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
-to augment interview** footer card beneath the microphone. Clicking its heading
-or enlarged top-right clipboard copies the request without opening the preview.
-The **Prompt** dropdown inside the card expands the instruction and collapses it
-again; the preview starts collapsed. A question-mark tooltip to the left of **Prompt** explains:
+to augment interview** footer card beneath the microphone when the interview has
+not already been opened from a ChatGPT or Claude prefill packet. Clicking its
+heading or enlarged top-right clipboard copies the request without opening the
+preview. The **Prompt** dropdown inside the card expands the instruction and
+collapses it again; the preview starts collapsed and remains collapsed after a
+successful copy. A question-mark tooltip to the left of **Prompt** explains:
 “Allows your agent to predict your responses and raise better interview questions.”
 The tooltip is available on hover and keyboard focus. The copied request begins:
 
