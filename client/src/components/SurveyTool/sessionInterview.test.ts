@@ -82,6 +82,15 @@ describe('session interview protocol', () => {
       'Unsure',
       'Disagree',
     ]);
+    expect(
+      normalizeInterviewQuestions([
+        { id: 'q5', prompt: 'Rate confidence', type: 'rating', scale: { min: 1, max: 10 } },
+      ])[0],
+    ).toMatchObject({
+      id: 'q5',
+      type: 'rating',
+      scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+    });
   });
 
   it('canonicalizes question hashing order and resolves realtime model provenance', () => {
@@ -206,6 +215,23 @@ describe('session interview protocol', () => {
     expect(instructions).toContain('one question at a time');
     expect(instructions).toContain('which session question they would most like to see other people answer');
     expect(instructions).not.toContain('important insight');
+  });
+
+  it('includes exact rating endpoint labels in realtime question instructions', () => {
+    const instructions = buildRealtimeInterviewInstructions({
+      questions: normalizeInterviewQuestions([
+        {
+          id: 'rating-q1',
+          prompt: 'Rate support',
+          type: 'rating',
+          scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+        },
+      ]),
+    });
+
+    expect(instructions).toContain('scale 1-10');
+    expect(instructions).toContain('1=Strongly oppose');
+    expect(instructions).toContain('10=Strongly support');
   });
 
   it('adds owner steering after the fixed preamble and omits it when empty', () => {
@@ -437,6 +463,30 @@ describe('session interview protocol', () => {
     ).toEqual([
       { questionId: 'binary', answer: 'Agree', confidence: 0.8 },
       { questionId: 'rating', answer: 10, confidence: 0.6 },
+    ]);
+  });
+
+  it('uses per-question rating scales for imported draft clamping', () => {
+    const directPacket: InterviewPrefillPacket = {
+      ...packet,
+      promptVersion: INTERVIEW_PROMPT_VERSION,
+      responses: [
+        { questionId: 'rating-low', answer: 0, confidence: 0.6 },
+        { questionId: 'rating-high', answer: 11, confidence: 0.7 },
+      ],
+    };
+
+    expect(
+      readImportedInterviewDraftResponses(
+        directPacket,
+        normalizeInterviewQuestions([
+          { id: 'rating-low', prompt: 'How much?', type: 'rating', scale: { min: 1, max: 10 } },
+          { id: 'rating-high', prompt: 'How much?', type: 'rating', scale: { min: 1, max: 10 } },
+        ]),
+      ),
+    ).toEqual([
+      { questionId: 'rating-low', answer: 1, confidence: 0.6 },
+      { questionId: 'rating-high', answer: 10, confidence: 0.7 },
     ]);
   });
 

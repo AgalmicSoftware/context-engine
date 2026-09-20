@@ -10,6 +10,7 @@ import {
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
+import { hasRatingScaleMetadata, normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import {
   buildRealtimeInterviewPrefillContext,
   type RealtimeInterviewReviewedResponse,
@@ -30,8 +31,6 @@ const SUPPORTED_INTERVIEW_PROMPT_VERSIONS = new Set([
 const BINARY_RESPONSE_OPTIONS = ['Agree', 'Unsure', 'Disagree'];
 const SUGGESTED_QUESTION_TYPES = ['freeform', 'rating', 'multichoice', 'binary', 'quadratic'] as const;
 const SUGGESTED_QUESTION_TYPE_SET = new Set<string>(SUGGESTED_QUESTION_TYPES);
-const RATING_MIN = 0;
-const RATING_MAX = 10;
 const REALTIME_INSTRUCTIONS_LIMIT = 31_500;
 
 export type SessionVoiceMode = 'interview' | 'recordGroup';
@@ -41,6 +40,7 @@ export type InterviewQuestion = {
   prompt: string;
   type: string;
   options: string[];
+  scale?: RatingScale;
   voiceCredits?: number;
 };
 
@@ -136,6 +136,11 @@ const normalizeSuggestedQuestionType = (value: unknown): (typeof SUGGESTED_QUEST
   return SUGGESTED_QUESTION_TYPE_SET.has(type) ? (type as (typeof SUGGESTED_QUESTION_TYPES)[number]) : 'freeform';
 };
 
+const describeRatingScale = (question: InterviewQuestion): string => {
+  const scale = normalizeRatingScale(question);
+  return `; scale ${scale.min}-${scale.max}; ${scale.min}=${scale.minLabel}; ${scale.max}=${scale.maxLabel}`;
+};
+
 const clampRating = (value: unknown): number | undefined => {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : undefined;
@@ -187,7 +192,8 @@ const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQues
       } else if (question?.type === 'rating') {
         const numericAnswer = Number(answer);
         if (!Number.isFinite(numericAnswer)) return normalized;
-        answer = Math.max(RATING_MIN, Math.min(RATING_MAX, numericAnswer));
+        const scale = normalizeRatingScale(question);
+        answer = Math.max(scale.min, Math.min(scale.max, numericAnswer));
       }
       if (answer === undefined || answer === null) return normalized;
       const confidence = Number(response.confidence);
@@ -264,7 +270,14 @@ export const normalizeInterviewQuestions = (questions: unknown): InterviewQuesti
           : (Array.isArray(rawOptions) ? rawOptions : [])
               .map((option) => toTrimmedString(asRecord(option).label || asRecord(option).value || option))
               .filter(Boolean);
-      return { id, prompt, type, options, ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}) };
+      return {
+        id,
+        prompt,
+        type,
+        options,
+        ...(type === 'rating' && hasRatingScaleMetadata(question) ? { scale: normalizeRatingScale(question) } : {}),
+        ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
+      };
     })
     .filter((question) => {
       if (!question.id || !question.prompt || seen.has(question.id)) return false;
@@ -416,7 +429,7 @@ export const buildExternalInterviewKickoff = ({
     '',
     'Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions; do not seek new access or invent a position.',
     '',
-    'Use first-person for direct statements and reasonable inferences; give inferences lower confidence and basis. responderContext: concise question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit unsupported/personal-irrelevant material; do not request or add a name. Never prefix with "(Agent):". Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings are 0-10; quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).',
+    'Use first-person for direct statements and reasonable inferences; give inferences lower confidence and basis. responderContext: concise question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit unsupported/personal-irrelevant material; do not request or add a name. Never prefix with "(Agent):". Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings must use each catalog question scale; quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).',
     '',
     'Return only: one short research-coverage line, a question/answer/confidence/basis table, the exact single-line JSON packet, and its review link.',
     '',
@@ -466,7 +479,7 @@ export const buildRealtimeInterviewInstructions = ({
     `Questions:\n${questions
       .map(
         (question, index) =>
-          `${index + 1}. [${question.id}] (${question.type}${question.type === 'quadratic' ? `; ${question.voiceCredits ?? 99} voice credits` : ''}) ${question.prompt}${
+          `${index + 1}. [${question.id}] (${question.type}${question.type === 'rating' ? describeRatingScale(question) : ''}${question.type === 'quadratic' ? `; ${question.voiceCredits ?? 99} voice credits` : ''}) ${question.prompt}${
             question.options.length ? ` Options: ${question.options.join(' | ')}` : ''
           }`,
       )

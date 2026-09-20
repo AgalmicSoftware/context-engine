@@ -83,6 +83,7 @@ export const buildInterviewBriefDocument = ({
   answerContract: {
     binary: ['Agree', 'Unsure', 'Disagree'],
     rating: { min: 0, max: 10, step: 1 },
+    ratingScaleOverrides: 'Use a question.scale object when present; otherwise use the default rating contract.',
     multichoice: 'Use one exact question option.',
     quadratic: 'Signed integer array in option order; sum(vote²) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed.',
   },

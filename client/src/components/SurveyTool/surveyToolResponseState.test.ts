@@ -22,6 +22,8 @@ describe('surveyToolResponseState', () => {
     expect(toNumberOrNull('NaN')).toBeNull();
     expect(getNormalizedUiRatingValue(null)).toBe(RATING_MIN);
     expect(getNormalizedUiRatingValue('7')).toBe(7);
+    expect(getNormalizedUiRatingValue('0', 1, 10)).toBe(1);
+    expect(getNormalizedUiRatingValue('11', 1, 10)).toBe(10);
     expect(clampSliderValue('11', 1, 10)).toBe(10);
     expect(clampSliderValue('bad', 1, 10)).toBe(1);
   });

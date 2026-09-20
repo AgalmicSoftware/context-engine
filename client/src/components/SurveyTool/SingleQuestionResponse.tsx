@@ -28,6 +28,7 @@ import GateTooltip from '../Gates/GateTooltip';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import {
   getRatingFillPercent,
+  normalizeRatingScale,
   normalizeRatingValue,
   RATING_MAX,
   RATING_MIN,
@@ -1486,17 +1487,20 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       }
 
       case 'rating': {
-        const normalizedRatingValue = normalizeRatingValue(value, null);
+        const ratingScale = normalizeRatingScale(this.props.question || {});
+        const normalizedRatingValue = normalizeRatingValue(value, null, ratingScale);
         if (normalizedRatingValue === null) {
           return <div className={styles.freeformAnswer}>No answer provided.</div>;
         }
-        const ratingFillPercent = getRatingFillPercent(value, RATING_MIN);
+        const ratingFillPercent = getRatingFillPercent(value, ratingScale.min, ratingScale);
         return (
           <div className={styles.readOnlyRating}>
             <div className={styles.ratingTrack}>
               <div className={styles.ratingBar} style={resolveSingleQuestionRatingBarStyle(ratingFillPercent)} />
             </div>
-            <span className={styles.ratingValueLabel}>{`${normalizedRatingValue}/${RATING_MAX}`}</span>
+            <span className={styles.ratingEndpointLabel}>{ratingScale.minLabel}</span>
+            <span className={styles.ratingValueLabel}>{`${normalizedRatingValue}/${ratingScale.max}`}</span>
+            <span className={styles.ratingEndpointLabel}>{ratingScale.maxLabel}</span>
           </div>
         );
       }

@@ -22,6 +22,22 @@ describe('FullQuestionRatingInput', () => {
     expect(onChangeComplete).toHaveBeenCalled();
   });
 
+  it('renders per-question rating endpoints and applies them to the slider', () => {
+    render(
+      <FullQuestionRatingInput
+        value={1}
+        scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }}
+      />,
+    );
+
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('min', '1');
+    expect(slider).toHaveAttribute('max', '10');
+    expect(screen.getAllByText('1')).toHaveLength(2);
+    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+  });
+
   it('does not emit slider updates when disabled', () => {
     const onChange = jest.fn();
     const onChangeComplete = jest.fn();

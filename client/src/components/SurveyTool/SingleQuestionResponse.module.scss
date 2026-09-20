@@ -516,6 +516,16 @@
   opacity: 0.7;
 }
 
+.ratingEndpointLabel {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ce-color-white);
+  opacity: 0.64;
+  overflow-wrap: anywhere;
+}
+
 .readOnlyMultichoice {
   margin-top: 10px;
   display: flex;

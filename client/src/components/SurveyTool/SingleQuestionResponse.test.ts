@@ -588,6 +588,32 @@ describe('SingleQuestionResponse rating rendering', () => {
     expect(findElement(tree, (node) => nodeHasClassName(node, styles.ratingBar))).toBeNull();
     expect(renderToStaticMarkup(tree)).toContain('No answer provided.');
   });
+
+  it('renders read-only ratings against per-question scale metadata', () => {
+    const subject = createSubject({
+      mode: 'fullscreen',
+      question: {
+        id: 'q1',
+        type: 'rating',
+        prompt: 'Rate this',
+        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+      },
+      response: {
+        answer: { value: '1', encrypted: false },
+        additional: { value: '', encrypted: false },
+      },
+    });
+
+    const tree = subject.renderSinglePersonView();
+    const bar = findElement(tree, (node) => nodeHasClassName(node, styles.ratingBar));
+    const label = findElement(tree, (node) => nodeHasClassName(node, styles.ratingValueLabel));
+
+    expect(bar).not.toBeNull();
+    expect(bar.props.style.width).toBe('0%');
+    expect(renderToStaticMarkup(label)).toContain('1/10');
+    expect(renderToStaticMarkup(tree)).toContain('Strongly oppose');
+    expect(renderToStaticMarkup(tree)).toContain('Strongly support');
+  });
 });
 
 describe('SingleQuestionResponse encrypted answer CTA variants', () => {

@@ -30,6 +30,7 @@ test('buildInterviewBriefDocument returns only an inert question catalog', () =>
     answerContract: {
       binary: ['Agree', 'Unsure', 'Disagree'],
       rating: { min: 0, max: 10, step: 1 },
+      ratingScaleOverrides: 'Use a question.scale object when present; otherwise use the default rating contract.',
       multichoice: 'Use one exact question option.',
       quadratic: 'Signed integer array in option order; sum(vote²) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed.',
     },
@@ -98,7 +99,13 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
       }),
       getCorsContext: async () => ({ ok: true, headers: { 'access-control-allow-origin': '*' } }),
       loadPublicInterviewQuestions: async () => [
-        { id: 'q1', type: 'freeform', prompt: 'What matters?', options: [] },
+        {
+          id: 'rating-q1',
+          type: 'rating',
+          prompt: 'Rate support',
+          options: [],
+          scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+        },
       ],
       sha256: async () => 'question-hash',
       json,
@@ -113,6 +120,19 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
   assert.equal(body.reviewUrl, 'https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview');
   assert.deepEqual(body.answerContract.binary, ['Agree', 'Unsure', 'Disagree']);
   assert.deepEqual(body.answerContract.rating, { min: 0, max: 10, step: 1 });
+  assert.equal(
+    body.answerContract.ratingScaleOverrides,
+    'Use a question.scale object when present; otherwise use the default rating contract.',
+  );
+  assert.deepEqual(body.questions, [
+    {
+      id: 'rating-q1',
+      type: 'rating',
+      prompt: 'Rate support',
+      options: [],
+      scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+    },
+  ]);
   assert.equal(body.researchCoverageContract.verification, 'self_reported');
   assert.equal(body.researchCoverageContract.unknownSearchedCount, null);
   assert.equal('instructions' in body, false);

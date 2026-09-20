@@ -18,6 +18,55 @@ test('interview question normalization omits masked prompts and deduplicates IDs
   );
 });
 
+test('rating catalog questions retain exact scale metadata for interview prefill', () => {
+  assert.deepEqual(
+    helpers.dedupeQuestions([
+      {
+        id: 'rating-q1',
+        prompt: 'Rate support',
+        type: 'rating',
+        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+      },
+      {
+        id: 'rating-q2',
+        prompt: 'Rate confidence',
+        type: 'rating',
+        scale: {},
+        ratingScale: { lowLabel: 'Not confident', highLabel: 'Very confident' },
+      },
+      {
+        id: 'rating-q3',
+        prompt: 'Rate invalid',
+        type: 'rating',
+        scale: { min: 10, max: 1, minLabel: 'High', maxLabel: 'Low' },
+      },
+    ]),
+    [
+      {
+        id: 'rating-q1',
+        prompt: 'Rate support',
+        type: 'rating',
+        options: [],
+        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+      },
+      {
+        id: 'rating-q2',
+        prompt: 'Rate confidence',
+        type: 'rating',
+        options: [],
+        scale: { min: 0, max: 10, minLabel: 'Not confident', maxLabel: 'Very confident' },
+      },
+      {
+        id: 'rating-q3',
+        prompt: 'Rate invalid',
+        type: 'rating',
+        options: [],
+        scale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
+      },
+    ],
+  );
+});
+
 test('bytes32 pointers preserve all 32 bytes and payloads remain session-scoped', () => {
   const hex = `0x01${'00'.repeat(31)}`;
   assert.equal(helpers.base64urlFromHex(hex), Buffer.from(hex.slice(2), 'hex').toString('base64url'));

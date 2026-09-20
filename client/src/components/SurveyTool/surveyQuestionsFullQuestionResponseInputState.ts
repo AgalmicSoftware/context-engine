@@ -1,10 +1,16 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils';
 
 type SurveyQuestionRecord = {
   id: string;
   type: string;
   options?: unknown[];
+  scale?: unknown;
+  min?: unknown;
+  max?: unknown;
+  minLabel?: unknown;
+  maxLabel?: unknown;
 };
 
 type SurveyAnswerRecord = {
@@ -26,6 +32,7 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
       kind: 'rating';
       questionId: string;
       ratingValue: number;
+      ratingScale: RatingScale;
       disabled: boolean;
       useDeferredRating: boolean;
     }
@@ -123,15 +130,18 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         isSingleSelect: isSingleSelectMultichoice(question),
         disabled,
       };
-    case 'rating':
+    case 'rating': {
+      const ratingScale = normalizeRatingScale(question);
       return {
         kind: 'rating',
         questionId: question.id,
-        ratingValue: getNormalizedUiRatingValue(answer.value),
+        ratingValue: getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max),
+        ratingScale,
         disabled,
         // Regression guard: keep pointer-drag ticks local; parent updates rebuild the full question list.
         useDeferredRating: true,
       };
+    }
     case 'binary':
       return {
         kind: 'binary',

@@ -1,5 +1,5 @@
 import { createLogger } from 'utilities/logging.js';
-import { normalizeRatingValue, RATING_MIN } from '../../utilities/survey/ratingValue.js';
+import { normalizeRatingValue, RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
 
@@ -84,9 +84,10 @@ export const toNumberOrNull = (value: unknown): number | null => {
   return Number.isNaN(num) ? null : num;
 };
 
-export const getNormalizedUiRatingValue = (value: unknown): number => {
-  const normalizedValue = normalizeRatingValue(value, RATING_MIN);
-  return normalizedValue == null ? RATING_MIN : normalizedValue;
+export const getNormalizedUiRatingValue = (value: unknown, min = RATING_MIN, max = RATING_MAX): number => {
+  const scale = { min, max, minLabel: String(min), maxLabel: String(max) };
+  const normalizedValue = normalizeRatingValue(value, min, scale);
+  return normalizedValue == null ? min : normalizedValue;
 };
 
 export const clampSliderValue = (value: unknown, min: number, max: number): number => {

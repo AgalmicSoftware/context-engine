@@ -288,7 +288,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 12px;
   font-weight: 600;
   color: var(--ce-color-white);
   font-size: 1.5em;
@@ -6493,6 +6494,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .ratingValueDisplay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
   color: var(--ce-color-white);
   font-size: 1.5rem;
   font-weight: 600;

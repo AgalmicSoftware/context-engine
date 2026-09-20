@@ -140,12 +140,14 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
       return inputDescriptor.useDeferredRating || onDeferredRatingCommit ? (
         <DeferredRatingSlider
           value={inputDescriptor.ratingValue}
+          scale={inputDescriptor.ratingScale}
           disabled={inputDescriptor.disabled}
           onCommit={emitDeferredRatingCommit}
         />
       ) : (
         <FullQuestionRatingInput
           value={inputDescriptor.ratingValue}
+          scale={inputDescriptor.ratingScale}
           disabled={inputDescriptor.disabled}
           onChange={emitRatingChange}
           onChangeComplete={emitRatingChangeComplete}

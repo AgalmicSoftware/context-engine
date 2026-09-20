@@ -66,6 +66,7 @@ const applyAdditionalAudience = (state, questionId, audience, options = {}) => {
 
 const renderResponseInput = ({
   answerValue,
+  question = {},
   singleQuestionMode = false,
   onRatingChange = jest.fn(),
   onDeferredRatingCommit = jest.fn(),
@@ -75,6 +76,7 @@ const renderResponseInput = ({
       id: 'q1',
       type: 'rating',
       question: 'How strongly do you agree?',
+      ...question,
     },
     qIndex: 0,
     answer: { value: answerValue, encrypted: false },
@@ -241,6 +243,17 @@ describe('SurveyTool rating encryption controller', () => {
     expect(withNonNumericValue.type).toBe(DeferredRatingSlider);
     expect(withNonNumericValue.props.value).toBe(0);
     expect(withNonNumericValue.props.id).toBeUndefined();
+  });
+
+  it('passes per-question rating scale metadata into full-mode deferred rating inputs', () => {
+    const scaled = renderResponseInput({
+      answerValue: 0,
+      question: { scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } },
+    });
+
+    expect(scaled.type).toBe(DeferredRatingSlider);
+    expect(scaled.props.value).toBe(1);
+    expect(scaled.props.scale).toEqual({ min: 1, max: 10, minLabel: '1', maxLabel: '10' });
   });
 
   it('routes full-mode rating commits through the deferred parent update path', () => {

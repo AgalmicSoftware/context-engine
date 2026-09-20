@@ -1190,6 +1190,25 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(container.querySelector('.pileCardActive')).not.toBeNull();
   });
 
+  it('renders pile rating controls with per-question scale metadata', () => {
+    renderPile({
+      questionPool: [
+        {
+          id: 'rating-q1',
+          type: 'rating',
+          prompt: 'Rate readiness',
+          scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+        },
+      ],
+    });
+
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('min', '1');
+    expect(slider).toHaveAttribute('max', '10');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.getByText('10')).toBeInTheDocument();
+  });
+
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', async () => {
     renderPile();
 

@@ -96,6 +96,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       kind: 'rating',
       questionId: 'q2',
       ratingValue: 7,
+      ratingScale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
       disabled: false,
       useDeferredRating: true,
     });
@@ -117,6 +118,36 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       forceGlow: true,
       placeholder: 'response (optional)',
     });
+  });
+
+  it('honors per-question rating scale metadata in full-question descriptors and sliders', () => {
+    const descriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+      question: { id: 'q-rating', type: 'rating', scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } },
+      answer: { value: 0 },
+    });
+
+    expect(descriptor).toEqual({
+      kind: 'rating',
+      questionId: 'q-rating',
+      ratingValue: 1,
+      ratingScale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+      disabled: false,
+      useDeferredRating: true,
+    });
+
+    render(
+      <SurveyQuestionsFullQuestionResponseInput
+        question={{ id: 'q-rating', type: 'rating', scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } }}
+        answer={{ value: 0 }}
+        onDeferredRatingCommit={jest.fn()}
+      />,
+    );
+
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('min', '1');
+    expect(slider).toHaveAttribute('max', '10');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.getByText('10')).toBeInTheDocument();
   });
 
   it('describes response input actions with question identity and dispatch readiness', () => {

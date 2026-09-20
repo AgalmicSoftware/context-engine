@@ -302,7 +302,7 @@ import {
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { resolvePayloadStorageRef } from '../../utilities/storage/storageRefs.js';
-import { normalizeRatingValue, RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
+import { normalizeRatingScale } from '../../utilities/survey/ratingValue.js';
 
 import {
   EMPTY_QUESTION_POOL,
@@ -2724,12 +2724,13 @@ const renderPileResponseInput = (
     }
 
     case 'rating': {
-      const ratingValue = getNormalizedUiRatingValue(answer.value);
+      const ratingScale = normalizeRatingScale(question);
+      const ratingValue = getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max);
       return (
         <div className={styles.ratingContainer}>
           <CESlider
-            min={RATING_MIN}
-            max={RATING_MAX}
+            min={ratingScale.min}
+            max={ratingScale.max}
             step={1}
             value={ratingValue}
             onChange={(val: any, event: any) =>
@@ -2741,7 +2742,11 @@ const renderPileResponseInput = (
             disabled={engine.state.isSubmitting}
             className={styles.ratingSlider}
           />
-          <span className={styles.ratingValueDisplay}>{ratingValue}</span>
+          <span className={styles.ratingValueDisplay}>
+            <span>{ratingScale.minLabel}</span>
+            <span aria-label="Current rating">{ratingValue}</span>
+            <span>{ratingScale.maxLabel}</span>
+          </span>
         </div>
       );
     }

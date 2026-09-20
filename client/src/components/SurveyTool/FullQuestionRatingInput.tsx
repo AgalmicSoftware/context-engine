@@ -1,11 +1,12 @@
 import React from 'react';
 import { FormText } from 'reactstrap';
 import CESlider from '../Shared/CESlider';
-import { RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
+import { DEFAULT_RATING_SCALE, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import styles from './SurveyTool.module.scss';
 
 type FullQuestionRatingInputProps = {
   value?: number;
+  scale?: RatingScale;
   disabled?: boolean;
   onChange?: ((nextValue: number, event?: unknown) => void) | null;
   onChangeComplete?: ((event?: unknown) => void) | null;
@@ -16,7 +17,8 @@ export const resolveFullQuestionRatingSliderStyle = (): React.CSSProperties => (
 });
 
 const FullQuestionRatingInput = ({
-  value = 0,
+  value = DEFAULT_RATING_SCALE.min,
+  scale = DEFAULT_RATING_SCALE,
   disabled = false,
   onChange = null,
   onChangeComplete = null,
@@ -24,8 +26,8 @@ const FullQuestionRatingInput = ({
   <>
     <div className={styles.importanceSlider}>
       <CESlider
-        min={RATING_MIN}
-        max={RATING_MAX}
+        min={scale.min}
+        max={scale.max}
         step={1}
         value={value}
         tooltip={false}
@@ -40,7 +42,11 @@ const FullQuestionRatingInput = ({
         disabled={disabled}
       />
     </div>
-    <FormText className={styles.ratingLabelText}>{value}</FormText>
+    <FormText className={styles.ratingLabelText}>
+      <span>{scale.minLabel}</span>
+      <span aria-label="Current rating">{value}</span>
+      <span>{scale.maxLabel}</span>
+    </FormText>
   </>
 );
 
