@@ -75,6 +75,23 @@ test('catalog review URLs include only the trusted serving Worker discovery orig
   );
 });
 
+test('safeSessionUrl preserves only bounded recruitment and group auto-join state', () => {
+  const safe = __test__interviewBriefDispatch.safeSessionUrl;
+  const options = { slug: 'demo', allowOrigins: ['https://app.example'] };
+  assert.equal(
+    safe('https://app.example/session/demo?src=partner launch&joinGroup=EDDY-2026&worker=https%3A%2F%2Fattacker.example&mode=recordGroup#prefill=private', options),
+    'https://app.example/session/demo?src=partner-launch&joinGroup=eddy-2026',
+  );
+  assert.equal(
+    safe('https://app.example/session/demo?src=one&src=two&joinGroup=EDDY-2026', options),
+    'https://app.example/session/demo?joinGroup=eddy-2026',
+  );
+  assert.equal(
+    safe('https://app.example/session/demo?src=partner&joinGroup=bad/path', options),
+    'https://app.example/session/demo?src=partner',
+  );
+});
+
 test('canonicalizes question order before calculating a revision hash', () => {
   assert.deepEqual(
     canonicalizeQuestions([
@@ -179,9 +196,9 @@ test('dispatchInterviewBriefRequest honors per-session disablement and requires 
   });
 });
 
-test('dispatchInterviewBriefRequest strips query and fragment state from the supplied return URL', async () => {
+test('dispatchInterviewBriefRequest preserves only safe source and auto-join state from the supplied return URL', async () => {
   const response = await dispatchInterviewBriefRequest({
-    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fworker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DrecordGroup%23private'),
+    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fsrc%3Dpartner%2520launch%26joinGroup%3DEDDY-2026%26worker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DrecordGroup%23private'),
     deps: {
       resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
       getSessionConfig: async () => ({ allowOrigins: ['https://app.example'] }),
@@ -192,8 +209,13 @@ test('dispatchInterviewBriefRequest strips query and fragment state from the sup
     },
   });
   const body = await response.json();
-  assert.equal(body.reviewUrl, 'https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview');
+  assert.equal(
+    body.reviewUrl,
+    'https://app.example/session/demo?src=partner-launch&joinGroup=eddy-2026&worker=https%3A%2F%2Fworker.example&mode=interview',
+  );
   assert.equal(body.reviewUrl.includes('attacker.example'), false);
+  assert.equal(body.reviewUrl.includes('recordGroup'), false);
+  assert.equal(body.reviewUrl.includes('private'), false);
   assert.equal('instructions' in body, false);
 });
 

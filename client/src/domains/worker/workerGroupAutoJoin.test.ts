@@ -38,3 +38,54 @@ it('includes the validated Worker origin for first-time visitors without accepti
     expect(() => buildWorkerGroupAutoJoinPath('alpha', 'participants', worker)).toThrow();
   }
 });
+
+it('composes auto-join with same-session workflow links without copying private query or hash data', () => {
+  expect(
+    buildWorkerGroupAutoJoinPath(
+      'alpha',
+      'participants',
+      'https://worker.example/',
+      '/session/alpha?mode=interview&src=partner&groups=EDDY-2026&agentToken=private&worker=https%3A%2F%2Fold.example#prefill=abc&secret=hidden',
+    ),
+  ).toBe(
+    '/session/alpha?mode=interview&src=partner&joinGroup=participants&worker=https%3A%2F%2Fworker.example',
+  );
+
+  expect(
+    buildWorkerGroupAutoJoinPath(
+      'alpha',
+      'participants',
+      'https://worker.example/',
+      '/session/alpha?mode=interview#secret',
+    ),
+  ).toBe('/session/alpha?mode=interview&joinGroup=participants&worker=https%3A%2F%2Fworker.example');
+
+  expect(
+    buildWorkerGroupAutoJoinPath(
+      'alpha',
+      'participants',
+      'https://worker.example/',
+      '/session/beta?mode=interview&src=partner#prefill=abc',
+    ),
+  ).toBe('/session/alpha?joinGroup=participants&worker=https%3A%2F%2Fworker.example');
+});
+
+it('reuses a valid same-session Worker hint from the base path when no explicit Worker URL is supplied', () => {
+  expect(
+    buildWorkerGroupAutoJoinPath(
+      'alpha',
+      'participants',
+      undefined,
+      '/session/alpha?mode=interview&worker=https%3A%2F%2Fworker.example#prefill=abc',
+    ),
+  ).toBe('/session/alpha?mode=interview&joinGroup=participants&worker=https%3A%2F%2Fworker.example');
+
+  expect(
+    buildWorkerGroupAutoJoinPath(
+      'alpha',
+      'participants',
+      undefined,
+      '/session/alpha?mode=interview&worker=https%3A%2F%2Fworker.example%2Fprivate#prefill=abc',
+    ),
+  ).toBe('/session/alpha?mode=interview&joinGroup=participants');
+});

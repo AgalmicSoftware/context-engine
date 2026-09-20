@@ -4,6 +4,7 @@ import type {
   SurveyQuestionsPrimarySubmitPlan,
 } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsSubmitPendingStats } from './surveyQuestionsSubmitController.js';
+import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 
 export type SurveyQuestionsJsonRuntime = SurveyQuestionsLegacyRecord;
 
@@ -154,6 +155,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       getConvictionFromSlice,
       getImportanceFromSlice,
       sanitizeQuestionPromptForResponsePayload: surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload,
+      recruitmentSource: readSessionRecruitmentSource(resolveEffectiveSlug(propsRef.current)),
     });
   };
 

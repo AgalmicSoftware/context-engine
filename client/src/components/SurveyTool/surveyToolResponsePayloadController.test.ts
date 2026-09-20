@@ -410,9 +410,31 @@ describe('surveyToolResponsePayloadController', () => {
     });
   });
 
-  it('submits an opted-in responder name without leaking opted-out model provenance', () => {
+  it('submits recruitment source with normal responses', () => {
     const result = buildResponsePayload(
       defaultOpts({
+        recruitmentSource: '  partner outreach  ',
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Reviewed answer' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      }),
+    );
+
+    expect(result.responses![0]).toMatchObject({
+      answer: expect.objectContaining({ value: 'Reviewed answer' }),
+      recruitment: { source: 'partner-outreach' },
+    });
+    expect(result.responses![0]).not.toHaveProperty('interviewProvenance');
+  });
+
+  it('submits recruitment source and opted-in responder name without leaking opted-out model provenance', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        recruitmentSource: 'partner-outreach',
         questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
         surveyResponseState: {
           answers: { q1: { value: 'Reviewed answer' } },
@@ -432,6 +454,7 @@ describe('surveyToolResponsePayloadController', () => {
 
     expect(result.responses![0]).toMatchObject({
       answer: expect.objectContaining({ value: 'Reviewed answer' }),
+      recruitment: { source: 'partner-outreach' },
       responderName: 'Ada Example',
     });
     expect(result.responses![0]).not.toHaveProperty('interviewProvenance');

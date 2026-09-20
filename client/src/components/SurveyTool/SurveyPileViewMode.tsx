@@ -146,6 +146,7 @@ import {
   type InterviewPrefillPacket,
   type SessionVoiceMode,
 } from './sessionInterview';
+import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 import {
   getUsableSessionWorkerUrl,
   resolveConfiguredSessionWorkerUrlFromConfig,
@@ -514,6 +515,9 @@ export const LazySessionVoiceModeModal = React.lazy(() => import('./SessionVoice
 
 export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
   const props = engine.props || {};
+  if (typeof window !== 'undefined') {
+    captureSessionRecruitmentSource(resolveEffectiveSlug(props), window.location.search || '');
+  }
   const interviewEnabled = isInterviewFeatureEnabled(props.sessionConfig);
   const initialVoiceMode =
     interviewEnabled && typeof window !== 'undefined' ? resolveSessionVoiceMode(window.location.search || '') : null;

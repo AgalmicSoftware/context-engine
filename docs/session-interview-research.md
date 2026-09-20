@@ -4,6 +4,8 @@ Imported and voice-assisted session interviews can optionally attach AI provenan
 
 The ordinary submitted answer remains the normal response fields: `answer`, `additional`, `importance`, `conviction`, question id, responder, and timestamps/storage metadata. Interview research is a sidecar on that submitted response, not a second answer. A final submitted snapshot in `interviewProvenance` should be read as a copy of the ordinary submitted values after review, with answer/comment text redacted when field encryption requires it.
 
+When a session URL includes a valid `src` query parameter, the browser keeps the first source token seen for that session in session storage and attaches it to submitted response entries as `recruitment: { "source": "<token>" }`. This recruitment metadata is independent of AI provenance consent and can appear on ordinary manual responses, AI prefill responses, and responses where all interview research checkboxes are off. The client stores only the normalized source token for the current browser session; it does not store the full URL, hash, account, or additional navigation history.
+
 `changedFields` is a net comparison between the original AI draft and the final submitted values. `userEditedFields` is a narrower signal from instrumented review-modal interactions; it can be empty even when a final value differs from the original draft, and it is not a complete event log. Neither field means the participant scientifically agreed or disagreed with the model.
 
 Encrypted answer or comment fields are redacted before this metadata is written, and the full interview transcript or imported conversation history is not attached. Saved AI draft changes appear in exportable data only after a selected draft is submitted and the relevant research controls allow the metadata; in-memory review state that is closed or discarded without submission is not a stored research record.
@@ -37,6 +39,7 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 
 | Field | Included when | Meaning |
 | --- | --- | --- |
+| `recruitment.source` | A valid first `src` URL token was captured for the session before submission | Session recruitment source attached to the submitted response entry. It is separate from `interviewProvenance`, does not depend on AI research consent, and is normalized to a bounded token rather than a URL. |
 | `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object. The current value is `1`. |
 | `source.platform` | AI provenance is included | Self-reported platform label from the import or voice workflow, normalized to a short string such as `chatgpt`, `claude`, or `other`. |
 | `source.modelId` | AI provenance is included | Self-reported model identifier, capped before submission. |

@@ -10,6 +10,8 @@ import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
 import SessionInterviewMemoryKickoffCard from './SessionInterviewMemoryKickoffCard';
 import SessionInterviewTranscriptDisclosure from './SessionInterviewTranscriptDisclosure';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
+import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
+import { readWorkerGroupAutoJoinId } from '../../domains/worker/workerGroupAutoJoin';
 import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
@@ -105,6 +107,16 @@ type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
 
 type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
+};
+
+const buildInterviewReturnSessionUrl = (): string => {
+  if (typeof window === 'undefined') return '';
+  const url = new URL(`${window.location.origin}${window.location.pathname}`);
+  const source = normalizeRecruitmentSource(new URLSearchParams(window.location.search).get('src'));
+  if (source) url.searchParams.set('src', source);
+  const joinGroup = readWorkerGroupAutoJoinId(window.location.search);
+  if (joinGroup) url.searchParams.set('joinGroup', joinGroup);
+  return url.toString();
 };
 
 function SessionInterviewPanel({
@@ -673,7 +685,7 @@ function SessionInterviewPanel({
     }
   };
 
-  const sessionUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
+  const sessionUrl = buildInterviewReturnSessionUrl();
   const kickoff = resolvedWorkerUrl
     ? buildExternalInterviewKickoff({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })
     : '';

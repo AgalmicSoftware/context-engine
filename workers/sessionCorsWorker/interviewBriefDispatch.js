@@ -19,6 +19,23 @@ const normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw])
 
 const isLocalHttpHostname = (hostname = '') => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(String(hostname));
 
+const normalizeRecruitmentSource = (value) => {
+  const normalized = trim(value).replace(/\s+/g, '-').slice(0, 128);
+  return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : '';
+};
+
+const normalizeJoinGroup = (value) => {
+  const normalized = trim(value).toLowerCase();
+  return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : '';
+};
+
+const copySafeReturnParams = (sourceUrl, targetUrl) => {
+  const recruitmentSources = sourceUrl.searchParams.getAll('src').map(normalizeRecruitmentSource).filter(Boolean);
+  if (recruitmentSources.length === 1) targetUrl.searchParams.set('src', recruitmentSources[0]);
+  const joinGroups = sourceUrl.searchParams.getAll('joinGroup').map(normalizeJoinGroup).filter(Boolean);
+  if (joinGroups.length === 1) targetUrl.searchParams.set('joinGroup', joinGroups[0]);
+};
+
 const safeServedWorkerOrigin = (value) => {
   try {
     const url = new URL(trim(value));
@@ -39,9 +56,9 @@ const safeSessionUrl = (value, { slug = '', allowOrigins } = {}) => {
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
     if (!allowedOrigins.length || !allowedOrigins.includes(url.origin)) return '';
-    url.search = '';
-    url.hash = '';
-    return url.toString().replace(/\/$/, '');
+    const safeUrl = new URL(`${url.origin}${url.pathname}`);
+    copySafeReturnParams(url, safeUrl);
+    return safeUrl.toString().replace(/\/$/, '');
   } catch {
     return '';
   }
@@ -182,6 +199,8 @@ export const __test__interviewBriefDispatch = {
   buildReviewUrl,
   canonicalizeQuestions,
   isInterviewEnabled,
+  normalizeJoinGroup,
+  normalizeRecruitmentSource,
   safeServedWorkerOrigin,
   safeSessionUrl,
 };

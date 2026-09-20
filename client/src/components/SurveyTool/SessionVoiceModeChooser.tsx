@@ -19,7 +19,7 @@ export default function SessionVoiceModeChooser({ onSelectMode }: SessionVoiceMo
       >
         <FontAwesomeIcon icon={faMicrophone} />
         <strong>Interview</strong>
-        <span>One person. A voice interviewer drafts responses and may suggest new questions for review.</span>
+        <span>Let your AI agent draft your answers, then correct it.</span>
       </button>
       <button
         type="button"

@@ -112,6 +112,24 @@ describe('WorkerGroupAutoJoin', () => {
     window.removeEventListener('ce:worker-groups-changed', changed);
   });
 
+  it('preserves source, mode, worker bootstrap, and prefill context after joining', async () => {
+    window.history.replaceState(
+      { keep: true },
+      '',
+      '/session/alpha?mode=interview&src=partner&groups=EDDY-2026&joinGroup=participants-2026&worker=https%3A%2F%2Fworker.example#prefill=abc',
+    );
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+    expect(joins()).toHaveLength(1);
+    expect(window.location.pathname).toBe('/session/alpha');
+    expect(window.location.search).toBe(
+      '?mode=interview&src=partner&groups=EDDY-2026&worker=https%3A%2F%2Fworker.example',
+    );
+    expect(window.location.hash).toBe('#prefill=abc');
+    expect(window.history.state).toEqual({ keep: true });
+  });
+
   it.each(['unreachable', 'identity-mismatch'])(
     'falls back to the group ID if public metadata is %s without blocking sign-in',
     async (variant) => {

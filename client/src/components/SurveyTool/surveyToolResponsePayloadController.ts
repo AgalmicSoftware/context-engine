@@ -1,5 +1,6 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 import { buildSelectedInterviewResearch, buildUnselectedInterviewResearch } from './sessionInterviewResearch';
+import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -144,6 +145,7 @@ type ResponsePayloadEntry = UnknownRecord & {
   answer: ResponsePayloadField;
   additional: ResponsePayloadField;
   interviewProvenance?: UnknownRecord;
+  recruitment?: { source: string };
   responderName?: string;
 };
 
@@ -180,6 +182,7 @@ export interface BuildResponsePayloadOptions {
   getConvictionFromSlice: (state: ResponseSlice, qid: string) => number | null;
   getImportanceFromSlice: (state: ResponseSlice, qid: string) => number | null;
   sanitizeQuestionPromptForResponsePayload: (q: ResponseQuestionSource, opts: { isLocked: boolean }) => string;
+  recruitmentSource?: unknown;
 }
 
 export const buildResponsePayload = (opts: BuildResponsePayloadOptions): ResponsePayload => {
@@ -194,6 +197,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
   const pilePool = Array.isArray(opts.pileQuestions) ? (opts.pileQuestions as ResponseQuestionSource[]) : [];
 
   if (!surveyResponseState) return {};
+
+  const recruitmentSource = normalizeRecruitmentSource(opts.recruitmentSource);
+  const recruitment = recruitmentSource ? { source: recruitmentSource } : null;
 
   let candidateQuestions: ResponseQuestionSource[] = [];
   if (poolFromState.length > 0) {
@@ -388,6 +394,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         hash: additional.hash || '',
         encryptedPortion: additionalEncrypted ? additional.encryptedPortion || '' : '',
       },
+      ...(recruitment ? { recruitment } : {}),
       ...(responderName ? { responderName } : {}),
       ...(interviewProvenance ? { interviewProvenance } : {}),
     };
@@ -425,6 +432,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         importance: null,
         answer: { value: '', encrypted: false, hash: '', encryptedPortion: '' },
         additional: { value: '', encrypted: false, hash: '', encryptedPortion: '' },
+        ...(recruitment ? { recruitment } : {}),
       };
     }
 

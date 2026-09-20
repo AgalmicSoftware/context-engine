@@ -27,6 +27,7 @@ import {
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
 import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
+import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
@@ -628,6 +629,62 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(provenance).not.toHaveProperty('originalPrediction');
     expect(provenance).not.toHaveProperty('predictionRevisions');
     expect(provenance).not.toHaveProperty('unselectedDrafts');
+  });
+
+  it('captures the first URL source for the session without adding it to interview provenance', async () => {
+    sessionStorage.clear();
+    window.history.replaceState(
+      {},
+      '',
+      '/session/demo?src=partner-outreach&src=ignored&mode=interview#prefill=abc',
+    );
+    expect(
+      buildPileRuntimeInitialState({
+        props: { sessionSlug: 'demo' },
+        buildWarmPileSeedState: () => null,
+      }),
+    ).toEqual(expect.any(Object));
+    expect(readSessionRecruitmentSource('demo')).toBe('partner-outreach');
+    window.history.replaceState({}, '', '/session/demo?src=second-source');
+    buildPileRuntimeInitialState({
+      props: { sessionSlug: 'demo' },
+      buildWarmPileSeedState: () => null,
+    });
+    expect(readSessionRecruitmentSource('demo')).toBe('partner-outreach');
+
+    const engine = {
+      props: { sessionConfig: {} },
+      state: {
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'Reviewed answer' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+      },
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+
+    await recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'Reviewed answer', confidence: 0.8 }],
+      { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
+      true,
+    );
+
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1.source).toMatchObject({
+      platform: 'claude',
+      modelId: 'claude-example',
+      verification: 'self_reported',
+    });
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1.source).not.toHaveProperty('urlSource');
   });
 
   it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {

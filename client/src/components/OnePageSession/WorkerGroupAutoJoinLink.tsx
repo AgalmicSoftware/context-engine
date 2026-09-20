@@ -16,7 +16,11 @@ export default function WorkerGroupAutoJoinLink({
   if (!canAutoJoinWorkerGroup(group)) return null;
   const copy = async () => {
     try {
-      const link = new URL(buildWorkerGroupAutoJoinPath(sessionSlug, group.groupId, workerUrl), window.location.origin);
+      const currentPath = `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
+      const link = new URL(
+        buildWorkerGroupAutoJoinPath(sessionSlug, group.groupId, workerUrl, currentPath),
+        window.location.origin,
+      );
       await navigator.clipboard.writeText(link.toString());
       setStatus('Auto-join link copied.');
     } catch {

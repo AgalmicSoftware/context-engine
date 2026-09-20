@@ -15,6 +15,7 @@ import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
+import { captureSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
@@ -385,6 +386,7 @@ class OnePageSession extends Component<any, any> {
   componentDidMount() {
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
     this.recordOriginalURL(routeUiState.showQuestions ? buildOnePageSessionCanonicalBaseUrl(this.props) : null);
+    captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
     this.kickoffLightSbtUniverseScan(this.props);
 
     // Make redirect flag group-aware (avoid cross-group bleed)
@@ -592,6 +594,9 @@ class OnePageSession extends Component<any, any> {
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
     const slugChanged = prevSlug !== nextSlug;
+    if (slugChanged) {
+      captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
+    }
     const telegramTargetChanged =
       getAgentClientLoginEnvelopeMemoryKey(
         resolveAgentClientLoginIdentityTarget({

@@ -14,14 +14,51 @@ export const readWorkerGroupAutoJoinId = (search: string): string => {
   return values.length === 1 ? normalizeGroupId(values[0]) : '';
 };
 
-export const buildWorkerGroupAutoJoinPath = (sessionSlug: string, groupId: string, workerUrl?: string): string => {
+const copyableAutoJoinParams = new Set(['src', 'mode']);
+
+const readValidatedWorkerHint = (searchParams: URLSearchParams): string => {
+  const values = searchParams.getAll('worker');
+  if (values.length !== 1) return '';
+  try {
+    return parseSessionWorkerDiscoveryOrigin(values[0]);
+  } catch {
+    return '';
+  }
+};
+
+const buildAutoJoinBaseUrl = (slug: string, basePath?: string): { url: URL; workerHint: string } => {
+  const fallbackPath = buildPublicRoute(`/session/${encodeURIComponent(slug)}`);
+  if (!basePath) return { url: new URL(fallbackPath, 'https://session.invalid'), workerHint: '' };
+  try {
+    const candidate = new URL(basePath, 'https://session.invalid');
+    if (candidate.pathname.replace(/\/$/, '') !== fallbackPath) {
+      return { url: new URL(fallbackPath, 'https://session.invalid'), workerHint: '' };
+    }
+    const url = new URL(fallbackPath, 'https://session.invalid');
+    candidate.searchParams.forEach((value, key) => {
+      if (copyableAutoJoinParams.has(key)) url.searchParams.append(key, value);
+    });
+    return { url, workerHint: readValidatedWorkerHint(candidate.searchParams) };
+  } catch {
+    return { url: new URL(fallbackPath, 'https://session.invalid'), workerHint: '' };
+  }
+};
+
+export const buildWorkerGroupAutoJoinPath = (
+  sessionSlug: string,
+  groupId: string,
+  workerUrl?: string,
+  basePath?: string,
+): string => {
   const slug = canonicalizeSessionSlug(sessionSlug);
   const id = normalizeGroupId(groupId);
   if (!slug || !id) throw new Error('A session and group are required.');
-  const params = new URLSearchParams({ joinGroup: id });
+  const { url, workerHint } = buildAutoJoinBaseUrl(slug, basePath);
+  url.searchParams.set('joinGroup', id);
   // Fresh browsers need the same public discovery hint as session publish links.
-  if (workerUrl) params.set('worker', parseSessionWorkerDiscoveryOrigin(workerUrl));
-  return `${buildPublicRoute(`/session/${encodeURIComponent(slug)}`)}?${params}`;
+  const resolvedWorkerHint = workerUrl ? parseSessionWorkerDiscoveryOrigin(workerUrl) : workerHint;
+  if (resolvedWorkerHint) url.searchParams.set('worker', resolvedWorkerHint);
+  return `${url.pathname}${url.search}${url.hash}`;
 };
 
 export const removeWorkerGroupAutoJoinQuery = (path: string): string => {

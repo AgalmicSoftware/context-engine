@@ -880,7 +880,7 @@ describe('SessionVoiceModeModal', () => {
   it('offers the two large requested voice-mode choices', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
-      'One person. A voice interviewer drafts responses and may suggest new questions for review.',
+      'Let your AI agent draft your answers, then correct it.',
     );
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
@@ -953,7 +953,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent('Copy and paste this prompt into Claude or ChatGPT to augment interview');
+    expect(copyButton).toHaveTextContent('Copy Let your AI agent draft your answers, then correct it.');
     expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
@@ -1020,6 +1020,30 @@ describe('SessionVoiceModeModal', () => {
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'About the interview prompt' })).not.toBeInTheDocument();
+  });
+
+  it('keeps only bounded source and auto-join query state in the copied kickoff return URL', async () => {
+    const priorUrl = window.location.href;
+    try {
+      window.history.replaceState(
+        {},
+        '',
+        '/session/demo?src=partner launch&joinGroup=EDDY-2026&agentToken=private#prefill=hidden',
+      );
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+
+      await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
+
+      await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+      const prompt = String(jest.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] || '');
+      expect(prompt).toContain(
+        `sessionUrl=${encodeURIComponent(`${window.location.origin}/session/demo?src=partner-launch&joinGroup=eddy-2026`)}`,
+      );
+      expect(prompt).not.toContain('agentToken');
+      expect(prompt).not.toContain('prefill=hidden');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
   });
 
   it('shows a collapsed responder transcript disclosure after the voice interview ends', async () => {

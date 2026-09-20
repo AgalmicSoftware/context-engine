@@ -22,6 +22,22 @@ it('copies a session auto-join link without copying credentials from the current
   );
 });
 
+it('keeps same-session source, mode, and Worker while dropping private prefill context when copying', async () => {
+  window.history.replaceState(
+    {},
+    '',
+    '/session/alpha?mode=interview&src=partner&groups=EDDY-2026&agentToken=private#prefill=abc&secret=hidden',
+  );
+  const writeText = jest.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  render(<WorkerGroupAutoJoinLink group={group} sessionSlug="alpha" workerUrl="https://worker.example" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Copy auto-join link for Participants 2026' }));
+  expect(await screen.findByText('Auto-join link copied.')).toBeInTheDocument();
+  expect(writeText).toHaveBeenCalledWith(
+    `${window.location.origin}/session/alpha?mode=interview&src=partner&joinGroup=participants-2026&worker=https%3A%2F%2Fworker.example`,
+  );
+});
+
 it('does not offer auto-join for closed or restricted groups', () => {
   const { rerender } = render(
     <WorkerGroupAutoJoinLink
