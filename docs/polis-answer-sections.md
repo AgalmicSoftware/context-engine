@@ -68,4 +68,4 @@ mobile screen, normalizes modern theme colors for the canvas renderer, and
 restores the previous interactive expansion state when finished.
 
 Regression coverage lives beside `PolisReport` and `browserPdfExport`. The
-credential-free browser smoke is documented in [E2E commands](e2e-commands.md).
+credential-free browser smoke is covered by the repository E2E command notes.

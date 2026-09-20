@@ -97,9 +97,9 @@ and submitted-answer history restore numeric allocations without converting them
 to text; edit provenance tracks which option votes changed. Question-only previews show those options
 and the budget without introducing answer controls inside the navigation card.
 
-See [E2E commands](e2e-commands.md) for the credential-free respondent smoke.
-Live storage, wallet, and gated-decryption suites require the operator-local
-harness described there.
+Credential-free respondent smoke coverage is part of the repository E2E command
+notes. Live storage, wallet, and gated-decryption suites require the
+operator-local harness described there.
 
 ### Respondent controls
 
