@@ -16,7 +16,10 @@ describe('WorkerDeployHelperToggle', () => {
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED)).toBeChecked();
-    expect(screen.getByText('Enable embedded deploy-helper on this worker')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED).closest('label')).toHaveClass(
+      'workerToggle',
+    );
+    expect(screen.getByText('Enable embedded deploy-helper on this worker')).toHaveClass('workerToggleText');
     expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-embedded-deploy-helper-tip')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED));

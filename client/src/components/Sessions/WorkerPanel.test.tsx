@@ -81,6 +81,15 @@ describe('WorkerPanel', () => {
     expect(screen.getByText('Worker Setup')).toBeInTheDocument();
   });
 
+  it('renders the Worker Setup header as a frameless toggle', () => {
+    renderWorkerPanel();
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE)).toHaveAttribute(
+      'data-ce-control-appearance',
+      'frameless',
+    );
+  });
+
   it('fires the collapse toggle handler when the header button is clicked', () => {
     const onToggleCollapsed = jest.fn();
     renderWorkerPanel({ onToggleCollapsed });
@@ -114,6 +123,13 @@ describe('WorkerPanel', () => {
 
     expect(setWorkerLimitPerWallet).toHaveBeenCalledWith('9');
     expect(setWorkerLimitPerAnonymousIp).toHaveBeenCalledWith('12');
+  });
+
+  it('omits the planned shared hosted worker sentence from the custom-worker summary', () => {
+    renderWorkerPanel({ showSharedWorkerChoice: false });
+
+    expect(screen.getByText('Deploy your own worker or paste a worker URL you control.')).toBeInTheDocument();
+    expect(screen.queryByText(/Shared hosted worker support is planned separately/i)).not.toBeInTheDocument();
   });
 
   it('renders worker mode pills and fires the mode-change handler', () => {

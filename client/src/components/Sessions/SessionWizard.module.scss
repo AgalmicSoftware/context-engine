@@ -1578,6 +1578,8 @@ $muted-text: var(--ce-panel-text-muted);
 
 .bundleToggleGroup {
   grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
 }
 
 .promptPreview {
@@ -1926,8 +1928,12 @@ $muted-text: var(--ce-panel-text-muted);
 
 .workerDeployGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 12px;
+
+  > * {
+    min-width: 0;
+  }
 }
 
 .groupWizard .adminLoginControl {
@@ -2071,10 +2077,33 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .workerToggle {
+  box-sizing: border-box;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
   font-size: 12px;
+  line-height: 1.3;
+
+  > input[type='checkbox'],
+  :global(.form-check-input) {
+    float: none;
+    position: static;
+    flex: 0 0 auto;
+    margin: 2px 0 0 !important;
+  }
+
+  .workerToggleText {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  > :not(input):not(.workerToggleText) {
+    flex: 0 0 auto;
+  }
 }
 
 .workerConfigGrid {
@@ -2493,11 +2522,6 @@ $muted-text: var(--ce-panel-text-muted);
   &:focus-visible {
     color: var(--ce-action-accent-hover);
   }
-}
-
-.newSessionBannerTooltipTrigger {
-  margin-left: 6px;
-  vertical-align: middle;
 }
 
 .sponsoredBundleStatus {

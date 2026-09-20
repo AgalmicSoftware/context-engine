@@ -1,9 +1,8 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import CETooltip from '../Shared/CETooltip';
 import styles from './SessionWizard.module.scss';
 import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardRequirementId } from './sessionWizardModeRequirements';
@@ -15,9 +14,6 @@ export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
   arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
   optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
 });
-
-const CLOUDFLARE_ACCOUNT_TOOLTIP =
-  'Log in to your Cloudflare account in this browser before continuing, so the setup links in later steps open correctly.';
 
 const isOpenAiProviderLabel = (label: string): boolean => /\bopenai\b/i.test(label);
 
@@ -62,8 +58,6 @@ const SessionWizardRequirementsBanner = ({
   requiredAiProviderKeyLabels = [],
   requiredRequirementIds,
 }: SessionWizardRequirementsBannerProps): React.ReactElement => {
-  const cloudflareAccountTooltipId = `cloudflare-account-requirement-${React.useId().replace(/:/g, '')}`;
-  const cloudflareAccountTooltipContentId = `${cloudflareAccountTooltipId}-content`;
   const hasResolvedRequirements = Array.isArray(requiredRequirementIds);
   const requires = (requirementId: SessionWizardRequirementId): boolean =>
     !hasResolvedRequirements || requiredRequirementIds.includes(requirementId);
@@ -94,6 +88,7 @@ const SessionWizardRequirementsBanner = ({
           className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
           aria-label="Dismiss session setup requirements"
           title="Dismiss session setup requirements"
+          data-ce-control-appearance="frameless"
           onClick={onDismiss}
         >
           <FontAwesomeIcon icon={faTimes} />
@@ -111,27 +106,6 @@ const SessionWizardRequirementsBanner = ({
               >
                 Cloudflare account
               </a>
-              <button
-                id={cloudflareAccountTooltipId}
-                type="button"
-                className={`${styles.tooltipTrigger} ${styles.newSessionBannerTooltipTrigger}`}
-                data-ce-control-appearance="frameless"
-                aria-label="Why log in to Cloudflare before continuing?"
-                aria-describedby={cloudflareAccountTooltipContentId}
-              >
-                <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} aria-hidden="true" />
-              </button>
-              <CETooltip
-                id={cloudflareAccountTooltipContentId}
-                placement="top"
-                trigger="hover focus"
-                target={cloudflareAccountTooltipId}
-                className={styles.tooltipBubble}
-                delay={0}
-                container="body"
-              >
-                {CLOUDFLARE_ACCOUNT_TOOLTIP}
-              </CETooltip>
             </li>
           ) : null}
           {requires('cloudflareApiToken') ? (

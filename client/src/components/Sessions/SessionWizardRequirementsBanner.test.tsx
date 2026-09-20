@@ -40,7 +40,10 @@ describe('SessionWizardRequirementsBanner', () => {
       'mailto:contextengine@protonmail.com',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
+    const dismissButton = screen.getByRole('button', { name: /dismiss session setup requirements/i });
+    expect(dismissButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
+
+    fireEvent.click(dismissButton);
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
@@ -156,7 +159,7 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.queryByRole('link', { name: 'contextengine@protonmail.com' })).not.toBeInTheDocument();
   });
 
-  it('renders the native Cloudflare account requirement as a concise dashboard link with login guidance', async () => {
+  it('renders the native Cloudflare account requirement as a concise dashboard link', async () => {
     render(
       <SessionWizardRequirementsBanner
         fundingRequirementLabel="OP Sepolia ETH"
@@ -169,17 +172,8 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(cloudflareAccount).toHaveAttribute('href', SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount);
     expect(cloudflareAccount).toHaveAttribute('target', '_blank');
     expect(cloudflareAccount).toHaveAttribute('rel', 'noopener noreferrer');
-    const cloudflareAccountHelp = screen.getByRole('button', {
-      name: 'Why log in to Cloudflare before continuing?',
-    });
-    expect(cloudflareAccountHelp).toHaveAttribute('data-ce-control-appearance', 'frameless');
-    fireEvent.focus(cloudflareAccountHelp);
-    fireEvent.click(cloudflareAccountHelp);
-    expect(
-      await screen.findByText(
-        'Log in to your Cloudflare account in this browser before continuing, so the setup links in later steps open correctly.',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Why log in to Cloudflare before continuing?' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Log in to your Cloudflare account in this browser/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Worker step deploys the full Session Worker/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Context Engine deploy helper/i)).not.toBeInTheDocument();
   });
