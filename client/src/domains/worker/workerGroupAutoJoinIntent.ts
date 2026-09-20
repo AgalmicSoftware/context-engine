@@ -4,7 +4,8 @@ import {
   parseSessionWorkerDiscoveryOrigin,
 } from '../../utilities/session/sessionWorkerDiscovery';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl';
-import { readWorkerGroupAutoJoinId, resolveWorkerGroupAutoJoinContext } from './workerGroupAutoJoin';
+import { readWorkerGroupAutoJoinId } from './workerGroupAutoJoin';
+import type { resolveWorkerGroupAutoJoinContext } from './workerGroupAutoJoinContext';
 
 export const AUTO_JOIN_STORAGE_KEY = 'ce:worker-group-auto-join:v1';
 export const AUTO_JOIN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -87,7 +88,7 @@ export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAut
     const workers = url.searchParams.getAll('worker');
     if (workers.length > 1) return null;
     const matchingContext = context?.sessionSlug === sessionSlug ? context : null;
-    const workerOrigin = parseSessionWorkerDiscoveryOrigin(workers[0] || matchingContext?.workerUrl);
+    const workerOrigin = parseSessionWorkerDiscoveryOrigin(workers.length ? workers[0] : matchingContext?.workerUrl);
     const sessionId =
       matchingContext && parseSessionWorkerDiscoveryOrigin(matchingContext.workerUrl) === workerOrigin
         ? matchingContext.sessionId

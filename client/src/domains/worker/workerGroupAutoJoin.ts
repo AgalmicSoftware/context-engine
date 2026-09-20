@@ -1,10 +1,5 @@
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import {
-  parseSessionWorkerDiscoveryOrigin,
-  resolveWorkerCanonicalSessionIdHex,
-} from '../../utilities/session/sessionWorkerDiscovery';
-import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
+import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl';
 import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import type { WorkerGroup } from './workerGroupPorts';
@@ -40,25 +35,6 @@ export const canAutoJoinWorkerGroup = (group: WorkerGroup): boolean =>
   group.joinMode === 'open' &&
   group.memberVisibility === 'session' &&
   (!group.joinEndsAt || Date.parse(group.joinEndsAt) > Date.now());
-
-export const resolveWorkerGroupAutoJoinContext = (sessionConfig: unknown, sessionSlug: string) => {
-  const config = (sessionConfig || {}) as Record<string, unknown>;
-  const slug = canonicalizeSessionSlug(sessionSlug);
-  const projection = resolveSessionCapabilityProjection(config);
-  const sessionId = resolveWorkerCanonicalSessionIdHex(config);
-  const workerUrl = getUsableSessionWorkerUrl({ slug, sessionConfig, requireExactWorkerSession: true });
-  if (
-    !slug ||
-    canonicalizeSessionSlug(config.slug) !== slug ||
-    !sessionId ||
-    !workerUrl ||
-    projection.source !== 'profile' ||
-    !projection.profileValid ||
-    !projection.isWorkerCanonical
-  )
-    return null;
-  return { sessionSlug: slug, sessionId, workerUrl, chainId: projection.hasOnChainComponent ? projection.chainId : 1 };
-};
 
 export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, sessionId?: string) => {
   // Only consume the intent we handled; preserve other query parameters and

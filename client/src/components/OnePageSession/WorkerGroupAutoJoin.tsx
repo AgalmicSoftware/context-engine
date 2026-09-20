@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore }
 import {
   finishWorkerGroupAutoJoin,
   canAutoJoinWorkerGroup,
-  resolveWorkerGroupAutoJoinContext,
 } from '../../domains/worker/workerGroupAutoJoin';
+import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
   autoJoinIntentKey,
   clearPendingAutoJoin,
