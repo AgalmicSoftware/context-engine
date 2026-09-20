@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import fs from 'fs';
+import path from 'path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
 import type { InterviewDraftResponse } from './sessionInterview';
+
+const readDraftCardScss = () => fs.readFileSync(path.join(__dirname, 'SessionInterviewDraftCard.module.scss'), 'utf8');
 
 describe('SessionInterviewDraftCard sliders', () => {
   it('exposes both modes and preserves their independent values when editing', () => {
@@ -148,7 +152,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
   });
 
-  it('wraps injected prose editors with focus, border-aware autosize and a Done editing return path', async () => {
+  it('wraps injected prose editors with focus, bounded autosize and a Done editing return path', async () => {
     const renderAnswerInput = jest.fn((_questionId, value, onChange) => (
       <textarea
         aria-label="Injected answer"
@@ -158,7 +162,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
           if (!node) return;
           Object.defineProperty(node, 'scrollHeight', { configurable: true, value: 120 });
         }}
-        style={{ boxSizing: 'border-box', borderTopWidth: '3px', borderBottomWidth: '4px' }}
+        style={{ boxSizing: 'border-box', borderTopWidth: '3px', borderBottomWidth: '4px', maxHeight: '96px' }}
       />
     ));
     render(
@@ -178,9 +182,9 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     fireEvent.click(screen.getByRole('button', { name: /Draft answer for Explain this/i }));
     const injected = screen.getByLabelText('Injected answer') as HTMLTextAreaElement;
     expect(injected).toHaveFocus();
-    await waitFor(() => expect(injected.style.height).toBe('127px'));
+    await waitFor(() => expect(injected.style.height).toBe('96px'));
     expect(injected.style.overflow).toBe('hidden');
-    expect(injected.style.overflowY).toBe('hidden');
+    expect(injected.style.overflowY).toBe('auto');
     fireEvent.click(screen.getByRole('button', { name: 'Done editing' }));
     expect(screen.getByRole('button', { name: /Draft answer for Explain this/i })).toBeInTheDocument();
   });
@@ -225,5 +229,22 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     );
     expect(renderAnswerInput).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /Draft answer for Explain this/i })).toHaveTextContent('Freeform draft');
+  });
+});
+
+describe('SessionInterviewDraftCard styles', () => {
+  it('keeps long freeform editors scrollable and the AI marker borderless', () => {
+    const scss = readDraftCardScss();
+
+    expect(scss).toMatch(
+      /\.autosizeTextArea\s*\{[\s\S]*?max-height:\s*min\(34vh, 320px\);[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /\.injectedEditorShell textarea\s*\{[\s\S]*?max-height:\s*min\(34vh, 320px\);[\s\S]*?overflow:\s*hidden;[\s\S]*?overflow-y:\s*hidden;/,
+    );
+    expect(scss).not.toMatch(/\.injectedEditorShell textarea\s*\{[\s\S]*?overflow(?:-y)?:\s*[^;]+!important/);
+    expect(scss).toMatch(
+      /\.agentCommentMarker\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
+    );
   });
 });

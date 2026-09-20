@@ -107,6 +107,7 @@
 
 .autosizeTextArea {
   min-height: 76px;
+  max-height: min(34vh, 320px);
   width: 100%;
   overflow: hidden;
   resize: none;
@@ -130,11 +131,14 @@
 .injectedEditorShell {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .injectedEditorShell textarea {
   min-height: 76px;
-  overflow: hidden !important;
+  max-height: min(34vh, 320px);
+  overflow: hidden;
+  overflow-y: hidden;
   resize: none !important;
 }
 
@@ -184,26 +188,27 @@
 }
 
 .footerIconCluster {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
 .agentCommentMarker {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   justify-content: center;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--ce-status-success-text);
-  font-size: 0.88rem;
+  font-size: 0.96rem;
   font-weight: 850;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+  box-shadow: none;
 }
 
 .confidence {
@@ -317,5 +322,9 @@
   .controlsRow {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .footerIconCluster {
+    justify-content: flex-end;
   }
 }

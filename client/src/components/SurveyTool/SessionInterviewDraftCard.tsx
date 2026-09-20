@@ -74,10 +74,13 @@ const DraftEditableText = ({
       computed.boxSizing === 'border-box'
         ? (Number.parseFloat(computed.borderTopWidth) || 0) + (Number.parseFloat(computed.borderBottomWidth) || 0)
         : 0;
+    const maxHeight = Number.parseFloat(computed.maxHeight) || 0;
     node.style.height = 'auto';
     node.style.overflow = 'hidden';
-    node.style.overflowY = 'hidden';
-    node.style.height = `${Math.ceil(node.scrollHeight + borderBoxAdjustment)}px`;
+    const desiredHeight = Math.ceil(node.scrollHeight + borderBoxAdjustment);
+    const boundedHeight = maxHeight > 0 ? Math.min(desiredHeight, maxHeight) : desiredHeight;
+    node.style.overflowY = maxHeight > 0 && desiredHeight > maxHeight ? 'auto' : 'hidden';
+    node.style.height = `${boundedHeight}px`;
   }, []);
   const resizeInjectedTextareas = useCallback(() => {
     const wrapper = injectedEditorRef.current;

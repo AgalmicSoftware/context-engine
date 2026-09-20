@@ -50,6 +50,9 @@ describe('SurveyTool styles', () => {
       /\.sessionInterviewStatusPill\s*\{[\s\S]*?&\[data-tone='error'\]\s*\{[\s\S]*?background:\s*var\(--ce-status-error\) !important;/,
     );
     expect(scss).toMatch(
+      /\.sessionInterviewContext\s*\{[\s\S]*?border:\s*1px solid var\(--ce-card-border\);[\s\S]*?summary\s*\{[\s\S]*?cursor:\s*pointer;[\s\S]*?font-weight:\s*800;/,
+    );
+    expect(scss).toMatch(
       /\.sessionInterviewMappingNotice\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-status-warning\) 58%, var\(--ce-card-border\)\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-status-warning\) 12%, var\(--ce-surface-sunken\)\);[\s\S]*?color:\s*var\(--ce-panel-text\);/,
     );
     expect(scss).toMatch(
@@ -62,7 +65,11 @@ describe('SurveyTool styles', () => {
       /\.sessionInterviewConfidenceTrack\s*\{[\s\S]*?height:\s*9px;[\s\S]*?overflow:\s*hidden;[\s\S]*?border-radius:\s*var\(--ce-radius-round\);/,
     );
     expect(scss).toMatch(
-      /\.sessionInterviewReviewActions\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?bottom:\s*-18px;[\s\S]*?justify-content:\s*space-between;/,
+      /\.sessionInterviewReviewActions\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?bottom:\s*-18px;[\s\S]*?z-index:\s*20;[\s\S]*?justify-content:\s*space-between;[\s\S]*?flex-wrap:\s*wrap;/,
+    );
+    expect(scss).not.toContain('&:has(.sessionInterviewMetadata)');
+    expect(scss).toMatch(
+      /\.sessionInterviewReviewActions \.sessionInterviewSubmitButton\s*\{[\s\S]*?flex:\s*0 0 min\(100%, 280px\);[\s\S]*?margin-left:\s*auto;/,
     );
     expect(scss).toMatch(
       /\.sessionInterviewAnswerInput\s*\{[\s\S]*?background:\s*var\(--ce-input-bg\) !important;[\s\S]*?color:\s*var\(--ce-panel-text\) !important;[\s\S]*?opacity:\s*1;/,
