@@ -22,6 +22,11 @@ type UseSessionInterviewGroupRecommendationsArgs = {
   workerUrl?: string;
 };
 
+export type SessionInterviewGroupRecommendationState = {
+  availability: 'idle' | 'loading' | 'available' | 'empty' | 'unsupported' | 'error';
+  recommendations: InterviewGroupRecommendation[];
+};
+
 const questionPromptById = (questions: InterviewQuestion[]): Map<string, string> =>
   new Map(
     questions
@@ -52,18 +57,21 @@ export function useSessionInterviewGroupRecommendations({
   sessionConfig,
   sessionSlug = '',
   workerUrl = '',
-}: UseSessionInterviewGroupRecommendationsArgs): InterviewGroupRecommendation[] {
+}: UseSessionInterviewGroupRecommendationsArgs): SessionInterviewGroupRecommendationState {
+  const availabilityScopeKey = useMemo(
+    () => (active ? [sessionSlug, workerUrl].map((value) => String(value || '')).join('\n') : ''),
+    [active, sessionSlug, workerUrl],
+  );
   const requestKey = useMemo(
-    () =>
-      active && request
-        ? [request.requestId, sessionSlug, workerUrl].map((value) => String(value || '')).join('\n')
-        : '',
-    [active, request, sessionSlug, workerUrl],
+    () => (active && request ? [request.requestId, availabilityScopeKey].map((value) => String(value || '')).join('\n') : ''),
+    [active, availabilityScopeKey, request],
   );
   const [recommendationState, setRecommendationState] = useState<{
+    availability: SessionInterviewGroupRecommendationState['availability'];
     key: string;
+    scopeKey: string;
     recommendations: InterviewGroupRecommendation[];
-  }>({ key: '', recommendations: [] });
+  }>({ availability: 'idle', key: '', scopeKey: '', recommendations: [] });
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -73,10 +81,16 @@ export function useSessionInterviewGroupRecommendations({
     let canceled = false;
 
     const load = async () => {
+      setRecommendationState({ availability: 'loading', key: requestKey, scopeKey: availabilityScopeKey, recommendations: [] });
       const catalog = await loadInterviewWorkerGroupCandidates({ sessionConfig, sessionSlug, workerUrl });
-      if (canceled || requestRef.current !== requestId || catalog.status !== 'ready' || !catalog.candidates.length) {
-        if (!canceled && requestRef.current === requestId)
-          setRecommendationState({ key: requestKey, recommendations: [] });
+      if (canceled || requestRef.current !== requestId) return;
+      if (catalog.status !== 'ready' || !catalog.candidates.length) {
+        setRecommendationState({
+          availability: catalog.status === 'unsupported' ? 'unsupported' : catalog.status === 'error' ? 'error' : 'empty',
+          key: requestKey,
+          scopeKey: availabilityScopeKey,
+          recommendations: [],
+        });
         return;
       }
       const result = await recommendInterviewGroups({
@@ -90,25 +104,38 @@ export function useSessionInterviewGroupRecommendations({
       });
       if (canceled || requestRef.current !== requestId) return;
       setRecommendationState({
+        availability: 'available',
         key: requestKey,
+        scopeKey: availabilityScopeKey,
         recommendations: result.status === 'ready' ? result.recommendations : [],
       });
     };
 
     void load().catch(() => {
       if (!canceled && requestRef.current === requestId)
-        setRecommendationState({ key: requestKey, recommendations: [] });
+        setRecommendationState({ availability: 'error', key: requestKey, scopeKey: availabilityScopeKey, recommendations: [] });
     });
 
     return () => {
       canceled = true;
       requestRef.current += 1;
     };
-  }, [active, questions, request, requestKey, sessionConfig, sessionSlug, workerUrl]);
+  }, [active, availabilityScopeKey, questions, request, requestKey, sessionConfig, sessionSlug, workerUrl]);
 
   useEffect(() => {
-    if (!requestKey) setRecommendationState({ key: '', recommendations: [] });
-  }, [requestKey]);
+    if (!requestKey)
+      setRecommendationState((current) => {
+        const preserveAvailability = current.scopeKey === availabilityScopeKey && current.availability !== 'loading';
+        return {
+          availability: preserveAvailability ? current.availability : 'idle',
+          key: '',
+          scopeKey: availabilityScopeKey,
+          recommendations: [],
+        };
+      });
+  }, [availabilityScopeKey, requestKey]);
 
-  return recommendationState.key === requestKey ? recommendationState.recommendations : [];
+  if (recommendationState.key !== requestKey || recommendationState.scopeKey !== availabilityScopeKey)
+    return { availability: 'idle', recommendations: [] };
+  return { availability: recommendationState.availability, recommendations: recommendationState.recommendations };
 }

@@ -734,6 +734,7 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     toggleSessionVoiceModeModal: bindPileEngineMethod(engine, toggleSessionVoiceModeModal),
     selectSessionVoiceMode: bindPileEngineMethod(engine, selectSessionVoiceMode),
     closeSessionVoiceModeModal: bindPileEngineMethod(engine, closeSessionVoiceModeModal),
+    viewResultsFromSessionVoiceModeModal: bindPileEngineMethod(engine, viewResultsFromSessionVoiceModeModal),
     recordInterviewProvenance: bindPileEngineMethod(engine, recordInterviewProvenance),
     toggleHologramAssistant: bindPileEngineMethod(engine, toggleHologramAssistant),
     toggleConviction: bindPileEngineMethod(engine, toggleConviction),
@@ -1716,6 +1717,27 @@ const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
       engine.syncSessionVoiceModeQuery(null);
     },
   );
+};
+
+const appendCurrentWorkerHintToPath = (pathIn = ''): string => {
+  if (typeof window === 'undefined') return pathIn;
+  const worker = new URLSearchParams(window.location.search || '').get('worker')?.trim();
+  if (!worker) return pathIn;
+  const [pathAndSearch, fragment = ''] = String(pathIn || '').split('#');
+  const [pathname, search = ''] = pathAndSearch.split('?');
+  const params = new URLSearchParams(search);
+  if (!params.has('worker')) params.set('worker', worker);
+  const query = params.toString();
+  return `${pathname}${query ? `?${query}` : ''}${fragment ? `#${fragment}` : ''}`;
+};
+
+const viewResultsFromSessionVoiceModeModal = (engine: PileViewModeEngine) => {
+  engine.closeSessionVoiceModeModal();
+  if (typeof window === 'undefined') return;
+  const slug = resolveEffectiveSlug(engine.props);
+  const path = applyExistingGroupPrefix(appendCurrentWorkerHintToPath(appendExplicitSessionHintToPath('/questions/results', slug)));
+  window.history.pushState({}, '', path);
+  window.dispatchEvent(new Event('popstate'));
 };
 
 export const recordInterviewProvenance = (
@@ -3312,6 +3334,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   if (!engine.props.loginComplete) return { status: 'login-required' as const };
                   return { status: 'failed' as const, message: 'Submission did not complete.' };
                 }}
+                onViewResults={engine.viewResultsFromSessionVoiceModeModal}
                 renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion) =>
                   engine.renderPileResponseInput({
                     // The live interview catalog can discover questions before the pile cache does.

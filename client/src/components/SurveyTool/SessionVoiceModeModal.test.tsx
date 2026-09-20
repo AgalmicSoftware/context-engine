@@ -19,7 +19,7 @@ jest.mock('./SessionInterviewRecommendedGroups', () => ({
 }));
 
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
-  useSessionInterviewGroupRecommendations: jest.fn(() => []),
+  useSessionInterviewGroupRecommendations: jest.fn(() => ({ availability: 'idle', recommendations: [] })),
 }));
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({
@@ -134,6 +134,7 @@ describe('SessionVoiceModeModal', () => {
     baseProps.onSubmitResponses.mockResolvedValue({ status: 'submitted' });
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'idle', recommendations: [] });
   });
 
   it.each([
@@ -311,18 +312,18 @@ describe('SessionVoiceModeModal', () => {
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    expect(screen.getByLabelText(/Include self-reported AI platform/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Privacy q1 answer' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Privacy q1 additional' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'About accuracy research' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'About research metadata' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
     expect(metadata).not.toHaveAttribute('open');
-    expect(metadata.querySelector('summary')).toHaveTextContent('AI prefill metadata · example');
+    expect(metadata.querySelector('summary')).toHaveTextContent('AI prefill metadata');
     fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveAttribute('open');
     expect(metadata).toHaveTextContent('Claude');
+    expect(metadata).toHaveTextContent('example');
     expect(metadata).toHaveTextContent('Self-reported');
     expect(metadata).toHaveTextContent('ce-interview-brief-v4');
     expect(metadata).toHaveTextContent('a'.repeat(64));
@@ -831,13 +832,16 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it('does not mount group recommendations while interview mapping is still running', async () => {
-    mockedUseSessionInterviewGroupRecommendations.mockReturnValue([
-      {
-        groupId: 'ai-optimists',
-        reason: 'They asked for accountability groups.',
-        evidence: 'I want AI accountability groups.',
-      },
-    ]);
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
+      availability: 'available',
+      recommendations: [
+        {
+          groupId: 'ai-optimists',
+          reason: 'They asked for accountability groups.',
+          evidence: 'I want AI accountability groups.',
+        },
+      ],
+    });
     let finishMapping: ((value: []) => void) | null = null;
     mockedMapInterviewEvidenceToResponses.mockImplementation(
       () =>
@@ -1183,7 +1187,148 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
+  it('shows confirmed submit success before offering results navigation and clears it on edit', async () => {
+    jest.useFakeTimers();
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onViewResults = jest.fn();
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        onViewResults={onViewResults}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
+          responderContext: { summary: 'Relevant context' },
+        }}
+      />,
+    );
+
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
+
+    const submitButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
+    expect(submitButton).toHaveTextContent('Responses submitted');
+    expect(submitButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
+    expect(submitButton).toBeDisabled();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+
+    await act(async () => {
+      jest.advanceTimersByTime(4999);
+    });
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS));
+    expect(onViewResults).toHaveBeenCalledTimes(1);
+
+    await editReadableDraftText('Draft answer for What matters?', 'Edited after submit');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Submit responses');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+  });
+
+  it('keeps the confirmed success button disabled when no results navigation handler exists', async () => {
+    jest.useFakeTimers();
+    try {
+      mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+        { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+      ]);
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v1',
+            source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
+            responderContext: { summary: 'Relevant context' },
+          }}
+        />,
+      );
+
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
+
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      const submitButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
+      expect(submitButton).toHaveTextContent('Responses submitted');
+      expect(submitButton).toBeDisabled();
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('shows manual group refresh after edits only when a group catalog was available', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
+      availability: 'available',
+      recommendations: [],
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'other', modelId: 'fixture', verification: 'self_reported' },
+          responderContext: { summary: 'Relevant context' },
+        }}
+      />,
+    );
+
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
+    await editReadableDraftText('Draft answer for What matters?', 'Edited answer');
+    expect(screen.getByRole('button', { name: 'Refresh group suggestions' })).toBeInTheDocument();
+  });
+
+  it('hides manual group refresh after edits when the session has no configured groups', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
+      availability: 'empty',
+      recommendations: [],
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'other', modelId: 'fixture', verification: 'self_reported' },
+          responderContext: { summary: 'Relevant context' },
+        }}
+      />,
+    );
+
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    await editReadableDraftText('Draft answer for What matters?', 'Edited answer');
+    expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
+  });
+
   it('reviews agent-authored predictions with confidence without remapping or misattributing them', async () => {
+    const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = jest.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
     const prefillPacket = {
       version: 1 as const,
       sessionSlug: 'demo',
@@ -1214,9 +1359,15 @@ describe('SessionVoiceModeModal', () => {
         },
       ],
     };
-    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    try {
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
-    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
+      expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
+    const panel = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PANEL);
     const coverage = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE);
     expect(coverage).toHaveTextContent('Self-reported agent research coverage');
     expect(coverage).toHaveTextContent('History chats: 8 used');
@@ -1224,6 +1375,13 @@ describe('SessionVoiceModeModal', () => {
     expect(coverage).toHaveTextContent('Connected sources: 1 used / 3 searched');
     expect(coverage).toHaveTextContent('15 user statements used');
     expect(coverage).toHaveTextContent('Chat search did not expose a total scanned count.');
+    const footer = coverage.nextElementSibling;
+    expect(footer).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(panel.lastElementChild).toBe(footer);
+    const responderContext = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT);
+    expect(responderContext).toHaveValue('A tentative related signal.');
+    expect(responderContext.closest('details')).not.toHaveAttribute('open');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
     fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
@@ -1465,11 +1623,11 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
     expect(includeComparison).not.toBeChecked();
-    fireEvent.click(screen.getByLabelText(/Include self-reported AI platform\/model provenance/i));
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
     fireEvent.click(metadata.querySelector('summary')!);
-    expect(metadata).toHaveTextContent('Source platform and coverage details will not be included.');
-    expect(metadata).not.toHaveTextContent('a'.repeat(64));
+    expect(metadata).toHaveTextContent('Platform');
+    expect(metadata).toHaveTextContent('Claude');
+    expect(metadata).toHaveTextContent('Question set');
     expect(metadata).toHaveTextContent(
       'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
     );
@@ -1482,7 +1640,7 @@ describe('SessionVoiceModeModal', () => {
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1' })]),
         expect.objectContaining({ platform: 'claude' }),
         expect.any(Object),
-        false,
+        true,
         true,
         '',
         expect.any(Array),

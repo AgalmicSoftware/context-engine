@@ -19,7 +19,7 @@ import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import SessionInterviewDraftCard, { type InterviewQuestionControls } from './SessionInterviewDraftCard';
 import SessionListeningPanel, {
@@ -60,6 +60,7 @@ type UnknownRecord = SessionInterviewModalRecord;
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
   onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
+  onViewResults?: () => void;
   onClose: () => void;
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
   onApplyAdditional: (questionId: string, comments: string) => void | Promise<void>;
@@ -131,6 +132,7 @@ function SessionInterviewPanel({
   onApplyConviction,
   onRecordProvenance,
   onSubmitResponses,
+  onViewResults,
   renderAnswerInput,
   renderAdditionalInput,
   renderFieldLock,
@@ -140,6 +142,7 @@ function SessionInterviewPanel({
   const importedRef = useRef(false);
   const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
   const interviewOpening = useInterviewOpening({
@@ -173,8 +176,8 @@ function SessionInterviewPanel({
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
-  const isDirectUserContextPrefill = prefillPacket?.source.modelId === 'direct-user-context';
-  const hasAiPrefill = Boolean(prefillPacket && !isDirectUserContextPrefill);
+  const isDirectUserContextPrefill = prefillPacket?.source?.modelId === 'direct-user-context';
+  const hasAiPrefill = Boolean(prefillPacket?.source && !isDirectUserContextPrefill);
   const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
   const hasAiGeneratedReview = drafts.length > 0 && !isDirectUserContextPrefill;
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
@@ -185,6 +188,10 @@ function SessionInterviewPanel({
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [contextExpanded, setContextExpanded] = useState(false);
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
+  const [showViewResults, setShowViewResults] = useState(false);
+  const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   useEffect(() => {
     if (workerUrl) setResolvedWorkerUrl(workerUrl);
   }, [workerUrl]);
@@ -194,6 +201,7 @@ function SessionInterviewPanel({
     return () => {
       disposedRef.current = true;
       if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
     };
   }, []);
 
@@ -266,7 +274,7 @@ function SessionInterviewPanel({
     sessionConfig,
     sessionSlug,
   });
-  const generatedGroupRecommendations = useSessionInterviewGroupRecommendations({
+  const generatedGroupRecommendationState = useSessionInterviewGroupRecommendations({
     active: !isInterviewBusy && !mapping,
     request: groupRecommendationRequest,
     questions,
@@ -274,6 +282,18 @@ function SessionInterviewPanel({
     sessionSlug,
     workerUrl: resolvedWorkerUrl,
   });
+  const generatedGroupRecommendations = generatedGroupRecommendationState.recommendations;
+
+  useEffect(() => {
+    if (generatedGroupRecommendationState.availability === 'available') {
+      setHasRefreshableGroups(true);
+    } else if (
+      groupRecommendationRequest &&
+      ['empty', 'unsupported', 'error'].includes(generatedGroupRecommendationState.availability)
+    ) {
+      setHasRefreshableGroups(false);
+    }
+  }, [generatedGroupRecommendationState.availability, groupRecommendationRequest]);
 
   useEffect(() => {
     if (isStarting || mapping) statusRef.current?.focus();
@@ -328,6 +348,12 @@ function SessionInterviewPanel({
       setMapping(true);
       setError('');
       setMappingNotice('');
+      setSubmitSucceeded(false);
+      setShowViewResults(false);
+      if (viewResultsRevealRef.current) {
+        clearTimeout(viewResultsRevealRef.current);
+        viewResultsRevealRef.current = null;
+      }
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
@@ -410,15 +436,19 @@ function SessionInterviewPanel({
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
-        setGroupRecommendationRequest({
-          requestId: Date.now(),
-          transcript: nextTranscript,
-          prefillPacket: contextPacket,
-          draftResponses: review.drafts.map((draft) => ({
-            ...draft,
-            ...(review.edited[draft.questionId] || {}),
-          })),
-        });
+        if (review.drafts.length) {
+          setGroupRecommendationRequest({
+            requestId: Date.now(),
+            transcript: nextTranscript,
+            prefillPacket: contextPacket,
+            draftResponses: review.drafts.map((draft) => ({
+              ...draft,
+              ...(review.edited[draft.questionId] || {}),
+            })),
+          });
+        } else {
+          setGroupRecommendationRequest(null);
+        }
         setMappingNotice(
           review.drafts.length
             ? ''
@@ -470,7 +500,7 @@ function SessionInterviewPanel({
   }, [prefillPacket, questions.length, runMapping]);
 
   useEffect(() => {
-    if (drafts.length && !mapping) {
+    if (drafts.length && !mapping && !importedRef.current) {
       reviewRef.current?.focus();
       reviewRef.current?.scrollIntoView?.({ block: 'start' });
     }
@@ -563,6 +593,14 @@ function SessionInterviewPanel({
       onApplyImportance,
       onRecordProvenance,
       onSubmitResponses,
+      onSubmitted: () => {
+        setSubmitSucceeded(true);
+        setShowViewResults(false);
+        if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
+        viewResultsRevealRef.current = setTimeout(() => {
+          if (!disposedRef.current) setShowViewResults(true);
+        }, 5000);
+      },
       onRequestLogin: () => toggleLoginModal?.(true),
       setApplying,
       setError,
@@ -643,6 +681,12 @@ function SessionInterviewPanel({
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
+  const hasImportedExternalPrefill = Boolean(
+    prefillPacket &&
+      Array.isArray(prefillPacket.responses) &&
+      ['claude', 'chatgpt'].includes(String(prefillPacket.source?.platform || '').toLowerCase()),
+  );
+  const canManuallyRefreshGroupRecommendations = hasRefreshableGroups && drafts.length > 0;
 
   const guidance = isPaused
     ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
@@ -706,8 +750,13 @@ function SessionInterviewPanel({
       <ModalBody>
         <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
           {hasImportedResponderContext ? (
-            <div className={styles.sessionInterviewContext}>
-              <Label for="ce-interview-context">Imported responder context</Label>
+            <details
+              className={styles.sessionInterviewContext}
+              open={contextExpanded}
+              onToggle={(event) => setContextExpanded(event.currentTarget.open)}
+            >
+              <summary>Imported responder context</summary>
+              <Label for="ce-interview-context">Imported responder context details</Label>
               <Input
                 id="ce-interview-context"
                 type="textarea"
@@ -720,19 +769,7 @@ function SessionInterviewPanel({
                 className={styles.sessionInterviewContextInput}
                 data-testid={E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT}
               />
-            </div>
-          ) : null}
-
-          {researchCoverage ? (
-            <section
-              className={styles.sessionInterviewResearchCoverage}
-              aria-label="Self-reported agent research coverage"
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
-            >
-              <strong>Self-reported agent research coverage</strong>
-              <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
-              {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
-            </section>
+            </details>
           ) : null}
 
           {updates.notice ? <p role="status">{updates.notice}</p> : null}
@@ -867,7 +904,7 @@ function SessionInterviewPanel({
             </div>
           ) : null}
 
-          {kickoff ? (
+          {kickoff && !hasImportedExternalPrefill ? (
             <SessionInterviewMemoryKickoffCard
               kickoff={kickoff}
               promptCopied={promptCopied}
@@ -894,66 +931,33 @@ function SessionInterviewPanel({
                   selected={Boolean(selected[draft.questionId])}
                   existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
                   disabled={applying}
-                  onSelect={(value) => setSelected((current) => ({ ...current, [draft.questionId]: value }))}
+                  onSelect={(value) => {
+                    setSubmitSucceeded(false);
+                    setShowViewResults(false);
+                    if (viewResultsRevealRef.current) {
+                      clearTimeout(viewResultsRevealRef.current);
+                      viewResultsRevealRef.current = null;
+                    }
+                    setSelected((current) => ({ ...current, [draft.questionId]: value }));
+                  }}
                   onEdit={(patch) => {
                     setGroupRecommendationRequest(null);
                     setEditedDrafts((current) => ({
                       ...current,
                       [draft.questionId]: { ...current[draft.questionId], ...patch },
                     }));
+                    setSubmitSucceeded(false);
+                    setShowViewResults(false);
+                    if (viewResultsRevealRef.current) {
+                      clearTimeout(viewResultsRevealRef.current);
+                      viewResultsRevealRef.current = null;
+                    }
                   }}
                   renderAnswerInput={renderAnswerInput}
                   renderAdditionalInput={renderAdditionalInput}
                   renderFieldLock={renderFieldLock}
                 />
               ))}
-              <div className={styles.sessionInterviewReviewActions}>
-                <div className={styles.sessionInterviewConsentOptions}>
-                  {researchAvailable ? (
-                    <SessionInterviewResearchConsent
-                      packet={researchPacket}
-                      showProvenance={hasAiPrefill}
-                      revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
-                      includeProvenance={includeProvenance}
-                      includeComparison={includePredictionComparison}
-                      onProvenanceChange={setIncludeProvenance}
-                      onComparisonChange={setIncludePredictionComparison}
-                      coverageDetails={researchCoverageDetails}
-                      selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
-                      unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
-                      disabled={applying}
-                    />
-                  ) : null}
-                  {importedResponderName ? (
-                    <Label check className={styles.sessionInterviewProvenance}>
-                      <Input
-                        type="checkbox"
-                        checked={includeResponderName}
-                        onChange={(event) => setIncludeResponderName(event.target.checked)}
-                        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
-                      />{' '}
-                      Include “{importedResponderName}” as the responder name with submitted responses
-                    </Label>
-                  ) : null}
-                </div>
-                <Button
-                  color="primary"
-                  onClick={() => {
-                    void applyDrafts();
-                  }}
-                  disabled={
-                    applying || mapping || isInterviewBusy || !drafts.some((draft) => selected[draft.questionId])
-                  }
-                  className={styles.sessionInterviewSubmitButton}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
-                >
-                  {applying
-                    ? 'Preparing submission…'
-                    : pendingSubmitAfterLogin && !authenticatedForSubmit
-                      ? 'Submit after login'
-                      : 'Submit responses'}
-                </Button>
-              </div>
             </SessionInterviewReviewSection>
           ) : null}
           {suggestedQuestions.length > 0 ? (
@@ -963,7 +967,7 @@ function SessionInterviewPanel({
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
           ) : null}
-          {!isInterviewBusy && !mapping && drafts.length && !groupRecommendationRequest ? (
+          {!isInterviewBusy && !mapping && canManuallyRefreshGroupRecommendations && !groupRecommendationRequest ? (
             <Button outline onClick={refreshGroupRecommendations}>
               Refresh group suggestions
             </Button>
@@ -981,6 +985,86 @@ function SessionInterviewPanel({
               sessionSlug={sessionSlug}
               workerUrl={resolvedWorkerUrl}
             />
+          ) : null}
+          {researchCoverage ? (
+            <section
+              className={styles.sessionInterviewResearchCoverage}
+              aria-label="Self-reported agent research coverage"
+              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
+            >
+              <strong>Self-reported agent research coverage</strong>
+              <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
+              {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
+            </section>
+          ) : null}
+          {drafts.length && !isInterviewBusy && !mapping ? (
+            <div className={styles.sessionInterviewReviewActions}>
+              <div className={styles.sessionInterviewConsentOptions}>
+                {researchAvailable ? (
+                  <SessionInterviewResearchConsent
+                    packet={researchPacket}
+                    showProvenance={hasAiPrefill}
+                    revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
+                    includeProvenance={includeProvenance}
+                    includeComparison={includePredictionComparison}
+                    onProvenanceChange={setIncludeProvenance}
+                    onComparisonChange={setIncludePredictionComparison}
+                    coverageDetails={researchCoverageDetails}
+                    selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
+                    unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
+                    disabled={applying}
+                  />
+                ) : null}
+                {importedResponderName ? (
+                  <Label check className={styles.sessionInterviewProvenance}>
+                    <Input
+                      type="checkbox"
+                      checked={includeResponderName}
+                      onChange={(event) => setIncludeResponderName(event.target.checked)}
+                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
+                    />{' '}
+                    Include “{importedResponderName}” as the responder name with submitted responses
+                  </Label>
+                ) : null}
+              </div>
+              <Button
+                color="primary"
+                onClick={() => {
+                  if (submitSucceeded && showViewResults && onViewResults) {
+                    onViewResults();
+                    return;
+                  }
+                  void applyDrafts();
+                }}
+                disabled={
+                  applying ||
+                  mapping ||
+                  isInterviewBusy ||
+                  (submitSucceeded && (!showViewResults || !onViewResults)) ||
+                  !drafts.some((draft) => selected[draft.questionId])
+                }
+                className={styles.sessionInterviewSubmitButton}
+                data-testid={
+                  submitSucceeded && showViewResults && onViewResults
+                    ? E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS
+                    : E2E_TESTIDS.SESSION_INTERVIEW_APPLY
+                }
+              >
+                {submitSucceeded && showViewResults && onViewResults ? (
+                  'View results'
+                ) : submitSucceeded ? (
+                  <>
+                    <FontAwesomeIcon icon={faCheck} /> Responses submitted
+                  </>
+                ) : applying ? (
+                  'Preparing submission…'
+                ) : pendingSubmitAfterLogin && !authenticatedForSubmit ? (
+                  'Submit after login'
+                ) : (
+                  'Submit responses'
+                )}
+              </Button>
+            </div>
           ) : null}
         </div>
       </ModalBody>

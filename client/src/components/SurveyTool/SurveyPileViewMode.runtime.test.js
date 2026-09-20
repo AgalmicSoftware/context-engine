@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -450,6 +450,53 @@ describe('SurveyPileViewMode runtime surface', () => {
     renderPile({}, { route: '/session/demo?mode=recordGroup' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'recordGroup');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
+  });
+
+  it('lets the interview modal close and navigate to session results after submit success', async () => {
+    const onPopState = jest.fn();
+    window.addEventListener('popstate', onPopState);
+    renderPile({ activeSessionSlug: 'demo' }, { route: '/session/demo?mode=interview#drafts' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+
+    try {
+      await act(async () => {
+        mockVoiceModeProps.onViewResults();
+      });
+    } finally {
+      window.removeEventListener('popstate', onPopState);
+    }
+
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    expect(window.location.pathname).toBe('/questions/results');
+    expect(window.location.search).toContain('session=demo');
+    expect(onPopState).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves explicit worker query and drops modal state when interview results navigation runs', async () => {
+    const onPopState = jest.fn();
+    window.addEventListener('popstate', onPopState);
+    renderPile(
+      { activeSessionSlug: 'demo' },
+      { route: '/session/demo?mode=interview&worker=https%3A%2F%2Fworker.custom.example%2Fedge#drafts' },
+    );
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+
+    try {
+      await act(async () => {
+        mockVoiceModeProps.onViewResults();
+      });
+    } finally {
+      window.removeEventListener('popstate', onPopState);
+    }
+
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    expect(window.location.pathname).toBe('/questions/results');
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('session')).toBe('demo');
+    expect(params.get('worker')).toBe('https://worker.custom.example/edge');
+    expect(params.has('mode')).toBe(false);
+    expect(window.location.hash).toBe('');
+    expect(onPopState).toHaveBeenCalledTimes(1);
   });
 
   it('renders newly discovered quadratic interview questions before the pile cache catches up', async () => {

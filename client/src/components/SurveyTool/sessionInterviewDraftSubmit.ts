@@ -43,6 +43,7 @@ type RunInterviewDraftSubmitInput = {
     review?: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }>,
   ) => void | Promise<void>;
   onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
+  onSubmitted?: () => void;
   onRequestLogin?: () => void;
   setApplying: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string>>;
@@ -92,6 +93,7 @@ export const runInterviewDraftSubmit = async ({
   onApplyImportance,
   onRecordProvenance,
   onSubmitResponses,
+  onSubmitted,
   onRequestLogin,
   setApplying,
   setError,
@@ -204,6 +206,7 @@ export const runInterviewDraftSubmit = async ({
       setPendingSubmitAfterLogin,
     });
     setStatus('Responses submitted');
+    onSubmitted?.();
   } catch (applyError) {
     if (disposedRef.current) return;
     clearPendingSubmit({
