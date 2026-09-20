@@ -69,19 +69,22 @@ describe('SurveySelector Lit hook forwarding', () => {
     expect(resultsNode?.props?.litHooks).toBe(litHooks);
   });
 
-  it('forwards scoped Lit hooks from questions dashboard to pile question surfaces', () => {
+  it('forwards scoped session, network, and Lit hooks from questions dashboard to pile question surfaces', () => {
     const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
     const lit = { getKey: jest.fn() };
+    const sessionConfig = { slug: 'demo-2', networkChainId: 11155420, demoCompatibilitySeed: { temporary: true } };
     const SurveyQuestionsComponent = () => null;
     const subject = new QuestionsDashboard({
       SurveyQuestionsComponent,
       account: '0x123',
       provider: {},
       network: { id: 11155420 },
+      networkChainId: 11155420,
       lit,
       litHooks,
-      activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
+      activeSessionSlug: 'demo-2',
+      sessionSlug: 'demo-2',
+      sessionConfig,
       isQuestionCacheReady: true,
       isResponsesCacheReady: true,
       isSurveyCacheReady: true,
@@ -98,5 +101,7 @@ describe('SurveySelector Lit hook forwarding', () => {
 
     expect(questionsNode?.props?.lit).toBe(lit);
     expect(questionsNode?.props?.litHooks).toBe(litHooks);
+    expect(questionsNode?.props?.sessionConfig).toBe(sessionConfig);
+    expect(questionsNode?.props?.networkChainId).toBe(11155420);
   });
 });

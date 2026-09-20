@@ -76,6 +76,13 @@ describe('surveyPolisDemoQuestionPool', () => {
         sourceSlug: '',
       }),
     ).toEqual([]);
+    expect(
+      resolvePolisDemoQuestionPool({
+        displaySlug: 'demo-2',
+        sourceSlug: 'demo-2',
+        pathname: '/session/demo-2/questions',
+      }),
+    ).toEqual([]);
   });
 
   it('recognizes /session/demo after route source aliasing clears the display slug', () => {

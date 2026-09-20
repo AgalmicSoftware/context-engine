@@ -1670,6 +1670,7 @@ export class SurveySelector extends Component<any, any> {
             lit={this.props.lit}
             litHooks={this.props.litHooks}
             network={this.props.network}
+            networkChainId={this.props.networkChainId}
             toggleLoginModal={this.props.toggleLoginModal}
             loginComplete={this.props.loginComplete}
             cache={this.props.cache}
@@ -2054,6 +2055,8 @@ export class QuestionsDashboard extends Component<any, any> {
               network={this.props.network}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
               sessionSlug={this.props.sessionSlug}
+              sessionConfig={this.props.sessionConfig}
+              networkChainId={this.props.networkChainId}
               refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
               refreshQuestionMetadata={this.props.refreshQuestionMetadata}
               refreshQuestionResponses={this.props.refreshQuestionResponses}
