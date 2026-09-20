@@ -159,11 +159,10 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
 
   async function fetchQuestionPool() {
     if (propsRef.current.isStandalone || propsRef.current.singleQuestionMode) return;
-    const runId: SurveyQuestionsLegacyValue = (Number(inst._questionPoolHydrationRunId) || 0) + 1;
+    const runId = (Number(inst._questionPoolHydrationRunId) || 0) + 1;
     inst._questionPoolHydrationRunId = runId;
-    const isStaleQuestionPoolRun: SurveyQuestionsLegacyValue = () =>
-      !inst._isMounted || inst._questionPoolHydrationRunId !== runId;
-    const setQuestionPoolState: SurveyQuestionsLegacyValue = (...args: SurveyQuestionsLegacyValue[]) => {
+    const isStaleQuestionPoolRun = (): boolean => !inst._isMounted || inst._questionPoolHydrationRunId !== runId;
+    const setQuestionPoolState = (...args: Parameters<typeof setState>): void => {
       if (!isStaleQuestionPoolRun()) {
         setState(...args);
       }
