@@ -34,7 +34,9 @@ describe('SBTsList module styles', () => {
   it('keeps the Worker Groups toolbar on one row with borderless refresh', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'SBTsList.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/\.createGroupButton\s*{[\s\S]*?border:\s*1px solid var\(--ce-action-accent\);/);
+    expect(scss).toMatch(
+      /\.workerRouteSessionHero,\s*\.header \.createGroupButton\s*{[^}]*border:\s*1px solid color-mix\(in srgb, var\(--ce-color-white\) 50%, transparent\);/,
+    );
     expect(scss).toMatch(
       /\.workerRouteToolbar\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
     );

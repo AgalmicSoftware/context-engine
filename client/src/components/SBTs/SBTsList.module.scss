@@ -630,7 +630,7 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   .header .createGroupButton {
     box-sizing: border-box;
     height: var(--worker-toolbar-control-height);
-    border: 1px solid var(--ce-action-accent);
+    border: 1px solid color-mix(in srgb, var(--ce-color-white) 50%, transparent);
     border-radius: var(--ce-radius-8);
     background: transparent;
     box-shadow: none;

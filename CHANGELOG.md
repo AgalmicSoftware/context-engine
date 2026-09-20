@@ -15,7 +15,8 @@ All notable changes to this project will be documented in this file.
   Older clean Group links re-verify cached Worker discovery and show the full
   Group page instead of falling back to SBT block-scan progress.
   Kept the Cloudflare Groups refresh icon borderless and beside the section title.
-  Matched the full Groups toolbar controls in height and styling, with borderless Refresh.
+  Matched the full Groups toolbar controls in height and styling, with subtle
+  half-opacity white borders and borderless Refresh.
 
 - Refreshed About functionality copy with accounts, gated content, and interviews.
   Added collapsible related-work and recognition sections with project-specific
