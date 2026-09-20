@@ -478,15 +478,33 @@ function SessionInterviewPanel({
 
   const startInterview = () => {
     if (isInterviewBusy || mappingRef.current || applying) return;
+    if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
+      setError('This prefill link was created for an older or different question set. Ask the AI for a fresh link.');
+      setStatus('Error');
+      return;
+    }
     setMappingNotice('');
     roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
+    const validatedPrefillPacket =
+      prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
+        ? prefillPacket
+        : null;
+    const importedDrafts = validatedPrefillPacket
+      ? readImportedInterviewDraftResponses(validatedPrefillPacket, questions)
+      : null;
     void recorder.start(
       buildRealtimeInterviewInstructions({
         questions,
         responderContext,
         openingPrompt: interviewOpening.opening,
         previousTranscript: transcriptRef.current,
+        prefillPacket: validatedPrefillPacket,
+        importedDrafts,
+        reviewedResponses: drafts.map((draft) => ({
+          prediction: draft,
+          reviewed: editedDrafts[draft.questionId],
+        })),
       }),
     );
   };

@@ -246,7 +246,7 @@ in a Context Engine link. The copied prompt asks capable interfaces to render
 that long URL as an **Open prefilled interview** Markdown link rather than
 showing the encoded payload; raw-URL fallback remains allowed for interfaces
 without clickable Markdown. The packet records the session slug, question-set
-hash, prompt version, an optional responder summary, proposed response drafts, per-draft
+hash, prompt version, concise question-relevant responder context, proposed response drafts, per-draft
 confidence and basis, source platform, exact model ID when available, and
 `self_reported` verification. It also carries self-reported research coverage:
 distinct prior chats, memory items, and connected sources searched and used,
@@ -280,6 +280,16 @@ history, and validates the AI-authored response drafts against the current
 questions and listed options. Current direct responses are not re-authored by a
 different mapping model, so their source attribution and confidence remain
 faithful to the external AI. Every proposed answer remains a local review draft.
+When the participant starts or continues the live voice interview after a valid
+prefill is loaded, the realtime interviewer receives a bounded JSON background
+block with the imported summary/facts, question-matched predictions, and any
+fields the participant already edited in review. That block is labeled as
+untrusted, unconfirmed AI prediction data: the interviewer can ask useful
+confirmation, correction, and gap-filling follow-ups, but it must not treat
+predicted answers as spoken beliefs, skip all predicted questions, or override
+later spoken clarifications. If the prefill hash is stale or belongs to a
+different question set, the live interviewer is not started with the imported
+context.
 The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.

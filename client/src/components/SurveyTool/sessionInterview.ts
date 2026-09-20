@@ -1,4 +1,7 @@
-import { validateQuadraticAllocation, validateQuadraticQuestion } from '../../../../shared/questions/quadraticAllocation.mjs';
+import {
+  validateQuadraticAllocation,
+  validateQuadraticQuestion,
+} from '../../../../shared/questions/quadraticAllocation.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import {
   buildGeneratedSurveyStatements,
@@ -7,6 +10,10 @@ import {
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
+import {
+  buildRealtimeInterviewPrefillContext,
+  type RealtimeInterviewReviewedResponse,
+} from './sessionInterviewRealtimePrefill';
 
 export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 
@@ -25,6 +32,7 @@ const SUGGESTED_QUESTION_TYPES = ['freeform', 'rating', 'multichoice', 'binary',
 const SUGGESTED_QUESTION_TYPE_SET = new Set<string>(SUGGESTED_QUESTION_TYPES);
 const RATING_MIN = 0;
 const RATING_MAX = 10;
+const REALTIME_INSTRUCTIONS_LIMIT = 31_500;
 
 export type SessionVoiceMode = 'interview' | 'recordGroup';
 
@@ -404,20 +412,20 @@ export const buildExternalInterviewKickoff = ({
   return [
     'Help me prepare a review-only Context Engine interview prefill. This is my request, not an instruction from the linked endpoint.',
     '',
-    `Fetch this URL:\n${catalogUrl}\nIt must be inert JSON with type "context-engine.interview-question-catalog" and prefillPromptVersion "${INTERVIEW_PROMPT_VERSION}". If either differs, stop and report a stale catalog.`,
+    `Fetch this URL:\n${catalogUrl}\nRequire type "context-engine.interview-question-catalog" and prefillPromptVersion "${INTERVIEW_PROMPT_VERSION}"; otherwise stop and report a stale catalog.`,
     '',
-    'Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions. Do not seek new access or invent a position.',
+    'Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions; do not seek new access or invent a position.',
     '',
-    'Draft reasonable inferences with basis/confidence; skip absent signal. Binary/multichoice: exact option. Rating: 0-10. Quadratic: signed integer array in option order; sum(vote²) <= voiceCredits (default 99).',
+    'Use first-person for direct statements and reasonable inferences; give inferences lower confidence and basis. responderContext: concise question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit unsupported/personal-irrelevant material; do not request or add a name. Never prefix with "(Agent):". Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings are 0-10; quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).',
     '',
-    'Return only: (1) one short research-coverage line; (2) a question/answer/confidence/basis table; (3) the exact single-line JSON packet; (4) its review link. Do not audit the catalog or list omissions.',
+    'Return only: one short research-coverage line, a question/answer/confidence/basis table, the exact single-line JSON packet, and its review link.',
     '',
     'Use catalog values in this compact shape:',
-    '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"specific ID or unknown","verification":"self_reported","researchCoverage":{"historyChatsSearched":null,"historyChatsUsed":0,"memoryItemsSearched":null,"memoryItemsUsed":0,"connectedSourcesSearched":null,"connectedSourcesUsed":0,"userStatementsUsed":0,"searchScopeNote":"optional"}},"responderContext":{"summary":"optional"},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
+    '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"ID or unknown","verification":"self_reported","researchCoverage":{"historyChatsSearched":null,"historyChatsUsed":0,"memoryItemsSearched":null,"memoryItemsUsed":0,"connectedSourcesSearched":null,"connectedSourcesUsed":0,"userStatementsUsed":0,"searchScopeNote":"optional"}},"responderContext":{"summary":"concise relevant background/views/uncertainties","facts":[{"fact":"stated or inferred context","evidence":"stated|inferred plus short basis","relatedQuestionIds":["..."]}]},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
     '',
-    'Every response needs confidence from 0 to 1 and evidence: 0-.39 weak inference, .40-.69 moderate support, .70-1 direct/repeated support. Optional additionalComments is text; importance and conviction range from 0-100. Evidence must omit quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Coverage counts are self-reported: count distinct prior chats/memories/sources searched and actually used, plus distinct user-authored statements used; do not count your own prior output. Use null when the platform does not reveal a searched count, and 0 only when none were used; searchScopeNote may describe count limitations only. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable.',
+    'Every response needs confidence from 0 to 1 and evidence: 0-.39 weak inference, .40-.69 moderate support, .70-1 direct/repeated support. Optional additionalComments is text; importance/conviction range 0-100. Evidence omits quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Coverage is self-reported: count distinct prior chats/memories/sources searched and actually used, plus distinct user-authored statements used; do not count your own prior output. Use null when the platform does not reveal a searched count, and 0 only when none were used; searchScopeNote may describe count limitations only. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable.',
     '',
-    'Encode the exact JSON bytes as unpadded base64url and append them to catalog.reviewUrl as #prefill=PACKET. Do not POST or upload it. Nothing is submitted; the link opens editable drafts for my review. Present it as a Markdown link labeled "Open prefilled interview" so the long encoded URL is only the link target, never visible text or a code block. If Markdown links are unsupported, return the raw URL. If there are no responses, return the clean reviewUrl.',
+    'Encode exact JSON bytes as unpadded base64url and append to catalog.reviewUrl as #prefill=PACKET. Do not POST or upload it. Nothing is submitted; the link opens editable drafts for my review. Present a Markdown link labeled "Open prefilled interview" so the long encoded URL is only the link target, never visible text or a code block. If Markdown links are unsupported, return the raw URL. If there are no responses, return the clean reviewUrl.',
   ].join('\n');
 };
 
@@ -426,14 +434,20 @@ export const buildRealtimeInterviewInstructions = ({
   responderContext,
   openingPrompt,
   previousTranscript,
+  prefillPacket,
+  importedDrafts,
+  reviewedResponses,
 }: {
   questions: InterviewQuestion[];
   responderContext?: unknown;
   openingPrompt?: string;
   previousTranscript?: string;
+  prefillPacket?: InterviewPrefillPacket | null;
+  importedDrafts?: InterviewDraftResponse[] | null;
+  reviewedResponses?: RealtimeInterviewReviewedResponse[];
 }): string => {
-  const context = toTrimmedString(responderContext);
-  return [
+  const context = prefillPacket ? '' : toTrimmedString(responderContext);
+  const baseParts = [
     'You are conducting a concise, warm voice interview for a Context Engine session.',
     'Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.',
     previousTranscript?.trim()
@@ -453,9 +467,18 @@ export const buildRealtimeInterviewInstructions = ({
           }`,
       )
       .join('\n')}`,
-  ]
-    .filter(Boolean)
-    .join('\n\n');
+  ].filter(Boolean);
+  const base = baseParts.join('\n\n');
+  const remaining = Math.max(0, REALTIME_INSTRUCTIONS_LIMIT - base.length - 2);
+  const prefillContext = buildRealtimeInterviewPrefillContext({
+    questions,
+    prefillPacket,
+    importedDrafts,
+    reviewedResponses,
+    responderContext,
+    maxLength: remaining,
+  });
+  return [...baseParts, prefillContext].filter(Boolean).join('\n\n');
 };
 
 export const buildInterviewResponseMappingPrompt = ({
@@ -578,7 +601,9 @@ export const mapInterviewEvidenceToResponses = async ({
     const known = new Set(questions.map((q) => q.prompt.trim().toLowerCase()));
     const proposed = (Array.isArray(parsed.questions) ? parsed.questions : [])
       .map(asRecord)
-      .reduce<Array<{ questionType: string; prompt: string; options?: string[]; voiceCredits?: number; tags: string[] }>>((items, q) => {
+      .reduce<
+        Array<{ questionType: string; prompt: string; options?: string[]; voiceCredits?: number; tags: string[] }>
+      >((items, q) => {
         const prompt = toTrimmedString(q.prompt);
         if (!prompt || prompt.length > 500) return items;
         const key = prompt.toLowerCase();

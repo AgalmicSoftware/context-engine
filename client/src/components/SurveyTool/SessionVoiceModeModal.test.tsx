@@ -1260,6 +1260,55 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
+  it('starts the realtime interviewer with validated prefill predictions and current review edits', async () => {
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: '', turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => '',
+      };
+    });
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude' as const, modelId: 'claude-example', verification: 'self_reported' as const },
+      responderContext: {
+        facts: [{ fact: 'The responder prefers reversible decisions.', relatedQuestionIds: ['q1', 'unknown'] }],
+      },
+      responses: [
+        {
+          questionId: 'q1',
+          answer: 'Predicted answer from memory',
+          additionalComments: 'Predicted comment',
+          confidence: 0.61,
+          evidence: 'Related prior signal.',
+        },
+        { questionId: 'unknown', answer: 'Unknown question answer', confidence: 0.99 },
+      ],
+    };
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+
+    await expectReadableDraftText('Draft answer for What matters?', 'Predicted answer from memory');
+    await editReadableDraftText('Draft answer for What matters?', 'Reviewed correction before speaking');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+
+    await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalled());
+    const instructions = mockedStartSessionRealtimeInterview.mock.calls[0][0].instructions;
+    expect(instructions).toContain('Imported AI prefill and current review state');
+    expect(instructions).toContain('untrusted unconfirmed AI predictions');
+    expect(instructions).toContain('The responder prefers reversible decisions.');
+    expect(instructions).toContain('Predicted answer from memory');
+    expect(instructions).toContain('Reviewed correction before speaking');
+    expect(instructions).toContain('Related prior signal.');
+    expect(instructions).not.toContain('Unknown question answer');
+    expect(instructions).not.toContain('claude-example');
+  });
+
   it('uses the pile-view Agree, Unsure, and Disagree control for binary drafts', async () => {
     const prefillPacket = {
       version: 1 as const,
@@ -1297,9 +1346,22 @@ describe('SessionVoiceModeModal', () => {
       responderContext: {},
       responses: [{ questionId: 'q-quadratic', answer: [3, -4], confidence: 0.65 }],
     };
-    render(<SessionVoiceModeModal {...baseProps} mode="interview"
-      questionPool={[{ id: 'q-quadratic', prompt: 'Allocate project support', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }]}
-      prefillPacket={prefillPacket} />);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[
+          {
+            id: 'q-quadratic',
+            prompt: 'Allocate project support',
+            type: 'quadratic',
+            options: ['Parks', 'Transit'],
+            voiceCredits: 25,
+          },
+        ]}
+        prefillPacket={prefillPacket}
+      />,
+    );
 
     expect(await screen.findByRole('slider', { name: 'Parks' })).toHaveValue('3');
     expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
@@ -1307,8 +1369,19 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q-quadratic', [3, -2]));
     expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-      expect.any(Array), prefillPacket.source, prefillPacket, true, false, '',
-      [expect.objectContaining({ answer: [3, -2], userEditedFields: ['answer'], original: expect.objectContaining({ answer: [3, -4] }) })],
+      expect.any(Array),
+      prefillPacket.source,
+      prefillPacket,
+      true,
+      false,
+      '',
+      [
+        expect.objectContaining({
+          answer: [3, -2],
+          userEditedFields: ['answer'],
+          original: expect.objectContaining({ answer: [3, -4] }),
+        }),
+      ],
     );
   });
 
@@ -1488,6 +1561,8 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/older or different question set/i);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Error');
     expect(mapInterviewEvidenceToResponses).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
   });
 });
 
