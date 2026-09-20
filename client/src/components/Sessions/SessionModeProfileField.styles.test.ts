@@ -57,10 +57,10 @@ describe('SessionModeProfileField theme contrast styles', () => {
 
   it('renders the saved-draft resume action as a clear primary target', () => {
     expect(source).toMatch(
-      /\.modeSavedProfileResumeButton\s*\{[\s\S]*?min-height:\s*48px;[\s\S]*?padding:\s*10px 18px;[\s\S]*?border:\s*1px solid var\(--ce-action-accent\);[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);[\s\S]*?font-size:\s*0\.9rem;[\s\S]*?font-weight:\s*800;/,
+      /\.modeSavedProfileResumeButton\s*\{[\s\S]*?min-height:\s*48px;[\s\S]*?padding:\s*10px 18px;[\s\S]*?border:\s*1px solid var\(--ce-session-setup-accent\);[\s\S]*?background:\s*var\(--ce-session-setup-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);[\s\S]*?font-size:\s*0\.9rem;[\s\S]*?font-weight:\s*800;/,
     );
     expect(source).toMatch(
-      /\.modeSavedProfileResumeButton:focus-visible\s*\{[\s\S]*?outline:\s*2px solid color-mix\(in srgb, var\(--ce-action-accent\) 72%, transparent\);[\s\S]*?outline-offset:\s*3px;/,
+      /\.modeSavedProfileResumeButton:focus-visible\s*\{[\s\S]*?outline:\s*2px solid color-mix\(in srgb, var\(--ce-session-setup-accent\) 72%, transparent\);[\s\S]*?outline-offset:\s*3px;/,
     );
   });
 });
