@@ -3607,6 +3607,21 @@ $muted-text: var(--ce-panel-text-muted);
   gap: 10px;
 }
 
+.modeCheckboxWithTooltip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.modeCheckboxWithTooltip .modeCheckboxLabel {
+  flex: 0 1 auto;
+}
+
+.modeCheckboxWithTooltip [role='button'] {
+  flex: 0 0 auto;
+}
+
 .modeCheckboxLabel {
   box-sizing: border-box;
   display: flex;

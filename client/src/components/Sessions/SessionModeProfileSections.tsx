@@ -41,6 +41,8 @@ const LIT_ENCRYPTION_TOOLTIP =
   'Lit encrypts data before upload and uses on-chain access conditions to control decryption. It requires a registry network, an RPC connection, and Lit credentials.';
 const CLOUDFLARE_ENCRYPTION_TOOLTIP =
   'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
+const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =
+  'Checked: use the default rules, allowing session admins and agents authorized for storage to access encrypted data. Unchecked: customize access below using session roles, authorized agents, or SBT holders, and choose whether any or all rules must match.';
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
   { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
@@ -397,28 +399,38 @@ const SessionModeProfileSections = ({
               <li>Data is encrypted before Cloudflare stores it.</li>
               <li>The session worker decrypts it only after checking access.</li>
             </ul>
-            <Label check className={styles.modeCheckboxLabel}>
-              <Input
-                type="checkbox"
-                checked={useDefaultCloudflareAccessRules}
-                onChange={(event) =>
-                  updateProfile((draft) => {
-                    if (event.target.checked) {
-                      setWorkerEnvelopeCondition(draft);
-                      return;
-                    }
-                    const configured = cloneAccessConditions(draft.storage.payloadAccessControl?.accessConditions);
-                    setWorkerEnvelopeCondition(
-                      draft,
-                      configured.conditions.length
-                        ? configured
-                        : cloneAccessConditions(DEFAULT_CUSTOM_ACCESS_CONDITIONS),
-                    );
+            <div className={styles.modeCheckboxWithTooltip}>
+              <Label check className={styles.modeCheckboxLabel}>
+                <Input
+                  type="checkbox"
+                  checked={useDefaultCloudflareAccessRules}
+                  onChange={(event) =>
+                    updateProfile((draft) => {
+                      if (event.target.checked) {
+                        setWorkerEnvelopeCondition(draft);
+                        return;
+                      }
+                      const configured = cloneAccessConditions(draft.storage.payloadAccessControl?.accessConditions);
+                      setWorkerEnvelopeCondition(
+                        draft,
+                        configured.conditions.length
+                          ? configured
+                          : cloneAccessConditions(DEFAULT_CUSTOM_ACCESS_CONDITIONS),
+                      );
+                    })
+                  }
+                />
+                <span className={styles.modeCheckboxText}>Use default Cloudflare access rules</span>
+              </Label>
+              {renderInfoTooltip
+                ? renderInfoTooltip({
+                    id: 'ce-new-default-cloudflare-access-rules-info',
+                    content: DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP,
+                    ariaLabel: 'About default Cloudflare access rules',
+                    testId: 'ce-new-default-cloudflare-access-rules-info',
                   })
-                }
-              />{' '}
-              Use default Cloudflare access rules
-            </Label>
+                : null}
+            </div>
             {useDefaultCloudflareAccessRules ? (
               <p className={styles.helperText}>
                 The worker grants storage access to configured admins and agents granted the storage scope.
