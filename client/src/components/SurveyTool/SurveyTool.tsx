@@ -1176,6 +1176,9 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     const currentProps = { autoOpenResults: props.autoOpenResults };
     if (!didRunAutoOpenUpdateEffectRef.current) {
       didRunAutoOpenUpdateEffectRef.current = true;
+      if (currentProps.autoOpenResults && !showResultsModalRef.current) {
+        setShowResultsModal(true);
+      }
       prevAutoOpenResultsRef.current = currentProps.autoOpenResults;
       return;
     }

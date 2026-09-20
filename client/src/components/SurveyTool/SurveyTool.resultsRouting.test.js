@@ -1,12 +1,12 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SurveyTool from './SurveyTool';
 import { SurveySelector } from './SurveySelector';
 
 jest.mock('./SurveyResults', () => ({
   __esModule: true,
-  default: ({ onClose }) =>
-    jest.requireActual('react').createElement('button', { onClick: onClose }, 'Close functional results'),
+  default: ({ isOpen, onClose }) =>
+    isOpen ? jest.requireActual('react').createElement('button', { onClick: onClose }, 'Close functional results') : null,
 }));
 
 jest.mock('./SurveySelector', () => ({
@@ -142,6 +142,22 @@ describe('SurveyTool results routing', () => {
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
+  });
+
+  it('opens functional results when autoOpenResults flips on immediately after the full view mounts', async () => {
+    const { rerender } = render(
+      <SurveyTool autoOpenResults={false} preventUrlChange={true} activeSessionSlug="edge" network={{ id: 84532 }} />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Close functional results' })).not.toBeInTheDocument();
+
+    rerender(
+      <SurveyTool autoOpenResults={true} preventUrlChange={true} activeSessionSlug="edge" network={{ id: 84532 }} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Close functional results' })).toBeInTheDocument();
+    });
   });
 
   it('preserves query and hash through the functional results close path', async () => {
