@@ -3431,22 +3431,62 @@ $muted-text: var(--ce-panel-text-muted);
 
 .pendingWorkerGroupCardHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
 
-  button {
-    appearance: none;
-    border: 0;
-    background: transparent;
+.pendingWorkerGroupCardTitleWrap {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+
+  h4 {
+    margin: 0;
     color: var(--ce-control-text);
-    opacity: 0.72;
+    font-size: 0.95rem;
+    line-height: 1.25;
   }
+}
 
-  button:hover,
-  button:focus-visible {
-    opacity: 1;
-  }
+.pendingWorkerGroupCardActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.pendingWorkerGroupCard .pendingWorkerGroupCardHeader button.pendingWorkerGroupIconButton {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-round);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ce-control-text);
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.pendingWorkerGroupCard .pendingWorkerGroupCardHeader button.pendingWorkerGroupIconButton:hover,
+.pendingWorkerGroupCard .pendingWorkerGroupCardHeader button.pendingWorkerGroupIconButton:focus-visible {
+  background: color-mix(in srgb, var(--ce-control-text) 8%, transparent);
+  color: var(--ce-control-text);
+  opacity: 1;
+}
+
+.pendingWorkerGroupCard .pendingWorkerGroupCardHeader button.pendingWorkerGroupIconButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.pendingWorkerGroupCardBody {
+  min-width: 0;
 }
 
 @media (max-width: 640px) {
@@ -3486,17 +3526,23 @@ $muted-text: var(--ce-panel-text-muted);
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid color-mix(in srgb, var(--ce-status-error) 24%, transparent);
+  border: 0;
   border-radius: var(--ce-radius-round);
-  background: color-mix(in srgb, var(--ce-status-error) 6%, transparent);
+  background: transparent;
+  box-shadow: none;
   color: var(--ce-status-danger-text);
   cursor: pointer;
 
   &:hover,
   &:focus-visible {
-    border-color: color-mix(in srgb, var(--ce-status-error) 56%, transparent);
     background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
   }
+}
+
+.modeRuleCard .modeRuleHeader button.modeRuleRemove {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .modeSbtRuleFields {

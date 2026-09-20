@@ -754,6 +754,7 @@ const WorkerEnvelopeOptions = ({
               type="button"
               className={styles.modeRuleRemove}
               aria-label={`Remove ${RULE_LABELS[condition.kind]} rule`}
+              data-ce-control-appearance="frameless"
               onClick={() => {
                 const next = cloneAccessConditions(profile.encryption.accessConditions);
                 next.conditions.splice(index, 1);

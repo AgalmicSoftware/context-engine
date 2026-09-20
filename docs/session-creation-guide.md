@@ -492,7 +492,8 @@ or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
 Before publishing a worker-canonical session, the **Session Access** section can
-queue Groups through the same form used by normal Worker Group creation. Each
+queue Groups through the same form used by normal Worker Group creation. Queued
+Group drafts collapse independently while preserving their edits. Each
 draft supports a name, description, image URL or local image file, tags, public
 HTTPS reference URLs, member limit, self-join deadline, group-admin address,
 join mode, and member visibility. Durable text and URL metadata stays in the
