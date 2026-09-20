@@ -21,7 +21,7 @@ async function main() {
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url());
       if (url.origin === new URL(baseUrl).origin) {
-        if (url.pathname === `/session/${sessionSlug}`) return route.fulfill({ contentType: 'text/html', body: html });
+        if (url.pathname === `/session/${sessionSlug}` || url.pathname === '/about') return route.fulfill({ contentType: 'text/html', body: html });
         return route.continue();
       }
       if (url.origin === 'https://auto-join-worker.example') {
@@ -42,10 +42,9 @@ async function main() {
     const banner = page.getByTestId('ce-session-worker-group-auto-join');
     await banner.getByText('Sign in to join this group automatically.').waitFor();
     assert.equal(joins, 0);
-    // The session shell owns joining; its collapsed Groups panel is not needed.
+    // The app shell owns joining; its collapsed Groups panel is not needed.
     assert.equal(await page.getByTestId('ce-session-worker-groups-native').count(), 0);
     await banner.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await banner.getByText('Joining Participants 2026 in 5…').waitFor({ timeout: 10000 }).catch(async (error) => { console.error(await banner.innerText()); throw error; });
     await banner.getByText('Joined Participants 2026.', { exact: true }).waitFor();
     assert.equal(joins, 1);
     assert.equal(new URL(page.url()).search, '?view=questions');
@@ -75,10 +74,21 @@ async function main() {
     await page.reload();
     assert.equal(await banner.count(), 0);
     assert.equal(joins, 1);
+    // A pending invitation survives client navigation and a refresh away from
+    // the session, and still joins its original group after login.
+    await page.goto(link);
+    await banner.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Navigate away before signing in' }).click();
+    await page.reload();
+    await banner.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await banner.getByText('Joined Participants 2026.', { exact: true }).waitFor();
+    assert.equal(joins, 2);
+    assert.equal(new URL(page.url()).pathname, '/about');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('ce:worker-group-auto-join:v1')), null);
     await page.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${'a'.repeat(80)}`);
     await banner.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    console.log('PASS: Cloudflare auto-join smoke (sign-in, collapsed groups, join, cleanup, existing member, cancellation, mobile layout)');
+    console.log('PASS: Cloudflare auto-join smoke (sign-in, collapsed groups, join, cleanup, existing member, cancellation, navigation/refresh before login, mobile layout)');
   } finally { await browser.close(); }
 }
 

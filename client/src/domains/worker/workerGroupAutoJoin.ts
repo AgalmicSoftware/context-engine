@@ -64,9 +64,13 @@ export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, 
   // Only consume the intent we handled; preserve other query parameters and
   // a newer link if navigation happened while a request was in flight.
   const url = new URL(window.location.href);
-  if (readWorkerGroupAutoJoinId(url.search) === groupId) {
+  if (
+    url.pathname.replace(/\/$/, '') === buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`) &&
+    readWorkerGroupAutoJoinId(url.search) === groupId
+  ) {
     url.searchParams.delete('joinGroup');
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
   if (sessionId) dispatchWorkerGroupsChanged({ sessionSlug, sessionId });
 };

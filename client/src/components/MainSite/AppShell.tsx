@@ -1,6 +1,7 @@
 /** @file AppShell.tsx */
 
 import React, { Component, Suspense } from 'react';
+import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoin';
 import { connect } from 'react-redux';
 import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
 import {
@@ -4215,6 +4216,15 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           loginInProgress={this.props.loginInProgress}
           sendTestETH={this.getUserTestETH}
           sessionConfig={activeRouteSessionConfig}
+        />
+
+        <WorkerGroupAutoJoin
+          sessionConfig={activeRouteSessionConfig}
+          sessionSlug={this.getSessionSlugFromProps()}
+          account={this.props.account}
+          provider={this.props.provider}
+          loginComplete={this.props.loginComplete}
+          toggleLoginModal={this.props.toggleLoginModal}
         />
 
         <DevE2eNav />

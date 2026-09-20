@@ -1,11 +1,19 @@
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   finishWorkerGroupAutoJoin,
   canAutoJoinWorkerGroup,
-  readWorkerGroupAutoJoinId,
   resolveWorkerGroupAutoJoinContext,
 } from '../../domains/worker/workerGroupAutoJoin';
 import { getWorkerSessionToken, joinWorkerGroup, loadWorkerGroupOverview } from '../../domains/worker/workerGroupPorts';
+import {
+  autoJoinIntentKey,
+  clearPendingAutoJoin,
+  loadAutoJoinSessionConfig,
+  readAutoJoinLink,
+  readPendingAutoJoin,
+  savePendingAutoJoin,
+  type WorkerGroupAutoJoinIntent,
+} from '../../domains/worker/workerGroupAutoJoinIntent';
 import styles from './OnePageSession.module.scss';
 
 type Props = {
@@ -17,13 +25,13 @@ type Props = {
   toggleLoginModal: unknown;
 };
 type Context = NonNullable<ReturnType<typeof resolveWorkerGroupAutoJoinContext>>;
-type Progress = { phase: 'loading' | 'countdown' | 'joining' | 'done' | 'error'; message: string };
+type Progress = { phase: 'loading' | 'joining' | 'done' | 'error'; message: string };
 
 const subscribeLocation = (notify: () => void) => {
   window.addEventListener('popstate', notify);
   return () => window.removeEventListener('popstate', notify);
 };
-const readSearch = () => window.location.search;
+const readLocation = () => `${window.location.pathname}${window.location.search}`;
 const autoJoinErrorMessage = (error: unknown): string => {
   const reason = error instanceof Error ? error.message : '';
   if (reason === 'worker_group_member_cap_exceeded' || reason === 'worker_group_session_cap_exceeded')
@@ -39,9 +47,10 @@ const autoJoinErrorMessage = (error: unknown): string => {
 function AutoJoinIntent({
   context,
   groupId,
-  linkActive,
+  intent,
+  onConsumed,
   ...props
-}: Props & { context: Context; groupId: string; linkActive: boolean }) {
+}: Props & { context: Context; groupId: string; intent: WorkerGroupAutoJoinIntent; onConsumed: () => void }) {
   const { sessionId, sessionSlug, workerUrl, chainId } = context;
   const account = String(props.account || '').trim();
   const ready = !!account && !!props.loginComplete;
@@ -54,12 +63,10 @@ function AutoJoinIntent({
   const [progress, setProgress] = useState<Progress>({ phase: 'loading', message: 'Preparing to join group…' });
 
   useEffect(() => {
-    if (!ready || !linkActive || finishedRef.current) return undefined;
+    if (!ready || finishedRef.current) return undefined;
     let active = true;
-    let timer: ReturnType<typeof setInterval> | undefined;
     const stop = () => {
       active = false;
-      clearInterval(timer);
     };
     cancelRef.current = stop;
     const fail = (error: unknown) => {
@@ -70,6 +77,8 @@ function AutoJoinIntent({
       finishedRef.current = true;
       completedAccountRef.current = account;
       setProgress({ phase: 'done', message });
+      onConsumed();
+      clearPendingAutoJoin(intent);
       finishWorkerGroupAutoJoin(sessionSlug, groupId, sessionId);
     };
     setProgress({ phase: 'loading', message: 'Preparing to join group…' });
@@ -93,39 +102,28 @@ function AutoJoinIntent({
         const group = overview.groups.find((candidate) => candidate.groupId === groupId);
         if (!group) throw new Error('This group is unavailable in this session.');
         if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
-        let remaining = 5;
-        setProgress({ phase: 'countdown', message: `Joining ${group.label} in ${remaining}…` });
-        timer = setInterval(() => {
-          remaining -= 1;
-          if (!active) return;
-          if (remaining > 0) {
-            setProgress({ phase: 'countdown', message: `Joining ${group.label} in ${remaining}…` });
-            return;
-          }
-          clearInterval(timer);
-          setProgress({ phase: 'joining', message: `Joining ${group.label}…` });
-          void joinWorkerGroup({ ...request, groupId })
-            .then(() => complete(`Joined ${group.label}.`))
-            .catch(fail);
-        }, 1000);
+        setProgress({ phase: 'joining', message: `Joining ${group.label}…` });
+        await joinWorkerGroup({ ...request, groupId });
+        complete(`Joined ${group.label}.`);
       } catch (error) {
         fail(error);
       }
     })();
     // Account, session, provider changes and unmount invalidate pending auth,
-    // reads and countdowns before they can submit a join for the previous viewer.
+    // and reads before they can submit a join for the previous viewer.
     return stop;
-  }, [account, ready, linkActive, props.provider, sessionId, sessionSlug, workerUrl, chainId, groupId, retry]);
+  }, [account, ready, props.provider, sessionId, sessionSlug, workerUrl, chainId, groupId, retry, intent, onConsumed]);
 
   const cancel = () => {
     cancelRef.current();
     finishedRef.current = true;
+    onConsumed();
+    clearPendingAutoJoin(intent);
     finishWorkerGroupAutoJoin(sessionSlug, groupId);
     setProgress({ phase: 'done', message: 'Auto-join cancelled.' });
   };
   const done = progress.phase === 'done';
-  if ((!linkActive && !done) || (done && completedAccountRef.current && completedAccountRef.current !== account))
-    return null;
+  if (done && completedAccountRef.current && completedAccountRef.current !== account) return null;
   return (
     <div
       className={`${styles.workerGroupNotice} ${styles.workerGroupAutoJoinNotice}`}
@@ -160,25 +158,116 @@ function AutoJoinIntent({
 }
 
 export default function WorkerGroupAutoJoin(props: Props) {
-  const search = useSyncExternalStore(subscribeLocation, readSearch, () => '');
-  const incomingGroupId = readWorkerGroupAutoJoinId(search);
-  const context = resolveWorkerGroupAutoJoinContext(props.sessionConfig, props.sessionSlug);
-  const scope = context ? `${context.sessionId}:${context.sessionSlug}:${context.workerUrl}` : '';
-  const [intent, setIntent] = useState({ scope, groupId: incomingGroupId });
-  // Keep the intent through login and URL cleanup, but never carry it to a
-  // different session/Worker or ignore a newly opened invitation.
-  if (intent.scope !== scope || (incomingGroupId && incomingGroupId !== intent.groupId)) {
-    setIntent({ scope, groupId: incomingGroupId });
-    return null;
-  }
-  if (!context || !intent.groupId) return null;
+  const location = useSyncExternalStore(subscribeLocation, readLocation, () => '');
+  const currentContext = resolveWorkerGroupAutoJoinContext(props.sessionConfig, props.sessionSlug);
+  const contextKey = currentContext
+    ? `${currentContext.sessionId}:${currentContext.sessionSlug}:${currentContext.workerUrl}`
+    : '';
+  const configRef = useRef(props.sessionConfig);
+  configRef.current = props.sessionConfig;
+  const [intent, setIntent] = useState(readPendingAutoJoin);
+  const intentKey = intent ? autoJoinIntentKey(intent) : '';
+  const consumedKey = useRef('');
+  const onConsumed = useCallback(() => {
+    consumedKey.current = intentKey;
+  }, [intentKey]);
+  const [resolved, setResolved] = useState<{ key: string; config: unknown; context: Context } | null>(null);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    const incoming = readAutoJoinLink(
+      location,
+      resolveWorkerGroupAutoJoinContext(configRef.current, props.sessionSlug),
+    );
+    if (!incoming) return;
+    setIntent((previous) => {
+      if (
+        previous &&
+        consumedKey.current !== autoJoinIntentKey(previous) &&
+        previous.groupId === incoming.groupId &&
+        previous.sessionSlug === incoming.sessionSlug &&
+        previous.workerOrigin === incoming.workerOrigin
+      )
+        return previous;
+      savePendingAutoJoin(incoming);
+      return incoming;
+    });
+  }, [location, contextKey, props.sessionSlug]);
+
+  useEffect(() => {
+    if (!intent) return undefined;
+    const controller = new AbortController();
+    setError('');
+    const accept = (config: unknown) => {
+      const context = resolveWorkerGroupAutoJoinContext(config, intent.sessionSlug);
+      if (
+        !context ||
+        new URL(context.workerUrl).origin !== intent.workerOrigin ||
+        (intent.sessionId && context.sessionId.toLowerCase() !== intent.sessionId.toLowerCase())
+      )
+        throw new Error('The session identity has changed. Ask the host for a new invitation.');
+      if (!controller.signal.aborted) {
+        // Pin the canonical identity before login; browsing another session must
+        // never redirect a remembered invitation to that session's Worker.
+        savePendingAutoJoin({ ...intent, sessionId: context.sessionId });
+        setResolved({ key: intentKey, config, context });
+      }
+    };
+    const context = resolveWorkerGroupAutoJoinContext(configRef.current, intent.sessionSlug);
+    if (context && new URL(context.workerUrl).origin === intent.workerOrigin) {
+      try {
+        accept(configRef.current);
+      } catch (failure) {
+        setError(autoJoinErrorMessage(failure));
+      }
+    } else {
+      void loadAutoJoinSessionConfig(intent, controller.signal)
+        .then(accept)
+        .catch((failure) => {
+          if (!controller.signal.aborted) setError(autoJoinErrorMessage(failure));
+        });
+    }
+    return () => controller.abort();
+    // An invitation owns its config independently of the currently viewed route.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intentKey, retry]);
+
+  if (!intent) return null;
+  if (resolved?.key === intentKey)
+    return (
+      <AutoJoinIntent
+        key={intentKey}
+        {...props}
+        sessionConfig={resolved.config}
+        context={resolved.context}
+        groupId={intent.groupId}
+        intent={intent}
+        onConsumed={onConsumed}
+      />
+    );
   return (
-    <AutoJoinIntent
-      key={`${scope}:${intent.groupId}`}
-      {...props}
-      context={context}
-      groupId={intent.groupId}
-      linkActive={incomingGroupId === intent.groupId}
-    />
+    <div
+      className={`${styles.workerGroupNotice} ${styles.workerGroupAutoJoinNotice}`}
+      data-testid="ce-session-worker-group-auto-join"
+    >
+      <span role={error ? 'alert' : 'status'}>{error || 'Preparing your group invitation…'}</span>
+      {error ? (
+        <button type="button" className={styles.telegramSecondaryButton} onClick={() => setRetry((value) => value + 1)}>
+          Retry
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className={styles.telegramSecondaryButton}
+        onClick={() => {
+          clearPendingAutoJoin(intent);
+          finishWorkerGroupAutoJoin(intent.sessionSlug, intent.groupId);
+          setIntent(null);
+        }}
+      >
+        Cancel auto-join
+      </button>
+    </div>
   );
 }

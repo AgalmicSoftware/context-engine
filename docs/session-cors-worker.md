@@ -1022,14 +1022,24 @@ or a restricted invitation.
 To separate an event cohort, create an open Group named for the event, choose
 session member visibility, and distribute its auto-join link to participants.
 Visitors using the ordinary session URL are not automatically added. Visitors
-who follow the auto-join link sign in first, then see a cancellable five-second
-countdown before the client calls the existing `/groups/join` endpoint. This
-works even with the Groups section collapsed and records native Worker
+who follow the auto-join link sign in first; the client then calls the existing
+`/groups/join` endpoint automatically. The app remembers one pending invitation
+in tab-scoped session storage for up to 24 hours, including across navigation
+and refresh before sign-in. It retains the original session and Worker identity,
+so signing in elsewhere joins the intended group. This works even with the
+Groups section collapsed and records native Worker
 membership rather than minting an on-chain SBT. Existing members are recognized
 without another join request. Worker capacity, deadlines, and authorization
 remain authoritative; failures expose an explicit Retry action. Success or
-cancellation removes only `joinGroup` from the current URL to avoid repeating
-on refresh. Account/session changes and navigation away cancel pending work.
+cancellation clears the saved invitation and removes its matching `joinGroup`
+parameter without disturbing other URL parameters. Account changes invalidate
+pending authentication; failures retain the invitation for explicit retry.
+No credentials are saved with an invitation. Browser storage restrictions can
+limit persistence to the current page.
+
+Native Group membership is separate from the existing on-chain SBT results
+filters. Auto-joining records the cohort membership, but does not itself filter
+the question set, response statistics, or generated analysis by that cohort.
 
 `memberVisibility` defaults to `admin_only`. `members` lets members see the
 group metadata and member identities, while `session` lets any authenticated

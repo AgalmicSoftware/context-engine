@@ -3,6 +3,13 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import WorkerGroupAutoJoin from './WorkerGroupAutoJoin';
+import { AUTO_JOIN_STORAGE_KEY, readPendingAutoJoin } from '../../domains/worker/workerGroupAutoJoinIntent';
+import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
+jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
+  ...jest.requireActual<Record<string, unknown>>('../../utilities/session/sessionWorkerDiscovery'),
+  fetchWorkerCanonicalSessionBootstrap: jest.fn(),
+}));
+const bootstrap = jest.mocked(fetchWorkerCanonicalSessionBootstrap);
 
 jest.mock('../../utilities/worker/workerAuth', () => ({ getWorkerSessionToken: jest.fn() }));
 const getToken = jest.mocked(getWorkerSessionToken);
@@ -45,6 +52,14 @@ const originalFetch = global.fetch;
 describe('WorkerGroupAutoJoin', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    sessionStorage.clear();
+    bootstrap.mockReset().mockResolvedValue({
+      config,
+      sessionId,
+      sessionSlug: 'alpha',
+      workerOrigin: 'https://worker.example',
+      configRevision: 'v1',
+    });
     window.history.replaceState(
       { keep: true },
       '',
@@ -65,7 +80,7 @@ describe('WorkerGroupAutoJoin', () => {
   });
   const joins = () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/groups/join'));
 
-  it('retains the link through sign-in, joins once after a countdown and cleans only its parameter', async () => {
+  it('retains the link through sign-in, joins once immediately after login and cleans only its parameter', async () => {
     const changed = jest.fn();
     window.addEventListener('ce:worker-groups-changed', changed);
     const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
@@ -75,10 +90,6 @@ describe('WorkerGroupAutoJoin', () => {
     expect(props.toggleLoginModal).toHaveBeenCalledWith(true);
     rerender(<WorkerGroupAutoJoin {...props} />);
     await flush();
-    expect(screen.getByText('Joining Participants 2026 in 5…')).toBeInTheDocument();
-    await tick(4000);
-    expect(joins()).toHaveLength(0);
-    await tick(1000);
     expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
     expect(joins()).toHaveLength(1);
     const [url, init] = joins()[0];
@@ -105,14 +116,21 @@ describe('WorkerGroupAutoJoin', () => {
     expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
   });
 
-  it('cancels a countdown and does not restart on rerender or account change', async () => {
+  it('cancels while authentication is pending without restarting after account changes', async () => {
+    let resolveToken: (token: string) => void = () => {};
+    getToken.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveToken = resolve;
+        }),
+    );
     const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
-    await flush();
-    await tick(4000);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    await act(async () => resolveToken('old-token'));
     rerender(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
     await tick();
     expect(joins()).toHaveLength(0);
+    expect(readPendingAutoJoin()).toBeNull();
   });
 
   it('recognizes existing members without posting another join', async () => {
@@ -198,39 +216,96 @@ describe('WorkerGroupAutoJoin', () => {
     ).toBe(true);
   });
 
-  it('cancels pending countdowns on logout and unmount', async () => {
+  it('invalidates pending authentication on logout and unmount while retaining the invitation', async () => {
+    const resolvers: Array<(token: string) => void> = [];
+    getToken.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
     const { rerender, unmount } = render(<WorkerGroupAutoJoin {...props} />);
-    await flush();
     rerender(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
-    await tick();
+    await act(async () => resolvers[0]('stale-token'));
     expect(joins()).toHaveLength(0);
     rerender(<WorkerGroupAutoJoin {...props} />);
-    await flush();
     unmount();
-    await tick();
+    await act(async () => resolvers[1]('stale-token'));
     expect(joins()).toHaveLength(0);
+    expect(readPendingAutoJoin()?.groupId).toBe(group.groupId);
   });
 
-  it('does not transfer intent to a different session', async () => {
-    const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
-    await flush();
+  it('remembers the original session through navigation and refresh before login', async () => {
+    const { unmount } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    expect(readPendingAutoJoin()?.sessionId).toBe(sessionId);
+    unmount();
     window.history.pushState({}, '', '/session/beta');
-    rerender(<WorkerGroupAutoJoin {...props} sessionSlug="beta" sessionConfig={{ ...config, slug: 'beta' }} />);
-    await tick();
+    const betaProps = {
+      ...props,
+      sessionSlug: 'beta',
+      sessionConfig: { ...config, slug: 'beta', corsWorkerUrl: 'https://beta.example' },
+    };
+    const { rerender } = render(<WorkerGroupAutoJoin {...betaProps} account="" loginComplete={false} />);
+    await flush();
+    expect(bootstrap).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'alpha', workerQueryValue: 'https://worker.example' }),
+    );
     expect(joins()).toHaveLength(0);
-    expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+    rerender(<WorkerGroupAutoJoin {...betaProps} />);
+    await flush();
+    expect(joins()).toHaveLength(1);
+    expect(joins()[0][0]).toBe('https://worker.example/groups/join');
+    expect(readPendingAutoJoin()).toBeNull();
+    expect(window.location.pathname).toBe('/session/beta');
   });
 
-  it('cancels pending work when navigation removes the join parameter in the same session', async () => {
-    render(<WorkerGroupAutoJoin {...props} />);
+  it('captures a link before session config loads and preserves it across a refresh elsewhere', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/session/alpha?joinGroup=participants-2026&worker=https%3A%2F%2Fworker.example',
+    );
+    bootstrap.mockImplementationOnce(() => new Promise(() => {}));
+    const { unmount } = render(
+      <WorkerGroupAutoJoin {...props} account="" loginComplete={false} sessionConfig={null} />,
+    );
+    expect(readPendingAutoJoin()?.groupId).toBe(group.groupId);
+    unmount();
+    window.history.replaceState({}, '', '/about');
+    render(<WorkerGroupAutoJoin {...props} sessionConfig={null} sessionSlug="" />);
     await flush();
+    expect(joins()).toHaveLength(1);
+    expect(readPendingAutoJoin()).toBeNull();
+  });
+
+  it('rejects a changed canonical identity after restoring the pending invitation', async () => {
+    const { unmount } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    unmount();
+    window.history.replaceState({}, '', '/about');
+    bootstrap.mockResolvedValueOnce({
+      config,
+      sessionId: '0x22222222222222222222222222222222',
+      sessionSlug: 'alpha',
+      workerOrigin: 'https://worker.example',
+      configRevision: 'v2',
+    });
+    render(<WorkerGroupAutoJoin {...props} sessionConfig={null} sessionSlug="" />);
+    await flush();
+    expect(screen.getByRole('alert')).toHaveTextContent('session identity has changed');
+    expect(joins()).toHaveLength(0);
+    expect(sessionStorage.getItem(AUTO_JOIN_STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('keeps the invitation when same-session navigation removes the query', async () => {
+    const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
     act(() => {
       window.history.pushState({}, '', '/session/alpha?view=questions');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    await tick();
-    expect(joins()).toHaveLength(0);
-    expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+    rerender(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(joins()).toHaveLength(1);
+    expect(window.location.search).toBe('?view=questions');
   });
 
   it('posts only once under StrictMode effect replay', async () => {
@@ -251,6 +326,22 @@ describe('WorkerGroupAutoJoin', () => {
     await tick();
     expect(joins()).toHaveLength(1);
     expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+  });
+
+  it('handles the same invitation again after logout and a new sign-in', async () => {
+    const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(joins()).toHaveLength(1);
+    rerender(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    await tick(1);
+    act(() => {
+      window.history.pushState({}, '', '/session/alpha?joinGroup=participants-2026');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(screen.getByText('Sign in to join this group automatically.')).toBeInTheDocument();
+    rerender(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
+    await flush();
+    expect(joins()).toHaveLength(2);
   });
 
   it('ignores malformed or ambiguous links and ordinary session visits', async () => {
