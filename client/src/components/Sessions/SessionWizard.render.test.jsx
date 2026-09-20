@@ -1132,6 +1132,8 @@ describe('SessionWizard rendered validation', () => {
         await jest.advanceTimersByTimeAsync(SESSION_SLUG_AVAILABILITY_DEBOUNCE_MS);
       });
       expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
+      jest.clearAllTimers();
+      jest.useRealTimers();
       await createPendingFeaturedDraft();
       await deployVerifiedWorkerForCurrentDraft();
 
