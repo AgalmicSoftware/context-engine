@@ -607,32 +607,62 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
 .workerRouteSessionHero {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(12px, 2.4vw, 20px);
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 2px;
   box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.standardBase .workerRouteToolbar {
+  --worker-toolbar-control-height: 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
   width: 100%;
   max-width: 800px;
   margin-bottom: 18px;
-  padding: clamp(14px, 2.4vw, 20px);
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
-  border-radius: var(--ce-radius-12);
-  background:
-    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--ce-data-series-1) 24%, transparent), transparent 42%),
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--ce-action-accent) 14%, transparent),
-      color-mix(in srgb, var(--ce-overlay-base) 88%, transparent)
-    );
-  box-shadow: 0 16px 38px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
-}
 
-.workerRouteToolbar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-width: 800px;
+  .workerRouteSessionHero,
+  .header .createGroupButton {
+    box-sizing: border-box;
+    height: var(--worker-toolbar-control-height);
+    border: 1px solid var(--ce-action-accent);
+    border-radius: var(--ce-radius-8);
+    background: transparent;
+    box-shadow: none;
+    color: var(--ce-panel-text);
+    font-family: var(--ce-font-body);
+  }
+
+  .header {
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    gap: 8px;
+
+    .createGroupButton {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      font-size: 0.92rem;
+      line-height: 1.1;
+      white-space: nowrap;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--ce-card-bg);
+        transform: none;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--ce-panel-text);
+        outline-offset: 2px;
+      }
+    }
+  }
 }
 
 .workerRouteRefreshButton {
@@ -640,45 +670,48 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   flex: 0 0 44px;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   width: 44px;
-  min-height: 44px;
+  height: var(--worker-toolbar-control-height);
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 34%, transparent);
+  border: 0;
   border-radius: var(--ce-radius-8);
-  background: color-mix(in srgb, var(--ce-overlay-surface) 82%, transparent);
-  color: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ce-panel-text);
   cursor: pointer;
   transition:
     background-color 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
+    color 0.18s ease;
 
   &:hover,
   &:focus-visible {
-    border-color: var(--ce-action-accent);
-    background: color-mix(in srgb, var(--ce-action-accent) 18%, var(--ce-overlay-surface));
-    color: var(--ce-action-accent);
-    outline: 3px solid var(--ce-session-focus);
+    background: var(--ce-card-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-panel-text);
     outline-offset: 2px;
-    transform: translateY(-1px);
   }
 }
 
 .workerRouteSessionEyebrow {
   display: block;
-  color: color-mix(in srgb, var(--ce-text-inverse) 68%, transparent);
-  font-size: 0.74rem;
+  overflow: hidden;
+  color: var(--ce-panel-text);
+  font-size: 0.62rem;
   font-weight: 700;
+  line-height: 1.2;
   letter-spacing: 0.15em;
   text-transform: uppercase;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .workerRouteSessionName {
   min-width: 0;
   margin: 0;
-  font-size: clamp(1.1rem, 3.2vw, 1.75rem);
+  font-size: clamp(0.92rem, 3vw, 1.15rem);
   line-height: 1.08;
 
   a {
@@ -686,9 +719,8 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
     align-items: center;
     gap: 9px;
     max-width: 100%;
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
     text-decoration: none;
-    text-shadow: 0 4px 22px color-mix(in srgb, var(--ce-compat-dark) 42%, transparent);
 
     &:hover,
     &:focus-visible {
@@ -1157,36 +1189,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   @media (max-width: 768px) {
     padding: 10px;
 
-    .workerRouteToolbar {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: stretch;
-      gap: 8px;
-      max-width: 100%;
-      margin-bottom: 18px;
-    }
-
-    .workerRouteSessionHero {
-      grid-template-columns: minmax(0, 1fr);
-      align-content: center;
-      gap: 2px;
-      width: auto;
-      max-width: none;
-      min-width: 0;
-      margin: 0;
-      padding: 9px 12px;
-      border-radius: var(--ce-radius-8);
-    }
-
-    .workerRouteSessionEyebrow {
-      overflow: hidden;
-      font-size: 0.62rem;
-      text-overflow: ellipsis;
-    }
-
-    .workerRouteSessionName {
-      font-size: clamp(0.92rem, 3vw, 1.15rem);
-    }
     .standardCardShell {
       max-width: 100%;
     }

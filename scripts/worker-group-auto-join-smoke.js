@@ -111,6 +111,28 @@ async function main() {
     await detailPage.getByRole('link', { name: /back to groups/i }).click();
     await detailPage.getByRole('button', { name: 'Open group details for Participants 2026', exact: true }).waitFor();
     assert.equal(await detailPage.getByText(/blocks left/i).count(), 0);
+    const sessionHero = detailPage.getByTestId('ce-worker-groups-session-hero');
+    const createGroup = detailPage.getByTestId('ce-sbts-create-toggle');
+    const listRefresh = detailPage.getByRole('button', { name: 'Refresh groups', exact: true });
+    for (const width of [390, 646, 1280]) {
+      await detailPage.setViewportSize({ width, height: 900 });
+      for (const creating of [false, true]) {
+        if (creating) await createGroup.click();
+        const heroBox = await sessionHero.boundingBox();
+        for (const control of [createGroup, listRefresh]) {
+          const box = await control.boundingBox();
+          assert.ok(Math.abs(box.y - heroBox.y) <= 1, `Groups toolbar stays on one row at ${width}px`);
+          assert.ok(Math.abs(box.height - heroBox.height) <= 1, `Groups toolbar controls match height at ${width}px`);
+          assert.ok(box.height >= 44, 'Toolbar controls retain a usable touch target');
+        }
+        assert.equal(await listRefresh.evaluate((button) => getComputedStyle(button).borderTopWidth), '0px');
+        assert.equal(await detailPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+        if (creating) await createGroup.click();
+      }
+      await detailPage.screenshot({ path: path.join(os.tmpdir(), `ce-worker-groups-toolbar-${width}.png`) });
+    }
+    await listRefresh.click();
+    await detailPage.getByRole('button', { name: 'Open group details for Participants 2026', exact: true }).waitFor();
     await detailPage.close();
     await page.reload();
     assert.equal(await banner.count(), 0);
@@ -141,7 +163,7 @@ async function main() {
     await page.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${'a'.repeat(80)}`);
     await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    console.log('PASS: Cloudflare auto-join smoke (sign-in, join, cleanup, real app group routes, clean links and refresh, no blockchain progress, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout)');
+    console.log('PASS: Cloudflare auto-join smoke (sign-in, join, cleanup, real app group routes, clean links and refresh, matching toolbar heights, no blockchain progress, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout)');
   } finally { await browser.close(); }
 }
 
