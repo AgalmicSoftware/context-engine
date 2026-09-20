@@ -242,6 +242,7 @@ export const buildWorkerSessionConfigPayload = ({
       'defaultGroupTags',
       'questionsGenPrompt',
       'defaultFilterState',
+      'resultsAnalysis',
       'adminAddresses',
       'corsWorkerUrl',
       'sessionModeProfile',

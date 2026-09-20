@@ -1,3 +1,9 @@
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import {
+  normalizeResultsAnalysisSettings,
+  validResultsAnalysisSettings,
+} from '../../../../shared/resultsAnalysisSettings.mjs';
+import { DEFAULT_AI_MODELS as SHARED_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 import { ethers } from 'ethers';
 
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
@@ -12,12 +18,15 @@ import {
 } from './adminPageDraftFormattingHelpers';
 import { dedupeSbtSelections } from './adminPageSbtGateSelectionHelpers';
 
+const asInterviewRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
 
-export const ADMIN_DEFAULT_AI_MODELS = Object.freeze({
-  fast: 'gpt-5',
-  thinking: 'gpt-5',
-});
+const buildResultsAnalysisDraft = (value: unknown) =>
+  validResultsAnalysisSettings(value) ? normalizeResultsAnalysisSettings(value) : value;
+
+export const ADMIN_DEFAULT_AI_MODELS = SHARED_AI_MODELS;
 
 export const ADMIN_AI_PROVIDER_OPTIONS = Object.freeze([
   { value: 'openai', label: 'OpenAI' },
@@ -78,6 +87,8 @@ export const buildAdminMetadataDraft = (metadata: any = {}) => {
     'whisper-1';
 
   return {
+    interviewMode: { ...metadata?.interviewMode, ...normalizeInterviewSettings(metadata?.interviewMode) },
+    resultsAnalysis: buildResultsAnalysisDraft(metadata?.resultsAnalysis),
     defaultTags: toStr(metadata?.defaultTags).trim(),
     questionsGenPrompt: toStr(metadata?.questionsGenPrompt).trim(),
     defaultSbtTags: toStr(metadata?.defaultSbtTags).trim(),
@@ -122,6 +133,14 @@ export const applyAdminMetadataDraft = (
 ) => {
   const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
 
+  next.interviewMode = {
+    ...asInterviewRecord(draft.interviewMode),
+    ...normalizeInterviewSettings(draft.interviewMode),
+  };
+  if (!validResultsAnalysisSettings(draft.resultsAnalysis)) {
+    throw new Error('Session results analysis settings are invalid.');
+  }
+  next.resultsAnalysis = normalizeResultsAnalysisSettings(draft.resultsAnalysis);
   next.defaultTags = toStr(draft.defaultTags).trim();
   next.questionsGenPrompt = toStr(draft.questionsGenPrompt).trim();
   next.defaultFilterState = parseDefaultFilterStateDraft(draft.defaultFilterState);
@@ -234,6 +253,8 @@ export const resolveAutoFeatureBySessionSlug = (metadata: any) =>
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags;
 
 const WORKER_CANONICAL_METADATA_PATCH_KEYS = Object.freeze([
+  'interviewMode',
+  'resultsAnalysis',
   'defaultTags',
   'defaultSbtTags',
   'questionsGenPrompt',

@@ -1307,7 +1307,7 @@ describe('OnePageSession view gating', () => {
   });
 
   it('moves the full questions title into the top back-button header', async () => {
-    const questionsHeaderName = /Questions(?:\s+[-–]\s+|\s+)Answer or Add/i;
+    const questionsHeaderName = /^Questions$/;
 
     render(<OnePageSession {...buildProps()} />);
 
@@ -1353,7 +1353,8 @@ describe('OnePageSession view gating', () => {
 
     const fullHeader = await screen.findByTestId(E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER);
     expect(within(fullHeader).getByText('Questions')).toHaveClass(styles.sectionHeaderTitle);
-    expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
+    expect(within(fullHeader).queryByText('Answer or Add')).not.toBeInTheDocument();
+    expect(fullHeader.querySelector(`.${styles.sectionHeaderSubtitle}`)).toBeNull();
   });
 
   it('renders the Context header title and View subtitle with the shared section header classes', async () => {
@@ -1642,7 +1643,7 @@ describe('OnePageSession view gating', () => {
       /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeaderActionsScroller\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*100%;[\s\S]*?padding-left:\s*0;/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActionsScroller\s*{[\s\S]*?flex:\s*1 1 260px;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;/,
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActionsScroller\s*{[\s\S]*?flex:\s*0 0 100%;[\s\S]*?justify-content:\s*flex-start;[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;/,
     );
     expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActions\s*{[\s\S]*?display:\s*flex;[\s\S]*?min-width:\s*max-content;/,

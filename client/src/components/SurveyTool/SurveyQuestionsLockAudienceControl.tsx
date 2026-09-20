@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import CETooltip from '../Shared/CETooltip';
 import type { CSSProperties } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faLock, faUnlock } from '@fortawesome/free-solid-svg-icons';
@@ -84,126 +85,142 @@ const SurveyQuestionsLockAudienceControl = ({
   onLockClick,
   onSelectAudience,
   onToggleGateDetails,
-}: SurveyQuestionsLockAudienceControlProps): React.ReactElement => (
-  <div className={styles.lockAudienceContainer}>
-    <button
-      type="button"
-      className={[
-        styles.iconButton,
-        styles.lockButton,
-        showBrightLockState ? styles.iconButtonActive : '',
-        isPileVisualContext ? styles.pileLockButton : '',
-        pileMenuPressed ? styles.pileLockButtonMenuOpen : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      onClick={onLockClick}
-      disabled={isLockDisabled}
-      title={buttonTitle}
-      aria-label={buttonTitle}
-      aria-expanded={hasAudienceMenu ? menuOpen : undefined}
-      aria-haspopup={hasAudienceMenu ? 'dialog' : undefined}
-      style={lockButtonStyle}
-      data-testid={
-        effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK
-      }
-    >
-      <FontAwesomeIcon
-        icon={fieldState?.encrypted || forcedGate ? faLock : faUnlock}
-        className={resolveSurveyQuestionsIconGlowClassName(styles, showBrightLockState)}
-      />
-    </button>
+}: SurveyQuestionsLockAudienceControlProps): React.ReactElement => {
+  const lockRef = useRef<HTMLButtonElement | null>(null);
+  return (
+    <div className={styles.lockAudienceContainer}>
+      <button
+        ref={lockRef}
+        type="button"
+        className={[
+          styles.iconButton,
+          styles.lockButton,
+          showBrightLockState ? styles.iconButtonActive : '',
+          isPileVisualContext ? styles.pileLockButton : '',
+          pileMenuPressed ? styles.pileLockButtonMenuOpen : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        onClick={onLockClick}
+        disabled={isLockDisabled}
+        title={buttonTitle}
+        aria-label={buttonTitle}
+        aria-expanded={hasAudienceMenu ? menuOpen : undefined}
+        aria-haspopup={hasAudienceMenu ? 'dialog' : undefined}
+        style={lockButtonStyle}
+        data-testid={
+          effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK
+        }
+      >
+        <FontAwesomeIcon
+          icon={fieldState?.encrypted || forcedGate ? faLock : faUnlock}
+          className={resolveSurveyQuestionsIconGlowClassName(styles, showBrightLockState)}
+        />
+      </button>
 
-    {hasAudienceMenu && menuOpen && !isLockDisabled && (
-      <div className={buildSurveyQuestionsLockAudiencePopoverClassName(styles, isPileVisualContext)}>
-        {allowPlaintextOption && (
+      {!menuOpen && !isLockDisabled && (
+        <CETooltip target={lockRef} placement="top" trigger="hover focus">
+          {hasAudienceMenu
+            ? effectiveFieldKey === 'additional'
+              ? fieldState?.encrypted
+                ? 'Remove encryption from additional comments.'
+                : 'Choose who can read additional comments.'
+              : 'Choose who can read this answer.'
+            : buttonTitle}
+        </CETooltip>
+      )}
+
+      {hasAudienceMenu && menuOpen && !isLockDisabled && (
+        <div className={buildSurveyQuestionsLockAudiencePopoverClassName(styles, isPileVisualContext)}>
+          {allowPlaintextOption && (
+            <button
+              type="button"
+              className={buildSurveyQuestionsLockAudienceToggleClassName(styles, plaintextActive)}
+              onClick={() => onSelectAudience?.('none')}
+              data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE}
+            >
+              <span className={styles.convictionToggleLabel}>Not encrypted</span>
+            </button>
+          )}
           <button
             type="button"
-            className={buildSurveyQuestionsLockAudienceToggleClassName(styles, plaintextActive)}
-            onClick={() => onSelectAudience?.('none')}
-            data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE}
+            className={buildSurveyQuestionsLockAudienceToggleClassName(styles, selfActive)}
+            onClick={() => onSelectAudience?.('self')}
+            data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF}
           >
-            <span className={styles.convictionToggleLabel}>Not encrypted</span>
+            <span className={styles.convictionToggleLabel}>{normalizedSelfAudienceLabel}</span>
           </button>
-        )}
-        <button
-          type="button"
-          className={buildSurveyQuestionsLockAudienceToggleClassName(styles, selfActive)}
-          onClick={() => onSelectAudience?.('self')}
-          data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF}
-        >
-          <span className={styles.convictionToggleLabel}>{normalizedSelfAudienceLabel}</span>
-        </button>
-        {gateOptions.map((option) => {
-          const showGateDetails = expandedGateId === option.gateId;
-          const sbtItems = Array.isArray(option.sbtItems) ? option.sbtItems : [];
+          {gateOptions.map((option) => {
+            const showGateDetails = expandedGateId === option.gateId;
+            const sbtItems = Array.isArray(option.sbtItems) ? option.sbtItems : [];
 
-          return (
-            <React.Fragment key={`${qid}:${effectiveFieldKey}:${option.gateId}`}>
-              <div className={styles.lockAudienceGateRow}>
-                <button
-                  type="button"
-                  className={buildSurveyQuestionsLockAudienceGateClassName(
-                    styles,
-                    gateActive && currentGateId === option.gateId,
-                  )}
-                  onClick={() => onSelectAudience?.('gate', option.gateId)}
-                  data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
-                  data-ce-gate-id={option.gateId}
-                >
-                  <span className={styles.convictionToggleLabel}>{option.label}</span>
-                </button>
-                {sbtItems.length > 0 && (
+            return (
+              <React.Fragment key={`${qid}:${effectiveFieldKey}:${option.gateId}`}>
+                <div className={styles.lockAudienceGateRow}>
                   <button
                     type="button"
-                    className={styles.lockAudienceCaretButton}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onToggleGateDetails?.(qid, showGateDetails ? '' : option.gateId, effectiveFieldKey);
-                    }}
-                    aria-expanded={showGateDetails}
-                    aria-label={
-                      showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`
-                    }
+                    className={buildSurveyQuestionsLockAudienceGateClassName(
+                      styles,
+                      gateActive && currentGateId === option.gateId,
+                    )}
+                    onClick={() => onSelectAudience?.('gate', option.gateId)}
+                    data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
+                    data-ce-gate-id={option.gateId}
                   >
-                    <FontAwesomeIcon icon={showGateDetails ? faCaretUp : faCaretDown} />
+                    <span className={styles.convictionToggleLabel}>{option.label}</span>
                   </button>
-                )}
-              </div>
-              {showGateDetails && (
-                <div className={styles.lockAudienceGateDetails}>
-                  {sbtItems.map((item) => (
-                    <a
-                      key={`${option.gateId}:${item.address}`}
-                      href={item.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.lockAudienceGateDetailItem}
-                      onClick={(event) => event.stopPropagation()}
+                  {sbtItems.length > 0 && (
+                    <button
+                      type="button"
+                      className={styles.lockAudienceCaretButton}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onToggleGateDetails?.(qid, showGateDetails ? '' : option.gateId, effectiveFieldKey);
+                      }}
+                      aria-expanded={showGateDetails}
+                      aria-label={
+                        showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`
+                      }
                     >
-                      <span className={styles.lockAudienceGateDetailName}>{item.label}</span>
-                      <span className={styles.lockAudienceGateDetailSbts}>{item.meta}</span>
-                    </a>
-                  ))}
+                      <FontAwesomeIcon icon={showGateDetails ? faCaretUp : faCaretDown} />
+                    </button>
+                  )}
                 </div>
-              )}
-            </React.Fragment>
-          );
-        })}
-        {showFollowOption && (
-          <button
-            type="button"
-            className={buildSurveyQuestionsLockAudienceToggleClassName(styles, followActive)}
-            onClick={() => onSelectAudience?.('follow')}
-            data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW}
-          >
-            <span className={styles.convictionToggleLabel}>Match Answer</span>
-          </button>
-        )}
-      </div>
-    )}
-  </div>
-);
+                {showGateDetails && (
+                  <div className={styles.lockAudienceGateDetails}>
+                    {sbtItems.map((item) => (
+                      <a
+                        key={`${option.gateId}:${item.address}`}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.lockAudienceGateDetailItem}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <span className={styles.lockAudienceGateDetailName}>{item.label}</span>
+                        <span className={styles.lockAudienceGateDetailSbts}>{item.meta}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+          {showFollowOption && (
+            <button
+              type="button"
+              className={buildSurveyQuestionsLockAudienceToggleClassName(styles, followActive)}
+              onClick={() => onSelectAudience?.('follow')}
+              data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW}
+            >
+              <span className={styles.convictionToggleLabel}>Match Answer</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default SurveyQuestionsLockAudienceControl;

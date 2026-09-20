@@ -948,6 +948,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   onClick={stopCardNavigation}
                   onMouseDown={stopCardNavigation}
                   onKeyDown={stopCardNavigation}
+                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon icon={faExternalLinkAlt} />
                 </a>
@@ -962,6 +963,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   onClick={stopCardNavigation}
                   onMouseDown={stopCardNavigation}
                   onKeyDown={stopCardNavigation}
+                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon icon={faExpand} />
                 </a>
@@ -1177,6 +1179,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     isBookmarked ? styles.bookmarkCardLinkButtonActive : '',
                   )}
                   title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
+                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon
                     icon={faBookmark}
@@ -1193,6 +1196,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   rel="noopener noreferrer"
                   className={cardLinkButtonClassName}
                   title="View on Arweave"
+                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon icon={faExternalLinkAlt} />
                 </a>
@@ -1210,6 +1214,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   rel="noopener noreferrer"
                   className={cardLinkButtonClassName}
                   title="View question page"
+                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon icon={faExpand} />
                 </a>
@@ -1370,6 +1375,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                       isBookmarked ? styles.bookmarkCardLinkButtonActive : '',
                     )}
                     title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
+                    data-ce-control-appearance="frameless"
                   >
                     <FontAwesomeIcon
                       icon={faBookmark}
@@ -1386,6 +1392,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     rel="noopener noreferrer"
                     className={cardLinkButtonClassName}
                     title="View on Arweave"
+                    data-ce-control-appearance="frameless"
                   >
                     <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </a>
@@ -1397,6 +1404,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     rel="noopener noreferrer"
                     className={cardLinkButtonClassName}
                     title="View question page"
+                    data-ce-control-appearance="frameless"
                   >
                     <FontAwesomeIcon icon={faExpand} />
                   </a>

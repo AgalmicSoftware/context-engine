@@ -62,6 +62,7 @@ describe('SurveyResultsQuestionSummaryCard', () => {
     expect(bookmark).toHaveAttribute('color', 'gold');
     const bookmarkButton = screen.getByRole('button', { name: 'Remove bookmark' });
     expect(bookmarkButton).toHaveClass('questionBookmarkButton');
+    expect(bookmarkButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     fireEvent.click(bookmarkButton);
     expect(onToggleBookmark).toHaveBeenCalledTimes(1);
     expect(onToggleSummary).not.toHaveBeenCalled();

@@ -62,6 +62,34 @@ describe('aiClient worker auth options', () => {
     );
   });
 
+  it('passes anonymous-only through callAI so background requests do not trigger auth fallback', async () => {
+    getEffectiveAiConfig.mockResolvedValue({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      apiKeySource: 'worker',
+    });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'Anonymous access denied' }),
+    });
+
+    await expect(callAI('Suggest optional groups', { sessionSlug: '', anonymousOnly: true })).rejects.toThrow(
+      'Anonymous access denied',
+    );
+
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example/ai',
+      expect.any(Object),
+      expect.objectContaining({
+        anonymousOnly: true,
+        preferAnonymous: true,
+        workerUrl: 'https://worker.example',
+      }),
+    );
+  });
+
   it('disables anonymous-first for custom provider local apiKey without rpcUrl', async () => {
     getEffectiveAiConfig.mockResolvedValue({
       provider: 'custom',

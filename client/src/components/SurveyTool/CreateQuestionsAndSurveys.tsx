@@ -22,6 +22,7 @@ import {
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CreateQuestionsAndSurveys.module.scss';
+import InterviewSuggestedQuestionPrompt from './InterviewSuggestedQuestionPrompt';
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
@@ -496,6 +497,9 @@ interface CreateQuestionsAndSurveysProps {
     [key: string]: unknown;
   } | null;
   preformedMode?: 'questions' | 'survey';
+  interviewQuestionReview?: boolean;
+  questionSubmitLabel?: string;
+  submitClassName?: string;
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
@@ -543,6 +547,7 @@ interface CreateQuestionsAndSurveysState {
   showClearFormConfirm: boolean;
   surveyLockGateIds: string[];
   openLockKey: string;
+  activeTagInputKey: string;
   [key: string]: unknown;
 }
 
@@ -679,6 +684,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
   _copySuccessResetTimers: Partial<Record<CreateSurveyCopySuccessStateKey, ReturnType<typeof setTimeout> | null>> = {};
   _promptRefs: Record<string, FocusablePromptElement | null> = {};
+  _tagInputRefs: Record<string, FocusablePromptElement | null> = {};
   _lastSavedUnfinishedSurveyJson: string | null = null;
 
   constructor(props: CreateQuestionsAndSurveysProps) {
@@ -737,6 +743,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       // Lock-driven Lit encryption
       surveyLockGateIds: [],
       openLockKey: '',
+      activeTagInputKey: '',
     };
 
     let initialQuestions: CreateQuestionsAndSurveysQuestion[] = [];
@@ -1065,6 +1072,30 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    if (this.props.interviewQuestionReview && prevProps.preformedQuestions !== this.props.preformedQuestions) {
+      const previousIds = new Set(
+        (prevProps.preformedQuestions || []).map((question) => question.id || question.prompt),
+      );
+      const added = (this.props.preformedQuestions || []).filter(
+        (question) => !previousIds.has(question.id || question.prompt),
+      );
+      if (added.length) {
+        // Append new suggestions without resetting edited prompts/tags or restoring removed questions.
+        this.setState((state) => ({
+          questions: [
+            ...state.questions,
+            ...added.map((question) => ({
+              ...question,
+              uiKey: question.uiKey || `interview-${question.id}`,
+              tags: normalizeTagList(question.tags),
+              aiGeneratedTagsFromSource: normalizeTagList(question.tags),
+              currentTagInputValue: '',
+              isGeneratingTags: false,
+            })),
+          ],
+        }));
+      }
+    }
     // Keep documentURLs synced from props if they change externally (e.g. AudioSurveyGenerator generation)
     if (prevProps.documentURLs !== this.props.documentURLs && Array.isArray(this.props.documentURLs)) {
       // If props update, we overwrite local state to match
@@ -3382,6 +3413,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           }
           if (question.isGeneratingTags) showGenerateTagsButton = true;
 
+          const removeQuestionButton = (
+            <Button
+              className={styles.removeQuestionButton}
+              aria-label="Remove question"
+              onClick={() => this.removeQuestion(qIndex)}
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </Button>
+          );
+
           return (
             <div
               key={question.uiKey || `question-${qIndex}`}
@@ -3390,11 +3431,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               data-ce-question-index={qIndex}
             >
               <div className={styles.questionHeader}>
-                <strong className={styles.questionTypeText}>
-                  #{qIndex + 1}:{' '}
-                  {question.type ? question.type.charAt(0).toUpperCase() + question.type.slice(1) : 'Unknown Type'}{' '}
-                  Question
-                </strong>
+                {!this.props.interviewQuestionReview && (
+                  <strong className={styles.questionTypeText}>
+                    #{qIndex + 1}:{' '}
+                    {question.type ? question.type.charAt(0).toUpperCase() + question.type.slice(1) : 'Unknown Type'}{' '}
+                    Question
+                  </strong>
+                )}
                 <div className={styles.questionHeaderActions}>
                   {(() => {
                     const lockKey = `q-lock:${question.uiKey || qIndex}`;
@@ -3480,27 +3523,34 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     ) : null;
                   })()}
 
-                  <Button className={styles.removeQuestionButton} onClick={() => this.removeQuestion(qIndex)}>
-                    <FontAwesomeIcon icon={faTimes} />
-                  </Button>
+                  {!this.props.interviewQuestionReview ? removeQuestionButton : null}
                 </div>
               </div>
 
-              {/* Ref attached to the prompt textarea for auto-focus */}
-              <Input
-                innerRef={(el: FocusablePromptElement | null) => {
-                  this._promptRefs[question.uiKey] = el;
-                }}
-                type="textarea"
-                rows="2"
-                className={styles.questionPromptInput}
-                placeholder="Question prompt"
-                data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
-                value={question.prompt || ''}
-                onChange={(e: CreateSurveyInputValueEvent) =>
-                  this.handleQuestionChange(qIndex, 'prompt', e.target.value)
-                }
-              />
+              {this.props.interviewQuestionReview ? (
+                <InterviewSuggestedQuestionPrompt
+                  prompt={question.prompt || ''}
+                  type={question.type || 'freeform'}
+                  options={question.options || []}
+                  onChange={(value) => this.handleQuestionChange(qIndex, 'prompt', value)}
+                  actions={removeQuestionButton}
+                />
+              ) : (
+                <Input
+                  innerRef={(el: FocusablePromptElement | null) => {
+                    this._promptRefs[question.uiKey] = el;
+                  }}
+                  type="textarea"
+                  rows="2"
+                  className={styles.questionPromptInput}
+                  placeholder="Question prompt"
+                  data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
+                  value={question.prompt || ''}
+                  onChange={(e: CreateSurveyInputValueEvent) =>
+                    this.handleQuestionChange(qIndex, 'prompt', e.target.value)
+                  }
+                />
+              )}
 
               {question.type === 'multichoice' && (
                 <div className={styles.optionsContainer}>
@@ -3572,53 +3622,99 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     ))}
 
                     {/* Updated Tag Input UX */}
-                    <div className={styles.tagInputGroup}>
-                      <Input
-                        type="text"
-                        placeholder="Add tag"
-                        data-testid={E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT}
-                        value={question.currentTagInputValue || ''}
-                        onChange={(e: CreateSurveyInputValueEvent) =>
-                          this.handleCurrentTagInputChange(qIndex, e.target.value)
-                        }
-                        onKeyDown={(e: CreateSurveyTagInputKeyEvent) => this.handleTagInputKeyDown(qIndex, e)}
-                        className={styles.tagInputField}
-                      />
+                    {(() => {
+                      const tagInputKey = String(question.uiKey || qIndex);
+                      const tagInputActive =
+                        this.state.activeTagInputKey === tagInputKey || !!(question.currentTagInputValue || '').trim();
+                      const activateTagInput = () => {
+                        this.setState({ activeTagInputKey: tagInputKey }, () => {
+                          this._tagInputRefs[tagInputKey]?.focus?.();
+                        });
+                      };
+                      if (this.props.interviewQuestionReview && !tagInputActive) {
+                        return (
+                          <button
+                            type="button"
+                            className={styles.revealTagInputButton}
+                            aria-label="Add tag"
+                            title="Add tag"
+                            onClick={activateTagInput}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                activateTagInput();
+                              }
+                            }}
+                          >
+                            <FontAwesomeIcon icon={faPlus} />
+                          </button>
+                        );
+                      }
+                      return (
+                        <div className={`${styles.tagInputGroup} ${tagInputActive ? styles.tagInputGroupActive : ''}`}>
+                          <Input
+                            innerRef={(el: FocusablePromptElement | null) => {
+                              this._tagInputRefs[tagInputKey] = el;
+                            }}
+                            type="text"
+                            placeholder="Add tag"
+                            data-testid={E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT}
+                            value={question.currentTagInputValue || ''}
+                            onFocus={() => {
+                              if (this.props.interviewQuestionReview && this.state.activeTagInputKey !== tagInputKey) {
+                                this.setState({ activeTagInputKey: tagInputKey });
+                              }
+                            }}
+                            onBlur={() => {
+                              if (this.props.interviewQuestionReview && !(question.currentTagInputValue || '').trim()) {
+                                this.setState((state) =>
+                                  state.activeTagInputKey === tagInputKey ? { activeTagInputKey: '' } : null,
+                                );
+                              }
+                            }}
+                            onChange={(e: CreateSurveyInputValueEvent) =>
+                              this.handleCurrentTagInputChange(qIndex, e.target.value)
+                            }
+                            onKeyDown={(e: CreateSurveyTagInputKeyEvent) => this.handleTagInputKeyDown(qIndex, e)}
+                            className={styles.tagInputField}
+                          />
 
-                      {/* Checkmark: Only visible when user is typing */}
-                      {(question.currentTagInputValue || '').trim() !== '' && (
-                        <button
-                          type="button"
-                          className={styles.addTagButton}
-                          data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_TAG}
-                          onClick={() => this.processTagInput(qIndex)}
-                          title="Add Tag"
-                        >
-                          <FontAwesomeIcon icon={faCheck} />
-                        </button>
-                      )}
-
-                      {/* Magic Wand: Replaces old generate button, hidden if tags populated */}
-                      {showGenerateTagsButton && (
-                        <button
-                          type="button"
-                          className={styles.magicTagButton}
-                          onClick={() => this.suggestTagsForQuestion(qIndex)}
-                          disabled={question.isGeneratingTags || !question.prompt.trim()}
-                          title={
-                            !question.prompt.trim()
-                              ? 'Enter a question prompt to generate tags'
-                              : 'Generate tags using AI'
-                          }
-                        >
-                          {question.isGeneratingTags ? (
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                          ) : (
-                            <FontAwesomeIcon icon={faMagic} />
+                          {/* Checkmark: Only visible when user is typing */}
+                          {(question.currentTagInputValue || '').trim() !== '' && (
+                            <button
+                              type="button"
+                              className={styles.addTagButton}
+                              data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_TAG}
+                              onClick={() => this.processTagInput(qIndex)}
+                              title="Add Tag"
+                            >
+                              <FontAwesomeIcon icon={faCheck} />
+                            </button>
                           )}
-                        </button>
-                      )}
-                    </div>
+
+                          {/* Magic Wand: Replaces old generate button, hidden if tags populated */}
+                          {showGenerateTagsButton && (
+                            <button
+                              type="button"
+                              className={styles.magicTagButton}
+                              onClick={() => this.suggestTagsForQuestion(qIndex)}
+                              disabled={question.isGeneratingTags || !question.prompt.trim()}
+                              title={
+                                !question.prompt.trim()
+                                  ? 'Enter a question prompt to generate tags'
+                                  : 'Generate tags using AI'
+                              }
+                            >
+                              {question.isGeneratingTags ? (
+                                <FontAwesomeIcon icon={faSpinner} spin />
+                              ) : (
+                                <FontAwesomeIcon icon={faMagic} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -3627,13 +3723,18 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         })}
 
         {/* Visual type selector */}
-        {this.renderTypeSelector()}
+        {!this.props.interviewQuestionReview && this.renderTypeSelector()}
 
         {/* Submit Button: only render if at least one question exists */}
         {questions.length > 0 && (
           <>
             <Button
-              className={buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError)}
+              className={[
+                buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError),
+                this.props.submitClassName,
+              ]
+                .filter(Boolean)
+                .join(' ')}
               data-testid={E2E_TESTIDS.CREATE_SUBMIT}
               onClick={
                 !isPureWorkerCanonicalAuthoring &&
@@ -3682,7 +3783,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   this.props.loginComplete ? (
                   'Switch to correct network → Submit'
                 ) : isStandaloneQuestion ? (
-                  'Create Questions'
+                  this.props.questionSubmitLabel || 'Create Questions'
                 ) : (
                   'Create Survey'
                 )}
@@ -3924,53 +4025,55 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
     return (
       <div
-        className={buildCreateSurveyContainerClassName(styles, this.props.miniaturized)}
+        className={`${buildCreateSurveyContainerClassName(styles, this.props.miniaturized)} ${this.props.interviewQuestionReview ? styles.interviewQuestionReview : ''}`}
         data-testid={E2E_TESTIDS.CREATE_PANEL}
       >
         {/* Header: Survey/Questions toggle + single context-aware mode switch */}
-        <div className={styles.modeHeader}>
-          {showModeToggle && (
-            <div className={styles.modeToggle}>
-              <Label className={styles.toggleLabel}> Survey</Label>
-              <div className={styles.toggleSwitch} onClick={this.toggleStandaloneQuestion}>
-                <div className={styles.toggleKnob} style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)} />
+        {!this.props.interviewQuestionReview && (
+          <div className={styles.modeHeader}>
+            {showModeToggle && (
+              <div className={styles.modeToggle}>
+                <Label className={styles.toggleLabel}> Survey</Label>
+                <div className={styles.toggleSwitch} onClick={this.toggleStandaloneQuestion}>
+                  <div className={styles.toggleKnob} style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)} />
+                </div>
+                <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
+                  Questions
+                </Label>
               </div>
-              <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
-                Questions
-              </Label>
-            </div>
-          )}
-
-          {!this.props.miniaturized && !this.props.preformedQuestions && (
-            <Button
-              className={styles.modeSwitchButton}
-              data-testid={E2E_TESTIDS.CREATE_MODE_SWITCH}
-              onClick={this.toggleAutoTool}
-              color="secondary"
-              outline
-            >
-              <FontAwesomeIcon icon={showAutoTool ? faPenNib : faMagic} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
-              {showAutoTool ? 'Manual' : 'from URL / Content'}
-            </Button>
-          )}
-
-          {/* Clear Form Button */}
-          {!this.props.preformedQuestions &&
-            !this.state.showAutoTool &&
-            (this.state.questions.length > 0 || this.state.title.trim() !== '') && (
-              <button
-                type="button"
-                className={styles.clearFormButton}
-                data-testid={E2E_TESTIDS.CREATE_CLEAR}
-                onClick={this.handleClearForm}
-                title="Clear entire form"
-                style={CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE}
-              >
-                <FontAwesomeIcon icon={faEraser} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
-                Clear
-              </button>
             )}
-        </div>
+
+            {!this.props.miniaturized && !this.props.preformedQuestions && (
+              <Button
+                className={styles.modeSwitchButton}
+                data-testid={E2E_TESTIDS.CREATE_MODE_SWITCH}
+                onClick={this.toggleAutoTool}
+                color="secondary"
+                outline
+              >
+                <FontAwesomeIcon icon={showAutoTool ? faPenNib : faMagic} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
+                {showAutoTool ? 'Manual' : 'from URL / Content'}
+              </Button>
+            )}
+
+            {/* Clear Form Button */}
+            {!this.props.preformedQuestions &&
+              !this.state.showAutoTool &&
+              (this.state.questions.length > 0 || this.state.title.trim() !== '') && (
+                <button
+                  type="button"
+                  className={styles.clearFormButton}
+                  data-testid={E2E_TESTIDS.CREATE_CLEAR}
+                  onClick={this.handleClearForm}
+                  title="Clear entire form"
+                  style={CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE}
+                >
+                  <FontAwesomeIcon icon={faEraser} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
+                  Clear
+                </button>
+              )}
+          </div>
+        )}
 
         {this.state.showAutoTool && !this.props.miniaturized && !this.props.preformedQuestions ? (
           <div style={CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE}>

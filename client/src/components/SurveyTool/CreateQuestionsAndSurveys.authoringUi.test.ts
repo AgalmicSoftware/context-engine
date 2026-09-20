@@ -42,6 +42,110 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     } catch (_) {}
   });
 
+  it('supports the Interview upload label and styling through the existing submit handler', () => {
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      questionSubmitLabel: 'Upload Questions',
+      submitClassName: 'interviewSubmit',
+    });
+    instance.setState({
+      isStandaloneQuestion: true,
+      showAutoTool: false,
+      questions: [{ id: 'q1', type: 'freeform', prompt: 'Which AI impact matters?' }],
+    });
+    const buttons = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_SUBMIT,
+    );
+    expect(buttons).toHaveLength(1);
+    expect(treeHasText(buttons[0], 'Upload Questions')).toBe(true);
+    expect(nodeHasClassName(buttons[0], 'interviewSubmit')).toBe(true);
+    expect(buttons[0]).toHaveProperty('props.onClick', instance.handleSubmitButtonClick);
+    const tree = instance.render();
+    expect(treeHasText(tree, 'Choose Question Type')).toBe(false);
+    expect(collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeHeader'))).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add tag')).toHaveLength(1);
+    expect(
+      collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(0);
+  });
+
+  it('shows interview suggestion type, options, and compact tag authoring while keeping review-only chrome hidden', () => {
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      preformedQuestions: [
+        {
+          id: 'q-choice',
+          type: 'multichoice',
+          prompt: 'Which path should the group compare?',
+          options: ['Pilot', 'Full launch'],
+          tags: ['governance'],
+        },
+      ],
+      preformedMode: 'questions',
+    });
+
+    const tree = instance.render();
+    const markup = renderToStaticMarkup(tree);
+
+    expect(markup).toContain('Multichoice');
+    expect(markup).toContain('Options: Pilot · Full launch');
+    expect(treeHasText(tree, 'Survey')).toBe(false);
+    expect(treeHasText(tree, 'from URL / Content')).toBe(false);
+    expect(markup).toContain('interviewQuestionPromptEditButton');
+    const promptNodes = collectTreeNodes(tree, (node) =>
+      String((node as { type?: { name?: string } })?.type?.name || '').includes('InterviewSuggestedQuestionPrompt'),
+    );
+    expect(promptNodes).toHaveLength(1);
+    expect(
+      nodeHasClassName((promptNodes[0] as { props?: { actions?: unknown } })?.props?.actions, 'removeQuestionButton'),
+    ).toBe(true);
+    expect(markup).toContain('revealTagInputButton');
+    expect(markup).toContain('aria-label="Add tag"');
+    expect(markup).not.toContain('tagInputGroup');
+    expect(
+      collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(0);
+    const revealButtons = collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add tag');
+    expect(revealButtons).toHaveLength(1);
+    (revealButtons[0] as { props?: { onClick?: () => void } })?.props?.onClick?.();
+    let activeTree = instance.render();
+    expect(collectTreeNodes(activeTree, (node) => nodeHasClassName(node, 'revealTagInputButton'))).toHaveLength(0);
+    expect(
+      collectTreeNodes(activeTree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(1);
+
+    const preventDefault = jest.fn();
+    instance.setState({ activeTagInputKey: '' });
+    (
+      revealButtons[0] as { props?: { onKeyDown?: (event: { key: string; preventDefault: () => void }) => void } }
+    )?.props?.onKeyDown?.({ key: 'Enter', preventDefault });
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    activeTree = instance.render();
+    expect(
+      collectTreeNodes(activeTree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(1);
+  });
+
+  it('appends only new Interview suggestions without undoing question edits or removals', () => {
+    const original = { id: 'q1', type: 'freeform', prompt: 'Original?', tags: ['original'] };
+    const removed = { id: 'q2', type: 'freeform', prompt: 'Removed?' };
+    const added = { id: 'q3', type: 'freeform', prompt: 'New?', tags: ['new'] };
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      preformedQuestions: [original, removed],
+      preformedMode: 'questions',
+    });
+    instance.setState({ questions: [{ ...original, prompt: 'My edited question?', tags: ['manual'] }] });
+    const prevProps = instance.props;
+    const prevState = instance.state;
+    Object.assign(instance, { props: { ...prevProps, preformedQuestions: [original, removed, added] } });
+    instance.componentDidUpdate(prevProps, prevState);
+    expect(instance.state.questions.map(({ id }) => id)).toEqual(['q1', 'q3']);
+    expect(instance.state.questions[0]).toMatchObject({ prompt: 'My edited question?', tags: ['manual'] });
+    expect(instance.state.questions[1]).toMatchObject({ prompt: 'New?', tags: ['new'] });
+  });
+
   it('renders the survey/questions toggle immediately on initial load', () => {
     const instance = makeInstance();
 

@@ -17,7 +17,7 @@ import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse';
 import { buildTagHref } from '../../SurveyTool/QuestionTagDropdown';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
-type Question = {
+export type DemoAnalysisWorkspaceQuestion = {
   id: string;
   text: string;
   options: string[];
@@ -26,7 +26,7 @@ type Question = {
   sourcePromptType?: string;
 };
 
-type FlatResponse = {
+export type DemoAnalysisWorkspaceFlatResponse = {
   questionId: string;
   responseText: string;
   segmentKey: string;
@@ -36,16 +36,16 @@ type FlatResponse = {
   rate?: number;
 };
 
-type DemographicOption = {
+export type DemoAnalysisWorkspaceDemographicOption = {
   value: string;
   count?: number;
 };
 
-type DemographicsByCategory = Record<string, DemographicOption[]>;
+export type DemoAnalysisWorkspaceDemographicsByCategory = Record<string, DemoAnalysisWorkspaceDemographicOption[]>;
 
-type SegmentCounts = Record<string, Record<string, number>>;
+export type DemoAnalysisWorkspaceSegmentCounts = Record<string, Record<string, number>>;
 
-type QuestionTag = {
+export type DemoAnalysisWorkspaceQuestionTag = {
   tagID: string;
   tagName: string;
 };
@@ -55,7 +55,7 @@ type ComparisonGroup = {
   name: string;
 };
 
-type QuestionTagsById = Record<string, QuestionTag[]>;
+export type DemoAnalysisWorkspaceQuestionTagsById = Record<string, DemoAnalysisWorkspaceQuestionTag[]>;
 
 type Suggestion = {
   pair: string[];
@@ -63,21 +63,31 @@ type Suggestion = {
   questionText: string;
 };
 
-type AnalysisData = {
-  questions: Question[];
-  flatResponses: FlatResponse[];
-  demographics: DemographicsByCategory;
-  segmentCounts: SegmentCounts;
-  questionTagsData: QuestionTagsById;
+export type DemoAnalysisWorkspaceData = {
+  questions: DemoAnalysisWorkspaceQuestion[];
+  flatResponses: DemoAnalysisWorkspaceFlatResponse[];
+  demographics: DemoAnalysisWorkspaceDemographicsByCategory;
+  segmentCounts: DemoAnalysisWorkspaceSegmentCounts;
+  questionTagsData: DemoAnalysisWorkspaceQuestionTagsById;
 };
 
 type DemoAnalysisWorkspaceProps = {
+  analysisData?: DemoAnalysisWorkspaceData | null;
   demoData?: unknown;
+  emptyReason?: string;
   metadataByXid?: unknown;
   sessionSlug?: string;
 };
 
-const getDemoAnalysisData = (demoData?: unknown, metadataByXid?: unknown): AnalysisData =>
+const EMPTY_ANALYSIS_DATA: DemoAnalysisWorkspaceData = Object.freeze({
+  questions: [],
+  flatResponses: [],
+  demographics: {},
+  segmentCounts: {},
+  questionTagsData: {},
+});
+
+const getDemoAnalysisData = (demoData?: unknown, metadataByXid?: unknown): DemoAnalysisWorkspaceData =>
   buildDemoAnalysisData(
     demoData as DemoAnalysisSource | undefined,
     metadataByXid as DemoAnalysisMetadataByXid | undefined,
@@ -90,14 +100,17 @@ const buildSuggestionSelectionKey = (questionId = '', segmentKeys: string[] = []
   `${String(questionId || '').trim()}::${[...(Array.isArray(segmentKeys) ? segmentKeys : [])].sort().join('::')}`;
 
 const DemoAnalysisWorkspace = ({
+  analysisData: explicitAnalysisData,
   demoData = demoAnalysisData,
+  emptyReason = '',
   metadataByXid = historicalFigureDemographics,
   sessionSlug = '',
 }: DemoAnalysisWorkspaceProps) => {
-  const analysisData = useMemo<AnalysisData>(
-    () => getDemoAnalysisData(demoData, metadataByXid),
-    [demoData, metadataByXid],
-  );
+  const analysisData = useMemo<DemoAnalysisWorkspaceData>(() => {
+    if (explicitAnalysisData === null) return EMPTY_ANALYSIS_DATA;
+    if (explicitAnalysisData !== undefined) return explicitAnalysisData;
+    return getDemoAnalysisData(demoData, metadataByXid);
+  }, [demoData, explicitAnalysisData, metadataByXid]);
 
   const questionMap = useMemo(
     () => new Map(analysisData.questions.map((question) => [question.id, question])),
@@ -160,6 +173,17 @@ const DemoAnalysisWorkspace = ({
       .map(({ value }) => value);
     return Array.from(new Set(countries)).sort();
   }, [selectedSegmentKeys]);
+
+  if (emptyReason) {
+    return (
+      <div className={styles.workspace} data-testid="demo-analysis-workspace">
+        <section className={`${styles.panel} ${styles.chartPanel}`} data-testid="generated-breakdown-unavailable">
+          <h3 className={styles.panelTitle}>Breakdown unavailable</h3>
+          <p className={styles.emptyHint}>{emptyReason}</p>
+        </section>
+      </div>
+    );
+  }
 
   const toggleSegment = (segmentKey: string) => {
     setSelectedSegmentKeys((previous) =>

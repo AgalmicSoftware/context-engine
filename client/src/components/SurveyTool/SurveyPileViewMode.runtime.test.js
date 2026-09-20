@@ -5,6 +5,7 @@ import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
   buildPileRuntimeInitialState,
+  buildSessionInterviewSubmitContextToken,
   createPileViewRuntimeStrategy,
   recordInterviewProvenance,
 } from './SurveyPileViewMode';
@@ -496,6 +497,88 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(engine.persistDraft).toHaveBeenCalled();
   });
 
+  it('does not store interview research comparison when the comparison flag is omitted', async () => {
+    const engine = {
+      props: { sessionConfig: {} },
+      state: {
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'Reviewed answer' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+      },
+      getChangedQidsAndFields: () => ({ changedQids: new Set(['q1']) }),
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+
+    await recordInterviewProvenance(
+      engine,
+      [
+        {
+          questionId: 'q1',
+          answer: 'Reviewed answer',
+          revisions: [{ revision: 1, modelId: 'fixture-model', answer: 'Original AI answer' }],
+        },
+      ],
+      { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
+      true,
+    );
+
+    const provenance = engine.state.surveysResponseState[0].interviewProvenance.q1;
+    expect(provenance).toMatchObject({
+      includeAiProvenance: true,
+      includePredictionComparison: false,
+      source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+    });
+    expect(provenance).not.toHaveProperty('originalPrediction');
+    expect(provenance).not.toHaveProperty('predictionRevisions');
+    expect(provenance).not.toHaveProperty('unselectedDrafts');
+  });
+
+  it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {
+    const engine = {
+      props: { sessionConfig: {} },
+      state: { surveysResponseState: [{ answers: { q1: { value: 'Agree' }, q2: { value: 'Edited answer' } } }] },
+      getChangedQidsAndFields: () => ({ changedQids: new Set(['q2']) }),
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+    const revisions = [
+      { revision: 1, modelId: 'fixture-model', answer: 'Original answer' },
+      { revision: 2, modelId: 'fixture-model', answer: 'Revised prediction' },
+    ];
+    const selected = [
+      { questionId: 'q1', answer: 'Agree' },
+      { questionId: 'q2', answer: 'Revised prediction', revisions },
+    ];
+    const rejected = {
+      questionId: 'q3',
+      answer: 'Rejected edit',
+      selected: false,
+      original: { questionId: 'q3', answer: 'Original rejected prediction' },
+    };
+    await recordInterviewProvenance(engine, selected, null, null, false, true, '', [rejected]);
+    const slice = engine.state.surveysResponseState[0];
+    expect(slice.interviewProvenance.q1).not.toHaveProperty('unselectedDrafts');
+    expect(slice.interviewProvenance.q2.unselectedDrafts).toEqual([rejected]);
+    expect(slice.answers).not.toHaveProperty('q3');
+    expect(slice.interviewProvenance.q2.originalPrediction.answer).toBe('Original answer');
+    expect(slice.interviewProvenance.q2.predictionRevisions).toEqual(revisions);
+    await recordInterviewProvenance(engine, selected, null, null, false, false, '', [rejected]);
+    expect(engine.state.surveysResponseState[0].interviewProvenance).toEqual({});
+  });
+
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {
     jest.useFakeTimers();
     const encryptAndUpload = jest.fn();
@@ -615,6 +698,102 @@ describe('SurveyPileViewMode runtime surface', () => {
     jest.advanceTimersByTime(5000);
     expect(state.pileSubmitTempText).toBeNull();
     expect(pileTimer).toBeNull();
+  });
+
+  it('includes exact Worker and session identity in the interview submit context token', () => {
+    const baseProps = {
+      network: { id: 11155420 },
+      sessionSlug: 'demo',
+      sessionConfig: {
+        slug: 'demo',
+        sessionId: '0x11111111111111111111111111111111',
+        corsWorkerUrl: 'https://worker-a.example/',
+        sessionModeProfile: {
+          preset: 'fast-cheap-cloudflare',
+          authority: { mode: 'worker_canonical' },
+          storage: { backend: 'cloudflare' },
+        },
+        storageProfile: {
+          backend: 'cloudflare',
+          resources: { questions: 'active', surveys: 'active' },
+        },
+      },
+    };
+
+    expect(
+      buildSessionInterviewSubmitContextToken({
+        ...baseProps,
+        sessionConfig: {
+          ...baseProps.sessionConfig,
+          sessionId: '0x22222222222222222222222222222222',
+          corsWorkerUrl: 'https://worker-b.example/',
+        },
+      }),
+    ).not.toEqual(buildSessionInterviewSubmitContextToken(baseProps));
+  });
+
+  it('refreshes interview response readiness when only login completion changes', () => {
+    const account = '0x0000000000000000000000000000000000000001';
+    const engine = {
+      _sessionInterviewResponseReadyToken: '',
+      computePendingEditStatsAtIndex: jest.fn(() => ({ total: 0 })),
+      props: {
+        account,
+        isResponsesCacheReady: true,
+        loginComplete: false,
+        network: { id: 11155420 },
+        sessionSlug: 'demo',
+        sessionConfig: {
+          slug: 'demo',
+          sessionId: '0x11111111111111111111111111111111',
+          corsWorkerUrl: 'https://worker-a.example/',
+        },
+      },
+      state: {
+        isSubmitting: false,
+        loading: false,
+      },
+    };
+    createPileViewRuntimeStrategy().getPendingEditStats(engine);
+    const baseToken = engine.buildSessionInterviewSubmitContextToken(engine.props);
+
+    expect(engine.getSessionInterviewResponseReadinessToken(baseToken)).toBe(`${baseToken}|${account}|false`);
+
+    engine.props = {
+      ...engine.props,
+      loginComplete: true,
+    };
+
+    expect(engine.getSessionInterviewResponseReadinessToken(baseToken)).toBe(`${baseToken}|${account}|true`);
+  });
+
+  it('treats an already completed pile submission as submitted instead of an in-flight failure', async () => {
+    const encryptAndUpload = jest.fn();
+    const pendingStats = { total: 0, encrypted: 0 };
+    const engine = {
+      _pileSubmitTimer: null,
+      computePendingEditStatsAtIndex: jest.fn(() => pendingStats),
+      encryptAndUpload,
+      getPendingStatsSnapshot: jest.fn(() => pendingStats),
+      props: {
+        account: '0x0000000000000000000000000000000000000001',
+        computeSubmitLabel: () => 'Submitted',
+        loginComplete: true,
+      },
+      setState: jest.fn(),
+      state: {
+        isSubmitting: false,
+        pileSubmitTempText: '',
+        submittedSinceLastEdit: true,
+        submissionComplete: true,
+      },
+    };
+    createPileViewRuntimeStrategy().getPendingEditStats(engine);
+
+    await expect(engine.handlePileSubmitClick()).resolves.toEqual({ status: 'submitted' });
+
+    expect(encryptAndUpload).not.toHaveBeenCalled();
+    expect(engine.setState).not.toHaveBeenCalled();
   });
 
   it('routes pile submit clicks through shared submit flow before no-pending feedback when logged out', async () => {

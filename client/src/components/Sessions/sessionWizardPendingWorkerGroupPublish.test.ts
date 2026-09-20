@@ -1,6 +1,6 @@
 import { publishPendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroupPublish';
 import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
-import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
+import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 
 const SESSION_ID = `0x${'12'.repeat(16)}`;
 const ADMIN_ADDRESS = `0x${'34'.repeat(20)}`;

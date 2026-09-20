@@ -50,7 +50,7 @@ describe('sessionWizardAiConfig', () => {
     expect(getAiModelOptions('thinking', 'anthropic')[0]).toBe('claude-3-5-sonnet-20240620');
     expect(getAiModelOptions('transcription', 'openai')).toEqual(['whisper-1']);
 
-    expect(normalizeAiModelForProvider('fast', 'openai', 'not-a-real-model')).toBe('gpt-5');
+    expect(normalizeAiModelForProvider('fast', 'openai', 'not-a-real-model')).toBe('gpt-5.6-terra');
     expect(normalizeAiModelForProvider('thinking', 'anthropic', 'claude-sonnet-4-5-20250929')).toBe(
       'claude-sonnet-4-5-20250929',
     );

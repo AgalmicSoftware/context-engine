@@ -78,6 +78,15 @@ describe('DemoAnalysisWorkspace', () => {
     expect(screen.queryByTestId('demo-analysis-selected-question')).not.toBeInTheDocument();
   });
 
+  it('does not fall back to demo fixtures when explicit analysis data is null', () => {
+    render(<DemoAnalysisWorkspace analysisData={null} />);
+
+    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/select a question to inspect/i);
+    expect(screen.queryByText(/Era:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Modern/i)).not.toBeInTheDocument();
+  });
+
   it('updates the report when demographics are selected while keeping the map unselected', async () => {
     render(<DemoAnalysisWorkspace />);
 

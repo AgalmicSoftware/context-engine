@@ -259,7 +259,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       if (!propsRef.current.loginComplete) {
         inst._submitGuard = false;
         propsRef.current.toggleLoginModal(true);
-        return;
+        return { status: 'login-required' };
       }
 
       const answeredCount: SurveyQuestionsLegacyValue = getAnsweredQuestionsCount();
@@ -273,12 +273,12 @@ export const createSurveyQuestionsSubmitRuntime = (
           setState(buildSubmissionErrorState(''));
           inst._emptySubmitTimer = null;
         }, 2000);
-        return;
+        return { status: 'failed', message: 'No responses to submit.' };
       }
 
       if (maybeBlockSubmitUntilQuestionPoolComplete()) {
         inst._submitGuard = false;
-        return;
+        return { status: 'pending', message: 'Question metadata is still loading.' };
       }
 
       submitContext = buildSubmitContextSnapshot();
@@ -353,13 +353,15 @@ export const createSurveyQuestionsSubmitRuntime = (
           });
           if (!isSubmitContextCurrent(submitContext)) {
             handleStaleSubmitContext(submitContext);
-            return;
+            return { status: 'stale', message: 'Submission context changed before encryption completed.' };
           }
 
           // Merge back (overrides hash with salted Keccak; carries envelope v1 + recipients)
           const newArr: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
           const base: SurveyQuestionsLegacyValue = {
             ...(newArr[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
+            // Keep research snapshots captured before encryption replaces plaintext fields.
+            interviewProvenance: activeSlice.interviewProvenance,
           };
 
           Object.keys(encState.answers || {}).forEach((qid: SurveyQuestionsLegacyValue) => {
@@ -392,7 +394,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       const receipt: SurveyQuestionsLegacyValue = await submitSurveyResponse(activeSlice, changedQids, submitContext);
       if (!isSubmitContextCurrent(submitContext)) {
         handleStaleSubmitContext(submitContext);
-        return;
+        return { status: 'stale', message: 'Submission context changed before upload completed.' };
       }
       surveyLog.log('Submission receipt received', receipt?.blockNumber || 'unknown block');
 
@@ -521,11 +523,12 @@ export const createSurveyQuestionsSubmitRuntime = (
           }
         },
       });
+      return { status: 'submitted' };
     } catch (error: any) {
       surveyLog.error('Failed to submit survey:', error);
       if (submitContext && !isSubmitContextCurrent(submitContext)) {
         handleStaleSubmitContext(submitContext);
-        return;
+        return { status: 'stale', message: 'Submission context changed before failure handling completed.' };
       }
       runSurveyQuestionsSubmitFailureController({
         error,
@@ -539,6 +542,7 @@ export const createSurveyQuestionsSubmitRuntime = (
           setSubmitFailureState: (statePatch: SurveySubmitFailureStatePatch) => setState(statePatch),
         },
       });
+      return { status: 'failed', message: error?.message || 'Submission failed.' };
     }
   };
   return {

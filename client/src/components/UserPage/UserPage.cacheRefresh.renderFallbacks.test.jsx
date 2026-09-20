@@ -655,9 +655,9 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
     const tree = instance.render();
 
-    const groupSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection');
-    expect(groupSections).toHaveLength(1);
-    expect(groupSections[0].props.showMemberships).toBe(false);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toEqual([
+      expect.objectContaining({ props: expect.objectContaining({ showMemberships: false }) }),
+    ]);
     expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection')).toHaveLength(1);
   });
 
@@ -678,9 +678,9 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
     const tree = instance.render();
 
-    const groupSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection');
-    expect(groupSections).toHaveLength(1);
-    expect(groupSections[0].props.showMemberships).toBe(false);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toEqual([
+      expect.objectContaining({ props: expect.objectContaining({ showMemberships: false }) }),
+    ]);
   });
 
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {

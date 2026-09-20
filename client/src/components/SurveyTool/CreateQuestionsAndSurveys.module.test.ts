@@ -41,3 +41,16 @@ describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => 
     expect(scss).toMatch(/\.freeformPreview\s*{[\s\S]*?opacity:\s*1;/);
   });
 });
+
+describe('CreateQuestionsAndSurveys.module.scss interview suggestion review guards', () => {
+  it('keeps review cards compact and lets the add-tag field expand only after activation', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.interviewQuestionReview\.createSurveyContainer\s*{[\s\S]*?\.questionContainer\s*{[\s\S]*?padding:\s*14px\s+16px\s+16px;/,
+    );
+    expect(scss).toContain('.revealTagInputButton');
+    expect(scss).not.toMatch(/:focus-within\s+\.revealTagInputButton/);
+    expect(scss).toContain('.interviewQuestionPromptActions');
+  });
+});

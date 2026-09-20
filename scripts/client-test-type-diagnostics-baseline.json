@@ -3,23 +3,11 @@
   "measuredAt": "2026-07-21",
   "source": "npm run typecheck:client-tests",
   "policy": "Every tracked typed test/helper is compiled. Existing diagnostics are a monotonic migration baseline; new signatures or counts fail.",
-  "typedTestFileCount": 826,
-  "typedTestInventorySha256": "accbbfff40d6a1566c485d4bbfffe3de1f7c1a62348fe8cc726359270badda88",
+  "typedTestFileCount": 931,
+  "typedTestInventorySha256": "2816f4003f134e98436afde356b918d47572d48f1e33f6ae9fc499baf1cb5132",
   "diagnostics": [
     {
       "signature": "src/app/runtime/appQueryClient.test.tsx|TS2339|Property 'QueryClient' does not exist on type 'unknown'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Account/LoginAndSettingsModal.test.tsx|TS2698|Spread types may only be created from object types.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Admin/adminAgentSessionWrapped.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Admin/adminPageSignedWorkerRequest.test.ts|TS2554|Expected 0 arguments, but got 1.",
       "count": 1
     },
     {
@@ -75,10 +63,6 @@
       "count": 1
     },
     {
-      "signature": "src/components/MainSite/mainSiteRouteViewMap.test.ts|TS2741|Property 'posts' is missing in type '{ surveyId: () => string; home: () => string; debate: () => string; atlas: () => string; tag: () => string; bookmarks: () => string; compare: () => string; surveysOrQuestionsList: () => string; questionDetail: () => string; ... 11 more ...; session: () => string; }' but required in type 'MainSiteRouteViewRenderers'.",
-      "count": 1
-    },
-    {
       "signature": "src/components/MainSite/routeSessionResolution.test.ts|TS2554|Expected 0 arguments, but got 1.",
       "count": 2
     },
@@ -92,10 +76,6 @@
     },
     {
       "signature": "src/components/MainSite/sessionFallbackRedirect.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/OnePageSession/onePageSessionTelegramController.test.ts|TS2339|Property 'beta' does not exist on type '{ alpha: AgentClientLoginEnvelope; general: AgentClientLoginEnvelope; }'.",
       "count": 1
     },
     {
@@ -121,14 +101,6 @@
     {
       "signature": "src/components/SBTs/createSbtGroupHelpers.routing.test.ts|TS2554|Expected 0 arguments, but got 1.",
       "count": 1
-    },
-    {
-      "signature": "src/components/SBTs/sbtFilterHelpers.cache.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/SBTs/sbtFilterHelpers.cache.test.ts|TS2554|Expected 2 arguments, but got 3.",
-      "count": 2
     },
     {
       "signature": "src/components/SBTs/sbtFilterHelpers.holders.test.ts|TS2554|Expected 0 arguments, but got 2.",
@@ -275,10 +247,6 @@
       "count": 1
     },
     {
-      "signature": "src/components/SBTs/sbtSelectorHelpers.test.ts|TS2554|Expected 0 arguments, but got 3.",
-      "count": 1
-    },
-    {
       "signature": "src/components/SBTs/SBTsList.listModeRouting.testUtils.tsx|TS2698|Spread types may only be created from object types.",
       "count": 1
     },
@@ -313,14 +281,6 @@
     {
       "signature": "src/components/Sessions/ContractsSection.test.tsx|TS2554|Expected 1 arguments, but got 3.",
       "count": 2
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSessionSlugState.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSessionWizardBlockLimits.test.ts|TS18046|'updater' is of type 'unknown'.",
-      "count": 1
     },
     {
       "signature": "src/components/Sessions/hooks/useSessionWizardNormalModeSectionVisibility.test.ts|TS2571|Object is of type 'unknown'.",
@@ -375,31 +335,7 @@
       "count": 1
     },
     {
-      "signature": "src/components/Sessions/hooks/useSponsoredBundleLifecycle.test.ts|TS2339|Property 'id' does not exist on type '{}'.",
-      "count": 2
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSponsoredBundleLifecycle.test.ts|TS2345|Argument of type '\"bundle gateway timeout\"' is not assignable to parameter of type 'never'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSponsoredBundleLifecycle.test.ts|TS2345|Argument of type '{ id: string; bootstrapWorkerUrl: string; faucetGrantToken: string; meta: { sourceSessionSlug: string; sourceWorkerUrl: string; }; }' is not assignable to parameter of type 'never'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSponsoredBundleLifecycle.test.ts|TS2345|Argument of type 'null' is not assignable to parameter of type 'never'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/hooks/useSponsoredBundleLifecycle.test.ts|TS2698|Spread types may only be created from object types.",
-      "count": 3
-    },
-    {
       "signature": "src/components/Sessions/SessionWizard.blankBundle.render.test.tsx|TS2698|Spread types may only be created from object types.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.devMode.test.ts|TS2353|Object literal may only specify known properties, and 'PUBLIC_URL' does not exist in type '{ NODE_ENV?: unknown; }'.",
       "count": 1
     },
     {
@@ -447,40 +383,12 @@
       "count": 3
     },
     {
-      "signature": "src/components/Sessions/SessionWizard.sponsoredBundleIndexedDb.testUtils.ts|TS2322|Type '{ objectStoreNames: { contains: (name: any) => boolean; }; createObjectStore: Mock<(name: any) => {}>; close: Mock<any, any[]>; transaction: Mock<(storeName: any) => { oncomplete: null; onerror: null; onabort: null; error: null; objectStore: Mock<...>; }>; }' is not assignable to type 'null'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.sponsoredBundleIndexedDb.testUtils.ts|TS2322|Type 'unknown' is not assignable to type 'null'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.sponsoredBundleIndexedDb.testUtils.ts|TS2349|This expression is not callable.",
-      "count": 4
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.sponsoredBundleIndexedDb.testUtils.ts|TS7006|Parameter 'name' implicitly has an 'any' type.",
-      "count": 2
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.sponsoredBundleIndexedDb.testUtils.ts|TS7006|Parameter 'run' implicitly has an 'any' type.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.sponsoredBundleIndexedDb.testUtils.ts|TS7006|Parameter 'tx' implicitly has an 'any' type.",
-      "count": 1
-    },
-    {
       "signature": "src/components/Sessions/SessionWizard.workerPanel.testUtils.tsx|TS2339|Property '_isMockFunction' does not exist on type '() => Promise<number>'.",
       "count": 1
     },
     {
       "signature": "src/components/Sessions/SessionWizard.workerPanel.testUtils.tsx|TS2339|Property 'disabled' does not exist on type 'HTMLElement'.",
       "count": 4
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizard.workerPanel.testUtils.tsx|TS2339|Property 'mockImplementation' does not exist on type '({ sessionContracts, chainId, includeSessionRegistry, includeCustomSBT, }?: { sessionContracts?: SessionContractsLike | null | undefined; chainId?: ChainIdLike; includeSessionRegistry?: boolean | undefined; includeCustomSBT?: boolean | undefined; }) => ContractViewerContractLike[]'.",
-      "count": 1
     },
     {
       "signature": "src/components/Sessions/SessionWizard.workerPanel.testUtils.tsx|TS2339|Property 'mockResolvedValue' does not exist on type '() => Promise<number>'.",
@@ -547,10 +455,6 @@
       "count": 1
     },
     {
-      "signature": "src/components/Sessions/SessionWizard.workerPanel.testUtils.tsx|TS7053|Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.",
-      "count": 3
-    },
-    {
       "signature": "src/components/Sessions/sessionWizardChipotleLitSupport.test.ts|TS2554|Expected 0 arguments, but got 1.",
       "count": 3
     },
@@ -576,14 +480,6 @@
     },
     {
       "signature": "src/components/Sessions/SessionWizardModals.test.tsx|TS2561|Object literal may only specify known properties, but 'address' does not exist in type 'ContractViewerContract'. Did you mean to write 'addresses'?",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/sessionWizardModeProfileDraftController.test.ts|TS2339|Property 'sessionModeProfile' does not exist on type '{ telegramOnly: boolean; telegram_only: boolean; telegramMode: boolean; sessionMode: string; telegramBridgeEnabled: boolean; telegram: { only: boolean; mode: string; keep: string; }; }'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/sessionWizardModeProfileDraftController.test.ts|TS2339|Property 'storageProfile' does not exist on type '{ telegramOnly: boolean; telegram_only: boolean; telegramMode: boolean; sessionMode: string; telegramBridgeEnabled: boolean; telegram: { only: boolean; mode: string; keep: string; }; }'.",
       "count": 1
     },
     {
@@ -623,10 +519,6 @@
       "count": 2
     },
     {
-      "signature": "src/components/Sessions/sessionWizardSecrets.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 2
-    },
-    {
       "signature": "src/components/Sessions/SessionWizardShell.test.tsx|TS2345|Argument of type 'string' is not assignable to parameter of type 'AsymmetricMatcher_2 | { targetType: string | AsymmetricMatcher_2; gateId: string | AsymmetricMatcher_2; }'.",
       "count": 1
     },
@@ -636,22 +528,6 @@
     },
     {
       "signature": "src/components/Sessions/SessionWizardShell.test.tsx|TS2739|Type '{ key: \"worker\"; title: string; }' is missing the following properties from type 'NormalModeCard': summary, tone, stepNumber",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/SessionWizardShell.test.tsx|TS2739|Type '{ shouldAutoDeployWorker: false; shouldDeployPendingSbts: false; shouldRegisterSession: true; shouldUploadMetadata: false; stepNumbers: {}; steps: never[]; }' is missing the following properties from type '{ shouldAutoDeployWorker: boolean; shouldDeployPendingSbts: boolean; shouldUploadMetadata: boolean; shouldPersistWorkerConfig: boolean; shouldRegisterSession: boolean; shouldRefreshRegistryCache: boolean; steps: string[]; stepNumbers: Record<...>; }': shouldPersistWorkerConfig, shouldRefreshRegistryCache",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts|TS2345|Argument of type '(input: any) => Promise<{ address: string; message: string; signature: string; }>' is not assignable to parameter of type '() => Promise<{ address: string; message: string; signature: string; }>'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 3
-    },
-    {
-      "signature": "src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts|TS7006|Parameter 'input' implicitly has an 'any' type.",
       "count": 1
     },
     {
@@ -709,14 +585,6 @@
     {
       "signature": "src/components/SurveyTool/CreateQuestionsAndSurveys.authoringUi.test.ts|TS2322|Type 'Mock<() => { gateMap: { gate_1: { id: string; }; }; gateOptions: { id: string; label: string; badgeLabel: string; color: string; }[]; defaultGateId: string; }>' is not assignable to type '(cfgIn?: unknown, { isStandaloneQuestion }?: CreateSurveyGateOptionsArgs) => CreateSurveyGateOptionsResult'.",
       "count": 1
-    },
-    {
-      "signature": "src/components/SurveyTool/CreateQuestionsAndSurveys.authoringUi.test.ts|TS2339|Property 'href' does not exist on type '{ children?: unknown; className?: unknown; }'.",
-      "count": 2
-    },
-    {
-      "signature": "src/components/SurveyTool/CreateQuestionsAndSurveys.authoringUi.test.ts|TS7053|Element implicitly has an 'any' type because expression of type '\"data-testid\"' can't be used to index type '{ children?: unknown; className?: unknown; }'.",
-      "count": 3
     },
     {
       "signature": "src/components/SurveyTool/CreateQuestionsAndSurveys.cache.test.ts|TS2339|Property 'flushNow' does not exist on type 'CacheUpdateCoalescerLike'.",
@@ -824,10 +692,6 @@
     },
     {
       "signature": "src/components/SurveyTool/SessionListeningPanel.test.tsx|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/SurveyTool/SurveyAudioFieldInput.test.tsx|TS2322|Type '{ qIndex: number; placeholder: string; value: string; encrypted: true; dataTestId: string; dataCeQuestionId: string; forceGlow: true; disabled: true; updateFunction: Mock<void, [value: string]>; toggleEncryption: Mock<...>; }' is not assignable to type 'IntrinsicAttributes & SurveyAudioWorkerProps & { placeholder: string; placeholderOpacity?: number | undefined; value?: string | number | null | undefined; ... 8 more ...; toggleEncryption: (encrypted: boolean) => void; }'.",
       "count": 1
     },
     {
@@ -1140,10 +1004,6 @@
     },
     {
       "signature": "src/components/SurveyTool/surveyQuestionsSubmitController.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/SurveyTool/surveyQuestionsSubmitRuntime.test.ts|TS2554|Expected 0 arguments, but got 2.",
       "count": 1
     },
     {
@@ -1651,22 +1511,6 @@
       "count": 1
     },
     {
-      "signature": "src/components/SurveyTool/surveyToolSubmitTransactionController.test.ts|TS2322|Type 'Mock<(<T>(obj: T) => T)>' is not assignable to type '<T>(obj: T) => T'.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/SurveyTool/surveyToolSubmitTransactionController.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/SurveyTool/surveyToolSubmitTransactionController.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 1
-    },
-    {
-      "signature": "src/components/SurveyTool/surveyToolTopLevelHelpers.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 1
-    },
-    {
       "signature": "src/components/TagPage/TagPage.test.tsx|TS2556|A spread argument must either have a tuple type or be passed to a rest parameter.",
       "count": 1
     },
@@ -1751,56 +1595,8 @@
       "count": 2
     },
     {
-      "signature": "src/domains/chain/chainScanReadsPort.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/chain/chainScanReadsPort.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 3
-    },
-    {
       "signature": "src/domains/chain/rpcProvidersChainReadsPort.test.ts|TS2554|Expected 0 arguments, but got 1.",
       "count": 1
-    },
-    {
-      "signature": "src/domains/chain/rpcProvidersChainReadsPort.test.ts|TS2554|Expected 1 arguments, but got 2.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/crypto/cryptoGatePort.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 3
-    },
-    {
-      "signature": "src/domains/profiles/profileScanPort.test.ts|TS2322|Type '{ getSBTsForUser: Mock<() => Promise<{ data: { id: string; }[]; hadError: boolean; }>>; getUserActivity: Mock<() => Promise<{ data: { surveys: string[]; }; hadError: boolean; }>>; }' is not assignable to type '{ getSBTsForUser: Mock<() => Promise<{ id: string; }[]>>; getUserActivity: Mock<() => Promise<{ surveys: string[]; }>>; }'.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/profiles/profileScanPort.test.ts|TS2554|Expected 0 arguments, but got 4.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/sbts/sbtAdminOpsPort.test.ts|TS2554|Expected 0 arguments, but got 3.",
-      "count": 4
-    },
-    {
-      "signature": "src/domains/sbts/sbtAdminOpsPort.test.ts|TS2554|Expected 0 arguments, but got 4.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtEventStreamsPort.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/sbts/sbtEventStreamsPort.test.ts|TS2554|Expected 0 arguments, but got 3.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtEventStreamsPort.test.ts|TS2739|Type '{ removeSBTEventListener: Mock<() => string>; removeSurveyEventsListener: Mock<() => string>; removeSBTInstanceEventsListener: Mock<() => string>; }' is missing the following properties from type 'SbtEventStreamsChainGateway': listenForSBTEvents, listenForSurveyEvents, listenForSBTInstanceEvents",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtGroupMintAuthorizationPort.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 3
     },
     {
       "signature": "src/domains/sbts/sbtMetadataReadsPort.test.ts|TS2554|Expected 0 arguments, but got 2.",
@@ -1815,83 +1611,11 @@
       "count": 2
     },
     {
-      "signature": "src/domains/sbts/sbtMintExecutionPort.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtMintExecutionPort.test.ts|TS2554|Expected 0 arguments, but got 3.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtMintExecutionPort.test.ts|TS2554|Expected 0 arguments, but got 4.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtOwnershipReadsPort.test.ts|TS2554|Expected 0 arguments, but got 3.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sbts/sbtOwnershipReadsPort.test.ts|TS2554|Expected 0 arguments, but got 4.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/sessions/publish/sessionPublishAdapters.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/sessions/publish/sessionPublishAdapters.test.ts|TS2741|Property 'getSbtCreationBlockByAddress' is missing in type '{ getSbtMetadata: Mock<() => Promise<{ name: string; }>>; getMintedTokens: Mock<() => Promise<never[]>>; getGroupPasswordHash: Mock<() => Promise<null>>; getSbtOnChainConfig: Mock<...>; }' but required in type 'SbtMetadataReadsPort'.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/sessions/registry/sessionRegistryAdminPorts.test.ts|TS2739|Type '{ getAllSessionEntries: Mock<() => never[]>; }' is missing the following properties from type 'SessionRegistryStore': getSessionConfig, getSessionConfigById",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/sessions/registry/sessionRegistryReadPorts.test.ts|TS2322|Type 'Mock<() => (string | { slug: string; })[][]>' is not assignable to type '() => SessionRegistryRawEntry[]'.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/sessions/registry/sessionRegistryReadPorts.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/storage/sponsoredBundlePorts.test.ts|TS2322|Type 'Mock<() => Promise<{ txId: string; }>>' is not assignable to type '(input?: { secret?: unknown; label?: unknown; expiresAt?: unknown; createdAt?: unknown; createdBy?: unknown; arweaveJwk?: unknown; workerUrl?: unknown; sessionSlug?: unknown; sessionConfig?: unknown; context?: unknown; adminAuth?: unknown; skipAuth?: boolean | undefined; bundle?: LooseRecord | undefined; tags?: unkn...'.",
-      "count": 2
-    },
-    {
       "signature": "src/domains/surveys/questionArweaveCacheBranches.test.ts|TS18046|'localNode.arweaveTxCache' is of type 'unknown'.",
       "count": 2
     },
     {
       "signature": "src/domains/surveys/questionArweaveCacheBranches.test.ts|TS18046|'localNode.arweaveTxFailureCache' is of type 'unknown'.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/surveys/surveyReadsPort.test.ts|TS2554|Expected 0 arguments, but got 3.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/surveys/surveyReadsPort.test.ts|TS2554|Expected 0 arguments, but got 4.",
-      "count": 3
-    },
-    {
-      "signature": "src/domains/surveys/surveyReadsPort.test.ts|TS2554|Expected 0 arguments, but got 5.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/surveys/surveyResultsCachePort.test.ts|TS2345|Argument of type '\"written\"' is not assignable to parameter of type 'never'.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/surveys/surveyResultsCachePort.test.ts|TS2345|Argument of type '{ asyncCached: boolean; }' is not assignable to parameter of type 'never'.",
-      "count": 1
-    },
-    {
-      "signature": "src/domains/surveys/surveyResultsCachePort.test.ts|TS2554|Expected 0 arguments, but got 2.",
-      "count": 2
-    },
-    {
-      "signature": "src/domains/surveys/surveyResultsCachePort.test.ts|TS2554|Expected 0 arguments, but got 3.",
       "count": 2
     },
     {
@@ -1909,10 +1633,6 @@
     {
       "signature": "src/domains/worker/adminWorkerPorts.test.ts|TS2554|Expected 0 arguments, but got 2.",
       "count": 1
-    },
-    {
-      "signature": "src/domains/worker/faucetFundingPort.test.ts|TS2554|Expected 0 arguments, but got 1.",
-      "count": 2
     },
     {
       "signature": "src/domains/worker/workerGroupPorts.test.ts|TS2554|Expected 0 arguments, but got 2.",
@@ -2083,23 +1803,7 @@
       "count": 1
     },
     {
-      "signature": "src/utilities/sbt/sessionSbtCacheControllerHostTypes.test.ts|TS2322|Type '(path: string) => string' is not assignable to type '(pathIn?: string | undefined) => string'.",
-      "count": 1
-    },
-    {
-      "signature": "src/utilities/sbt/sessionSbtCacheControllerHostTypes.test.ts|TS2345|Argument of type '{ getActiveSessionSlug: () => string; getCurrentPath: () => string; getEffectiveRoutePath: (path: string) => string; setState: () => undefined; }' is not assignable to parameter of type 'SessionSbtCacheHost'.",
-      "count": 1
-    },
-    {
-      "signature": "src/utilities/session/agentClientLogin.test.ts|TS2322|Type 'Mock<unknown, unknown[]>' is not assignable to type '{ (input: URL | RequestInfo, init?: RequestInit | undefined): Promise<Response>; (input: string | URL | Request, init?: RequestInit | undefined): Promise<...>; }'.",
-      "count": 1
-    },
-    {
       "signature": "src/utilities/session/metadataSessionBinding.test.ts|TS2698|Spread types may only be created from object types.",
-      "count": 1
-    },
-    {
-      "signature": "src/utilities/session/sessionWorkerDiscovery.test.ts|TS2554|Expected 0 arguments, but got 2.",
       "count": 1
     },
     {
@@ -2116,14 +1820,6 @@
     },
     {
       "signature": "src/utilities/sessionResultsExport/sessionResultsExport.test.ts|TS2589|Type instantiation is excessively deep and possibly infinite.",
-      "count": 1
-    },
-    {
-      "signature": "src/utilities/sessionResultsExport/sessionResultsExport.test.ts|TS2739|Type '{ id: string; prompt: string; responseCount: number; type: string; }' is missing the following properties from type 'SessionResultsReportQuestion': options, tags",
-      "count": 1
-    },
-    {
-      "signature": "src/utilities/sessionResultsExport/sessionResultsExport.test.ts|TS2739|Type '{ id: string; prompt: string; type: string; responseCount: number; }' is missing the following properties from type 'SessionResultsReportQuestion': options, tags",
       "count": 1
     },
     {
@@ -2188,7 +1884,7 @@
     },
     {
       "signature": "src/wallet/passkeyWallet.test.ts|TS18046|'request' is of type 'unknown'.",
-      "count": 2
+      "count": 1
     },
     {
       "signature": "src/wallet/passkeyWallet.test.ts|TS2554|Expected 0 arguments, but got 1.",

@@ -40,6 +40,7 @@ export interface SessionState {
   demoMode: Record<string, boolean>;
   demoSurfaceMode: boolean;
   loginModalToggled: boolean;
+  loginModalFocus: string;
   afterLoginModalToggled: boolean;
   onboardingStep: number | null;
   tooltipsEnabled: boolean;
@@ -56,7 +57,7 @@ type SessionSelectionPayload = {
 type FetchSessionStatePayload = SessionSelectionPayload &
   Partial<Pick<SessionState, 'focusedTab' | 'loginModalToggled' | 'explorerHistory'>>;
 type LoginProgressPayload = Partial<Pick<SessionState, 'loginInProgress' | 'loginComplete'>>;
-type LoginModalPayload = boolean | { isOpen?: unknown };
+type LoginModalPayload = boolean | { isOpen?: unknown; focus?: unknown };
 type DemoModePayload = boolean | Partial<SessionState['demoMode']>;
 type SessionReducerAction =
   | { type: typeof FETCH_SESSION_STATE; payload?: FetchSessionStatePayload }
@@ -88,6 +89,7 @@ const getInitialState = (): SessionState => ({
   demoSurfaceMode: readStoredDemoSurfaceMode(),
   // Modal state
   loginModalToggled: false,
+  loginModalFocus: '',
   afterLoginModalToggled: false,
   onboardingStep: null,
   tooltipsEnabled: readStoredTooltipsEnabled(),
@@ -161,12 +163,14 @@ export default function sessionStateReducer(
         return {
           ...state,
           loginModalToggled: isOpen,
+          loginModalFocus: isOpen ? String(p.focus || '') : '',
         };
       } else {
         const isOpen = !!p;
         return {
           ...state,
           loginModalToggled: isOpen,
+          loginModalFocus: '',
         };
       }
     }

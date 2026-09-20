@@ -1,3 +1,5 @@
+import AdminInterviewOpening from './AdminInterviewOpening';
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, FormGroup, FormText } from 'reactstrap';
@@ -48,6 +50,10 @@ import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
+import {
+  getBackgroundResultsAnalysisUnsupportedReason,
+  supportsBackgroundResultsAnalysis,
+} from '../Sessions/resultsAnalysisSettingsSupport';
 import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
@@ -591,6 +597,10 @@ const AdminPageRuntime = ({
   }, [availableSessions, selectedSlug]);
   const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
   const { sessionCapabilities, selectedWorkerSessionId, signedWorkerSessionId } = adminCapabilityRoute;
+  const resultsAnalysisBackgroundAutoSupported = supportsBackgroundResultsAnalysis(selectedConfig);
+  const resultsAnalysisBackgroundAutoUnsupportedReason = resultsAnalysisBackgroundAutoSupported
+    ? ''
+    : getBackgroundResultsAnalysisUnsupportedReason(selectedConfig);
   const effectiveWorkerCorsState = useMemo(() => {
     if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
@@ -1829,12 +1839,12 @@ const AdminPageRuntime = ({
         providerModelCandidate ||
         (legacyModelMatchesProvider ? legacyModelCandidate : '') ||
         (providerMode === 'openai'
-          ? 'gpt-4o-mini'
+          ? DEFAULT_AI_MODEL
           : providerMode === 'openrouter'
-            ? 'openai/gpt-4o-mini'
+            ? `openai/${DEFAULT_AI_MODEL}`
             : providerMode === 'anthropic'
               ? 'claude-3-haiku-20240307'
-              : 'gpt-4o-mini');
+              : DEFAULT_AI_MODEL);
 
       const payload = {
         action: 'ai',
@@ -2637,6 +2647,20 @@ const AdminPageRuntime = ({
                   chain defaults. Verify them before publishing any metadata update.
                 </div>
               )}
+              {canAdminWorker && (
+                <AdminInterviewOpening
+                  key={selectedSlug}
+                  settings={groupMetadata?.interviewMode}
+                  onRefresh={async () => {
+                    const { data } = await postSignedAdminRequest({
+                      action: 'refresh-interview-opening',
+                      path: '/admin/refresh-interview-opening',
+                      body: { sessionSlug: normalizeSlug(selectedSlug) },
+                    });
+                    return data;
+                  }}
+                />
+              )}
               {(canAdminWorker || canAdminRegistry) && (
                 <AdminPageMetadataEditor
                   metadataConfigDraft={metadataConfigDraft}
@@ -2667,6 +2691,8 @@ const AdminPageRuntime = ({
                   handleSaveSessionMetadata={handleSaveSessionMetadata}
                   metadataUpdateStatus={metadataUpdateStatus}
                   showChainFields={sessionCapabilities.usesChainMetadata}
+                  resultsAnalysisBackgroundAutoSupported={resultsAnalysisBackgroundAutoSupported}
+                  resultsAnalysisBackgroundAutoUnsupportedReason={resultsAnalysisBackgroundAutoUnsupportedReason}
                 />
               )}
               <div className={styles.metadataJsonSection}>

@@ -49,6 +49,7 @@ const FAUCET_SBT_GATE_ABI = [
 const TOKEN_TTL_SECONDS = 60 * 60 * 4;
 const NONCE_TTL_SECONDS = 60 * 5;
 const NONCE_RATE_LIMIT_MAX = 5;
+const NONCE_SHARED_NETWORK_RATE_LIMIT_MAX = 300;
 const NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const NONCE_RATE_LIMIT_TTL_SECONDS = 60;
 const USED_NONCE_TTL_SECONDS = 60 * 10;
@@ -93,6 +94,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     TOKEN_TTL_SECONDS,
     NONCE_TTL_SECONDS,
     NONCE_RATE_LIMIT_MAX,
+    NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     NONCE_RATE_LIMIT_WINDOW_MS,
     NONCE_RATE_LIMIT_TTL_SECONDS,
     USED_NONCE_TTL_SECONDS,
@@ -115,6 +117,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     fetch: deps.fetch,
     rpcFetch: deps.rpcFetch,
     now: deps.now,
+    waitUntil: deps.waitUntil,
   };
   const resolved = (deps.resolveWorkerRuntimeDeps || resolveWorkerRuntimeDeps)({
     deps: runtimeDeps,
@@ -216,6 +219,14 @@ export const createWorkerRuntime = (env, overrides = {}) => {
       evaluateAuthenticatedRoutePreflight: resolvedDeps.evaluateAuthenticatedRoutePreflight,
       resolveAuthenticatedRouteSecrets: resolvedDeps.resolveAuthenticatedRouteSecrets,
       normalizeAiRequestPayload: resolvedDeps.normalizeAiRequestPayload,
+      authorizeCloudflareStorageResourceRead: resolvedDeps.authorizeCloudflareStorageResourceRead,
+      readPublishedResultsAnalysisArtifact: resolvedDeps.readPublishedResultsAnalysisArtifact,
+      evaluateResultsAnalysisViewerEligibility: resolvedDeps.evaluateResultsAnalysisViewerEligibility,
+      readCoordinatedResultsAnalysisStatus: resolvedDeps.readCoordinatedResultsAnalysisStatus,
+      dispatchResultsAnalysisArtifactRequest: resolvedDeps.dispatchResultsAnalysisArtifactRequest,
+      createAnonymousRegistrySupportAdaptersWithWorkerDeps: resolvedDeps.createAnonymousRegistrySupportAdaptersWithWorkerDeps,
+      createAuthCorsAdminAdaptersWithWorkerDeps: resolvedDeps.createAuthCorsAdminAdaptersWithWorkerDeps,
+      waitUntil: resolvedDeps.waitUntil,
     },
     constants: {
       resourceGateKeys: resolved.constants.RESOURCE_GATE_KEYS,
@@ -231,6 +242,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
       slugMismatchError: resolved.constants.SLUG_MISMATCH_ERROR,
       nonceTtlSeconds: resolved.constants.NONCE_TTL_SECONDS,
       nonceRateLimitMax: resolved.constants.NONCE_RATE_LIMIT_MAX,
+      nonceSharedNetworkRateLimitMax: resolved.constants.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
       nonceRateLimitWindowMs: resolved.constants.NONCE_RATE_LIMIT_WINDOW_MS,
       nonceRateLimitTtlSeconds: resolved.constants.NONCE_RATE_LIMIT_TTL_SECONDS,
       usedNonceTtlSeconds: resolved.constants.USED_NONCE_TTL_SECONDS,
@@ -263,7 +275,9 @@ export const workerAuthGateUtils = defaultWorkerRuntime.workerAuthGateUtils;
 export default {
   fetch(request, env, ctx) {
     initializeWorkerDebugLogs(env);
-    const workerRuntime = createWorkerRuntime(env);
+    const workerRuntime = createWorkerRuntime(env, {
+      waitUntil: typeof ctx?.waitUntil === 'function' ? ctx.waitUntil.bind(ctx) : undefined,
+    });
     return workerRuntime.fetch(request, env, ctx);
   },
 };

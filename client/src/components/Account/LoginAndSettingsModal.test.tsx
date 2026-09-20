@@ -146,6 +146,7 @@ const buildProps = (overrides: Record<string, any> = {}) => ({
   selectedSessionSlugs: [],
   demoMode: { tools: false },
   provider: 'wagmi',
+  loginModalFocus: '',
   loginComplete: false,
   network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
   ...overrides,
@@ -611,6 +612,60 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     subject.componentDidUpdate(prevProps, subject.state);
 
     expect(subject.syncPasskeyWalletChain).toHaveBeenCalledWith(expect.objectContaining({ id: 84532 }));
+  });
+
+  it('opens the AI config settings section from a focused login modal payload', () => {
+    const prevProps = buildProps({
+      loginModalToggled: false,
+      loginModalFocus: '',
+      loginComplete: true,
+    });
+    const nextProps = buildProps({
+      loginModalToggled: true,
+      loginModalFocus: 'ai-config',
+      loginComplete: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+    subject.state.aiSettingsOpen = false;
+    subject.state.preLoginSettingsOpen = false;
+    subject.state.preLoginConfigOpen = false;
+    subject.state.aiSettingsSectionsOpen = { aiConfig: false };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.state.aiSettingsOpen).toBe(true);
+    expect(subject.state.preLoginSettingsOpen).toBe(true);
+    expect(subject.state.preLoginConfigOpen).toBe(true);
+    expect(subject.state.aiSettingsSectionsOpen.aiConfig).toBe(true);
+    expect(nextProps.toggleLoginModal).toHaveBeenCalledWith({ isOpen: true, focus: '' });
+  });
+
+  it('does not force AI config when the settings modal opens without a focus hint after recovery focus was consumed', () => {
+    const prevProps = buildProps({
+      loginModalToggled: false,
+      loginModalFocus: '',
+      loginComplete: true,
+    });
+    const nextProps = buildProps({
+      loginModalToggled: true,
+      loginModalFocus: '',
+      loginComplete: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+    subject.state.aiSettingsOpen = false;
+    subject.state.preLoginSettingsOpen = false;
+    subject.state.preLoginConfigOpen = false;
+    subject.state.aiSettingsSectionsOpen = { aiConfig: false };
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.state.aiSettingsOpen).toBe(false);
+    expect(subject.state.aiSettingsSectionsOpen.aiConfig).toBe(false);
+    expect(nextProps.toggleLoginModal).not.toHaveBeenCalled();
   });
 
   it('refreshes worker resource presence when account settings are opened', () => {

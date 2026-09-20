@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 /**
  * @module aiSettings
  * @description Central AI settings resolver — merges session-level defaults with local user overrides
@@ -124,12 +125,9 @@ export const AI_SETTINGS_ENVELOPE_KIND = 'ai-settings';
 
 export const DEFAULT_REASONING_EFFORT = 'low';
 
-const DEFAULT_PRESET = 'gpt-5';
+const DEFAULT_PRESET = DEFAULT_AI_MODEL;
 
-const DEFAULT_MODELS = Object.freeze({
-  fast: 'gpt-5',
-  thinking: 'gpt-5',
-});
+const DEFAULT_MODELS = DEFAULT_AI_MODELS;
 const DEFAULT_MODEL_PROVIDERS = Object.freeze({
   fast: AI_PROVIDERS.OPENAI,
   thinking: AI_PROVIDERS.OPENAI,
@@ -147,6 +145,7 @@ const DEFAULT_PROVIDER = Object.freeze({
 });
 
 export const AI_PRESET_CONFIGS: Record<string, AiPresetConfig> = Object.freeze({
+  [DEFAULT_AI_MODEL]: Object.freeze({ provider: AI_PROVIDERS.OPENAI, models: DEFAULT_AI_MODELS }),
   'gpt-5': Object.freeze({
     provider: AI_PROVIDERS.OPENAI,
     models: Object.freeze({
@@ -178,7 +177,7 @@ export const AI_PRESET_CONFIGS: Record<string, AiPresetConfig> = Object.freeze({
 });
 
 const PRELOGIN_PROVIDER_PRESETS: Record<string, string> = Object.freeze({
-  [AI_PROVIDERS.OPENAI]: 'gpt-5',
+  [AI_PROVIDERS.OPENAI]: DEFAULT_AI_MODEL,
   [AI_PROVIDERS.ANTHROPIC]: 'claude-sonnet',
 });
 

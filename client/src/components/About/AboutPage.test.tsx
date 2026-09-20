@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
@@ -28,6 +28,67 @@ const renderAboutPage = () =>
   );
 
 describe('AboutPage', () => {
+  it('only offers Uses for medium layouts with categories below the initial viewport', () => {
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    const rect = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 900 } as DOMRect);
+    const resize = (width: number, height: number) =>
+      act(() => {
+        window.innerWidth = width;
+        window.innerHeight = height;
+        window.dispatchEvent(new Event('resize'));
+      });
+    try {
+      window.innerWidth = 754;
+      window.innerHeight = 803;
+      renderAboutPage();
+      const categories = screen.getByTestId('ce-about-use-cases');
+      const scrollIntoView = jest.fn();
+      categories.scrollIntoView = scrollIntoView;
+      fireEvent.click(screen.getByRole('button', { name: /^Uses$/ }));
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      resize(754, 1000);
+      expect(screen.queryByRole('button', { name: /^Uses$/ })).not.toBeInTheDocument();
+      resize(474, 803);
+      expect(screen.queryByRole('button', { name: /^Uses$/ })).not.toBeInTheDocument();
+      resize(1280, 803);
+      expect(screen.queryByRole('button', { name: /^Uses$/ })).not.toBeInTheDocument();
+      resize(754, 803);
+      expect(screen.getByRole('button', { name: /^Uses$/ })).toBeVisible();
+    } finally {
+      rect.mockRestore();
+      window.innerWidth = originalWidth;
+      window.innerHeight = originalHeight;
+    }
+  });
+  it('briefly reveals title-link labels on hover, keyboard focus, and press', () => {
+    jest.useFakeTimers();
+    try {
+      const { unmount } = renderAboutPage();
+      const github = screen.getByTestId('ce-about-link-github');
+      const mail = screen.getByTestId('ce-about-link-email');
+      const whitepaper = screen.getByTestId('ce-about-link-whitepaper');
+      fireEvent.mouseEnter(github);
+      expect(github).toHaveAttribute('data-label-visible', 'true');
+      act(() => jest.advanceTimersByTime(600));
+      fireEvent.focus(mail);
+      expect(github).toHaveAttribute('data-label-visible', 'false');
+      expect(mail).toHaveAttribute('data-label-visible', 'true');
+      act(() => jest.advanceTimersByTime(600));
+      expect(mail).toHaveAttribute('data-label-visible', 'true');
+      fireEvent.pointerDown(whitepaper, { pointerType: 'touch' });
+      expect(mail).toHaveAttribute('data-label-visible', 'false');
+      expect(whitepaper).toHaveAttribute('data-label-visible', 'true');
+      act(() => jest.advanceTimersByTime(1000));
+      expect(whitepaper).toHaveAttribute('data-label-visible', 'false');
+      fireEvent.mouseEnter(github);
+      unmount();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('renders the hero with the expected primary and external links', () => {
     renderAboutPage();
 
@@ -41,7 +102,7 @@ describe('AboutPage', () => {
     expect(hero).toBeInTheDocument();
     expect(
       within(hero).getByText(
-        'An open-source toolkit for deliberation, decision-making, and negotiation (for humans and AI agents)',
+        'An open toolkit for deliberation, decision-making, and negotiation (for humans and AI agents)',
       ),
     ).toBeVisible();
     expect(demoLink).toHaveAttribute('href', getAboutDemoSessionPath());
@@ -51,6 +112,11 @@ describe('AboutPage', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md',
     );
+    const titleRow = within(screen.getByTestId('ce-about-title-row'));
+    expect(titleRow.getByRole('link', { name: 'Whitepaper' })).toBeVisible();
+    expect(titleRow.getByRole('link', { name: 'Email Context Engine' })).toBeVisible();
+    expect(titleRow.getByRole('link', { name: /GitHub/ })).toBeVisible();
+    expect(within(hero).queryByText(/^Email$/)).not.toBeInTheDocument();
     expect(within(hero).queryByRole('link', { name: /^Posts$/i })).not.toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-link-posts')).not.toBeInTheDocument();
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
@@ -239,102 +305,116 @@ describe('AboutPage', () => {
     }
   });
 
-  it('keeps functionality separate and renders checked foundations plus planned roadmap items', () => {
+  it('renders the live roadmap foundations and specific planned capabilities', () => {
     renderAboutPage();
-
-    const currentToggle = screen.getByRole('button', { name: /functionality/i });
     const roadmapToggle = screen.getByRole('button', { name: /roadmap/i });
-
-    expect(currentToggle).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /present functionalities/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^future$/i })).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/zero-knowledge proofs for encrypted predictions and retroactive evaluation/i),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
-
-    fireEvent.click(currentToggle);
-
-    expect(screen.getByText(/^Sessions:$/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/include questions, responses, documents, access gates, and configuration/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Questions:$/i)).toBeInTheDocument();
-    expect(screen.getByText(/supports binary, rating, multiple-choice, and freeform questions/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Storage:$/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /responses and documents on arweave plus built-in report views, exports, and address-based comparison tools/i,
-      ),
-    ).toBeInTheDocument();
-
+    expect(roadmapToggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(roadmapToggle);
+    expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
+    const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
+    expect(within(foundations).getAllByText('Complete:')).toHaveLength(6);
+    expect(screen.getAllByText('Planned:')).toHaveLength(14);
+    expect(screen.getByText(/unlinkable per-response and per-SBT accounts, ZK\/FHE aggregation/)).toBeVisible();
+    expect(screen.getByText(/affiliation proofs, encrypted claims, and conditional timelocks/)).toBeVisible();
+    expect(screen.getByText(/Turnkey deployment bundles for Arweave, Lit, EVM gas, and AI API access/)).toBeVisible();
+    expect(screen.getByText(/Group prompting and backcasting from result clusters/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Interfaces and Inputs' })).toBeVisible();
+    fireEvent.keyDown(roadmapToggle, { key: 'Enter' });
+    expect(screen.queryByRole('heading', { name: 'Current Foundations' })).not.toBeInTheDocument();
 
-    expect(screen.getByText(/^Current Foundations$/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /create sessions with questions, responses, documents, access gates, and configuration from the web app/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /run binary, rating, multiple-choice, and freeform questions with conviction weighting and comments/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /use sbt groups for gated participation, encrypted fields, and sponsored rpc, ai, gas, arweave, and lit resources/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /persist responses and documents on arweave with report views, exports, and address-based comparison tools/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets/i,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /explore shipped demo sessions and reusable ai discourse corpus data from the app and repository/i,
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Privacy, Credentials, and Safety$/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/stronger privacy with unlinkable per-response and per-sbt accounts, zk\/fhe aggregation/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/zktls group formation for privacy-preserving groups/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /ai whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks/i,
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Deployment and Resilience$/i)).toBeInTheDocument();
-    expect(screen.getByText(/walkaway resilience through ens-hosted frontends/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Interfaces and Inputs$/i)).toBeInTheDocument();
-    expect(screen.getByText(/agent-first ux so people can point an assistant at a session/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Preference Data and Models$/i)).toBeInTheDocument();
-    expect(screen.getByText(/group-representative ai models/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Deliberation and Negotiation$/i)).toBeInTheDocument();
-    expect(screen.getByText(/agent-to-agent negotiation tooling/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/^Complete:/i)).toHaveLength(6);
-    expect(screen.getAllByText(/^Planned:/i)).toHaveLength(14);
-    expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Stage 2:$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Stage 3:$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Stage 4\+:$/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /functionality/i }));
+    expect(screen.getByRole('link', { name: 'SBT groups' })).toHaveAttribute('href', '/groups');
+    expect(screen.getByText(/Stores responses and documents in Cloudflare or on Arweave/)).toBeVisible();
+  });
+
+  it('links related research and documented uses and includes the media entry', () => {
+    renderAboutPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Related Work' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recognition' }));
+    const related = within(screen.getByTestId('ce-about-related-work'));
+    expect(related.getByRole('link', { name: 'AI Opinions Benchmark' })).toHaveAttribute('href', '/benchmarks');
+    expect(related.getByRole('link', { name: 'The Agent Mirror Test' })).toHaveAttribute(
+      'href',
+      '/posts/agent-village-wrapped',
+    );
+    expect(related.getByRole('heading', { name: 'Ladders Made of Numbers' })).toBeVisible();
+    expect(related.getByRole('link', { name: 'CommonGround · Prime Intellect' })).toHaveAttribute(
+      'href',
+      'https://app.primeintellect.ai/dashboard/environments',
+    );
+    const practice = within(screen.getByTestId('ce-about-used-by'));
+    expect(practice.getByRole('link', { name: 'Cosmos × FIRE grants' })).toHaveAttribute(
+      'href',
+      'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
+    );
+    expect(practice.getByText(/Context Engine was selected for a Cosmos × FIRE/)).toBeVisible();
+    expect(practice.getByRole('link', { name: 'Foresight Institute grant · 2026' })).toHaveAttribute(
+      'href',
+      'https://foresight.org/grants/ai-science-safety-nodes-rfp/',
+    );
+    expect(practice.getByText(/Context Engine received a grant through Foresight Institute/)).toBeVisible();
+    expect(practice.getByRole('link', { name: 'Agent Village 2026' })).toHaveAttribute(
+      'href',
+      '/posts/agent-village-wrapped',
+    );
+    expect(practice.getByRole('link', { name: 'EDDY 2026 demo' })).toHaveAttribute(
+      'href',
+      'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna/program',
+    );
+    expect(practice.getByRole('link', { name: /d\/acc residency/ })).toHaveAttribute(
+      'href',
+      'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
+    );
+    const artwork = practice.getAllByRole('presentation', { hidden: true });
+    expect(artwork).toHaveLength(6);
+    artwork.forEach((img) => fireEvent.error(img));
+    expect(practice.queryAllByRole('presentation', { hidden: true })).toHaveLength(0);
+    expect(practice.getAllByRole('link')).toHaveLength(5);
+    expect(screen.queryByRole('heading', { name: /^Media$/ })).not.toBeInTheDocument();
+  });
+
+  it('expands the new sections independently with mouse and keyboard controls', () => {
+    renderAboutPage();
+    const related = screen.getByRole('button', { name: 'Related Work' });
+    const practice = screen.getByRole('button', { name: 'Recognition' });
+    expect(related).toHaveAttribute('aria-expanded', 'false');
+    expect(practice).toHaveAttribute('aria-expanded', 'false');
+    const preview = screen.getByTestId('ce-about-related-summary');
+    ['benchmark', 'eval', 'media'].forEach((category) => expect(within(preview).getByText(category)).toBeVisible());
+    expect(screen.getByTestId('ce-about-practice-summary')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'AI Opinions Benchmark' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Cosmos × FIRE grants' })).not.toBeInTheDocument();
+
+    fireEvent.click(related);
+    expect(related).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByTestId('ce-about-related-summary')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'AI Opinions Benchmark' })).toBeVisible();
+    expect(practice).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.keyDown(practice, { key: 'Enter' });
+    expect(practice).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByTestId('ce-about-practice-summary')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cosmos × FIRE grants' })).toBeVisible();
+    fireEvent.keyDown(related, { key: ' ' });
+    expect(related).toHaveAttribute('aria-expanded', 'false');
+    expect(practice).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(practice);
+    expect(screen.queryByRole('link', { name: 'Cosmos × FIRE grants' })).not.toBeInTheDocument();
   });
 
   it('keeps the recognition section visible without rendering empty individuals content', () => {
     renderAboutPage();
 
-    const recognitionSection = screen.getByTestId('ce-about-recognition-toggle');
-    const recognitionToggle = within(recognitionSection).getByRole('button', { name: /recognition/i });
+    const recognitionSection = screen.getByTestId('ce-about-in-practice');
+    const recognitionToggle = within(recognitionSection).getByRole('button', { name: /^recognition$/i });
 
     expect(recognitionSection).toBeInTheDocument();
+    expect(recognitionToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(recognitionSection).getByTestId('ce-about-practice-summary')).toBeInTheDocument();
+    fireEvent.click(recognitionToggle);
     expect(recognitionToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(recognitionSection).getByRole('heading', { name: 'Recognized & Used By' })).toBeVisible();
+    expect(within(recognitionSection).getByRole('heading', { name: 'Acknowledgements' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Acknowledgements' })).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-about-recognition-radicalxchange')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-about-recognition-individuals')).not.toBeInTheDocument();
     expect(screen.queryByText(/No recognized individuals yet/i)).not.toBeInTheDocument();
@@ -342,14 +422,14 @@ describe('AboutPage', () => {
     fireEvent.click(recognitionToggle);
 
     expect(recognitionToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(within(recognitionSection).getByTestId('ce-about-recognition-summary')).toBeInTheDocument();
+    expect(within(recognitionSection).getByTestId('ce-about-practice-summary')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-about-recognition-radicalxchange')).not.toBeInTheDocument();
   });
 
   it('keeps every collapsible section header frameless', () => {
     renderAboutPage();
 
-    ['Functionality', 'Roadmap', 'Recognition'].forEach((name) => {
+    ['Functionality', 'Roadmap', 'Related Work', 'Recognition'].forEach((name) => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('data-ce-control-appearance', 'frameless');
     });
   });
@@ -376,57 +456,38 @@ describe('AboutPage', () => {
   });
 
   it.each([
+    ['ethereum', /^Ethereum is an open, decentralized network/, /^Context Engine uses Ethereum-compatible accounts/],
+    ['radicalxchange', /^RadicalxChange is a movement/, /^Context Engine draws on these ideas/],
+    ['pol-is', /^Pol.is is an open-source tool/, /^Context Engine builds on this approach/],
     [
-      'ce-about-recognition-ethereum',
-      /cryptographic foundation for proof-of-human and attestation-based access/i,
-      /users do not need any crypto expertise to use it/i,
-      null,
+      'collective-intelligence-project',
+      /^The Collective Intelligence Project studies/,
+      /^Context Engine shares this focus/,
     ],
-    [
-      'ce-about-recognition-radicalxchange',
-      /builds on radicalxchange ideas around social identity, plural governance, and groups owning the data and value they create/i,
-      /retain ownership over the preference data and value they create/i,
-      null,
-    ],
-    [
-      'ce-about-recognition-pol-is',
-      /large-group discourse software can clarify both consensus and persistent difference/i,
-      /vtaiwan where simple agree \/ unsure \/ disagree inputs helped structure public reasoning/i,
-      null,
-    ],
-    [
-      'ce-about-recognition-collective-intelligence-project',
-      /context engine is social infrastructure for the ai transition/i,
-      /alongside cip’s work on scalable collective decision-making for transformative technology/i,
-      null,
-    ],
-    [
-      'ce-about-recognition-edge-city',
-      /edge patagonia, sponsored by protocol labs/i,
-      /prototype tools for resilient technology, coordination, and governance in live community settings/i,
-      null,
-    ],
+    ['edge-city', /^Edge City brings people together/, /^Context Engine was developed and tested/],
   ])(
-    'shows product-facing recognition modal copy in the %s recognition modal',
-    async (testId: string, firstCopy: RegExp, secondCopy: RegExp, expectedLinkHref: string | null) => {
+    'introduces %s before explaining its connection to Context Engine',
+    async (slug: string, introduction: RegExp, relationship: RegExp) => {
       renderAboutPage();
-
-      fireEvent.click(screen.getByTestId(testId));
-
+      fireEvent.click(screen.getByRole('button', { name: 'Recognition' }));
+      fireEvent.click(screen.getByTestId(`ce-about-recognition-${slug}`));
       const dialog = screen.getByRole('dialog');
-
-      expect(screen.getByText(firstCopy)).toBeInTheDocument();
-      expect(screen.getByText(secondCopy)).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: /close recognition details/i })).toBeVisible();
-      if (expectedLinkHref) {
-        expect(within(dialog).getByRole('link', { name: /github repo/i })).toHaveAttribute('href', expectedLinkHref);
+      const first = within(dialog).getByText(introduction);
+      const second = within(dialog).getByText(relationship);
+      expect(first.tagName).toBe('P');
+      expect(second.tagName).toBe('P');
+      expect(first.nextElementSibling).toBe(second);
+      if (slug === 'edge-city') {
+        expect(first).toHaveTextContent('pop-up communities');
+        expect(second).toHaveTextContent('(Sponsored by Protocol Labs).');
+        expect(second).not.toHaveTextContent('Feedback');
+        expect(within(dialog).getByRole('link', { name: 'Residency blog post' })).toHaveAttribute(
+          'href',
+          'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
+        );
       }
-
-      fireEvent.click(within(dialog).getByRole('button', { name: /close recognition details/i }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      });
+      fireEvent.click(within(dialog).getByRole('button', { name: /close acknowledgement details/i }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     },
   );
 
@@ -490,18 +551,9 @@ describe('AboutPage', () => {
     );
   });
 
-  it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
+  it('keeps mobile recognition rows and section headers aligned', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 
-    expect(scss).toMatch(
-      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
-    );
-    expect(scss).toMatch(
-      /@media \(min-width:\s*520px\) and \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
-    );
-    expect(scss).toMatch(
-      /@media \(max-width:\s*519px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/,
-    );
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/,
     );
@@ -538,10 +590,10 @@ describe('AboutPage', () => {
       /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.mainTitle\s*{[\s\S]*?font-size:\s*clamp\(3rem,\s*7vw,\s*4\.4rem\);/,
     );
     expect(scss).toMatch(
-      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.tagline\s*{[\s\S]*?font-size:\s*clamp\(1\.45rem,\s*3\.4vw,\s*1\.85rem\);/,
+      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.tagline\s*{[\s\S]*?font-size:\s*1\.05rem;/,
     );
     expect(scss).toMatch(
-      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.52rem;/,
+      /@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.08rem;/,
     );
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.demoVideo\s*{[\s\S]*?display:\s*none;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideo\s*{[\s\S]*?display:\s*grid;/);

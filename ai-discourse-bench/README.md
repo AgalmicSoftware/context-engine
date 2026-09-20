@@ -93,6 +93,23 @@ author-side review recorded without model outputs displayed or consulted, and
 independently of the author's judgment. Unresolved disagreement leaves the
 item at `candidate`.
 
+The next-generation bank is the 1000-item v0.3 candidate at
+`banks/ai-futures/v0.3-candidate/question-bank.json`. It is hand-authored from
+`banks/ai-futures/v0.3-candidate/authoring/*.jsonl` and rebuilt with:
+
+```bash
+npm run build:v03-candidate-bank      # writes bank, manifest, audit, review CSV, coverage report
+npm run check:v03-candidate-bank      # lint + constraints only, non-zero exit on violation
+```
+
+Every v0.3 item forces a tradeoff, threshold, forecast, scenario, or
+comparison; canonical direction is balanced per topic; items carry a role
+(`probe`, `self-referential`, `minority`, `control-anchor`, `attention-check`)
+and paraphrases under `v03`. The current harness runs it unchanged (the `v03`
+fields are ignored). Design rationale, methodology changes, and the slice plan
+are summarized in [the methodology](docs/methodology.md). Like v0.2, it is `candidate` until
+two independent human reviews are recorded.
+
 Before launching calls, inspect the experiment plan:
 
 ```bash

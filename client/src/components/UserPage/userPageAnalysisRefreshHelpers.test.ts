@@ -260,6 +260,7 @@ describe('userPage analysis refresh helpers', () => {
       analysisHistoricalReasoning: 'Reason',
       analysisElapsedMs: 0,
       analysisError: '',
+      analysisErrorAction: '',
       analyzing: false,
       analysisServedFromCache: true,
       analysisCachedAt: 1710000000000,
@@ -282,6 +283,7 @@ describe('userPage analysis refresh helpers', () => {
       showAnalysisModal: true,
       analyzing: true,
       analysisError: '',
+      analysisErrorAction: '',
       aiAnalysis: '',
       analysisDetails: '',
       analysisName: '',
@@ -479,6 +481,7 @@ describe('userPage analysis refresh helpers', () => {
     expect(buildUserPageAnalysisErrorStatePatch()).toEqual({
       analyzing: false,
       analysisError: 'Unable to generate analysis right now. Please try again later.',
+      analysisErrorAction: '',
       showAnalysisModal: true,
       analysisServedFromCache: false,
       analysisCachedAt: null,

@@ -29,20 +29,26 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(
       /\.sessionVoiceModeChooser\s*\{[\s\S]*?button:hover,[\s\S]*?strong,[\s\S]*?span,[\s\S]*?svg\s*\{[\s\S]*?color:\s*var\(--ce-action-accent-text\) !important;/,
     );
+    expect(scss).toMatch(/\.sessionAgentKickoffRow\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
+    expect(scss).toMatch(/\.sessionAgentKickoffCopyTarget\s*\{[\s\S]*?min-height:\s*48px;[\s\S]*?cursor:\s*copy;/);
     expect(scss).toMatch(
-      /\.sessionAgentKickoffCopy\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*8px;[\s\S]*?right:\s*8px;[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;/,
+      /\.sessionAgentKickoffCopyBadge\s*\{[\s\S]*?border:\s*1px solid var\(--ce-status-info-text\);[\s\S]*?font-weight:\s*800;/,
     );
     expect(scss).toMatch(
-      /\.sessionAgentKickoffToggle\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?right:\s*10px;[\s\S]*?bottom:\s*8px;[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
+      /\.sessionAgentKickoffToggle\s*\{[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(/\.sessionAgentKickoffCaretExpanded\s*\{[\s\S]*?transform:\s*rotate\(180deg\);/);
     expect(scss).toMatch(
-      /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?opacity:\s*0\.5;/,
+      /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*pre-line;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?a\s*\{[\s\S]*?color:\s*var\(--ce-action-accent\);/,
+    );
+    expect(scss).toMatch(/\.sessionListeningActiveRecorder\s*\{[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(/\.sessionListeningWaveformShell\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;/);
+    expect(scss).toMatch(
+      /\.sessionInterviewStatusPill\s*\{[\s\S]*?background:\s*var\(--ce-status-success-bright\) !important;/,
     );
     expect(scss).toMatch(
-      /\.sessionInterviewStatusDot\s*\{[\s\S]*?border-radius:\s*var\(--ce-radius-round\);[\s\S]*?background:\s*var\(--ce-status-success\);/,
+      /\.sessionInterviewStatusPill\s*\{[\s\S]*?&\[data-tone='error'\]\s*\{[\s\S]*?background:\s*var\(--ce-status-error\) !important;/,
     );
-    expect(scss).toMatch(/\.sessionInterviewStatusDotError\s*\{[\s\S]*?background:\s*var\(--ce-status-error\);/);
     expect(scss).toMatch(
       /\.sessionInterviewMappingNotice\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-status-warning\) 58%, var\(--ce-card-border\)\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-status-warning\) 12%, var\(--ce-surface-sunken\)\);[\s\S]*?color:\s*var\(--ce-panel-text\);/,
     );

@@ -95,3 +95,44 @@ describe('aiClientWorkerTransport', () => {
     expect(readAiWorkerFirstMessageContentLength('not-messages')).toBe(0);
   });
 });
+
+it('routes fast Astra mapping through Responses with low effort and no sampling parameters', () => {
+  const plan = buildAiWorkerRequestPlan({
+    ai: { provider: 'openai', model: 'gpt-6-astra' },
+    opts: { reasoningEffort: 'low', service_tier: 'fast', temperature: 0.1, maxTokens: 8000 },
+  });
+  expect(plan.requestBody).toMatchObject({
+    endpoint: 'responses',
+    model: 'gpt-6-astra',
+    reasoning_effort: 'low',
+    service_tier: 'fast',
+    max_output_tokens: 8000,
+  });
+  expect(plan.requestBody).not.toHaveProperty('temperature');
+  expect(plan.requestBody).not.toHaveProperty('max_tokens');
+});
+
+it('requests standard processing for Terra unless explicitly overridden', () => {
+  const plan = buildAiWorkerRequestPlan({ ai: { model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' } });
+  expect(plan.requestBody).toMatchObject({
+    endpoint: 'responses',
+    model: 'gpt-5.6-terra',
+    service_tier: 'default',
+    reasoning_effort: 'low',
+  });
+  expect(plan.requestBody).not.toHaveProperty('temperature');
+});
+
+it('sends the higher interview mapping effort even when the session default is low', () => {
+  const plan = buildAiWorkerRequestPlan({
+    ai: { model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' },
+    taskType: 'interview-map',
+    opts: { reasoningEffort: 'medium', service_tier: 'default' },
+  });
+  expect(plan.requestBody).toMatchObject({
+    model: 'gpt-5.6-terra',
+    endpoint: 'responses',
+    reasoning_effort: 'medium',
+    service_tier: 'default',
+  });
+});

@@ -151,11 +151,25 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     gap: 25px;
     align-items: center;
     margin-bottom: 25px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 5px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+      border-radius: var(--ce-radius-pill);
+    }
+
     .primaryControls,
     .secondaryControls {
       display: flex;
       align-items: center;
       gap: 14px;
+      flex: 0 0 auto;
       flex-wrap: wrap;
     }
 
@@ -732,13 +746,20 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           text-align: center;
           white-space: normal;
           line-height: 1.06;
+          max-width: 100%;
+          max-height: 100%;
+          overflow: hidden;
+          overflow-wrap: anywhere;
+          word-break: normal;
+          hyphens: auto;
+          text-wrap: balance;
           padding: 0;
           transform: scale(0.94);
           text-shadow: 0 2px 10px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
           background: transparent;
           border-radius: var(--ce-radius-0);
           font-weight: 700;
-          letter-spacing: 0.02em;
+          letter-spacing: 0.01em;
         }
 
         &.depthCenter {
@@ -1779,6 +1800,29 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           );
         }
       }
+    }
+
+    .generatedSummarySection {
+      margin: 0 20px 16px;
+      padding: 14px 16px;
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+      border-radius: var(--ce-radius-10);
+      background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+
+      p {
+        margin: 6px 0 0;
+        color: $text-main;
+        font-size: 0.95rem;
+        line-height: 1.55;
+      }
+    }
+
+    .generatedSummaryEyebrow {
+      color: color-mix(in srgb, var(--ce-status-info) 88%, transparent);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .argumentClaim {

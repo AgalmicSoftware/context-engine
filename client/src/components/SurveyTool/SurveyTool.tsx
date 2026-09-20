@@ -97,6 +97,7 @@ type SurveyToolProps = {
   provider?: unknown;
   loginComplete?: boolean;
   loginInProgress?: boolean;
+  loginModalToggled?: boolean;
   network?: { id?: number; chainId?: number; name?: string };
   networkChainId?: number;
   networkLatestBlock?: number;

@@ -77,6 +77,129 @@ describe('RiskMatrix', () => {
     expect(screen.queryByTestId('ce-risk-matrix-comment-input')).not.toBeInTheDocument();
   });
 
+  it('renders generated read-only comments without falling back to seeded notes', () => {
+    render(
+      <RiskMatrix
+        categories={[
+          { name: 'Session Evidence', subcategories: ['Generated'] },
+          { name: 'Rehearsal Readiness', subcategories: ['Generated'] },
+        ]}
+        commentEyebrow="Generated note"
+        initialComments={[
+          {
+            cell: 'Session Evidence.Generated.Rehearsal Readiness.Generated',
+            comment: 'Participants noted that late setup changes could reduce rehearsal quality.',
+            intensity: 8,
+            valence: 'risk',
+          },
+        ]}
+        readOnly={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-session-evidence-vs-rehearsal-readiness'));
+
+    expect(
+      screen.getByText('Participants noted that late setup changes could reduce rehearsal quality.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/AI-driven productivity gains/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-risk-matrix-comment-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-risk-matrix-save-comment')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Close'));
+    fireEvent.click(
+      screen.getByTestId('ce-risk-matrix-subcell-session-evidence-generated-vs-rehearsal-readiness-generated'),
+    );
+
+    expect(screen.getByText('Generated note')).toBeInTheDocument();
+  });
+
+  it('opens generated likelihood and impact assessment details without seeded scenarios or measured counts', () => {
+    render(
+      <RiskMatrix
+        generatedSeverityAssessments={[
+          {
+            id: 'risk_1',
+            category: 'Rehearsal Readiness',
+            likelihood: 'medium',
+            impact: 'high',
+            sourceRefs: ['question:setup-readiness'],
+            summary: 'Late setup changes may reduce rehearsal quality.',
+          },
+        ]}
+        readOnly={true}
+      />,
+    );
+
+    expect(screen.getByTestId('ce-risk-matrix-generated-severity')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-risk-matrix-severity-cell-likelihood-medium-impact-high')).toHaveTextContent(
+      'Rehearsal Readiness',
+    );
+    expect(screen.getByText(/not measured response counts/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Rehearsal Readiness/i }));
+
+    expect(screen.getByText('Late setup changes may reduce rehearsal quality.')).toBeInTheDocument();
+    expect(screen.getByText('question:setup-readiness')).toBeInTheDocument();
+    expect(screen.queryByText(/0 votes|0 responses|0 participants/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI-driven productivity gains/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-risk-matrix-comment-input')).not.toBeInTheDocument();
+  });
+
+  it('renders generated risk assessments on dynamic AI-selected axes', () => {
+    render(
+      <RiskMatrix
+        generatedSeverityAxes={{
+          x: {
+            id: 'readiness_uncertainty',
+            label: 'Readiness uncertainty',
+            levels: [
+              { id: 'settled', label: 'Settled' },
+              { id: 'uncertain', label: 'Uncertain' },
+            ],
+          },
+          y: {
+            id: 'coordination_load',
+            label: 'Coordination load',
+            levels: [
+              { id: 'light', label: 'Light' },
+              { id: 'heavy', label: 'Heavy' },
+            ],
+          },
+        }}
+        generatedSeverityAssessments={[
+          {
+            id: 'risk_1',
+            category: 'Setup Risk',
+            xLevelId: 'uncertain',
+            yLevelId: 'heavy',
+            sourceRefs: ['q2'],
+            summary: 'Late setup changes may reduce quality.',
+          },
+        ]}
+        readOnly={true}
+      />,
+    );
+
+    expect(screen.getByText('Coordination load / Readiness uncertainty')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-risk-matrix-axis-cell-x-uncertain-y-heavy')).toHaveTextContent('Setup Risk');
+    expect(screen.getByText(/generated axes/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Setup Risk/i }));
+
+    expect(screen.getByText('Late setup changes may reduce quality.')).toBeInTheDocument();
+    expect(screen.getByText('q2')).toBeInTheDocument();
+    expect(screen.queryByText(/0 votes|0 responses|0 participants/i)).not.toBeInTheDocument();
+  });
+
+  it('does not fall back to seeded categories when explicit categories are empty', () => {
+    render(<RiskMatrix categories={[]} initialComments={[]} />);
+
+    expect(screen.queryByTestId('ce-risk-matrix-header-x-safety')).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI-driven productivity gains/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-risk-matrix')).toBeInTheDocument();
+  });
+
   it('renders the crypto category and opens seeded crypto aggregate notes', () => {
     render(<RiskMatrix />);
 

@@ -302,6 +302,9 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     { interviewMode: { provider: 'openrouter' } },
     { interviewMode: { realtimeModel: 'gpt-5' } },
     { interviewMode: { enabled: true, apiKey: 'must-not-be-public' } },
+    { interviewMode: { openingMode: 'owner', openingPrompt: '' } },
+    { interviewMode: { followNewQuestions: 'true' } },
+    { interviewMode: { questionGrowthPercent: 0 } },
   ]) {
     const result = applySessionConfigMutation({
       existingConfig: cloneJson(profileBearingConfig),
@@ -567,4 +570,36 @@ test('non-authorization config mutation preserves the current epoch', () => {
   assert.equal(result.ok, true);
   assert.equal(result.config.authzEpoch, 6);
   assert.equal(result.config.limits.perWalletPerDay, 3);
+});
+
+test('accepts gpt-live-1 and documented legacy models while rejecting invented or retired values', () => {
+  for (const model of ['gpt-live-1', 'gpt-realtime-2.1', 'gpt-realtime-2', 'gpt-realtime-1.5']) {
+    const result = applySessionConfigMutation({ existingConfig: cloneJson(profileBearingConfig), mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, provider: 'openai', realtimeModel: model } } }, slug: 'session-a' });
+    assert.equal(result.ok, true); assert.equal(result.config.interviewMode.realtimeModel, model);
+  }
+  for (const model of ['gpt-realtime-custom', 'gpt-realtime', 'gpt-live-invented', 'GPT-LIVE-1']) {
+    const result = applySessionConfigMutation({ existingConfig: cloneJson(profileBearingConfig), mutation: { kind: 'set-config', incomingConfig: { interviewMode: { realtimeModel: model } } }, slug: 'session-a' });
+    assert.equal(result.ok, false); assert.equal(result.status, 400);
+  }
+});
+
+test('set-config preserves owner opening and optional interview features', () => {
+  const interviewMode = {
+    enabled: true,
+    realtimeModel: 'gpt-live-1',
+    openingMode: 'owner',
+    openingPrompt: 'Which AI view is overlooked?',
+    autoRegenerate: false,
+    questionGrowthPercent: 20,
+    followNewQuestions: true,
+    suggestQuestions: true,
+    allowManualRefresh: false,
+  };
+  const result = applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode } },
+    slug: 'session-a',
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.config.interviewMode, interviewMode);
 });

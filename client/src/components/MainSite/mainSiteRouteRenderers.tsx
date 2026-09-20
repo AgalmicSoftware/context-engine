@@ -478,6 +478,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
           account={host.props.account}
           address={host.props.address}
           provider={host.props.provider}
+          toggleLoginModal={host.props.toggleLoginModal}
           network={onChainProfileEnabled ? defaultSessionNetwork : null}
           activeSessionSlug={defaultSlug}
           sessionConfig={profileSessionConfig}

@@ -36,6 +36,7 @@ describe('mainSiteViewProps', () => {
     expect(composeMainSiteLoginViewProps(props)).toEqual({
       toggleLoginModal: props.toggleLoginModal,
       loginComplete: props.loginComplete,
+      loginModalToggled: false,
     });
     expect(composeMainSiteAuthViewProps(props)).toEqual({
       account: props.account,
@@ -43,6 +44,7 @@ describe('mainSiteViewProps', () => {
       toggleLoginModal: props.toggleLoginModal,
       loginComplete: props.loginComplete,
       loginInProgress: props.loginInProgress,
+      loginModalToggled: false,
     });
   });
 

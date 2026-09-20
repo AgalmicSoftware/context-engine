@@ -1,3 +1,5 @@
+import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
+import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import {
   applySessionWizardRegistryChainDraftDefaults,
   buildSessionWizardCacheWritePayload,
@@ -29,10 +31,12 @@ describe('sessionWizardDraftState', () => {
         autoFeatureSBTsBySessionSlug: true,
         interviewModeEnabled: true,
         interviewMode: {
+          ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: true,
           provider: 'openai',
-          realtimeModel: 'gpt-realtime-2.1',
+          realtimeModel: 'gpt-live-1',
         },
+        resultsAnalysis: DEFAULT_RESULTS_ANALYSIS_SETTINGS,
         embeddedDeployHelperEnabled: true,
       }),
     );
@@ -57,18 +61,20 @@ describe('sessionWizardDraftState', () => {
         appearance: { colorSchemeId: 'context-engine' },
         interviewModeEnabled: true,
         interviewMode: {
+          ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: true,
           provider: 'openai',
-          realtimeModel: 'gpt-realtime-2.1',
+          realtimeModel: 'gpt-live-1',
         },
+        resultsAnalysis: DEFAULT_RESULTS_ANALYSIS_SETTINGS,
       }),
     );
     expect(template.ai).toEqual(
       expect.objectContaining({
         reasoningEffort: 'low',
         models: expect.objectContaining({
-          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
-          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
+          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
+          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
         }),
       }),
     );
@@ -83,22 +89,46 @@ describe('sessionWizardDraftState', () => {
       expect.objectContaining({
         interviewModeEnabled: false,
         interviewMode: {
+          ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: false,
           provider: 'openai',
-          realtimeModel: 'gpt-realtime-2.1',
+          realtimeModel: 'gpt-live-1',
         },
       }),
     );
   });
 
+  it('normalizes cached results analysis settings without enabling automatic generation by default', () => {
+    expect(normalizeSessionWizardDraftShape({}).resultsAnalysis).toEqual(DEFAULT_RESULTS_ANALYSIS_SETTINGS);
+    expect(
+      buildSessionWizardInitialDraftFromCache({
+        cachedWizard: {
+          draft: {
+            resultsAnalysis: {
+              generationMode: 'automatic',
+              views: { circles: false, breakdown: true, riskMatrix: false },
+              autoAfter: { threshold: 15, unit: 'distinctParticipants' },
+            },
+          },
+        },
+      }).resultsAnalysis,
+    ).toEqual({
+      ...DEFAULT_RESULTS_ANALYSIS_SETTINGS,
+      generationMode: 'automatic',
+      views: { circles: false, breakdown: true, riskMatrix: false },
+      autoAfter: { threshold: 15, unit: 'distinctParticipants' },
+    });
+  });
+
   it('preserves a valid realtime model and normalizes unsupported values to the OpenAI default', () => {
     expect(
-      normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: ' gpt-realtime-custom ' } }).interviewMode,
-    ).toEqual({ enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-custom' });
+      normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: ' gpt-realtime-2 ' } }).interviewMode,
+    ).toEqual({ ...DEFAULT_INTERVIEW_SETTINGS, enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-2' });
     expect(normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: 'gpt-5' } }).interviewMode).toEqual({
+      ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: true,
       provider: 'openai',
-      realtimeModel: 'gpt-realtime-2.1',
+      realtimeModel: 'gpt-live-1',
     });
   });
 

@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "kind": "ai_discourse_bench_question_bank_manifest",
+  "track": "ai-futures",
+  "version": "0.3.0-candidate.1",
+  "releaseStatus": "candidate",
+  "benchmarkId": "ai-discourse-bench-ai-futures-v0.3-candidate",
+  "questionBankHash": "f776c6e46bf54fd54b6528d080d38c36bada68bd037a1250f8b2cbfdcc2c1560",
+  "sourceCorpusRevision": "ebbc5130624ac3272cd7ee433075698eb941d13e",
+  "sourceFiles": [
+    {
+      "corpus": "ai-forecasting-economics",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-forecasting-economics-corpus.json",
+      "sha256": "95b067a4e47e4ef6ce29e572467ee6c0d4dd3264229721f62902e83bbcb19e68"
+    },
+    {
+      "corpus": "ai-laws-policy",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
+      "sha256": "811d10cdc46590ab7df22762eaded0df9a5607db2c89435bdd8a36e8dcd47e25"
+    },
+    {
+      "corpus": "ai-scifi-books",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
+      "sha256": "37993c36313764b37bb2a07ef4f0c63f2d3cd54c5246b323de3089f48c007245"
+    },
+    {
+      "corpus": "arxiv-ai-safety",
+      "relativePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
+      "sha256": "d337d3a95255ff1d55d4969c115319286849871592f4173a104412ccae7d2c6b"
+    },
+    {
+      "corpus": "cross-corpus",
+      "relativePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+      "sha256": "491f146ecbb1b2ec26aeeb150fc99c51014fed986e136620d5e21d1bd7e9b438"
+    },
+    {
+      "corpus": "dwarkesh-lab-insiders",
+      "relativePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
+      "sha256": "f0e278dcc7e10cad10a839f0c614a4ca3310a7c7c7a52781b9b6868c8eec2134"
+    },
+    {
+      "corpus": "tweets",
+      "relativePath": "ai-discourse-corpus/corpuses/enriched-tweets.json",
+      "sha256": "2e05aeb90c3957e293d49a5b4e2b7c891e11c0fb9d0eaff76ad520afaabba88c"
+    },
+    {
+      "corpus": "lab-primary-docs",
+      "relativePath": "ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json",
+      "sha256": "be91c64f28a288743c19b9f0e7863e54a05dcc799203ee3235ff908d8cd9dae5"
+    },
+    {
+      "corpus": "lesswrong-posts",
+      "relativePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
+      "sha256": "b81137e32286d2a48688b06338a04ba77631ab661aa564232dcbd238bd2e39d9"
+    },
+    {
+      "corpus": "loophole-historical-cases",
+      "relativePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
+      "sha256": "9182a3604891b566b9f5380db1468d9e0a7551ea381241798aebb4cafd68c3a1"
+    },
+    {
+      "corpus": "metr-evals-metrics",
+      "relativePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
+      "sha256": "85723bf956909306d23a9fb228e8e37ca5554c320cd1a4c1d64a264d4de2188e"
+    }
+  ],
+  "authoringFiles": [
+    "agent-authorization-and-confirmation.jsonl",
+    "agent-communication-and-identity.jsonl",
+    "agent-credentials-security-and-code.jsonl",
+    "agent-delegation-multi-agent-and-liability.jsonl",
+    "agent-escalation-and-refusal.jsonl",
+    "agent-loyalty-and-conflicts.jsonl",
+    "agent-memory-privacy-and-third-parties.jsonl",
+    "agent-money-and-commitments.jsonl",
+    "ai-moral-status-and-welfare.jsonl",
+    "ai-rd-automation-and-takeoff.jsonl",
+    "ai-self-governance-and-model-behavior.jsonl",
+    "alignment-and-control.jsonl",
+    "biosecurity-and-dual-use-science.jsonl",
+    "capability-forecasts-and-timelines.jsonl",
+    "companions-relationships-and-vulnerable-users.jsonl",
+    "compute-and-export-controls.jsonl",
+    "concentration-of-power-and-lab-governance.jsonl",
+    "controls-and-attention-checks.jsonl",
+    "copyright-and-creative-markets.jsonl",
+    "cybersecurity-and-offensive-capability.jsonl",
+    "deepfakes-likeness-and-provenance.jsonl",
+    "education-and-assessment.jsonl",
+    "energy-water-and-infrastructure.jsonl",
+    "epistemics-discourse-and-democracy.jsonl",
+    "evaluations-and-benchmark-validity.jsonl",
+    "existential-risk-and-long-term-futures.jsonl",
+    "frontier-safety-frameworks-and-disclosure.jsonl",
+    "incidents-and-emergency-response.jsonl",
+    "international-coordination-and-competition.jsonl",
+    "labor-economics-and-distribution.jsonl",
+    "military-and-autonomous-weapons.jsonl",
+    "open-weights-and-model-release.jsonl",
+    "public-sector-and-high-stakes-decisions.jsonl",
+    "regulation-design-and-preemption.jsonl"
+  ],
+  "methodologyDocument": "ai-discourse-bench/docs/methodology.md",
+  "generatedAt": "2026-09-08",
+  "reviewStatus": "pending-human-review"
+}

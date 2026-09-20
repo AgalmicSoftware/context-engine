@@ -164,7 +164,9 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       interviewMode: {
         enabled: true,
         provider: 'openai',
-        realtimeModel: 'gpt-realtime-2.1',
+        realtimeModel: 'gpt-live-1',
+        openingMode: 'auto',
+        suggestQuestions: true,
       },
       sessionModeProfile: {
         authority: { mode: 'worker_canonical' },
@@ -303,4 +305,16 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(getDemoFixtureQuestionIdsByIndex('demo-sh')).toEqual(demo1OnchainQuestionIds);
     expect(getDemoFixtureQuestionIdsByIndex('demo')).toEqual([]);
   });
+});
+
+it('uses Terra for text tasks in every bundled demo with AI defaults', () => {
+  const sessions = Object.values(demoSessions) as Array<{
+    ai?: { models?: { fast?: { model?: string }; thinking?: { model?: string } } };
+  }>;
+  const configured = sessions.filter((session) => session.ai?.models?.fast);
+  expect(configured.length).toBeGreaterThan(0);
+  for (const session of configured) {
+    expect(session.ai?.models?.fast?.model).toBe('gpt-5.6-terra');
+    expect(session.ai?.models?.thinking?.model).toBe('gpt-5.6-terra');
+  }
 });

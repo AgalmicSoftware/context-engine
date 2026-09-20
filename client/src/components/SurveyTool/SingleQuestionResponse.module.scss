@@ -291,7 +291,7 @@
     }
 
     &.agree {
-      background-color: var(--ce-status-success);
+      background-color: var(--ce-binary-choice-agree-bg);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -300,12 +300,12 @@
     }
 
     &.unsure {
-      background-color: var(--ce-status-warning);
-      color: var(--ce-color-border);
+      background-color: var(--ce-binary-choice-unsure-bg);
+      color: var(--ce-text);
     }
 
     &.disagree {
-      background-color: var(--ce-status-error);
+      background-color: var(--ce-binary-choice-disagree-bg);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -410,17 +410,17 @@
   box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   &.agree {
-    background-color: var(--ce-status-success);
+    background-color: var(--ce-binary-choice-agree-bg);
     color: var(--ce-color-white);
   }
 
   &.unsure {
-    background-color: var(--ce-status-warning);
-    color: var(--ce-color-border);
+    background-color: var(--ce-binary-choice-unsure-bg);
+    color: var(--ce-text);
   }
 
   &.disagree {
-    background-color: var(--ce-status-error);
+    background-color: var(--ce-binary-choice-disagree-bg);
     color: var(--ce-color-white);
   }
 
@@ -608,7 +608,8 @@
 
 .cardLinkButton {
   background: none;
-  border: none;
+  border: 0 !important;
+  box-shadow: none !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -627,6 +628,11 @@
     opacity: 1;
     color: var(--ce-color-accent);
     transform: translateY(-1px);
+    box-shadow: none !important;
+  }
+  &:focus-visible {
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 

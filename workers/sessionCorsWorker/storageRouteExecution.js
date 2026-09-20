@@ -43,6 +43,7 @@ import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
@@ -53,8 +54,8 @@ const isJsonContentType = (contentType) => {
   return mediaType === 'application/json' || mediaType.endsWith('+json');
 };
 
-const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
-const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
+export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
+export const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
 const MAX_STORAGE_LIST_PAGE_SIZE = 100;
 const DEFAULT_RESOURCE_GATES = Object.freeze({
@@ -96,11 +97,11 @@ const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValue
   bytes[0] &= 0xf7;
   return bytesToBase64url(bytes);
 };
-const buildObjectKey = ({ slug, id }) => `sessions/${sessionSlugStorageKey(slug)}/storage/${id}`;
-const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:${id}`;
-const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:`;
+export const buildObjectKey = ({ slug, id }) => `sessions/${sessionSlugStorageKey(slug)}/storage/${id}`;
+export const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:${id}`;
+export const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:`;
 const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
-const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
+export const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -119,7 +120,7 @@ const readKvPayloadEnvelope = async ({ index, slug, id }) => {
     return null;
   }
 };
-const base64urlToBytes = (value) => {
+export const base64urlToBytes = (value) => {
   const text = trim(value);
   if (!text) return new Uint8Array();
   const base64 = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
@@ -919,6 +920,28 @@ const authorizeCloudflareStorageAccess = async ({
   };
 };
 
+
+export const authorizeCloudflareStorageResourceRead = async ({
+  env,
+  config,
+  slug,
+  resource = 'generatedArtifacts',
+  requesterAddress = '',
+  authScopes,
+  baseHeaders,
+  deps,
+} = {}) => authorizeCloudflareStorageAccess({
+  env,
+  config,
+  slug,
+  resource,
+  requesterAddress,
+  authScopes,
+  metadata: { resource },
+  baseHeaders,
+  deps,
+});
+
 const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, authScopes, baseHeaders, deps }) => {
   const policy = payload?.uploadPolicy;
   if (!policy?.mode) return { ok: true };
@@ -1249,6 +1272,28 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
 
   const storageRef = normalizeStorageRef(metadata);
+  if (resource === 'responses') {
+    const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
+    if (typeof enqueueAutomatic === 'function') {
+      let committedPayload = null;
+      try { committedPayload = JSON.parse(decoder.decode(bytesToStore || new Uint8Array())); } catch { committedPayload = null; }
+      const committedResponses = committedPayload && typeof committedPayload === 'object'
+        ? [{ metadata, payload: committedPayload }]
+        : [];
+      await enqueueAutomatic({
+        env,
+        slug,
+        config,
+        job: {
+          slug,
+          requestId: `auto-upload:${id}`,
+          committedResponses,
+        },
+      }).catch((error) => {
+        deps?.log?.warn?.('[results-analysis] auto enqueue failed', { slug, error: error?.message || String(error || '') });
+      });
+    }
+  }
   return responseJson(deps, {
     id,
     storageRef,
@@ -1550,7 +1595,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   }, 200, baseHeaders);
 };
 
-const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
+export const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
   const rows = [];
   const prefix = trim(resource)
     ? buildIndexPrefix({ slug, resource })
@@ -1578,7 +1623,7 @@ const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
   return rows;
 };
 
-const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
+export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
   const id = trim(metadata?.id);
   if (!id) return null;
   const r2 = getStorageR2Binding(env);

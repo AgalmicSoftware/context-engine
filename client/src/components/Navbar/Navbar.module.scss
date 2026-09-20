@@ -27,7 +27,8 @@
     align-content: center;
     justify-items: center;
     padding: 0px;
-    width: 40%;
+    width: auto;
+    flex: 0 0 auto;
   }
 
   #navbarLogoColLoggedIn {
@@ -35,16 +36,25 @@
     align-content: center;
     justify-items: center;
     padding: 0px;
+    flex: 0 0 auto;
   }
 
   #mainLogo {
+    display: block;
     object-fit: contain;
-    min-height: 75px;
+    width: min(32vw, 110px);
+    max-width: min(32vw, 110px);
+    min-height: 0;
+    height: auto;
   }
 
   #mainLogoLoggedIn {
+    display: block;
     object-fit: contain;
-    max-width: 120px;
+    width: min(32vw, 110px);
+    max-width: min(32vw, 110px);
+    min-height: 0;
+    height: auto;
   }
 
   #navbarSearchCol {

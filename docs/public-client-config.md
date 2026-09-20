@@ -207,6 +207,8 @@ matching app routes and reapply it when generating links, so deep links such as
 mounted app. Legacy `/ce/contracts` deep links are rewritten to `/ce/docs`
 without dropping their path suffix, query, or hash. The SPA fallback must also
 be scoped to the same deployed base path by the hosting platform.
+Relative mount paths are normalized directly; route lookups avoid repeatedly
+parsing them as absolute URLs during question-list rendering.
 
 Set browser cache headers so search-result clicks and fresh navigations
 revalidate the deployed files after each deploy. For manual drag-and-drop

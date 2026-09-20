@@ -133,6 +133,8 @@ export type SessionResultsGeneratedAnalysisArtifact = {
       summary: Record<string, unknown>;
     };
     riskMatrix: {
+      assessments?: unknown[];
+      axes?: unknown;
       available: boolean;
       categories: unknown[];
       comments: unknown[];

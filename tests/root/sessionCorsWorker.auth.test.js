@@ -25,6 +25,15 @@ describe('sessionCorsWorker auth routes', () => {
   const makeAuthJsonRequest = (path, body, origin = loginOrigin) => makeJsonRequest(path, body, {
     headers: { Origin: origin },
   });
+  const addCloudflareRuntimeIp = (request, ip = '198.51.100.7') => {
+    Object.defineProperty(request, 'cf', {
+      configurable: true,
+      value: { colo: 'VIE' },
+    });
+    request.headers.set('CF-Connecting-IP', ip);
+    return request;
+  };
+  const addressFor = (value) => `0x${Number(value).toString(16).padStart(40, '0')}`;
 
   const buildLoginSiweMessage = (params = {}, origin = loginOrigin) => buildSiweMessage({
     domain: new URL(origin).host || loginDomain,
@@ -94,6 +103,100 @@ describe('sessionCorsWorker auth routes', () => {
       payload.nonce,
       { expirationTtl: 60 * 5 }
     );
+  });
+
+  it('allows 100 distinct wallets behind one trusted Cloudflare IP to request login nonces concurrently', async () => {
+    const kv = createMemoryKv();
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
+    const requests = Array.from({ length: 100 }, (_, index) => (
+      sessionCorsWorker.fetch(
+        addCloudflareRuntimeIp(makeAuthJsonRequest('/auth/nonce', {
+          address: addressFor(index + 1),
+          sessionSlug,
+        })),
+        env,
+        {},
+      )
+    ));
+
+    const responses = await Promise.all(requests);
+    const payloads = await Promise.all(responses.map((response) => response.json()));
+
+    expect(responses.map((response) => response.status)).toEqual(Array(100).fill(200));
+    expect(payloads.every((payload) => typeof payload?.nonce === 'string')).toBe(true);
+  });
+
+  it('keeps the five-per-wallet nonce ceiling even on a shared trusted network', async () => {
+    const kv = createMemoryKv();
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
+    const address = addressFor(111);
+
+    const responses = [];
+    for (let index = 0; index < 6; index += 1) {
+      responses.push(await sessionCorsWorker.fetch(
+        addCloudflareRuntimeIp(makeAuthJsonRequest('/auth/nonce', {
+          address,
+          sessionSlug,
+        })),
+        env,
+        {},
+      ));
+    }
+    const payload = await responses[5].json();
+
+    expect(responses.slice(0, 5).map((response) => response.status)).toEqual(Array(5).fill(200));
+    expect(responses[5].status).toBe(429);
+    expect(payload?.error).toBe('Too many nonce requests. Try again shortly.');
+  });
+
+  it('enforces the shared trusted-network nonce ceiling across distinct wallets', async () => {
+    const kv = createMemoryKv();
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
+
+    const responses = [];
+    for (let index = 0; index < 301; index += 1) {
+      responses.push(await sessionCorsWorker.fetch(
+        addCloudflareRuntimeIp(makeAuthJsonRequest('/auth/nonce', {
+          address: addressFor(index + 1),
+          sessionSlug,
+        })),
+        env,
+        {},
+      ));
+    }
+    const payload = await responses[300].json();
+
+    expect(responses.slice(0, 300).map((response) => response.status)).toEqual(Array(300).fill(200));
+    expect(responses[300].status).toBe(429);
+    expect(payload?.error).toBe('Too many nonce requests. Try again shortly.');
+  });
+
+  it('does not let forged forwarded IP headers bypass the bounded unknown-network nonce bucket', async () => {
+    const kv = createMemoryKv();
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
+
+    const responses = [];
+    for (let index = 0; index < 301; index += 1) {
+      responses.push(await sessionCorsWorker.fetch(
+        makeJsonRequest('/auth/nonce', {
+          address: addressFor(index + 1),
+          sessionSlug,
+        }, {
+          headers: {
+            Origin: loginOrigin,
+            'CF-Connecting-IP': `198.51.100.${index % 250}`,
+            'X-Forwarded-For': `203.0.113.${index % 250}`,
+          },
+        }),
+        env,
+        {},
+      ));
+    }
+    const payload = await responses[300].json();
+
+    expect(responses.slice(0, 300).map((response) => response.status)).toEqual(Array(300).fill(200));
+    expect(responses[300].status).toBe(429);
+    expect(payload?.error).toBe('Too many nonce requests. Try again shortly.');
   });
 
   it('rejects auth nonce requests with non-canonical session slugs', async () => {

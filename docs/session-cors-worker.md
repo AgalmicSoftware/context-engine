@@ -523,6 +523,69 @@ Admin test panel:
   `Session config not found.` and retry once.
 - The faucet test sends a micro transfer (0.0000001) to a fresh random address; it does not fund the connected wallet.
 - The SBT gate negative tests expect a 403 on login when you connect a wallet without the sponsored SBT.
+- Admin-generated Results views split viewer reads from admin controls.
+  `GET /results-analysis/artifact?sessionSlug=<slug>&includeSnapshot=true`
+  returns the latest successful generated artifact plus a safe frozen submitted
+  snapshot only when the session profile has `results.visibility: "public_full_if_storage_public"`, `aggregateResultsEnabled: true`, and the
+  caller passes the existing Cloudflare read gates for all three resources:
+  `generatedArtifacts`, `questions`, and `responses`. This prevents a broader
+  generated-artifact gate from exposing raw snapshot source rows. The viewer
+  response includes a safe `jobState` such as `succeeded`/`idle`, the canonical
+  `sessionId`, artifact metadata, and the snapshot when requested. It must not
+  include active reservations, request ledgers, failure internals, wallet
+  mappings, or admin-only status. Failed or active generation continues to show
+  the last successful artifact.
+  `GET /admin/results-analysis/status?sessionSlug=<slug>&includeDraft=true`
+  requires a cached Worker JWT and then runs server-side `validateAdmin` before
+  returning normalized `settings`, `capability`, and private admin job state for
+  Generate/Refresh controls. Clients must treat malformed or mismatched 200
+  responses as unavailable.
+- Manual generation uses signed admin action
+  `POST /admin/results-analysis/generate` with action
+  `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
+  `{ "source": { "kind": "worker-canonical" } }`; non-canonical
+  registry/Arweave profiles may use `{ "source": { "kind":
+  "admin-snapshot", "snapshot": ... } }` only when the browser has a
+  same-session, unlocked submitted-response snapshot. The Worker sanitizes the
+  snapshot and rejects encrypted or locked rows. A successful run immediately
+  replaces the latest visible artifact for authorized viewers; Generate and
+  Refresh remain admin-only actions.
+- Automatic generated-results work is durable background work only for
+  Worker-canonical Cloudflare storage. The Worker counts authoritative submitted
+  distinct participants since the last successful run, defaults to threshold
+  `10`, and queues SessionWriteCoordinator alarm work. It does not rely on
+  browser snapshots, does not use `waitUntil` for provider work, and does not
+  run for registry/Arweave profiles. If automatic generation fails,
+  `automatic`-only sessions allow an explicit admin manual retry as recovery;
+  otherwise repeated submissions do not thrash provider calls.
+- Generated-results AI calls inherit the session's existing AI provider/model
+  routing, especially the analysis/thinking assignment. They do not hardcode a
+  separate provider or model. Inputs are submitted responses only; Circles is
+  the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
+  from the session subject matter.
+
+### Local mocked generated-results browser smoke
+
+Use the generated-results smoke to verify the real session results UI without
+live AI, provider keys, Worker secrets, or a deployed session. The script mocks
+Worker responses, including the viewer artifact, admin status, and refresh
+request, and writes screenshots to its configured local screenshot directory.
+Run it against an isolated Vite instance on port 3100:
+
+```bash
+# terminal 1
+cd client
+PUBLIC_URL=/ ./node_modules/.bin/vite --host 127.0.0.1 --port 3100
+
+# terminal 2, from the repo root
+BASE_URL=http://127.0.0.1:3100 node scripts/session-generated-results-real-ui-smoke.js
+```
+
+The fixture uses synthetic submitted questions/responses and synthetic
+generated artifacts. It exercises real OnePageSession refresh success, provider
+timeout with the newer artifact preserved, admin-auth `403` with the allowed
+viewer artifact preserved, a second anonymous viewer plus reload, mobile Risk
+Matrix scroll/detail behavior, and Circles hover/drill interactions.
 
 ## Session Storage Routes
 
@@ -1097,6 +1160,14 @@ Runtime:
       "participantScopes": ["ai", "storage"],
       "anonymousScopes": []
     },
+    "resultsAnalysis": {
+      "version": 1,
+      "generationMode": "manual",
+      "views": { "circles": true, "breakdown": true, "riskMatrix": true },
+      "autoAfter": { "threshold": 10, "unit": "distinctParticipants" },
+      "inputScope": "submitted",
+      "publication": "latest_success_visible"
+    },
     "storageProfile": {
       "backend": "cloudflare",
       "resources": {
@@ -1555,6 +1626,12 @@ login, and signed admin request bodies must carry that config's canonical
      `Nonce mismatch or expired.`, `Nonce already used.`, used-nonce TTL writes,
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
+   - Nonce request rate limiting uses two coordinated fixed-window buckets per
+     session: a strict wallet bucket capped at 5 requests per address per
+     minute, and a shared-network bucket capped at 300 requests per minute.
+     In native Cloudflare runtime the shared-network bucket uses the platform
+     `CF-Connecting-IP`; outside that runtime, forwarded IP headers are ignored
+     and requests fall back to the bounded `anon:unknown` bucket.
 2. Build a SIWE message client-side and sign with `personal_sign`.
 3. `POST /auth/login` body:
    `{ address, message, signature, sessionSlug, sessionId }` for
@@ -1843,7 +1920,10 @@ Signed login/bootstrap requests:
   requirement for registry-canonical anonymous access.
 - Anonymous rate-identity normalization also routes through a shared helper:
   it preserves the existing Cloudflare-only `CF-Connecting-IP` trust rule, `X-Anonymous-Client-Id`
-  lowercasing/validation, and `anon:unknown` fallback used for anonymous rate limiting.
+  lowercasing/validation, and `anon:unknown` fallback used for anonymous route
+  rate limiting. Auth nonce shared-network limiting uses Cloudflare runtime IPs
+  or the bounded `anon:unknown` bucket; it does not use caller-controlled shard
+  ids.
 - Anonymous request slug resolution also routes through a shared helper:
   it preserves `X-Session-Slug` before legacy `X-Group-Slug`, still routes through worker slug canonicalization,
   and keeps the anonymous missing-explicit-slug contract before config lookup.
@@ -1926,6 +2006,7 @@ Signed login/bootstrap requests:
     `Origin` and `X-Session-Slug`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /resource-presence` with `X-Session-Slug`
+  - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.
   - Returns only `{ ai, arweave, rpc, txGas }` booleans derived from worker-held
     secrets. It never returns secret names, values, previews, or provider URLs.
@@ -1978,24 +2059,46 @@ Signed login/bootstrap requests:
     the session's `allowOrigins` or a configured public/app/session URL, and its
     `/session/<slug>` path must match. Existing query and fragment state are
     stripped before the Worker supplies `reviewUrl`.
+  - `reviewUrl` includes a `worker=<origin>` discovery hint derived from the
+    Worker endpoint that served the catalog, followed by `mode=interview`. The
+    Worker does not copy any `worker` query supplied in `sessionUrl`; the client
+    still verifies the Worker-canonical session config before using that hint.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
   `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical
   Agent API family on the Session Worker; the Agent Bridge compatibility route
   remains during the staged transport migration.
+- `POST /interview/starter?slug=<slug>`
+  - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
+  - Returns `{ openingPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing.
+  - Stores the generated opening and baseline count in `session:<slug>:interview-opening`, separate from owner configuration. Reuses it by default; optional regeneration uses `interviewMode.questionGrowthPercent` (20% by default). Concurrent requests within one Worker isolate share generation; Cloudflare KV remains eventually consistent across isolates.
+  - Failed regeneration preserves the last successful opening; initial failure returns a recoverable error. The client bounds waiting to ten seconds and can start with an existing session question.
+- `POST /admin/refresh-interview-opening`
+  - Uses the existing signed admin request body and authority checks. Regenerates the cached opening when `interviewMode.allowManualRefresh` is enabled (default true). Owner-written openings are preserved.
 - `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
-  - Uses the anonymous AI eligibility policy above, then exchanges the bounded
-    browser SDP offer for an OpenAI Realtime SDP answer without exposing the
-    Worker-held `openaiKey`.
-  - Preserves the browser offer byte-for-byte, including its terminal CRLF,
-    then forwards it as a filename-free `application/sdp` multipart field and
-    sends the session configuration as `application/json`, matching OpenAI's
-    Realtime call contract. Trimming the SDP can make an otherwise valid offer
-    fail with an unexpected EOF.
-  - Defaults to `gpt-realtime-2.1`, `gpt-transcribe`, server VAD, and audio
-    output. A session may set `interviewMode.realtimeModel` to another
-    `gpt-realtime*` ID. `interviewMode.provider` is reserved for future
-    providers; values other than `openai` currently return `400`.
+  - Uses the anonymous AI eligibility policy above and the Worker-held
+    `openaiKey`. The key is never accepted from or returned to the browser.
+  - Defaults to `gpt-live-1`. Posts JSON to OpenAI `/v1/live/sessions` with
+    `{ session: { model, instructions, store: false, delegation: { type: "client" } },
+    transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
+    including terminal CRLF, and reads the answer from `transport.sdp`.
+    Live negotiates audio through WebRTC and uses native continuous speech and
+    transcripts; no Realtime `type`, `output_modalities`, transcription model,
+    `turn_detection`, or `max_output_tokens` fields are sent.
+  - Explicit supported legacy aliases (`gpt-realtime-2.1`,
+    `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`) use
+    `/v1/realtime/calls` with filename-free SDP/JSON multipart fields,
+    `type: realtime`, audio output, `gpt-transcribe`, and `server_vad` with
+    `create_response` and `interrupt_response` enabled. Other old model values
+    resolve to Live; new config writes reject unsupported IDs.
+  - Returns `application/sdp` with `cache-control: no-store` and the
+    CORS-exposed `x-interview-protocol: live|realtime` header so the client uses
+    the actual Worker-selected protocol. Non-OpenAI providers return `400`;
+    malformed upstream SDP answers return `502`. Provider errors are sanitized.
+  - Existing deployments must rebuild/redeploy the canonical Session Worker
+    before using the new client. This code change does not mutate deployed
+    Worker configuration or secrets. See [Session Voice Modes](session-listening-mode.md)
+    for startup, transcript, stop, and review behavior and the official sources.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).

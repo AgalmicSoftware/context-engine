@@ -1,3 +1,5 @@
+import { callAI } from '../../utilities/ai/aiClient.js';
+jest.mock('../../utilities/ai/aiClient.js', () => ({ callAI: jest.fn() }));
 import {
   buildExternalInterviewKickoff,
   buildInterviewResponseMappingPrompt,
@@ -11,6 +13,7 @@ import {
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
   normalizeInterviewQuestions,
+  mapInterviewEvidenceToResponses,
   parseInterviewDraftResponses,
   readImportedInterviewDraftResponses,
   readInterviewPrefillFromHash,
@@ -81,17 +84,23 @@ describe('session interview protocol', () => {
   });
 
   it('canonicalizes question hashing order and resolves realtime model provenance', () => {
+    expect(resolveRealtimeInterviewSource({ ai: { realtimeModel: 'gpt-realtime-2.1' } }).modelId).toBe(
+      'gpt-realtime-2.1',
+    );
+    expect(resolveRealtimeInterviewSource({ interviewMode: { realtimeModel: 'gpt-realtime-invented' } }).modelId).toBe(
+      'gpt-live-1',
+    );
     const q1 = { id: 'q1', prompt: 'First', type: 'freeform', options: [] };
     const q2 = { id: 'q2', prompt: 'Second', type: 'freeform', options: [] };
     expect(canonicalizeInterviewQuestions([q2, q1])).toEqual([q1, q2]);
     expect(resolveRealtimeInterviewSource({})).toEqual({
       platform: 'other',
-      modelId: 'gpt-realtime-2.1',
+      modelId: 'gpt-live-1',
       verification: 'self_reported',
     });
-    expect(resolveRealtimeInterviewSource({ interviewMode: { realtimeModel: 'gpt-realtime-custom' } })).toEqual({
+    expect(resolveRealtimeInterviewSource({ interviewMode: { realtimeModel: 'gpt-realtime-2' } })).toEqual({
       platform: 'other',
-      modelId: 'gpt-realtime-custom',
+      modelId: 'gpt-realtime-2',
       verification: 'self_reported',
     });
   });
@@ -150,13 +159,15 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('reasonable inferences');
     expect(kickoff).toContain('binary and multichoice answers must match one listed option');
     expect(kickoff).toContain('Every response needs confidence from 0 to 1');
+    expect(kickoff).toContain('additionalComments is text');
     expect(kickoff).toContain('Platform/model are self-reported fidelity metadata');
     expect(kickoff).toContain('historyChatsSearched');
     expect(kickoff).toContain('count distinct prior chats/memories/sources searched and actually used');
     expect(kickoff).toContain('do not count your own prior output');
     expect(kickoff).toContain('Use null when the platform does not reveal a searched count');
-    expect(kickoff).toContain('responderContext.name');
-    expect(kickoff).toContain('keeps name sharing off');
+    expect(kickoff).not.toContain('responderContext.name');
+    expect(kickoff).not.toContain('preferred name');
+    expect(kickoff).toContain('"responderContext":{"summary":"optional"}');
     expect(kickoff).toContain('the exact single-line JSON packet');
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');
@@ -171,15 +182,23 @@ describe('session interview protocol', () => {
     expect(mappingPrompt).toContain('defensible indirect signal');
     expect(mappingPrompt).toContain('Low-confidence inference is allowed');
     expect(mappingPrompt).toContain('confidence is required for every response');
+    expect(mappingPrompt).toContain('first person');
+    expect(mappingPrompt).toContain('Do not add an "(Agent):" prefix');
   });
 
-  it('opens by inviting personal or topic insight and preserves responder steering', () => {
+  it('opens directly on topic and preserves a configured opening', () => {
+    const questions = [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }];
+    expect(buildRealtimeInterviewInstructions({ questions })).toContain('Begin directly with one relevant question');
     const instructions = buildRealtimeInterviewInstructions({
-      questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+      questions,
+      openingPrompt: 'What is your uncommon AI view?',
     });
-    expect(instructions).toContain('either about themselves and their perspective or about the broader topic');
-    expect(instructions).toContain('steer the conversation toward what matters most to them at any point');
-    expect(instructions).toContain('Follow that direction before naturally covering');
+    expect(instructions).toContain('What is your uncommon AI view?');
+    expect(instructions).toContain('Ask useful follow-ups');
+    expect(instructions).toContain('ask what topics or questions the responder thinks should be asked more');
+    expect(instructions).toContain('one question at a time');
+    expect(instructions).toContain('which session question they would most like to see other people answer');
+    expect(instructions).not.toContain('important insight');
   });
 
   it('keeps only known question drafts and clamps optional supported ratings', () => {
@@ -258,4 +277,75 @@ describe('session interview protocol', () => {
       ]),
     ).toEqual([]);
   });
+});
+
+it('maps a numeric reply using standard Terra with medium effort and keeps the rating value', async () => {
+  jest
+    .mocked(callAI)
+    .mockResolvedValue(JSON.stringify({ responses: [{ questionId: 'trust', answer: 4, confidence: 1 }] }));
+  const questions = normalizeInterviewQuestions([
+    { id: 'trust', type: 'rating', prompt: 'How much do you trust AI companies to self-regulate? (1-10)' },
+  ]);
+  const result = await mapInterviewEvidenceToResponses({
+    questions,
+    transcript: 'Interviewer: How much do you trust AI companies to self-regulate? From one to ten.\nResponder: Four.',
+  });
+  expect(callAI).toHaveBeenCalledWith(
+    expect.stringContaining('Responder: Four.'),
+    expect.objectContaining({
+      model: 'gpt-5.6-terra',
+      provider: 'openai',
+      preferLocal: false,
+      reasoningEffort: 'medium',
+      service_tier: 'default',
+    }),
+  );
+  expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
+});
+
+it('returns reviewable novel question drafts only when enabled', async () => {
+  const onSuggestedQuestions = jest.fn();
+  jest.mocked(callAI).mockResolvedValue(
+    JSON.stringify({
+      responses: [],
+      questions: [
+        {
+          questionType: 'multichoice',
+          prompt: 'Which governance path fits?',
+          options: [' Pilot ', 'Full launch', 'Pilot', { unexpected: true }],
+          tags: [' governance ', 'Governance', '', 7, 'institutions'],
+        },
+        { questionType: 'rating', prompt: 'How ready is the team?' },
+        { questionType: 'multichoice', prompt: 'Which invalid choice set?', options: ['Only one'] },
+        { questionType: 'freeform', prompt: 'Existing question?' },
+      ],
+    }),
+  );
+  const options = {
+    questions: [{ id: 'q1', type: 'freeform', prompt: 'Existing question?', options: [] }],
+    transcript: 'Responder: AI could change our institutions.',
+    onSuggestedQuestions,
+  };
+  await mapInterviewEvidenceToResponses(options);
+  expect(onSuggestedQuestions).not.toHaveBeenCalled();
+  await mapInterviewEvidenceToResponses({
+    ...options,
+    sessionConfig: {
+      defaultTags: ['governance'],
+      questionsGenPrompt: 'Prefer policy questions.',
+      interviewMode: { suggestQuestions: true },
+    },
+  });
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Session default tags: ["governance"]');
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Prefer policy questions.');
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('freeform|rating|multichoice|binary');
+  expect(onSuggestedQuestions).toHaveBeenCalledWith([
+    expect.objectContaining({
+      type: 'multichoice',
+      prompt: 'Which governance path fits?',
+      options: ['Pilot', 'Full launch'],
+      tags: ['Governance', 'institutions'],
+    }),
+    expect.objectContaining({ type: 'rating', prompt: 'How ready is the team?' }),
+  ]);
 });

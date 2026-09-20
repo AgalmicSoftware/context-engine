@@ -1520,3 +1520,188 @@ $user-page-background: var(--ce-surface-sunken);
     transition-duration: 0.01ms !important;
   }
 }
+
+// Interview reviews show the proposed questions, with the normal upload and tag editor underneath.
+.interviewQuestionReview.createSurveyContainer {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+
+  .questionContainer {
+    position: relative;
+    padding: 14px 16px 16px;
+    border-radius: var(--ce-radius-20);
+    background: var(--ce-color-surface);
+    box-shadow: var(--ce-card-shadow);
+  }
+
+  .questionHeader {
+    justify-content: flex-end;
+    margin-bottom: 0;
+  }
+
+  .questionHeaderActions:empty {
+    display: none;
+  }
+
+  .filterBubble {
+    color: var(--ce-panel-text);
+  }
+
+  .questionMetadata {
+    margin-top: 12px;
+  }
+
+  .tagsContainer {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .tagInputGroup {
+    flex: 1 1 260px;
+    max-width: min(100%, 260px);
+    min-width: min(100%, 220px);
+    margin-left: 0;
+    overflow: hidden;
+  }
+
+  .tagInputField {
+    min-width: 0;
+  }
+
+  .removeQuestionButton {
+    padding: 0;
+  }
+
+  .revealTagInputButton {
+    border: 1px solid color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+    box-shadow: none;
+  }
+}
+
+.revealTagInputButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+  color: var(--ce-panel-text);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.interviewQuestionPrompt {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-body);
+
+  h3 {
+    color: var(--ce-panel-text);
+    margin: 0;
+    font-family: inherit;
+    font-size: 1.32rem;
+    font-weight: 800;
+    line-height: 1.28;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    border: 0;
+    background: transparent;
+    color: var(--ce-panel-text);
+    font: inherit;
+    padding: 6px;
+    cursor: pointer;
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.interviewQuestionPromptActions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.interviewQuestionPromptActions .interviewQuestionPromptEditButton,
+.interviewQuestionPromptActions .removeQuestionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: var(--ce-radius-8);
+}
+
+.interviewQuestionPromptActions .removeQuestionButton {
+  color: var(--ce-status-error);
+}
+
+.interviewQuestionPromptActions .removeQuestionButton:hover,
+.interviewQuestionPromptActions .removeQuestionButton:focus {
+  color: var(--ce-color-white);
+}
+
+.interviewQuestionSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding-right: 96px;
+  font-size: 0.78rem;
+}
+
+.interviewQuestionTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 44%, transparent);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--ce-panel-text);
+  background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.interviewQuestionOptions {
+  color: color-mix(in srgb, var(--ce-panel-text) 76%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.interviewQuestionPromptEditButton {
+  flex: 0 0 auto;
+}
+
+.interviewQuestionPromptDoneButton {
+  justify-self: start;
+  border: 1px solid color-mix(in srgb, var(--ce-panel-text) 20%, transparent) !important;
+  border-radius: var(--ce-radius-8);
+  padding: 6px 10px !important;
+}

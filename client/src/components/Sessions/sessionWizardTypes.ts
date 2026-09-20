@@ -49,7 +49,7 @@ export type DraftState = UnknownRecord &
     sessionModeProfile?: UnknownRecord;
     groupCreationPolicy?: string;
     interviewModeEnabled?: boolean;
-    interviewMode?: {
+    interviewMode?: Partial<import('../../../../shared/interviewSettings.mjs').InterviewSettings> & {
       enabled?: boolean;
       provider?: string;
       realtimeModel?: string;

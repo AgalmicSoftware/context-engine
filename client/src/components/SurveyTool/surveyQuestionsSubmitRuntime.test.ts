@@ -288,6 +288,11 @@ describe('surveyQuestionsSubmitRuntime', () => {
 
   it('passes a pre-encryption prediction comparison snapshot into submission', async () => {
     const context = createContext();
+    context.getPendingEditStats.mockReturnValue({ encrypted: 1, total: 1 });
+    context.buildFieldEncryptionWorkGroupsCore.mockReturnValue({
+      groups: [{ qids: ['q1'], recipients: [], slice: { answers: { q1: { value: 'Final answer' } } } }],
+      missingRecipients: [],
+    });
     context.stateRef.current.surveysResponseState[2] = {
       additionalComments: { q1: { value: 'Final note', encrypted: true } },
       answers: { q1: { value: 'Final answer', encrypted: true } },
@@ -302,10 +307,12 @@ describe('surveyQuestionsSubmitRuntime', () => {
     };
 
     const runtime = createSurveyQuestionsSubmitRuntime(context);
-    await runtime.encryptAndUpload();
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'submitted' });
 
+    expect(context.cryptoUtils.encryptMultipleAnswers).toHaveBeenCalled();
     expect(context.submitSurveyResponse).toHaveBeenCalledWith(
       expect.objectContaining({
+        answers: { q1: { encrypted: true, value: 'encrypted-answer' } },
         interviewProvenance: {
           q1: expect.objectContaining({
             submissionValueSnapshot: {
@@ -331,10 +338,27 @@ describe('surveyQuestionsSubmitRuntime', () => {
     });
     const runtime = createSurveyQuestionsSubmitRuntime(context);
 
-    await runtime.encryptAndUpload();
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'login-required' });
 
     expect(context.inst._submitGuard).toBe(false);
     expect(context.propsRef.current.toggleLoginModal).toHaveBeenCalledWith(true);
     expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('returns a failed outcome instead of reporting success when there is nothing to submit', async () => {
+    const context = createContext({
+      getAnsweredQuestionsCount: jest.fn(() => 0),
+    });
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: 'No responses to submit.',
+    });
+
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+    expect(context.setState).toHaveBeenCalledWith({ submissionError: 'No responses to submit.' });
+    clearTimeout(context.inst._emptySubmitTimer);
+    context.inst._emptySubmitTimer = null;
   });
 });

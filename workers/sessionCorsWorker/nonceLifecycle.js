@@ -12,6 +12,7 @@ const DEFAULT_USED_NONCE_TTL_SECONDS = 60 * 10;
 const DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS = 60;
 const DEFAULT_NONCE_RATE_LIMIT_MAX = 5;
+const DEFAULT_NONCE_SHARED_NETWORK_RATE_LIMIT_MAX = 300;
 
 const recordAbuseEventBestEffort = async ({
   env,
@@ -115,43 +116,73 @@ export const checkNonceRateLimit = async ({
   identity,
   address,
   limit = DEFAULT_NONCE_RATE_LIMIT_MAX,
+  sharedNetworkLimit = DEFAULT_NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
   now,
   windowMs = DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS,
   ttlSeconds = DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS,
   recordAbuseEvent,
   checkCoordinatedAuthRateLimit,
 } = {}) => {
-  const numericLimit = Number(limit);
-  if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true };
+  const numericWalletLimit = Number(limit);
+  const numericSharedNetworkLimit = Number(sharedNetworkLimit);
+  if (
+    (!Number.isFinite(numericWalletLimit) || numericWalletLimit <= 0) &&
+    (!Number.isFinite(numericSharedNetworkLimit) || numericSharedNetworkLimit <= 0)
+  ) {
+    return { ok: true };
+  }
 
   const numericWindowMs = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0
     ? Number(windowMs)
     : DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS;
   const normalizedIdentity = String(identity || '').trim().toLowerCase();
   const fallbackIdentity = String(address || '').trim().toLowerCase();
-  const rateIdentity = normalizedIdentity || fallbackIdentity || 'unknown';
+  const walletIdentity = fallbackIdentity || 'unknown-wallet';
+  const networkIdentity = normalizedIdentity || 'unknown-network';
   const sessionSlug = String(slug || '').trim();
   const expirationTtl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0
     ? Number(ttlSeconds)
     : DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS;
   const coordinate = checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimitBoundary;
-  const result = await coordinate({
-    env,
-    slug: sessionSlug,
-    route: 'authNonce',
-    identity: rateIdentity,
-    limit: numericLimit,
-    windowMs: numericWindowMs,
-    now,
+
+  const runLimitCheck = async ({ route, rateIdentity, numericLimit }) => {
+    if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true, allowed: true };
+    const result = await coordinate({
+      env,
+      slug: sessionSlug,
+      route,
+      identity: rateIdentity,
+      limit: numericLimit,
+      windowMs: numericWindowMs,
+      now,
+    });
+    if (!result?.ok) {
+      return {
+        ok: false,
+        status: Number(result?.status || 0) || 503,
+        error: result?.error || 'Authorization state coordination is unavailable.',
+      };
+    }
+    return result;
+  };
+
+  const walletResult = await runLimitCheck({
+    route: 'authNonceWallet',
+    rateIdentity: walletIdentity,
+    numericLimit: numericWalletLimit,
   });
-  if (!result?.ok) {
-    return {
-      ok: false,
-      status: Number(result?.status || 0) || 503,
-      error: result?.error || 'Authorization state coordination is unavailable.',
-    };
-  }
-  if (!result?.allowed) {
+  if (!walletResult?.ok) return walletResult;
+
+  const networkResult = walletResult?.allowed
+    ? await runLimitCheck({
+      route: 'authNonceNetwork',
+      rateIdentity: networkIdentity,
+      numericLimit: numericSharedNetworkLimit,
+    })
+    : walletResult;
+  if (!networkResult?.ok) return networkResult;
+
+  if (!walletResult?.allowed || !networkResult?.allowed) {
     await recordAbuseEventBestEffort({
       env,
       type: ABUSE_COUNTER_TYPES.RATE_LIMIT_TRIP,

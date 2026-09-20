@@ -16,10 +16,22 @@ const normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw])
   })
   .filter(Boolean);
 
+const isLocalHttpHostname = (hostname = '') => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(String(hostname));
+
+const safeServedWorkerOrigin = (value) => {
+  try {
+    const url = new URL(trim(value));
+    if (url.protocol === 'https:' || (url.protocol === 'http:' && isLocalHttpHostname(url.hostname))) {
+      return url.origin;
+    }
+  } catch {}
+  return '';
+};
+
 const safeSessionUrl = (value, { slug = '', allowOrigins } = {}) => {
   try {
     const url = new URL(trim(value));
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost') return '';
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHttpHostname(url.hostname))) return '';
     const parts = url.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
     if (parts.length < 2 || parts.at(-2) !== 'session' || parts.at(-1)?.toLowerCase() !== trim(slug).toLowerCase()) {
       return '';
@@ -46,16 +58,25 @@ const canonicalizeQuestions = (questions = []) => [...questions].sort((left, rig
   trim(left?.type).localeCompare(trim(right?.type)),
 );
 
+const buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
+  const url = new URL(sessionUrl);
+  const workerOrigin = safeServedWorkerOrigin(servedWorkerOrigin);
+  if (workerOrigin) url.searchParams.set('worker', workerOrigin);
+  url.searchParams.set('mode', 'interview');
+  return url.toString();
+};
+
 export const buildInterviewBriefDocument = ({
   slug,
   sessionUrl,
+  servedWorkerOrigin,
   questions,
   questionSetHash,
 } = {}) => ({
   type: 'context-engine.interview-question-catalog',
   version: 1,
   sessionSlug: slug,
-  reviewUrl: `${sessionUrl}?mode=interview`,
+  reviewUrl: buildReviewUrl({ sessionUrl, servedWorkerOrigin }),
   questionSetHash,
   prefillPromptVersion: INTERVIEW_PROMPT_VERSION,
   answerContract: {
@@ -142,10 +163,22 @@ export const dispatchInterviewBriefRequest = async ({
   }
   const questionSetHash = await (deps?.sha256 || sha256)(JSON.stringify(canonicalizeQuestions(questions)));
   return deps?.json?.(
-    buildInterviewBriefDocument({ slug, sessionUrl, questions, questionSetHash }),
+    buildInterviewBriefDocument({
+      slug,
+      sessionUrl,
+      servedWorkerOrigin: safeServedWorkerOrigin(request.url),
+      questions,
+      questionSetHash,
+    }),
     200,
     headers,
   );
 };
 
-export const __test__interviewBriefDispatch = { canonicalizeQuestions, isInterviewEnabled, safeSessionUrl };
+export const __test__interviewBriefDispatch = {
+  buildReviewUrl,
+  canonicalizeQuestions,
+  isInterviewEnabled,
+  safeServedWorkerOrigin,
+  safeSessionUrl,
+};

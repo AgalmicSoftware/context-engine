@@ -233,7 +233,7 @@ describe('UserPage analysis cache and routing', () => {
         aiContext: {
           sessionSlug: slug,
           provider: 'openai',
-          model: 'gpt-5',
+          model: 'gpt-5.6-terra',
         },
         result,
       });
@@ -536,6 +536,55 @@ describe('UserPage analysis cache and routing', () => {
 
     expect(instance.getActiveSessionSlug()).toBe('primary-session');
     expect(instance._getDeepScanPrioritySlugs()).toEqual(['primary-session', '', 'edge']);
+  });
+
+  it('turns Worker missing AI key failures into an AI settings recovery action', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockRejectedValueOnce(new Error('Server misconfigured: openaiKey is missing.'));
+
+    try {
+      await instance.analyzeUser();
+
+      expect(instance.state.analyzing).toBe(false);
+      expect(instance.state.analysisError).toBe(
+        'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+      );
+      expect(instance.state.analysisErrorAction).toBe('add-ai-key');
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('keeps network fetch failures distinct from missing AI key recovery', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    try {
+      await instance.analyzeUser();
+
+      expect(instance.state.analyzing).toBe(false);
+      expect(instance.state.analysisError).toBe(
+        'Unable to reach the AI service. Check your connection or AI settings, then try again.',
+      );
+      expect(instance.state.analysisErrorAction).toBe('open-ai-settings');
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('closes the analysis modal before opening the focused AI settings panel', () => {
+    const toggleLoginModal = jest.fn();
+    const { instance } = makeAnalysisCacheInstance({ toggleLoginModal });
+    instance.state.showAnalysisModal = true;
+    instance.analysisTimer = setInterval(() => {}, 1000);
+
+    instance.openAiSettings();
+
+    expect(instance.state.showAnalysisModal).toBe(false);
+    expect(instance.analysisTimer).toBeNull();
+    expect(toggleLoginModal).toHaveBeenCalledWith({ isOpen: true, focus: 'ai-config' });
   });
 
   it('does not route analyze calls through default worker fallback when no exact session config resolves', async () => {

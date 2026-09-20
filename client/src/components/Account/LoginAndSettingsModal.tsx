@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file LoginAndSettingsModal.tsx */
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
@@ -136,6 +137,7 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   network: WagmiInjectedProps['network'] | null;
   account: string;
   loginModalToggled: boolean;
+  loginModalFocus: string;
   loginInProgress: boolean;
   loginComplete: boolean;
   demoMode: RootState['sessionState']['demoMode'];
@@ -267,7 +269,8 @@ const readChainIdLike = (value: ChainIdLike): unknown =>
 const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown =>
   value && typeof value === 'object' ? (value.data?.value ?? value.value ?? null) : null;
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
-  'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
+  [DEFAULT_AI_MODEL]: { label: 'GPT-5.6 Terra (default)', badgeLabel: 'GPT-5.6 Terra' },
+  'gpt-5': { label: 'GPT-5', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
   'claude-sonnet': { label: 'Claude Sonnet 4.6', badgeLabel: 'Claude Sonnet 4.6' },
   'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
@@ -303,7 +306,7 @@ const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption =>
 const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
   const hasModelShape = !!(settings?.models?.fast || settings?.models?.thinking || settings?.mode);
   if (!hasModelShape) {
-    return getAiPresetMeta('gpt-5').badgeLabel;
+    return getAiPresetMeta(DEFAULT_AI_MODEL).badgeLabel;
   }
   const presetKey = deriveAiPresetKey(settings);
   if (presetKey !== 'custom') {
@@ -542,6 +545,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   async componentDidMount() {
     this._isMounted = true;
+    this.applyLoginModalFocus(this.props.loginModalFocus);
     this.checkAndSendTestFundsIfNeeded();
 
     // Passkey wallet session rehydration
@@ -858,6 +862,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.getTestFundsRequestContextKey(prevProps, prevState);
     const accountChanged = this.props.account !== prevProps.account;
     const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
+    const focusChanged = this.props.loginModalFocus !== prevProps.loginModalFocus;
+    if (this.props.loginModalToggled && (settingsOpened || focusChanged)) {
+      this.applyLoginModalFocus(this.props.loginModalFocus);
+    }
     const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
     if (accountChanged) {
@@ -1479,6 +1487,21 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
+  applyLoginModalFocus = (focus: unknown) => {
+    const focusKey = toStr(focus).trim();
+    if (focusKey !== 'ai-config') return;
+    this.setStateIfMounted((prevState: Readonly<LoginAndSettingsModalState>) => ({
+      aiSettingsOpen: true,
+      preLoginSettingsOpen: true,
+      preLoginConfigOpen: true,
+      aiSettingsSectionsOpen: {
+        ...(prevState.aiSettingsSectionsOpen || {}),
+        aiConfig: true,
+      },
+    }));
+    this.props.toggleLoginModal?.({ isOpen: true, focus: '' });
+  };
+
   toggleAiSettingsSection = (sectionKey: any) => {
     if (!sectionKey) return;
     this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
@@ -2081,7 +2104,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiDisplay?.preset ||
       (aiDisplay?.models?.fast || aiDisplay?.models?.thinking || aiDisplay?.mode
         ? deriveAiPresetKey(aiDisplay)
-        : 'gpt-5');
+        : DEFAULT_AI_MODEL);
     const aiPresetLabel = formatAiPresetBadgeLabel(aiDisplay);
     const showReasoningControls = settingsSupportReasoning(aiDisplay);
     const reasoningEffort =
@@ -2503,6 +2526,7 @@ const mapStateToProps = (state: RootState) => ({
   network: state.profile.network,
   account: state.profile.account,
   loginModalToggled: state.sessionState.loginModalToggled,
+  loginModalFocus: state.sessionState.loginModalFocus,
   loginInProgress: state.sessionState.loginInProgress,
   loginComplete: state.sessionState.loginComplete,
   demoMode: state.sessionState.demoMode,

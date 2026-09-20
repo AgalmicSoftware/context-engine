@@ -31,6 +31,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'resource-presence' };
   }
 
+  if (path === '/interview/starter' && method === 'POST') return { kind: 'interview-starter' };
+
   if (path === '/session-config' && method === 'GET') {
     return { kind: 'session-config' };
   }
@@ -55,6 +57,14 @@ export const resolveTopLevelRouteSelection = ({
 
   if (path === '/admin/abuse-summary' && method === 'GET') {
     return { kind: 'admin-abuse-summary' };
+  }
+
+  if (path === '/admin/results-analysis/status' && method === 'GET') {
+    return { kind: 'admin-results-analysis-status' };
+  }
+
+  if (path === '/results-analysis/artifact' && method === 'GET') {
+    return { kind: 'results-analysis-artifact' };
   }
 
   if (path.startsWith('/admin/') && method === 'POST') {

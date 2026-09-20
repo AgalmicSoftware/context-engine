@@ -36,10 +36,15 @@ becomes a stronger security requirement.
 
 Nonce issue/consume and nonce, authenticated, anonymous, and faucet route
 counters now use the existing SQLite-backed `SessionWriteCoordinator` Durable
-Object binding. Object identity is a SHA-256 digest of the session, route, and
-principal boundary; persisted counter records do not contain the slug, wallet,
-anonymous identifier, or route name. KV nonce/used markers remain diagnostic
-compatibility mirrors and are not authorization authority.
+Object binding. Auth nonce requests use separate coordinated wallet and
+shared-network counter buckets: 5 requests per wallet per session per minute,
+plus 300 requests per trusted Cloudflare client IP per session per minute.
+Outside native Cloudflare runtime, forwarded IP headers are ignored and the
+shared-network bucket falls back to the bounded `anon:unknown` identity. Object
+identity is a SHA-256 digest of the session, route, and principal boundary;
+persisted counter records do not contain the slug, wallet, anonymous identifier,
+IP address, or route name. KV nonce/used markers remain diagnostic compatibility
+mirrors and are not authorization authority.
 
 Missing or unreachable coordination fails closed. One-click deploys already
 install the binding and migration; manual deploys must bind

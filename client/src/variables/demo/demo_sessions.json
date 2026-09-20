@@ -27,11 +27,11 @@
       "reasoningEffort": "low",
       "models": {
         "fast": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "thinking": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "transcription": {
@@ -80,11 +80,11 @@
       "reasoningEffort": "low",
       "models": {
         "fast": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "thinking": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "transcription": {
@@ -231,11 +231,11 @@
       "reasoningEffort": "low",
       "models": {
         "fast": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "thinking": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "transcription": {
@@ -265,7 +265,9 @@
     "interviewMode": {
       "enabled": true,
       "provider": "openai",
-      "realtimeModel": "gpt-realtime-2.1"
+      "realtimeModel": "gpt-live-1",
+      "openingMode": "auto",
+      "suggestQuestions": true
     },
     "defaultTags": "",
     "questionsGenPrompt": "",
@@ -388,11 +390,11 @@
       "reasoningEffort": "low",
       "models": {
         "fast": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "thinking": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "transcription": {
@@ -454,11 +456,11 @@
       "reasoningEffort": "low",
       "models": {
         "fast": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "thinking": {
-          "model": "gpt-4o-mini",
+          "model": "gpt-5.6-terra",
           "provider": "openai"
         },
         "transcription": {

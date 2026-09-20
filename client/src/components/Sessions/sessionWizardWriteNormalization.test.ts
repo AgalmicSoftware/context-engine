@@ -1,3 +1,5 @@
+import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
+import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
@@ -317,7 +319,7 @@ describe('sessionWizardWriteNormalization', () => {
         interviewMode: {
           enabled: true,
           provider: 'openai',
-          realtimeModel: 'gpt-realtime-custom',
+          realtimeModel: 'gpt-realtime-2',
         },
       },
       { fieldOrder: ['slug', 'interviewModeEnabled', 'interviewMode'] },
@@ -329,7 +331,7 @@ describe('sessionWizardWriteNormalization', () => {
       interviewMode: {
         enabled: true,
         provider: 'openai',
-        realtimeModel: 'gpt-realtime-custom',
+        realtimeModel: 'gpt-realtime-2',
       },
     });
   });
@@ -765,10 +767,64 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.groupCreationPolicy).toBe('admin_only');
     expect(payload.interviewModeEnabled).toBe(true);
     expect(payload.interviewMode).toEqual({
+      ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: true,
       provider: 'openai',
-      realtimeModel: 'gpt-realtime-2.1',
+      realtimeModel: 'gpt-live-1',
     });
+    expect(payload.resultsAnalysis).toEqual(DEFAULT_RESULTS_ANALYSIS_SETTINGS);
+  });
+
+  test('buildSessionWizardWorkerConfigPayload preserves valid results analysis settings', () => {
+    const resultsAnalysis = {
+      version: 1,
+      generationMode: 'both',
+      views: { circles: true, breakdown: false, riskMatrix: true },
+      autoAfter: { threshold: 20, unit: 'distinctParticipants' },
+      inputScope: 'submitted',
+      publication: 'latest_success_visible',
+    };
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'results-analysis',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        resultsAnalysis,
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.resultsAnalysis).toEqual(resultsAnalysis);
+  });
+
+  test('write payload builders reject invalid results analysis settings', () => {
+    const invalidResultsAnalysis = {
+      version: 1,
+      generationMode: 'automatic',
+      views: { circles: true, breakdown: true, riskMatrix: true },
+      autoAfter: { threshold: 0, unit: 'distinctParticipants' },
+      inputScope: 'submitted',
+      publication: 'latest_success_visible',
+    };
+
+    expect(() =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'bad-results-analysis',
+        draft: {
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          resultsAnalysis: invalidResultsAnalysis,
+        },
+      }),
+    ).toThrow('Session results analysis settings are invalid.');
+    expect(() =>
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'bad-results-analysis',
+        sessionName: 'Bad Results Analysis',
+        resultsAnalysis: invalidResultsAnalysis,
+        blockLimits: { start: 1 },
+      }),
+    ).toThrow('Session results analysis settings are invalid.');
   });
 
   test('buildSessionWizardWorkerConfigPayload preserves an explicit interview-mode opt-out', () => {
@@ -777,7 +833,7 @@ describe('sessionWizardWriteNormalization', () => {
       draft: {
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         interviewModeEnabled: false,
-        interviewMode: { realtimeModel: 'gpt-realtime-custom' },
+        interviewMode: { realtimeModel: 'gpt-realtime-2' },
       },
       account: '0x00000000000000000000000000000000000000aa',
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
@@ -786,9 +842,10 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(payload.interviewModeEnabled).toBe(false);
     expect(payload.interviewMode).toEqual({
+      ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: false,
       provider: 'openai',
-      realtimeModel: 'gpt-realtime-custom',
+      realtimeModel: 'gpt-realtime-2',
     });
   });
 

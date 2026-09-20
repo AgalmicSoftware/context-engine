@@ -4,6 +4,7 @@ import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
   buildUserPageAnalysisErrorStatePatch,
+  buildUserPageAnalysisErrorPresentation,
   buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisFingerprint,
   applyUserPageBookmarkToggle,
@@ -756,6 +757,7 @@ class UserPage extends Component<any, any> {
       analysisName: '',
       analysisDetails: '',
       analysisError: '',
+      analysisErrorAction: '',
       analyzing: false,
       aiAvailable: null, // null = unchecked, true = available, false = unavailable
       // Added for elapsed timer + historical alignment
@@ -3275,10 +3277,20 @@ class UserPage extends Component<any, any> {
       if (!this._isMounted) return;
       this.setState(
         buildUserPageAnalysisErrorStatePatch({
-          message: getUserPageErrorMessage(e, 'Unable to generate analysis right now. Please try again later.'),
+          ...buildUserPageAnalysisErrorPresentation(e),
         }),
       );
       this.clearAnalysisTimer();
+    }
+  };
+
+  openAiSettings = (): void => {
+    if (this._isMounted) {
+      this.setState(buildUserPageAnalysisModalStatePatch());
+      this.clearAnalysisTimer();
+    }
+    if (typeof this.props.toggleLoginModal === 'function') {
+      this.props.toggleLoginModal({ isOpen: true, focus: 'ai-config' });
     }
   };
 
@@ -3392,6 +3404,7 @@ class UserPage extends Component<any, any> {
       analysisDetails,
       analysisName,
       analysisError,
+      analysisErrorAction,
       analyzing,
       analysisElapsedMs,
       analysisHistoricalFigure,
@@ -3846,12 +3859,14 @@ class UserPage extends Component<any, any> {
           analysisDetails={analysisDetails}
           analysisElapsedMs={analysisElapsedMs}
           analysisError={analysisError}
+          analysisErrorAction={analysisErrorAction}
           analysisHistoricalFigure={analysisHistoricalFigure}
           analysisHistoricalReasoning={analysisHistoricalReasoning}
           analysisModalDisplayState={analysisModalDisplayState}
           analysisName={analysisName}
           analyzing={analyzing}
           isOpen={showAnalysisModal}
+          onOpenAiSettings={() => this.openAiSettings()}
           onRefreshAnalysis={() => this.analyzeUser(true)}
           onToggle={() => {
             if (this._isMounted) {

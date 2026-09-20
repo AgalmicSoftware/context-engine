@@ -1,3 +1,5 @@
+import InterviewSettingsFields from '../Sessions/InterviewSettingsFields';
+import ResultsAnalysisSettingsFields from '../Sessions/ResultsAnalysisSettingsFields';
 import React from 'react';
 import { Button, FormGroup, FormText, Input, Label } from 'reactstrap';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -47,6 +49,8 @@ type AdminPageMetadataEditorProps = {
   handleSaveSessionMetadata: () => void;
   metadataUpdateStatus: string;
   showChainFields?: boolean;
+  resultsAnalysisBackgroundAutoSupported?: boolean;
+  resultsAnalysisBackgroundAutoUnsupportedReason?: string;
 };
 
 const draftValue = (draft: AdminMetadataDraft, key: string): string => toStr(draft[key]);
@@ -87,6 +91,8 @@ const AdminPageMetadataEditor = ({
   handleSaveSessionMetadata,
   metadataUpdateStatus,
   showChainFields = true,
+  resultsAnalysisBackgroundAutoSupported = false,
+  resultsAnalysisBackgroundAutoUnsupportedReason = '',
 }: AdminPageMetadataEditorProps) => (
   <div className={styles.metadataEditorCard}>
     <div className={styles.metadataEditorIntro}>
@@ -97,6 +103,18 @@ const AdminPageMetadataEditor = ({
     <div className={styles.metadataSectionGrid}>
       <div className={styles.metadataSectionCard}>
         <div className={styles.panelSubtitle}>Session defaults</div>
+        <InterviewSettingsFields
+          value={metadataConfigDraft.interviewMode}
+          onChange={(value) => updateMetadataConfigDraft('interviewMode', value)}
+          disabled={metadataUpdateBusy}
+        />
+        <ResultsAnalysisSettingsFields
+          value={metadataConfigDraft.resultsAnalysis}
+          onChange={(value) => updateMetadataConfigDraft('resultsAnalysis', value)}
+          disabled={metadataUpdateBusy}
+          backgroundAutoSupported={resultsAnalysisBackgroundAutoSupported}
+          unsupportedReason={resultsAnalysisBackgroundAutoUnsupportedReason}
+        />
         <div className={styles.metadataEditorGrid}>
           <FormGroup>
             <Label>Default tags</Label>

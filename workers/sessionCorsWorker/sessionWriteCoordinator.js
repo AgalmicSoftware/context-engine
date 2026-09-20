@@ -5,6 +5,7 @@ import {
   stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
+import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
@@ -39,6 +40,16 @@ const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
+const RESULTS_ANALYSIS_RECORD_KEY = 'results-analysis-v1';
+const RESULTS_ANALYSIS_DRAFT_KEY = 'results-analysis-draft-v1';
+const RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = 'results-analysis-draft-v1:chunk:';
+const RESULTS_ANALYSIS_AUTO_JOB_KEY = 'results-analysis-auto-job-v1';
+const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
+const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
+const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
+const RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES = 48_000;
+const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
+const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
@@ -64,6 +75,8 @@ const toTrimmedString = (value) => (
 const isObjectRecord = (value) => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
+
+const byteLength = (value) => new TextEncoder().encode(toTrimmedString(value)).length;
 
 const normalizePositiveSafeInteger = (value) => {
   const numeric = Number(value);
@@ -266,10 +279,12 @@ export class SessionWriteCoordinator {
     this.crypto = deps.crypto || globalThis.crypto;
     this.applySessionConfigMutation = deps.applySessionConfigMutation || applySessionConfigMutation;
     this.putSessionConfig = deps.putSessionConfig || putSessionConfig;
+    this.runResultsAnalysisAutoJob = deps.runResultsAnalysisAutoJob || runQueuedAutomaticResultsAnalysisJob;
     this.activeAttemptId = '';
     this.activeDirectAttemptId = '';
     this.sessionConfigTail = Promise.resolve();
     this.workerGroupTail = Promise.resolve();
+    this.resultsAnalysisTail = Promise.resolve();
   }
 
   serializeSessionConfigOperation(operation) {
@@ -282,6 +297,476 @@ export class SessionWriteCoordinator {
     const run = this.workerGroupTail.then(operation);
     this.workerGroupTail = run.catch(() => undefined);
     return run;
+  }
+
+  serializeResultsAnalysisOperation(operation) {
+    const run = this.resultsAnalysisTail.then(operation);
+    this.resultsAnalysisTail = run.catch(() => undefined);
+    return run;
+  }
+
+
+  normalizeResultsAnalysisRecord(record) {
+    const source = isObjectRecord(record) && record.version === 1 ? record : {};
+    const requests = isObjectRecord(source.requests) ? source.requests : {};
+    return {
+      version: 1,
+      active: isObjectRecord(source.active) ? source.active : null,
+      lastGood: isObjectRecord(source.lastGood) ? source.lastGood : null,
+      lastFailure: isObjectRecord(source.lastFailure) ? source.lastFailure : null,
+      requests,
+    };
+  }
+
+  pruneResultsAnalysisRequests(requests) {
+    const entries = Object.entries(isObjectRecord(requests) ? requests : {})
+      .filter(([key, value]) => toTrimmedString(key) && isObjectRecord(value))
+      .sort((left, right) => Number(right[1]?.updatedAtMs || 0) - Number(left[1]?.updatedAtMs || 0))
+      .slice(0, MAX_RESULTS_ANALYSIS_REQUESTS);
+    return Object.fromEntries(entries);
+  }
+
+  isResultsAnalysisActiveFresh(active, nowMs) {
+    return isObjectRecord(active) && nowMs - Number(active.startedAtMs || 0) < RESULTS_ANALYSIS_RUNNING_LEASE_MS;
+  }
+
+  async deleteResultsAnalysisDraftChunks(storage, meta) {
+    const chunkCount = Number(meta?.chunkCount || 0) || 0;
+    for (let index = 0; index < chunkCount; index += 1) {
+      await storage.delete(`${RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX}${index}`);
+    }
+  }
+
+  async readResultsAnalysisDraft(storage = this.state.storage) {
+    const record = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+    if (!isObjectRecord(record) || record.chunked !== true) return record;
+    const chunkCount = Number(record.chunkCount || 0) || 0;
+    if (!chunkCount || chunkCount > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) return null;
+    let serialized = '';
+    for (let index = 0; index < chunkCount; index += 1) {
+      const chunk = await storage.get(`${RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX}${index}`);
+      if (typeof chunk !== 'string') return null;
+      serialized += chunk;
+    }
+    try { return JSON.parse(serialized); } catch { return null; }
+  }
+
+  async putResultsAnalysisDraft(storage, draft) {
+    const serialized = JSON.stringify(draft || {});
+    if (serialized.length <= RESULTS_ANALYSIS_VALUE_CHUNK_CHARS && byteLength(serialized) < 120_000) {
+      const existing = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+      await this.deleteResultsAnalysisDraftChunks(storage, existing);
+      await storage.put(RESULTS_ANALYSIS_DRAFT_KEY, draft);
+      return;
+    }
+    const chunks = [];
+    for (let index = 0; index < serialized.length; index += RESULTS_ANALYSIS_VALUE_CHUNK_CHARS) {
+      chunks.push(serialized.slice(index, index + RESULTS_ANALYSIS_VALUE_CHUNK_CHARS));
+    }
+    if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) {
+      const error = new Error('Results analysis draft exceeds durable storage limits.');
+      error.status = 413;
+      throw error;
+    }
+    if (chunks.some((chunk) => byteLength(chunk) >= 120_000)) {
+      const error = new Error('Results analysis draft chunk exceeds durable storage limits.');
+      error.status = 413;
+      throw error;
+    }
+    const existing = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+    await this.deleteResultsAnalysisDraftChunks(storage, existing);
+    for (let index = 0; index < chunks.length; index += 1) {
+      await storage.put(`${RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX}${index}`, chunks[index]);
+    }
+    await storage.put(RESULTS_ANALYSIS_DRAFT_KEY, {
+      version: 1,
+      chunked: true,
+      draftId: toTrimmedString(draft?.draftId),
+      chunkCount: chunks.length,
+      updatedAtMs: Number(this.now()) || Date.now(),
+    });
+  }
+
+  resultsAnalysisPayloadLooksLocked(value, depth = 0) {
+    if (depth > 5) return false;
+    if (!isObjectRecord(value)) return false;
+    if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
+    const encryptedKeys = new Set(['ciphertext', 'cipherText', 'encryptedContent', 'encryptedKey', 'encryptedPortion', 'keyCipher', 'payloadCiphertext', 'wrappedKey']);
+    if (Object.keys(value).some((key) => encryptedKeys.has(key))) return true;
+    return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
+  }
+
+  sanitizeResultsAnalysisAutoJob(payload = {}) {
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
+    const requestId = toTrimmedString(payload.requestId);
+    const committedResponses = Array.isArray(payload.committedResponses)
+      ? payload.committedResponses.slice(0, 1).map((entry) => {
+          const metadata = isObjectRecord(entry?.metadata) ? entry.metadata : {};
+          const payloadRecord = isObjectRecord(entry?.payload) ? entry.payload : {};
+          const payloadLooksLocked = this.resultsAnalysisPayloadLooksLocked(payloadRecord);
+          const sanitizedPayload = this.sanitizeResultsAnalysisResponsePayload(payloadRecord);
+          if (payloadLooksLocked) sanitizedPayload.locked = true;
+          return {
+            metadata: {
+              id: toTrimmedString(metadata.id).slice(0, 160),
+              responder: toTrimmedString(metadata.responder).toLowerCase().slice(0, 128),
+              createdAt: toTrimmedString(metadata.createdAt).slice(0, 64),
+              encrypted: metadata.encrypted === true,
+              payloadEncrypted: metadata.payloadEncrypted === true,
+              payloadAccessMode: toTrimmedString(metadata.payloadAccessMode).slice(0, 80),
+              payloadAccessControl: isObjectRecord(metadata.payloadAccessControl)
+                ? metadata.payloadAccessControl
+                : toTrimmedString(metadata.payloadAccessControl).slice(0, 1000),
+              groupIds: Array.isArray(metadata.groupIds)
+                ? metadata.groupIds.map((entry) => toTrimmedString(entry).slice(0, 160)).filter(Boolean).slice(0, 24)
+                : [],
+            },
+            payload: sanitizedPayload,
+          };
+        }).filter((entry) => entry.metadata.responder && isObjectRecord(entry.payload))
+      : [];
+    const job = {
+      version: 1,
+      slug,
+      requestId,
+      committedResponses,
+      queuedAtMs: Number(this.now()) || Date.now(),
+      thresholdRecheckAttempts: 0,
+    };
+    const serialized = JSON.stringify(job);
+    if (!slug || byteLength(serialized) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) return null;
+    return job;
+  }
+
+  sanitizeResultsAnalysisResponsePayload(payload = {}) {
+    const allowedKeys = new Set([
+      'additional',
+      'additionalComments',
+      'answer',
+      'comment',
+      'comments',
+      'conviction',
+      'createdAt',
+      'encrypted',
+      'encryptedPortion',
+      'id',
+      'importance',
+      'locked',
+      'payloadEncrypted',
+      'questionID',
+      'questionId',
+      'response',
+      'sessionId',
+      'sessionIdHex',
+      'sessionSlug',
+      'submittedAt',
+      'timestamp',
+      'value',
+    ]);
+    const sanitizeValue = (value, depth = 0) => {
+      if (value == null || typeof value === 'boolean' || typeof value === 'number') return value;
+      if (typeof value === 'string') return value.slice(0, 2000);
+      if (Array.isArray(value)) return depth > 2 ? [] : value.slice(0, 24).map((entry) => sanitizeValue(entry, depth + 1));
+      if (!isObjectRecord(value) || depth > 3) return null;
+      return Object.fromEntries(Object.entries(value).slice(0, 32).map(([key, entry]) => [
+        toTrimmedString(key).slice(0, 80),
+        sanitizeValue(entry, depth + 1),
+      ]));
+    };
+    return Object.fromEntries(Object.entries(payload)
+      .filter(([key]) => allowedKeys.has(key))
+      .map(([key, value]) => [key, sanitizeValue(value)]));
+  }
+
+  async scheduleResultsAnalysisAlarm(delayMs = 1_000) {
+    if (typeof this.state.storage?.setAlarm !== 'function') return false;
+    await this.state.storage.setAlarm((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0));
+    return true;
+  }
+
+  async enqueueResultsAnalysisAutoJob(payload = {}) {
+    const job = this.sanitizeResultsAnalysisAutoJob(payload);
+    if (!job) return { ok: false, status: 400, error: 'Invalid results analysis auto job.' };
+    const existing = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    if (isObjectRecord(existing) && existing.slug === job.slug) {
+      const byId = new Map();
+      for (const entry of [...(Array.isArray(existing.committedResponses) ? existing.committedResponses : []), ...job.committedResponses]) {
+        const key = toTrimmedString(entry?.metadata?.id) || `${toTrimmedString(entry?.metadata?.responder)}:${toTrimmedString(entry?.metadata?.createdAt)}`;
+        if (key) byId.set(key, entry);
+      }
+      job.committedResponses = [...byId.values()].slice(-12);
+      job.queuedAtMs = Number(existing.queuedAtMs || 0) || job.queuedAtMs;
+    }
+    if (byteLength(JSON.stringify(job)) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) {
+      job.committedResponses = job.committedResponses.slice(-4);
+    }
+    if (byteLength(JSON.stringify(job)) > RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES) {
+      return { ok: false, status: 413, error: 'Results analysis auto job is too large.' };
+    }
+    await this.state.storage.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, job);
+    const scheduled = await this.scheduleResultsAnalysisAlarm(1_000);
+    return { ok: true, status: 202, queued: true, scheduled };
+  }
+
+  async recordResultsAnalysisQueueFailure(error) {
+    const nowMs = Number(this.now()) || Date.now();
+    const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    const record = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+    record.lastFailure = {
+      ok: false,
+      error: error?.message || toTrimmedString(error) || 'Automatic results analysis job failed.',
+      status: 502,
+      requestId: toTrimmedString(queued?.requestId),
+      trigger: 'automatic',
+      failedAtMs: nowMs,
+    };
+    await this.state.storage.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    await this.state.storage.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+  }
+
+  async runQueuedResultsAnalysisAutoJob() {
+    const job = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    if (!isObjectRecord(job)) return { ok: true, skipped: true, reason: 'no_job' };
+    const result = await this.runResultsAnalysisAutoJob({
+      env: this.env,
+      slug: job.slug,
+      job,
+      deps: {
+        now: this.now,
+        readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: await this.readResultsAnalysisStatus() }),
+        reserveCoordinatedResultsAnalysis: async ({ reservation } = {}) => this.reserveResultsAnalysis(reservation || {}),
+        finalizeCoordinatedResultsAnalysis: async ({ finalization } = {}) => this.finalizeResultsAnalysis(finalization || {}),
+      },
+    });
+    if (result?.jobState === 'running') {
+      await this.scheduleResultsAnalysisAlarm(RESULTS_ANALYSIS_RUNNING_LEASE_MS + 1_000);
+      return result;
+    }
+    const current = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    const sameQueuedJob = current?.queuedAtMs === job.queuedAtMs && current?.requestId === job.requestId;
+    if (
+      sameQueuedJob &&
+      result?.reason === 'threshold_not_met' &&
+      Array.isArray(current.committedResponses) &&
+      current.committedResponses.length > 0
+    ) {
+      const attempts = Math.max(0, Number(current.thresholdRecheckAttempts || 0) || 0);
+      if (attempts < RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS) {
+        current.thresholdRecheckAttempts = attempts + 1;
+        await this.state.storage.put(RESULTS_ANALYSIS_AUTO_JOB_KEY, current);
+        await this.scheduleResultsAnalysisAlarm(current.thresholdRecheckAttempts * 30_000);
+        return {
+          ...result,
+          queued: true,
+          recheckScheduled: true,
+          thresholdRecheckAttempts: current.thresholdRecheckAttempts,
+        };
+      }
+    }
+    if (sameQueuedJob) {
+      await this.state.storage.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    }
+    return result;
+  }
+
+  async alarm() {
+    try {
+      await this.runQueuedResultsAnalysisAutoJob();
+    } catch (error) {
+      await this.recordResultsAnalysisQueueFailure(error);
+    }
+  }
+
+  async readResultsAnalysisStatus() {
+    const existing = await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY);
+    const record = this.normalizeResultsAnalysisRecord(existing);
+    const latestDraft = await this.readResultsAnalysisDraft();
+    const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
+    const lastGood = record.lastGood && latestDraft?.draftId === record.lastGood.draftId
+      ? { ...record.lastGood, ...latestDraft }
+      : record.lastGood;
+    const nowMs = Number(this.now()) || Date.now();
+    return {
+      version: 1,
+      jobState: this.isResultsAnalysisActiveFresh(record.active, nowMs) ? 'running' : (isObjectRecord(queued) ? 'queued' : (record.lastFailure ? 'failed' : (lastGood ? 'succeeded' : 'idle'))),
+      queued: isObjectRecord(queued) ? { requestId: toTrimmedString(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
+      active: this.isResultsAnalysisActiveFresh(record.active, nowMs) ? record.active : null,
+      lastGood,
+      lastFailure: record.lastFailure,
+    };
+  }
+
+  async reserveResultsAnalysis(payload = {}) {
+    const requestId = toTrimmedString(payload.requestId);
+    const sourceSignature = toTrimmedString(payload.sourceSignature);
+    const sourceVersion = toTrimmedString(payload.sourceVersion) || '1';
+    const viewSignature = toTrimmedString(payload.viewSignature);
+    const reservationKey = toTrimmedString(payload.reservationKey);
+    const trigger = toTrimmedString(payload.trigger) || 'manual';
+    const refresh = payload.refresh === true;
+    if (!sourceSignature || !viewSignature || !reservationKey) {
+      return { kind: 'failed', status: 400, error: 'Invalid results analysis reservation.' };
+    }
+    const nowMs = Number(this.now()) || Date.now();
+    return this.state.storage.transaction(async (transaction) => {
+      const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+      const latestDraft = await this.readResultsAnalysisDraft(transaction);
+      const prior = requestId ? record.requests[requestId] : null;
+      if (prior?.state === 'succeeded' && prior.draftId) {
+        if (latestDraft?.draftId === prior.draftId) {
+          return { kind: 'terminal', draft: latestDraft, draftId: prior.draftId };
+        }
+        return { kind: 'failed', status: 409, error: 'Results analysis request already completed for a previous draft.' };
+      }
+      if (prior?.state === 'failed') {
+        return { kind: 'failed', status: prior.status || 502, error: prior.error || 'Results analysis generation failed.' };
+      }
+      if (prior?.state === 'running' && record.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record.active, nowMs)) {
+        return { kind: 'pending' };
+      }
+      if (!refresh && record.lastGood?.sourceSignature === sourceSignature && record.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record.lastGood.draftId) {
+        if (requestId) {
+          record.requests[requestId] = { state: 'succeeded', draftId: latestDraft.draftId, updatedAtMs: nowMs };
+          record.requests = this.pruneResultsAnalysisRequests(record.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+        }
+        return { kind: 'terminal', draft: latestDraft, draftId: latestDraft.draftId };
+      }
+      if (
+        trigger === 'automatic' &&
+        record.lastFailure?.sourceSignature === sourceSignature &&
+        record.lastFailure?.viewSignature === viewSignature
+      ) {
+        return { kind: 'failed', status: record.lastFailure.status || 502, error: record.lastFailure.error || 'Results analysis generation failed.' };
+      }
+      if (this.isResultsAnalysisActiveFresh(record.active, nowMs)) {
+        if (requestId && !record.requests[requestId]) {
+          record.requests[requestId] = { state: 'running', updatedAtMs: nowMs };
+          record.requests = this.pruneResultsAnalysisRequests(record.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+        }
+        return { kind: 'pending' };
+      }
+      const attemptId = createAttemptId(this.crypto);
+      record.active = {
+        reservationKey,
+        requestId,
+        attemptId,
+        sourceSignature,
+        sourceVersion,
+        viewSignature,
+        trigger,
+        startedAtMs: nowMs,
+      };
+      if (requestId) record.requests[requestId] = { state: 'running', updatedAtMs: nowMs };
+      record.requests = this.pruneResultsAnalysisRequests(record.requests);
+      await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+      return { kind: 'execute', attemptId };
+    });
+  }
+
+  async finalizeResultsAnalysis(payload = {}) {
+    const requestId = toTrimmedString(payload.requestId);
+    const reservationKey = toTrimmedString(payload.reservationKey);
+    const attemptId = toTrimmedString(payload.attemptId);
+    const receipt = isObjectRecord(payload.receipt) ? payload.receipt : null;
+    const success = payload.success === true;
+    if (!reservationKey || !attemptId || !receipt) return { ok: false, status: 400 };
+    const nowMs = Number(this.now()) || Date.now();
+    return this.state.storage.transaction(async (transaction) => {
+      const record = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+      if (
+        record.active?.reservationKey !== reservationKey ||
+        record.active?.attemptId !== attemptId
+      ) {
+        return { ok: false, status: 409 };
+      }
+      const active = record.active;
+      record.active = null;
+      if (success) {
+        const draft = (receipt.draft && isObjectRecord(receipt.draft)) ? receipt.draft : receipt;
+        const draftId = toTrimmedString(draft.draftId);
+        if (!draftId) return { ok: false, status: 400 };
+        try {
+          await this.putResultsAnalysisDraft(transaction, draft);
+        } catch (error) {
+          record.lastFailure = {
+            ok: false,
+            error: error?.message || 'Results analysis draft exceeds durable storage limits.',
+            status: Number(error?.status || 0) || 413,
+            sourceSignature: active.sourceSignature,
+            sourceVersion: active.sourceVersion,
+            viewSignature: active.viewSignature,
+            requestId,
+            trigger: active.trigger,
+            failedAtMs: nowMs,
+          };
+          if (requestId) record.requests[requestId] = {
+            state: 'failed',
+            error: record.lastFailure.error,
+            status: record.lastFailure.status,
+            updatedAtMs: nowMs,
+          };
+          record.requests = this.pruneResultsAnalysisRequests(record.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+          return { ok: false, status: record.lastFailure.status, error: record.lastFailure.error };
+        }
+        record.lastGood = {
+          draftId,
+          generatedAt: draft.generatedAt,
+          requestId,
+          trigger: active.trigger,
+          source: isObjectRecord(draft.source) ? draft.source : null,
+          sourceSignature: active.sourceSignature,
+          sourceVersion: active.sourceVersion,
+          viewSignature: active.viewSignature,
+          sections: Array.isArray(draft.sections) ? draft.sections : [],
+          completedAtMs: nowMs,
+        };
+        record.lastFailure = null;
+        if (requestId) record.requests[requestId] = { state: 'succeeded', draftId, updatedAtMs: nowMs };
+      } else {
+        record.lastFailure = {
+          ok: false,
+          error: toTrimmedString(receipt.error) || 'Results analysis generation failed.',
+          status: Number(receipt.status || 0) || 502,
+          sourceSignature: active.sourceSignature,
+          sourceVersion: active.sourceVersion,
+          viewSignature: active.viewSignature,
+          requestId,
+          trigger: active.trigger,
+          failedAtMs: nowMs,
+        };
+        if (requestId) record.requests[requestId] = {
+          state: 'failed',
+          error: record.lastFailure.error,
+          status: record.lastFailure.status,
+          updatedAtMs: nowMs,
+        };
+      }
+      record.requests = this.pruneResultsAnalysisRequests(record.requests);
+      await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record);
+      return { ok: true, status: 200 };
+    });
+  }
+
+  async executeResultsAnalysisStatus() {
+    return jsonResponse({ ok: true, state: await this.readResultsAnalysisStatus() }, 200);
+  }
+
+  async executeResultsAnalysisReserve(payload) {
+    const reservation = await this.reserveResultsAnalysis(payload || {});
+    return jsonResponse(reservation, reservation.status || (reservation.kind === 'pending' ? 503 : 200));
+  }
+
+  async executeResultsAnalysisFinalize(payload) {
+    const result = await this.finalizeResultsAnalysis(payload || {});
+    return jsonResponse(result, result.status || 200);
+  }
+
+  async executeResultsAnalysisAutoEnqueue(payload) {
+    const result = await this.enqueueResultsAnalysisAutoJob(payload || {});
+    return jsonResponse(result, result.status || 202);
   }
 
   async initializeWorkerGroupCapacity(slug, sessionId) {
@@ -1740,6 +2225,18 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/session-config/mutate') {
       return this.executeSessionConfigMutation(payload);
     }
+    if (url.pathname === '/results-analysis/status') {
+      return this.executeResultsAnalysisStatus();
+    }
+    if (url.pathname === '/results-analysis/reserve') {
+      return this.executeResultsAnalysisReserve(payload);
+    }
+    if (url.pathname === '/results-analysis/finalize') {
+      return this.executeResultsAnalysisFinalize(payload);
+    }
+    if (url.pathname === '/results-analysis/auto/enqueue') {
+      return this.executeResultsAnalysisAutoEnqueue(payload);
+    }
     if (url.pathname === '/auth-state/nonce/issue') {
       return this.executeAuthNonceIssue(payload);
     }
@@ -2135,5 +2632,74 @@ export const finalizeCoordinatedSponsoredFaucet = async ({
     return response.ok ? result?.receipt : null;
   } catch {
     return null;
+  }
+};
+
+
+export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+  if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };
+  try {
+    const response = await stub.fetch('https://session-coordinator.internal/results-analysis/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const result = await response.json().catch(() => ({}));
+    return response.ok ? result : { ok: false, status: response.status || 503, error: result?.error || 'Results analysis status unavailable.' };
+  } catch {
+    return { ok: false, status: 503, error: 'Results analysis coordination failed; retry.' };
+  }
+};
+
+export const reserveCoordinatedResultsAnalysis = async ({ env, slug, reservation } = {}) => {
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+  if (!stub) return { kind: 'failed', status: 503, error: 'Results analysis coordination is unavailable.' };
+  try {
+    const response = await stub.fetch('https://session-coordinator.internal/results-analysis/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reservation || {}),
+    });
+    return response.json().catch(() => ({ kind: 'failed', status: response.status || 503 }));
+  } catch {
+    return { kind: 'failed', status: 503, error: 'Results analysis coordination failed; retry.' };
+  }
+};
+
+export const finalizeCoordinatedResultsAnalysis = async ({ env, slug, finalization } = {}) => {
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+  if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };
+  try {
+    const response = await stub.fetch('https://session-coordinator.internal/results-analysis/finalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(finalization || {}),
+    });
+    const result = await response.json().catch(() => ({}));
+    return response.ok ? result : { ok: false, status: response.status || 503, error: result?.error || 'Results analysis finalization failed.' };
+  } catch {
+    return { ok: false, status: 503, error: 'Results analysis coordination failed; retry.' };
+  }
+};
+
+
+export const enqueueCoordinatedResultsAnalysisAutoJob = async ({ env, slug, job } = {}) => {
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug || job?.slug);
+  const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+  if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };
+  try {
+    const response = await stub.fetch('https://session-coordinator.internal/results-analysis/auto/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...(job || {}), slug: normalizedSlug }),
+    });
+    const result = await response.json().catch(() => ({}));
+    return response.ok ? result : { ok: false, status: response.status || 503, error: result?.error || 'Results analysis auto enqueue failed.' };
+  } catch {
+    return { ok: false, status: 503, error: 'Results analysis auto enqueue failed; retry.' };
   }
 };

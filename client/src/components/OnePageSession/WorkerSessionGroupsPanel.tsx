@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminWorkerGroupsPanel from '../Admin/AdminWorkerGroupsPanel';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
-import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
+import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
-import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
+import {
+  dispatchWorkerGroupsChanged,
+  subscribeWorkerGroupsChanged,
+} from '../../utilities/worker/workerGroupChangeEvents';
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
 import type { PostSignedWorkerGroupRequest } from '../../domains/worker/workerGroupPorts';
@@ -96,6 +99,7 @@ const WorkerSessionGroupsPanel = ({
   const [groupsRevision, setGroupsRevision] = useState(0);
   const [preserveSignedOutParticipantDraft, setPreserveSignedOutParticipantDraft] = useState(false);
   const authRequestIdRef = useRef(0);
+  const suppressOwnGroupsChangedEventRef = useRef(false);
   const activeAuthState = authState.targetKey === targetKey ? authState : emptyAuthState(targetKey);
   const workerToken = activeAuthState.token;
   const authStatus = activeAuthState.status;
@@ -185,6 +189,15 @@ const WorkerSessionGroupsPanel = ({
     }
   }, [normalizedAccount, participantGroupCreationEnabled, showCreate]);
 
+  useEffect(() => {
+    if (!hasExactWorkerProfile) return undefined;
+    return subscribeWorkerGroupsChanged((detail) => {
+      if (detail.sessionId !== canonicalSessionId || detail.sessionSlug !== canonicalSessionSlug) return;
+      if (suppressOwnGroupsChangedEventRef.current) return;
+      setGroupsRevision((revision) => revision + 1);
+    });
+  }, [canonicalSessionId, canonicalSessionSlug, hasExactWorkerProfile]);
+
   const requestActionAuthentication = useCallback(() => {
     if (!normalizedAccount) {
       toggleLoginModal?.(true);
@@ -216,10 +229,15 @@ const WorkerSessionGroupsPanel = ({
     [account, canonicalSessionId, canonicalSessionSlug, chainId, provider, workerUrl],
   );
   const broadcastGroupsChanged = useCallback(() => {
-    dispatchWorkerGroupsChanged({
-      sessionSlug: canonicalSessionSlug,
-      sessionId: canonicalSessionId,
-    });
+    suppressOwnGroupsChangedEventRef.current = true;
+    try {
+      dispatchWorkerGroupsChanged({
+        sessionSlug: canonicalSessionSlug,
+        sessionId: canonicalSessionId,
+      });
+    } finally {
+      suppressOwnGroupsChangedEventRef.current = false;
+    }
   }, [canonicalSessionId, canonicalSessionSlug]);
   const handleGroupsChanged = useCallback(() => {
     setGroupsRevision((revision) => revision + 1);

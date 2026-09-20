@@ -85,10 +85,43 @@ is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
 dropdown in the same area, constrained to **All participants** or **Admins
 only** rather than accepting freeform config text. **Voice interview modes**
-defaults on. Its adjacent **Interview voice settings** group exposes the
-OpenAI **Realtime voice model**, defaulting to `gpt-realtime-2.1`; `/new`
+defaults on. Its adjacent **Interview settings** group exposes the
+OpenAI **Interview voice model**, defaulting to `gpt-live-1`; `/new`
 publishes this as `interviewMode.realtimeModel` for both Worker-canonical and
-Arweave-backed sessions.
+Arweave-backed sessions. It also lets owners supply an opening question or use the default generated opening. Automatic regeneration and discovery of new questions during a call are off by default; when enabled their default addition threshold is 20%. Question suggestions are optional and off by default. Admin refresh is on by default. Generation waits for public questions and uses the session Worker's OpenAI key. See [Interview settings and lifecycle](session-listening-mode.md#interview).
+
+**Results AI views** default to manual generation. The shared session setting is
+`resultsAnalysis` with `generationMode` (`manual`, `automatic`, or `both`),
+view toggles for Circles, Breakdown, and Risk Matrix,
+`autoAfter: { threshold: 10, unit: "distinctParticipants" }`,
+`inputScope: "submitted"`, and `publication: "latest_success_visible"`.
+The threshold counts newly seen distinct submitted participants since the last
+successful run. Circles renders the DebateMap-style argument map and atlas.
+Risk Matrix axes are generated from the session subject matter rather than a
+fixed likelihood/impact template. Generation inherits the session's configured
+AI provider and model routing, including object-shaped `ai.models.thinking`
+entries; owners do not choose a separate generated-results model.
+
+Successful runs are immediately visible as the latest successful generated
+artifact. Viewer reads are available only when the session profile exposes
+`public_full_if_storage_public`, `aggregateResultsEnabled` is true, and the
+caller can pass all three existing Cloudflare storage read gates for
+`generatedArtifacts`, `questions`, and `responses`. The viewer endpoint returns
+a safe `jobState` with the artifact and frozen submitted snapshot; it does not
+return active reservations, retry receipts, failure internals, or wallet
+mappings. Failed or active runs keep showing the last successful artifact.
+Admin-only status and Generate/Refresh controls use the separate admin status
+and signed generate routes.
+
+Automatic background generation is supported only for Worker-canonical
+Cloudflare storage, where the Worker can count authoritative submitted
+participants and queue durable alarm work. Registry/Arweave and other
+non-canonical profiles can still use explicit admin manual generation from a
+sanitized same-session browser snapshot when local submitted responses are
+hydrated and unlocked. Unsupported profiles report a capability reason instead
+of silently spending provider calls or using seeded demo data. In
+`automatic`-only mode, an admin manual retry is still permitted after a failed
+automatic run so owners can recover without changing generation mode.
 
 The optional **Session end time** is a timestamp for Worker-canonical sessions.
 It must be in the future when the session is published. At that instant the
@@ -381,8 +414,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.fast`
 - `ai.models.thinking`
 - `ai.models.transcription`
-- `interviewMode.realtimeModel` (OpenAI Realtime voice; defaults to
-  `gpt-realtime-2.1`)
+- `interviewMode.realtimeModel` (OpenAI interview voice; defaults to
+  `gpt-live-1`)
 
 What gets stored where:
 
@@ -1044,3 +1077,13 @@ Typical symptoms:
 
 - `Failed to fetch` or `Load failed` from worker auth endpoints usually means the origin is missing from `allowOrigins`
 - `SIWE domain does not match URI host.` means the login or admin signature was created for a different host than the one receiving the request
+
+
+### Default AI models
+
+New sessions default both text-model lanes to `gpt-5.6-terra` with low reasoning
+effort. This includes group/cluster identification, summaries, question generation,
+and Interview response mapping. OpenAI requests use standard processing
+(`service_tier: default`) unless a caller explicitly selects another tier.
+GPT-Live voice and transcription settings are separate. Existing explicit session
+models and local overrides remain available; bundled demo defaults use Terra.

@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Refreshed About functionality copy with accounts, gated content, and interviews.
+  Added collapsible related-work and recognition sections with project-specific
+  descriptions and links, including the Cosmos × FIRE grant announcement and
+  Foresight Institute grant. Grant and event cards use official Cosmos × FIRE,
+  Foresight, EDDY, and Edge Patagonia artwork.
+  Recognition entries include visual badges, Agent Village artwork, and a
+  collapsed preview strip. Renamed the original Recognition section to Acknowledgements.
+  Related Work previews benchmark, eval, and media categories, with entries for
+  Agent Village Wrapped and Ladders Made of Numbers.
+  Moved Whitepaper and the email icon into the title bar and kept the mobile
+  Demo and New Session actions side by side. Use-case buttons use compact rows that wrap on smaller screens.
+  Title links briefly expand with matching labels on hover, focus, and press.
+  Kept Related Work and Uses & Recognition previews compact, with square badges.
+  Recognition combines Recognized & Used By and Acknowledgements under one dropdown.
+  Acknowledgement dialogs introduce each entity before its connection to Context Engine.
+
 - Kept Account Settings open when a saved passkey session restores in the
   background; the one-second success auto-close now belongs only to an explicit
   passkey **Create** or **Login** action. The signed-in owner's profile labels

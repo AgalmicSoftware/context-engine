@@ -1298,8 +1298,11 @@ grey background, white text, bigger icons, etc.
   color: var(--ce-color-white);
   cursor: pointer;
 
-  &:hover,
-  &:focus {
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:focus-visible {
     background: transparent !important;
     outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 42%, transparent);
     outline-offset: 2px;

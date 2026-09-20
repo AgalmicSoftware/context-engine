@@ -242,23 +242,30 @@ export interface AtlasTopNodeCandidate {
 
 export interface AtlasViewProps {
   data: DebateNode[];
+  rootLabel?: string;
   onNodeClick: (node: DebateNode) => void;
   atlasLayoutMode?: AtlasLayoutMode;
+  readOnly?: boolean;
 }
 
 export interface DebateMapProps {
   activeSessionSlug?: string;
+  atlasRootLabel?: string;
   demoMode?: DemoModeProp;
   embedded?: boolean;
+  hideDemoModeToggle?: boolean;
+  readOnly?: boolean;
   requestedModalNodeId?: string | null;
   onModalClose?: (() => void) | null;
   atlasLayoutMode?: AtlasLayoutMode;
+  treeData?: DebateNode[] | null;
 }
 
 export interface AtlasChromeProps {
   atlasRoot: DebateNode | null;
   handleBack: (event?: React.SyntheticEvent) => void;
   onNodeClick: (node: DebateNode) => void;
+  readOnly?: boolean;
   showActiveDebates: boolean;
   setShowActiveDebates: React.Dispatch<React.SetStateAction<boolean>>;
   topNodes: DebateNode[];
@@ -272,6 +279,7 @@ export interface AtlasLayoutViewProps {
   handleAtlasNodeClick: (node: AtlasRenderNode | DebateNode) => void;
   handleBack: (event?: React.SyntheticEvent) => void;
   onNodeClick: (node: DebateNode) => void;
+  readOnly?: boolean;
   showActiveDebates: boolean;
   setShowActiveDebates: React.Dispatch<React.SetStateAction<boolean>>;
   topNodes: DebateNode[];
@@ -281,6 +289,7 @@ export interface FlatNodeProps {
   node: FlattenedDebateNode;
   parentPath?: DebateNode[];
   onNodeClick: (node: DebateNode) => void;
+  readOnly?: boolean;
   onBookmark: (nodeId: string) => void;
   bookmarkedNodes: string[];
 }
@@ -290,6 +299,7 @@ export interface ModalProps {
   onClose: () => void;
   content: DebateNode | null;
   onVote: (nodeId: string, voteType: VoteDirection, count?: number) => void;
+  readOnly?: boolean;
   copied: boolean;
   onCopy: () => void;
   onTagClick?: ((tag: string) => void) | null;
@@ -308,6 +318,7 @@ export interface TreeNodeProps {
   depth?: number;
   parentPath?: DebateNode[];
   onNodeClick: (node: DebateNode) => void;
+  readOnly?: boolean;
   onBookmark: (nodeId: string) => void;
   bookmarkedNodes: string[];
   onSuggestNode: (node: DebateNode, parentPath: DebateNode[]) => void;

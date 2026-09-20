@@ -9,6 +9,20 @@ import {
 } from './publicUrl.js';
 
 describe('readPublicUrlBasePath', () => {
+  it('handles root and relative deployment paths without repeatedly invoking the URL parser', () => {
+    const parser = jest.spyOn(globalThis, 'URL');
+    try {
+      for (let i = 0; i < 100; i += 1) {
+        expect(readPublicUrlBasePath({ env: { PUBLIC_URL: '/' } })).toBe('');
+        expect(readPublicUrlBasePath({ env: { PUBLIC_URL: '/ce/' } })).toBe('/ce');
+        expect(readPublicUrlBasePath({ env: { PUBLIC_URL: './' } })).toBe('.');
+      }
+      expect(parser).not.toHaveBeenCalled();
+    } finally {
+      parser.mockRestore();
+    }
+  });
+
   it('returns an empty string when process is unavailable', () => {
     expect(readPublicUrlBasePath(undefined)).toBe('');
   });

@@ -17,6 +17,12 @@ import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetada
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
+import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
+import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
+import type {
+  GeneratedResultsSnapshotQuestion,
+  GeneratedResultsSnapshotResponse,
+} from '../../domains/sessionResults/sessionResultsAnalysisController';
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 
@@ -28,6 +34,7 @@ const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
+const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -79,6 +86,8 @@ type OnePageSessionStandardShellProps = {
   embeddedQuestionSessionSlug: string;
   expandedImages: OnePageSessionAutoMintAlertsProps['expandedImages'];
   filterState: UnknownRecord | null;
+  generatedResultsAnalysis?: UnknownRecord | null;
+  generatedResultsAuthAvailable?: boolean;
   isDemoSlug: boolean;
   isQuestionCacheReady: boolean;
   isResponsesCacheReady: boolean;
@@ -86,6 +95,7 @@ type OnePageSessionStandardShellProps = {
   isSurveyCacheReady: unknown;
   litHooks: unknown;
   loginComplete: unknown;
+  loginModalToggled?: boolean;
   needsLoginForAutoMint: boolean;
   network: UnknownRecord | null;
   networkChainId: string | number | null;
@@ -130,6 +140,9 @@ type OnePageSessionStandardShellProps = {
   onEmbeddedAtlasModalClose: () => void;
   onFilterChange: (newFilterState: unknown) => void;
   onGroupsViewAll: (event: React.MouseEvent<HTMLElement>) => void;
+  onGeneratedResultsAuthorize?: () => void;
+  onGeneratedResultsCheck?: () => void;
+  onGeneratedResultsGenerate?: (refresh?: boolean) => void;
   onKickoffAutoMintIfNeeded: () => void;
   onLoadFullCorpusClick: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenResults: () => void;
@@ -146,22 +159,28 @@ type OnePageSessionStandardShellProps = {
   onViewAllQuestionsClick: () => void;
 };
 
-const renderSectionHeading = (title: React.ReactNode, subtitle: React.ReactNode) => (
+const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode) => (
   <span className={styles.sectionHeaderText}>
     <span className={styles.sectionHeaderTitle}>{title}</span>
-    <span className={styles.sectionHeaderSubtitle}>{subtitle}</span>
+    {subtitle ? <span className={styles.sectionHeaderSubtitle}>{subtitle}</span> : null}
   </span>
 );
 
-const buildResultsViewOptions = (isDemoSlug: boolean, showDemoAnalysisView: boolean): ResultsViewOption[] => [
+const buildResultsViewOptions = (
+  isDemoSlug: boolean,
+  showDemoAnalysisView: boolean,
+  generatedOptions: ResultsViewOption[] = [],
+): ResultsViewOption[] => [
   { key: 'polis', label: 'Report', icon: '🧾' },
-  ...(isDemoSlug
-    ? [
-        { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
-        ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
-        { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
-      ]
-    : []),
+  ...(generatedOptions.length > 0
+    ? generatedOptions
+    : isDemoSlug
+      ? [
+          { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
+          ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
+          { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
+        ]
+      : []),
 ];
 
 export default function OnePageSessionStandardShell({
@@ -193,6 +212,8 @@ export default function OnePageSessionStandardShell({
   embeddedQuestionSessionSlug,
   expandedImages,
   filterState,
+  generatedResultsAnalysis,
+  generatedResultsAuthAvailable = false,
   isDemoSlug,
   isQuestionCacheReady,
   isResponsesCacheReady,
@@ -200,6 +221,7 @@ export default function OnePageSessionStandardShell({
   isSurveyCacheReady,
   litHooks,
   loginComplete,
+  loginModalToggled,
   needsLoginForAutoMint,
   network,
   networkChainId,
@@ -244,6 +266,9 @@ export default function OnePageSessionStandardShell({
   onEmbeddedAtlasModalClose,
   onFilterChange,
   onGroupsViewAll,
+  onGeneratedResultsAuthorize,
+  onGeneratedResultsCheck,
+  onGeneratedResultsGenerate,
   onKickoffAutoMintIfNeeded,
   onLoadFullCorpusClick,
   onOpenResults,
@@ -261,10 +286,51 @@ export default function OnePageSessionStandardShell({
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
-  const requestedResultsViewMode = isDemoSlug ? resultsViewMode : 'polis';
-  const effectiveResultsViewMode =
-    requestedResultsViewMode === 'analysis' && !showDemoAnalysisView ? 'polis' : requestedResultsViewMode;
-  const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView);
+  const generatedState = (
+    generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
+  ) as UnknownRecord;
+  const generatedHasArtifact = !!generatedState.artifact;
+  const generatedViewOptions =
+    generatedState.viewerAuthorized === true && generatedHasArtifact
+      ? (Array.isArray(generatedState.viewOptions) ? generatedState.viewOptions : [])
+          .map((option: unknown) => {
+            const record = option && typeof option === 'object' ? (option as UnknownRecord) : {};
+            const key = String(record.key || '');
+            return {
+              key,
+              label: String(record.label || key),
+              icon: key === 'circles' ? '◎' : key === 'breakdown' ? '📊' : '⚠️',
+            };
+          })
+          .filter((option) => option.key)
+      : [];
+  const generatedViewKeys = new Set(generatedViewOptions.map((option) => option.key));
+  const requestedResultsViewMode = resultsViewMode;
+  const effectiveResultsViewMode = generatedViewKeys.has(requestedResultsViewMode)
+    ? requestedResultsViewMode
+    : isDemoSlug
+      ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
+        ? 'polis'
+        : requestedResultsViewMode
+      : requestedResultsViewMode === 'polis'
+        ? requestedResultsViewMode
+        : 'polis';
+  const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView, generatedViewOptions);
+  const generatedStatus = String(generatedState.status || 'idle');
+  const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
+  const generatedCanCheckStatus = generatedState.canCheckStatus === true;
+  const generatedCanGenerate = generatedState.canGenerate === true && !generatedIsRunning;
+  const showGeneratedCheckAction =
+    generatedCanCheckStatus || (generatedResultsAuthAvailable && generatedState.adminAuthorized !== true);
+  const showGeneratedGenerateAction = generatedState.adminAuthorized === true && !generatedCanCheckStatus;
+  const generatedCheckActionLabel = generatedCanCheckStatus ? 'Recheck AI Views' : 'Check AI Views';
+  const generatedActionLabel = generatedIsRunning
+    ? 'Generating AI Views…'
+    : generatedState.lastFailure
+      ? 'Retry AI Views'
+      : generatedHasArtifact
+        ? 'Refresh AI Views'
+        : 'Generate AI Views';
   const sectionsGridClassName = [styles.sectionsGrid, !isDemoSlug ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -281,7 +347,7 @@ export default function OnePageSessionStandardShell({
   ]
     .filter(Boolean)
     .join(' ');
-  const questionsSectionTitle = renderSectionHeading('Questions', 'Answer or Add');
+  const questionsSectionTitle = renderSectionHeading('Questions');
   const questionsSectionTooltip =
     'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
   const documentsSectionTooltip =
@@ -359,6 +425,7 @@ export default function OnePageSessionStandardShell({
               network={network}
               toggleLoginModal={toggleLoginModal}
               loginComplete={loginComplete}
+              loginModalToggled={loginModalToggled}
               isSBTCacheReady={isSBTCacheReady}
               isSurveyCacheReady={isSurveyCacheReady}
               isQuestionCacheReady={isQuestionCacheReady}
@@ -409,6 +476,7 @@ export default function OnePageSessionStandardShell({
                 network={network}
                 toggleLoginModal={toggleLoginModal}
                 loginComplete={loginComplete}
+                loginModalToggled={loginModalToggled}
                 sessionInfo={sessionInfo}
                 sessionName={sessionName}
                 sessionHeader={sessionHeader}
@@ -610,6 +678,40 @@ export default function OnePageSessionStandardShell({
                     <FontAwesomeIcon icon={faExpand} />
                     Raw Results
                   </button>
+                  {showGeneratedCheckAction && (
+                    <button
+                      type="button"
+                      onClick={(event: React.MouseEvent<HTMLElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (generatedCanCheckStatus) {
+                          onGeneratedResultsCheck?.();
+                        } else {
+                          onGeneratedResultsAuthorize?.();
+                        }
+                      }}
+                      className={styles.sectionHeaderViewModeButton}
+                      disabled={generatedStatus === 'loading'}
+                      data-testid="ce-session-generated-results-check"
+                    >
+                      {generatedCheckActionLabel}
+                    </button>
+                  )}
+                  {showGeneratedGenerateAction && (
+                    <button
+                      type="button"
+                      onClick={(event: React.MouseEvent<HTMLElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onGeneratedResultsGenerate?.(true);
+                      }}
+                      className={styles.sectionHeaderViewModeButton}
+                      disabled={!generatedCanGenerate}
+                      data-testid="ce-session-generated-results-generate"
+                    >
+                      {generatedActionLabel}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -669,15 +771,54 @@ export default function OnePageSessionStandardShell({
                     </div>
                   </Suspense>
                 )}
-                {isDemoSlug && effectiveResultsViewMode === 'riskMatrix' && (
-                  <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-                    <RiskMatrix
-                      embedded={true}
-                      onOpenAtlasNode={onCorpusAtlasIssueOpen}
-                      restoreState={riskMatrixRestoreState}
-                      onRestoreApplied={onRiskMatrixRestoreApplied}
-                    />
-                  </Suspense>
+                {isDemoSlug &&
+                  effectiveResultsViewMode === 'riskMatrix' &&
+                  !generatedViewKeys.has(effectiveResultsViewMode) && (
+                    <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
+                      <RiskMatrix
+                        embedded={true}
+                        onOpenAtlasNode={onCorpusAtlasIssueOpen}
+                        restoreState={riskMatrixRestoreState}
+                        onRestoreApplied={onRiskMatrixRestoreApplied}
+                      />
+                    </Suspense>
+                  )}
+                {generatedViewKeys.has(effectiveResultsViewMode) && (
+                  <div className={styles.generatedResultsPanel} data-testid="ce-session-generated-results-panel">
+                    <div className={styles.generatedResultsStatus}>
+                      <span>{String(generatedState.statusLabel || '')}</span>
+                      {generatedState.lastFailure ? <span>{String(generatedState.lastFailure)}</span> : null}
+                    </div>
+                    {generatedState.artifact ? (
+                      <Suspense fallback={<LazyFallback label="Loading generated AI view..." minHeight="30vh" />}>
+                        <SessionGeneratedResultsViews
+                          artifact={generatedState.artifact as SessionResultsGeneratedAnalysisArtifact}
+                          questions={
+                            (Array.isArray(generatedState.questions)
+                              ? generatedState.questions
+                              : []) as GeneratedResultsSnapshotQuestion[]
+                          }
+                          responses={
+                            (Array.isArray(generatedState.responses)
+                              ? generatedState.responses
+                              : []) as GeneratedResultsSnapshotResponse[]
+                          }
+                          selectedView={effectiveResultsViewMode as SessionGeneratedResultsViewKey}
+                          sessionSlug={displaySessionSlug}
+                        />
+                      </Suspense>
+                    ) : (
+                      <div className={styles.generatedResultsEmpty} data-testid="ce-session-generated-results-empty">
+                        <p>
+                          {String(
+                            generatedState.unsupportedReason ||
+                              generatedState.statusLabel ||
+                              'No generated view is available yet.',
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

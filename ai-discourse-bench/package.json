@@ -11,6 +11,8 @@
   "scripts": {
     "build:candidate-bank": "node ./scripts/build-candidate-bank.mjs",
     "build:reviewed-candidate-bank": "node ./scripts/build-reviewed-candidate-bank.mjs",
+    "build:v03-candidate-bank": "node ./scripts/build-v03-candidate-bank.mjs",
+    "check:v03-candidate-bank": "node ./scripts/build-v03-candidate-bank.mjs --check",
     "audit:development-bank": "node ./scripts/audit-development-question-bank.mjs",
     "evaluate:questions": "node ./scripts/evaluate-question-results.mjs",
     "generate:questions": "node ./scripts/generate-sample-question-bank.mjs",

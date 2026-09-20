@@ -2129,10 +2129,11 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="aidb-world-map-svg"/);
   assert.match(html, /class="mapLegend" aria-label="Map answer legend"/);
   assert.match(html, /class="legendSwatch" style="background-color:#4dffa4"><\/span>\s*Agree/);
-  assert.match(html, /class="legendSwatch" style="background-color:#ffd166"><\/span>\s*Unsure/);
-  assert.match(html, /--unsure:#ffd166;/);
+  assert.match(html, /class="legendSwatch" style="background-color:#ffeb3b"><\/span>\s*Unsure/);
+  assert.match(html, /--unsure:#ffeb3b;/);
   assert.match(html, /\.aidb-answer-unsure \{ background: var\(--unsure\); \}/);
   assert.match(html, /\.tagExplorerUnsure \{ background: var\(--unsure\); \}/);
+  assert.doesNotMatch(html, /--unsure:#ffd166;/);
   assert.doesNotMatch(html, /--unsure:#cbd5e1;/);
   assert.match(html, /class="legendSwatch" style="background-color:#ff6b6b"><\/span>\s*Disagree/);
   assert.equal((html.match(/data-ce-world-map-country=/g) || []).length, 177);

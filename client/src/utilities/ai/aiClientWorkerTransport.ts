@@ -66,6 +66,11 @@ export const buildAiWorkerRequestPlan = ({
         ? { temperature: opts.temperature }
         : { temperature: 0.7 }
       : {}),
+    ...(provider === 'openai' && ['fast', 'priority', 'default', 'auto'].includes(String(opts.service_tier))
+      ? { service_tier: opts.service_tier }
+      : provider === 'openai'
+        ? { service_tier: 'default' }
+        : {}),
     messages,
     ...(opts.thinking && provider === 'anthropic' ? { thinking: true } : {}),
   };
@@ -78,7 +83,7 @@ export const buildAiWorkerRequestPlan = ({
     ai.reasoningEffort ||
     'medium';
   const modelLeaf = asString(model).toLowerCase().split('/').pop();
-  if (modelLeaf && /^(gpt-5|o[13])/.test(modelLeaf)) {
+  if (modelLeaf && /^(gpt-5|gpt-6-astra(?:$|-)|o[13])/.test(modelLeaf)) {
     requestBody.reasoning_effort = reasoningEffort;
   }
 

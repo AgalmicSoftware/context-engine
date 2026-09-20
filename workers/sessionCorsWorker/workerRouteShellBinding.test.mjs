@@ -74,6 +74,7 @@ const createBaseConstants = () => ({
   missingSlugError: 'Missing sessionSlug.',
   nonceTtlSeconds: 300,
   nonceRateLimitMax: 5,
+  nonceSharedNetworkRateLimitMax: 300,
   nonceRateLimitWindowMs: 60000,
   nonceRateLimitTtlSeconds: 60,
   usedNonceTtlSeconds: 600,
@@ -169,6 +170,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves resource-presence branch wi
           getSessionConfig: 'getSessionConfig',
           getCorsContext: 'getCorsContext',
           getSessionSecrets: 'getSessionSecrets',
+          evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
           json: 'json',
         });
         assert.deepEqual(value.constants, {
@@ -309,6 +311,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', 
         assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
         assert.equal(value.deps.NONCE_TTL_SECONDS, 300);
         assert.equal(value.deps.NONCE_RATE_LIMIT_MAX, 5);
+        assert.equal(value.deps.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX, 300);
         assert.equal(value.deps.NONCE_RATE_LIMIT_WINDOW_MS, 60000);
         assert.equal(value.deps.NONCE_RATE_LIMIT_TTL_SECONDS, 60);
         assert.equal(value.deps.buildNonce(), 'nonce-built');

@@ -18,6 +18,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './AudioInput.module.scss';
+import CETooltip from '../CETooltip';
 import { requestAiRewrite } from '../../../utilities/ai/aiClient.js';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
@@ -135,6 +136,8 @@ const AudioInput = ({
   recordingDurationSeconds = null,
   enableDownloads = false,
 }: AudioInputProps) => {
+  const microphoneRef = useRef<HTMLButtonElement | null>(null);
+  const rewriteRef = useRef<HTMLButtonElement | null>(null);
   const [encryptBoxChecked, setEncryptBoxChecked] = useState<boolean | undefined>(encrypted);
   const [userText, setUserText] = useState('');
   const [originalText, setOriginalText] = useState('');
@@ -872,6 +875,7 @@ const AudioInput = ({
       <div className={styles.topControls}>
         {enableAiRewrite && visibleText.trim().length > 0 && !aiRewriteActive && !waitingForAI && (
           <button
+            ref={rewriteRef}
             onClick={handleAiRewrite}
             title="AI rewrite"
             aria-label="AI rewrite"
@@ -884,6 +888,7 @@ const AudioInput = ({
 
         {enableAiRewrite && aiRewriteActive && !waitingForAI && (
           <button
+            ref={rewriteRef}
             onClick={handleRevertText}
             title="Revert to original"
             aria-label="Revert to original"
@@ -892,6 +897,14 @@ const AudioInput = ({
           >
             <FontAwesomeIcon icon={faArrowLeft} />
           </button>
+        )}
+
+        {enableAiRewrite && visibleText.trim().length > 0 && !waitingForAI && (
+          <CETooltip target={rewriteRef} placement="top" trigger="hover focus">
+            {aiRewriteActive
+              ? 'Restore the text from before the AI rewrite.'
+              : 'AI rewrite: remove filler words and improve punctuation. You can revert the result.'}
+          </CETooltip>
         )}
 
         {/* Hide encryption UI when either prop requests it */}
@@ -1177,6 +1190,7 @@ const AudioInput = ({
 
         {/* Mic button: Record / Stop */}
         <button
+          ref={microphoneRef}
           onClick={handleRecordClick}
           className={`${styles.microphoneButton} ${
             isActiveRecording ? `${styles.recording} ${styles.pinnedLeft}` : ''
@@ -1201,6 +1215,13 @@ const AudioInput = ({
         >
           {isActiveRecording ? <FontAwesomeIcon icon={faCircle} /> : <FontAwesomeIcon icon={faMicrophone} />}
         </button>
+        <CETooltip target={microphoneRef} placement="top" trigger="hover focus">
+          {isRecorderDisabled
+            ? LIVE_CONVERSATION_RECORDER_DISABLED_REASON
+            : isActiveRecording
+              ? 'Stop recording and add the transcript to this text.'
+              : 'Record speech and add its transcript to this text.'}
+        </CETooltip>
       </div>
     </div>
   );

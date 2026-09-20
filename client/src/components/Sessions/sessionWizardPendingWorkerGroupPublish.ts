@@ -9,7 +9,7 @@ import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpl
 import { resolveSessionStorageBackend } from '../../utilities/storage/sessionStorageConfig';
 import { STORAGE_BACKENDS } from '../../utilities/storage/storageRefs';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
-import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
+import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import type { AnyRecord } from '../shellTypes';
 import {
   buildPendingWorkerGroupInput,

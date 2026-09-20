@@ -133,7 +133,8 @@ $icon-size-standard: 1.25rem;
 .expandButton,
 .bookmarkButton {
   background: none;
-  border: none;
+  border: 0 !important;
+  box-shadow: none !important;
   color: $button-color;
   cursor: pointer;
   /* Unified Layout & Spacing */
@@ -156,6 +157,11 @@ $icon-size-standard: 1.25rem;
     outline: none;
     color: $clickable-color;
     transform: scale(1.05);
+    box-shadow: none !important;
+  }
+  &:focus-visible {
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 
@@ -1685,7 +1691,7 @@ $icon-size-standard: 1.25rem;
 }
 
 // Keep the analysis reading surface paired with document text in either theme.
-:global(:root) :global(.modal-dialog) > .analysisModalContent:global(.modal-content) {
+:global(:root) .analysisModalContent.analysisModalContent {
   background: var(--ce-document-canvas);
   color: var(--ce-document-text);
 
@@ -1732,4 +1738,30 @@ $icon-size-standard: 1.25rem;
     margin-left: 12px;
     cursor: pointer;
   }
+}
+
+.analysisErrorNotice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.analysisSettingsLink {
+  min-height: 40px;
+  border: 1px solid var(--ce-action-accent);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.analysisSettingsLink:hover,
+.analysisSettingsLink:focus-visible {
+  filter: brightness(1.08);
+  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 64%, transparent);
+  outline-offset: 2px;
 }

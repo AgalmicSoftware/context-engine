@@ -125,6 +125,54 @@ describe('UserPageAnalysisModal', () => {
     expect(onRefreshAnalysis).not.toHaveBeenCalled();
   });
 
+  it('renders an AI settings action only for missing-key analysis errors', () => {
+    const onOpenAiSettings = jest.fn();
+    const { rerender } = render(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisCacheStatusState: { shouldRenderAnalysisCacheStatus: false },
+          analysisError: 'AI analysis needs a configured AI provider key.',
+          analysisErrorAction: 'add-ai-key',
+          analysisModalDisplayState: {
+            shouldRenderAnalysisBody: false,
+            shouldRenderAnalyzing: false,
+            shouldRenderDetails: false,
+            shouldRenderError: true,
+            shouldRenderHistoricalAlignment: false,
+            shouldRenderHistoricalFigure: false,
+            shouldRenderHistoricalReasoning: false,
+          },
+          onOpenAiSettings,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add AI key' }));
+    expect(onOpenAiSettings).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisCacheStatusState: { shouldRenderAnalysisCacheStatus: false },
+          analysisError: 'Unable to reach the AI service.',
+          analysisErrorAction: 'open-ai-settings',
+          analysisModalDisplayState: {
+            shouldRenderAnalysisBody: false,
+            shouldRenderAnalyzing: false,
+            shouldRenderDetails: false,
+            shouldRenderError: true,
+            shouldRenderHistoricalAlignment: false,
+            shouldRenderHistoricalFigure: false,
+            shouldRenderHistoricalReasoning: false,
+          },
+          onOpenAiSettings,
+        })}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Add AI key' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open AI settings' })).toBeInTheDocument();
+  });
+
   it('keeps cached analysis visible while refresh is disabled during analysis', () => {
     const onRefreshAnalysis = jest.fn();
     render(

@@ -1,0 +1,16 @@
+.smokePage {
+  width: min(1180px, calc(100vw - 28px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.smokePage [data-testid='ce-session-generated-results-panel'] {
+  min-height: 420px;
+}
+
+@media (max-width: 720px) {
+  .smokePage {
+    width: min(100vw - 16px, 420px);
+    padding: 14px 0 32px;
+  }
+}

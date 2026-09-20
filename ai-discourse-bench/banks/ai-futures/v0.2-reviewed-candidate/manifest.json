@@ -5,8 +5,8 @@
   "version": "0.2.0-candidate.1",
   "releaseStatus": "candidate",
   "benchmarkId": "model-opinions-bench-ai-futures-v0.2-reviewed-candidate",
-  "questionBankHash": "52eadfb2fa7486c347b97e682dd3b2e367d76c920e58da8561b8ef93c2c1ac8a",
-  "sourceCorpusRevision": "79b19bbd9826b42968abbffb05e402949417a88c",
+  "questionBankHash": "6c86cec578b211b301d7a5b413345b521adf0da6616114ad44f70a073709d852",
+  "sourceCorpusRevision": "ebbc5130624ac3272cd7ee433075698eb941d13e",
   "sourceFiles": [
     {
       "corpus": "ai-laws-policy",
@@ -39,6 +39,11 @@
       "sha256": "2e05aeb90c3957e293d49a5b4e2b7c891e11c0fb9d0eaff76ad520afaabba88c"
     },
     {
+      "corpus": "lab-primary-docs",
+      "relativePath": "ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json",
+      "sha256": "be91c64f28a288743c19b9f0e7863e54a05dcc799203ee3235ff908d8cd9dae5"
+    },
+    {
       "corpus": "lesswrong-posts",
       "relativePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
       "sha256": "b81137e32286d2a48688b06338a04ba77631ab661aa564232dcbd238bd2e39d9"
@@ -57,7 +62,7 @@
   "reviewStatus": "ai-reviewed-pending-independent-human-review",
   "derivedFrom": {
     "benchmarkId": "ai-discourse-bench-ai-futures-v0.1-candidate",
-    "questionBankHash": "cc442e11af1794116cbab693146150e88512464e72368618e31a18f2e991bdd5"
+    "questionBankHash": "7cf0c1469485a62c676c9db7ab23b791cc8f5a71c68411e792267406cacb0522"
   },
   "audit": {
     "questionsReviewed": 50,

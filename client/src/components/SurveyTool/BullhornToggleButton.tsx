@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import CETooltip from '../Shared/CETooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBullhorn } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
@@ -47,29 +48,38 @@ const BullhornToggleButton = ({
   title = 'Conviction / importance',
   ariaLabel = 'Conviction / importance',
   active = false,
-}: BullhornToggleButtonProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className={buildBullhornToggleButtonClassName({
-      active,
-      activeClassName: styles.iconButtonActive,
-      baseClassName: styles.iconButton,
-      bullhornClassName: styles.bullhornButton,
-      commentClassName: styles.commentButton,
-    })}
-    title={title}
-    aria-label={ariaLabel}
-  >
-    <FontAwesomeIcon
-      icon={faBullhorn}
-      className={resolveBullhornToggleIconClassName({
-        active,
-        iconGlowClassName: styles.iconGlow,
-      })}
-    />
-  </button>
-);
+}: BullhornToggleButtonProps) => {
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={buildBullhornToggleButtonClassName({
+          active,
+          activeClassName: styles.iconButtonActive,
+          baseClassName: styles.iconButton,
+          bullhornClassName: styles.bullhornButton,
+          commentClassName: styles.commentButton,
+        })}
+        title={title}
+        aria-label={ariaLabel}
+      >
+        <FontAwesomeIcon
+          icon={faBullhorn}
+          className={resolveBullhornToggleIconClassName({
+            active,
+            iconGlowClassName: styles.iconGlow,
+          })}
+        />
+      </button>
+      <CETooltip target={buttonRef} placement="top" trigger="hover focus">
+        Set how strongly you hold this answer and how important it is to you.
+      </CETooltip>
+    </>
+  );
+};
 
 export default BullhornToggleButton;
