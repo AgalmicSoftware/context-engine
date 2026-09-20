@@ -83,10 +83,11 @@ greeting through `session.instructions.append`; it does not send
 `response.create` or a second `session.start`. No live task backend is invoked:
 a client delegation receives a factual notice that drafting happens after Stop.
 
-The shipped `demo-interview` client record enables question suggestions and pins its deployed Worker, so its
-route is simply `/session/demo-interview?mode=interview`; it does not require a
-`worker=` discovery parameter. Registry-backed sessions likewise read
-`corsWorkerUrl` from registered session metadata. A newly shared,
+The shipped `demo-interview` client record pins its deployed Worker and enables question suggestions.
+The shipped `demo-interview-5` record is a trusted clean-route discovery stub:
+`/session/demo-interview-5?mode=interview` bootstraps and verifies the live config from its pinned
+Worker, so the public URL does not require a visible `worker=` parameter. Registry-backed sessions
+likewise read `corsWorkerUrl` from registered session metadata. A newly shared,
 Worker-canonical session still needs an explicit discovery link unless its app
 deployment bundles the Worker origin or serves the session from that origin.
 

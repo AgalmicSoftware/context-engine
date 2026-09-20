@@ -10,6 +10,7 @@ import {
 } from '../../domains/sessions/sessionConfig.js';
 import { getVerifiedWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache.js';
 import {
+  parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
   validateWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery.js';
@@ -61,6 +62,21 @@ type ResolveSessionRouteOptions = {
   resolveSessionSlugFromPathToken: (sessionToken: string) => string;
   resolveStandardSessionRoute?: typeof resolveMainSiteSessionRouteContext;
   getVerifiedConfig?: typeof getVerifiedWorkerCanonicalSessionBootstrap;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const resolveTrustedBundledWorkerOrigin = (sessionConfig: SessionConfig | null | undefined): string => {
+  if (!isRecord(sessionConfig) || sessionConfig.workerCanonicalCleanRoute !== true) return '';
+  const profile = isRecord(sessionConfig.sessionModeProfile) ? sessionConfig.sessionModeProfile : {};
+  const authority = isRecord(profile.authority) ? profile.authority : {};
+  if (authority.mode !== 'worker_canonical') return '';
+  try {
+    return parseSessionWorkerDiscoveryOrigin(sessionConfig.corsWorkerUrl);
+  } catch {
+    return '';
+  }
 };
 
 const emptyWorkerRouteState = (): WorkerCanonicalRouteState => ({
@@ -238,20 +254,40 @@ export const resolveMainSiteSessionRouteForRender = ({
     controller,
     getVerifiedConfig,
   });
+  const buildWorkerSessionRoute = (route: WorkerCanonicalRouteState): MainSiteSessionRouteResolution => ({
+    ...route,
+    sessionRoute:
+      route.kind === 'error'
+        ? null
+        : {
+            sessionIdFromPath: null,
+            configBySessionId: null,
+            sessionSlug: route.workerSessionSlug,
+            sessionConfig: route.sessionConfig,
+            hasUnresolvedSessionId: false,
+          },
+  });
+
   if (workerRoute.kind !== 'standard') {
-    return {
-      ...workerRoute,
-      sessionRoute:
-        workerRoute.kind === 'error'
-          ? null
-          : {
-              sessionIdFromPath: null,
-              configBySessionId: null,
-              sessionSlug: workerRoute.workerSessionSlug,
-              sessionConfig: workerRoute.sessionConfig,
-              hasUnresolvedSessionId: false,
-            },
-    };
+    return buildWorkerSessionRoute(workerRoute);
+  }
+
+  const routeSlug = normalizeSessionSlug(
+    sessionTokenRaw ? resolveSessionSlugFromPathToken(sessionTokenRaw) || sessionTokenRaw : DEFAULT_SESSION_SLUG,
+  );
+  const registrySessionConfig = routeSlug ? sessionRegistryReadsPort.getSessionConfig(routeSlug) : null;
+  const bundledDisplayConfig = registrySessionConfig
+    ? null
+    : getDemoSessionConfigBySlug(routeSlug, { allowDemoFallback: true });
+  const bundledWorkerOrigin = resolveTrustedBundledWorkerOrigin(bundledDisplayConfig);
+  if (bundledWorkerOrigin) {
+    const trustedWorkerRoute = resolveWorkerRouteState({
+      searchStr: `?worker=${encodeURIComponent(bundledWorkerOrigin)}`,
+      workerSessionSlug: routeSlug,
+      controller,
+      getVerifiedConfig,
+    });
+    if (trustedWorkerRoute.kind !== 'standard') return buildWorkerSessionRoute(trustedWorkerRoute);
   }
 
   return {
