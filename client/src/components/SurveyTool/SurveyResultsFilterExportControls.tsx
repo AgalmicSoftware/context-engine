@@ -57,6 +57,7 @@ type SurveyResultsFilterExportControlsProps = SurveyResultsFilterExportControlsC
   onToggleQuestionFilter: () => void;
   provider?: unknown;
   questionFilterQuestions: unknown;
+  workerGroupAllowedQuestionIds?: unknown;
   questionFilterRef: React.Ref<QuestionFilterHandle>;
   questionResponses: unknown;
   responses: unknown;
@@ -93,6 +94,7 @@ export const renderSurveyResultsFilterExportControls = ({
   onToggleQuestionFilter,
   provider,
   questionFilterQuestions,
+  workerGroupAllowedQuestionIds,
   questionFilterRef,
   questionResponses,
   questionResponsesNonce,
@@ -181,6 +183,7 @@ export const renderSurveyResultsFilterExportControls = ({
               filterModalOpen={showQuestionFilter}
               toggleFilterModal={onToggleQuestionFilter}
               questions={questionFilterQuestions}
+              workerGroupAllowedQuestionIds={workerGroupAllowedQuestionIds}
               questionResponses={questionResponses}
               provider={provider}
               network={network}

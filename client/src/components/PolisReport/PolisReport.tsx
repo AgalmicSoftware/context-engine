@@ -25,6 +25,16 @@ import {
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import styles from './PolisReport.module.scss';
+import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
+import {
+  filterWorkerGroupResponses,
+  reportFilterStateForSession,
+  buildWorkerGroupAnalysisKey,
+  GROUP_FILTER_ROLES,
+  hasWorkerGroupSelection,
+  usesWorkerGroupFilters,
+  type WorkerGroupResultsSelection,
+} from '../../domains/worker/workerGroupResultsFilter';
 import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
@@ -150,6 +160,8 @@ export const buildPolisParticipantProfileHref = ({
  * The main PolisReport component
  ***************************************************************/
 export default function PolisReport({
+  account,
+  provider,
   questionResponses, // Aggregator object { questionId -> [ { responder, questionId, response }, ... ] }
   network, // blockchain network object
   sbtFilterString, // (Optional) String describing SBT filters applied by parent
@@ -196,10 +208,18 @@ export default function PolisReport({
     }) ||
       Number(filterState.topQuestions?.count) > 0 ||
       filterState.onlyVerifiedHumans ||
+      (usesWorkerGroupFilters(sessionConfig) && hasWorkerGroupSelection(filterState.workerGroupFilter)) ||
       Object.values(filterState.sbtFilter || {}).some((value) => Array.isArray(value) && value.length > 0)),
   );
   const activeReportSlug = normalizeSessionSlug(slug || sessionSlug || '');
   const resolvedSessionSlug = activeReportSlug;
+  const groupResolution = useWorkerGroupResultsFilter({
+    sessionConfig,
+    sessionSlug: activeReportSlug,
+    account,
+    provider,
+    selection: filterState?.workerGroupFilter,
+  });
   const hasBlockchainContext = Number(networkChainId || network?.id || network?.chainId || 0) > 0;
   const reportProgressSlug = useMemo(() => normalizeQuestionProgressSlug(resolvedSessionSlug), [resolvedSessionSlug]);
   const resolvedDemoDataBySlug = useMemo(() => buildPolisDemoDatasetsBySlug(demoDataBySlug), [demoDataBySlug]);
@@ -622,7 +642,9 @@ export default function PolisReport({
       allQuestions,
     ],
   );
-  const currentAnalysisKey = analysisDataKey;
+  const currentAnalysisKey = groupResolution.cohort.active
+    ? buildWorkerGroupAnalysisKey(analysisDataKey, filterState?.workerGroupFilter, allResponders, ratingMatrix)
+    : analysisDataKey;
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -747,10 +769,13 @@ export default function PolisReport({
     const source = effectiveUseDemoData
       ? buildPolisDemoSurveyResultsAggregatorData(activeDemoData, { sessionSlug: activeReportSlug })
       : questionResponses;
+    // One resolved cohort feeds answers, charts, participant stats and downstream analysis.
+    // Keep native Group principals separate from the on-chain SBT holder cache.
+    const cohortSource = filterWorkerGroupResponses(source, metadata, groupResolution.cohort);
     const filtered = applyFilterStateToAggregator(
-      source,
+      cohortSource,
       network,
-      filterState,
+      reportFilterStateForSession(sessionConfig, filterState),
       activeReportSlug,
       sessionConfig,
       metadata,
@@ -768,6 +793,7 @@ export default function PolisReport({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Cache metadata can change without a new response object.
   }, [
     questionResponses,
+    groupResolution.cohort,
     network,
     filterState,
     activeReportSlug,
@@ -2213,7 +2239,8 @@ export default function PolisReport({
       return <span>None</span>;
     }
 
-    const { sbtFilter, onlyVerifiedHumans, questionTypes, selectedTags, topQuestions } = filterState;
+    const { onlyVerifiedHumans, questionTypes, selectedTags, topQuestions } = filterState;
+    const sbtFilter = reportFilterStateForSession(sessionConfig, filterState)?.sbtFilter;
 
     const activeFilterElements: React.ReactNode[] = [];
 
@@ -2310,6 +2337,24 @@ export default function PolisReport({
       }
     }
 
+    if (groupResolution.enabled && hasWorkerGroupSelection(filterState.workerGroupFilter)) {
+      const selection = filterState.workerGroupFilter as WorkerGroupResultsSelection;
+      const labels = {
+        creatorInclude: 'Creator Groups include',
+        creatorExclude: 'Creator Groups exclude',
+        responderInclude: 'Responder Groups include',
+        responderExclude: 'Responder Groups exclude',
+      };
+      for (const role of GROUP_FILTER_ROLES) {
+        if (Array.isArray(selection[role]) && selection[role].length)
+          activeFilterElements.push(
+            <div key={role}>
+              <strong>{labels[role]}:</strong> {selection[role].map((group) => group.label || group.groupId).join(', ')}
+            </div>,
+          );
+      }
+    }
+
     // Handle the old `sbtFilterString` for basic backward compatibility if `filterState` is simple
     if (activeFilterElements.length === 0 && sbtFilterString) {
       return <span>{sbtFilterString}</span>;
@@ -2361,6 +2406,15 @@ export default function PolisReport({
   /***************************************************************
    * Render
    ***************************************************************/
+  if (groupResolution.cohort.active && groupResolution.cohort.status !== 'ready')
+    return (
+      <div className={styles.polisReportContainer} data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}>
+        <p role={groupResolution.cohort.status === 'error' ? 'alert' : 'status'}>{groupResolution.cohort.message}</p>
+        <button type="button" onClick={groupResolution.refresh}>
+          Retry Group filter
+        </button>
+      </div>
+    );
   return (
     <div
       className={`${styles.polisReportContainer} ${isModernStyle ? styles.polisReportModern : ''} ${isDarkStyle ? styles.polisReportDark : ''}`}

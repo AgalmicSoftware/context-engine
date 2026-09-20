@@ -41,6 +41,13 @@ import {
   QuestionFilterTagsSection,
   QuestionFilterTopQuestionsSection,
 } from './QuestionFilterSections';
+import WorkerGroupResultsFilterControls from './WorkerGroupResultsFilterControls';
+import {
+  usesWorkerGroupFilters,
+  hasWorkerGroupSelection,
+  asGroupRecord,
+  GROUP_FILTER_ROLES,
+} from '../../domains/worker/workerGroupResultsFilter';
 import { QuestionFilterCapabilitySbtSection } from './QuestionFilterCapabilitySbtSection';
 import {
   DEFAULT_AI_TOP_N,
@@ -245,6 +252,7 @@ class QuestionFilter extends React.Component<any, any> {
 
       // SBT filter internal state
       sbtFilterLocalState: sbtFilterLocalState,
+      workerGroupFilter: filterState.workerGroupFilter || null,
 
       // AI filter
       aiSearchQuery: aiSearchQuery,
@@ -333,6 +341,10 @@ class QuestionFilter extends React.Component<any, any> {
 
   getEffectiveSessionConfig = (propsIn: QuestionFilterSessionProps = this.props): UnknownRecord => {
     return (resolveEffectiveSessionContext(propsIn).sessionConfig || {}) as UnknownRecord;
+  };
+
+  handleWorkerGroupFilter = (workerGroupFilter: unknown): void => {
+    this.setState({ workerGroupFilter }, () => this.handleApplyFilters(true));
   };
 
   canUseSbtFilter = (propsIn: QuestionFilterSessionProps = this.props): boolean =>
@@ -630,6 +642,8 @@ class QuestionFilter extends React.Component<any, any> {
         newStateFromUrl.aiAppliedTopN = parsedTopN;
       }
 
+      newStateFromUrl.workerGroupFilter = urlFilterState.workerGroupFilter || null;
+
       // Map sbtFilter
       if (this.canUseSbtFilter() && urlFilterState.sbtFilter !== undefined) {
         newStateFromUrl.sbtFilterLocalState =
@@ -726,6 +740,7 @@ class QuestionFilter extends React.Component<any, any> {
       aiRankingCount: Number(state.aiRankingCount ?? DEFAULT_AI_TOP_N),
       aiCombineWithOtherFilters: !!state.aiCombineWithOtherFilters,
       sbtFilterLocalState: this.canUseSbtFilter(props) ? state.sbtFilterLocalState || null : null,
+      workerGroupFilter: state.workerGroupFilter || null,
       selectedTags: state.selectedTags || [],
       showTopQuestionsByResponses: !!state.showTopQuestionsByResponses,
       filterByResponded: !!state.filterByResponded,
@@ -809,6 +824,7 @@ class QuestionFilter extends React.Component<any, any> {
       prevState.aiRankingCount !== this.state.aiRankingCount ||
       prevState.aiCombineWithOtherFilters !== this.state.aiCombineWithOtherFilters ||
       prevState.sbtFilterLocalState !== this.state.sbtFilterLocalState ||
+      prevState.workerGroupFilter !== this.state.workerGroupFilter ||
       prevState.selectedTags !== this.state.selectedTags ||
       prevState.showTopQuestionsByResponses !== this.state.showTopQuestionsByResponses ||
       prevState.filterByResponded !== this.state.filterByResponded ||
@@ -884,7 +900,10 @@ class QuestionFilter extends React.Component<any, any> {
       });
 
       const statePatch: QuestionFilterMutableStatePatch = {};
-      let shouldApplyFiltersAfterPatch = false;
+      // Group membership resolves after selection and may change without a response-cache nonce.
+      let shouldApplyFiltersAfterPatch =
+        JSON.stringify(prevProps.workerGroupAllowedQuestionIds ?? null) !==
+        JSON.stringify(this.props.workerGroupAllowedQuestionIds ?? null);
       let nextMergedQuestionsSyncSignature = this._mergedQuestionsSyncSignature;
       let nextCachedQuestionResponsesSignature = this._cachedQuestionResponsesSignature;
       const lostSbtCapabilityPatch = buildQuestionFilterLostSbtCapabilityPatch({
@@ -1086,6 +1105,7 @@ class QuestionFilter extends React.Component<any, any> {
     sortByImportance: false,
     sbtFilteredQuestions: null,
     sbtFilterLocalState: null,
+    workerGroupFilter: null,
     aiSearchQuery: '',
     aiDraftQuery: '',
     aiRankingCount: DEFAULT_AI_TOP_N,
@@ -1167,6 +1187,7 @@ class QuestionFilter extends React.Component<any, any> {
               aiRankedQuestionIds: [],
               aiCombineWithOtherFilters: parsed.aiSearchQuery ? parsed.aiCombineWithOtherFilters === true : false,
               aiApplyError: '',
+              workerGroupFilter: parsed.workerGroupFilter || null,
               sbtFilterLocalState: this.canUseSbtFilter()
                 ? Object.prototype.hasOwnProperty.call(parsed, 'sbtFilterLocalState')
                   ? parsed.sbtFilterLocalState || null
@@ -1253,6 +1274,7 @@ class QuestionFilter extends React.Component<any, any> {
         aiAppliedTopN,
         aiCombineWithOtherFilters,
         sbtFilterLocalState: this.canUseSbtFilter() ? sbtFilterLocalState : null,
+        workerGroupFilter: this.state.workerGroupFilter || null,
         selectedTags,
         showTopQuestionsByResponses,
         filterByResponded,
@@ -1370,6 +1392,7 @@ class QuestionFilter extends React.Component<any, any> {
         aiCombineWithOtherFilters,
         aiApplyError: shouldPreserveAppliedAiState ? this.state.aiApplyError : '',
         aiApplying: false,
+        workerGroupFilter: filterState.workerGroupFilter || null,
         sbtFilterLocalState,
         filterByResponded: responseStatusState.filterByResponded,
         filterByNotResponded: responseStatusState.filterByNotResponded,
@@ -1595,9 +1618,15 @@ class QuestionFilter extends React.Component<any, any> {
   }
 
   buildFilterPipelineResult(usePendingState = false): QuestionFilterPipelineResult {
-    const mergedQuestions: QuestionFilterQuestionRecord[] = Array.isArray(this.state.mergedQuestions)
+    const allMergedQuestions: QuestionFilterQuestionRecord[] = Array.isArray(this.state.mergedQuestions)
       ? (this.state.mergedQuestions as QuestionFilterQuestionRecord[])
       : [];
+    const allowedGroupIds = Array.isArray(this.props.workerGroupAllowedQuestionIds)
+      ? new Set(this.props.workerGroupAllowedQuestionIds)
+      : null;
+    const mergedQuestions = allowedGroupIds
+      ? allMergedQuestions.filter((question) => allowedGroupIds.has(String(question.id)))
+      : allMergedQuestions;
     const selectedTypes = usePendingState ? this.state.pendingSelectedTypes : this.state.selectedTypes;
     const sortByImportance = usePendingState ? this.state.pendingSortByImportance : this.state.sortByImportance;
     const sbtFilteredQuestions = this.canUseSbtFilter()
@@ -1882,6 +1911,7 @@ class QuestionFilter extends React.Component<any, any> {
       aiFilterApplied: this.state.aiFilterApplied,
       aiCombineWithOtherFilters: this.state.aiCombineWithOtherFilters,
       sbtFilterLocalState: this.state.sbtFilterLocalState,
+      workerGroupFilter: this.state.workerGroupFilter || null,
       selectedTags: this.state.selectedTags,
       showTopQuestionsByResponses: this.state.showTopQuestionsByResponses,
     };
@@ -2140,7 +2170,12 @@ class QuestionFilter extends React.Component<any, any> {
 
   buildFilterState(): QuestionFilterSerializableState {
     return suppressQuestionFilterSbtState(
-      buildQuestionFilterStateFromComponentState(this.state, DEFAULT_AI_TOP_N) as QuestionFilterSerializableState,
+      {
+        ...buildQuestionFilterStateFromComponentState(this.state, DEFAULT_AI_TOP_N),
+        ...(usesWorkerGroupFilters(resolveQuestionFilterSbtSessionConfig(this.props))
+          ? { workerGroupFilter: this.state.workerGroupFilter || null }
+          : {}),
+      } as QuestionFilterSerializableState,
       this.canUseSbtFilter(),
     );
   }
@@ -2408,6 +2443,7 @@ class QuestionFilter extends React.Component<any, any> {
         pendingSelectedTypes: selectedTypes,
         selectedTags,
         sbtFilterLocalState,
+        workerGroupFilter: deserializedState.workerGroupFilter || null,
       };
       // Map deserialized state to component's state structure
       if (deserializedState.responseStatus) {
@@ -2566,7 +2602,8 @@ class QuestionFilter extends React.Component<any, any> {
       showTopQuestionsByResponses: this.state.pendingShowTopQuestionsByResponses,
       selectedTypes: this.state.pendingSelectedTypes,
       selectedTags: this.state.selectedTags, // No pending version
-      sbtFilterLocalState: this.state.sbtFilterLocalState, // No pending version
+      sbtFilterLocalState: this.state.sbtFilterLocalState,
+      workerGroupFilter: this.state.workerGroupFilter || null, // No pending version
     };
 
     // 1) Show "Top X questions" if active
@@ -2797,6 +2834,24 @@ class QuestionFilter extends React.Component<any, any> {
 
     // Gather summary items
     const summaryItems = this.getFilterSummaryItems();
+    if (
+      usesWorkerGroupFilters(resolveQuestionFilterSbtSessionConfig(this.props)) &&
+      hasWorkerGroupSelection(this.state.workerGroupFilter)
+    ) {
+      const selection = asGroupRecord(this.state.workerGroupFilter);
+      for (const role of GROUP_FILTER_ROLES) {
+        const entries = Array.isArray(selection[role]) ? selection[role] : [];
+        for (const raw of entries) {
+          const entry = asGroupRecord(raw);
+          summaryItems.push({
+            type: 'workerGroup',
+            label: `${role.startsWith('creator') ? 'Creator' : 'Responder'} ${role.endsWith('Include') ? 'include' : 'exclude'}: ${String(entry.label || entry.groupId)}`,
+            onRemove: () =>
+              this.handleWorkerGroupFilter({ ...selection, [role]: entries.filter((item) => item !== raw) }),
+          });
+        }
+      }
+    }
     const hasConnectedAccount = toStr(this.props.account).trim() !== '';
 
     const allTags = this.getAllTagsWithCounts();
@@ -2852,6 +2907,20 @@ class QuestionFilter extends React.Component<any, any> {
             filterByResponded={this.state.filterByResponded}
             filterByNotResponded={this.state.filterByNotResponded}
           />
+
+          {this.props.resultsMode && (
+            <WorkerGroupResultsFilterControls
+              sessionConfig={resolveQuestionFilterSbtSessionConfig(this.props)}
+              sessionSlug={resolveEffectiveSessionContext(this.props).sessionSlug || resolveEffectiveSlug(this.props)}
+              account={this.props.account}
+              provider={this.props.provider}
+              value={this.state.workerGroupFilter}
+              onChange={this.handleWorkerGroupFilter}
+              expandedSections={expandedSections}
+              onToggleSection={this.toggleSection}
+              discover={!!this.props.filterModalOpen}
+            />
+          )}
 
           <QuestionFilterCapabilitySbtSection
             disabled={isOtherFiltersDisabled}

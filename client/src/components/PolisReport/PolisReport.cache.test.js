@@ -1721,3 +1721,83 @@ it('renders named quadratic totals from a scoped Worker cache and filters its qu
   );
   expect(screen.queryByText('Worker allocation')).not.toBeInTheDocument();
 });
+
+it('uses native Group members for all answer sections and blocks unreadable cohorts without changing SBT filters', async () => {
+  const tokenSpy = jest
+    .spyOn(require('../../utilities/worker/workerAuth'), 'getWorkerSessionToken')
+    .mockResolvedValue('synthetic-token');
+  const memberSpy = jest.spyOn(require('../../domains/worker/workerGroupPorts'), 'loadWorkerGroupMembers');
+  const account = '0x' + 'a'.repeat(40),
+    outsider = '0x' + 'b'.repeat(40);
+  const sessionConfig = {
+    slug: 'group-report',
+    sessionIdHex: '0x' + '3'.repeat(32),
+    corsWorkerUrl: 'https://group-report.example',
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  };
+  const group = {
+    groupId: 'eddy-2026',
+    label: 'EDDY-2026',
+    sessionSlug: sessionConfig.slug,
+    joinMode: 'open',
+    memberVisibility: 'session',
+  };
+  memberSpy.mockResolvedValue({
+    group,
+    members: [{ principal: { kind: 'passkey_account', address: account } }],
+    nextCursor: '',
+    memberCount: 1,
+  });
+  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: sessionConfig.slug });
+  const metadata = { q: { type: 'freeform', prompt: 'Group feedback', creator: account } };
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache'
+      ? {
+          worker: withWorkerCanonicalCacheIdentity({ questions: metadata }, identity),
+          84532: { questions: metadata },
+        }
+      : {},
+  );
+  const selection = {
+    sessionSlug: sessionConfig.slug,
+    sessionId: sessionConfig.sessionIdHex,
+    workerUrl: sessionConfig.corsWorkerUrl,
+    creatorInclude: [],
+    creatorExclude: [],
+    responderInclude: [group],
+    responderExclude: [],
+  };
+  const responses = {
+    q: [
+      { responder: account, response: { type: 'freeform', answer: { value: 'Member-only feedback' } } },
+      { responder: outsider, response: { type: 'freeform', answer: { value: 'Outside feedback' } } },
+    ],
+  };
+  const props = { ...baseReportProps, account, sessionConfig, slug: sessionConfig.slug, questionResponses: responses };
+  try {
+    const { rerender } = render(<PolisReport {...props} filterState={{ workerGroupFilter: selection }} />);
+    expect(screen.queryByText('Outside feedback')).not.toBeInTheDocument();
+    await screen.findByText('Member-only feedback');
+    expect(screen.queryByText('Outside feedback')).not.toBeInTheDocument();
+    rerender(
+      <PolisReport
+        {...props}
+        filterState={{ workerGroupFilter: { ...selection, responderInclude: [], responderExclude: [group] } }}
+      />,
+    );
+    await screen.findByText('Outside feedback');
+    expect(screen.queryByText('Member-only feedback')).not.toBeInTheDocument();
+    memberSpy.mockRejectedValue(new Error('worker_group_member_list_forbidden'));
+    rerender(<PolisReport {...props} account={outsider} filterState={{ workerGroupFilter: selection }} />);
+    expect(screen.queryByText('Outside feedback')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('permission'));
+    rerender(
+      <PolisReport {...props} sessionConfig={{ chainId: 84532 }} filterState={{ workerGroupFilter: selection }} />,
+    );
+    await screen.findByText('Outside feedback');
+    expect(screen.getByText('Member-only feedback')).toBeInTheDocument();
+  } finally {
+    tokenSpy.mockRestore();
+    memberSpy.mockRestore();
+  }
+});

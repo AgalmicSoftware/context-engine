@@ -85,6 +85,7 @@ export interface PolisFilterState extends UnknownRecord {
   includeTags?: string | unknown[];
   questionTypes?: unknown[];
   sbtFilter?: PolisSbtFilter | null;
+  workerGroupFilter?: unknown;
   topQuestions?: {
     count?: unknown;
     by?: unknown;

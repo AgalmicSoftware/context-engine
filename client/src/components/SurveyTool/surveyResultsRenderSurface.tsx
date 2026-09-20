@@ -78,6 +78,7 @@ export type SurveyResultsRenderSurfaceDisplayStyles = {
 };
 
 export type SurveyResultsRenderSurfaceArgs = {
+  workerGroupFilterNotice?: React.ReactNode;
   applyDecryptedOverrideToResponse: SurveyResultsDisplayPanelsArgs['applyDecryptedOverrideToResponse'];
   closeModal: () => void;
   displayStyles: SurveyResultsRenderSurfaceDisplayStyles;
@@ -138,6 +139,7 @@ export type SurveyResultsRenderSurfaceArgs = {
 };
 
 export const renderSurveyResultsRenderSurface = ({
+  workerGroupFilterNotice,
   applyDecryptedOverrideToResponse,
   closeModal,
   displayStyles,
@@ -278,46 +280,52 @@ export const renderSurveyResultsRenderSurface = ({
     miniProgressStyle: displayStyles.miniProgressStyle,
     remainingSpinnerStyle: displayStyles.remainingSpinnerStyle,
   });
-  const filterControlsNode = renderSurveyResultsFilterExportControls({
-    activeSessionSlug: filterInput.activeSessionSlug,
-    aggregateQuestionResponses: state.aggregateQuestionResponses,
-    currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
-    currentViewModeForUrl: filterInput.currentViewModeForUrl,
-    defaultTags: props.defaultTags,
-    ensureLightSbtUniverse: props.ensureLightSbtUniverse,
-    exportControlsDisplay,
-    filterState: filterInput.filterState,
-    isFilterActive,
-    isQuestionCacheReady: filterInput.isQuestionCacheReady,
-    isSBTCacheReady: filterInput.isSBTCacheReady,
-    network: props.network,
-    onClearFilters: handleClearFiltersFromParent,
-    onDownload: downloadCSV,
-    onExportHtmlReport: openHtmlReportExportModal,
-    onExportTypeChange: handleExportTypeChange,
-    onFilterActivityChange: handleFilterActivityChange,
-    onQuestionFilter: handleQuestionFilter,
-    onQuestionFilterCountUpdate: handleQuestionFilterCountUpdate,
-    onSbtFilter: handleFilteredResponses,
-    onSetFilterLoading: stableSetFilterLoading,
-    onToggleExportArea: toggleExportArea,
-    onToggleQuestionFilter: toggleQuestionFilter,
-    provider: props.provider,
-    questionFilterQuestions,
-    questionFilterRef,
-    questionResponses: state.questionResponses,
-    questionResponsesNonce: filterInput.questionResponsesNonce,
-    questionsCacheNonce: filterInput.questionsCacheNonce,
-    responses: state.responses,
-    sbtCacheRevision: filterInput.sbtCacheRevision,
-    sessionConfig: props.sessionConfig,
-    sessionSlug: props.sessionSlug,
-    showQuestionFilter: filterInput.showQuestionFilter,
-    storageKeyPrefix: filterInput.storageKeyPrefix,
-    styleMap,
-    surveyViewMode,
-    viewMode,
-  });
+  const filterControlsNode = (
+    <>
+      {workerGroupFilterNotice}
+      {renderSurveyResultsFilterExportControls({
+        activeSessionSlug: filterInput.activeSessionSlug,
+        aggregateQuestionResponses: state.aggregateQuestionResponses,
+        currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
+        currentViewModeForUrl: filterInput.currentViewModeForUrl,
+        defaultTags: props.defaultTags,
+        ensureLightSbtUniverse: props.ensureLightSbtUniverse,
+        exportControlsDisplay,
+        filterState: filterInput.filterState,
+        isFilterActive,
+        isQuestionCacheReady: filterInput.isQuestionCacheReady,
+        isSBTCacheReady: filterInput.isSBTCacheReady,
+        network: props.network,
+        onClearFilters: handleClearFiltersFromParent,
+        onDownload: downloadCSV,
+        onExportHtmlReport: openHtmlReportExportModal,
+        onExportTypeChange: handleExportTypeChange,
+        onFilterActivityChange: handleFilterActivityChange,
+        onQuestionFilter: handleQuestionFilter,
+        onQuestionFilterCountUpdate: handleQuestionFilterCountUpdate,
+        onSbtFilter: handleFilteredResponses,
+        onSetFilterLoading: stableSetFilterLoading,
+        onToggleExportArea: toggleExportArea,
+        onToggleQuestionFilter: toggleQuestionFilter,
+        provider: props.provider,
+        questionFilterQuestions,
+        workerGroupAllowedQuestionIds: state.workerGroupAllowedQuestionIds,
+        questionFilterRef,
+        questionResponses: state.questionResponses,
+        questionResponsesNonce: filterInput.questionResponsesNonce,
+        questionsCacheNonce: filterInput.questionsCacheNonce,
+        responses: state.responses,
+        sbtCacheRevision: filterInput.sbtCacheRevision,
+        sessionConfig: props.sessionConfig,
+        sessionSlug: props.sessionSlug,
+        showQuestionFilter: filterInput.showQuestionFilter,
+        storageKeyPrefix: filterInput.storageKeyPrefix,
+        styleMap,
+        surveyViewMode,
+        viewMode,
+      })}
+    </>
+  );
   const displayPanelsProps: SurveyResultsDisplayPanelsArgs = {
     account: props.account,
     activeQuestionToggles: state.activeQuestionToggles,

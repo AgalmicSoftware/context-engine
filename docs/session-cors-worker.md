@@ -762,6 +762,26 @@ accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
 
+Question Results → Filter → Groups offers separate include/exclude choices for
+question creators and responders in Cloudflare sessions. Inclusion matches any
+selected Group; exclusion wins. Selections also apply to PolisReport answers,
+charts, participants and AI analysis, and to question-results exports. The native
+`workerGroupFilter` URL/bookmark state carries the canonical session ID, slug,
+Worker origin and Group IDs; it is separate from `sbtFilter`. Registry sessions
+retain SBT filters, including in PolisReport, and declared Worker/SBT hybrids
+retain their SBT controls.
+
+Filters resolve the authenticated `/groups/members` directory through every page
+before displaying a cohort. Signed-out, denied, incomplete and failed reads show
+an actionable status and never silently fall back to unfiltered answers. Member
+visibility still applies. Membership changes refresh the active filter; focus,
+manual refresh and a one-minute refresh also pick up changes from other clients.
+Passkey and EVM principals match response addresses; a selected Group containing
+Telegram/agent principals currently reports that those identities cannot yet be
+matched. Older Workers without the member-directory endpoint need an update.
+Clearing Group filters restores the unfiltered cohort while retaining other
+selected filters.
+
 Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic
 research buckets are separate profile data and never grant worker access, and
 the Bridge does not mirror worker group definitions or memberships. A

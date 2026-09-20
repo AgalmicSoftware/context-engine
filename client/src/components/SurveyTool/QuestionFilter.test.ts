@@ -890,3 +890,56 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     expect(getNodeText(aiApplyButton)).toContain('Applying... 9s');
   });
 });
+
+describe('native Group filter state isolation', () => {
+  const nativeSelection = {
+    sessionId: '0x' + '1'.repeat(32),
+    sessionSlug: 'test',
+    workerUrl: 'https://worker.example',
+    creatorInclude: [],
+    creatorExclude: [],
+    responderInclude: [{ groupId: 'eddy-2026', label: 'EDDY-2026' }],
+    responderExclude: [],
+  };
+  it('retains native selections for Cloudflare results, marks them active, and clears them with other filters', () => {
+    const instance = new QuestionFilter({
+      resultsMode: true,
+      filterState: { workerGroupFilter: nativeSelection },
+      sessionConfig: {
+        slug: 'test',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+    });
+    expect(instance.buildFilterState().workerGroupFilter).toEqual(nativeSelection);
+    expect(instance.isFilterStateDefault(instance.buildFilterState())).toBe(false);
+    instance.state = { ...instance.state, ...instance.getDefaultFilterStatePatch() };
+    expect(instance.buildFilterState().workerGroupFilter).toBeNull();
+  });
+  it('does not export a stale native Group selection into the on-chain SBT filter state', () => {
+    const sbtFilter = { selectedSBTGroupsResponder: [{ address: '0x' + 'a'.repeat(40) }] };
+    const instance = new QuestionFilter({
+      resultsMode: true,
+      filterState: { workerGroupFilter: nativeSelection, sbtFilter },
+      sessionConfig: {
+        slug: 'test',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      },
+    });
+    expect(instance.buildFilterState().workerGroupFilter).toBeUndefined();
+    expect(instance.buildFilterState().sbtFilter).toEqual(sbtFilter);
+  });
+  it('reapplies question and AI candidates when membership resolves without a response-cache change', () => {
+    const instance = new QuestionFilter({ questions: [{ id: 'q1' }], workerGroupAllowedQuestionIds: [] });
+    instance.handleApplyFilters = jest.fn();
+    instance.queueAutoApplyAiFilter = jest.fn();
+    instance.setState = (_patch: unknown, done: () => void) => done();
+    const previousProps = instance.props;
+    instance.props = { ...previousProps, workerGroupAllowedQuestionIds: ['q1'] };
+    instance.componentDidUpdate(previousProps, instance.state);
+    expect(instance.handleApplyFilters).toHaveBeenCalledWith(true);
+    expect(instance.queueAutoApplyAiFilter).toHaveBeenCalledWith('update:questions-or-responses');
+    instance.handleApplyFilters.mockClear();
+    instance.componentDidUpdate({ ...instance.props, workerGroupAllowedQuestionIds: ['q1'] }, instance.state);
+    expect(instance.handleApplyFilters).not.toHaveBeenCalled();
+  });
+});
