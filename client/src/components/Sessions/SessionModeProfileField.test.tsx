@@ -196,7 +196,7 @@ describe('SessionModeProfileField', () => {
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
-  it('continues an existing saved profile without replacing its custom settings', () => {
+  it('does not render the saved-profile resume action inside the setup cards', () => {
     const onContinue = jest.fn();
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -213,13 +213,8 @@ describe('SessionModeProfileField', () => {
     );
 
     expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
-    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
-    expect(resumeButton).toHaveAccessibleName('Resume in-progress session setup');
-    expect(resumeButton).not.toHaveClass('btn-primary');
-    expect(resumeButton).not.toHaveClass('btn-secondary');
-    fireEvent.click(resumeButton);
-
-    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME)).not.toBeInTheDocument();
+    expect(onContinue).not.toHaveBeenCalled();
   });
 
   it('supports arrow-key selection within the hosting radio group', () => {

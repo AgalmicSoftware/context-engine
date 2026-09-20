@@ -174,6 +174,7 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
+  sessionModeProfileResumeControl?: React.ReactNode;
   sessionModeProfilePrivacyControl?: React.ReactNode;
   sessionModeProfileWorkerControl?: WorkerPanelProps['sessionModeProfileWorkerControl'];
   sessionModeProfilePublishControl?: PublishSectionProps['sessionModeProfilePublishControl'];
@@ -356,6 +357,7 @@ const SessionWizardShell = ({
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
   sessionModeProfileControl = null,
+  sessionModeProfileResumeControl = null,
   sessionModeProfilePrivacyControl = null,
   sessionModeProfileWorkerControl = null,
   sessionModeProfilePublishControl = null,
@@ -436,6 +438,7 @@ const SessionWizardShell = ({
       registryChainOptions={registryChainOptions}
       renderInfoTooltip={renderSessionWizardInfoTooltip}
       sessionModeProfileControl={sessionModeProfileControl}
+      sessionModeProfileResumeControl={sessionModeProfileResumeControl}
       sessionModeProfileLabel={sessionModeProfileLabel}
       sessionModeProfileSelectionStep={showSessionModeProfileGate}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}

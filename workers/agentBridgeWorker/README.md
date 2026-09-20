@@ -920,7 +920,7 @@ Current v0 scope:
   Sessions with `telegramOnly=true`, `sessionMode=telegram_only`, or Cloudflare
   question storage and no explicit on-chain question mode do not use
   SessionRegistry/RPC question indexing on this path.
-- Native freeform, binary, rating, multichoice, and quadratic allocation answer forms rendered inline
+- Native freeform, binary, rating, and multichoice answer forms rendered inline
   on each displayed question card in one document-scroll question list. The Mini
   App does not render question IDs or a `Create Agent` launcher; filters and
   settings are opened from the top-right filter and gear buttons.
@@ -970,8 +970,8 @@ Current v0 scope:
   comma-tag fields; dictation formatting sends those values to the session
   worker `/ai` route so the returned prompt/options/tags fit the selected
   session. Microphone-generated question drafts request automatic question-type
-  inference, so spoken requests can become binary, rating, multichoice, quadratic, or
-  freeform questions and can populate allocation or multichoice options when the choices are
+  inference, so spoken requests can become binary, rating, multichoice, or
+  freeform questions and can populate multichoice options when the choices are
   spoken. If AI is unavailable, the bridge still derives conservative type,
   option, and tag metadata from the prompt, selected session metadata, and
   session context.
@@ -1166,10 +1166,9 @@ agent drafts before submission.
   `agentRevision` fingerprint. Legacy v1 drafts are backfilled as origin on the
   next save.
 - Edit detection compares a canonical semantic form rather than raw strings, so
-  binary, rating, multichoice, quadratic, and freeform answers compare correctly across the
+  binary, rating, multichoice, and freeform answers compare correctly across the
   bot, Mini App, and agent handoff lanes. Multichoice selections are sorted and
-  deduped before comparison. Quadratic allocations preserve the order and sign of
-  every option's votes, including neutral zeros.
+  deduped before comparison.
 - Submit records carry a `draftProvenance` block with origin and final
   plaintext, raw and semantic fingerprints, edit counts, first view time,
   draft-to-submit latency, agent-draft flags, and a typed delta such as stance

@@ -1,7 +1,9 @@
 import { useCallback, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from 'react';
 
+import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import type { SessionModeProfile } from '../../../utilities/session/sessionModeProfile';
 import type { UnknownRecord } from '../../../utilities/session/sessionTypes';
+import styles from '../SessionWizard.module.scss';
 import SessionModeProfileSections from '../SessionModeProfileSections';
 import SessionWizardSessionModeProfileControl from '../SessionWizardSessionModeProfileControl';
 import type { SessionWizardTooltipRenderOptions } from '../SessionWizardInfoTooltip';
@@ -31,8 +33,15 @@ export type SessionWizardModeProfileControls = {
   header: ReactNode;
   privacy: ReactNode;
   publish: ReactNode;
+  resume: ReactNode;
   worker: ReactNode;
 };
+
+const isSessionModeProfile = (value: unknown): value is SessionModeProfile =>
+  !!value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  (value as { profileVersion?: unknown }).profileVersion === 1;
 
 const focusSessionModeProfilePrivacy = <Sections extends { encryption: boolean }>(
   setCollapsedSections: Dispatch<SetStateAction<Sections>>,
@@ -79,6 +88,7 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
     value: draft.sessionModeProfile,
     onChange: handleChange,
   };
+  const showResume = entryOnly && isSessionModeProfile(draft.sessionModeProfile);
 
   return {
     header: (
@@ -100,6 +110,16 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
         showPresetToggle={showPresetToggle}
       />
     ),
+    resume: showResume ? (
+      <button
+        type="button"
+        className={styles.modeSavedProfileResumeButton}
+        onClick={onContinue}
+        data-testid={E2E_TESTIDS.WIZARD_MODE_RESUME}
+      >
+        Resume existing setup
+      </button>
+    ) : null,
     privacy: <SessionModeProfileSections {...sharedSectionProps} section="privacy" />,
     worker: <SessionModeProfileSections {...sharedSectionProps} section="worker" />,
     publish: <SessionModeProfileSections {...sharedSectionProps} section="publish" />,

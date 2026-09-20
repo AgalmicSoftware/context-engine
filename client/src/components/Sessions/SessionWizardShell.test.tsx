@@ -11,6 +11,7 @@ jest.mock('./SessionWizardHeader', () => (props: any) => (
     data-profile-label={props.sessionModeProfileLabel || ''}
     data-profile-selection-step={String(!!props.sessionModeProfileSelectionStep)}
   >
+    {props.sessionModeProfileResumeControl}
     {props.sessionModeProfileControl}
     <button type="button" onClick={props.onEnterAdvancedMode}>
       advanced

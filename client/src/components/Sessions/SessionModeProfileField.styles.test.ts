@@ -22,7 +22,7 @@ describe('SessionModeProfileField theme contrast styles', () => {
 
   it('keeps the setup-choice heading and architecture help aligned on narrow screens', () => {
     expect(source).toMatch(
-      /\.headerProfileSelectionStep\s*\{[\s\S]*?\.headerTitleBlock\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center;[\s\S]*?gap:\s*12px;[\s\S]*?h1\s*\{[\s\S]*?font-size:\s*clamp\(28px, 4vw, 32px\);/,
+      /\.headerProfileSelectionStep\s*\{[\s\S]*?\.headerTitleBlock\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?gap:\s*12px;[\s\S]*?h1\s*\{[\s\S]*?font-size:\s*clamp\(28px, 4vw, 32px\);/,
     );
     expect(source).toMatch(/\.modeProfileArchitectureLink\s*\{[\s\S]*?font-size:\s*0\.9rem;/);
   });
@@ -57,10 +57,10 @@ describe('SessionModeProfileField theme contrast styles', () => {
 
   it('renders the saved-draft resume action as a clear primary target', () => {
     expect(source).toMatch(
-      /\.modeSavedProfileEntry\s*\{[\s\S]*?\.modeSavedProfileResumeButton\s*\{[\s\S]*?min-height:\s*48px;[\s\S]*?padding:\s*10px 18px;[\s\S]*?border:\s*1px solid var\(--ce-action-accent\);[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);[\s\S]*?font-size:\s*0\.9rem;[\s\S]*?font-weight:\s*800;/,
+      /\.modeSavedProfileResumeButton\s*\{[\s\S]*?min-height:\s*48px;[\s\S]*?padding:\s*10px 18px;[\s\S]*?border:\s*1px solid var\(--ce-action-accent\);[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);[\s\S]*?font-size:\s*0\.9rem;[\s\S]*?font-weight:\s*800;/,
     );
     expect(source).toMatch(
-      /\.modeSavedProfileEntry\s*\{[\s\S]*?\.modeSavedProfileResumeButton:focus-visible\s*\{[\s\S]*?outline:\s*2px solid color-mix\(in srgb, var\(--ce-action-accent\) 72%, transparent\);[\s\S]*?outline-offset:\s*3px;/,
+      /\.modeSavedProfileResumeButton:focus-visible\s*\{[\s\S]*?outline:\s*2px solid color-mix\(in srgb, var\(--ce-action-accent\) 72%, transparent\);[\s\S]*?outline-offset:\s*3px;/,
     );
   });
 });

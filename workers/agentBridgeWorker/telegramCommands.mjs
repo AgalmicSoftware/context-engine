@@ -1,4 +1,3 @@
-import { validateQuadraticQuestion } from '../../shared/questions/quadraticAllocation.mjs';
 import {
   safeString,
   lower,
@@ -1657,13 +1656,6 @@ const ADD_QUESTION_TYPES = Object.freeze([
     example: '/add_question freeform: What should we consider?',
     help: 'Open text response.',
   },
-  {
-    id: 'quadratic',
-    label: 'Quadratic allocation',
-    commandPrefix: 'quadratic',
-    example: '/add_question quadratic: Allocate support or opposition | Parks | Transit',
-    help: 'Use | between at least two options. 99 voice credits by default; configure the budget in the Mini App.',
-  },
 ]);
 
 function normalizeQuestionProposalType(value = '') {
@@ -1671,7 +1663,6 @@ function normalizeQuestionProposalType(value = '') {
   if (['agree', 'agree_disagree', 'agree_unsure_disagree', 'binary', 'boolean', 'yes_no', 'yes_no_unsure'].includes(type)) {
     return 'agree_unsure_disagree';
   }
-  if (['quadratic', 'quadratic_allocation'].includes(type)) return 'quadratic';
   if (['rating', 'scale', 'linear_scale'].includes(type)) return 'rating';
   if (['multichoice', 'multi_choice', 'multiple_choice', 'single_choice', 'choice', 'choices'].includes(type)) return 'multichoice';
   if (['freeform', 'free_response', 'text'].includes(type)) return 'freeform';
@@ -1719,7 +1710,7 @@ function parseQuestionProposalInput(args = []) {
       text = safeString(typed[2]);
     }
   }
-  if (['multichoice', 'quadratic'].includes(questionType)) {
+  if (questionType === 'multichoice') {
     const parsed = parseMultichoiceText(text);
     text = parsed.prompt;
     options = parsed.options;
@@ -1756,7 +1747,6 @@ function parseRequestedQuestionCount(text = '') {
 
 function parseRequestedGenerationQuestionType(text = '') {
   const raw = lower(text);
-  if (/\bquadratic\b/.test(raw)) return 'quadratic';
   if (/\b(multi(?:ple)?[-\s]?choice|choice|choices)\b/.test(raw)) return 'multichoice';
   if (/\b(rating|scale|score)\b/.test(raw)) return 'rating';
   if (/\b(free[-\s]?form|open[-\s]?ended|text)\b/.test(raw)) return 'freeform';
@@ -2071,7 +2061,6 @@ export function buildUrlQuestionGenerationPrompt({
     '',
     'For binary questions, return questionType "binary" and phrase each prompt as a clear neutral statement answerable by Agree, Unsure, or Disagree.',
     'For multichoice questions, include 3-5 relevant and distinct options that cover a range of plausible viewpoints or solutions, and append "None / Comment" as the last option only if relevant.',
-    'For quadratic questions, provide at least two distinct options and voiceCredits as a positive integer (99 by default). Respondents assign signed whole-number votes costing the sum of their squares.',
     'For rating questions, ask about likelihood, importance, degree of concern, or confidence that can be meaningfully quantified.',
     'For freeform questions, ask for concrete, nuanced responses on issues that do not fit neatly into other formats.',
     '',
@@ -2169,7 +2158,6 @@ export function buildLocalUrlQuestionCandidates({
   const genericTemplates = {
     freeform: (theme) => `What should participants consider about ${theme}?`,
     rating: (theme) => `How important is ${theme} for this session?`,
-    quadratic: (theme) => `Allocate support or opposition to approaches to ${theme}.`,
     multichoice: (theme) => `Which approach to ${theme} should this session prioritize?`,
   };
   const prompts = [];
@@ -2184,7 +2172,7 @@ export function buildLocalUrlQuestionCandidates({
   return normalizeGeneratedQuestionCandidates(prompts.map((prompt) => ({
     prompt,
     questionType: normalizedType,
-    options: ['multichoice', 'quadratic'].includes(normalizedType) ? ['Prioritize now', 'Explore later', 'Do not prioritize'] : [],
+    options: normalizedType === 'multichoice' ? ['Prioritize now', 'Explore later', 'Do not prioritize'] : [],
     tags: inferQuestionTags({
       prompt,
       questionType: normalizedType,
@@ -2257,16 +2245,14 @@ export function normalizeGeneratedQuestionCandidates(questions = [], {
     ).replace(/\s+/g, ' ').slice(0, 1000);
     if (!prompt) continue;
     const normalizedType = normalizeQuestionProposalType(item.questionType || item.type || preferredType) || preferredType;
-    const options = ['multichoice', 'quadratic'].includes(normalizedType)
+    const options = normalizedType === 'multichoice'
       ? (Array.isArray(item.options) ? item.options.map(safeString).filter(Boolean).slice(0, 12) : [])
       : [];
     if (normalizedType === 'multichoice' && options.length < 2) continue;
-    if (normalizedType === 'quadratic' && validateQuadraticQuestion({ options, voiceCredits: item.voiceCredits ?? 99 })) continue;
     candidates.push({
       candidateNumber: candidates.length + 1,
       prompt,
       questionType: normalizedType,
-      ...(normalizedType === 'quadratic' ? { voiceCredits: item.voiceCredits ?? 99 } : {}),
       options,
       tags: normalizeQuestionTags([
         ...(Array.isArray(item.tags) ? item.tags : []),
@@ -2283,7 +2269,6 @@ function formatGeneratedQuestionTypeLabel(type = '') {
   if (normalized === 'agree_unsure_disagree') return 'Agree';
   if (normalized === 'multichoice') return 'Multi-choice';
   if (normalized === 'rating') return 'Rating';
-  if (normalized === 'quadratic') return 'Quadratic allocation';
   return 'Freeform';
 }
 
@@ -2668,8 +2653,6 @@ async function writeDraftLifecycleEvent(env = {}, {
 }
 
 const CANONICAL_ANSWER_KINDS = Object.freeze({
-  quadratic: 'quadratic',
-  quadratic_allocation: 'quadratic',
   binary: 'binary',
   agree_unsure_disagree: 'binary',
   rating: 'rating',
@@ -2699,9 +2682,6 @@ function canonicalDraftAnswerForm(record = {}) {
       ? NaN
       : Number(candidate);
     return { type, value: Number.isFinite(value) ? value : null, comments };
-  }
-  if (type === 'quadratic') {
-    return { type, value: Array.isArray(source?.value) ? source.value : null, comments };
   }
   if (type === 'multichoice') {
     const values = Array.isArray(source?.values)
@@ -2733,11 +2713,6 @@ function buildDraftDelta(origin = null, finalAnswer = null) {
     delta.ratingShift = delta.ratingBefore !== null && delta.ratingAfter !== null
       ? delta.ratingAfter - delta.ratingBefore
       : null;
-  } else if (kind === 'quadratic') {
-    const valuesBefore = Array.isArray(before.value) ? before.value : [];
-    const valuesAfter = Array.isArray(after.value) ? after.value : [];
-    delta.changedOptionCount = Array.from({ length: Math.max(valuesBefore.length, valuesAfter.length) },
-      (_, index) => valuesBefore[index] !== valuesAfter[index]).filter(Boolean).length;
   } else if (kind === 'multichoice') {
     const valuesBefore = Array.isArray(before.values) ? before.values : [];
     const valuesAfter = Array.isArray(after.values) ? after.values : [];
@@ -4110,7 +4085,6 @@ async function buildAnswerButtonRows({
 } = {}) {
   const buttons = [];
   for (const [index, control] of controls.entries()) {
-    if (control.controlType === 'quadratic_allocation') continue;
     buttons.push(await makeAnswerButton({
       env,
       sessionSlug,
@@ -5546,30 +5520,30 @@ async function buildAddQuestionResponse({
       extra: { sessionSlug: resolved.session.sessionSlug, selectedQuestionType: selectedType },
     });
   }
-  if (['multichoice', 'quadratic'].includes(proposal.questionType) && proposal.options.length < 2) {
+  if (proposal.questionType === 'multichoice' && proposal.options.length < 2) {
     return reply({
       method,
       chatId: normalized.chat.chatId,
       messageId,
       text: [
-        `${addQuestionTypeById(proposal.questionType).label} questions need at least two options.`,
+        'Multi-choice questions need at least two options.',
         '',
         'Example:',
-        addQuestionTypeById(proposal.questionType).example,
+        addQuestionTypeById('multichoice').example,
       ].join('\n'),
       replyMarkup: {
         inline_keyboard: await buildAddQuestionTypeRows({
           env,
           sessionSlug: resolved.session.sessionSlug,
           normalized,
-          selectedType: proposal.questionType,
+          selectedType: 'multichoice',
           createdAt,
         }),
       },
       screen: 'add_question',
       command,
       normalized,
-      extra: { sessionSlug: resolved.session.sessionSlug, selectedQuestionType: proposal.questionType },
+      extra: { sessionSlug: resolved.session.sessionSlug, selectedQuestionType: 'multichoice' },
     });
   }
 
@@ -6120,7 +6094,6 @@ async function buildGeneratedQuestionSelectionResponse({
       prompt: candidate.prompt,
       questionType: candidate.questionType,
       options: candidate.options,
-      voiceCredits: candidate.voiceCredits ?? 99,
       tags: candidate.tags,
       sessionContext: record.sessionContext,
       createdAt,
@@ -6237,7 +6210,6 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
           record.answerLabel,
         )),
         questionType: safeString(answer.questionType || record.questionType || record.controlType),
-        ...(answer.questionType === 'quadratic' ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {}),
         text: safeAnswerString(firstAnswerValue(
           answer.text,
           record.answerText,
@@ -8743,7 +8715,7 @@ async function buildPoseQuestionResponse({
     : group.questionText;
   const miniAppButton = payloadUnavailable ? null : await makeMiniAppButton({
     env,
-    label: (selected.questionType || selected.type) === 'quadratic' ? 'Allocate voice credits' : 'Open Mini App',
+    label: 'Open Mini App',
     action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
     serverContextRef: {
       sessionSlug: resolved.session.sessionSlug,

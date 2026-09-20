@@ -413,17 +413,6 @@ test('buildDraftProvenance computes typed deltas for rating, multichoice, and fr
   assert.equal(freeform.delta.lengthDelta, freeform.delta.lengthAfter - freeform.delta.lengthBefore);
 });
 
-test('quadratic draft provenance compares ordered votes as an allocation', () => {
-  const before = { answerValue: JSON.stringify({ questionType: 'quadratic', value: [3, -4, 0] }), controlType: 'quadratic_allocation' };
-  const draft = { ...before, origin: { ...before, source: 'agent_handoff' },
-    answerValue: JSON.stringify({ questionType: 'quadratic', value: [-4, 3, 0] }) };
-  const provenance = buildDraftProvenance({ draft });
-  assert.equal(provenance.delta.kind, 'quadratic');
-  assert.equal(provenance.delta.changedOptionCount, 2);
-  assert.equal(provenance.editedFromOrigin, true);
-  assert.equal(buildDraftProvenance({ draft: { ...draft, answerValue: before.answerValue } }).delta.changed, false);
-});
-
 test('legacy drafts without an origin block report unknown edit state', () => {
   const provenance = buildDraftProvenance({
     draft: {

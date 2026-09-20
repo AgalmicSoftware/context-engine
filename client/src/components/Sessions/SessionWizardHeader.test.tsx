@@ -43,6 +43,11 @@ describe('SessionWizardHeader', () => {
       <SessionWizardHeader
         {...baseProps}
         sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting cards</div>}
+        sessionModeProfileResumeControl={
+          <button type="button" data-testid={E2E_TESTIDS.WIZARD_MODE_RESUME}>
+            Resume existing setup
+          </button>
+        }
         sessionModeProfileLabel="Centralized"
         sessionModeProfileSelectionStep
       />,
@@ -62,7 +67,11 @@ describe('SessionWizardHeader', () => {
       'Compare where session data is stored and which credentials each setup requires.',
     );
     expect(screen.queryByRole('heading', { name: /Centralized/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId('hosting-profile-control')).toHaveTextContent('hosting cards');
+    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    const hostingControl = screen.getByTestId('hosting-profile-control');
+    expect(resumeButton).toHaveAccessibleName('Resume existing setup');
+    expect(hostingControl).toHaveTextContent('hosting cards');
+    expect(Boolean(resumeButton.compareDocumentPosition(hostingControl) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
   });

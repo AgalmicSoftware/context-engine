@@ -122,6 +122,13 @@ $muted-text: var(--ce-panel-text-muted);
   min-width: 0;
 }
 
+.headerResumeControl {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 .headerBackButton {
   display: inline-flex;
   align-items: center;
@@ -178,6 +185,7 @@ $muted-text: var(--ce-panel-text-muted);
     align-items: center;
     justify-content: center;
     flex-basis: 100%;
+    flex-wrap: wrap;
     gap: 12px;
     min-width: 0;
     text-align: center;
@@ -3263,61 +3271,40 @@ $muted-text: var(--ce-panel-text-muted);
   color: var(--ce-text-inverse);
 }
 
-.modeSavedProfile {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: color-mix(in srgb, var(--ce-control-text) 76%, transparent);
-  font-size: 0.7rem;
-  white-space: nowrap;
-
-  :global(.btn) {
-    min-height: 34px;
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-pill);
-    font-size: 0.7rem;
-  }
+.modeSavedProfileResumeButton {
+  appearance: none;
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 1px solid var(--ce-action-accent);
+  border-radius: var(--ce-radius-pill);
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.4;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.12s ease;
 }
 
-.modeSavedProfileEntry {
-  justify-content: center;
-  white-space: normal;
+.modeSavedProfileResumeButton:hover,
+.modeSavedProfileResumeButton:focus {
+  border-color: var(--ce-action-accent-hover);
+  background: var(--ce-action-accent-hover);
+  color: var(--ce-action-accent-text);
+}
 
-  .modeSavedProfileResumeButton {
-    appearance: none;
-    min-height: 48px;
-    padding: 10px 18px;
-    border: 1px solid var(--ce-action-accent);
-    border-radius: var(--ce-radius-pill);
-    background: var(--ce-action-accent);
-    color: var(--ce-action-accent-text);
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 800;
-    line-height: 1.4;
-    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
-    transition:
-      background 0.16s ease,
-      border-color 0.16s ease,
-      box-shadow 0.16s ease,
-      transform 0.12s ease;
-  }
+.modeSavedProfileResumeButton:hover {
+  transform: translateY(-1px);
+}
 
-  .modeSavedProfileResumeButton:hover,
-  .modeSavedProfileResumeButton:focus {
-    border-color: var(--ce-action-accent-hover);
-    background: var(--ce-action-accent-hover);
-    color: var(--ce-action-accent-text);
-  }
-
-  .modeSavedProfileResumeButton:hover {
-    transform: translateY(-1px);
-  }
-
-  .modeSavedProfileResumeButton:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
-    outline-offset: 3px;
-  }
+.modeSavedProfileResumeButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
+  outline-offset: 3px;
 }
 
 .modeCheckboxRow {

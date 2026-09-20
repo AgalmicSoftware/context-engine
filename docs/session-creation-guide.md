@@ -309,7 +309,7 @@ Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is t
 
 The first screen is the session-mode choice. A blank draft has nothing
 preselected. If this browser already has an explicit saved profile, the header
-offers `Resume in-progress session setup` instead of silently discarding or
+offers `Resume existing setup` instead of silently discarding or
 replacing it. Choosing a new preset immediately opens the
 four-stage setup with fields prefilled from the chosen mode; there is no
 separate Continue action for a new selection:

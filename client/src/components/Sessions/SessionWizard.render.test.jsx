@@ -1027,6 +1027,7 @@ describe('SessionWizard rendered validation', () => {
     window.history.replaceState({}, '', '/session/new');
     renderSessionWizard();
 
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
     const sessionInfoInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO);
     fireEvent.change(sessionInfoInput, {
@@ -1034,10 +1035,17 @@ describe('SessionWizard rendered validation', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toBeInTheDocument();
+    const centralizedCard = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
+    expect(centralizedCard).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME));
+    const resumeButtons = screen.getAllByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    expect(resumeButtons).toHaveLength(1);
+    expect(resumeButtons[0]).toHaveAccessibleName('Resume existing setup');
+    expect(Boolean(resumeButtons[0].compareDocumentPosition(centralizedCard) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(
+      true,
+    );
+    fireEvent.click(resumeButtons[0]);
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).toHaveValue(
       'Temporary browser verification description.',
     );
@@ -1134,7 +1142,9 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
     expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME));
+    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    expect(resumeButton).toHaveAccessibleName('Resume existing setup');
+    fireEvent.click(resumeButton);
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Saved custom session');
     expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();

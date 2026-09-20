@@ -54,7 +54,6 @@ function normalizeQuestionType(value = '') {
   if (type === 'agree_unsure_disagree' || type === 'binary') return 'binary';
   if (type === 'rating' || type === 'rating_button') return 'rating';
   if (type === 'multichoice' || type === 'multi_select_toggle' || type === 'multiple_choice') return 'multichoice';
-  if (type === 'quadratic_allocation') return 'quadratic';
   if (type === 'freeform' || type === 'freeform_text' || type === 'text') return 'freeform';
   return type || 'freeform';
 }
@@ -122,9 +121,6 @@ function normalizeAnswerForMetric(answer = null, questionType = '') {
     const value = Number(firstValue(source.value, source.rating, source.answer, source.label));
     return Number.isFinite(value) ? { type, value, comments } : { type, comments };
   }
-  if (type === 'quadratic') {
-    return { type, values: Array.isArray(source.value) ? source.value : [], comments };
-  }
   if (type === 'multichoice') {
     return { type, values: normalizeChoiceList(source), comments };
   }
@@ -189,10 +185,6 @@ export function buildDraftEditMetricSummary({
     metrics.ratingDirection = !Number.isFinite(delta) || delta === 0 ? 'same' : delta > 0 ? 'up' : 'down';
     metrics.ratingAbsDeltaBucket = numericDeltaBucket(delta);
     metrics.answerChanged = metrics.ratingDirection !== 'same';
-  } else if (type === 'quadratic') {
-    const length = Math.max(draft.values.length, sent.values.length);
-    metrics.changedOptionCount = Array.from({ length }, (_, i) => draft.values[i] !== sent.values[i]).filter(Boolean).length;
-    metrics.answerChanged = metrics.changedOptionCount > 0;
   } else if (type === 'multichoice') {
     Object.assign(metrics, buildMultichoiceMetrics(draft, sent));
     metrics.answerChanged = metrics.addedCount > 0 || metrics.removedCount > 0;

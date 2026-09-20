@@ -280,7 +280,6 @@ function normalizeQuestionType(value = '') {
   const normalized = safeString(value).toLowerCase();
   if (['text', 'freeform', 'free_response'].includes(normalized)) return QUESTION_TYPES.FREEFORM;
   if (['agree_unsure_disagree', 'agree-disagree', 'boolean', 'binary', 'yes_no', 'yes-no'].includes(normalized)) return QUESTION_TYPES.AGREE_UNSURE_DISAGREE;
-  if (normalized === 'quadratic') return QUESTION_TYPES.QUADRATIC;
   if (['rating', 'scale', 'linear_scale'].includes(normalized)) return QUESTION_TYPES.RATING;
   if ([
     'multichoice',
@@ -1645,8 +1644,6 @@ export function buildTelegramQuestionControls(question = {}, {
         selectionMode: 'single',
       }));
     }
-  } else if (questionType === QUESTION_TYPES.QUADRATIC) {
-    controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Allocate voice credits', questionId, TELEGRAM_CHAT_LANES.MINI_APP, { controlType: 'quadratic_allocation', voiceCredits: question.voiceCredits ?? 99 }));
   } else if (questionType === QUESTION_TYPES.MULTICHOICE) {
     const selectionMode = normalizeChoiceSelectionMode(question);
     const selected = selectedChoiceSet(question);
@@ -1710,9 +1707,6 @@ export function buildTelegramQuestionAnswerSchema(question = {}) {
       },
     };
   }
-  if (questionType === QUESTION_TYPES.QUADRATIC) {
-    return { questionType: 'quadratic', answerSchema: { kind: 'quadratic', options: normalizeOptions(question), voiceCredits: question.voiceCredits ?? 99 } };
-  }
   if (questionType === QUESTION_TYPES.MULTICHOICE) {
     const selectionMode = normalizeChoiceSelectionMode(question);
     const options = buildTelegramQuestionControls(question, { microphoneSupported: false })
@@ -1744,7 +1738,6 @@ export function buildTelegramQuestionCard(question = {}, options = {}) {
     type: 'telegram_question_card',
     questionId,
     questionType,
-    ...(questionType === QUESTION_TYPES.QUADRATIC ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
     selectionMode: questionType === QUESTION_TYPES.MULTICHOICE ? normalizeChoiceSelectionMode(question) : null,
     ratingScale: questionType === QUESTION_TYPES.RATING ? normalizeTelegramRatingScale(question) : null,
     questionText: safeString(question.questionText || question.prompt),

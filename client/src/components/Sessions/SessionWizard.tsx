@@ -3019,6 +3019,7 @@ const SessionWizard = ({
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
       sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
       sessionModeProfileControl={sessionModeProfileControls.header}
+      sessionModeProfileResumeControl={sessionModeProfileControls.resume}
       sessionModeProfilePrivacyControl={sessionModeProfileControls.privacy}
       sessionModeProfileWorkerControl={sessionModeProfileControls.worker}
       sessionModeProfilePublishControl={sessionModeProfileControls.publish}

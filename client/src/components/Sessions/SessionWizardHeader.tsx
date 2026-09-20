@@ -36,6 +36,7 @@ type SessionWizardHeaderProps = {
   wizardDisplaySettingsOpen?: boolean;
   wizardMode?: string;
   sessionModeProfileControl?: React.ReactNode;
+  sessionModeProfileResumeControl?: React.ReactNode;
   sessionModeProfileLabel?: string;
   sessionModeProfileSelectionStep?: boolean;
   showNetworkSelector?: boolean;
@@ -57,6 +58,7 @@ const SessionWizardHeader = ({
   registryChainOptions = [],
   renderInfoTooltip,
   sessionModeProfileControl = null,
+  sessionModeProfileResumeControl = null,
   sessionModeProfileLabel = '',
   sessionModeProfileSelectionStep = false,
   showNetworkSelector = true,
@@ -112,6 +114,9 @@ const SessionWizardHeader = ({
               {ARCHITECTURE_TOOLTIP_TEXT}
             </CETooltip>
           </>
+        ) : null}
+        {sessionModeProfileSelectionStep && sessionModeProfileResumeControl ? (
+          <div className={styles.headerResumeControl}>{sessionModeProfileResumeControl}</div>
         ) : null}
       </div>
       {showHeaderActions ? (
