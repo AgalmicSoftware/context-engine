@@ -42,6 +42,7 @@ export type TelegramAgentQuestion = {
   prompt: string;
   questionText: string;
   options: string[];
+  voiceCredits?: number;
   tags: string[];
   answeredByUser: boolean;
   answerable: boolean;
@@ -59,6 +60,7 @@ export const normalizeTelegramAgentQuestion = (input: unknown): TelegramAgentQue
     type: questionType,
     prompt,
     questionText: prompt,
+    ...(questionType === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
     options: (Array.isArray(question.options) ? question.options : []).map(toStr).filter(Boolean),
     tags: (Array.isArray(question.tags) ? question.tags : []).map(toStr).filter(Boolean).slice(0, 8),
     answeredByUser: question.answeredByUser === true,

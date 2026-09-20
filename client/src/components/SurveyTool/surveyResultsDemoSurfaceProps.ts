@@ -8,6 +8,7 @@ export type SurveyResultsDemoSurfaceParentProps = {
   isQuestionCacheReady?: SurveyResultsDemoSurfaceProps['isQuestionCacheReady'];
   isResponsesCacheReady?: SurveyResultsDemoSurfaceProps['isResponsesCacheReady'];
   network?: SurveyResultsDemoSurfaceProps['network'];
+  sessionConfig?: SurveyResultsDemoSurfaceProps['sessionConfig'];
   networkChainId?: SurveyResultsDemoSurfaceProps['networkChainId'];
   questionResponsesNonce?: SurveyResultsDemoSurfaceProps['questionResponsesNonce'];
   questionScanProgress?: SurveyResultsDemoSurfaceProps['questionScanProgress'];
@@ -81,6 +82,7 @@ export const buildSurveyResultsDemoSurfaceProps = ({
     isResponsesCacheReady: parentProps.isResponsesCacheReady,
     network: parentProps.network,
     networkChainId: parentProps.networkChainId,
+    sessionConfig: parentProps.sessionConfig,
     onAtlasModalClose,
     onAtlasNodeOpen,
     questionResponses: getPolisQuestionResponses(true, questionSource),
@@ -99,6 +101,7 @@ export const createSurveyResultsDemoSurfaceParentProps = (
   isResponsesCacheReady:
     parentProps.isResponsesCacheReady as SurveyResultsDemoSurfaceParentProps['isResponsesCacheReady'],
   network: parentProps.network as SurveyResultsDemoSurfaceParentProps['network'],
+  sessionConfig: parentProps.sessionConfig,
   networkChainId: parentProps.networkChainId as SurveyResultsDemoSurfaceParentProps['networkChainId'],
   questionResponsesNonce:
     parentProps.questionResponsesNonce as SurveyResultsDemoSurfaceParentProps['questionResponsesNonce'],

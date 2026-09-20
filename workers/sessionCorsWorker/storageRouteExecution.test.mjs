@@ -438,7 +438,11 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 });
 
 for (const resource of ['questions', 'surveys', 'responses']) {
-	test(`storageRoute stores and lists Cloudflare ${resource} payloads behind opaque refs`, async () => {
+  const question = { id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
+  const response = { questionID: 'q1', type: 'quadratic', answer: { value: [3, -4], encrypted: false } };
+  const payload = resource === 'questions' ? question : resource === 'responses' ? response : { title: 'Quadratic survey', questions: [question] };
+
+	test(`storageRoute round-trips quadratic ${resource} payloads through Cloudflare behind opaque refs`, async () => {
 		const r2 = createMockR2();
 		const kv = createMockKv();
 		const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
@@ -446,7 +450,7 @@ for (const resource of ['questions', 'surveys', 'responses']) {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { resource, ok: true },
+				data: payload,
 				contentType: 'application/json',
 				resource,
 				payloadEncrypted: resource === 'responses',
@@ -490,7 +494,7 @@ for (const resource of ['questions', 'surveys', 'responses']) {
 			deps: { json },
 		});
 		assert.equal(readResponse.headers.get('X-CE-Storage-Ref'), uploadBody.storageRef.id);
-		assert.deepEqual(JSON.parse(await readResponse.text()), { resource, ok: true });
+		assert.deepEqual(JSON.parse(await readResponse.text()), payload);
 
 		const listResponse = await storageRoute({
 			path: '/storage/list',

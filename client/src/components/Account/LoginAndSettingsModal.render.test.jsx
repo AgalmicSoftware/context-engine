@@ -373,6 +373,48 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
   });
 
+  it.each([
+    ['below the screen', 900, 768, true],
+    ['already visible', 120, 768, false],
+    ['clipped by the dialog', 400, 300, true],
+    ['above the dialog', -100, 768, true],
+  ])('reveals Config only when its opening is %s', async (_label, panelTop, clipBottom, shouldScroll) => {
+    const modalRef = React.createRef();
+    const scrollIntoView = jest.fn();
+    const previousScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const bounds = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const top = this.classList.contains(styles.aiSettingsPanel) ? panelTop : 0;
+      return { top, bottom: top + (this.getAttribute('role') === 'dialog' ? clipBottom : 600), height: 600 };
+    });
+    try {
+      render(
+        <div data-testid="settings-scroll-area" style={{ overflowY: 'auto' }}>
+          <LoginAndSettingsModal
+            {...buildProps({ account: WAGMI_ADDRESS, loginComplete: true, provider: 'wagmi' })}
+            ref={modalRef}
+          />
+        </div>,
+      );
+      screen.getByRole('dialog').style.overflowY = 'auto';
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^Config/i }));
+      });
+      expect(modalRef.current.state.aiSettingsOpen).toBe(true);
+      expect(scrollIntoView).toHaveBeenCalledTimes(shouldScroll ? 1 : 0);
+      if (shouldScroll) expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^Config/i }));
+      });
+      expect(modalRef.current.state.aiSettingsOpen).toBe(false);
+      expect(scrollIntoView).toHaveBeenCalledTimes(shouldScroll ? 1 : 0);
+    } finally {
+      bounds.mockRestore();
+      if (previousScroll) HTMLElement.prototype.scrollIntoView = previousScroll;
+      else delete HTMLElement.prototype.scrollIntoView;
+    }
+  });
+
   it('resolves a signed-out pure Worker session and presents passkey as its only identity path', () => {
     getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
       slug === 'demo-sh' ? buildPureWorkerSessionConfig() : {},
@@ -580,6 +622,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(4);
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
+    expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
     expect(screen.getByText('Theme')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Appearance & colors/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
@@ -711,6 +754,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
     expect(screen.getByText('Appearance & colors')).toBeInTheDocument();
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
+    expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
     expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
     expect(document.getElementById('preLoginTooltipsToggleTooltip')).toBeTruthy();

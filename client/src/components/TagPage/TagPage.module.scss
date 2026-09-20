@@ -337,9 +337,9 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  border: 0;
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  background: transparent;
   color: $page-text-color;
   cursor: pointer;
   transition:
@@ -349,9 +349,7 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
 }
 
 .sessionSelectorTriggerRowOpen .sessionSelectorToggle {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 44%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-compat-dark) 24%, transparent);
+  color: var(--ce-action-accent);
 }
 
 .sessionSelectorPopover {

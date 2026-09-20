@@ -537,6 +537,6 @@ describe('surveyGeneratorHelpers', () => {
       transcriptMode: false,
     });
 
-    expect(prompt).toBe('binary,rating,freeform,multichoice|text|unknown|');
+    expect(prompt).toBe('binary,rating,freeform,multichoice,quadratic|text|unknown|');
   });
 });

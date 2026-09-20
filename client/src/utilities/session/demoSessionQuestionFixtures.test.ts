@@ -11,6 +11,23 @@ import {
 import { classifySessionModeProfileSupport } from './sessionModeProfile';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
+  it('preserves quadratic metadata in session demo question adapters', () => {
+    const comments = demo2QuestionSeed.comments as Array<Record<string, unknown>>;
+    comments.push({
+      commentId: 'quadratic-fixture',
+      commentBody: 'Allocate support',
+      type: 'quadratic',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    });
+    try {
+      const question = getTemporaryDemoSessionQuestionFixtures('demo-2').find((q) => q.prompt === 'Allocate support');
+      expect(question).toMatchObject({ type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 });
+      expect(question?.singleSelect).toBeUndefined();
+    } finally {
+      comments.pop();
+    }
+  });
   it('maps the demo polis comments to temporary demo-1 question metadata', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-1', {
       sessionName: 'Demo Session',

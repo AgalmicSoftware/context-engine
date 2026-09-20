@@ -2079,6 +2079,7 @@ class CommunityTab extends Component<any, any> {
         <button
           type="button"
           className={styles.sessionSelectorToggle}
+          data-ce-control-appearance="frameless"
           aria-label="Leaderboard filters"
           data-testid="ce-community-leaderboard-controls-toggle"
           onClick={this.toggleLeaderboardControls}

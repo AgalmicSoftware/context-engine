@@ -120,8 +120,9 @@ type QuestionLike = UnknownRecord & {
   options?: unknown;
 };
 type QuestionKindMeta = {
-  kind: 'freeform' | 'binary' | 'rating' | 'multichoice';
+  kind: 'freeform' | 'binary' | 'rating' | 'multichoice' | 'quadratic';
   options: unknown[];
+  voiceCredits?: unknown;
 };
 type CryptoEncryptOptions = UnknownRecord & {
   provider?: unknown;
@@ -335,7 +336,7 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {(slice: CryptoAnswerSlice & Record<string, unknown>, questionPool?: Array<Record<string, unknown>>, accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptMultipleAnswers
  * @property {(slice: CryptoAnswerSlice & Record<string, unknown>, qId: string, fieldToDecrypt: 'answer' | 'additional' | 'both', accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptSingleField
  * @property {(input: { chainId?: number | string | null, account?: string, surveyId?: string, qId?: string }) => string} computeContext
- * @property {(qId: string, opts?: { questionPool?: Array<Record<string, unknown>> }) => { kind: 'freeform' | 'binary' | 'rating' | 'multichoice', options: string[] }} getQuestionKindMeta
+ * @property {(qId: string, opts?: { questionPool?: Array<Record<string, unknown>> }) => { kind: 'freeform' | 'binary' | 'rating' | 'multichoice' | 'quadratic', options: string[] }} getQuestionKindMeta
  * @property {(field: Record<string, unknown>, ctx?: { qId?: string, kind?: string, chainId?: number | string | null, surveyId?: string, optionsForKind?: string[], hasher?: ((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null }) => Promise<void>} addTopLevelPoseidonIfRequired
  * @property {(identifier: unknown) => string} hashIdentifier
  * @property {(data: unknown, password: string) => Promise<string>} encryptWithPassword
@@ -763,6 +764,7 @@ const getQuestionKindMeta = (qId: unknown, opts: { questionPool?: QuestionLike[]
   if (!q) return { kind: 'freeform', options: [] };
   const t = String(q.type || 'freeform').toLowerCase();
   if (t === 'binary') return { kind: 'binary', options: ['Disagree', 'Unsure', 'Agree'] };
+  if (t === 'quadratic') return { kind: 'quadratic', options: Array.isArray(q.options) ? q.options : [], voiceCredits: q.voiceCredits };
   if (t === 'rating') return { kind: 'rating', options: [] };
   if (t === 'multichoice') return { kind: 'multichoice', options: Array.isArray(q.options) ? q.options : [] };
   return { kind: 'freeform', options: [] };
@@ -1274,6 +1276,10 @@ const encryptField = async ({
 
   // Resolve options for canonicalization (multichoice), and compute commitments
   const meta = getQuestionKindMeta(qId, { questionPool });
+  if (kind === 'quadratic') {
+    const error = validateQuadraticAllocation(value, meta);
+    if (error) throw new Error(error);
+  }
   const optionsForKind = kind === 'multichoice' ? meta.options : [];
   const commits = await computeSaltedCommitments({
     chainId,
@@ -2072,3 +2078,4 @@ export const cryptoUtils = {
     buildDecryptEnvelopeCacheKey,
   },
 };
+import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';

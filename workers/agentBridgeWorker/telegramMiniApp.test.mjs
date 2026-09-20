@@ -3357,6 +3357,50 @@ test('Mini App state exposes submitted rating answers for hydration', async () =
   assert.deepEqual(state.draftAnswersByQuestionKey, {});
 });
 
+test('Mini App restores quadratic drafts and history as ordered numeric votes', async () => {
+  for (const value of [[3, -4], [0, 0]]) {
+    for (const submitted of [false, true]) {
+      const kv = new MemoryKv();
+      const questionId = 'q-quadratic-history';
+      const answer = { questionType: 'quadratic', value, comments: 'Saved context' };
+      if (submitted) {
+        await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}quadratic-history`, JSON.stringify({
+          version: 1, requestId: 'quadratic-history', status: 'direct_submitted',
+          lane: 'telegram_mini_app', telegramUserId: 'preview-user', sessionSlug: 'alpha', questionId,
+          answer, createdAt: '2026-05-08T12:00:02.000Z',
+        }));
+      } else {
+        await persistAnswerDraft({
+          env: { AGENT_ACTION_KV: kv },
+          normalized: { user: { telegramUserId: 'preview-user' }, chat: { chatId: 'preview-user' } },
+          sessionSlug: 'alpha', selectedQuestionId: questionId,
+          answerLabel: 'Saved allocation', answerValue: JSON.stringify(answer),
+          controlType: 'quadratic_allocation', submitLane: 'telegram_mini_app',
+          createdAt: '2026-05-08T12:00:00.000Z',
+        });
+      }
+      const state = await __test__telegramMiniApp.buildMiniAppState({
+        request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+        env: {
+          AGENT_ACTION_KV: kv, AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+          AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({ defaultSessionSlug: 'alpha',
+            sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true, telegramOnly: true }] }),
+          AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+          AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{ sessionSlug: 'alpha', questionId,
+            questionType: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 }]),
+        }, createdAt: '2026-05-08T12:00:03.000Z',
+      });
+      assert.equal(state.ok, true);
+      const questionKey = state.questions[0].questionKey;
+      assert.equal(state.questions[0].voiceCredits, 25);
+      const restored = submitted ? state.submittedAnswers[0].answer : state.draftAnswersByQuestionKey[questionKey];
+      assert.deepEqual(restored, { value, comments: 'Saved context' });
+      if (submitted) assert.equal(state.submittedAnswers[0].answerLabel,
+        value[0] === 0 ? 'Parks: 0; Transit: 0' : 'Parks: +3; Transit: -4');
+    }
+  }
+});
+
 test('Mini App state hydrates submitted rating answers from serialized values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-rating-serialized-history';
@@ -4476,7 +4520,7 @@ test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo togg
   assert.match(html, /await formatAddQuestionDraft\(text, \{ inferQuestionType: true \}\);/);
   assert.match(html, /sessionContext: state\.addQuestionSessionContext/);
   assert.match(html, /tags: normalizeQuestionTags\(state\.addQuestionTags\)/);
-  assert.match(html, /state\.addQuestionOptions = nextQuestionType === 'multichoice'/);
+  assert.match(html, /state\.addQuestionOptions = \['multichoice', 'quadratic'\]\.includes\(nextQuestionType\)/);
   assert.match(html, /state\.addQuestionTags = formatted\.tags\.join\(', '\);/);
   assert.match(html, /id="addQuestionTypes"/);
   assert.match(html, /\/telegram\/mini-app\/api\/questions\/add/);

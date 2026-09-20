@@ -37,6 +37,17 @@ The Settings selector is enabled by default. Set
 hides user theme selection. The preference remains restricted to the bundled
 registry and cannot load CSS, URLs, or arbitrary token maps.
 
+**Color-blind mode** is available in Settings → Theme, independently of the
+theme selector. It persists locally as `ce:color-vision`, restores before paint,
+and synchronizes across tabs. The shared palette uses blue for support/agree,
+orange for oppose/disagree, and gray for unsure. Response labels and signed
+values remain present. Semantic response, status, and chart-series tokens update
+across both themes; report text uses darker shades on white paper. Polis binary
+bars use the same `--ce-binary-choice-*` tokens as the pile inputs. Report SVG
+colors are resolved on the PDF capture clone so exports retain the preference.
+The palette overlay lives in `scss/themes/_color-vision.scss`; categorical SVG
+charts use `chartColors.ts` token references instead of fixed JavaScript colors.
+
 ## Adding A Bundled Theme
 
 1. Add a values-only SCSS definition beside the existing theme files.
@@ -120,8 +131,17 @@ directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
 controls. Signed-out Settings keeps it in the final `Appearance & colors`
 section. This selector changes the complete app theme; it is separate from a
 session's curated color scheme and does not accept arbitrary color values. Its
-deployment option reads `Deployment theme: <theme label>` for a valid embedded
-choice, or `Deployment theme: default` when that choice cannot be named.
+default option reads `<theme label> (default)` for a valid embedded
+choice, or `Default` when that choice cannot be named. Native dropdown options
+use paired document text and surface colors for readability. The theme bar
+uses the same border opacity as adjacent quick controls without dimming its
+text. Opening Config scrolls its start into view only when clipped by the
+screen or account dialog. Selected reasoning buttons retain the paired accent
+text color even when session defaults disable editing.
+
+At compact widths, Classic 95 uses the same question-action overflow trigger
+as Context Engine when pending answers make room for Submit necessary. Its
+menu opens above the toolbar on a raised surface.
 
 ## Session Color Schemes
 

@@ -1,3 +1,4 @@
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 import React from 'react';
 
 import BinaryChoiceInput from './BinaryChoiceInput';
@@ -16,6 +17,7 @@ type SurveyQuestionRecord = {
   id: string;
   type: string;
   options?: unknown[];
+  voiceCredits?: unknown;
 };
 
 type SurveyAnswerRecord = {
@@ -120,6 +122,8 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
   };
 
   switch (inputDescriptor.kind) {
+    case 'quadratic':
+      return <QuadraticAllocationInput questionId={question.id} options={question.options} voiceCredits={question.voiceCredits} value={answer.value} disabled={isSubmitting} deferDragUpdates={singleQuestionMode} onChange={emitAnswerChange} />;
     case 'multichoice': {
       return (
         <MultichoiceQuestionInput

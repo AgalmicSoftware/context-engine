@@ -1,3 +1,4 @@
+import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import {
   extractUserPageAnalysisAdditionalComment,
@@ -40,6 +41,8 @@ export type BuildUserPageAnalysisCreatedSurveysArgs = {
 };
 
 type UserPageAnalysisQuestionRecord = UserPageUnknownRecord & {
+  options?: unknown;
+  voiceCredits?: unknown;
   id?: unknown;
   prompt?: unknown;
   type?: unknown;
@@ -82,11 +85,15 @@ export const isUserPageSbtAggregateEntry = (value: unknown): boolean => {
   return record.mintedSet instanceof Set && record.burnedSet instanceof Set;
 };
 
+const quadraticMetadata = (question: UserPageUnknownRecord): UserPageUnknownRecord =>
+  question.type === 'quadratic' ? { options: question.options, voiceCredits: getVoiceCredits(question) } : {};
+
 export const buildUserPageAnalysisCreatedQuestions = (questionCreationInfo: unknown = []): UserPageUnknownRecord[] =>
   (Array.isArray(questionCreationInfo) ? (questionCreationInfo as UserPageAnalysisQuestionRecord[]) : []).map((q) => ({
     id: q.id,
     type: q.type,
     prompt: q.prompt,
+    ...quadraticMetadata(q),
   }));
 
 export const buildUserPageAnalysisSbts = ({
@@ -194,10 +201,12 @@ export const buildUserPageAnalysisQuestions = ({
         (detailedQuestionResponses as Record<string, UserPageUnknownRecord> | null | undefined)?.[q.id as string] || {};
       const ans = toAnalysisRecord(resp.answer).value;
       if (ans === '*' || ans === '' || ans == null) return null;
+      if (q.type === 'quadratic' && validateQuadraticAllocation(ans, q)) return null;
       return {
         id: q.id,
         type: q.type,
         prompt: q.prompt,
+        ...quadraticMetadata(q),
         answer: ans,
         importance: extractUserPageAnalysisImportance(resp),
         additionalComment: extractUserPageAnalysisAdditionalComment(resp) || undefined,
@@ -214,6 +223,8 @@ export const buildUserPageAnalysisSurveys = ({
     const answered = (Array.isArray(arr) ? (arr as UserPageAnalysisSurveyResponseItem[]) : []).filter((it) => {
       const responseData = toAnalysisRecord(it?.responseData);
       const v = toAnalysisRecord(responseData.answer).value;
+      const questionData = toAnalysisRecord(it?.questionData);
+      if (questionData.type === 'quadratic' && validateQuadraticAllocation(v, questionData)) return false;
       return v && v !== '*';
     });
 
@@ -224,6 +235,7 @@ export const buildUserPageAnalysisSurveys = ({
       return {
         prompt: questionData.prompt,
         type: questionData.type || responseData.type || 'unknown',
+        ...quadraticMetadata(questionData),
         answer: v,
         importance: extractUserPageAnalysisImportance(responseData),
         additionalComment: extractUserPageAnalysisAdditionalComment(responseData) || undefined,
@@ -269,7 +281,7 @@ export const buildUserPageAnalysisCreatedSurveys = ({
       const qidLower = qid.toLowerCase();
       const qRaw = questionBucket[qidLower];
       const q = toAnalysisRecord(qRaw);
-      return qRaw ? { id: q.id || qidLower, type: q.type, prompt: q.prompt } : { id: qidLower };
+      return qRaw ? { id: q.id || qidLower, type: q.type, prompt: q.prompt, ...quadraticMetadata(q) } : { id: qidLower };
     });
     return {
       surveyId: sv.id,

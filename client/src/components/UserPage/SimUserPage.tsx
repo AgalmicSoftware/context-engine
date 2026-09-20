@@ -82,6 +82,8 @@ type SimQuestionCardData = {
   question: {
     prompt: string;
     type: string;
+    options?: unknown[];
+    voiceCredits?: unknown;
   };
   response: {
     answer: {
@@ -243,6 +245,8 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
 
   buildQuestionCardData = (question: SimQuestion): SimQuestionCardData => ({
     question: {
+      ...(Array.isArray(question.options) ? { options: question.options } : {}),
+      ...(question.voiceCredits !== undefined ? { voiceCredits: question.voiceCredits } : {}),
       prompt: String(question?.question || '').trim() || 'Untitled question',
       type:
         String(question?.questionType || 'freeform')

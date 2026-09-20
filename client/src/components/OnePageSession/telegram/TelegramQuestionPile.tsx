@@ -1,3 +1,4 @@
+import QuadraticAllocationInput from '../../SurveyTool/QuadraticAllocationInput';
 import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft, faChevronRight, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
@@ -35,11 +36,13 @@ const questionContainerClassName = (question: TelegramAgentQuestion): string => 
   if (type === 'binary') return surveyStyles.binaryQuestionContainer;
   if (type === 'multichoice') return surveyStyles.multichoiceQuestionContainer;
   if (type === 'rating') return surveyStyles.ratingQuestionContainer;
+  if (type === 'quadratic') return surveyStyles.quadraticQuestionContainer;
   return surveyStyles.freeformQuestionContainer;
 };
 
 const buildInitialAnswer = (question: TelegramAgentQuestion): TelegramAnswerInput => {
   const type = normalizeQuestionType(question);
+  if (type === 'quadratic') return { value: question.options.map(() => 0) };
   if (type === 'rating') return { value: 5 };
   if (type === 'multichoice') return { values: [] };
   return { value: '' };
@@ -107,6 +110,8 @@ const TelegramQuestionPile = ({
         disabled={isSubmitting}
       />
     );
+  } else if (type === 'quadratic') {
+    questionComponent = <QuadraticAllocationInput questionId={questionId} options={activeQuestion.options} voiceCredits={activeQuestion.voiceCredits} value={answer.value} disabled={isSubmitting} onChange={(value) => updateAnswer(questionId, { value })} />;
   } else if (type === 'multichoice') {
     questionComponent = (
       <MultichoiceQuestionInput

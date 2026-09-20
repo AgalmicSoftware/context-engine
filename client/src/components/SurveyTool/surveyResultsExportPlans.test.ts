@@ -201,8 +201,8 @@ describe('surveyResultsExportPlans', () => {
         },
       ]),
     ).toBe(
-      '"questionID","prompt","type","tags","options"\n' +
-        '"q1","Question ""One""","multichoice","tag-a;tag-b","Alpha;Beta"',
+      '"questionID","prompt","type","tags","options","voiceCredits"\n' +
+        '"q1","Question ""One""","multichoice","tag-a;tag-b","Alpha;Beta",""',
     );
   });
 
@@ -255,13 +255,13 @@ describe('surveyResultsExportPlans', () => {
 
     const lines = csv.split('\n');
     expect(lines[0]).toBe(
-      'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp',
+      'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits',
     );
     expect(lines[1]).toBe(
-      '"0x111","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z"',
+      '"0x111","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z",""',
     );
     expect(lines[2]).toBe(
-      '"0x222","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z"',
+      '"0x222","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z",""',
     );
     expect(csv).not.toContain('Old note');
     expect(csv).not.toContain('old-hash');
@@ -299,13 +299,13 @@ describe('surveyResultsExportPlans', () => {
 
     const lines = csv.split('\n');
     expect(lines[0]).toBe(
-      'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp',
+      'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits',
     );
     expect(lines[1]).toBe(
-      '"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x111","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z"',
+      '"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x111","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z",""',
     );
     expect(lines[2]).toBe(
-      '"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x222","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z"',
+      '"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x222","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z",""',
     );
   });
 

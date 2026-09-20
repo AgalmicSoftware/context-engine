@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
 import AppThemeSelector from './AppThemeSelector';
+import ColorBlindModeControl from './ColorBlindModeControl';
 import { LoginSettingsSessionSummary } from './LoginSettingsControlRow';
 import { CE_THEME_SELECTOR_ENABLED } from '../../variables/appConfig.js';
 import { buildSettingsSessionHref } from './loginSettingsRouteHelpers';
@@ -101,13 +102,16 @@ const LoginPreLoginSettingsDisplay = ({
                       children: renderPreLoginConfigPanel(),
                     })
                   : null}
-                {CE_THEME_SELECTOR_ENABLED
-                  ? renderStaticSettingsSection({
-                      title: 'Appearance & colors',
-                      summary: '',
-                      children: <AppThemeSelector />,
-                    })
-                  : null}
+                {renderStaticSettingsSection({
+                  title: 'Appearance & colors',
+                  summary: '',
+                  children: (
+                    <>
+                      {CE_THEME_SELECTOR_ENABLED && <AppThemeSelector />}
+                      <ColorBlindModeControl />
+                    </>
+                  ),
+                })}
               </>
             ),
           })}

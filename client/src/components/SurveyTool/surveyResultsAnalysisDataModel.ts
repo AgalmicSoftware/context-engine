@@ -139,7 +139,15 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
     const questionId = questionIdPort(response) || String(questionIdFallback || '').trim();
     if (!questionId) return;
     const questionData = toRecord(questions[questionId.toLowerCase()] || questions[questionId]);
-    const answer = readSurveyResultsAnalysisTextField(response.answer);
+    const questionType = questionTypePort(response, questionData);
+    const rawAnswer = Array.isArray(response.answer) ? response.answer : toRecord(response.answer).value;
+    // Keep option-indexed allocations intact until analysis validates and labels them.
+    const answer =
+      questionType === 'quadratic'
+        ? Array.isArray(rawAnswer)
+          ? rawAnswer
+          : ''
+        : readSurveyResultsAnalysisTextField(response.answer);
     const additional = readSurveyResultsAnalysisTextField(response.additional);
     if (!answer && !additional) return;
     rows.push({
@@ -148,7 +156,7 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
       participantAddress: responder,
       questionId,
       questionPrompt: questionPromptPort(response, questionData),
-      questionType: questionTypePort(response, questionData),
+      questionType,
     });
   };
 

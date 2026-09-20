@@ -1,8 +1,4 @@
-import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
-import {
-  buildGeneratedSurveyStatements,
-  type GeneratedSurveyStatement,
-} from './SurveyGenerator/surveyGeneratorHelpers';
+import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
@@ -32,6 +28,7 @@ export type InterviewQuestion = {
   prompt: string;
   type: string;
   options: string[];
+  voiceCredits?: number;
 };
 
 export type InterviewSource = {
@@ -166,7 +163,9 @@ const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQues
       const question = questionById?.get(questionId);
       if (!questionId || seen.has(questionId) || (questionById && !question)) return normalized;
       let answer = response.answer;
-      if (question?.options.length) {
+      if (question?.type === 'quadratic') {
+        if (validateQuadraticAllocation(answer, question)) return normalized;
+      } else if (question?.options.length) {
         const matchingOption = question.options.find(
           (option) => option.toLowerCase() === toTrimmedString(answer).toLowerCase(),
         );
@@ -252,7 +251,7 @@ export const normalizeInterviewQuestions = (questions: unknown): InterviewQuesti
           : (Array.isArray(rawOptions) ? rawOptions : [])
               .map((option) => toTrimmedString(asRecord(option).label || asRecord(option).value || option))
               .filter(Boolean);
-      return { id, prompt, type, options };
+      return { id, prompt, type, options, ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}) };
     })
     .filter((question) => {
       if (!question.id || !question.prompt || seen.has(question.id)) return false;
@@ -404,7 +403,7 @@ export const buildExternalInterviewKickoff = ({
     '',
     'Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions. Do not seek new access or invent a position.',
     '',
-    'Draft direct statements and reasonable inferences as if I am speaking in first person when prose is needed; lower confidence for inferences and explain their basis. Do not prefix answers with "(Agent):". Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings are 0-10.',
+    'Draft reasonable inferences with basis/confidence; skip absent signal. Binary/multichoice: exact option. Rating: 0-10. Quadratic: signed integer array in option order; sum(vote²) <= voiceCredits (default 99).',
     '',
     'Return only: (1) one short research-coverage line; (2) a question/answer/confidence/basis table; (3) the exact single-line JSON packet; (4) its review link. Do not audit the catalog or list omissions.',
     '',
@@ -444,7 +443,7 @@ export const buildRealtimeInterviewInstructions = ({
     `Questions:\n${questions
       .map(
         (question, index) =>
-          `${index + 1}. [${question.id}] (${question.type}) ${question.prompt}${
+          `${index + 1}. [${question.id}] (${question.type}${question.type === 'quadratic' ? `; ${question.voiceCredits ?? 99} voice credits` : ''}) ${question.prompt}${
             question.options.length ? ` Options: ${question.options.join(' | ')}` : ''
           }`,
       )
@@ -469,6 +468,7 @@ export const buildInterviewResponseMappingPrompt = ({
 Rules:
 - Use only the supplied transcript and responder context. Never invent evidence.
 - Include a reviewable draft when there is a direct statement or a defensible indirect signal. Low-confidence inference is allowed only when the evidence field explains its basis. Omit only questions with no relevant signal at all.
+- For quadratic questions, return a signed integer array in option order. The sum of squared votes must not exceed voiceCredits (99 default); unused credits and all-neutral zeros are valid.
 - Match the question type and listed options exactly when options exist. For rating questions, return a JSON number on the stated scale (for example, 4), not prose or "4/10".
 - Interviewer turns supply question context only; never treat their suggestions as the responder's beliefs. Resolve short replies such as "four", "yes", or "no" against the preceding question. Check every explicit responder answer, including numeric ratings, before returning drafts.
 - Use additionalComments for relevant explanations, qualifications, or examples from the interview that do not fit the main answer, especially for binary, rating, and choice questions. Preserve the responder's meaning without inventing details or repeating the main answer.

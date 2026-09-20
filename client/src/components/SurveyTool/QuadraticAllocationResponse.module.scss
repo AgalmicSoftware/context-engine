@@ -1,0 +1,84 @@
+.response {
+  width: 100%;
+  min-width: 0;
+  margin-top: 0.75rem;
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-ui);
+  font-style: normal;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.options {
+  margin: 0;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  padding: 0.65rem 0;
+
+  dt {
+    font-weight: 400;
+    overflow-wrap: anywhere;
+  }
+  dd {
+    display: contents;
+    margin: 0;
+  }
+}
+
+.vote {
+  text-align: right;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.positive {
+  color: var(--ce-response-agree-text);
+}
+.negative {
+  color: var(--ce-response-disagree-text);
+}
+.track {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 20px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 9px;
+    height: 2px;
+    background: color-mix(in srgb, var(--ce-panel-text) 12%, transparent);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: color-mix(in srgb, var(--ce-panel-text) 40%, transparent);
+  }
+}
+
+.bar {
+  position: absolute;
+  top: 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.summary {
+  margin: 0.75rem 0 0;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.8rem;
+  font-style: normal;
+}

@@ -82,3 +82,14 @@ test('on-chain question discovery fails closed on payloads from another session'
 
   assert.deepEqual(questions, []);
 });
+
+
+test('quadratic catalog questions retain ordered options and the configured or default credit budget', () => {
+  const questions = helpers.dedupeQuestions([
+    { id: 'q1', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 },
+    { id: 'q2', type: 'quadratic', prompt: 'Allocate elsewhere', options: ['A', 'B'] },
+  ]);
+  assert.deepEqual(questions[0].options, ['Parks', 'Transit']);
+  assert.equal(questions[0].voiceCredits, 25);
+  assert.equal(questions[1].voiceCredits, 99);
+});

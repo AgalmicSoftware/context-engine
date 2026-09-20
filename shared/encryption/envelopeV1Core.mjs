@@ -232,6 +232,9 @@ export const encodeValueBytes = (kind, value, { options = [] } = {}) => {
       return encodeBinary(value);
     case 'rating':
       return encodeRating(value);
+    case 'quadratic':
+      if (!Array.isArray(value) || Array.from(value).some((vote) => !Number.isSafeInteger(vote))) throw new Error('Invalid quadratic allocation');
+      return utf8e(JSON.stringify(value));
     case 'multichoice':
       return encodeMultichoiceBitset(value, options);
     case 'freeform':

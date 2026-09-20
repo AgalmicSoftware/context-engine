@@ -195,6 +195,16 @@ const renderPile = (props = {}, options = {}) =>
 const applyPatch = (state, patch) => ({ ...state, ...patch });
 
 describe('SurveyPileViewMode runtime surface', () => {
+  it('shows submission failures beside the shared controls and clears them on retry', () => {
+    const { rerender } = render(renderPileInteractionSurface(buildSurfaceProps({
+      submissionError: 'Response upload failed. Please try again.',
+    })));
+    expect(screen.getByRole('alert')).toHaveTextContent('Response upload failed. Please try again.');
+    expect(screen.getByTestId('active-q1')).not.toContainElement(screen.getByRole('alert'));
+    rerender(renderPileInteractionSurface(buildSurfaceProps({ submissionError: '' })));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     window.history.pushState({}, '', '/');
     jest.clearAllMocks();
@@ -246,6 +256,21 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByText('Which capability matters most?')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Cross-site graph' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Session memory' })).toBeInTheDocument();
+  });
+
+  it('edits signed quadratic votes in the pile using the question budget', async () => {
+    renderPile({
+      questionPool: [{ id: 'quadratic-q', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 }],
+      cacheHasLoaded: false, isQuestionCacheReady: true, isResponsesCacheReady: false,
+      isSBTCacheReady: false, isSurveyCacheReady: false,
+    });
+    const parks = await screen.findByLabelText('Parks');
+    fireEvent.change(parks, { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Transit'), { target: { value: '-4' } });
+    expect(screen.getByTestId('ce-quadratic-budget')).toHaveTextContent('0 credits left');
+    fireEvent.change(parks, { target: { value: '4' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(parks).toHaveValue('3');
   });
 
   it('updates a pile rating through the shared slider persistence helper', async () => {

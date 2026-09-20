@@ -308,7 +308,30 @@ describe('AboutPage', () => {
   it('renders the live roadmap foundations and specific planned capabilities', () => {
     renderAboutPage();
     const roadmapToggle = screen.getByRole('button', { name: /roadmap/i });
-    expect(roadmapToggle).toHaveAttribute('aria-expanded', 'false');
+
+    expect(currentToggle).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /present functionalities/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^future$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/zero-knowledge proofs for encrypted predictions and retroactive evaluation/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
+
+    fireEvent.click(currentToggle);
+
+    expect(screen.getByText(/^Sessions:$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/include questions, responses, documents, access gates, and configuration/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Questions:$/i)).toBeInTheDocument();
+    expect(screen.getByText(/supports binary, rating, multiple-choice, quadratic allocation, and freeform questions/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Storage:$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /responses and documents on arweave plus built-in report views, exports, and address-based comparison tools/i,
+      ),
+    ).toBeInTheDocument();
+
     fireEvent.click(roadmapToggle);
     expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
     const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
@@ -322,83 +345,61 @@ describe('AboutPage', () => {
     fireEvent.keyDown(roadmapToggle, { key: 'Enter' });
     expect(screen.queryByRole('heading', { name: 'Current Foundations' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /functionality/i }));
-    expect(screen.getByRole('link', { name: 'SBT groups' })).toHaveAttribute('href', '/groups');
-    expect(screen.getByText(/Stores responses and documents in Cloudflare or on Arweave/)).toBeVisible();
-  });
-
-  it('links related research and documented uses and includes the media entry', () => {
-    renderAboutPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Related Work' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Recognition' }));
-    const related = within(screen.getByTestId('ce-about-related-work'));
-    expect(related.getByRole('link', { name: 'AI Opinions Benchmark' })).toHaveAttribute('href', '/benchmarks');
-    expect(related.getByRole('link', { name: 'The Agent Mirror Test' })).toHaveAttribute(
-      'href',
-      '/posts/agent-village-wrapped',
-    );
-    expect(related.getByRole('heading', { name: 'Ladders Made of Numbers' })).toBeVisible();
-    expect(related.getByRole('link', { name: 'CommonGround · Prime Intellect' })).toHaveAttribute(
-      'href',
-      'https://app.primeintellect.ai/dashboard/environments',
-    );
-    const practice = within(screen.getByTestId('ce-about-used-by'));
-    expect(practice.getByRole('link', { name: 'Cosmos × FIRE grants' })).toHaveAttribute(
-      'href',
-      'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
-    );
-    expect(practice.getByText(/Context Engine was selected for a Cosmos × FIRE/)).toBeVisible();
-    expect(practice.getByRole('link', { name: 'Foresight Institute grant · 2026' })).toHaveAttribute(
-      'href',
-      'https://foresight.org/grants/ai-science-safety-nodes-rfp/',
-    );
-    expect(practice.getByText(/Context Engine received a grant through Foresight Institute/)).toBeVisible();
-    expect(practice.getByRole('link', { name: 'Agent Village 2026' })).toHaveAttribute(
-      'href',
-      '/posts/agent-village-wrapped',
-    );
-    expect(practice.getByRole('link', { name: 'EDDY 2026 demo' })).toHaveAttribute(
-      'href',
-      'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna/program',
-    );
-    expect(practice.getByRole('link', { name: /d\/acc residency/ })).toHaveAttribute(
-      'href',
-      'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
-    );
-    const artwork = practice.getAllByRole('presentation', { hidden: true });
-    expect(artwork).toHaveLength(6);
-    artwork.forEach((img) => fireEvent.error(img));
-    expect(practice.queryAllByRole('presentation', { hidden: true })).toHaveLength(0);
-    expect(practice.getAllByRole('link')).toHaveLength(5);
-    expect(screen.queryByRole('heading', { name: /^Media$/ })).not.toBeInTheDocument();
-  });
-
-  it('expands the new sections independently with mouse and keyboard controls', () => {
-    renderAboutPage();
-    const related = screen.getByRole('button', { name: 'Related Work' });
-    const practice = screen.getByRole('button', { name: 'Recognition' });
-    expect(related).toHaveAttribute('aria-expanded', 'false');
-    expect(practice).toHaveAttribute('aria-expanded', 'false');
-    const preview = screen.getByTestId('ce-about-related-summary');
-    ['benchmark', 'eval', 'media'].forEach((category) => expect(within(preview).getByText(category)).toBeVisible());
-    expect(screen.getByTestId('ce-about-practice-summary')).toBeVisible();
-    expect(screen.queryByRole('link', { name: 'AI Opinions Benchmark' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Cosmos × FIRE grants' })).not.toBeInTheDocument();
-
-    fireEvent.click(related);
-    expect(related).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.queryByTestId('ce-about-related-summary')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AI Opinions Benchmark' })).toBeVisible();
-    expect(practice).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.keyDown(practice, { key: 'Enter' });
-    expect(practice).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.queryByTestId('ce-about-practice-summary')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cosmos × FIRE grants' })).toBeVisible();
-    fireEvent.keyDown(related, { key: ' ' });
-    expect(related).toHaveAttribute('aria-expanded', 'false');
-    expect(practice).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(practice);
-    expect(screen.queryByRole('link', { name: 'Cosmos × FIRE grants' })).not.toBeInTheDocument();
+    expect(screen.getByText(/^Current Foundations$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /create sessions with questions, responses, documents, access gates, and configuration from the web app/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /run binary, rating, multiple-choice, quadratic allocation, and freeform questions with conviction weighting and comments/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /use sbt groups for gated participation, encrypted fields, and sponsored rpc, ai, gas, arweave, and lit resources/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /persist responses and documents on arweave with report views, exports, and address-based comparison tools/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /explore shipped demo sessions and reusable ai discourse corpus data from the app and repository/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Privacy, Credentials, and Safety$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/stronger privacy with unlinkable per-response and per-sbt accounts, zk\/fhe aggregation/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/zktls group formation for privacy-preserving groups/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /ai whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Deployment and Resilience$/i)).toBeInTheDocument();
+    expect(screen.getByText(/walkaway resilience through ens-hosted frontends/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Interfaces and Inputs$/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent-first ux so people can point an assistant at a session/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Preference Data and Models$/i)).toBeInTheDocument();
+    expect(screen.getByText(/group-representative ai models/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Deliberation and Negotiation$/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent-to-agent negotiation tooling/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Complete:/i)).toHaveLength(6);
+    expect(screen.getAllByText(/^Planned:/i)).toHaveLength(14);
+    expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 2:$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 3:$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 4\+:$/i)).not.toBeInTheDocument();
   });
 
   it('keeps the recognition section visible without rendering empty individuals content', () => {

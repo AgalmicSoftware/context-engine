@@ -5,6 +5,7 @@ import {
   generateQuestionsFromListeningTranscript,
   parseListeningQuestionResponse,
 } from './sessionListeningQuestions';
+import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 
 jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
@@ -13,10 +14,17 @@ jest.mock('../../utilities/ai/aiClient.js', () => ({
 const mockCallAI = callAI as jest.MockedFunction<typeof callAI>;
 
 describe('sessionListeningQuestions', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  it('includes a generated quadratic budget in the listening question identity', () => {
+    const question = { prompt: 'Allocate support', questionType: 'quadratic', options: ['Parks', 'Transit'] };
+    const build = (voiceCredits: number) =>
+      buildListeningQuestionStatements({ questions: [{ ...question, voiceCredits }] }).statements[0];
+    expect(build(25)).toMatchObject({
+      voiceCredits: 25,
+      options: question.options,
+      id: generateQuestionId('quadratic', question.prompt, question.options, false, 25),
+    });
+    expect(build(25).id).not.toBe(build(99).id);
   });
-
   it('builds a transcript-aware generation prompt for listening mode', () => {
     const prompt = buildListeningQuestionPrompt('Speaker A raised budget timing. Speaker B disagreed.', {
       count: 3,

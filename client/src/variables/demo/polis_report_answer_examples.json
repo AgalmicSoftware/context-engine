@@ -1,0 +1,94 @@
+[
+  {
+    "id": "report-demo-written-governance",
+    "type": "freeform",
+    "prompt": "What would make you trust an AI-assisted public decision?",
+    "tags": ["ai-governance"],
+    "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+    "answers": [
+      "Publish the evidence behind the recommendation and explain which alternatives were considered.",
+      "Give people a clear way to appeal to someone who can change the decision.",
+      "Independent testing should happen before the system affects access to public services.",
+      "Show where people disagreed instead of presenting one recommendation as unanimous.",
+      "Let affected communities help set the rules before the system is introduced.",
+      "Keep a public record of mistakes and what changed as a result."
+    ]
+  },
+  {
+    "id": "report-demo-written-education",
+    "type": "freeform",
+    "prompt": "What should students still learn to do without AI?",
+    "tags": ["education"],
+    "category": "DESIRABLE AI OUTCOMES",
+    "answers": [
+      "Ask good questions and check whether the evidence actually supports an answer.",
+      "Work through a difficult problem and explain the reasoning in their own words.",
+      "Listen to another person and disagree respectfully."
+    ]
+  },
+  {
+    "id": "report-demo-rating-governance",
+    "type": "rating",
+    "prompt": "How confident are you that public institutions can oversee AI effectively?",
+    "tags": ["ai-governance"],
+    "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+    "scale": { "min": 0, "max": 10 },
+    "answers": [0, 3, 4, 4, 5, 5, 5, 6, 6, 7, 8, 9]
+  },
+  {
+    "id": "report-demo-rating-education",
+    "type": "rating",
+    "prompt": "How useful could AI tutors be when a teacher remains involved?",
+    "tags": ["education"],
+    "category": "DESIRABLE AI OUTCOMES",
+    "scale": { "min": 0, "max": 10 },
+    "answers": [3, 5, 6, 7, 7, 8, 9, 10]
+  },
+  {
+    "id": "report-demo-rating-accountability",
+    "type": "rating",
+    "prompt": "How important is a right to appeal an automated public decision?",
+    "tags": ["ai-governance"],
+    "category": "DEMOCRATIC PARTICIPATION & LEGITIMACY",
+    "scale": { "min": 1, "max": 5 },
+    "answers": [3, 4, 4, 5, 5]
+  },
+  {
+    "id": "report-demo-choice-governance",
+    "type": "poll",
+    "prompt": "Which safeguard should come first for AI in public services?",
+    "tags": ["ai-governance"],
+    "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+    "options": ["Independent audits", "Human appeals", "Public decision records", "Community oversight"],
+    "answers": ["Independent audits", "Human appeals", "Independent audits", "Public decision records", "Human appeals", "Independent audits", "Community oversight", "Independent audits", "Human appeals", "Public decision records"]
+  },
+  {
+    "id": "report-demo-choice-education",
+    "type": "poll",
+    "prompt": "Where could AI best support a classroom?",
+    "tags": ["education"],
+    "category": "DESIRABLE AI OUTCOMES",
+    "options": ["Practice and feedback", "Accessible learning materials", "Lesson preparation", "Language support"],
+    "answers": ["Practice and feedback", "Accessible learning materials", "Practice and feedback", "Lesson preparation", "Language support", "Practice and feedback"]
+  },
+  {
+    "id": "report-demo-quadratic-governance",
+    "type": "quadratic",
+    "prompt": "Which AI governance measures would you support or oppose?",
+    "tags": ["ai-governance"],
+    "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
+    "options": ["Independent safety audits", "Public-interest AI research", "Blanket deployment bans", "Automated public decisions"],
+    "voiceCredits": 99,
+    "answers": [[7, 5, -3, -2], [6, 5, -4, -3], [5, 6, 2, -4], [4, 7, -3, 0], [7, 4, -5, -2], [3, 4, 6, -5], [5, -3, -4, 5], [0, 0, 0, 0]]
+  },
+  {
+    "id": "report-demo-quadratic-education",
+    "type": "quadratic",
+    "prompt": "Which uses of AI in education would you support or oppose?",
+    "tags": ["education"],
+    "category": "DESIRABLE AI OUTCOMES",
+    "options": ["Teacher-guided tutoring", "Accessible textbooks", "Automated final grades"],
+    "voiceCredits": 49,
+    "answers": [[4, 5, -2], [3, 4, -4], [5, 3, -3], [2, 6, 0]]
+  }
+]

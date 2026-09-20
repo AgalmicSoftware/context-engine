@@ -72667,8 +72667,391 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
   };
 };
 
-// workers/sessionCorsWorker/workerExecutionServiceBinding.js
-init_aiProviderExecution();
+// shared/aiDefaults.mjs
+var DEFAULT_AI_MODEL = "gpt-5.6-terra";
+var DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: DEFAULT_AI_MODEL });
+
+// workers/sessionCorsWorker/aiModelParams.js
+var toModelLeaf = (modelRaw = "") => String(modelRaw || "").trim().toLowerCase().split("/").pop();
+var usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
+  const normalizedProvider = String(provider || "").trim().toLowerCase();
+  const normalizedEndpoint = String(endpoint || "").trim().toLowerCase();
+  if (normalizedProvider !== "openai") return false;
+  if (normalizedEndpoint.includes("/responses") || normalizedEndpoint === "responses") return true;
+  return /^(gpt-5|gpt-6-astra(?:$|-))/.test(toModelLeaf(model));
+};
+var isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || /^o[13]/.test(toModelLeaf(model));
+var applyChatCompletionBudget = ({
+  body,
+  model = "",
+  thinking = false,
+  max_tokens,
+  max_completion_tokens,
+  temperature,
+  defaultMaxCompletionTokens = 16e3,
+  defaultMaxTokens = 2048,
+  defaultTemperature = 0.7
+} = {}) => {
+  const target = body && typeof body === "object" ? body : {};
+  if (isChatReasoningModel({ model, thinking })) {
+    target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
+    delete target.max_tokens;
+    delete target.temperature;
+    return target;
+  }
+  target.max_tokens = max_tokens ?? defaultMaxTokens;
+  target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
+  delete target.max_completion_tokens;
+  return target;
+};
+var resolveResponsesOutputTokens = ({
+  max_output_tokens,
+  max_completion_tokens,
+  max_tokens,
+  fallback = 16e3
+} = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
+
+// workers/sessionCorsWorker/aiProviderExecution.js
+var ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+var OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+var OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+var OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
+var CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR = "Custom provider rpcUrl override requires a request apiKey/rpcKey.";
+var extractOpenAiCompletion = (data, useResponses = false) => {
+  if (!data || typeof data !== "object") return "";
+  if (useResponses) {
+    if (typeof data.output_text === "string") return data.output_text;
+    if (Array.isArray(data.output)) {
+      const parts = [];
+      const push = (value) => {
+        if (typeof value === "string" && value.trim() !== "") parts.push(value);
+      };
+      data.output.forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        push(item.text);
+        push(item.output_text);
+        const content = item.content ?? item.message?.content;
+        if (Array.isArray(content)) {
+          content.forEach((part) => {
+            if (part && typeof part === "object") {
+              push(part.text);
+              push(part.output_text);
+            } else {
+              push(part);
+            }
+          });
+        } else if (content && typeof content === "object") {
+          push(content.text);
+          push(content.output_text);
+        } else {
+          push(content);
+        }
+      });
+      return parts.join("");
+    }
+    return "";
+  }
+  return data?.choices?.[0]?.message?.content || "";
+};
+var normalizeComparableRpcUrl = (raw) => {
+  const url = toStr7(raw).trim();
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.origin}${path}${parsed.search}`;
+  } catch {
+    return url.replace(/\/+$/, "");
+  }
+};
+var resolveJson = (deps) => deps?.json || json;
+var proxyAnthropic = async ({
+  payload,
+  secrets,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const json2 = resolveJson(deps);
+  const fetchImpl = deps?.fetch || fetch;
+  const payloadKey = toStr7(payload?.apiKey).trim();
+  const key = payloadKey || toStr7(secrets?.anthropicKey).trim();
+  if (!key) {
+    return json2({ error: "Server misconfigured: anthropicKey is missing." }, 401, baseHeaders);
+  }
+  const {
+    model,
+    temperature,
+    max_tokens,
+    messages,
+    prompt,
+    max_tokens_to_sample
+  } = payload || {};
+  const body = messages ? {
+    model: model || "claude-3-5-sonnet-20240620",
+    temperature: temperature ?? 0.7,
+    max_tokens: max_tokens ?? 4096,
+    messages
+  } : {
+    model: model || "claude-3-5-sonnet-20240620",
+    temperature: temperature ?? 0.7,
+    max_tokens: max_tokens ?? max_tokens_to_sample ?? 4096,
+    messages: [{ role: "user", content: String(prompt || "") }]
+  };
+  const response2 = await fetchImpl(constants?.anthropicUrl || ANTHROPIC_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "anthropic-version": "2023-06-01",
+      "x-api-key": key
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await response2.json().catch(() => ({}));
+  if (!response2.ok) {
+    return json2({ error: data?.error?.message || "Anthropic error", details: data }, response2.status, baseHeaders);
+  }
+  const completion = data?.content?.[0]?.text || "";
+  return json2({ completion, raw: data }, 200, baseHeaders);
+};
+var proxyOpenAI = async ({
+  payload,
+  secrets,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const json2 = resolveJson(deps);
+  const fetchImpl = deps?.fetch || fetch;
+  const payloadKey = toStr7(payload?.apiKey).trim();
+  const key = payloadKey || toStr7(secrets?.openaiKey).trim();
+  if (!key) {
+    return json2({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+  }
+  const {
+    model,
+    temperature,
+    max_tokens,
+    max_output_tokens,
+    messages,
+    prompt,
+    response_format,
+    max_completion_tokens,
+    reasoning_effort
+  } = payload || {};
+  const requestedEndpoint = toStr7(payload?.endpoint).trim();
+  const defaultModel = model || DEFAULT_AI_MODEL;
+  const useResponses = usesOpenAiResponsesApi({
+    provider: "openai",
+    model: defaultModel,
+    endpoint: requestedEndpoint
+  });
+  const isReasoning = isChatReasoningModel({ model: defaultModel, thinking: payload?.thinking === true });
+  const body = useResponses ? {
+    model: defaultModel,
+    input: messages || prompt || ""
+  } : {
+    model: model || (isReasoning ? "o3-mini" : DEFAULT_AI_MODEL),
+    messages: messages || [{ role: "user", content: String(prompt || "") }]
+  };
+  body.service_tier = ["fast", "priority", "default", "auto"].includes(payload?.service_tier) ? payload.service_tier : "default";
+  if (useResponses) {
+    if (response_format) body.text = { format: response_format };
+    if (payload?.tools) body.tools = payload.tools;
+    if (payload?.functions && !payload?.tools) body.functions = payload.functions;
+    body.reasoning = { effort: reasoning_effort || "low" };
+    body.max_output_tokens = resolveResponsesOutputTokens({
+      max_output_tokens,
+      max_completion_tokens,
+      max_tokens,
+      fallback: 16e3
+    });
+  } else {
+    if (response_format) body.response_format = response_format;
+    if (payload?.tools) body.tools = payload.tools;
+    if (payload?.functions && !payload?.tools) body.functions = payload.functions;
+    const effectiveLeaf = toStr7(body.model).toLowerCase().split("/").pop();
+    if (reasoning_effort && /^(gpt-5|o[13])/.test(effectiveLeaf)) {
+      body.reasoning_effort = reasoning_effort;
+    }
+    applyChatCompletionBudget({
+      body,
+      model: body.model,
+      thinking: isReasoning,
+      max_tokens,
+      max_completion_tokens,
+      temperature
+    });
+  }
+  const response2 = await fetchImpl(
+    useResponses ? constants?.openAiResponsesUrl || OPENAI_RESPONSES_URL : constants?.openAiChatUrl || OPENAI_CHAT_URL,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify(body)
+    }
+  );
+  const data = await response2.json().catch(() => ({}));
+  if (!response2.ok) {
+    return json2({ error: data?.error?.message || "OpenAI error", details: data }, response2.status, baseHeaders);
+  }
+  const completion = extractOpenAiCompletion(data, useResponses);
+  return json2({ completion, raw: data }, 200, baseHeaders);
+};
+var proxyOpenRouter = async ({
+  payload,
+  secrets,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const json2 = resolveJson(deps);
+  const fetchImpl = deps?.fetch || fetch;
+  const payloadKey = toStr7(payload?.apiKey).trim();
+  const key = payloadKey || toStr7(secrets?.openrouterKey).trim();
+  if (!key) {
+    return json2({ error: "Server misconfigured: openrouterKey is missing." }, 401, baseHeaders);
+  }
+  const {
+    model,
+    temperature,
+    max_tokens,
+    messages,
+    prompt,
+    response_format,
+    max_completion_tokens,
+    reasoning_effort
+  } = payload || {};
+  const isReasoning = isChatReasoningModel({ model, thinking: payload?.thinking === true });
+  const body = {
+    model: model || "openrouter/auto",
+    messages: messages || [{ role: "user", content: String(prompt || "") }]
+  };
+  if (response_format) body.response_format = response_format;
+  if (payload?.tools) body.tools = payload.tools;
+  if (payload?.functions && !payload?.tools) body.functions = payload.functions;
+  if (reasoning_effort) body.reasoning_effort = reasoning_effort;
+  applyChatCompletionBudget({
+    body,
+    model: body.model,
+    thinking: isReasoning,
+    max_tokens,
+    max_completion_tokens,
+    temperature
+  });
+  const headers = {
+    "content-type": "application/json",
+    authorization: `Bearer ${key}`
+  };
+  const ref = payload?.referer || payload?.referrer || payload?.appUrl || payload?.origin;
+  const title = payload?.appName || payload?.title;
+  if (ref) headers["HTTP-Referer"] = ref;
+  if (title) headers["X-Title"] = title;
+  const response2 = await fetchImpl(constants?.openRouterChatUrl || OPENROUTER_CHAT_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
+  });
+  const data = await response2.json().catch(() => ({}));
+  if (!response2.ok) {
+    return json2({ error: data?.error?.message || "OpenRouter error", details: data }, response2.status, baseHeaders);
+  }
+  const completion = data?.choices?.[0]?.message?.content || "";
+  return json2({ completion, raw: data }, 200, baseHeaders);
+};
+var proxyCustomRPC = async ({
+  payload,
+  secrets,
+  baseHeaders,
+  deps,
+  auth
+} = {}) => {
+  const json2 = resolveJson(deps);
+  const safeFetch = deps?.safeFetch || fetch;
+  const isBlockedOutboundUrl = deps?.isBlockedOutboundUrl || (() => false);
+  const payloadRpcUrl = toStr7(payload?.rpcUrl).trim();
+  const secretRpcUrl = toStr7(secrets?.customRpcUrl).trim();
+  const payloadKey = toStr7(payload?.apiKey || payload?.rpcKey).trim();
+  const secretKey = toStr7(secrets?.customRpcKey).trim();
+  const requestOverridesRpcUrl = !!payloadRpcUrl && normalizeComparableRpcUrl(payloadRpcUrl) !== normalizeComparableRpcUrl(secretRpcUrl);
+  if (!payloadKey && requestOverridesRpcUrl && (secretRpcUrl || secretKey)) {
+    return json2({ error: CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR }, 400, baseHeaders);
+  }
+  const rpcUrl = payloadRpcUrl || secretRpcUrl;
+  if (!rpcUrl) {
+    return json2({ error: "Server misconfigured: customRpcUrl is missing." }, 400, baseHeaders);
+  }
+  let parsedRpcUrl;
+  try {
+    parsedRpcUrl = new URL(rpcUrl);
+  } catch {
+    return json2({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
+  }
+  if (parsedRpcUrl.protocol !== "https:") {
+    return json2({ error: "Custom RPC must use HTTPS" }, 403, baseHeaders);
+  }
+  if (parsedRpcUrl.username || parsedRpcUrl.password) {
+    return json2({ error: "Custom RPC URL must not contain credentials" }, 403, baseHeaders);
+  }
+  if (!auth || !auth?.scopes) {
+    return json2({ error: "Custom RPC requires authentication" }, 403, baseHeaders);
+  }
+  const walletAddress = toStr7(auth?.address || auth?.walletAddress || auth?.sub).trim().toLowerCase();
+  (typeof deps?.log === "function" ? deps.log : console.log)("[ai] custom rpc request", {
+    walletAddress: walletAddress || null,
+    rpcDomain: parsedRpcUrl.hostname
+  });
+  if (isBlockedOutboundUrl(rpcUrl)) {
+    return json2({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
+  }
+  const {
+    model,
+    temperature,
+    max_tokens,
+    messages,
+    prompt,
+    response_format,
+    max_completion_tokens,
+    reasoning_effort
+  } = payload || {};
+  const isReasoning = isChatReasoningModel({ model, thinking: payload?.thinking === true });
+  const body = {
+    model: model || DEFAULT_AI_MODEL,
+    messages: messages || [{ role: "user", content: String(prompt || "") }]
+  };
+  if (response_format) body.response_format = response_format;
+  if (payload?.tools) body.tools = payload.tools;
+  if (payload?.functions && !payload?.tools) body.functions = payload.functions;
+  const effectiveLeaf = toStr7(body.model).toLowerCase().split("/").pop();
+  if (reasoning_effort && /^(gpt-5|o[13])/.test(effectiveLeaf)) {
+    body.reasoning_effort = reasoning_effort;
+  }
+  applyChatCompletionBudget({
+    body,
+    model: body.model,
+    thinking: isReasoning,
+    max_tokens,
+    max_completion_tokens,
+    temperature
+  });
+  const key = payloadKey || secretKey;
+  const headers = { "content-type": "application/json" };
+  if (key) headers.authorization = `Bearer ${key}`;
+  const response2 = await safeFetch(rpcUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
+  });
+  if (!(response2 instanceof Response)) {
+    return json2({ error: response2?.error }, response2?.status, baseHeaders);
+  }
+  const data = await response2.json().catch(() => ({}));
+  if (!response2.ok) {
+    return json2({ error: data?.error?.message || "Custom RPC error", details: data }, response2.status, baseHeaders);
+  }
+  const completion = data?.choices?.[0]?.message?.content || data?.completion || data?.content?.[0]?.text || "";
+  return json2({ completion, raw: data }, 200, baseHeaders);
+};
 
 // workers/sessionCorsWorker/arweaveCeTagNormalization.js
 init_stringCoercion();
@@ -79358,6 +79741,243 @@ var dispatchSessionConfigBootstrapRequest = async ({
   }, 200, buildBootstrapHeaders(corsContext.headers));
 };
 
+// workers/sessionCorsWorker/interviewQuestionCatalog.js
+var QUESTIONS_ADDED_TOPIC0 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
+var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
+var ZERO_BYTES32 = `0x${"00".repeat(32)}`;
+var MAX_QUESTIONS = 100;
+var MAX_SCAN_BLOCKS = 2e6;
+var RPC_CHUNK_SIZE = 1e5;
+var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
+var trim8 = (value) => String(value == null ? "" : value).trim();
+var lower3 = (value) => trim8(value).toLowerCase();
+var isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var hasRestrictedPrompt = (question = {}) => {
+  const visibility = lower3(question.visibility || question.access || question.questionVisibility);
+  return Boolean(
+    question.promptEncrypted || question.encryptedPrompt || question.locked === true || question.gated === true || question.gate || Array.isArray(question.gates) && question.gates.length || /private|locked|gated|encrypted/.test(visibility)
+  );
+};
+var normalizeQuestion = (value = {}) => {
+  const question = isObj13(value) ? value : {};
+  const id2 = lower3(question.id || question.questionId);
+  const prompt = trim8(question.prompt || question.question || question.title);
+  if (!id2 || !prompt || hasRestrictedPrompt(question) || /connect.+decrypt|encrypted prompt/i.test(prompt)) return null;
+  const type = lower3(question.type || question.questionType || "freeform") || "freeform";
+  const rawOptions = question.options || question.choices;
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj13(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  return {
+    id: id2,
+    prompt,
+    type,
+    options,
+    ...type === "quadratic" ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}
+  };
+};
+var dedupeQuestions = (questions = []) => {
+  const seen = /* @__PURE__ */ new Set();
+  return questions.map(normalizeQuestion).filter((question) => {
+    if (!question || seen.has(question.id)) return false;
+    seen.add(question.id);
+    return true;
+  }).slice(0, MAX_QUESTIONS);
+};
+var readJsonResponse = async (response2) => {
+  if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
+  try {
+    return await response2.clone().json();
+  } catch {
+    try {
+      return JSON.parse(await response2.text());
+    } catch {
+      return null;
+    }
+  }
+};
+var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2 }) => {
+  if (typeof storageRoute2 !== "function") return [];
+  const origin = "https://session-worker.invalid";
+  const listResponse = await storageRoute2({
+    path: "/storage/list",
+    method: "GET",
+    request: new Request(`${origin}/storage/list?resource=questions&limit=${MAX_QUESTIONS}`),
+    env,
+    config,
+    slug,
+    uploaderAddress: "",
+    baseHeaders: {}
+  });
+  const listing = await readJsonResponse(listResponse);
+  const items = Array.isArray(listing?.items) ? listing.items.slice(0, MAX_QUESTIONS) : [];
+  const questions = [];
+  for (const item of items) {
+    const id2 = trim8(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    if (!id2) continue;
+    const readResponse = await storageRoute2({
+      path: "/storage/read",
+      method: "GET",
+      request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id2)}`),
+      env,
+      config,
+      slug,
+      uploaderAddress: "",
+      baseHeaders: {}
+    });
+    const payload = await readJsonResponse(readResponse);
+    if (payload) questions.push(payload);
+  }
+  return dedupeQuestions(questions);
+};
+var pickContractAddress = (config = {}) => {
+  const contracts = isObj13(config.contracts) ? config.contracts : {};
+  const surveys = isObj13(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  return trim8(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+};
+var pickRpcUrls = (config = {}) => {
+  const chainId = trim8(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const rpcConfig = isObj13(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj13(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj13(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj13(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj13(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const byChain = byChainMap[chainId];
+  const source = [
+    ...Array.isArray(byChain) ? byChain : [byChain],
+    ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
+    ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
+  ];
+  return [...new Set(source.map(trim8).filter((value) => /^https:\/\//i.test(value)))];
+};
+var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
+  let lastError;
+  for (const rpcUrl of rpcUrls) {
+    try {
+      const response2 = await fetchImpl(rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+      });
+      const data = await response2.json();
+      if (!response2.ok || data?.error) throw new Error(data?.error?.message || `RPC ${method} failed.`);
+      return data.result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
+};
+var wordAt = (hex, index) => trim8(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var decodeQuestionIds = (data = "") => {
+  const clean = trim8(data).replace(/^0x/, "");
+  if (clean.length < 128) return [];
+  const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || "0"}`));
+  const lengthWordIndex = offsetBytes / 32;
+  const length = Math.min(MAX_QUESTIONS, Number(BigInt(`0x${wordAt(clean, lengthWordIndex) || "0"}`)));
+  const ids = [];
+  for (let index = 0; index < length; index += 1) {
+    const id2 = `0x${wordAt(clean, lengthWordIndex + 1 + index)}`.toLowerCase();
+    if (/^0x[0-9a-f]{64}$/.test(id2) && id2 !== ZERO_BYTES32) ids.push(id2);
+  }
+  return ids;
+};
+var base64urlFromHex = (hex = "") => {
+  const clean = trim8(hex).replace(/^0x/, "");
+  if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
+  const bytes2 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
+  let binary = "";
+  bytes2.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+var payloadSessionSlug = (payload = {}) => {
+  const session = isObj13(payload.session) ? payload.session : {};
+  for (const candidate of [
+    payload.sessionSlug,
+    payload.session_slug,
+    payload.groupSlug,
+    session.sessionSlug,
+    session.slug,
+    payload.session
+  ]) {
+    if (typeof candidate !== "string" && typeof candidate !== "number") continue;
+    const normalized = lower3(candidate).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
+    if (normalized) return normalized;
+  }
+  return "";
+};
+var fetchArweaveQuestion = async (pointer, fetchImpl) => {
+  if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return null;
+  for (const gateway of ["https://ar-io.dev", "https://arweave.net"]) {
+    try {
+      const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
+      if (!response2.ok) continue;
+      const payload = await response2.json();
+      if (isObj13(payload)) return payload;
+    } catch {
+    }
+  }
+  return null;
+};
+var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
+  const surveysAddress = pickContractAddress(config);
+  const rpcUrls = pickRpcUrls(config);
+  const start = Number(config?.blockLimits?.start);
+  if (!/^0x[0-9a-fA-F]{40}$/.test(surveysAddress) || !rpcUrls.length || !Number.isFinite(start) || start < 0) {
+    return [];
+  }
+  const latestHex = await rpc({ rpcUrls, method: "eth_blockNumber", params: [], fetchImpl });
+  const latest = Number(BigInt(latestHex));
+  const configuredEnd = Number(config?.blockLimits?.end);
+  const end = Number.isFinite(configuredEnd) && configuredEnd >= start ? Math.min(configuredEnd, latest) : latest;
+  if (end < start || end - start > MAX_SCAN_BLOCKS) return [];
+  const ids = [];
+  for (let from = start; from <= end && ids.length < MAX_QUESTIONS; from += RPC_CHUNK_SIZE) {
+    const to = Math.min(end, from + RPC_CHUNK_SIZE - 1);
+    const logs = await rpc({
+      rpcUrls,
+      method: "eth_getLogs",
+      params: [{
+        address: surveysAddress,
+        fromBlock: `0x${from.toString(16)}`,
+        toBlock: `0x${to.toString(16)}`,
+        topics: [QUESTIONS_ADDED_TOPIC0]
+      }],
+      fetchImpl
+    });
+    (Array.isArray(logs) ? logs : []).forEach((log2) => {
+      decodeQuestionIds(log2?.data).forEach((id2) => {
+        if (!ids.includes(id2) && ids.length < MAX_QUESTIONS) ids.push(id2);
+      });
+    });
+  }
+  const questions = [];
+  for (const id2 of ids) {
+    const result = await rpc({
+      rpcUrls,
+      method: "eth_call",
+      params: [{ to: surveysAddress, data: `${GET_QUESTION_HASH_SELECTOR}${id2.slice(2)}` }, "latest"],
+      fetchImpl
+    });
+    const pointer = base64urlFromHex(result);
+    if (!pointer) continue;
+    const payload = await fetchArweaveQuestion(pointer, fetchImpl);
+    if (payload && payloadSessionSlug(payload) === lower3(slug)) {
+      questions.push({ ...payload, id: payload.id || id2 });
+    }
+  }
+  return dedupeQuestions(questions);
+};
+var loadPublicInterviewQuestions = async ({
+  env = {},
+  config = {},
+  slug = "",
+  storageRoute: storageRoute2,
+  fetch: fetchImpl = globalThis.fetch
+} = {}) => {
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute: storageRoute2 });
+  if (cloudflareQuestions.length) return cloudflareQuestions;
+  return loadOnChainQuestions({ config, slug, fetchImpl });
+};
+
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v4";
 var trim10 = (value) => String(value == null ? "" : value).trim();
@@ -79432,7 +80052,8 @@ var buildInterviewBriefDocument = ({
   answerContract: {
     binary: ["Agree", "Unsure", "Disagree"],
     rating: { min: 0, max: 10, step: 1 },
-    multichoice: "Use one exact question option."
+    multichoice: "Use one exact question option.",
+    quadratic: "Signed integer array in option order; sum(vote\xB2) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed."
   },
   researchCoverageContract: {
     countFields: [

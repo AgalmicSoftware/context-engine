@@ -40,6 +40,7 @@ const normalizeQuestion = (value = {}) => {
     prompt,
     type,
     options,
+    ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
   };
 };
 

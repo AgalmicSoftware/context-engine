@@ -124,6 +124,7 @@
   "WIZARD_SESSION_COLOR_PREVIEW": "ce-wizard-session-color-preview",
   "SETTINGS_QUICK_CONTROLS": "ce-settings-quick-controls",
   "SETTINGS_THEME": "ce-settings-theme",
+  "SETTINGS_COLOR_BLIND": "ce-settings-color-blind",
   "WIZARD_SESSION_HEADER_INLINE_BAR": "ce-wizard-session-header-inline-bar",
   "WIZARD_SESSION_HEADER_URL_TOGGLE": "ce-wizard-session-header-url-toggle",
   "WIZARD_SESSION_HEADER_PASTE": "ce-wizard-session-header-paste",

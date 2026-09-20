@@ -20,6 +20,7 @@ export const LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS = [
 export const LISTENING_QUESTION_TYPES: QuestionTypeSelection = Object.freeze({
   binary: true,
   multichoice: true,
+  quadratic: true,
   rating: true,
   freeform: true,
 });
@@ -103,8 +104,13 @@ export const parseListeningQuestionResponse = (raw: unknown): GeneratedAiQuestio
   return parsed;
 };
 
-export const generateListeningQuestionId = (type: string, prompt: string, options: string[] = []) =>
-  generateSharedQuestionId(type, prompt, options);
+export const generateListeningQuestionId = (
+  type: string,
+  prompt: string,
+  options: string[] = [],
+  singleSelect = false,
+  voiceCredits = 99,
+) => generateSharedQuestionId(type, prompt, options, singleSelect, voiceCredits);
 
 export const buildListeningQuestionStatements = (
   payload: GeneratedAiQuestionPayload,

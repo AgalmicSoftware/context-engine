@@ -2,6 +2,29 @@
   display: block;
 }
 
+.colorBlindControl {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  margin: 0;
+  color: var(--ce-settings-text);
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  input {
+    appearance: auto;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--ce-action-primary);
+  }
+  input:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+}
+
 .field select.select {
   width: 100%;
   min-height: 42px;
@@ -13,6 +36,11 @@
   font-family: var(--ce-font-button);
   font-weight: 700;
   padding: var(--ce-control-padding-y) var(--ce-control-padding-x);
+
+  option {
+    color: var(--ce-document-text);
+    background-color: var(--ce-document-surface);
+  }
 
   &:focus-visible {
     outline: 3px solid var(--ce-focus-ring);

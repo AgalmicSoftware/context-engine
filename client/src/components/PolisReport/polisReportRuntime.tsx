@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseReportResponse, readReportAnswer, reportQuestionMetadata } from './polisReportAnswers';
 import * as d3 from 'd3';
 
 import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
@@ -16,6 +17,7 @@ import {
 } from '../SurveyTool/surveyToolWorkerCacheIsolation';
 import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
+import { withPolisReportDemoAnswers } from '../../utilities/demo/polisReportDemoAnswers';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
   getHistoricalFigureAvatarOrBlockie,
@@ -268,6 +270,7 @@ export const buildPolisReportPdfFilename = (sessionName: unknown, now: Date = ne
  **************************************************************/
 function safeJsonParse(str: unknown): UnknownRecord | null {
   if (!str) return null;
+  if (typeof str === 'object' && !Array.isArray(str)) return str as UnknownRecord;
   try {
     const parsed = JSON.parse(String(str));
     return parsed && typeof parsed === 'object' ? (parsed as UnknownRecord) : null;
@@ -320,7 +323,7 @@ export function normalizePolisBinaryVote(value: unknown): ConcretePolisVote | nu
   return null;
 }
 
-export const DEFAULT_POLIS_DEMO_DATA = demoData;
+export const DEFAULT_POLIS_DEMO_DATA = withPolisReportDemoAnswers(demoData);
 export const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;
 const POLIS_DEMO_CLUSTER_ANALYSIS_VERSION = 2;
 // Registry-backed demo pages can reuse the shared Context corpus fixture while
@@ -329,7 +332,7 @@ const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
   (Array.isArray(CE_DEMO_SESSION_SLUGS) ? CE_DEMO_SESSION_SLUGS : ['demo']).reduce<Record<string, unknown>>(
     (acc, rawSlug) => {
       const slug = normalizeSessionSlug(rawSlug);
-      if (slug) acc[slug] = resolveDemoPolisDataset(slug, DEFAULT_POLIS_DEMO_DATA);
+      if (slug) acc[slug] = withPolisReportDemoAnswers(resolveDemoPolisDataset(slug, demoData));
       return acc;
     },
     { demo: DEFAULT_POLIS_DEMO_DATA },
@@ -494,18 +497,14 @@ export function buildClusterAnalysisDataKey({
  * per-question filtered response arrays.
  *
  * Notes:
- *  - If caches are missing/partial, we skip that filter step gracefully.
- *  - We DO NOT read demo mode here; caller bypasses filtering when demo is on.
+ *  - Active tag/type filters require a metadata match.
+ *  - Demo callers supply fixture question metadata instead of relying on caches.
  **************************************************************/
-export function applyFilterStateToAggregator(
-  questionResponses: PolisQuestionResponses | UnknownRecord | null | undefined,
+export function readPolisReportCacheContext(
   network: UnknownRecord | null | undefined,
-  filterState: PolisFilterState | null | undefined,
   sessionSlug: unknown,
   sessionConfig?: unknown,
-): PolisQuestionResponses {
-  if (!questionResponses || typeof questionResponses !== 'object') return {};
-
+) {
   // Resolve group slug (optional param -> URL path fallback)
   const resolveSlug = () => {
     if (typeof sessionSlug === 'string') {
@@ -575,6 +574,23 @@ export function applyFilterStateToAggregator(
     });
     Object.assign(sbtList, scopedSbtList);
   });
+
+  return { qMap, sbtList };
+}
+
+export function applyFilterStateToAggregator(
+  questionResponses: PolisQuestionResponses | UnknownRecord | null | undefined,
+  network: UnknownRecord | null | undefined,
+  filterState: PolisFilterState | null | undefined,
+  sessionSlug: unknown,
+  sessionConfig?: unknown,
+  questionMetadata: Record<string, PolisQuestionMeta> = {},
+  options: { allowDemo?: boolean } = {},
+): PolisQuestionResponses {
+  if (!questionResponses || typeof questionResponses !== 'object') return {};
+
+  const { qMap: cachedQuestions, sbtList } = readPolisReportCacheContext(network, sessionSlug, sessionConfig);
+  const qMap = { ...cachedQuestions, ...questionMetadata };
 
   // ---- Build combined tag set (lowercased) ----
   const combinedTagSet = new Set<string>();
@@ -703,20 +719,21 @@ export function applyFilterStateToAggregator(
     const qIdLower = String(qId || '').toLowerCase();
 
     // Question metadata (may be missing)
-    const qMeta = qMap[qIdLower] || null;
-    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map((t) => String(t).toLowerCase()) : null;
+    const firstPayload = Array.isArray(arr) ? parseReportResponse(arr[0]?.response) : {};
+    const qMeta = reportQuestionMetadata(qMap[qIdLower], firstPayload);
+    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map((t) => String(t).trim().toLowerCase()) : null;
     const qTypeLower = qMeta?.type ? String(qMeta.type).toLowerCase() : null;
     const creatorLower = qMeta?.creator ? String(qMeta.creator).toLowerCase() : null;
 
-    // 1) Tags: if we have tags in cache AND combined set is non-empty, require intersection.
-    if (combinedTagSet.size > 0 && Array.isArray(qTagsLower) && qTagsLower.length > 0) {
-      const hasAny = qTagsLower.some((t) => combinedTagSet.has(t));
+    // 1) Tags belong to the question; never match respondent attributes.
+    if (combinedTagSet.size > 0) {
+      const hasAny = qTagsLower?.some((t) => combinedTagSet.has(t));
       if (!hasAny) return; // skip this question
     }
-    // If tags missing from cache, skip gating (graceful).
+    // Missing question tags cannot establish a match to an active tag filter.
 
-    // 2) Types: if provided AND we know the type, require it to match; if unknown type, skip gating.
-    if (typesSet.size > 0 && qTypeLower && !typesSet.has(qTypeLower)) {
+    // 2) Explicit type filters require a known matching question type.
+    if (typesSet.size > 0 && (!qTypeLower || !typesSet.has(qTypeLower))) {
       return;
     }
 
@@ -739,6 +756,9 @@ export function applyFilterStateToAggregator(
     const nextArr: PolisResponseRow[] = [];
     const originalArr = Array.isArray(arr) ? (arr as PolisResponseRow[]) : [];
     for (const respObj of originalArr) {
+      const payload = parseReportResponse(respObj?.response);
+      if (!options.allowDemo && isPolisDemoFixturePayload(payload)) continue;
+      if (!isPolisRealRowAllowedForSession(respObj, payload, sessionSlug)) continue;
       const responderLower = respObj?.responder ? String(respObj.responder).toLowerCase() : '';
       if (!responderLower) continue;
 
@@ -774,18 +794,21 @@ export function applyFilterStateToAggregator(
       for (const r of arr) {
         const parsed = safeJsonParse(r?.response);
         if (!parsed) continue;
-        if (isPolisDemoFixturePayload(parsed)) continue;
-        // We only consider binary answers here to align with rating-matrix & spec
-        if (parsed.type !== 'binary') continue;
+        const question = reportQuestionMetadata(qMap[qId.toLowerCase()], parsed);
         const answer = asRecord(parsed.answer);
         if (answer.encrypted) continue;
 
         if (topBy === 'responses') {
-          if (normalizePolisBinaryVote(answer.value) !== null) {
+          if (
+            question.type === 'binary'
+              ? normalizePolisBinaryVote(answer.value) !== null
+              : readReportAnswer(parsed, question) !== null
+          ) {
             score += 1;
           }
         } else {
-          const imp = Number(parsed?.conviction ?? parsed?.importance ?? 0);
+          const rawImportance = parsed?.conviction ?? parsed?.importance ?? 0;
+          const imp = Number(asRecord(rawImportance).value ?? rawImportance);
           if (!Number.isNaN(imp)) score += imp;
         }
       }
@@ -831,7 +854,7 @@ function isPolisRealRowAllowedForSession(
 
 export function buildRatingMatrixFromRealData(
   realQR: PolisQuestionResponses | UnknownRecord,
-  options: { sessionSlug?: unknown } = {},
+  options: { sessionSlug?: unknown; allowDemo?: boolean } = {},
 ): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
     return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
@@ -852,7 +875,7 @@ export function buildRatingMatrixFromRealData(
     let firstPrompt: unknown = null;
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
-      if (isPolisDemoFixturePayload(parsed)) continue;
+      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       if (parsed && typeof parsed === 'object' && parsed.type) {
         firstType = parsed.type;
@@ -868,7 +891,7 @@ export function buildRatingMatrixFromRealData(
     // Gather participants who answered this (binary) question
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
-      if (isPolisDemoFixturePayload(parsed)) continue;
+      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       if (r?.responder) {
         const responder = String(r.responder).toLowerCase();
@@ -915,7 +938,7 @@ export function buildRatingMatrixFromRealData(
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
       if (!parsed || parsed.type !== 'binary') continue;
-      if (isPolisDemoFixturePayload(parsed)) continue;
+      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       const answer = asRecord(parsed.answer);
       if (answer.encrypted) continue;
@@ -1182,8 +1205,8 @@ export function getUTCDataTimestamp() {
 }
 
 export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic grouping.`;
+export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering.`;
 export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT =
-  "Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
+  "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
 export const OPINION_GROUPS_TOOLTIP_TEXT =
-  "Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.";
+  "Leave K on auto to use Polis Auto's automatic clustering, or set K manually when exploring UMAP or SVD/PCA layouts.";

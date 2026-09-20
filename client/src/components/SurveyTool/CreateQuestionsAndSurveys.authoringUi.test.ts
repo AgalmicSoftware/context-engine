@@ -270,6 +270,28 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(treeHasText(modeSwitches[0], 'from URL / Content')).toBe(true);
   });
 
+  it.each([25, undefined])('preserves the AI quadratic budget %s when opening the editor', (voiceCredits) => {
+    const instance = makeInstance();
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    const options = ['Parks', 'Transit'];
+
+    instance.handleAutoQuestionsGenerated([
+      { type: 'quadratic', prompt: 'Allocate support', options, voiceCredits },
+    ], [], '');
+
+    const budget = voiceCredits ?? 99;
+    expect(instance.state.questions[0]).toMatchObject({
+      type: 'quadratic', options, voiceCredits: budget,
+      id: instance.generateQuestionId('quadratic', 'Allocate support', options, false, budget),
+    });
+    const budgetInputs = collectTreeNodes(instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
+    expect(budgetInputs).toHaveLength(1);
+    expect(budgetInputs[0].props.value).toBe(budget);
+  });
+
   it('hides survey/question gate controls when the active session exposes no selectable gates', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({

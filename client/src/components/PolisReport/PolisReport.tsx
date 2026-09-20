@@ -1,5 +1,5 @@
 /** @file PolisReport.tsx */
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faQuestionCircle,
@@ -7,6 +7,8 @@ import {
   faMagic as faWand,
   faCog,
   faInfoCircle,
+  faMinus,
+  faPlus,
   faMinusSquare,
   faPlusSquare,
   faCaretDown,
@@ -31,11 +33,13 @@ import {
   loadBrowserModuleWithRetry,
   resolveDefaultExport,
   saveCanvasAsPagedPdf,
+  prepareReportCanvasClone,
 } from '../../utilities/ui/browserPdfExport';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { QuestionStanceBar } from '../Shared/QuestionStanceCard';
+import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import BeeswarmPlot, { type BeeswarmPoint } from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import {
   buildQuestionScanProgressDisplay,
@@ -90,6 +94,13 @@ import {
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
 } from './polisReportRuntime';
+import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSections';
+import { buildReportAnswerQuestions } from './polisReportAnswers';
+import { readPolisReportCacheContext } from './polisReportRuntime';
+import {
+  buildPolisDemoSurveyResultsNetworkData,
+  buildPolisDemoSurveyResultsAggregatorData,
+} from '../SurveyTool/surveyPolisDemoResultsData';
 import PolisReportSectionToggleLabel from './PolisReportSectionToggleLabel';
 export {
   OPINION_GROUPS_TOOLTIP_TEXT,
@@ -113,7 +124,7 @@ export {
 } from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
-export const POLIS_CLUSTER_COLORS = d3Report.schemeCategory10;
+export const POLIS_CLUSTER_COLORS = CHART_SERIES_COLORS;
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
 
@@ -141,7 +152,6 @@ export const buildPolisParticipantProfileHref = ({
 export default function PolisReport({
   questionResponses, // Aggregator object { questionId -> [ { responder, questionId, response }, ... ] }
   network, // blockchain network object
-  disclaimersActive, // boolean
   sbtFilterString, // (Optional) String describing SBT filters applied by parent
   filterState, // (Optional) Object with detailed filter state from parent
   sessionName = null, // Optional session name
@@ -178,6 +188,16 @@ export default function PolisReport({
   const [questionLabels, setQuestionLabels] = useState<string[]>([]);
   const resolvedSessionName = sessionName;
   const resolvedSessionInfo = sessionInfo;
+  const hasActiveReportFilters = Boolean(
+    filterState &&
+    (['selectedTags', 'tag', 'tags', 'includeTags', 'questionTypes'].some((key) => {
+      const value = filterState[key];
+      return Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim().length > 0;
+    }) ||
+      Number(filterState.topQuestions?.count) > 0 ||
+      filterState.onlyVerifiedHumans ||
+      Object.values(filterState.sbtFilter || {}).some((value) => Array.isArray(value) && value.length > 0)),
+  );
   const activeReportSlug = normalizeSessionSlug(slug || sessionSlug || '');
   const resolvedSessionSlug = activeReportSlug;
   const hasBlockchainContext = Number(networkChainId || network?.id || network?.chainId || 0) > 0;
@@ -269,7 +289,15 @@ export default function PolisReport({
   // Collapsible states
   const [beeswarmOpen, setBeeswarmOpen] = useState<boolean>(true);
   const [participantsGraphOpen, setParticipantsGraphOpen] = useState<boolean>(true);
+  const allQuestionsBodyId = useId();
   const [allQuestionsOpen, setAllQuestionsOpen] = useState<boolean>(true);
+  const [answerSectionsOpen, setAnswerSectionsOpen] = useState<AnswerSectionsOpen>({
+    binary: true,
+    freeform: true,
+    rating: true,
+    multichoice: true,
+    quadratic: true,
+  });
   const [statsOpen, setStatsOpen] = useState<boolean>(true);
   const [participantsListOpen, setParticipantsListOpen] = useState<boolean>(true); // NEW: List of Participants section toggle
 
@@ -468,6 +496,7 @@ export default function PolisReport({
   // Caller overrides stay on the normal computed/AI path even for demo slugs.
   const shouldUsePrecomputedDemoClusters = !!(
     precomputedDemoClusterState &&
+    !hasActiveReportFilters &&
     isDemoSessionSlug(activeReportSlug) &&
     effectiveUseDemoData &&
     activeDemoData === trustedBuiltInDemoData &&
@@ -628,6 +657,7 @@ export default function PolisReport({
    * handleCollapseAll / handleExpandAll
    ***************************************************************/
   function handleCollapseAll() {
+    setAnswerSectionsOpen({});
     setBeeswarmOpen(false);
     setParticipantsGraphOpen(false);
     setAllQuestionsOpen(false);
@@ -642,6 +672,7 @@ export default function PolisReport({
   }
 
   function handleExpandAll() {
+    setAnswerSectionsOpen({ binary: true, freeform: true, rating: true, multichoice: true, quadratic: true });
     setBeeswarmOpen(true);
     setParticipantsGraphOpen(true);
     setAllQuestionsOpen(true);
@@ -709,6 +740,45 @@ export default function PolisReport({
     }
   };
 
+  const reportData = useMemo(() => {
+    const metadata = effectiveUseDemoData
+      ? buildPolisDemoSurveyResultsNetworkData(activeDemoData, { sessionSlug: activeReportSlug }).questions
+      : readPolisReportCacheContext(network, activeReportSlug, sessionConfig).qMap;
+    const source = effectiveUseDemoData
+      ? buildPolisDemoSurveyResultsAggregatorData(activeDemoData, { sessionSlug: activeReportSlug })
+      : questionResponses;
+    const filtered = applyFilterStateToAggregator(
+      source,
+      network,
+      filterState,
+      activeReportSlug,
+      sessionConfig,
+      metadata,
+      { allowDemo: effectiveUseDemoData },
+    );
+    return {
+      filtered,
+      answers: buildReportAnswerQuestions(filtered, metadata, {
+        sessionSlug: activeReportSlug,
+        allowDemo: effectiveUseDemoData,
+      }),
+    };
+    // Cache writes may preserve aggregator identity; the nonce/readiness signals
+    // must also rebuild metadata so tags and option labels cannot remain stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Cache metadata can change without a new response object.
+  }, [
+    questionResponses,
+    network,
+    filterState,
+    activeReportSlug,
+    sessionConfig,
+    effectiveUseDemoData,
+    activeDemoData,
+    questionResponsesNonce,
+    isQuestionCacheReady,
+    isResponsesCacheReady,
+  ]);
+
   /***************************************************************
    * Build rating matrix from real or demo
    ***************************************************************/
@@ -717,50 +787,15 @@ export default function PolisReport({
     let buildResult: RatingMatrixBuildResult;
     try {
       if (!effectiveUseDemoData) {
-        // TODO(worker-group-results-filter): Integrate when merging the concurrent
-        // PolisReport changes; retain this TODO until the behavior below is covered.
-        // Cloudflare auto-join records native Group membership, but the current
-        // filterState.sbtFilter / polisReportRuntime.applyFilterStateToAggregator
-        // only resolves on-chain SBT holders. It does NOT yet isolate Worker cohorts.
-        // Add the same optional creator/responder include/exclude Group controls
-        // exposed by SurveyTool/QuestionFilter (QuestionFilterCapabilitySbtSection
-        // and QuestionFilterSections), backed by native Groups for Worker sessions.
-        // Keep the shared filterState flowing through SurveyResults / OnePageSession
-        // into this report; do not hard-code an EDDY default or filter only the chart.
-        // Extend PolisFilterState in polisReportRuntime with a distinct Worker Group
-        // selection keyed by canonical session ID, Worker origin, slug, and groupId;
-        // never reinterpret groupId as an SBT contract address or use chain scans.
-        // Use domains/worker/workerGroupPorts loadWorkerGroupOverview and
-        // loadWorkerGroupMembers with the authenticated session token, paging until
-        // nextCursor is empty. Anonymous discovery and /groups/my-memberships cannot
-        // provide a cohort directory. Honor memberVisibility and identity validation;
-        // loading, forbidden, partial, stale, or failed reads must not silently show
-        // unfiltered results. Map evm_address/passkey_account principal.address to
-        // response.responder using canonical address normalization; Telegram/agent
-        // principals require an explicit matching response-identity representation.
-        // Resolve membership before this synchronous matrix build. Apply creator
-        // rules to questions and responder rules to rows, preserving existing
-        // include/exclude semantics and other filters. Recompute on selection,
-        // identity and membership changes (subscribeWorkerGroupsChanged); clear
-        // stale data on account/session switches and refresh remote memberships.
-        // All stats, clusters, participant lists, AI analysis/cache keys, exports,
-        // and renderFilterInfo must describe the same filtered cohort.
-        // Acceptance: EDDY-2026 (groupId eddy-2026 in session test-eddy-1) can be
-        // included/excluded via question Results and updates Polis consistently;
-        // cover multiple Groups, pagination, empty cohorts, sign-in/auto-join/leave,
-        // account/session switching, denied reads, and legacy SBT/demo regressions.
-        // Apply the upstream filterState BEFORE building the matrix
-        const filteredAgg = applyFilterStateToAggregator(
-          questionResponses,
-          network,
-          filterState,
-          activeReportSlug,
-          sessionConfig,
-        );
-        buildResult = buildRatingMatrixFromRealData(filteredAgg, { sessionSlug: activeReportSlug });
+        buildResult = buildRatingMatrixFromRealData(reportData.filtered, { sessionSlug: activeReportSlug });
       } else {
-        // Demo mode: bypass all filters entirely
-        buildResult = buildRatingMatrixFromDemo(activeDemoData);
+        const demoResult = buildRatingMatrixFromDemo(activeDemoData);
+        buildResult = hasActiveReportFilters
+          ? {
+              ...buildRatingMatrixFromRealData(reportData.filtered, { sessionSlug: activeReportSlug, allowDemo: true }),
+              displayNamesMap: demoResult.displayNamesMap,
+            }
+          : demoResult;
       }
       if (!buildResult.matrix || !buildResult.matrix.length) {
         setRatingMatrix(null);
@@ -789,7 +824,8 @@ export default function PolisReport({
       setErrorMessage(`Error building rating matrix: ${getErrorMessage(e)}`);
     }
   }, [
-    questionResponses,
+    reportData,
+    hasActiveReportFilters,
     effectiveUseDemoData,
     filterState,
     network,
@@ -1036,8 +1072,9 @@ export default function PolisReport({
    * PDF Download (UPDATED for layout + BeeSwarm numeric dots + size)
    ***************************************************************/
   const handleDownloadPDF = async () => {
-    if (!reportRef.current) return;
+    if (!reportRef.current || isPdfModeActive) return;
     const input = reportRef.current;
+    setErrorMessage(null);
 
     // Enter PDF mode (BeeSwarm numbers; hide tooltips via CSS)
     setIsPdfModeActive(true);
@@ -1076,7 +1113,10 @@ export default function PolisReport({
       const html2canvas = resolveDefaultExport<(typeof import('html2canvas'))['default']>(html2canvasModule);
       const jsPDF = resolveJsPdfConstructor(jsPdfModule);
 
-      // Capture full element
+      // Measure the desktop capture clone, not the mobile live layout: media
+      // queries change chart heights when html2canvas uses the export viewport.
+      let captureWidth = input.getBoundingClientRect().width;
+      let captureBlocks: { top: number; bottom: number }[] = [];
       const canvas = await html2canvas(input, {
         scale: 2,
         useCORS: true,
@@ -1086,14 +1126,30 @@ export default function PolisReport({
         windowWidth: input.scrollWidth,
         windowHeight: input.scrollHeight,
         ignoreElements: (el) => el.classList && el.classList.contains(styles.pdfIgnore),
+        onclone: (_document, element) => {
+          prepareReportCanvasClone(element);
+          const reportBounds = element.getBoundingClientRect();
+          captureWidth = reportBounds.width;
+          captureBlocks = Array.from(element.querySelectorAll<HTMLElement>('[data-pdf-keep-together]')).map((block) => {
+            const bounds = block.getBoundingClientRect();
+            return { top: bounds.top - reportBounds.top, bottom: bounds.bottom - reportBounds.top };
+          });
+        },
       });
 
+      const captureScale = canvas.width / captureWidth;
+      const keepTogether = captureBlocks.map((block) => ({
+        top: Math.floor(block.top * captureScale),
+        bottom: Math.ceil(block.bottom * captureScale),
+      }));
       saveCanvasAsPagedPdf({
         canvas,
+        keepTogether,
         filename: buildPolisReportPdfFilename(resolvedSessionName),
         JsPdf: jsPDF,
       });
     } catch (e) {
+      surveyLog.error('Polis report PDF export failed', e);
       setErrorMessage('PDF export failed — please try refreshing the page and downloading again.');
     } finally {
       // Restore tooltips
@@ -1128,10 +1184,23 @@ export default function PolisReport({
     }
   }
 
+  // Reuse the beeswarm's difference score so the list and graph rank the same data.
+  const rankedBinaryQuestions = useMemo(() => {
+    const scores = new Map(memoizedCommentSwarmResult.commentStats.map((item) => [item.commentIndex, item.extremity]));
+    return (ratingMatrix || [])
+      .map((votes, index) => ({
+        votes,
+        index,
+        score: Number(scores.get(index)) || 0,
+        responses: votes.filter((vote) => vote !== null && vote !== undefined).length,
+      }))
+      .sort((a, b) => b.score - a.score || b.responses - a.responses || a.index - b.index);
+  }, [ratingMatrix, memoizedCommentSwarmResult.commentStats]);
+
   /***************************************************************
    * Build question list with box plots
    ***************************************************************/
-  function buildQuestionList() {
+  function buildQuestionList(heading: React.ReactNode, limit?: number) {
     if (!ratingMatrix || !ratingMatrix.length) {
       return (
         <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px' }}>
@@ -1139,7 +1208,7 @@ export default function PolisReport({
         </p>
       );
     }
-    const lines = ratingMatrix.map((votes, i: number) => {
+    const lines = rankedBinaryQuestions.slice(0, limit).map(({ votes, index: i }, position) => {
       const label = questionLabels[i] || `#${i + 1}`;
       const originalId = allQuestions[i];
       const prompt = questionPrompts[originalId] || '(No prompt)';
@@ -1153,20 +1222,22 @@ export default function PolisReport({
       return (
         <div
           key={i}
+          data-pdf-keep-together
           style={{
             marginBottom: '6px',
             borderBottom: '1px solid var(--ce-document-border)',
             paddingBottom: '6px',
           }}
         >
+          {position === 0 && heading}
           <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
             {label}: {prompt}
           </div>
           {/* UPDATED: Added className for mobile styling */}
           <div className={styles.questionVoteRow}>
             <span style={{ fontSize: '0.8rem', marginRight: '8px' }}>
-              <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
-              {unsures} / (Total: {total})
+              <strong>Agree:</strong> {agrees} / <strong>Unsure:</strong> {unsures} / <strong>Disagree:</strong>{' '}
+              {disagrees} / (Total: {total})
             </span>
             <QuestionStanceBar votes={votes} />
           </div>
@@ -1466,15 +1537,20 @@ export default function PolisReport({
         {arr.map((rq, idx) => {
           const qIndex = rq.questionIndex;
           const questionPrompt = rq.prompt;
-          const representativeDifference = Number(rq.difference);
-          const hasRepresentativeDifference =
-            rq.difference !== null && rq.difference !== undefined && Number.isFinite(representativeDifference);
           const clusterVotes = getVotesForQuestionInCluster(
             qIndex,
             clusterIndex,
             ratingMatrix,
             activeClusterAssignments,
           );
+
+          const stance = rq.repfulFor === 'disagree' ? 'disagree' : 'agree';
+          const clusterCounts = countVotes(clusterVotes);
+          const overallCounts = countVotes(ratingMatrix?.[qIndex] || []);
+          const comparison =
+            clusterCounts.responded && overallCounts.responded
+              ? `${Math.round((clusterCounts[stance] / clusterCounts.responded) * 100)}% ${stance} in this cluster · ${Math.round((overallCounts[stance] / overallCounts.responded) * 100)}% overall`
+              : 'No responses to compare in this cluster';
 
           return (
             <div
@@ -1487,10 +1563,11 @@ export default function PolisReport({
               }}
             >
               <strong>{rq.label}</strong>: {questionPrompt} <br />
-              <small style={{ color: 'var(--ce-document-text-muted)' }}>
-                {hasRepresentativeDifference
-                  ? `(${rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation by ${(representativeDifference * 100).toFixed(1)} percentage points)`
-                  : '(difference from the overall conversation is unavailable)'}
+              <small
+                style={{ color: 'var(--ce-document-text-muted)' }}
+                title="Percentages use responses to this question, including Unsure. Overall includes this cluster and respects the report filters."
+              >
+                {comparison}
               </small>
               <div style={{ marginTop: '4px' }}>
                 <QuestionStanceBar votes={clusterVotes} />
@@ -1581,14 +1658,56 @@ export default function PolisReport({
 
     return (
       <div style={{ marginTop: '12px', marginBottom: '20px' }}>
-        <strong style={{ marginRight: '6px' }}>
-          Opinion Groups
-          {renderTooltipReference('Groups are made of participants who voted similarly on statements.', {
-            title: 'Groups are made of participants who voted similarly on statements.',
-            style: { cursor: 'help', marginLeft: '4px' },
-          })}
-          :
-        </strong>
+        <div className={styles.clusterHeader}>
+          <strong className={styles.clusterHeading}>
+            Opinion Clusters
+            {renderTooltipReference('Clusters contain participants who voted similarly on statements.', {
+              title: 'Clusters contain participants who voted similarly on statements.',
+              style: { cursor: 'help', marginLeft: '4px' },
+            })}
+          </strong>
+          <div className={`${styles.clusterHeaderActions} ${styles.pdfIgnore}`}>
+            <button
+              className={styles.analyzeClustersBtn}
+              onClick={handleAnalyzeClustersClick}
+              disabled={!!analysisLoadingKey}
+              data-testid={E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS}
+              title="Use AI to summarize each cluster’s unique viewpoint"
+            >
+              {analysisLoadingKey ? (
+                <>
+                  <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
+                  <span>Analyzing…</span>
+                </>
+              ) : (
+                <>
+                  <FontAwesomeIcon icon={faWand} />
+                  <span>Analyze clusters</span>
+                </>
+              )}
+            </button>
+            <div className={styles.clusterToggles}>
+              <button
+                type="button"
+                className={styles.clusterToggle}
+                onClick={handleCollapseAllClusters}
+                aria-label="Collapse Clusters"
+                title="Collapse Clusters"
+              >
+                <FontAwesomeIcon icon={faMinus} />
+              </button>
+              <button
+                type="button"
+                className={styles.clusterToggle}
+                onClick={handleExpandAllClusters}
+                aria-label="Expand Clusters"
+                title="Expand Clusters"
+              >
+                <FontAwesomeIcon icon={faPlus} />
+              </button>
+            </div>
+          </div>
+        </div>
         <div
           style={{
             display: 'flex',
@@ -1927,8 +2046,8 @@ export default function PolisReport({
                         <strong>{label}:</strong> {prompt}
                       </div>
                       <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
-                        <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees},{' '}
-                        <strong>Unsure:</strong> {unsures}, <strong>No Resp:</strong> {noresps}
+                        <strong>Agree:</strong> {agrees}, <strong>Unsure:</strong> {unsures}, <strong>Disagree:</strong>{' '}
+                        {disagrees}, <strong>No Resp:</strong> {noresps}
                       </div>
                       <QuestionStanceBar votes={rowVotes} />
                     </div>
@@ -2038,8 +2157,8 @@ export default function PolisReport({
                     {label}: {prompt}
                   </div>
                   <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
-                    <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
-                    {unsures}
+                    <strong>Agree:</strong> {agrees}, <strong>Unsure:</strong> {unsures}, <strong>Disagree:</strong>{' '}
+                    {disagrees}
                   </div>
                   <QuestionStanceBar votes={rowVotes} />
                 </div>
@@ -2086,7 +2205,7 @@ export default function PolisReport({
    * Render Filter Info (from filterState) - Comprehensive Version
    ***************************************************************/
   function renderActiveFilters() {
-    if (effectiveUseDemoData) {
+    if (effectiveUseDemoData && !hasActiveReportFilters) {
       return <span>None (Demo Data Active)</span>;
     }
 
@@ -2207,7 +2326,7 @@ export default function PolisReport({
    * Loading flag (component always renders; content spinners inline)
    ***************************************************************/
   // When Demo Data is active, bypass cache readiness gates so the report renders deterministically.
-  const hasRenderableReport = !!stats;
+  const hasRenderableReport = !!stats || reportData.answers.length > 0;
   const isModernStyle = reportStyle === 'modern';
   const isDarkStyle = reportStyle === 'dark';
   const sessionInfoText =
@@ -2284,29 +2403,28 @@ export default function PolisReport({
 
       {showSettingsRow && (
         <div className={`${styles.pdfIgnore} ${styles.settingsRow}`}>
-          <div style={{ marginRight: '12px', position: 'relative' }}>
+          <div className={styles.settingsItem}>
             <button
               onClick={handleDownloadPDF}
-              style={{
-                padding: '6px 12px',
-                cursor: 'pointer',
-                marginRight: '4px',
-              }}
+              disabled={isPdfModeActive}
+              className={styles.downloadButton}
               onMouseEnter={() => {
                 if (enableTooltips) {
                   cancelTooltipHide();
-                  setHoveredContent('Downloads only the currently open sections of this report as a PDF');
+                  setHoveredContent(
+                    'Downloads this filtered report, including all answered questions in the response sections',
+                  );
                 }
               }}
               onMouseLeave={() => scheduleTooltipHide(400)}
-              title="Download the currently open sections of the report"
+              title="Download the filtered report"
             >
               Download as PDF {enableTooltips && <FontAwesomeIcon icon={faInfoCircle} style={{ marginLeft: '4px' }} />}
             </button>
           </div>
 
-          <div style={{ marginRight: '12px' }}>
-            <label className={styles.demoToggleLabel} style={{ marginRight: '10px' }}>
+          <div className={styles.settingsItem}>
+            <label className={styles.demoToggleLabel}>
               <input
                 type="checkbox"
                 data-testid={E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE}
@@ -2320,20 +2438,20 @@ export default function PolisReport({
             </label>
           </div>
 
-          <div style={{ marginRight: '12px' }}>
-            <label className={styles.demoToggleLabel} style={{ marginRight: '5px' }}>
+          <div className={styles.settingsItem}>
+            <label className={styles.demoToggleLabel}>
               <input
                 type="checkbox"
                 checked={enableTooltips}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnableTooltips(e.target.checked)}
-                style={{ marginRight: '4px', cursor: 'pointer' }}
+                className={styles.demoToggleCheckbox}
               />
               Show Explainers
             </label>
           </div>
 
-          <div style={{ marginRight: '12px' }}>
-            <label className={styles.demoToggleLabel} htmlFor="report-style-select" style={{ marginRight: '6px' }}>
+          <div className={styles.settingsItem}>
+            <label className={styles.demoToggleLabel} htmlFor="report-style-select">
               Report style:
             </label>
             <select
@@ -2348,13 +2466,9 @@ export default function PolisReport({
             </select>
           </div>
 
-          <div style={{ marginRight: '12px' }}>
-            <button onClick={handleCollapseAll} style={{ marginRight: '4px' }}>
-              Collapse All
-            </button>
-            <button onClick={handleExpandAll} style={{ marginRight: '8px' }}>
-              Expand All
-            </button>
+          <div className={styles.settingsActions}>
+            <button onClick={handleCollapseAll}>Collapse All</button>
+            <button onClick={handleExpandAll}>Expand All</button>
           </div>
         </div>
       )}
@@ -2397,13 +2511,6 @@ export default function PolisReport({
           </h4>
         )}
 
-        {disclaimersActive && (
-          <div className={styles.disclaimerBox}>
-            <strong>Note:</strong> Only non-encrypted, binary (Agree/Disagree/Unsure) responses have been considered in
-            this Polis-inspired report.
-          </div>
-        )}
-
         {errorMessage && (
           <div style={{ color: 'var(--ce-status-danger-text)', marginBottom: '10px', fontWeight: 'bold' }}>
             Error: {errorMessage}
@@ -2444,223 +2551,232 @@ export default function PolisReport({
               </div>
             )}
           </div>
-        ) : !stats ? (
-          <p className={styles.noData}>No non-encrypted binary responses found, or no Demo data loaded.</p>
+        ) : !hasRenderableReport ? (
+          <p className={styles.noData}>No readable responses match the current filters.</p>
         ) : (
           <>
-            <div className={styles.sectionCollapse}>
-              <div
-                className={styles.sectionHeaderRow}
-                style={{ width: '100%', cursor: 'pointer' }}
-                onClick={() => setStatsOpen(!statsOpen)}
-              >
-                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon icon={faCaretUp} style={{ marginRight: '6px' }} />
-                  Summary and Statistics
-                </h5>
-                <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  <PolisReportSectionToggleLabel open={statsOpen} />
-                </div>
-              </div>
-              {statsOpen ? (
-                <div className={styles.statsSectionCollapsible}>
-                  <div className={styles.statsSection}>
-                    <div className={styles.statsRow}>
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>
-                          Participants
-                          {renderTooltipReference('Participants who voted or wrote statements in the conversation.')}:
-                        </span>
-                        <span className={styles.statValue}>{stats.nParticipants}</span>
-                      </div>
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>
-                          Statements
-                          {renderTooltipReference(
-                            'Number of statements (questions) with a binary vote option available.',
-                          )}
-                          :
-                        </span>
-                        <span className={styles.statValue}>{stats.nComments}</span>
-                      </div>
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>
-                          Votes
-                          {renderTooltipReference(
-                            'Total agree or disagree clicks recorded across all statements by participants.',
-                          )}
-                          :
-                        </span>
-                        <span className={styles.statValue}>{stats.totalVotes}</span>
-                      </div>
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>
-                          Votes/Voter Avg
-                          {renderTooltipReference('The average number of vote actions each participant made.')}:
-                        </span>
-                        <span className={styles.statValue}>{stats.votesPerVoterAvg.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    <div className={styles.statsRow}>
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>
-                          Active Filters
-                          {renderTooltipReference('Summary of all active filters applied to this data.')}:
-                        </span>
-                        <div className={styles.statValue}>{renderActiveFilters()}</div>
-                      </div>
-                    </div>
-
-                    {/* Added row for network and block info */}
-                    <div className={styles.statsRow}>
-                      {hasBlockchainContext ? (
-                        <div className={styles.statsItem}>
-                          <span className={styles.statLabel}>Blockchain:</span>
-                          <span className={styles.statValue}>
-                            {formatBlockchainNetworkLabel(network, networkChainId)}
-                          </span>
-                        </div>
-                      ) : null}
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>Timestamp:</span>
-                        <span className={styles.statValue}>{getUTCDataTimestamp()}</span>
-                      </div>
+            {stats && (
+              <>
+                <div className={styles.sectionCollapse}>
+                  <div
+                    className={styles.sectionHeaderRow}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                    onClick={() => setStatsOpen(!statsOpen)}
+                  >
+                    <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
+                      <FontAwesomeIcon icon={faCaretUp} style={{ marginRight: '6px' }} />
+                      Summary and Statistics
+                    </h5>
+                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                      <PolisReportSectionToggleLabel open={statsOpen} />
                     </div>
                   </div>
-                </div>
-              ) : null}
-            </div>
+                  {statsOpen ? (
+                    <div className={styles.statsSectionCollapsible}>
+                      <div className={styles.statsSection}>
+                        <div className={styles.statsRow}>
+                          <div className={styles.statsItem}>
+                            <span className={styles.statLabel}>
+                              Participants
+                              {renderTooltipReference(
+                                'Participants who voted or wrote statements in the conversation.',
+                              )}
+                              :
+                            </span>
+                            <span className={styles.statValue}>{stats.nParticipants}</span>
+                          </div>
+                          <div className={styles.statsItem}>
+                            <span className={styles.statLabel}>
+                              Statements
+                              {renderTooltipReference(
+                                'Number of statements (questions) with a binary vote option available.',
+                              )}
+                              :
+                            </span>
+                            <span className={styles.statValue}>{stats.nComments}</span>
+                          </div>
+                          <div className={styles.statsItem}>
+                            <span className={styles.statLabel}>
+                              Votes
+                              {renderTooltipReference(
+                                'Total agree or disagree clicks recorded across all statements by participants.',
+                              )}
+                              :
+                            </span>
+                            <span className={styles.statValue}>{stats.totalVotes}</span>
+                          </div>
+                          <div className={styles.statsItem}>
+                            <span className={styles.statLabel}>
+                              Votes/Voter Avg
+                              {renderTooltipReference('The average number of vote actions each participant made.')}:
+                            </span>
+                            <span className={styles.statValue}>{stats.votesPerVoterAvg.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div className={styles.statsRow}>
+                          <div className={styles.statsItem}>
+                            <span className={styles.statLabel}>
+                              Active Filters
+                              {renderTooltipReference('Summary of all active filters applied to this data.')}:
+                            </span>
+                            <div className={styles.statValue}>{renderActiveFilters()}</div>
+                          </div>
+                        </div>
 
-            {/* CONSENSUS SECTION */}
-            <div className={styles.sectionCollapse}>
-              <div
-                className={styles.sectionHeaderRow}
-                style={{ width: '100%', cursor: 'pointer' }}
-                onClick={() => setBeeswarmOpen(!beeswarmOpen)}
-              >
-                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
-                  Consensus and Difference
-                </h5>
-                <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  <PolisReportSectionToggleLabel open={beeswarmOpen} />
-                </div>
-              </div>
-              {beeswarmOpen ? <div className={styles.graphSection}>{renderCommentSwarm()}</div> : null}
-            </div>
-
-            {/* PARTICIPANTS + STATEMENTS GRAPH */}
-            <div className={styles.sectionCollapse}>
-              <div
-                className={styles.sectionHeaderRow}
-                style={{ width: '100%', cursor: 'pointer' }}
-                onClick={() => setParticipantsGraphOpen(!participantsGraphOpen)}
-              >
-                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon
-                    icon={participantsGraphOpen ? faCaretUp : faCaretDown}
-                    style={{ marginRight: '6px' }}
-                  />
-                  Participants Graph
-                  {renderTooltipReference(PARTICIPANTS_GRAPH_TOOLTIP_TEXT, {
-                    ariaLabel: 'Participants graph view details',
-                  })}
-                </h5>
-                <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  <PolisReportSectionToggleLabel open={participantsGraphOpen} />
-                </div>
-              </div>
-              {participantsGraphOpen ? (
-                <>
-                  <div className={styles.participantGraphControls}>
-                    <div className={styles.controlGroup}>
-                      <label htmlFor="embedding-choice-select">
-                        Embedding:
-                        {renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}
-                      </label>
-                      <select
-                        id="embedding-choice-select"
-                        value={embeddingChoice}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                          handleEmbeddingChoiceChange(e.target.value as EmbeddingChoice)
-                        }
-                        style={{ padding: '4px' }}
-                      >
-                        <option value="UMAP">UMAP</option>
-                        <option value="SVD">SVD/PCA</option>
-                        <option value="POLIS">{REPORT_DEFAULT_EMBEDDING_LABEL}</option>
-                      </select>
-                    </div>
-
-                    <div className={styles.controlGroup}>
-                      <label>
-                        Opinion groups:
-                        {renderTooltipReference(OPINION_GROUPS_TOOLTIP_TEXT)}
-                      </label>
-                      <div className={styles.numberInputWrapper}>
-                        <button
-                          className={styles.stepperButton}
-                          onClick={() => stepManualClusterCount(-1)}
-                          aria-label="Decrease cluster count"
-                        >
-                          -
-                        </button>
-                        <input
-                          id="cluster-count-input"
-                          type="number"
-                          value={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            handleManualClusterCountChange(e.target.value)
-                          }
-                          onBlur={handleManualClusterCountBlur}
-                          className={styles.clusterNumberInput}
-                          min="2"
-                        />
-                        <button
-                          className={styles.stepperButton}
-                          onClick={() => stepManualClusterCount(1)}
-                          aria-label="Increase cluster count"
-                        >
-                          +
-                        </button>
-                        <button type="button" onClick={() => setManualClusterCount('')} style={{ marginLeft: '6px' }}>
-                          Auto
-                        </button>
+                        {/* Added row for network and block info */}
+                        <div className={styles.statsRow}>
+                          {hasBlockchainContext ? (
+                            <div className={styles.statsItem}>
+                              <span className={styles.statLabel}>Blockchain:</span>
+                              <span className={styles.statValue}>
+                                {formatBlockchainNetworkLabel(network, networkChainId)}
+                              </span>
+                            </div>
+                          ) : null}
+                          <div className={styles.statsItem}>
+                            <span className={styles.statLabel}>Timestamp:</span>
+                            <span className={styles.statValue}>{getUTCDataTimestamp()}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  ) : null}
+                </div>
 
-                    <div className={styles.controlGroup} style={{ flexBasis: '100%' }}>
-                      <label style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showComments && embeddingChoice === 'SVD'}
-                          onChange={() => {
-                            if (showComments && embeddingChoice === 'SVD') {
-                              setShowComments(false);
-                              return;
+                {/* CONSENSUS SECTION */}
+                <div className={styles.sectionCollapse}>
+                  <div
+                    className={styles.sectionHeaderRow}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                    onClick={() => setBeeswarmOpen(!beeswarmOpen)}
+                  >
+                    <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
+                      <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
+                      Consensus and Difference
+                    </h5>
+                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                      <PolisReportSectionToggleLabel open={beeswarmOpen} />
+                    </div>
+                  </div>
+                  {beeswarmOpen ? <div className={styles.graphSection}>{renderCommentSwarm()}</div> : null}
+                </div>
+
+                {/* PARTICIPANTS + STATEMENTS GRAPH */}
+                <div className={styles.sectionCollapse}>
+                  <div
+                    className={styles.sectionHeaderRow}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                    onClick={() => setParticipantsGraphOpen(!participantsGraphOpen)}
+                  >
+                    <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
+                      <FontAwesomeIcon
+                        icon={participantsGraphOpen ? faCaretUp : faCaretDown}
+                        style={{ marginRight: '6px' }}
+                      />
+                      Participants Graph
+                      {renderTooltipReference(PARTICIPANTS_GRAPH_TOOLTIP_TEXT, {
+                        ariaLabel: 'Participants graph view details',
+                      })}
+                    </h5>
+                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                      <PolisReportSectionToggleLabel open={participantsGraphOpen} />
+                    </div>
+                  </div>
+                  {participantsGraphOpen ? (
+                    <>
+                      <div className={styles.participantGraphControls}>
+                        <div className={styles.controlGroup}>
+                          <label htmlFor="embedding-choice-select">
+                            Embedding:
+                            {renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}
+                          </label>
+                          <select
+                            id="embedding-choice-select"
+                            value={embeddingChoice}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                              handleEmbeddingChoiceChange(e.target.value as EmbeddingChoice)
                             }
-                            if (embeddingChoice !== 'SVD') {
-                              handleEmbeddingChoiceChange('SVD');
-                            }
-                            setShowComments(true);
-                          }}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Statements
-                      </label>
+                            style={{ padding: '4px' }}
+                          >
+                            <option value="UMAP">UMAP</option>
+                            <option value="SVD">SVD/PCA</option>
+                            <option value="POLIS">{REPORT_DEFAULT_EMBEDDING_LABEL}</option>
+                          </select>
+                        </div>
 
-                      <label style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showParticipants}
-                          onChange={() => setShowParticipants(!showParticipants)}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Participants
-                      </label>
+                        <div className={styles.controlGroup}>
+                          <label>
+                            Opinion clusters:
+                            {renderTooltipReference(OPINION_GROUPS_TOOLTIP_TEXT)}
+                          </label>
+                          <div className={styles.numberInputWrapper}>
+                            <button
+                              className={styles.stepperButton}
+                              onClick={() => stepManualClusterCount(-1)}
+                              aria-label="Decrease cluster count"
+                            >
+                              -
+                            </button>
+                            <input
+                              id="cluster-count-input"
+                              type="number"
+                              value={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handleManualClusterCountChange(e.target.value)
+                              }
+                              onBlur={handleManualClusterCountBlur}
+                              className={styles.clusterNumberInput}
+                              min="2"
+                            />
+                            <button
+                              className={styles.stepperButton}
+                              onClick={() => stepManualClusterCount(1)}
+                              aria-label="Increase cluster count"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setManualClusterCount('')}
+                              style={{ marginLeft: '6px' }}
+                            >
+                              Auto
+                            </button>
+                          </div>
+                        </div>
 
-                      {/* NEW: toggle for addresses (disabled in demo) */}
-                      {/* <label style={{ cursor: (useDemoData || onePageDemo || demoMode) ? 'not-allowed' : 'pointer', opacity: (useDemoData || onePageDemo || demoMode) ? 0.6 : 1 }}>
+                        <div className={styles.controlGroup} style={{ flexBasis: '100%' }}>
+                          <label style={{ cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showComments && embeddingChoice === 'SVD'}
+                              onChange={() => {
+                                if (showComments && embeddingChoice === 'SVD') {
+                                  setShowComments(false);
+                                  return;
+                                }
+                                if (embeddingChoice !== 'SVD') {
+                                  handleEmbeddingChoiceChange('SVD');
+                                }
+                                setShowComments(true);
+                              }}
+                              style={{ marginRight: '4px' }}
+                            />
+                            Statements
+                          </label>
+
+                          <label style={{ cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showParticipants}
+                              onChange={() => setShowParticipants(!showParticipants)}
+                              style={{ marginRight: '4px' }}
+                            />
+                            Participants
+                          </label>
+
+                          {/* NEW: toggle for addresses (disabled in demo) */}
+                          {/* <label style={{ cursor: (useDemoData || onePageDemo || demoMode) ? 'not-allowed' : 'pointer', opacity: (useDemoData || onePageDemo || demoMode) ? 0.6 : 1 }}>
                         <input
                           type="checkbox"
                           checked={showAddresses && !(useDemoData || onePageDemo || demoMode)}
@@ -2671,113 +2787,115 @@ export default function PolisReport({
                         Show addresses
                       </label> */}
 
-                      <label style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showGroupOutline}
-                          onChange={() => setShowGroupOutline(!showGroupOutline)}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Outline
-                      </label>
+                          <label style={{ cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showGroupOutline}
+                              onChange={() => setShowGroupOutline(!showGroupOutline)}
+                              style={{ marginRight: '4px' }}
+                            />
+                            Outline
+                          </label>
 
-                      <label style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showAxes}
-                          onChange={() => setShowAxes(!showAxes)}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Axes
-                      </label>
+                          <label style={{ cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showAxes}
+                              onChange={() => setShowAxes(!showAxes)}
+                              style={{ marginRight: '4px' }}
+                            />
+                            Axes
+                          </label>
 
-                      <label style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showRadialAxes}
-                          onChange={() => setShowRadialAxes(!showRadialAxes)}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Radial Axes
-                      </label>
+                          <label style={{ cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showRadialAxes}
+                              onChange={() => setShowRadialAxes(!showRadialAxes)}
+                              style={{ marginRight: '4px' }}
+                            />
+                            Radial Axes
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className={styles.graphSection}>{renderParticipantGraph()}</div>
+
+                      {renderClusterLegend()}
+                    </>
+                  ) : (
+                    <div style={{ width: '900px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
+                  )}
+                </div>
+              </>
+            )}
+            <section className={styles.sectionCollapse} aria-label="All Questions" data-testid="ce-polis-all-questions">
+              <h2 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
+                <button
+                  type="button"
+                  className={styles.allQuestionsToggle}
+                  aria-label="All Questions"
+                  aria-expanded={allQuestionsOpen || isPdfModeActive}
+                  aria-controls={allQuestionsBodyId}
+                  onClick={() => {
+                    if (!allQuestionsOpen) {
+                      setAnswerSectionsOpen({
+                        binary: true,
+                        freeform: true,
+                        rating: true,
+                        multichoice: true,
+                        quadratic: true,
+                      });
+                    }
+                    setAllQuestionsOpen(!allQuestionsOpen);
+                  }}
+                >
+                  <FontAwesomeIcon icon={allQuestionsOpen || isPdfModeActive ? faCaretUp : faCaretDown} />
+                  All Questions
+                  <span className={`${styles.pdfIgnore} ${styles.allQuestionsToggleLabel}`}>
+                    <PolisReportSectionToggleLabel open={allQuestionsOpen} />
+                  </span>
+                </button>
+              </h2>
+              <div
+                id={allQuestionsBodyId}
+                className={styles.allQuestionsBody}
+                hidden={!allQuestionsOpen && !isPdfModeActive}
+              >
+                <PolisAnswerSections
+                  questions={reportData.answers}
+                  pdfMode={isPdfModeActive}
+                  openSections={answerSectionsOpen}
+                  onToggleSection={(type) => setAnswerSectionsOpen((prev) => ({ ...prev, [type]: !prev[type] }))}
+                  renderBinaryQuestions={ratingMatrix?.length ? buildQuestionList : undefined}
+                  binaryQuestionCount={rankedBinaryQuestions.length}
+                />
+              </div>
+            </section>
+            {stats && (
+              <>
+                {/* LIST OF PARTICIPANTS (NEW) – Appears directly BELOW "All Questions" */}
+                <div className={styles.sectionCollapse}>
+                  <div
+                    className={styles.sectionHeaderRow}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                    onClick={() => setParticipantsListOpen(!participantsListOpen)}
+                  >
+                    <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
+                      <FontAwesomeIcon
+                        icon={participantsListOpen ? faCaretUp : faCaretDown}
+                        style={{ marginRight: '6px' }}
+                      />
+                      List of Participants
+                    </h5>
+                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                      <PolisReportSectionToggleLabel open={participantsListOpen} />
                     </div>
                   </div>
-
-                  <div className={styles.graphSection}>{renderParticipantGraph()}</div>
-
-                  <div className={styles.pdfIgnore}>
-                    <button onClick={handleCollapseAllClusters} style={{ marginRight: '10px' }}>
-                      Collapse Clusters
-                    </button>
-                    <button onClick={handleExpandAllClusters}>Expand Clusters</button>
-                    {/* NEW: Analyze clusters button */}
-                    <button
-                      className={styles.analyzeClustersBtn}
-                      onClick={handleAnalyzeClustersClick}
-                      disabled={!!analysisLoadingKey}
-                      data-testid={E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS}
-                      title="Use AI to summarize each cluster’s unique viewpoint"
-                      style={{ marginLeft: '10px' }}
-                    >
-                      {analysisLoadingKey ? (
-                        <>
-                          <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
-                          <span>Analyzing…</span>
-                        </>
-                      ) : (
-                        <>
-                          <FontAwesomeIcon icon={faWand} />
-                          <span>Analyze clusters</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {renderClusterLegend()}
-                </>
-              ) : (
-                <div style={{ width: '900px', height: '1px', opacity: 0, pointerEvents: 'none' }} />
-              )}
-            </div>
-
-            {/* ALL QUESTIONS */}
-            <div className={styles.sectionCollapse}>
-              <div
-                className={styles.sectionHeaderRow}
-                style={{ width: '100%', cursor: 'pointer' }}
-                onClick={() => setAllQuestionsOpen(!allQuestionsOpen)}
-              >
-                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon icon={allQuestionsOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
-                  All Questions
-                </h5>
-                <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  <PolisReportSectionToggleLabel open={allQuestionsOpen} />
+                  {participantsListOpen ? renderParticipantsList() : null}
                 </div>
-              </div>
-              {allQuestionsOpen ? <>{buildQuestionList()}</> : null}
-            </div>
-
-            {/* LIST OF PARTICIPANTS (NEW) – Appears directly BELOW "All Questions" */}
-            <div className={styles.sectionCollapse}>
-              <div
-                className={styles.sectionHeaderRow}
-                style={{ width: '100%', cursor: 'pointer' }}
-                onClick={() => setParticipantsListOpen(!participantsListOpen)}
-              >
-                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                  <FontAwesomeIcon
-                    icon={participantsListOpen ? faCaretUp : faCaretDown}
-                    style={{ marginRight: '6px' }}
-                  />
-                  List of Participants
-                </h5>
-                <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  <PolisReportSectionToggleLabel open={participantsListOpen} />
-                </div>
-              </div>
-              {participantsListOpen ? renderParticipantsList() : null}
-            </div>
+              </>
+            )}
 
             {footnoteTexts.length > 0 && (
               <div className={`${styles.showWhenPdf} ${styles.footnotesSection}`}>
@@ -2791,7 +2909,7 @@ export default function PolisReport({
             )}
 
             {liveReportUrl && (
-              <div className={`${styles.showWhenPdf} ${styles.pdfFooter}`}>
+              <div data-pdf-keep-together className={`${styles.showWhenPdf} ${styles.pdfFooter}`}>
                 <div className={styles.pdfFooterQr}>
                   <QRCodeSVG
                     value={liveReportUrl}

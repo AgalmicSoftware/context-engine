@@ -4,6 +4,7 @@ type SurveyResultsQuestionRecord = {
   prompt?: unknown;
   tags?: unknown;
   type?: unknown;
+  voiceCredits?: unknown;
 };
 
 type SurveyResultsResponseRecord = {
@@ -22,6 +23,7 @@ export type SurveyResultsQuestionExportRecord = {
   prompt: unknown;
   tags: unknown[];
   type: unknown;
+  voiceCredits?: unknown;
 };
 
 export type BuildSurveyResultsFilteredQuestionIdsForExportArgs = {
@@ -76,6 +78,7 @@ export const buildSurveyResultsFilteredQuestionsForExport = ({
       id: questionData.id || qId,
       prompt: questionData.prompt || '',
       type: questionData.type || '',
+      ...(questionData.type === 'quadratic' ? { voiceCredits: questionData.voiceCredits ?? 99 } : {}),
       tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
       options: Array.isArray(questionData.options) ? [...questionData.options] : [],
     };

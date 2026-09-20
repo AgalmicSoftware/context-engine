@@ -13,6 +13,7 @@ type SurveyAnswerRecord = {
 };
 
 export type SurveyQuestionsFullQuestionResponseInputDescriptor =
+  | { kind: 'quadratic'; questionId: string; disabled: boolean }
   | {
       kind: 'multichoice';
       questionId: string;
@@ -111,6 +112,8 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
   const disabled = !!isSubmitting;
 
   switch (question.type) {
+    case 'quadratic':
+      return { kind: 'quadratic', questionId: question.id, disabled };
     case 'multichoice':
       return {
         kind: 'multichoice',

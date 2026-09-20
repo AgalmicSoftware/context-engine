@@ -14,7 +14,7 @@ const AppThemeSelector = (): React.ReactElement => {
   const deploymentTheme = normalizeThemeId(
     typeof document === 'undefined' ? null : document.documentElement.dataset.ceDeploymentTheme,
   );
-  const deploymentThemeLabel = deploymentTheme ? getThemeMetadata(deploymentTheme).label : 'default';
+  const defaultOptionLabel = deploymentTheme ? `${getThemeMetadata(deploymentTheme).label} (default)` : 'Default';
 
   React.useEffect(() => subscribeThemeChanges(() => setPreference(readStoredThemePreference() || '')), []);
 
@@ -33,7 +33,7 @@ const AppThemeSelector = (): React.ReactElement => {
           setPreference(readStoredThemePreference() || '');
         }}
       >
-        <option value="">Deployment theme: {deploymentThemeLabel}</option>
+        <option value="">{defaultOptionLabel}</option>
         {CE_THEME_IDS.map((id) => (
           <option key={id} value={id}>
             {getThemeMetadata(id).label}

@@ -19,6 +19,28 @@ const binaryCommentIndexes = new Set(
 );
 
 describe('surveyPolisDemoResultsData', () => {
+  it('imports valid signed quadratic responses without dropping neutral votes or overspending', () => {
+    const data = buildPolisDemoSurveyResultsNetworkData({
+      comments: [
+        {
+          commentId: 'q1',
+          commentBody: 'Allocate support',
+          type: 'quadratic',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      participantsVotes: [[3, -4], [0, 0], [5, -1], [1], ['3', -4]].map((value, index) => ({
+        participant: `participant-${index}`,
+        responses: { 0: { value } },
+      })),
+    });
+    expect(data.questions.q1).toMatchObject({ type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 });
+    expect(data.questions.q1.singleSelect).toBeUndefined();
+    expect(Object.keys(data.questionResponses.q1)).toEqual(['participant-0', 'participant-1']);
+    expect(data.questionResponses.q1['participant-0']).toMatchObject({ answer: { value: [3, -4] } });
+    expect(data.questionResponses.q1['participant-1']).toMatchObject({ answer: { value: [0, 0] } });
+  });
   it('normalizes the canonical Polis demo comments and votes into question-results cache data', () => {
     const data = buildPolisDemoSurveyResultsNetworkData();
     const expectedVoteCount = demoPolisData.participantsVotes.reduce(

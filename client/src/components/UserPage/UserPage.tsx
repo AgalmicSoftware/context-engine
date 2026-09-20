@@ -2286,6 +2286,7 @@ class UserPage extends Component<any, any> {
           userCreatedQuestions.push({
             prompt: qData.prompt || 'Unknown Prompt',
             type: qData.type || 'unknown',
+            ...(qData.type === 'quadratic' ? { options: qData.options, voiceCredits: qData.voiceCredits } : {}),
             id: qid,
             slug: sourceSlug,
             sessionSlug: sourceSlug,
@@ -2396,6 +2397,7 @@ class UserPage extends Component<any, any> {
         userQuestionResponsesInfo.push({
           prompt: qData.prompt || 'Unknown Prompt',
           type: qData.type || 'unknown',
+          ...(qData.type === 'quadratic' ? { options: qData.options, voiceCredits: qData.voiceCredits } : {}),
           id: qid,
           slug: sourceSlug,
           sessionSlug: sourceSlug,

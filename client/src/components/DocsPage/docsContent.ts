@@ -61,7 +61,7 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
     {
       id: 'respond',
       title: 'Answer questions and surveys',
-      body: 'Sessions can use binary, rating, multiple-choice, and freeform questions, plus optional conviction weighting and comments.',
+      body: 'Sessions can use binary, rating, multiple-choice, quadratic allocation, and freeform questions, plus optional conviction weighting and comments.',
     },
     {
       id: 'add-documents',

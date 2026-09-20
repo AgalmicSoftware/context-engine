@@ -173,7 +173,7 @@ describe('SurveyTool styles', () => {
     );
   });
 
-  it('keeps compact Classic 95 question actions visible without covering the lower panels', () => {
+  it('keeps compact Classic 95 question actions in an upward-opening overflow menu', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(
@@ -182,9 +182,9 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(
       /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?position:\s*static;[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*auto minmax\(180px, 1fr\) auto;[\s\S]*?grid-template-areas:\s*['"]actions footer nav['"];[\s\S]*?overflow:\s*visible;/,
     );
-    expect(scss).toMatch(/\.pileActionsMenuEligible \.pileActionMenuToggle\s*{[\s\S]*?display:\s*none;/);
+    expect(scss).toMatch(/\.pileActionsMenuEligible \.pileActionMenuToggle\s*{[\s\S]*?display:\s*flex;/);
     expect(scss).toMatch(
-      /\.pileActionsMenuEligible \.pileActionButtonGroup,[\s\S]*?\.pileActionsMenuEligible:hover \.pileActionButtonGroup\s*{[\s\S]*?position:\s*static;[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*row;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
+      /\.pileActionsMenuEligible \.pileActionButtonGroup\s*{[\s\S]*?top:\s*auto;[\s\S]*?bottom:\s*calc\(100% \+ 8px\);[\s\S]*?background:\s*var\(--ce-surface-raised\);/,
     );
     expect(scss).toMatch(
       /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;[\s\S]*?color:\s*var\(--ce-color-white\);/,

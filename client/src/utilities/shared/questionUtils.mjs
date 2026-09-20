@@ -24,10 +24,10 @@ const resolveEthersCompat = (loadedModule) => {
 const ethers = resolveEthersCompat(ethersModule);
 
 // --- Question ID generation ---
-// Canonical implementation. Matches CreateQuestionsAndSurveys.jsx and SurveyGenerator.tsx.
-// The ID is a keccak256 hash of "type:prompt[:options][:single]"
+// Canonical implementation. Matches CreateQuestionsAndSurveys.tsx and SurveyGenerator.tsx.
+// Existing types retain their original hash format. Quadratic includes ordered options and voiceCredits.
 
-export function generateQuestionId(type, prompt, options = [], singleSelect = false) {
+export function generateQuestionId(type, prompt, options = [], singleSelect = false, voiceCredits = 99) {
   let dataToHash = `${type}:${(prompt || '').trim().toLowerCase()}`;
   const validOpts = Array.isArray(options) ? options.filter((o) => o && o.trim() !== '') : [];
   if (type === 'multichoice') {
@@ -37,6 +37,9 @@ export function generateQuestionId(type, prompt, options = [], singleSelect = fa
         .join(',')
         .toLowerCase()}`;
     if (singleSelect) dataToHash += ':single';
+  }
+  if (type === 'quadratic') {
+    dataToHash += `:${JSON.stringify(validOpts.map((option) => option.trim().toLowerCase()))}:${voiceCredits}`;
   }
   return ethers.utils.id(dataToHash);
 }

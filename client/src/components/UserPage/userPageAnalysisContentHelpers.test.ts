@@ -211,3 +211,13 @@ describe('userPageAnalysisContentHelpers', () => {
     ]);
   });
 });
+
+
+it('keeps quadratic option order and budgets in profile analysis and excludes malformed allocations', () => {
+  const question = { id: 'q1', prompt: 'Priorities', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
+  const response = { answer: { value: [3, -4] } };
+  expect(buildUserPageAnalysisQuestions({ questionResponseInfo: [question], detailedQuestionResponses: { q1: response } })[0]).toMatchObject({ options: ['Parks', 'Transit'], voiceCredits: 25, answer: [3, -4] });
+  expect(buildUserPageAnalysisSurveys({ surveyResponseInfo: [{ id: 's1' }], detailedSurveyResponses: { s1: [{ questionData: question, responseData: response }] } })[0]).toMatchObject({ sample: [expect.objectContaining({ options: ['Parks', 'Transit'], voiceCredits: 25, answer: [3, -4] })] });
+  expect(buildUserPageAnalysisQuestions({ questionResponseInfo: [question], detailedQuestionResponses: { q1: { answer: { value: [4, -4] } } } })).toEqual([]);
+  expect(buildUserPageAnalysisCreatedQuestions([question])[0]).toMatchObject({ options: question.options, voiceCredits: 25 });
+});

@@ -156,6 +156,7 @@ const UserPageHeader = ({
             <button
               onClick={onNicknameEdit}
               className={styles.copyButton}
+              data-ce-control-appearance="frameless"
               aria-label="Edit nickname"
               title="Edit nickname"
               data-ce-control-appearance="frameless"
@@ -167,6 +168,7 @@ const UserPageHeader = ({
             <button
               onClick={onUsernameEdit}
               className={styles.copyButton}
+              data-ce-control-appearance="frameless"
               aria-label="Set username"
               title="Set username"
               data-ce-control-appearance="frameless"
@@ -185,7 +187,12 @@ const UserPageHeader = ({
             </CETooltip>
           )}
           {headerActionVisibility.showCopyAddressButton && (
-            <button onClick={onCopyAddress} className={styles.copyButton} data-ce-control-appearance="frameless">
+            <button
+              onClick={onCopyAddress}
+              className={styles.copyButton}
+              data-ce-control-appearance="frameless"
+              aria-label="Copy address"
+            >
               <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
               <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
             </button>
@@ -196,6 +203,7 @@ const UserPageHeader = ({
               target="_blank"
               rel="noopener noreferrer"
               className={styles.expandButton}
+              data-ce-control-appearance="frameless"
               aria-label="View address on explorer"
               title="View address on explorer"
               data-ce-control-appearance="frameless"
@@ -207,6 +215,7 @@ const UserPageHeader = ({
             <button
               onClick={onBookmark}
               className={headerBookmarkClassName}
+              data-ce-control-appearance="frameless"
               style={bookmarkButtonDisplayState.iconStyle}
               aria-label={bookmarkButtonDisplayState.ariaLabel}
               title={bookmarkButtonDisplayState.title}

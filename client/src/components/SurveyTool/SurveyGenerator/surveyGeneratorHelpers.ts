@@ -197,6 +197,7 @@ export type GeneratedAiQuestion = {
   questionType: string;
   prompt: string;
   options?: string[];
+  voiceCredits?: number;
   tags?: string[];
 };
 
@@ -210,6 +211,7 @@ export type GeneratedSurveyStatement = {
   type: string;
   prompt: string;
   options?: string[];
+  voiceCredits?: number;
   tags: string[];
 };
 
@@ -218,7 +220,7 @@ export type GeneratedSurveyStatementsInput = {
   questionTypes: QuestionTypeSelection;
   count: number;
   fallbackTitle?: unknown;
-  generateQuestionId?: (type: string, prompt: string, options?: string[]) => string;
+  generateQuestionId?: (type: string, prompt: string, options?: string[], singleSelect?: boolean, voiceCredits?: number) => string;
 };
 
 export type GeneratedSurveyStatementsResult = {
@@ -529,10 +531,13 @@ export const buildGeneratedSurveyStatements = ({
   });
 
   const statements = questions.map((question) => ({
-    id: generateQuestionId(question.questionType, question.prompt, question.options || []),
+    id: question.questionType === 'quadratic'
+      ? generateQuestionId(question.questionType, question.prompt, question.options || [], false, question.voiceCredits ?? 99)
+      : generateQuestionId(question.questionType, question.prompt, question.options || []),
     type: question.questionType,
     prompt: question.prompt,
-    options: question.questionType === 'multichoice' ? question.options : undefined,
+    options: ['multichoice', 'quadratic'].includes(question.questionType) ? question.options : undefined,
+    ...(question.questionType === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
     tags: question.tags || [],
   }));
 
@@ -556,7 +561,7 @@ export const buildSingleGenerationPrompt = ({
   const defaultTagsStr = allowed.length > 0 ? allowed.join(', ') : '';
 
   const selectedTypes = getSelectedQuestionTypes(questionTypes);
-  const typesStr = selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice';
+  const typesStr = selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice,quadratic';
 
   const sourceType = overrides.sourceTypeOverride || (transcriptMode ? 'transcript' : 'text');
 

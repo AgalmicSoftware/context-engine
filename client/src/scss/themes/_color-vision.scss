@@ -1,0 +1,72 @@
+@use 'sass:list';
+
+// Shared hues reach inputs, results, SVG charts, and PDF clones through
+// inheritance. Text on white report pages needs darker shades than app text.
+@mixin emit-color-vision() {
+  :root {
+    --ce-response-agree-document-text: #21652b;
+    --ce-response-disagree-document-text: #aa2420;
+    $series: (#1f77b4, #ff7f0e, #2ca02c, #d62728, #9467bd, #8c564b, #e377c2, #7f7f7f, #bcbd22, #17becf);
+    @for $index from 1 through list.length($series) {
+      --ce-chart-series-#{$index}: #{list.nth($series, $index)};
+    }
+  }
+
+  :root[data-ce-color-vision='color-blind'] {
+    --ce-binary-choice-agree-bg: #56b4e9;
+    --ce-binary-choice-unsure-bg: #b8bec7;
+    --ce-binary-choice-disagree-bg: #e69f00;
+    --ce-response-agree-bg: rgba(86, 180, 233, 0.16);
+    --ce-response-agree-border: #56b4e9;
+    --ce-response-agree-text: #80ccff;
+    --ce-response-unsure-bg: rgba(184, 190, 199, 0.16);
+    --ce-response-unsure-border: #b8bec7;
+    --ce-response-unsure-text: #d6dbe2;
+    --ce-response-disagree-bg: rgba(230, 159, 0, 0.16);
+    --ce-response-disagree-border: #e69f00;
+    --ce-response-disagree-text: #ffc078;
+    --ce-response-agree-document-text: #005a85;
+    --ce-response-disagree-document-text: #7a4500;
+    --ce-status-success: #56b4e9;
+    --ce-status-success-bright: #80ccff;
+    --ce-status-success-text: #80ccff;
+    --ce-status-success-soft: #d9edf8;
+    --ce-status-success-soft-hover: #bfdef0;
+    --ce-status-warning: #b8bec7;
+    --ce-status-warning-text: #d6dbe2;
+    --ce-status-warning-soft: #eceef1;
+    --ce-status-warning-soft-hover: #d6dbe2;
+    --ce-status-danger: #e69f00;
+    --ce-status-error: #e69f00;
+    --ce-status-danger-text: #ffc078;
+    --ce-action-accent: #80ccff;
+    --ce-action-accent-hover: #b3e0ff;
+    --ce-action-accent-text: #08121d;
+    --ce-data-viz-point: #80ccff;
+    --ce-data-viz-point-active: #ffc078;
+    $series: (#4477aa, #ee7733, #aa3377, #009988, #ccbb44, #66ccee, #ee6677, #bbbbbb, #000000, #228833);
+    @for $index from 1 through list.length($series) {
+      --ce-chart-series-#{$index}: #{list.nth($series, $index)};
+      @if $index <= 8 {
+        --ce-data-series-#{$index}: #{list.nth($series, $index)};
+      }
+    }
+  }
+
+  :root[data-ce-color-vision='color-blind'][data-ce-theme='classic-95'] {
+    --ce-response-agree-bg: #d9edf8;
+    --ce-response-agree-text: #004b70;
+    --ce-response-agree-border: #004b70;
+    --ce-response-unsure-bg: #eceef1;
+    --ce-response-unsure-text: #414854;
+    --ce-response-unsure-border: #414854;
+    --ce-response-disagree-bg: #fff0d6;
+    --ce-response-disagree-text: #703c00;
+    --ce-response-disagree-border: #703c00;
+    --ce-status-success-text: #004b70;
+    --ce-status-warning-text: #414854;
+    --ce-status-danger-text: #703c00;
+    --ce-data-viz-point: #004b70;
+    --ce-data-viz-point-active: #703c00;
+  }
+}

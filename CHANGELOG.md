@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Align report response bars with pile colors and add persistent Color-blind mode
+  under Theme settings, applying shared response and chart palettes across the
+  site and PDF reports. Preserve multiple-choice bars in desktop PDF captures.
+
+- Add filtered written-response, rating, multiple-choice, and quadratic sections
+  to the Polis report, with top-question previews, expansion, and PDF pagination
+  that keeps fitting question blocks together. Remove the binary-only notice.
+- Populate built-in Polis demo reports with tagged examples of all four answer
+  sections, multiple questions per type, and configurable quadratic budgets.
+
+### Added
+
+- Quadratic allocation questions with configurable voice credits (99 by default),
+  signed whole-number votes, quadratic budget validation, and positive, negative,
+  and net result totals. Available in survey and standalone authoring, response
+  views, named-vote AI analysis, exports, interview prefills, Telegram, and the
+  local companion. Tag cards, simulated profiles, demo adapters, and report
+  snapshots preserve ordered options and custom budgets.
+  Pile submission errors remain visible with pending answers available for retry.
+
 ### Changed
 
 - Added Cloudflare Group auto-join links on the detail pages of open, session-visible Groups.

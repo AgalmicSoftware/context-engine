@@ -29,6 +29,268 @@ export { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './
 
 const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
 
+const RECOGNITION_GROUPS: RecognitionGroup[] = [
+  {
+    name: 'Ethereum',
+    logo: 'https://ethereum.org/images/assets/eth-diamond-glyph.png',
+    itemClassName: 'recognitionItemEthereum',
+    logoClassName: 'recognitionLogoEthereum',
+    description:
+      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. Ethereum provides the cryptographic foundation for proof-of-human and attestation-based access, SBT-style membership, gated encryption, and durable on-chain references, while decentralized infrastructure adds censorship-resistance and data permanence. Users do not need any crypto expertise to use it.',
+    links: [
+      { url: 'https://ethereum.org/', text: 'Ethereum.org' },
+      { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },
+    ],
+  },
+  {
+    name: 'RadicalxChange',
+    logo: rxcLogo,
+    itemClassName: 'recognitionItemRadicalxchange',
+    logoClassName: 'recognitionLogoRxc',
+    description:
+      'Context Engine builds on RadicalxChange ideas around social identity, plural governance, and groups owning the data and value they create. SBT-style credentials issued by different communities can shape filtering and encryption, while the broader direction is for digital groups to retain ownership over the preference data and value they create instead of surrendering it to platforms.',
+    links: [
+      { url: 'https://www.radicalxchange.org/', text: 'Official Website' },
+      { url: 'https://twitter.com/RadxChange', text: 'Twitter / X' },
+    ],
+  },
+  {
+    name: 'Pol.is',
+    logo: polisLogo,
+    itemClassName: 'recognitionItemPolis',
+    logoClassName: 'recognitionLogoPolis',
+    description:
+      'Pol.is showed how large-group discourse software can clarify both consensus and persistent difference, especially in vTaiwan where simple Agree / Unsure / Disagree inputs helped structure public reasoning. Context Engine builds on that approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
+    links: [{ url: 'https://pol.is/', text: 'Official Website' }],
+  },
+  {
+    name: 'Collective Intelligence Project',
+    logo: 'https://images.squarespace-cdn.com/content/v1/631d02b2dfa9482a32db47ec/250a39fb-f2d0-432e-8784-4d2113ba8ae6/favicon.ico?format=100w',
+    itemClassName: 'recognitionItemCip',
+    logoClassName: 'recognitionLogoCip',
+    image: cipPhoto,
+    description:
+      'Context Engine is social infrastructure for the AI transition: a toolkit for collective intelligence, large-group deliberation, and coordination under information overload. That mission sits directly alongside CIP’s work on scalable collective decision-making for transformative technology.',
+    links: [{ url: 'https://cip.org/', text: 'CIP Website' }],
+  },
+  {
+    name: 'Edge City',
+    logo: 'https://cdn.prod.website-files.com/65b2cb5abdecf7cd7747e170/65d5ef08c6a2bf96d1f60a27_favicon.png',
+    itemClassName: 'recognitionItemEdgePatagonia',
+    logoClassName: 'recognitionLogoEdge',
+    description:
+      'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
+    links: [{ url: 'https://www.edgecity.live/patagonia', text: 'Edge City' }],
+  },
+];
+
+const RECOGNIZED_INDIVIDUALS: RecognitionIndividual[] = [];
+
+const ROADMAP_SECTIONS: RoadmapSection[] = [
+  {
+    category: 'Current Foundations',
+    items: [
+      {
+        status: 'complete',
+        text: 'Create sessions with questions, responses, documents, access gates, and configuration from the web app.',
+      },
+      {
+        status: 'complete',
+        text: 'Run binary, rating, multiple-choice, quadratic allocation, and freeform questions with conviction weighting and comments.',
+      },
+      {
+        status: 'complete',
+        text: 'Use SBT groups for gated participation, encrypted fields, and sponsored RPC, AI, gas, Arweave, and Lit resources.',
+      },
+      {
+        status: 'complete',
+        text: 'Persist responses and documents on Arweave with report views, exports, and address-based comparison tools.',
+      },
+      {
+        status: 'complete',
+        text: 'Generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets.',
+      },
+      {
+        status: 'complete',
+        text: 'Explore shipped demo sessions and reusable AI discourse corpus data from the app and repository.',
+      },
+    ],
+  },
+  {
+    category: 'Privacy, Credentials, and Safety',
+    items: [
+      {
+        status: 'planned',
+        text: 'Stronger privacy with unlinkable per-response and per-SBT accounts, ZK/FHE aggregation, and proofs on encrypted responses.',
+      },
+      {
+        status: 'planned',
+        text: 'zkTLS group formation for privacy-preserving groups based on verifiable attributes.',
+      },
+      {
+        status: 'planned',
+        text: 'AI whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks.',
+      },
+      {
+        status: 'planned',
+        text: 'Post-quantum cryptography as relevant libraries and standards mature.',
+      },
+    ],
+  },
+  {
+    category: 'Deployment and Resilience',
+    items: [
+      {
+        status: 'planned',
+        text: 'Walkaway resilience through ENS-hosted frontends and stronger decentralized service options.',
+      },
+      {
+        status: 'planned',
+        text: 'More storage options, including IPFS for larger or ephemeral files and configurable centralized storage.',
+      },
+      {
+        status: 'planned',
+        text: 'Turnkey deployment bundles for Arweave, Lit, EVM gas, and AI API access.',
+      },
+    ],
+  },
+  {
+    category: 'Interfaces and Inputs',
+    items: [
+      {
+        status: 'planned',
+        text: 'Agent-first UX so people can point an assistant at a session and interact through natural language.',
+      },
+      {
+        status: 'planned',
+        text: 'Voice-only mode for multilingual interaction through spoken commands.',
+      },
+      {
+        status: 'planned',
+        text: 'Better document and context integration with knowledge maps and richer debate-tree flows.',
+      },
+    ],
+  },
+  {
+    category: 'Preference Data and Models',
+    items: [
+      {
+        status: 'planned',
+        text: 'Group-representative AI models that can represent preferences, earn from approved invocations, and sell revocable future access.',
+      },
+      {
+        status: 'planned',
+        text: 'Preference weighting for questions, priorities, and representative figures in automated debate.',
+      },
+    ],
+  },
+  {
+    category: 'Deliberation and Negotiation',
+    items: [
+      {
+        status: 'planned',
+        text: 'Group prompting and backcasting from result clusters into scenarios to aim for or avoid.',
+      },
+      {
+        status: 'planned',
+        text: 'Agent-to-agent negotiation tooling for multi-step processes involving private information.',
+      },
+    ],
+  },
+];
+
+const USE_CASES = [
+  {
+    slug: 'ai-discourse',
+    label: 'For AI Discourse',
+    icon: faBrain,
+    tone: 'mint',
+    problemTitle: 'Low-Dimensional Debate',
+    problem:
+      'Public AI discourse gets flattened into slogans like "accelerate" vs. "pause," while harder questions on labor, surveillance, liability, and public goods stay under-specified.',
+    solutionTitle: 'Durable Public Map',
+    detail:
+      'Create a structured public map of AI questions, preferences, and predictions in durable form so disagreement stays legible over time.',
+  },
+  {
+    slug: 'corporate',
+    label: 'For Companies',
+    icon: faBuilding,
+    tone: 'blue',
+    problemTitle: 'Lost Decision Context',
+    problem:
+      'Organizations often preserve decisions without preserving the assumptions, tradeoffs, and confidence behind them.',
+    solutionTitle: 'Private Forecasting',
+    detail:
+      'Record predictions, assumptions, and confidence before outcomes are known, with timestamped entries that can remain encrypted until revealed or proven privately (and in the future, evaluated while still encrypted).',
+  },
+  {
+    slug: 'cities',
+    label: 'For Cities',
+    icon: faCity,
+    tone: 'orange',
+    problemTitle: 'Shallow Civic Input',
+    problem: 'Polls and hearings rarely capture the texture of public disagreement on complex civic questions.',
+    solutionTitle: 'Standing Public Record',
+    detail:
+      'Gather input that is more nuanced than a poll and more durable than a hearing, with responses that can be filtered across constituencies.',
+  },
+  {
+    slug: 'conferences',
+    label: 'For Events',
+    icon: faChalkboardTeacher,
+    tone: 'pink',
+    problemTitle: 'Signal That Vanishes',
+    problem: 'High-bandwidth event discussion usually disappears once the gathering ends.',
+    solutionTitle: 'Persistent Opinion Map',
+    detail:
+      'Leave with a durable map of consensus, subgroup differences, and unresolved questions that can keep growing between gatherings.',
+  },
+  {
+    slug: 'digital-groups',
+    label: 'For Groups',
+    icon: faUsers,
+    tone: 'gold',
+    problemTitle: 'Platform-Owned Group Data',
+    problem:
+      'Online communities rarely own the preference data, membership boundaries, or AI systems built from what they collectively know.',
+    solutionTitle: 'Representative Models',
+    detail:
+      'Codify group preferences over time, train representative AI models, and keep community data attributable, licensable, and revocable.',
+  },
+];
+
+export const getConfiguredRecognitionIndividuals = (individuals: unknown[] = []): RecognitionIndividual[] =>
+  individuals.filter(
+    (person): person is RecognitionIndividual =>
+      !!person &&
+      typeof person === 'object' &&
+      typeof (person as { name?: unknown }).name === 'string' &&
+      (person as { name: string }).name.trim().length > 0,
+  );
+
+export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
+  const scopeMode = String(selection?.selectedSessionScope || '')
+    .trim()
+    .toLowerCase();
+  if (scopeMode === 'list') {
+    const firstScopedSlug = derivePrimarySessionSlugFromList(selection?.selectedSessionSlugs || []);
+    if (firstScopedSlug) return `/session/${encodeURIComponent(firstScopedSlug)}`;
+  }
+  return `/session/${encodeURIComponent(getPrimaryDemoSessionSlug())}`;
+};
+
+const getRecognitionSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+const getRecognitionFallback = (name: string) =>
+  name
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((chunk: string) => chunk[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
 const AboutPage = () => {
   const [activeUseCase, setActiveUseCase] = useState('');
   const [activeRecognition, setActiveRecognition] = useState<RecognitionGroup | null>(null);
@@ -400,7 +662,7 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Questions:</span>
                   <span className={styles.featureText}>
-                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting
+                    Supports binary, rating, multiple-choice, quadratic allocation, and freeform questions, with optional conviction weighting
                     and comments.
                   </span>
                 </li>

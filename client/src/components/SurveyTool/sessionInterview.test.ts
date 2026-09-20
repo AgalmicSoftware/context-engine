@@ -157,7 +157,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('stop and report a stale catalog');
     expect(kickoff).toContain('conversation history, memory, and connected sources already available to you');
     expect(kickoff).toContain('reasonable inferences');
-    expect(kickoff).toContain('binary and multichoice answers must match one listed option');
+    expect(kickoff).toContain('Binary/multichoice: exact option.');
     expect(kickoff).toContain('Every response needs confidence from 0 to 1');
     expect(kickoff).toContain('additionalComments is text');
     expect(kickoff).toContain('Platform/model are self-reported fidelity metadata');

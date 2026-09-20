@@ -20,10 +20,15 @@ describe('QuestionStanceCard', () => {
       screen.getByText(
         (_content, node) =>
           node?.tagName === 'SPAN' &&
-          node.textContent?.replace(/\s+/g, ' ').trim() === 'Agree: 2 / Disagree: 1 / Unsure: 1',
+          node.textContent?.replace(/\s+/g, ' ').trim() === 'Agree: 2 / Unsure: 1 / Disagree: 1',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Agree 2, unsure 1, disagree 1' })).toBeInTheDocument();
+    const bar = screen.getByRole('img', { name: 'Agree 2, unsure 1, disagree 1' });
+    expect([...bar.querySelectorAll('rect')].slice(1).map((segment) => segment.getAttribute('fill'))).toEqual([
+      'var(--ce-binary-choice-agree-bg)',
+      'var(--ce-binary-choice-unsure-bg)',
+      'var(--ce-binary-choice-disagree-bg)',
+    ]);
   });
 
   it('ignores missing and unsupported values and reports an empty comparison', () => {

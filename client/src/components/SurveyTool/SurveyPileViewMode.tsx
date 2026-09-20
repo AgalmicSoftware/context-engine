@@ -1,3 +1,4 @@
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
@@ -677,15 +678,18 @@ export const createPileViewRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy 
   },
 });
 
-const mergeQuestionResponsesForPile = mergeQuestionResponses as unknown as (
-  target?: PileQuestionResponsesMap,
-  source?: unknown,
-) => PileQuestionResponsesMap;
+const mergeQuestionResponsesForPile = (
+  target: PileQuestionResponsesMap = {},
+  source: unknown = {},
+): PileQuestionResponsesMap => {
+  mergeQuestionResponses(target, source && typeof source === 'object' ? source as Record<string, unknown> : {});
+  return target;
+};
 
-const doesQuestionProgressMatchSlugForPile = doesQuestionProgressMatchSlug as unknown as (
+const doesQuestionProgressMatchSlugForPile = (
   progressSlugValue: unknown,
   currentSlug: string,
-) => boolean;
+): boolean => doesQuestionProgressMatchSlug(String(progressSlugValue || ''), currentSlug);
 
 const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
   if (!engine || typeof engine !== 'object') return engine;
@@ -2679,6 +2683,8 @@ const renderPileResponseInput = (
         />
       );
 
+    case 'quadratic':
+      return <QuadraticAllocationInput questionId={question.id} options={engine.getQuestionOptionsForInput(question)} voiceCredits={question.voiceCredits} value={answer.value} disabled={engine.state.isSubmitting} onChange={updateAnswer} />;
     case 'multichoice': {
       const options = engine.getQuestionOptionsForInput(question);
       const isSingleSelect = isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question);
@@ -2933,6 +2939,7 @@ const renderPileCardShell = (
 ) => {
   return renderPileCardShellView({
     promptHeader: engine.renderPromptWithManualDecrypt(question),
+    questionType: question.type,
     questionComponent,
     questionContainerClass,
     footerSection,
@@ -3188,6 +3195,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({
+            submissionError: String(engine.state.submissionError || ''),
             showHologramAssistant,
             toggleHologramAssistant: engine.toggleHologramAssistant,
             showMiniBackgroundSpinner,
