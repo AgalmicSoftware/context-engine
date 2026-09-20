@@ -66,6 +66,20 @@ async function main() {
     await page.getByTestId('ce-session-groups-toggle').click();
     const openDetails = page.getByRole('button', { name: 'Open group details for Participants 2026', exact: true });
     await openDetails.waitFor();
+    const groupHeading = page.getByTestId('ce-session-groups-toggle');
+    const refreshGroups = page.getByRole('button', { name: 'Refresh groups', exact: true });
+    for (const width of [390, 646, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      const headingBox = await groupHeading.boundingBox();
+      const refreshBox = await refreshGroups.boundingBox();
+      assert.ok(Math.abs(headingBox.y + headingBox.height / 2 - refreshBox.y - refreshBox.height / 2) <= 2,
+        `Group refresh stays aligned with its title at ${width}px`);
+      assert.equal(await refreshGroups.evaluate((button) => getComputedStyle(button).borderTopWidth), '0px');
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    }
+    await refreshGroups.click();
+    await openDetails.waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.getByRole('button', { name: 'Copy auto-join link for Participants 2026', exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Copy Participants 2026 group link', exact: true }).count(), 1);
     const [detailPage] = await Promise.all([context.waitForEvent('page'), openDetails.click()]);

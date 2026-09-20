@@ -1130,11 +1130,48 @@
   }
 }
 
-.sectionHeaderIconButton {
-  flex: 0 0 54px;
-  width: 54px;
-  min-width: 54px;
-  padding-inline: 0;
+.sectionHeaderRow.workerGroupsHeaderRow {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+
+  .sectionHeader {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+  }
+
+  .sectionHeaderText {
+    flex-wrap: wrap;
+  }
+
+  .sectionHeaderActionsScroller {
+    flex: 0 0 auto;
+    width: auto;
+    padding-left: 0;
+    overflow: visible;
+  }
+}
+
+.sectionHeaderActionButton.workerGroupsRefreshButton {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ce-panel-text);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--ce-card-bg);
+    transform: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-panel-text);
+    outline-offset: 2px;
+  }
 }
 
 /* The content area inside each collapsible section */
@@ -1517,13 +1554,6 @@
     font-size: 0.95rem;
   }
 
-  .sectionHeaderIconButton {
-    flex-basis: 48px;
-    width: 48px;
-    min-width: 48px;
-    padding-inline: 0;
-  }
-
   .pileHeaderRow {
     align-items: center;
     flex-wrap: nowrap;
@@ -1718,13 +1748,6 @@
     min-height: 50px;
     padding: 12px 18px;
     font-size: 1rem;
-  }
-
-  .sectionHeaderIconButton {
-    flex-basis: 50px;
-    width: 50px;
-    min-width: 50px;
-    padding-inline: 0;
   }
 
   .sectionHeaderViewModeButton {

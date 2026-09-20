@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
   Group detail links preserve public Worker discovery across new tabs.
   Older clean Group links re-verify cached Worker discovery and show the full
   Group page instead of falling back to SBT block-scan progress.
+  Kept the Cloudflare Groups refresh icon borderless and beside the section title.
 
 - Refreshed About functionality copy with accounts, gated content, and interviews.
   Added collapsible related-work and recognition sections with project-specific
