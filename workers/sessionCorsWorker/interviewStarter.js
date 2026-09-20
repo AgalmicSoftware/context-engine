@@ -1,3 +1,4 @@
+import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
@@ -109,7 +110,7 @@ export const dispatchInterviewStarterRequest = async ({ request, env, slugHint, 
       env,
       slug,
       address: deps.resolveAnonymousRateIdentity(request),
-      limit: config.limits?.perWalletPerDay || 0,
+      limit: resolveAnonymousIpDailyLimit(config),
       route: 'interview-starter',
     }))
   )

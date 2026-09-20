@@ -81,6 +81,7 @@ test('mergeWorkerLimitRecords updates only the limits branch', () => {
     },
     incomingLimits: {
       perIpPerHour: 8,
+      perAnonymousIpPerDay: 4,
     },
   });
 
@@ -89,6 +90,7 @@ test('mergeWorkerLimitRecords updates only the limits branch', () => {
     limits: {
       perWalletPerDay: 3,
       perIpPerHour: 8,
+      perAnonymousIpPerDay: 4,
     },
     scopes: { ai: true },
   });

@@ -176,35 +176,54 @@ test('dispatchInterviewBriefRequest strips query and fragment state from the sup
   assert.equal('instructions' in body, false);
 });
 
-test('dispatchInterviewBriefRequest applies the anonymous rate limit before loading questions', async () => {
-  let questionsLoaded = false;
-  const response = await dispatchInterviewBriefRequest({
-    request: new Request('https://worker.example/agent/interview-brief?slug=demo&sessionUrl=https://app.example/session/demo'),
-    env: { RATE_LIMITS: 'binding' },
-    deps: {
-      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
-      getSessionConfig: async () => ({ limits: { perWalletPerDay: 10 } }),
-      getCorsContext: async () => ({ ok: true, headers: {} }),
-      resolveAnonymousRateIdentity: () => 'anon:example',
-      checkRateLimit: async (value) => {
-        assert.deepEqual(value, {
-          env: { RATE_LIMITS: 'binding' },
-          slug: 'demo',
-          address: 'anon:example',
-          limit: 10,
-          route: 'interview-brief',
-        });
-        return false;
-      },
-      loadPublicInterviewQuestions: async () => {
-        questionsLoaded = true;
-        return [];
-      },
-      json,
+test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before loading questions', async () => {
+  const cases = [
+    {
+      name: 'explicit anonymous limit overrides wallet limit',
+      limits: { perWalletPerDay: 10, perAnonymousIpPerDay: 4 },
+      expectedLimit: 4,
     },
-  });
-  assert.equal(response.status, 429);
-  assert.equal(questionsLoaded, false);
+    {
+      name: 'absent anonymous limit keeps legacy wallet fallback',
+      limits: { perWalletPerDay: 10 },
+      expectedLimit: 10,
+    },
+  ];
+
+  for (const entry of cases) {
+    let questionsLoaded = false;
+    let capturedRateLimit = null;
+    const env = { RATE_LIMITS: entry.name };
+    const response = await dispatchInterviewBriefRequest({
+      request: new Request('https://worker.example/agent/interview-brief?slug=demo&sessionUrl=https://app.example/session/demo'),
+      env,
+      deps: {
+        resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+        getSessionConfig: async () => ({ limits: entry.limits }),
+        getCorsContext: async () => ({ ok: true, headers: {} }),
+        resolveAnonymousRateIdentity: () => 'anon:example',
+        checkRateLimit: async (value) => {
+          capturedRateLimit = value;
+          return false;
+        },
+        loadPublicInterviewQuestions: async () => {
+          questionsLoaded = true;
+          return [];
+        },
+        json,
+      },
+    });
+
+    assert.equal(response.status, 429, entry.name);
+    assert.equal(questionsLoaded, false, entry.name);
+    assert.deepEqual(capturedRateLimit, {
+      env,
+      slug: 'demo',
+      address: 'anon:example',
+      limit: entry.expectedLimit,
+      route: 'interview-brief',
+    }, entry.name);
+  }
 });
 
 test('catalog accepts approved loopback HTTP URLs but rejects other protocols', () => {

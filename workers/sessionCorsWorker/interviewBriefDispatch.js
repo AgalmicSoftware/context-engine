@@ -1,3 +1,4 @@
+import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v4';
@@ -130,7 +131,7 @@ export const dispatchInterviewBriefRequest = async ({
       env,
       slug,
       address: deps?.resolveAnonymousRateIdentity?.(request),
-      limit: config?.limits?.perWalletPerDay || 0,
+      limit: resolveAnonymousIpDailyLimit(config),
       route: 'interview-brief',
     });
     if (!rateAllowed) return deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers);

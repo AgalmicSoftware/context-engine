@@ -74910,6 +74910,18 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
   };
 };
 
+// workers/sessionCorsWorker/anonymousRateLimitPolicy.js
+var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
+var resolveAnonymousIpDailyLimit = (config = {}) => {
+  const limits = isObj14(config?.limits) ? config.limits : {};
+  if (Object.prototype.hasOwnProperty.call(limits, "perAnonymousIpPerDay")) {
+    const explicitLimit = limits.perAnonymousIpPerDay;
+    if (isNonNegativeInteger(explicitLimit)) return explicitLimit;
+  }
+  return limits.perWalletPerDay || 0;
+};
+
 // workers/sessionCorsWorker/interviewStarter.js
 init_interviewSettings();
 init_aiDefaults();
@@ -74925,7 +74937,7 @@ var RPC_CHUNK_SIZE = 1e5;
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim8 = (value) => String(value == null ? "" : value).trim();
 var lower4 = (value) => trim8(value).toLowerCase();
-var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower4(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -74933,13 +74945,13 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj14(value) ? value : {};
+  const question = isObj15(value) ? value : {};
   const id2 = lower4(question.id || question.questionId);
   const prompt = trim8(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /connect.+decrypt|encrypted prompt/i.test(prompt)) return null;
   const type = lower4(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj14(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj15(entry) ? entry.label || entry.value : entry)).filter(Boolean);
   return {
     id: id2,
     prompt,
@@ -75002,15 +75014,15 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return dedupeQuestions(questions);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj14(config.contracts) ? config.contracts : {};
-  const surveys = isObj14(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  const contracts = isObj15(config.contracts) ? config.contracts : {};
+  const surveys = isObj15(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
   return trim8(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
   const chainId = trim8(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj14(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj14(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj14(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj14(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj14(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const rpcConfig = isObj15(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj15(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj15(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj15(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj15(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
@@ -75062,7 +75074,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj14(payload.session) ? payload.session : {};
+  const session = isObj15(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -75084,7 +75096,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response2.ok) continue;
       const payload = await response2.json();
-      if (isObj14(payload)) return payload;
+      if (isObj15(payload)) return payload;
     } catch {
     }
   }
@@ -75251,7 +75263,7 @@ var dispatchInterviewStarterRequest = async ({ request, env, slugHint, baseHeade
     env,
     slug,
     address: deps.resolveAnonymousRateIdentity(request),
-    limit: config.limits?.perWalletPerDay || 0,
+    limit: resolveAnonymousIpDailyLimit(config),
     route: "interview-starter"
   }))
     return deps.json({ error: "Rate limit exceeded." }, 429, cors.headers);
@@ -75296,7 +75308,7 @@ var dispatchAnonymousRouteEntry = async ({
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
   const headers = corsContext?.headers;
-  const limit = config?.limits?.perWalletPerDay || 0;
+  const limit = resolveAnonymousIpDailyLimit(config);
   const anonymousIdentity = deps?.resolveAnonymousRateIdentity?.(request);
   const anonymousRateAllowed = await deps?.checkRateLimit?.({
     env,
@@ -75331,7 +75343,7 @@ init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 var trim9 = (value) => String(value == null ? "" : value).trim();
-var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
   const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
   const body = [
@@ -75359,7 +75371,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj15(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj16(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
   const instructions = trim9(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
@@ -75370,7 +75382,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj15(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj16(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim9(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
@@ -76194,7 +76206,7 @@ var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
 var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
@@ -76333,7 +76345,7 @@ var parseJsonIfPossible = (value) => {
 };
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj16(body)) {
+  if (isObj17(body)) {
     const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
@@ -76377,7 +76389,7 @@ var fetchChipotleJson = async ({
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj16(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj17(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -76388,8 +76400,8 @@ var resolveLitChipotleRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj16(body) ? body : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj17(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -76420,8 +76432,8 @@ var resolveLitChipotleProvisioningRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj16(body) ? body : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj17(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -76656,7 +76668,7 @@ var resolveConfigMappedChipotleRpcUrls = ({
 } = {}) => {
   const normalizedChainId = toChainId(chainId);
   if (!normalizedChainId) return [];
-  const map = isObj16(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+  const map = isObj17(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
   const mapped = normalizeChipotleRpcCandidateList(
     map[normalizedChainId] || map[String(normalizedChainId)] || []
   );
@@ -76679,7 +76691,7 @@ var resolveSessionChipotleRpcUrl = ({
   chainId = 0,
   op = ""
 } = {}) => {
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
   const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
@@ -76720,7 +76732,7 @@ var buildSessionBootstrapMetadata = ({
   request = {},
   sessionSlug = ""
 } = {}) => {
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const slugSegment = normalizeSessionScopedNameSegment(
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
@@ -76747,7 +76759,7 @@ var createLitChipotleAccount = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const response2 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
@@ -76978,7 +76990,7 @@ var provisionLitChipotleAction = async ({
   if (!toTrimmedString15(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const actionRequest = isObj16(request) ? request : {};
+  const actionRequest = isObj17(request) ? request : {};
   const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
@@ -77026,9 +77038,9 @@ var bootstrapLitChipotleSession = async ({
   sessionSlug = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
@@ -77306,7 +77318,7 @@ var executeLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleApiKey(runtime);
-  const actionRequest = isObj16(request) ? request : {};
+  const actionRequest = isObj17(request) ? request : {};
   const code = toTrimmedString15(actionRequest.code);
   const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -77356,8 +77368,8 @@ var executeSessionLitChipotleAction = async ({
   requesterAddress = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj16(request) ? request : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj17(request) ? request : {};
   const runtime = resolveLitChipotleRuntime({
     env,
     config,
@@ -79349,9 +79361,9 @@ var dispatchSessionConfigBootstrapRequest = async ({
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v4";
 var trim10 = (value) => String(value == null ? "" : value).trim();
-var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj17(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj18(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
@@ -79467,7 +79479,7 @@ var dispatchInterviewBriefRequest = async ({
       env,
       slug,
       address: deps?.resolveAnonymousRateIdentity?.(request),
-      limit: config?.limits?.perWalletPerDay || 0,
+      limit: resolveAnonymousIpDailyLimit(config),
       route: "interview-brief"
     });
     if (!rateAllowed) return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers);

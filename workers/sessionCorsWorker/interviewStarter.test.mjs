@@ -145,3 +145,53 @@ test('starter route preserves CORS and rate limits; public callers cannot force 
   assert.equal((await dispatchInterviewStarterRequest(args)).status, 410);
   assert.equal(f.calls(), 1);
 });
+
+test('starter route resolves anonymous IP daily budgets before generation', async () => {
+  const cases = [
+    {
+      name: 'explicit zero disables anonymous limiter while wallet limit stays positive',
+      limits: { perWalletPerDay: 12, perAnonymousIpPerDay: 0 },
+      expectedLimit: 0,
+    },
+    {
+      name: 'malformed anonymous limit keeps legacy wallet fallback',
+      limits: { perWalletPerDay: 12, perAnonymousIpPerDay: null },
+      expectedLimit: 12,
+    },
+  ];
+
+  for (const entry of cases) {
+    const f = fixture();
+    f.args.config.limits = entry.limits;
+    let capturedRateLimit = null;
+    const deps = {
+      ...f.args.deps,
+      evaluateAnonymousRouteAccess: async () => ({ ok: true }),
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+      getSessionConfig: async () => f.args.config,
+      getCorsContext: async () => ({ ok: true, headers: new Headers() }),
+      checkRateLimit: async (value) => {
+        capturedRateLimit = value;
+        return false;
+      },
+      resolveAnonymousRateIdentity: () => 'anon:starter',
+      json: (value, status, headers) => Response.json(value, { status, headers }),
+    };
+    const response = await dispatchInterviewStarterRequest({
+      ...f.args,
+      request: new Request('https://worker.example/interview/starter?slug=demo', { method: 'POST' }),
+      deps,
+      constants: {},
+    });
+
+    assert.equal(response.status, 429, entry.name);
+    assert.equal(f.calls(), 0, entry.name);
+    assert.deepEqual(capturedRateLimit, {
+      env: f.args.env,
+      slug: 'demo',
+      address: 'anon:starter',
+      limit: entry.expectedLimit,
+      route: 'interview-starter',
+    }, entry.name);
+  }
+});

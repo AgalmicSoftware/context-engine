@@ -1465,6 +1465,7 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
         limits: {
           perWalletPerDay: 5,
           perIpPerHour: 8,
+          perAnonymousIpPerDay: 4,
         },
       }),
     },
@@ -1493,11 +1494,12 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
     ['mergeWorkerLimitRecords', { adminAddress: '0xabc', limits: { perWalletPerDay: 3 } }, {
       perWalletPerDay: 5,
       perIpPerHour: 8,
+      perAnonymousIpPerDay: 4,
     }, 'session-a'],
     ['putSessionConfig', { GROUP_KV: {} }, 'session-a', {
       merged: true,
       slug: 'session-a',
-      incomingLimits: { perWalletPerDay: 5, perIpPerHour: 8 },
+      incomingLimits: { perWalletPerDay: 5, perIpPerHour: 8, perAnonymousIpPerDay: 4 },
     }],
   ]);
   assert.deepEqual(result, {

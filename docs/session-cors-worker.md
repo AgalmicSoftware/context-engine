@@ -1189,7 +1189,7 @@ Runtime:
       }
     },
     "ai": { "models": { "fast": { "provider": "openai", "model": "gpt-5" } } },
-    "limits": { "perWalletPerDay": 1000 }
+    "limits": { "perWalletPerDay": 1000, "perAnonymousIpPerDay": 0 }
   }
   ```
   For `"backend": "cloudflare"`, new `/new` configs default canonical CE payload
@@ -1213,6 +1213,7 @@ Runtime:
       writes do not. Callers cannot set it directly.
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
+    - `limits.perWalletPerDay` remains the authenticated per-wallet daily route budget and the legacy anonymous fallback. `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): omitted keeps the legacy `perWalletPerDay` fallback, `0` explicitly makes those anonymous route buckets unlimited, and a positive integer enforces that per-session/per-route anonymous identity budget. Malformed values fall back to `perWalletPerDay` rather than disabling limits.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
     - writes fail closed when open config subtrees contain secret-like keys,
@@ -1727,6 +1728,7 @@ Anonymous exception (AI/transcribe/realtime interview only):
 - If on-chain gate authority is unavailable/unresolved, anonymous access fails closed.
 - For the canonical default session slug (`""`), clients should send `X-Session-Slug: general` on anonymous-first attempts.
 - Anonymous requests are still rate-limited with an anonymous identity key.
+  The daily anonymous budget is `limits.perAnonymousIpPerDay` when that field is a non-negative integer; otherwise it falls back to the legacy `limits.perWalletPerDay`. This applies to anonymous AI/transcribe/realtime, public storage read/list, public group discovery, and interview starter/catalog routes. A value of `0` disables the anonymous daily IP bucket without changing authenticated per-wallet rate limits or nonce protections.
   - That rate identity now routes through a shared helper:
     native Cloudflare runtime prefers `CF-Connecting-IP`; otherwise the worker only uses a valid
     `X-Anonymous-Client-Id` as a best-effort sharding key and falls back to `anon:unknown`.
