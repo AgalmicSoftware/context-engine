@@ -45,24 +45,24 @@ describe('SessionModeProfileField', () => {
       within(decentralizedRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['OpenAI API Key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)']);
+    ).toEqual(['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
     expect(
       screen.getByText('Session settings and responses are stored in Cloudflare. No blockchain is required.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Session data is stored on Arweave, with session identity recorded in an EVM registry.'),
+      screen.getByText('Session data is stored on Arweave, with session identity recorded in an Ethereum registry.'),
     ).toBeInTheDocument();
     expect(screen.getAllByText("You'll need")).toHaveLength(2);
     expect(screen.queryByText("What you'll need")).not.toBeInTheDocument();
     expect(screen.getByText('Centralized').parentElement).toBe(screen.getByText('Cloudflare').parentElement);
-    expect(screen.getByText('Decentralized').parentElement).toBe(screen.getByText('Arweave + EVM').parentElement);
+    expect(screen.getByText('Decentralized').parentElement).toBe(screen.getByText('Ethereum + Arweave').parentElement);
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).not.toHaveTextContent(/worker/i);
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).not.toHaveTextContent(/worker/i);
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
     expect(within(selector).getByRole('radio', { name: 'Centralized (Cloudflare)' })).toBeInTheDocument();
-    expect(within(selector).getByRole('radio', { name: 'Decentralized (Arweave + EVM)' })).toBeInTheDocument();
+    expect(within(selector).getByRole('radio', { name: 'Decentralized (Ethereum + Arweave)' })).toBeInTheDocument();
     expect(within(selector).queryByText(/\b(?:public|private)\b/i)).not.toBeInTheDocument();
     expect(within(selector).queryByRole('radio', { name: /Corporate/i })).not.toBeInTheDocument();
   });

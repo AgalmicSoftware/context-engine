@@ -110,16 +110,16 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
                 : isWorkerCanonical
                   ? 'Worker URL configured; verify canonical config and browser access.'
                   : usesWorkerRuntime
-                    ? 'Compatible Session Worker URL configured; the EVM registry and Arweave remain canonical.'
+                    ? 'Compatible Session Worker URL configured; the Ethereum registry and Arweave remain canonical.'
                     : 'Your worker URL is configured.'
               : isWorkerCanonical
                 ? 'Complete the Cloudflare dashboard handoff, then verify the Worker URL.'
                 : usesWorkerRuntime
-                  ? 'Deploy or attach a compatible Session Worker; the EVM registry and Arweave remain canonical.'
+                  ? 'Deploy or attach a compatible Session Worker; the Ethereum registry and Arweave remain canonical.'
                   : 'Deploy or paste your own worker URL.'
             : workerMode === 'default'
               ? usesWorkerRuntime && !isWorkerCanonical
-                ? 'Using the shared default Session Worker; the EVM registry and Arweave remain canonical.'
+                ? 'Using the shared default Session Worker; the Ethereum registry and Arweave remain canonical.'
                 : 'Using the shared default worker.'
               : deployVerifiedInUi
                 ? 'Custom worker deployed in this run.'

@@ -155,7 +155,7 @@ describe('SessionWizardRequirementsBanner', () => {
     );
 
     expect(screen.getByText(/compatible Session Worker/i)).toHaveTextContent(
-      'A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.',
+      'A compatible Session Worker provides the web runtime; the Ethereum registry and Arweave remain canonical.',
     );
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toBeInTheDocument();
     expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();

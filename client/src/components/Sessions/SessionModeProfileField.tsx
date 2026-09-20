@@ -43,9 +43,9 @@ const HOSTING_PRESETS = [
     label: 'Decentralized',
     ariaLabel: 'Decentralized',
     entryLabel: 'Decentralized',
-    entryProvider: 'Arweave + EVM',
-    entryDescription: 'Session data is stored on Arweave, with session identity recorded in an EVM registry.',
-    entryRequirements: ['OpenAI API Key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)'],
+    entryProvider: 'Ethereum + Arweave',
+    entryDescription: 'Session data is stored on Arweave, with session identity recorded in an Ethereum registry.',
+    entryRequirements: ['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
   },
 ] as const;
 

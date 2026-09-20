@@ -159,7 +159,7 @@ export const validatePendingWorkerGroupDrafts = (value: unknown): string[] => {
     }
     const adminAddress = toText(raw.adminAddress);
     if (adminAddress && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress)) {
-      issues.push(`Group ${index + 1} admin address must be a valid EVM address.`);
+      issues.push(`Group ${index + 1} admin address must be a valid Ethereum address.`);
     }
   });
   normalized.forEach((draft, index) => {

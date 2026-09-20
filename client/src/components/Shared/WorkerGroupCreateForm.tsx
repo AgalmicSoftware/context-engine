@@ -601,7 +601,7 @@ const WorkerGroupCreateForm = ({
                 <span className={styles.accessHelp}>
                   {adminAddressReadOnly
                     ? 'This signed participant will be recorded as the group administrator.'
-                    : 'Identifies the EVM address responsible for this group. Session admins retain control.'}
+                    : 'Identifies the Ethereum address responsible for this group. Session admins retain control.'}
                 </span>
               </div>
               <input

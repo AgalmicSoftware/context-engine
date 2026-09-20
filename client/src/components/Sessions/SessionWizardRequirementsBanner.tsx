@@ -109,7 +109,7 @@ const SessionWizardRequirementsBanner = ({
           ) : null}
           {hasResolvedRequirements && requires('sessionWorker') ? (
             <li>
-              A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.
+              A compatible Session Worker provides the web runtime; the Ethereum registry and Arweave remain canonical.
             </li>
           ) : null}
           {requires('aiProviderKey') ? (

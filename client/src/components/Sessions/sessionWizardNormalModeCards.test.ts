@@ -144,7 +144,7 @@ describe('sessionWizardNormalModeCards', () => {
       expect(cards.find((card) => card.key === 'worker')).toEqual(
         expect.objectContaining({
           title: 'Session Worker',
-          summary: 'Using the shared default Session Worker; the EVM registry and Arweave remain canonical.',
+          summary: 'Using the shared default Session Worker; the Ethereum registry and Arweave remain canonical.',
         }),
       );
       expect(cards.find((card) => card.key === 'publish')?.summary).toBe(

@@ -119,7 +119,7 @@ describe('sessionWizardPendingWorkerGroups', () => {
         'Group 1 references must be unique public HTTPS URLs.',
         'Group 1 member limit must be a whole number from 1 to 1000.',
         'Group 1 join deadline must be in the future.',
-        'Group 1 admin address must be a valid EVM address.',
+        'Group 1 admin address must be a valid Ethereum address.',
       ]),
     );
   });

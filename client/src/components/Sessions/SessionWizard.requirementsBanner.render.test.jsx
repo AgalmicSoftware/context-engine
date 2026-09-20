@@ -128,7 +128,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
     expect(screen.getByText(/compatible Session Worker provides the web runtime/i)).toHaveTextContent(
-      'the EVM registry and Arweave remain canonical',
+      'the Ethereum registry and Arweave remain canonical',
     );
     expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toHaveAttribute(
