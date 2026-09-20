@@ -2,7 +2,6 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLink } from '@fortawesome/free-solid-svg-icons';
 import type { WorkerGroup } from '../../domains/worker/workerGroupPorts';
-import WorkerGroupAutoJoinLink from './WorkerGroupAutoJoinLink';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 import styles from './OnePageSession.module.scss';
@@ -93,7 +92,6 @@ const WorkerGroupCard = ({
         ) : null}
       </button>
       <div className={styles.workerGroupCardActions}>{children}</div>
-      <WorkerGroupAutoJoinLink group={group} sessionSlug={sessionSlug} workerUrl={workerUrl} />
     </article>
   );
 };

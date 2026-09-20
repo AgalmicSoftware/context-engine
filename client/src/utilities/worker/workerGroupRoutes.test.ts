@@ -31,6 +31,15 @@ describe('workerGroupRoutes', () => {
     }
   });
 
+  it('preserves validated public Worker discovery on group and list links', () => {
+    expect(buildWorkerGroupsPath({ groupId: 'reviewers', sessionSlug: 'alpha', workerUrl: 'https://worker.example/' }))
+      .toBe('/group/reviewers?sessionName=alpha&worker=https%3A%2F%2Fworker.example');
+    expect(buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://worker.example' }))
+      .toBe('/groups?sessionName=alpha&worker=https%3A%2F%2Fworker.example');
+    expect(() => buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://[redacted-email]' })).toThrow();
+    expect(() => buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://worker.example/?token=secret' })).toThrow();
+  });
+
   it('keeps legacy address-shaped Worker group ids out of SBT detail paths', () => {
     expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: 'demo-sh' })).toBe(
       `/groups?sessionName=demo-sh#group-${legacyAddressGroupId}`,

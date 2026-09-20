@@ -6,6 +6,7 @@ import store from '../store';
 import { LOGIN_ACCOUNT } from '../actions/types';
 import OnePageSession from '../components/OnePageSession/OnePageSession';
 import WorkerGroupAutoJoin from '../components/OnePageSession/WorkerGroupAutoJoinHost';
+import WorkerGroupMembershipPanel from '../components/OnePageSession/WorkerGroupMembershipPanel';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../utilities/session/sessionModeProfile';
 import { buildTokenCacheEnvelope, buildTokenCacheKey, writeTokenCache } from '../utilities/worker/workerAuthTokenCache';
 import 'assets/css/contextEngine.scss';
@@ -66,6 +67,17 @@ function SmokeSession() {
       <Link to="/about">Navigate away before signing in</Link>
       {location.pathname === '/about' ? (
         <p>Another page</p>
+      ) : location.pathname === '/group/participants-2026' ? (
+        <WorkerGroupMembershipPanel
+          allowAnonymousGroupDiscovery={true}
+          canReadGroups={true}
+          workerUrl={workerUrl}
+          sessionId={sessionId}
+          sessionSlug={sessionSlug}
+          sessionConfig={sessionConfig}
+          selectedGroupId="participants-2026"
+          onSignIn={signIn}
+        />
       ) : (
         <OnePageSession
           account={signedIn ? account : ''}

@@ -2852,6 +2852,47 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-config-slug', 'edge');
   });
 
+  it.each(['/group/participants', '/groups'])('discovers the exact Worker session when fresh-loading %s', async (path) => {
+    const workerOrigin = 'https://group-worker.example.com';
+    const workerConfig = {
+      slug: 'group-worker',
+      sessionId: '0xabcdefabcdefabcdefabcdefabcdefab',
+      configRevision: 'group-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, sessionSlug: workerConfig.slug, config: workerConfig }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const subject = createSubject({
+      path,
+      search: `?sessionName=${workerConfig.slug}&worker=${encodeURIComponent(workerOrigin)}`,
+      sessionConfig: null,
+    });
+    const view = render(subject.render());
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    expect(mockSBTsPage).not.toHaveBeenCalled();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+    expect(await screen.findByTestId('mock-sbts-page')).toBeInTheDocument();
+    expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
+    expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.workerGroupId).toBe(path.startsWith('/group/') ? 'participants' : undefined);
+  });
+
+  it('fails closed for an invalid Worker hint on a group detail link', async () => {
+    const subject = createSubject({
+      path: '/group/participants',
+      search: '?sessionName=group-worker&worker=https%3A%2F%2Fsecret%40worker.example.com',
+      sessionConfig: null,
+    });
+    render(subject.render());
+    expect(await screen.findByTestId('ce-worker-canonical-discovery-error')).toBeInTheDocument();
+    expect(mockSBTsPage).not.toHaveBeenCalled();
+  });
+
   it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {
     const sessionConfig = buildSessionConfig();
     const subject = createSubject({

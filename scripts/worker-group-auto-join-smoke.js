@@ -18,10 +18,10 @@ async function main() {
     const page = await context.newPage();
     let joins = 0;
     let member = false;
-    await page.route('**/*', async (route) => {
+    await context.route('**/*', async (route) => {
       const url = new URL(route.request().url());
       if (url.origin === new URL(baseUrl).origin) {
-        if (url.pathname === `/session/${sessionSlug}` || url.pathname === '/about') return route.fulfill({ contentType: 'text/html', body: html });
+        if ([`/session/${sessionSlug}`, `/group/${group.groupId}`, '/about'].includes(url.pathname)) return route.fulfill({ contentType: 'text/html', body: html });
         return route.continue();
       }
       if (url.origin === 'https://auto-join-worker.example') {
@@ -61,14 +61,23 @@ async function main() {
     assert.equal(new URL(page.url()).hash, '#questions');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     await page.getByTestId('ce-session-groups-toggle').click();
-    const copyLink = page.getByRole('button', { name: 'Copy auto-join link for Participants 2026', exact: true });
+    const openDetails = page.getByRole('button', { name: 'Open group details for Participants 2026', exact: true });
+    await openDetails.waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Copy auto-join link for Participants 2026', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Copy Participants 2026 group link', exact: true }).count(), 1);
+    const [detailPage] = await Promise.all([context.waitForEvent('page'), openDetails.click()]);
+    await detailPage.getByTestId('ce-worker-group-detail').waitFor();
+    assert.equal(new URL(detailPage.url()).pathname, `/group/${group.groupId}`);
+    assert.equal(new URL(detailPage.url()).searchParams.get('worker'), 'https://auto-join-worker.example');
+    const copyLink = detailPage.getByRole('button', { name: 'Copy auto-join link for Participants 2026', exact: true });
     await copyLink.click();
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `${baseUrl}/session/${sessionSlug}?joinGroup=${group.groupId}&worker=https%3A%2F%2Fauto-join-worker.example`);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    assert.equal(await detailPage.evaluate(() => navigator.clipboard.readText()), `${baseUrl}/session/${sessionSlug}?joinGroup=${group.groupId}&worker=https%3A%2F%2Fauto-join-worker.example`);
+    assert.equal(await detailPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     await copyLink.scrollIntoViewIfNeeded();
     const screenshot = path.join(os.tmpdir(), 'ce-worker-group-auto-join-mobile.png');
-    await page.screenshot({ path: screenshot });
+    await detailPage.screenshot({ path: screenshot });
     console.log(`Mobile screenshot: ${screenshot}`);
+    await detailPage.close();
     await page.reload();
     assert.equal(await banner.count(), 0);
     assert.equal(joins, 1);
@@ -98,7 +107,7 @@ async function main() {
     await page.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${'a'.repeat(80)}`);
     await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    console.log('PASS: Cloudflare auto-join smoke (sign-in, collapsed groups, join, cleanup, existing member, cancellation, navigation/refresh before login, mobile layout)');
+    console.log('PASS: Cloudflare auto-join smoke (sign-in, collapsed groups, join, cleanup, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout)');
   } finally { await browser.close(); }
 }
 

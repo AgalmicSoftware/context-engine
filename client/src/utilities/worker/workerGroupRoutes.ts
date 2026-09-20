@@ -1,4 +1,5 @@
 import { canonicalizeSessionSlug } from '../session/canonicalSessionContext.js';
+import { parseSessionWorkerDiscoveryOrigin } from '../session/sessionWorkerDiscovery.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../ui/publicUrl.js';
 
 const WORKER_GROUP_HASH_PREFIX = '#group-';
@@ -15,10 +16,12 @@ export const buildWorkerGroupsPath = ({
   groupId = '',
   rootPath = '/groups',
   sessionSlug,
+  workerUrl,
 }: {
   groupId?: unknown;
   rootPath?: unknown;
   sessionSlug: unknown;
+  workerUrl?: string;
 }): string => {
   const slug = canonicalizeSessionSlug(sessionSlug);
   const normalizedGroupId = String(groupId || '').trim();
@@ -32,6 +35,7 @@ export const buildWorkerGroupsPath = ({
 
   const params = new URLSearchParams();
   params.set('sessionName', slug);
+  if (workerUrl) params.set('worker', parseSessionWorkerDiscoveryOrigin(workerUrl));
   return `${path}?${params.toString()}${hash}`;
 };
 

@@ -372,7 +372,22 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const routeSessionSlug = host.getSbtListRouteSessionSlug(fullPath, searchStr);
     const workerGroupId = readWorkerGroupIdFromPath(fullPath);
     const allSessionsMode = !routeSessionSlug;
-    const routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
+    let routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
+    if (routeSessionSlug && new URLSearchParams(searchStr).has('worker')) {
+      // Group pages opened in a new tab need the same verified discovery as
+      // their session; an in-memory config from the opener is not available.
+      const controller = getWorkerCanonicalRouteController(host);
+      const workerRoute = resolveMainSiteSessionRouteForRender({
+        sessionTokenRaw: routeSessionSlug,
+        searchStr,
+        controller,
+        resolveSessionSlugFromPathToken: (token) => token,
+      });
+      const interruption =
+        renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
+      if (interruption) return interruption;
+      routeSessionConfig = workerRoute.sessionConfig;
+    }
     return (
       <InitialRouteBoundary fallback={<LazyFallback label={`Loading ${t('sbts')}...`} />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_SBTS_ROOT}>

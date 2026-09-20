@@ -1012,9 +1012,11 @@ group.
 
 Worker-canonical web sessions also support auto-joining an open, session-visible
 Group through `/session/<slug>?joinGroup=<groupId>`. **Copy auto-join link** on
-the Group card or detail page builds this session link from the actual Group
+the expanded Group detail page builds this session link from the actual Group
 ID and includes the validated public `worker` origin so fresh browsers can
-discover the session. The ordinary Group link still opens its details without joining. The
+discover the session. Ordinary Group and back-to-list links preserve this public
+Worker origin too, so expanded pages can verify the session in a fresh tab.
+The ordinary Group link still opens its details without joining. The
 auto-join link contains no credential and is shareable by anyone who can see
 the Group; it is a convenience for open joining, not proof of event attendance
 or a restricted invitation.
