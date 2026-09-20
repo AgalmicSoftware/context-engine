@@ -539,7 +539,12 @@ Admin test panel:
   requires a cached Worker JWT and then runs server-side `validateAdmin` before
   returning normalized `settings`, `capability`, and private admin job state for
   Generate/Refresh controls. Clients must treat malformed or mismatched 200
-  responses as unavailable.
+  responses as unavailable. While the public Results view is open, signed-out
+  viewers recheck the viewer artifact endpoint about every 15 seconds so a newly
+  generated successful artifact can appear without a full page reload. The
+  browser pauses this background recheck while the document is hidden, preserves
+  the last good artifact across transient errors or active generation, and does
+  not use admin credentials.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
