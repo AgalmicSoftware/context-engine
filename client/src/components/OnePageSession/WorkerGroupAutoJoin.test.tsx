@@ -125,6 +125,8 @@ describe('WorkerGroupAutoJoin', () => {
         }),
     );
     const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(getToken).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
     await act(async () => resolveToken('old-token'));
     rerender(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
@@ -207,6 +209,8 @@ describe('WorkerGroupAutoJoin', () => {
         }),
     );
     const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(getToken).toHaveBeenCalledTimes(1);
     rerender(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
     await act(async () => resolveOld('old-token'));
     await tick();
@@ -225,10 +229,12 @@ describe('WorkerGroupAutoJoin', () => {
         }),
     );
     const { rerender, unmount } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
     rerender(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
     await act(async () => resolvers[0]('stale-token'));
     expect(joins()).toHaveLength(0);
     rerender(<WorkerGroupAutoJoin {...props} />);
+    await flush();
     unmount();
     await act(async () => resolvers[1]('stale-token'));
     expect(joins()).toHaveLength(0);

@@ -4,7 +4,6 @@ import {
   canAutoJoinWorkerGroup,
   resolveWorkerGroupAutoJoinContext,
 } from '../../domains/worker/workerGroupAutoJoin';
-import { getWorkerSessionToken, joinWorkerGroup, loadWorkerGroupOverview } from '../../domains/worker/workerGroupPorts';
 import {
   autoJoinIntentKey,
   clearPendingAutoJoin,
@@ -16,7 +15,7 @@ import {
 } from '../../domains/worker/workerGroupAutoJoinIntent';
 import styles from './OnePageSession.module.scss';
 
-type Props = {
+export type WorkerGroupAutoJoinProps = {
   sessionConfig: unknown;
   sessionSlug: string;
   account: unknown;
@@ -24,6 +23,7 @@ type Props = {
   loginComplete: unknown;
   toggleLoginModal: unknown;
 };
+type Props = WorkerGroupAutoJoinProps;
 type Context = NonNullable<ReturnType<typeof resolveWorkerGroupAutoJoinContext>>;
 type Progress = { phase: 'loading' | 'joining' | 'done' | 'error'; message: string };
 
@@ -84,6 +84,9 @@ function AutoJoinIntent({
     setProgress({ phase: 'loading', message: 'Preparing to join group…' });
     void (async () => {
       try {
+        const { getWorkerSessionToken, joinWorkerGroup, loadWorkerGroupOverview } =
+          await import('../../domains/worker/workerGroupPorts');
+        if (!active) return;
         const credentialToken = await getWorkerSessionToken({
           sessionConfig: configRef.current,
           sessionSlug,

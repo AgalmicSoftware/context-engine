@@ -1,7 +1,7 @@
 /** @file AppShell.tsx */
 
 import React, { Component, Suspense } from 'react';
-import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoin';
+import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoinHost';
 import { connect } from 'react-redux';
 import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
 import {

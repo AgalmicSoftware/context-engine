@@ -5,7 +5,7 @@ import { BrowserRouter, Link, useLocation } from 'react-router-dom';
 import store from '../store';
 import { LOGIN_ACCOUNT } from '../actions/types';
 import OnePageSession from '../components/OnePageSession/OnePageSession';
-import WorkerGroupAutoJoin from '../components/OnePageSession/WorkerGroupAutoJoin';
+import WorkerGroupAutoJoin from '../components/OnePageSession/WorkerGroupAutoJoinHost';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../utilities/session/sessionModeProfile';
 import { buildTokenCacheEnvelope, buildTokenCacheKey, writeTokenCache } from '../utilities/worker/workerAuthTokenCache';
 import 'assets/css/contextEngine.scss';
