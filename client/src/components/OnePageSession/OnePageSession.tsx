@@ -89,6 +89,7 @@ import {
   sanitizeSbtAutoMintQueryForStorage,
 } from './onePageSessionAutoMintRuntime';
 import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
+import { readWorkerGroupAutoJoinId, removeWorkerGroupAutoJoinQuery } from '../../domains/worker/workerGroupAutoJoin';
 import {
   buildOnePageSessionAggregatorCacheResult,
   resolveOnePageSessionSurveySlug,
@@ -1017,7 +1018,8 @@ class OnePageSession extends Component<any, any> {
     const cleanCredentialPath = buildSbtAutoMintCredentialCleanPath(
       new URL(nextUrl || '/', window.location.origin).href,
     );
-    this.originalURL = cleanCredentialPath || nextUrl || '';
+    // Section toggles restore this URL; consumed Worker joins must not return.
+    this.originalURL = removeWorkerGroupAutoJoinQuery(cleanCredentialPath || nextUrl || '');
   }
 
   /* =======================
@@ -1996,6 +1998,7 @@ class OnePageSession extends Component<any, any> {
 
   resetDemoURL() {
     if (this.hasAutoMintIntent() && !this.state.mintSuccess) return;
+    if (readWorkerGroupAutoJoinId(window.location.search)) return;
     this.recordOriginalURL();
 
     const fallbackURL = buildOnePageSessionCanonicalBaseUrl(this.props);

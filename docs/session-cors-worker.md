@@ -1010,6 +1010,27 @@ validated public document references and tags. Contract address, network, gas,
 transaction, and burn controls are never synthesized for a Worker-native
 group.
 
+Worker-canonical web sessions also support auto-joining an open, session-visible
+Group through `/session/<slug>?joinGroup=<groupId>`. **Copy auto-join link** on
+the Group card or detail page builds this session link from the actual Group
+ID and includes the validated public `worker` origin so fresh browsers can
+discover the session. The ordinary Group link still opens its details without joining. The
+auto-join link contains no credential and is shareable by anyone who can see
+the Group; it is a convenience for open joining, not proof of event attendance
+or a restricted invitation.
+
+To separate an event cohort, create an open Group named for the event, choose
+session member visibility, and distribute its auto-join link to participants.
+Visitors using the ordinary session URL are not automatically added. Visitors
+who follow the auto-join link sign in first, then see a cancellable five-second
+countdown before the client calls the existing `/groups/join` endpoint. This
+works even with the Groups section collapsed and records native Worker
+membership rather than minting an on-chain SBT. Existing members are recognized
+without another join request. Worker capacity, deadlines, and authorization
+remain authoritative; failures expose an explicit Retry action. Success or
+cancellation removes only `joinGroup` from the current URL to avoid repeating
+on refresh. Account/session changes and navigation away cancel pending work.
+
 `memberVisibility` defaults to `admin_only`. `members` lets members see the
 group metadata and member identities, while `session` lets any authenticated
 session principal see both. Self-membership visibility is always allowed, but

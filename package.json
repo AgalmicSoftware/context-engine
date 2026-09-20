@@ -91,6 +91,7 @@
     "ai:wallet": "npm run -s ai:node -- scripts/ai-wallet.js",
     "ai:mint-test-sbt": "npm run -s ai:node -- scripts/mint-test-sbt.js",
     "ai:mint-test-sbt:dry": "DRY_RUN=1 npm run -s ai:node -- scripts/mint-test-sbt.js",
+    "ai:test-worker-groups:auto-join": "node scripts/worker-group-auto-join-smoke.js",
     "ai:test-nav:smoke": "node scripts/vite-navigation-smoke.js",
     "ai:test-theme:runtime": "npm run -s ai:node -- scripts/app-theme-runtime-smoke.js",
     "ai:test-nav:smoke:mobile": "PLAYWRIGHT_VIEWPORT=mobile npm run -s ai:test-nav:smoke",

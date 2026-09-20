@@ -24,6 +24,7 @@ import type {
   GeneratedResultsSnapshotResponse,
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
 import styles from './OnePageSession.module.scss';
+import WorkerGroupAutoJoin from './WorkerGroupAutoJoin';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
@@ -358,6 +359,14 @@ export default function OnePageSessionStandardShell({
 
   return (
     <div className={styles.onePageDemoContainer}>
+      <WorkerGroupAutoJoin
+        account={account}
+        provider={provider}
+        loginComplete={loginComplete}
+        sessionConfig={embeddedGroupsSessionConfig}
+        sessionSlug={embeddedGroupsSessionSlug}
+        toggleLoginModal={toggleLoginModal}
+      />
       <OnePageSessionAutoMintAlerts
         autoMintCountdown={autoMintCountdown}
         autoMintStatuses={autoMintStatuses}

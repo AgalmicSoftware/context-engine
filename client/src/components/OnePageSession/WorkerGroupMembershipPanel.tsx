@@ -24,6 +24,7 @@ import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
+import WorkerGroupAutoJoinLink from './WorkerGroupAutoJoinLink';
 import WorkerGroupCard from './WorkerGroupCard';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
@@ -915,6 +916,7 @@ const WorkerGroupMembershipPanel = ({
             onOpenMembers={handleOpenMembers}
           >
             {renderMembershipAction(selectedGroup, Boolean(selectedMembership))}
+            <WorkerGroupAutoJoinLink group={selectedGroup} sessionSlug={sessionSlug} workerUrl={workerUrl} />
           </WorkerGroupDetailView>
         ) : null}
         {status === 'ready' && !selectedGroup ? (

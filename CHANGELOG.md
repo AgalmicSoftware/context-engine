@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Added Cloudflare Group auto-join links on open, session-visible Groups.
+  Session links retain the target through sign-in, show a cancellable countdown,
+  recognize existing membership, and clear completed or cancelled intent.
+
 - Refreshed About functionality copy with accounts, gated content, and interviews.
   Added collapsible related-work and recognition sections with project-specific
   descriptions and links, including the Cosmos × FIRE grant announcement and

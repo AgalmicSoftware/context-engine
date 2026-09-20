@@ -565,6 +565,24 @@ describe('OnePageSession results routing', () => {
     }
   });
 
+  it('preserves pending Worker auto-join links and never restores completed intent on section toggles', () => {
+    const priorUrl = window.location.href;
+    try {
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026&view=questions#questions');
+      const subject = new OnePageSession(buildProps());
+      subject.hasAutoMintIntent = jest.fn(() => false);
+      subject.recordOriginalURL();
+      subject.resetDemoURL();
+      expect(window.location.search).toContain('joinGroup=participants-2026');
+      window.history.replaceState({}, '', '/session/alpha?view=questions#questions');
+      subject.resetDemoURL();
+      expect(window.location.search).toBe('?view=questions');
+      expect(window.location.hash).toBe('#questions');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('opens the questions view and auto-opens results when the session route is /questions/results', async () => {
     const priorUrl = window.location.href;
 
