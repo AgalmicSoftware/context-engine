@@ -512,6 +512,109 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(onChange).toHaveBeenCalledWith([3, -2]);
   });
 
+  it('imports a valid prefill hash when the mounted session URL changes', async () => {
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'b'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude', modelId: 'claude-live-return', verification: 'self_reported' },
+      responderContext: { summary: 'Synthetic live return context.' },
+      responses: [{ questionId: 'q1', answer: 'Returned draft', confidence: 0.74 }],
+    });
+    const rendered = renderPile(
+      { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
+      { route: '/session/demo?mode=interview' },
+    );
+    const modal = await screen.findByTestId('mock-voice-mode-modal');
+    expect(modal).toHaveAttribute('data-mode', 'interview');
+    expect(modal).toHaveAttribute('data-prefill-model', '');
+
+    act(() => {
+      window.history.replaceState({}, '', `/session/demo?mode=interview#prefill=${encoded}`);
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 2 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-live-return'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.74');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('can import the same valid prefill again after the URL hash is cleared', async () => {
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'd'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude', modelId: 'claude-repeat-return', verification: 'self_reported' },
+      responderContext: { summary: 'Repeat valid context.' },
+      responses: [{ questionId: 'q1', answer: 'Repeat draft', confidence: 0.67 }],
+    });
+    const rendered = renderPile(
+      { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
+      { route: `/session/demo?mode=interview#prefill=${encoded}` },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-repeat-return'),
+    );
+    await waitFor(() => expect(window.location.hash).toBe(''));
+
+    mockVoiceModeProps.onClose();
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 2 });
+
+    act(() => {
+      window.history.replaceState({}, '', `/session/demo?mode=interview#prefill=${encoded}`);
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 3 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-repeat-return'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.67');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('recovers when a mounted session receives an invalid prefill before a fresh valid prefill', async () => {
+    const rendered = renderPile(
+      { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
+      { route: '/session/demo?mode=interview' },
+    );
+    await screen.findByTestId('mock-voice-mode-modal');
+
+    act(() => {
+      window.history.replaceState({}, '', '/session/demo?mode=interview#prefill=invalid');
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 2 });
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', '');
+
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'c'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude', modelId: 'claude-fresh-return', verification: 'self_reported' },
+      responderContext: { summary: 'Fresh valid context.' },
+      responses: [{ questionId: 'q1', answer: 'Fresh draft', confidence: 0.81 }],
+    });
+    act(() => {
+      window.history.replaceState({}, '', `/session/demo?mode=interview#prefill=${encoded}`);
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 3 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-fresh-return'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.81');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
   it('keeps an imported prefill through initialization and clears it only after mount', async () => {
     const encoded = encodeInterviewPrefillPacket({
       version: 1,

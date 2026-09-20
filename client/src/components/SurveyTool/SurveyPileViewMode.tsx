@@ -513,6 +513,27 @@ export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./Crea
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 export const LazySessionVoiceModeModal = React.lazy(() => import('./SessionVoiceModeModal'));
 
+const readInterviewPrefillStateForProps = (props: SurveyQuestionsProps = {}, hash: unknown) => {
+  const hasPrefill = hasInterviewPrefillHash(hash);
+  if (!hasPrefill) {
+    return { hasPrefill: false, packet: null as InterviewPrefillPacket | null, error: '' };
+  }
+  const packet = readInterviewPrefillFromHash(hash);
+  const effectiveSlug = String(resolveEffectiveSlug(props) || '')
+    .trim()
+    .toLowerCase();
+  if (packet && (!effectiveSlug || packet.sessionSlug === effectiveSlug)) {
+    return { hasPrefill: true, packet, error: '' };
+  }
+  return {
+    hasPrefill: true,
+    packet: null as InterviewPrefillPacket | null,
+    error: packet
+      ? 'This interview prefill link belongs to a different session.'
+      : 'This interview prefill link is invalid or incomplete. Ask the AI for a fresh link.',
+  };
+};
+
 export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
   const props = engine.props || {};
   if (typeof window !== 'undefined') {
@@ -524,18 +545,9 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
   if (interviewEnabled && typeof window !== 'undefined') {
-    const hasPrefill = hasInterviewPrefillHash(window.location.hash || '');
-    const packet = readInterviewPrefillFromHash(window.location.hash || '');
-    const effectiveSlug = String(resolveEffectiveSlug(props) || '')
-      .trim()
-      .toLowerCase();
-    if (packet && (!effectiveSlug || packet.sessionSlug === effectiveSlug)) {
-      initialPrefillPacket = packet;
-    } else if (hasPrefill) {
-      initialInterviewPrefillError = packet
-        ? 'This interview prefill link belongs to a different session.'
-        : 'This interview prefill link is invalid or incomplete. Ask the AI for a fresh link.';
-    }
+    const prefillState = readInterviewPrefillStateForProps(props, window.location.hash || '');
+    initialPrefillPacket = prefillState.packet;
+    initialInterviewPrefillError = prefillState.error;
   }
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
   if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
@@ -1341,6 +1353,43 @@ const scheduleLoadAndSortQuestions = (engine: PileViewModeEngine, delayMs: any =
   );
 };
 
+const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
+  if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return false;
+  const hash = window.location.hash || '';
+  const prefillState = readInterviewPrefillStateForProps(engine.props || {}, hash);
+  if (!prefillState.hasPrefill) {
+    engine._lastConsumedInterviewPrefillHash = '';
+    return false;
+  }
+  if (engine._lastConsumedInterviewPrefillHash === hash) return false;
+  if (engine.state.interviewPrefillPacket && !prefillState.packet) {
+    engine._lastConsumedInterviewPrefillHash = hash;
+    try {
+      window.history.replaceState({}, '', clearInterviewPrefillHash(window.location));
+    } catch (e) {
+      surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
+    }
+    return true;
+  }
+  engine._lastConsumedInterviewPrefillHash = hash;
+  engine.setState(
+    {
+      showVoiceModeModal: true,
+      sessionVoiceMode: prefillState.packet ? 'interview' : engine.state.sessionVoiceMode || null,
+      interviewPrefillPacket: prefillState.packet,
+      interviewPrefillError: prefillState.error,
+    },
+    () => {
+      try {
+        window.history.replaceState({}, '', clearInterviewPrefillHash(window.location));
+      } catch (e) {
+        surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
+      }
+    },
+  );
+  return true;
+};
+
 const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   engine._isMounted = true;
   // Regression guard: consume the prefill during pure initialization, but clear it only after mount.
@@ -1373,6 +1422,7 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
 };
 
 const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, prevState: any) => {
+  consumeInterviewPrefillHashIfPresent(engine);
   const diffInputsChanged = engine.didEditDiffInputsChange(prevProps, prevState);
   if (diffInputsChanged) {
     engine.invalidateDiffCaches();
