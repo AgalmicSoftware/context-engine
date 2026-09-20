@@ -43,6 +43,8 @@ const CLOUDFLARE_ENCRYPTION_TOOLTIP =
   'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
 const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =
   'Checked: use the default rules, allowing session admins and agents authorized for storage to access encrypted data. Unchecked: customize access below using session roles, authorized agents, or SBT holders, and choose whether any or all rules must match.';
+const HIDE_SMALL_GROUPS_TOOLTIP =
+  'Checked: show anonymized group summaries only when a group meets the minimum size (at least 2 people). A minimum of 5 hides groups of 1–4. Unchecked: disable anonymized group summaries. Groups and responses are kept.';
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
   { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
@@ -481,22 +483,32 @@ const SessionModeProfileSections = ({
           ))}
         </Input>
         <div className={styles.modeCheckboxRow}>
-          <Label check className={styles.modeCheckboxLabel}>
-            <Input
-              type="checkbox"
-              checked={profile.results.exposure?.anonymizedGroupsEnabled === true}
-              onChange={(event) =>
-                updateProfile((draft) => {
-                  draft.results.exposure = {
-                    aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
-                    anonymizedGroupsEnabled: event.target.checked,
-                    minGroupSize: Math.max(2, Number(draft.results.exposure?.minGroupSize || 2) || 2),
-                  };
+          <div className={styles.modeCheckboxWithTooltip}>
+            <Label check className={styles.modeCheckboxLabel}>
+              <Input
+                type="checkbox"
+                checked={profile.results.exposure?.anonymizedGroupsEnabled === true}
+                onChange={(event) =>
+                  updateProfile((draft) => {
+                    draft.results.exposure = {
+                      aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
+                      anonymizedGroupsEnabled: event.target.checked,
+                      minGroupSize: Math.max(2, Number(draft.results.exposure?.minGroupSize || 2) || 2),
+                    };
+                  })
+                }
+              />
+              <span className={styles.modeCheckboxText}>Hide small groups in summaries</span>
+            </Label>
+            {renderInfoTooltip
+              ? renderInfoTooltip({
+                  id: 'ce-new-hide-small-groups-info',
+                  content: HIDE_SMALL_GROUPS_TOOLTIP,
+                  ariaLabel: 'About hiding small groups in summaries',
+                  testId: 'ce-new-hide-small-groups-info',
                 })
-              }
-            />{' '}
-            Hide small groups in summaries
-          </Label>
+              : null}
+          </div>
           {profile.results.exposure?.anonymizedGroupsEnabled ? (
             <MinGroupSizeInput profile={profile} updateProfile={updateProfile} />
           ) : null}
