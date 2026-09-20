@@ -717,6 +717,38 @@ export default function PolisReport({
     let buildResult: RatingMatrixBuildResult;
     try {
       if (!effectiveUseDemoData) {
+        // TODO(worker-group-results-filter): Integrate when merging the concurrent
+        // PolisReport changes; retain this TODO until the behavior below is covered.
+        // Cloudflare auto-join records native Group membership, but the current
+        // filterState.sbtFilter / polisReportRuntime.applyFilterStateToAggregator
+        // only resolves on-chain SBT holders. It does NOT yet isolate Worker cohorts.
+        // Add the same optional creator/responder include/exclude Group controls
+        // exposed by SurveyTool/QuestionFilter (QuestionFilterCapabilitySbtSection
+        // and QuestionFilterSections), backed by native Groups for Worker sessions.
+        // Keep the shared filterState flowing through SurveyResults / OnePageSession
+        // into this report; do not hard-code an EDDY default or filter only the chart.
+        // Extend PolisFilterState in polisReportRuntime with a distinct Worker Group
+        // selection keyed by canonical session ID, Worker origin, slug, and groupId;
+        // never reinterpret groupId as an SBT contract address or use chain scans.
+        // Use domains/worker/workerGroupPorts loadWorkerGroupOverview and
+        // loadWorkerGroupMembers with the authenticated session token, paging until
+        // nextCursor is empty. Anonymous discovery and /groups/my-memberships cannot
+        // provide a cohort directory. Honor memberVisibility and identity validation;
+        // loading, forbidden, partial, stale, or failed reads must not silently show
+        // unfiltered results. Map evm_address/passkey_account principal.address to
+        // response.responder using canonical address normalization; Telegram/agent
+        // principals require an explicit matching response-identity representation.
+        // Resolve membership before this synchronous matrix build. Apply creator
+        // rules to questions and responder rules to rows, preserving existing
+        // include/exclude semantics and other filters. Recompute on selection,
+        // identity and membership changes (subscribeWorkerGroupsChanged); clear
+        // stale data on account/session switches and refresh remote memberships.
+        // All stats, clusters, participant lists, AI analysis/cache keys, exports,
+        // and renderFilterInfo must describe the same filtered cohort.
+        // Acceptance: EDDY-2026 (groupId eddy-2026 in session test-eddy-1) can be
+        // included/excluded via question Results and updates Polis consistently;
+        // cover multiple Groups, pagination, empty cohorts, sign-in/auto-join/leave,
+        // account/session switching, denied reads, and legacy SBT/demo regressions.
         // Apply the upstream filterState BEFORE building the matrix
         const filteredAgg = applyFilterStateToAggregator(
           questionResponses,
