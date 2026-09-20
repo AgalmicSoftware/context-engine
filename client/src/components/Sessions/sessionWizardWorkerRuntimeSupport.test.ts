@@ -1,10 +1,12 @@
 import {
+  buildSessionWizardWorkerLimits,
   parseSessionWizardAllowOriginsInput,
   resolveSessionWizardWorkerBaseUrlFromDraft,
   resolveSessionWizardWorkerFaucetConfigFromDraft,
   resolveSessionWizardWorkerRpcUrlFromDraft,
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
   resolveSessionWizardWorkerUrlSourceState,
+  validateSessionWizardWorkerLimits,
 } from './sessionWizardWorkerRuntimeSupport';
 import { getSessionWizardDefaultWorkerUrl } from './sessionWizardWorkerDefaults';
 
@@ -193,6 +195,24 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
       amountEth: '0.0002',
       balanceThresholdEth: '0.001',
     });
+  });
+
+  it('omits blank limits but preserves explicit zero for wallet and anonymous IP caps', () => {
+    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '', perAnonymousIpPerDay: '' })).toEqual({});
+    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '0', perAnonymousIpPerDay: '0' })).toEqual({
+      perWalletPerDay: 0,
+      perAnonymousIpPerDay: 0,
+    });
+    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '4', perAnonymousIpPerDay: '12' })).toEqual({
+      perWalletPerDay: 4,
+      perAnonymousIpPerDay: 12,
+    });
+  });
+
+  it('rejects negative and fractional limit inputs', () => {
+    expect(validateSessionWizardWorkerLimits({ perWalletPerDay: '-1' })).toMatch(/wallet/i);
+    expect(validateSessionWizardWorkerLimits({ perAnonymousIpPerDay: '1.5' })).toMatch(/anonymous/i);
+    expect(() => buildSessionWizardWorkerLimits({ perWalletPerDay: '-1' })).toThrow(/wallet/i);
   });
 
   it('parses allow origins and falls back to defaults when all entries are invalid', () => {

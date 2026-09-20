@@ -223,6 +223,8 @@ to the legacy fallback. See
 for its account selection, one-attempt handling, expiration, and revocation
 requirements.
 
+The Worker setup section also separates daily request budgets for signed-in and anonymous users. `Authenticated requests per wallet per day` controls signed Worker credentials. `Anonymous requests per IP per day` controls anonymous public reads plus enabled AI, transcription, and realtime routes for everyone sharing the same public IP address, such as shared Wi-Fi. New sessions default the anonymous IP field to `0`, which disables this Worker-level shared-IP daily cap while leaving provider limits and access policy in force. Imported older configs that omit the field leave it blank so the Worker can keep its legacy fallback to the authenticated wallet budget.
+
 ### 2. AI provider keys
 
 Provide a key for every provider used by the selected fast, thinking, and

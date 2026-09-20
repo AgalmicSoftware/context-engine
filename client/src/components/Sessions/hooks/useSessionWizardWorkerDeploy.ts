@@ -82,6 +82,8 @@ import {
   resolveSessionWizardWorkerFaucetConfigFromDraft,
   resolveSessionWizardWorkerRpcUrlFromDraft,
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
+  buildSessionWizardWorkerLimits,
+  validateSessionWizardWorkerLimits,
 } from '../sessionWizardWorkerRuntimeSupport';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
 import type {
@@ -201,6 +203,15 @@ const useSessionWizardWorkerDeploy = ({
           if (typeof runtime.toggleLoginModal === 'function') runtime.toggleLoginModal(true);
           updateDeploymentState({ deployStatus: loginMessage });
           return { ok: false, error: loginMessage };
+        }
+        const limitValidationError = validateSessionWizardWorkerLimits({
+          perWalletPerDay: runtime.workerLimitPerWallet,
+          perAnonymousIpPerDay: runtime.workerLimitPerAnonymousIp,
+        });
+        if (limitValidationError) {
+          const message = `Fix Worker request limits before deploying: ${limitValidationError}`;
+          updateDeploymentState({ deployStatus: message });
+          return { ok: false, error: message };
         }
         updateDeploymentState({
           deployStatus: 'Deploying worker…',
@@ -337,9 +348,10 @@ const useSessionWizardWorkerDeploy = ({
             networkId: runtime.network?.id,
           }),
           allowOrigins: parseAllowOriginsInput(),
-          limits: Number(runtime.workerLimitPerWallet || 0)
-            ? { perWalletPerDay: Number(runtime.workerLimitPerWallet) }
-            : {},
+          limits: buildSessionWizardWorkerLimits({
+            perWalletPerDay: runtime.workerLimitPerWallet,
+            perAnonymousIpPerDay: runtime.workerLimitPerAnonymousIp,
+          }),
           scopes: {},
           faucet: resolveSessionWizardWorkerFaucetConfigFromDraft({
             draft: currentDraft,

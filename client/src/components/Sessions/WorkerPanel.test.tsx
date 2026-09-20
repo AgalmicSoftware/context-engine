@@ -29,6 +29,10 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
       renderResourceCard={() => null}
       workerAllowOrigins="https://app.example"
       setWorkerAllowOrigins={() => {}}
+      workerLimitPerWallet=""
+      setWorkerLimitPerWallet={() => {}}
+      workerLimitPerAnonymousIp="0"
+      setWorkerLimitPerAnonymousIp={() => {}}
       defaultAllowedOrigins="https://app.example"
       shouldUseSponsoredAutoDeployFlow={false}
       deployForm={{}}
@@ -90,6 +94,26 @@ describe('WorkerPanel', () => {
     renderWorkerPanel();
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_MODE_TOGGLE)).toBeInTheDocument();
+  });
+
+  it('labels independent authenticated wallet and anonymous IP request limits', () => {
+    const setWorkerLimitPerWallet = jest.fn();
+    const setWorkerLimitPerAnonymousIp = jest.fn();
+    renderWorkerPanel({ setWorkerLimitPerWallet, setWorkerLimitPerAnonymousIp });
+
+    const walletLimit = screen.getByLabelText('Authenticated requests per wallet per day');
+    const anonymousLimit = screen.getByLabelText('Anonymous requests per IP per day');
+
+    expect(walletLimit).toHaveValue(null);
+    expect(anonymousLimit).toHaveValue(0);
+    expect(screen.getByText(/shared Wi-Fi/i)).toBeInTheDocument();
+    expect(screen.getByText(/provider limits and access policy/i)).toBeInTheDocument();
+
+    fireEvent.change(walletLimit, { target: { value: '9' } });
+    fireEvent.change(anonymousLimit, { target: { value: '12' } });
+
+    expect(setWorkerLimitPerWallet).toHaveBeenCalledWith('9');
+    expect(setWorkerLimitPerAnonymousIp).toHaveBeenCalledWith('12');
   });
 
   it('renders worker mode pills and fires the mode-change handler', () => {

@@ -20,6 +20,10 @@ const renderWorkerSecretsSection = (props = {}) =>
       renderResource={(resourceKey) => <div key={resourceKey}>card {resourceKey}</div>}
       workerAllowOrigins="https://app.example"
       setWorkerAllowOrigins={() => {}}
+      workerLimitPerWallet=""
+      setWorkerLimitPerWallet={() => {}}
+      workerLimitPerAnonymousIp="0"
+      setWorkerLimitPerAnonymousIp={() => {}}
       defaultAllowedOrigins="https://default.example"
       {...props}
     />,

@@ -192,6 +192,55 @@ export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
   };
 };
 
+export const getSessionWizardWorkerLimitInputError = (value: unknown): string => {
+  const raw = toStr(value).trim();
+  if (raw === '') return '';
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric) || numeric < 0 || !Number.isInteger(numeric)) {
+    return 'Use a whole number of 0 or higher.';
+  }
+  return '';
+};
+
+export const normalizeSessionWizardWorkerLimitInput = (value: unknown): number | null => {
+  const raw = toStr(value).trim();
+  if (raw === '') return null;
+  if (getSessionWizardWorkerLimitInputError(raw)) return null;
+  const numeric = Number(raw);
+  return numeric;
+};
+
+export const validateSessionWizardWorkerLimits = ({
+  perWalletPerDay,
+  perAnonymousIpPerDay,
+}: {
+  perWalletPerDay?: unknown;
+  perAnonymousIpPerDay?: unknown;
+} = {}): string => {
+  const walletError = getSessionWizardWorkerLimitInputError(perWalletPerDay);
+  if (walletError) return `Authenticated requests per wallet per day: ${walletError}`;
+  const anonymousError = getSessionWizardWorkerLimitInputError(perAnonymousIpPerDay);
+  if (anonymousError) return `Anonymous requests per IP per day: ${anonymousError}`;
+  return '';
+};
+
+export const buildSessionWizardWorkerLimits = ({
+  perWalletPerDay,
+  perAnonymousIpPerDay,
+}: {
+  perWalletPerDay?: unknown;
+  perAnonymousIpPerDay?: unknown;
+} = {}): AnyRecord => {
+  const validationError = validateSessionWizardWorkerLimits({ perWalletPerDay, perAnonymousIpPerDay });
+  if (validationError) throw new Error(validationError);
+  const limits: AnyRecord = {};
+  const walletLimit = normalizeSessionWizardWorkerLimitInput(perWalletPerDay);
+  if (walletLimit !== null) limits.perWalletPerDay = walletLimit;
+  const anonymousIpLimit = normalizeSessionWizardWorkerLimitInput(perAnonymousIpPerDay);
+  if (anonymousIpLimit !== null) limits.perAnonymousIpPerDay = anonymousIpLimit;
+  return limits;
+};
+
 export const parseSessionWizardAllowOriginsInput = (value: unknown): string[] => {
   const raw = toStr(value).trim();
   if (!raw) return [];

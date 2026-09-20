@@ -62,6 +62,10 @@ export type WorkerPanelProps = {
   renderResourceCard?: (resourceKey: string, index: number) => React.ReactNode;
   workerAllowOrigins: string;
   setWorkerAllowOrigins: (value: string) => void;
+  workerLimitPerWallet: string;
+  setWorkerLimitPerWallet: (value: string) => void;
+  workerLimitPerAnonymousIp: string;
+  setWorkerLimitPerAnonymousIp: (value: string) => void;
   defaultAllowedOrigins: string;
   shouldUseSponsoredAutoDeployFlow: boolean;
   deployForm?: DeployForm;
@@ -125,6 +129,10 @@ const WorkerPanel = ({
   renderResourceCard,
   workerAllowOrigins,
   setWorkerAllowOrigins,
+  workerLimitPerWallet,
+  setWorkerLimitPerWallet,
+  workerLimitPerAnonymousIp,
+  setWorkerLimitPerAnonymousIp,
   defaultAllowedOrigins,
   shouldUseSponsoredAutoDeployFlow,
   deployForm = {},
@@ -266,6 +274,10 @@ const WorkerPanel = ({
             renderResource={renderResource}
             workerAllowOrigins={workerAllowOrigins}
             setWorkerAllowOrigins={setWorkerAllowOrigins}
+            workerLimitPerWallet={workerLimitPerWallet}
+            setWorkerLimitPerWallet={setWorkerLimitPerWallet}
+            workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
+            setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
             defaultAllowedOrigins={defaultAllowedOrigins}
           />
           <WorkerDeploySection

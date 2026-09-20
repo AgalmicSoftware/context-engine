@@ -54,6 +54,7 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.deployWorkerUrl).toBe('');
     expect(result.current.workerAllowOrigins).toBe('http://localhost:3010\nhttp://127.0.0.1:3010');
     expect(result.current.workerLimitPerWallet).toBe('');
+    expect(result.current.workerLimitPerAnonymousIp).toBe('0');
     expect(buildProvisionedSponsoredContextState).toHaveBeenCalledWith(undefined);
   });
 
@@ -127,6 +128,18 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.deployForm.bundleUrl).toBe('');
   });
 
+  it('hydrates imported limit fields but keeps older drafts without anonymous limits inherited', () => {
+    const legacy = renderWorkerState({ cachedWizard: { draft: { limits: { perWalletPerDay: 4 } } } });
+    expect(legacy.result.current.workerLimitPerWallet).toBe('4');
+    expect(legacy.result.current.workerLimitPerAnonymousIp).toBe('');
+
+    const explicit = renderWorkerState({
+      cachedWizard: { draft: { limits: { perWalletPerDay: 5, perAnonymousIpPerDay: 0 } } },
+    });
+    expect(explicit.result.current.workerLimitPerWallet).toBe('5');
+    expect(explicit.result.current.workerLimitPerAnonymousIp).toBe('0');
+  });
+
   it('exposes setters for worker form state', () => {
     const { result } = renderWorkerState();
 
@@ -137,6 +150,7 @@ describe('useSessionWizardWorkerState', () => {
       result.current.setDeployWorkerUrl('https://next-worker.example');
       result.current.setWorkerAllowOrigins('https://app.example');
       result.current.setWorkerLimitPerWallet('3');
+      result.current.setWorkerLimitPerAnonymousIp('0');
       result.current.setDeployForm((prev) => ({
         ...prev,
         workerName: 'next-worker',
@@ -149,6 +163,7 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.deployWorkerUrl).toBe('https://next-worker.example');
     expect(result.current.workerAllowOrigins).toBe('https://app.example');
     expect(result.current.workerLimitPerWallet).toBe('3');
+    expect(result.current.workerLimitPerAnonymousIp).toBe('0');
     expect(result.current.deployForm.workerName).toBe('next-worker');
   });
 });
