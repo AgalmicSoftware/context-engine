@@ -38,7 +38,11 @@ jest.mock('./useInterviewOpening', () => ({
 jest.mock('./SessionListeningPanel', () => ({
   __esModule: true,
   default: (props: Record<string, unknown>) => (
-    <div data-testid="mock-group-listening" data-mode={String(props.panelMode || '')} />
+    <div
+      data-testid="mock-group-listening"
+      data-mode={String(props.panelMode || '')}
+      data-embedded={String(Boolean(props.embeddedInModal))}
+    />
   ),
   SessionListeningWaveform: () => <canvas data-testid="mock-interview-waveform" />,
   formatSessionRecordingElapsed: (seconds: number) => `0:${String(seconds).padStart(2, '0')}`,
@@ -883,9 +887,10 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('opens Group Conversation directly for recordGroup mode', () => {
+  it('opens Group Conversation directly as an embedded recorder', () => {
     render(<SessionVoiceModeModal {...baseProps} mode="recordGroup" />);
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-mode', 'recordGroup');
+    expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-embedded', 'true');
   });
 
   it('prevents duplicate realtime sessions and stops a late connection after the modal closes', async () => {

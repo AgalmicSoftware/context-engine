@@ -65,6 +65,34 @@ describe('SessionListeningPanel', () => {
     jest.useRealTimers();
   });
 
+  it('removes duplicate recorder chrome only when embedded in the voice modal', () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" onClose={jest.fn()} />);
+
+    expect(screen.getByLabelText('Close listening panel')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeInTheDocument();
+
+    rerender(<SessionListeningPanel sessionSlug="demo" embeddedInModal onClose={jest.fn()} />);
+
+    expect(screen.queryByLabelText('Close listening panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeInTheDocument();
+  });
+
+  it('keeps the embedded modal header content when recorder status is visible', () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isRecording: true,
+        status: 'recording',
+      }),
+    );
+
+    render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal onClose={jest.fn()} />);
+
+    expect(screen.getByText('Group Conversation')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Close listening panel')).not.toBeInTheDocument();
+  });
+
   it('starts recording only from the explicit Record control', () => {
     const startRecording = jest.fn();
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(

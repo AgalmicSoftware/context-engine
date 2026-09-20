@@ -28,6 +28,7 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   defaultTags?: string | string[] | null;
   onClose?: () => void;
   panelMode?: 'recordGroup' | 'listening';
+  embeddedInModal?: boolean;
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 type BrowserAudioWindow = Window &
@@ -295,6 +296,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     defaultTags = null,
     onClose,
     panelMode = 'listening',
+    embeddedInModal = false,
   } = props;
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
@@ -458,35 +460,45 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     setGenerationError('');
   };
 
+  const showPanelHeader = hasVisibleStatus || !embeddedInModal;
+
   return (
     <aside
-      className={[styles.sessionListeningPanel, hasGeneratedDraft ? styles.sessionListeningPanelWithDraft : '']
+      className={[
+        styles.sessionListeningPanel,
+        embeddedInModal ? styles.sessionListeningPanelEmbedded : '',
+        hasGeneratedDraft ? styles.sessionListeningPanelWithDraft : '',
+      ]
         .filter(Boolean)
         .join(' ')}
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
-      <div className={styles.sessionListeningHeader}>
-        {hasVisibleStatus ? (
-          <div className={styles.sessionListeningTitle}>
-            <FontAwesomeIcon icon={faMicrophone} />
-            <span>{panelMode === 'recordGroup' ? 'Group Conversation' : 'Listening'}</span>
-          </div>
-        ) : (
-          <div aria-hidden="true" />
-        )}
-        <button
-          type="button"
-          className={styles.sessionListeningClose}
-          onClick={() => {
-            void handleClose();
-          }}
-          disabled={isClosing}
-          aria-label={isClosing ? 'Finalizing recording before closing' : 'Close listening panel'}
-          title={isClosing ? 'Finalizing recording' : 'Close'}
-        >
-          <FontAwesomeIcon icon={isClosing ? faSpinner : faTimes} spin={isClosing} />
-        </button>
-      </div>
+      {showPanelHeader ? (
+        <div className={styles.sessionListeningHeader}>
+          {hasVisibleStatus ? (
+            <div className={styles.sessionListeningTitle}>
+              <FontAwesomeIcon icon={faMicrophone} />
+              <span>{panelMode === 'recordGroup' ? 'Group Conversation' : 'Listening'}</span>
+            </div>
+          ) : (
+            <div aria-hidden="true" />
+          )}
+          {!embeddedInModal ? (
+            <button
+              type="button"
+              className={styles.sessionListeningClose}
+              onClick={() => {
+                void handleClose();
+              }}
+              disabled={isClosing}
+              aria-label={isClosing ? 'Finalizing recording before closing' : 'Close listening panel'}
+              title={isClosing ? 'Finalizing recording' : 'Close'}
+            >
+              <FontAwesomeIcon icon={isClosing ? faSpinner : faTimes} spin={isClosing} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {isRecorderSessionActive ? (
         <div className={styles.sessionListeningActiveRecorder}>

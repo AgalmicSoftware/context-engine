@@ -2677,6 +2677,22 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   max-width: 520px;
 }
 
+.sessionListeningPanelEmbedded {
+  max-width: 100%;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ce-panel-text);
+  box-shadow: none;
+  overflow: visible;
+}
+
+.sessionListeningPanelEmbedded .sessionListeningTitle {
+  color: var(--ce-panel-text);
+}
+
 .sessionListeningHeader,
 .sessionListeningActions {
   display: flex;

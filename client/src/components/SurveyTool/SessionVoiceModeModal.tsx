@@ -998,7 +998,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             {!mode ? (
               <SessionVoiceModeChooser onSelectMode={onSelectMode} />
             ) : (
-              <SessionListeningPanel {...props} panelMode="recordGroup" onClose={onClose} />
+              <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
             )}
           </ModalBody>
         </>
