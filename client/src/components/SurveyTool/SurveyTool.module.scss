@@ -3499,7 +3499,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   svg {
     font-size: 3.5rem;
-    color: var(--ce-action-accent);
+    color: var(--ce-status-info-text);
   }
 
   &:hover:not(:disabled),
@@ -3509,13 +3509,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     text-decoration: none;
 
     .sessionInterviewActionCircle {
-      background: var(--ce-card-bg);
-      border-color: var(--ce-action-accent);
+      background: color-mix(in srgb, var(--ce-status-info-text) 14%, var(--ce-card-bg));
+      border-color: var(--ce-status-info-text);
     }
   }
 
   &:focus-visible {
-    outline: 2px solid var(--ce-focus-ring);
+    outline: 2px solid var(--ce-status-info-text);
     outline-offset: 2px;
   }
 
@@ -3636,6 +3636,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewPanel :global(.btn):focus-visible {
   outline: 2px solid var(--ce-focus-ring);
   outline-offset: 2px;
+}
+
+.sessionInterviewPanel .sessionInterviewMicrophone:focus-visible,
+.sessionInterviewPanel .sessionAgentKickoffCopyTarget:focus-visible {
+  outline: 2px solid var(--ce-status-info-text);
 }
 
 .sessionInterviewPanel :global(.btn):disabled {
@@ -3789,13 +3794,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover .sessionAgentKickoffCopyBadge,
   &:focus-visible .sessionAgentKickoffCopyBadge {
-    border-color: var(--ce-action-accent-hover);
-    background: var(--ce-action-accent-hover);
-    color: var(--ce-action-accent-text);
+    border-color: var(--ce-status-info-text);
+    background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent);
+    color: var(--ce-status-info-text);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--ce-focus-ring);
+    outline: 2px solid var(--ce-status-info-text);
     outline-offset: 4px;
   }
 }
@@ -3820,9 +3825,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 6px;
   min-height: 30px;
   padding: 5px 9px;
-  border: 1px solid var(--ce-action-accent);
+  border: 1px solid var(--ce-status-info-text);
   border-radius: var(--ce-radius-pill);
-  color: var(--ce-action-accent);
+  color: var(--ce-status-info-text);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1;
@@ -3921,11 +3926,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionAgentKickoffCopied {
-  border-color: var(--ce-status-success);
+  border-color: var(--ce-status-info-text);
 
   .sessionAgentKickoffCopyBadge {
-    border-color: var(--ce-status-success);
-    color: var(--ce-status-success);
+    border-color: var(--ce-status-info-text);
+    color: var(--ce-status-info-text);
   }
 }
 

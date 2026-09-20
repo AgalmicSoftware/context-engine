@@ -29,12 +29,10 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(
       /\.sessionVoiceModeChooser\s*\{[\s\S]*?button:hover,[\s\S]*?strong,[\s\S]*?span,[\s\S]*?svg\s*\{[\s\S]*?color:\s*var\(--ce-action-accent-text\) !important;/,
     );
-    expect(scss).toMatch(
-      /\.sessionAgentKickoffRow\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 7fr\) minmax\(150px, 3fr\);/,
-    );
+    expect(scss).toMatch(/\.sessionAgentKickoffRow\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(scss).toMatch(/\.sessionAgentKickoffCopyTarget\s*\{[\s\S]*?min-height:\s*48px;[\s\S]*?cursor:\s*copy;/);
     expect(scss).toMatch(
-      /\.sessionAgentKickoffCopyBadge\s*\{[\s\S]*?border:\s*1px solid var\(--ce-action-accent\);[\s\S]*?font-weight:\s*800;/,
+      /\.sessionAgentKickoffCopyBadge\s*\{[\s\S]*?border:\s*1px solid var\(--ce-status-info-text\);[\s\S]*?font-weight:\s*800;/,
     );
     expect(scss).toMatch(
       /\.sessionAgentKickoffToggle\s*\{[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
