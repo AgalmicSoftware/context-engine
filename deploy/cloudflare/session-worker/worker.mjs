@@ -668,6 +668,7 @@ var init_interviewSettings = __esm({
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
       openingMode: "auto",
       openingPrompt: "",
+      steeringPrompt: "",
       autoRegenerate: false,
       questionGrowthPercent: 20,
       followNewQuestions: false,
@@ -679,6 +680,7 @@ var init_interviewSettings = __esm({
       return {
         openingMode: source.openingMode === "owner" ? "owner" : "auto",
         openingPrompt: String(source.openingPrompt || "").trim().slice(0, 1200),
+        steeringPrompt: String(source.steeringPrompt || "").trim().slice(0, 3e3),
         autoRegenerate: source.autoRegenerate === true,
         questionGrowthPercent: Number.isFinite(source.questionGrowthPercent) ? Math.max(1, Math.min(100, source.questionGrowthPercent)) : 20,
         followNewQuestions: source.followNewQuestions === true,
@@ -689,6 +691,8 @@ var init_interviewSettings = __esm({
     validInterviewSettings = (value = {}) => {
       if (value.openingMode !== void 0 && !["auto", "owner"].includes(value.openingMode)) return false;
       if (value.openingPrompt !== void 0 && (typeof value.openingPrompt !== "string" || value.openingPrompt.length > 1200))
+        return false;
+      if (value.steeringPrompt !== void 0 && (typeof value.steeringPrompt !== "string" || value.steeringPrompt.length > 3e3))
         return false;
       if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
       if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
@@ -75553,14 +75557,16 @@ var inFlight = /* @__PURE__ */ new WeakMap();
 var cacheKey = (slug) => `session:${slug}:interview-opening`;
 var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = false }) => {
   const settings = normalizeInterviewSettings(config?.interviewMode);
+  const withSteeringPrompt = (value) => ({ ...value, steeringPrompt: settings.steeringPrompt });
   if (config?.interviewModeEnabled === false || config?.interviewMode?.enabled === false)
     throw new Error("Interview mode is disabled.");
   if (refresh && !settings.allowManualRefresh) throw new Error("Manual opening refresh is disabled for this session.");
-  if (settings.openingMode === "owner") return { openingPrompt: settings.openingPrompt, source: "owner" };
+  if (settings.openingMode === "owner")
+    return withSteeringPrompt({ openingPrompt: settings.openingPrompt, source: "owner" });
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
   const cached = await read(env, cacheKey(slug));
-  if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return cached;
+  if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const questions = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
     slug,
@@ -75568,9 +75574,9 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
     storageRoute: deps.storageRoute,
     fetch: deps.fetch
   });
-  if (!questions.length) return cached || { openingPrompt: "", source: "waiting-for-questions" };
+  if (!questions.length) return withSteeringPrompt(cached || { openingPrompt: "", source: "waiting-for-questions" });
   if (cached?.openingPrompt && !refresh && !hasInterviewQuestionGrowth(cached.questionCount, questions.length, settings.questionGrowthPercent))
-    return cached;
+    return withSteeringPrompt(cached);
   let pending = inFlight.get(env.GROUP_KV);
   if (!pending) {
     pending = /* @__PURE__ */ new Map();
@@ -75612,13 +75618,13 @@ ${JSON.stringify({ title: config.sessionName, info: config.sessionInfo, question
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     await write(env, cacheKey(slug), value);
-    return value;
+    return withSteeringPrompt(value);
   })();
   pending.set(slug, generation);
   try {
     return await generation;
   } catch (error) {
-    if (cached?.openingPrompt && !refresh) return { ...cached, warning: error.message };
+    if (cached?.openingPrompt && !refresh) return withSteeringPrompt({ ...cached, warning: error.message });
     throw error;
   } finally {
     pending.delete(slug);
