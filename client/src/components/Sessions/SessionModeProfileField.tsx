@@ -32,7 +32,7 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Centralized',
     entryLabel: 'Centralized',
     entryProvider: 'Cloudflare',
-    entryDescription: 'Session settings and responses are stored in Cloudflare. No blockchain is required.',
+    entryDescription: 'Session settings and responses are stored in Cloudflare.',
     entryRequirements: ['Cloudflare account', 'OpenAI API Key'],
   },
   {
@@ -41,7 +41,8 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Decentralized',
     entryLabel: 'Decentralized',
     entryProvider: 'Ethereum + Arweave',
-    entryDescription: 'Session data is stored on Arweave, with session identity recorded in an Ethereum registry.',
+    entryDescription:
+      'Session data is stored on Arweave, with session identity and question logic recorded in Ethereum smart contracts.',
     entryRequirements: ['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
   },
 ] as const;

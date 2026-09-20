@@ -19,9 +19,9 @@ appears in the setup title. Use **Back** beside the title to return to the setup
 cards without clearing the current draft, or use **Custom** to open the extra
 settings supported by that profile. The Centralized card summarizes its inputs as
 `Cloudflare account / OpenAI API Key` and explains that session settings and
-responses are stored in Cloudflare without a blockchain requirement. The
-decentralized card explains that session data is stored on Arweave while session
-identity is recorded in an Ethereum registry; its pills list the OpenAI,
+responses are stored in Cloudflare. The decentralized card explains that session
+data is stored on Arweave while session identity and question logic are recorded
+in Ethereum smart contracts; its pills list the OpenAI,
 Arweave, Ethereum RPC URL, and Ethereum Gas requirements.
 
 For the default `Centralized (Cloudflare)` preset, the user needs a Cloudflare
@@ -320,7 +320,7 @@ separate Continue action for a new selection:
   banner lists exactly a Cloudflare account and one `OpenAI API Key`. It does
   not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - `Decentralized (Ethereum + Arweave)` compiles to the Arweave +
-  Ethereum-registry session shape. Its requirements banner lists a compatible
+  Ethereum smart-contract session shape. Its requirements banner lists a compatible
   Session Worker for the web runtime, the Arweave wallet/JWK, Ethereum RPC URL, Ethereum
   gas for transaction fees, an `OpenAI API Key`, and an optional Lit key needed when encryption is enabled. The
   Worker assists the browser runtime; the Ethereum registry and Arweave remain the

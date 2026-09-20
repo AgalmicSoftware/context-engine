@@ -38,10 +38,12 @@ describe('SessionModeProfileField', () => {
         .map((item) => item.textContent),
     ).toEqual(['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
     expect(
-      screen.getByText('Session settings and responses are stored in Cloudflare. No blockchain is required.'),
+      screen.getByText('Session settings and responses are stored in Cloudflare.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Session data is stored on Arweave, with session identity recorded in an Ethereum registry.'),
+      screen.getByText(
+        'Session data is stored on Arweave, with session identity and question logic recorded in Ethereum smart contracts.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("You'll need")).toHaveLength(2);
     expect(screen.queryByText("What you'll need")).not.toBeInTheDocument();
