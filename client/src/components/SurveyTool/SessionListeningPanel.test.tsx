@@ -79,18 +79,21 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeInTheDocument();
   });
 
-  it('keeps the embedded modal header content when recorder status is visible', () => {
+  it('keeps embedded recorder states visible without the duplicate modal heading', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
         isRecording: true,
         status: 'recording',
+        errorMessage: 'Permission denied',
       }),
     );
 
     render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal onClose={jest.fn()} />);
 
-    expect(screen.getByText('Group Conversation')).toBeInTheDocument();
+    expect(screen.queryByText('Group Conversation')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Close listening panel')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Stop recording')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Permission denied');
   });
 
   it('starts recording only from the explicit Record control', () => {

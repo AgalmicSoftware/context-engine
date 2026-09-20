@@ -460,7 +460,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     setGenerationError('');
   };
 
-  const showPanelHeader = hasVisibleStatus || !embeddedInModal;
+  const showPanelHeader = !embeddedInModal;
 
   return (
     <aside
