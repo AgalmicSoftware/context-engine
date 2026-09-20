@@ -132,8 +132,8 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 6px 10px;
   border: 0;
   border-radius: var(--ce-radius-pill);
-  background: transparent;
-  color: var(--ce-color-white);
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
   cursor: pointer;
   font-size: 0.86rem;
   font-weight: 700;
@@ -141,7 +141,8 @@ $muted-text: var(--ce-panel-text-muted);
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-action-accent-hover);
+    background: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
   }
 
   &:focus-visible {
