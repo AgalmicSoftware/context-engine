@@ -2849,9 +2849,9 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modeProfileEntryPanel {
   display: grid;
-  width: min(100%, 860px);
+  width: min(100%, 720px);
   margin: 0 auto;
-  gap: 20px;
+  gap: 18px;
 }
 
 .modeProfileEntryIntro {
@@ -2873,7 +2873,7 @@ $muted-text: var(--ce-panel-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ce-text-inverse);
+  color: var(--ce-session-setup-text);
   font-size: 0.9rem;
   line-height: 1;
   transition:
@@ -2882,7 +2882,7 @@ $muted-text: var(--ce-panel-text-muted);
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-text-inverse);
+    color: var(--ce-session-setup-text);
     transform: translateY(-1px);
   }
 
@@ -2903,23 +2903,25 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 18px;
 }
 
 .modePresetCard {
   appearance: none;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  min-height: 280px;
-  padding: 24px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  min-height: 0;
+  padding: 24px 26px;
+  border: 1px solid var(--ce-session-setup-border);
   border-radius: var(--ce-radius-18);
-  background: var(--ce-card-bg);
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
-  color: var(--ce-panel-text);
+  background: var(--ce-session-setup-surface);
+  box-shadow: var(--ce-session-setup-shadow);
+  color: var(--ce-session-setup-text);
   cursor: pointer;
+  font-family: var(--ce-font-ui);
   text-align: left;
   transition:
     background 0.18s ease,
@@ -2928,22 +2930,68 @@ $muted-text: var(--ce-panel-text-muted);
     transform 0.18s ease;
 }
 
+.modeProfileEntryPanel .modePresetCards .modePresetCard {
+  border: 1px solid var(--ce-session-setup-border);
+  border-radius: var(--ce-radius-18);
+  background: var(--ce-session-setup-surface);
+  box-shadow: var(--ce-session-setup-shadow);
+  color: var(--ce-session-setup-text);
+  font-family: var(--ce-font-ui);
+}
+
+.modeProfileEntryPanel .modePresetCards .modePresetCard:hover,
+.modeProfileEntryPanel .modePresetCards .modePresetCard:focus-visible {
+  border-color: color-mix(in srgb, var(--ce-session-setup-accent) 74%, transparent);
+  border-radius: var(--ce-radius-18);
+  background: var(--ce-session-setup-surface-hover);
+  box-shadow: var(--ce-session-setup-shadow);
+}
+
+.modeProfileEntryPanel .modePresetCards .modePresetCard:active {
+  border-radius: var(--ce-radius-18);
+  box-shadow: var(--ce-session-setup-shadow);
+  font-family: var(--ce-font-ui);
+}
+
+.modeProfileEntryPanel .modePresetCards .modePresetCardSelected {
+  border-color: var(--ce-session-setup-accent);
+  background: var(--ce-session-setup-surface-selected);
+}
+
+.modePresetCard::after {
+  position: absolute;
+  top: 24px;
+  right: 26px;
+  width: 20px;
+  height: 20px;
+  border: 2px solid color-mix(in srgb, var(--ce-status-info-text) 72%, transparent);
+  border-radius: var(--ce-radius-round);
+  background: color-mix(in srgb, var(--ce-overlay-base) 34%, transparent);
+  box-shadow: inset 0 0 0 4px var(--ce-session-setup-surface);
+  content: '';
+}
+
 .modePresetCard:hover,
 .modePresetCard:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent);
-  background: var(--ce-surface-alt);
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
-  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--ce-session-setup-accent) 74%, transparent);
+  background: var(--ce-session-setup-surface-hover);
+  box-shadow: var(--ce-session-setup-shadow);
+  transform: translateY(-1px);
 }
 
 .modePresetCard:focus-visible {
-  outline: 2px solid var(--ce-action-accent);
+  outline: 2px solid var(--ce-session-setup-accent);
   outline-offset: 3px;
 }
 
 .modePresetCardSelected {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
-  background: var(--ce-surface-alt);
+  border-color: var(--ce-session-setup-accent);
+  background: var(--ce-session-setup-surface-selected);
+}
+
+.modePresetCardSelected::after {
+  border-color: var(--ce-session-setup-accent);
+  background: var(--ce-session-setup-accent);
 }
 
 .modePresetCardHeader {
@@ -2951,6 +2999,7 @@ $muted-text: var(--ce-panel-text-muted);
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  padding-right: 34px;
 }
 
 .modePresetCardHeadingText {
@@ -2969,63 +3018,63 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .modePresetCardTitle {
-  color: var(--ce-panel-text);
-  font-size: 1.35rem;
-  font-weight: 850;
-  line-height: 1.2;
+  color: var(--ce-session-setup-text);
+  font-size: clamp(1.6rem, 4vw, 1.95rem);
+  font-weight: 680;
+  line-height: 1.1;
 }
 
 .modePresetCardProvider {
   margin-top: 0;
-  color: var(--ce-panel-text);
-  font-size: 1rem;
-  font-weight: 600;
+  color: var(--ce-session-setup-muted);
+  font-size: clamp(1rem, 2.2vw, 1.15rem);
+  font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
 }
 
 .modePresetCardDescription {
-  margin-top: 24px;
-  color: var(--ce-panel-text);
-  font-size: 0.9rem;
-  line-height: 1.55;
+  margin-top: 22px;
+  color: var(--ce-session-setup-muted);
+  font-size: clamp(0.98rem, 2.1vw, 1.06rem);
+  font-weight: 420;
+  line-height: 1.48;
 }
 
 .modePresetCardRequirements {
   display: grid;
-  gap: 7px;
-  margin-top: auto;
+  gap: 10px;
+  margin-top: 26px;
   padding-top: 20px;
-  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ce-session-setup-border) 62%, transparent);
 }
 
 .modePresetCardRequirementsLabel {
-  color: var(--ce-panel-text);
-  font-size: 0.9rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  color: var(--ce-session-setup-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .modePresetCardRequirementPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 6px;
 }
 
 .modePresetCardRequirementPill {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  min-height: 34px;
-  padding: 7px 12px;
-  border: 1px solid var(--ce-action-accent);
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--ce-session-setup-accent) 68%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-action-accent) 88%, var(--ce-overlay-base));
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  color: var(--ce-action-accent-text);
-  font-size: 0.84rem;
-  font-weight: 800;
+  background: color-mix(in srgb, var(--ce-session-setup-accent) 10%, transparent);
+  color: color-mix(in srgb, var(--ce-session-setup-accent) 78%, var(--ce-session-setup-text));
+  font-size: 0.72rem;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -3141,11 +3190,40 @@ $muted-text: var(--ce-panel-text-muted);
   justify-content: center;
   white-space: normal;
 
-  :global(.btn) {
+  .modeSavedProfileResumeButton {
+    appearance: none;
     min-height: 48px;
     padding: 10px 18px;
+    border: 1px solid var(--ce-action-accent);
+    border-radius: var(--ce-radius-pill);
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    cursor: pointer;
     font-size: 0.9rem;
     font-weight: 800;
+    line-height: 1.4;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
+    transition:
+      background 0.16s ease,
+      border-color 0.16s ease,
+      box-shadow 0.16s ease,
+      transform 0.12s ease;
+  }
+
+  .modeSavedProfileResumeButton:hover,
+  .modeSavedProfileResumeButton:focus {
+    border-color: var(--ce-action-accent-hover);
+    background: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
+  }
+
+  .modeSavedProfileResumeButton:hover {
+    transform: translateY(-1px);
+  }
+
+  .modeSavedProfileResumeButton:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
+    outline-offset: 3px;
   }
 }
 
@@ -3509,8 +3587,18 @@ $muted-text: var(--ce-panel-text-muted);
   }
 
   .modePresetCard {
-    min-height: 230px;
     padding: 20px;
+  }
+
+  .modePresetCard::after {
+    top: 20px;
+    right: 20px;
+  }
+
+  @media (max-width: 400px) {
+    .modePresetCardRequirementPill {
+      padding-inline: 5px;
+    }
   }
 
   .modePresetToggle {

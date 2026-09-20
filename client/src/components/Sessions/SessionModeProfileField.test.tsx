@@ -205,6 +205,8 @@ describe('SessionModeProfileField', () => {
     expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
     const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
     expect(resumeButton).toHaveAccessibleName('Resume in-progress session setup');
+    expect(resumeButton).not.toHaveClass('btn-primary');
+    expect(resumeButton).not.toHaveClass('btn-secondary');
     fireEvent.click(resumeButton);
 
     expect(onContinue).toHaveBeenCalledTimes(1);
