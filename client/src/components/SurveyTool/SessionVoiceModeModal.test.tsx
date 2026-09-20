@@ -164,7 +164,7 @@ describe('SessionVoiceModeModal', () => {
     const section = await screen.findByText('Suggested new questions (1)');
     expect(section.closest('details')).toHaveAttribute('open');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
-    expect(screen.getByText(/No response drafts matched the current bank/)).toBeInTheDocument();
+    expect(screen.getByText(/No matching answers yet. Review the suggested questions below./)).toBeInTheDocument();
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
   });
@@ -1080,7 +1080,9 @@ describe('SessionVoiceModeModal', () => {
       await Promise.resolve();
     });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
+    const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     const copyPromptButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(toggle.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
@@ -1317,8 +1319,8 @@ describe('SessionVoiceModeModal', () => {
 
     const notice = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE);
     expect(notice).toHaveTextContent('Not enough information to generate response drafts.');
-    expect(notice).toHaveTextContent('did not contain enough directly relevant detail');
-    expect(notice).toHaveTextContent('Start another interview and share more detail');
+    expect(notice).not.toHaveTextContent('did not contain enough directly relevant detail');
+    expect(notice).not.toHaveTextContent('Start another interview and share more detail');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');

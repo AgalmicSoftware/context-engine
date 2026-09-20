@@ -320,9 +320,7 @@ function SessionInterviewPanel({
       if (disposedRef.current || mappingRef.current) return;
       if (!nextTranscript.trim() && !prefillPacket && !responderContext.trim()) {
         setError('');
-        setMappingNotice(
-          'Not enough information to generate response drafts. Record an interview or add relevant responder context first.',
-        );
+        setMappingNotice('Not enough information to generate response drafts.');
         setStatus('Not enough information');
         return;
       }
@@ -425,8 +423,8 @@ function SessionInterviewPanel({
           review.drafts.length
             ? ''
             : combinedQuestions.length
-              ? 'No response drafts matched the current bank. Review the suggested new questions below.'
-              : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.',
+              ? 'No matching answers yet. Review the suggested questions below.'
+              : 'Not enough information to generate response drafts.',
         );
         setStatus(review.drafts.length || combinedQuestions.length ? 'Review drafts' : 'Ready');
       } catch (mappingError) {
@@ -666,6 +664,7 @@ function SessionInterviewPanel({
           (idle && (readiness.state !== 'ready' || interviewOpening.loading))
         ? 'pending'
         : 'ready';
+  const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
     : isStarting
@@ -753,6 +752,14 @@ function SessionInterviewPanel({
                   </span>
                   <span>{startLabel}</span>
                 </Button>
+                {hasTranscript ? (
+                  <SessionInterviewTranscriptDisclosure
+                    variant="compact"
+                    showTranscript={showTranscript}
+                    transcript={transcript}
+                    onToggleTranscript={() => setShowTranscript((current) => !current)}
+                  />
+                ) : null}
               </div>
             ) : (
               <div className={styles.sessionListeningActiveRecorder}>
@@ -818,23 +825,16 @@ function SessionInterviewPanel({
             ) : null}
           </div>
 
-          {!isInterviewBusy && transcript.trim() ? (
+          {hasTranscript && showTranscript ? (
             <div className={styles.sessionInterviewTranscriptArea}>
-              <SessionInterviewTranscriptDisclosure
-                showTranscript={showTranscript}
-                transcript={transcript}
-                onToggleTranscript={() => setShowTranscript((current) => !current)}
-              />
-              {showTranscript ? (
-                <pre
-                  id="ce-session-interview-transcript-content"
-                  className={styles.sessionInterviewTranscript}
-                  aria-label="Transcript"
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
-                >
-                  {transcript}
-                </pre>
-              ) : null}
+              <pre
+                id="ce-session-interview-transcript-content"
+                className={styles.sessionInterviewTranscript}
+                aria-label="Transcript"
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+              >
+                {transcript}
+              </pre>
             </div>
           ) : null}
 

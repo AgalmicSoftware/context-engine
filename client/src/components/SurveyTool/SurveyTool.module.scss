@@ -3415,8 +3415,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewPrimaryAction {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  min-width: 0;
   margin-inline: auto;
-  gap: 10px;
+  gap: 10px 12px;
 }
 
 .sessionInterviewHeader {
@@ -3479,9 +3482,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionInterviewPanel .sessionInterviewMicrophone {
   display: inline-flex;
+  flex: 0 1 132px;
   flex-direction: column;
   align-items: center;
-  width: 100%;
+  min-width: 112px;
   gap: 12px;
   padding: 10px 4px;
   background: transparent !important;
@@ -3706,6 +3710,24 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionInterviewTranscriptDisclosureCompact {
+  flex: 0 0 auto;
+  border-radius: var(--ce-radius-pill);
+  box-shadow: none;
+}
+
+.sessionInterviewTranscriptDisclosureCompact .sessionInterviewTranscriptToggle {
+  width: auto;
+  min-height: 44px;
+  justify-content: center;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.sessionInterviewTranscriptDisclosureCompact .sessionInterviewTranscriptToggle span {
+  margin-left: 0;
+}
+
 .sessionInterviewTranscriptCaret {
   flex: 0 0 auto;
   transition: transform 150ms ease;
@@ -3753,7 +3775,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  flex: 1 1 320px;
+  flex: 1 1 260px;
   min-width: min(100%, 260px);
   min-height: 48px;
   padding: 6px 0;
@@ -6640,10 +6662,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: grid;
   justify-items: center;
   gap: 10px;
-}
-
-.sessionInterviewTranscriptArea .sessionInterviewTranscriptDisclosure {
-  width: min(100%, 260px);
 }
 
 .sessionInterviewTranscriptArea .sessionInterviewTranscript {
