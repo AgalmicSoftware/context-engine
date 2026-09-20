@@ -30,8 +30,10 @@ it('includes the validated Worker origin for first-time visitors without accepti
   expect(buildWorkerGroupAutoJoinPath('alpha', 'participants', 'https://worker.example/')).toBe(
     '/session/alpha?joinGroup=participants&worker=https%3A%2F%2Fworker.example',
   );
+  const credentialedWorker = new URL('https://worker.example');
+  credentialedWorker.username = 'fixture';
   for (const worker of [
-    'https://[redacted-email]',
+    credentialedWorker.href,
     'https://worker.example/private',
     'https://worker.example?token=secret',
   ]) {
