@@ -727,10 +727,23 @@ describe('SessionWizard rendered validation', () => {
     expect(policy).toHaveAccessibleName('Who can create groups?');
     expect(policy).toHaveValue('participants');
     expect(screen.queryByRole('textbox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
-    const realtimeModel = screen.getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
+    const interviewPanel = screen.getByRole('region', { name: 'Voice interview settings' });
+    const interviewToggle = within(interviewPanel).getByLabelText('Voice interview modes');
+    expect(interviewToggle).toBeChecked();
+    const realtimeModel = within(interviewPanel).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
     expect(realtimeModel).toHaveValue('gpt-live-1');
     fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-2' } });
     expect(realtimeModel).toHaveValue('gpt-realtime-2');
+    fireEvent.click(interviewToggle);
+    expect(within(interviewPanel).queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
+    expect(screen.getByText('Results analysis')).toBeInTheDocument();
+    expect(policy).toBeInTheDocument();
+    expect(within(interviewPanel).queryByText('Results analysis')).not.toBeInTheDocument();
+    expect(within(interviewPanel).queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
+    fireEvent.click(within(interviewPanel).getByLabelText('Voice interview modes'));
+    expect(within(interviewPanel).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).toHaveValue(
+      'gpt-realtime-2',
+    );
 
     const colorsToggle = screen.getByRole('button', { name: 'Session colors expand' });
     expect(colorsToggle).toHaveAttribute('aria-expanded', 'false');
