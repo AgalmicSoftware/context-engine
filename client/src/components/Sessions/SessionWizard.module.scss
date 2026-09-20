@@ -2440,6 +2440,11 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
+.newSessionBannerTooltipTrigger {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .sponsoredBundleStatus {
   margin-bottom: 18px;
   padding: 10px 14px;

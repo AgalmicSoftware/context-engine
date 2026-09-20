@@ -26,6 +26,10 @@ describe('SessionWizardInfoTooltip', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Test info' })).toHaveAttribute('id', 'gw-tip-test');
+    expect(screen.getByRole('button', { name: 'Test info' })).toHaveAttribute(
+      'data-ce-control-appearance',
+      'frameless',
+    );
     expect(screen.getByTestId('ce-wizard-tooltip-gw-tip-test')).toBeInTheDocument();
     expect(screen.getByTestId('mock-ce-tooltip')).toHaveAttribute('data-target', 'gw-tip-test');
     expect(screen.getByTestId('mock-ce-tooltip')).toHaveAttribute('data-placement', 'bottom');
