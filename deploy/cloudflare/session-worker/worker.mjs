@@ -39020,7 +39020,7 @@ var init_aiProviderExecution = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr20, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, safeNumber, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr20, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeVoiceCredits, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_resultsAnalysisSettings();
@@ -39099,11 +39099,18 @@ var init_resultsAnalysisGeneration = __esm({
       "payloadCiphertext",
       "wrappedKey"
     ]);
+    encryptedEnvelopeValueHasContent = (value) => {
+      if (value == null || value === false) return false;
+      if (typeof value === "string") return trim7(value) !== "";
+      if (Array.isArray(value)) return value.length > 0;
+      if (isObj13(value)) return Object.keys(value).length > 0;
+      return true;
+    };
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
       if (!isObj13(value)) return false;
       if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-      if (Object.keys(value).some((key) => ENCRYPTED_ENVELOPE_KEYS.has(key))) return true;
+      if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
       return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
     };
     valueFromAnswerLike = (value) => {
@@ -39134,9 +39141,51 @@ var init_resultsAnalysisGeneration = __esm({
     normalizeQuestionId = (value) => trim7(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim7(value).replace(/\s+/g, " ").slice(0, 1200);
     normalizeQuestionType = (value) => trim7(value).slice(0, 64) || "text";
+    RATING_SCALE_METADATA_KEYS = [
+      "min",
+      "minimum",
+      "max",
+      "maximum",
+      "minLabel",
+      "lowLabel",
+      "maxLabel",
+      "highLabel"
+    ];
     safeNumber = (value) => {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : null;
+    };
+    hasMetadataValue = (value) => value !== void 0 && value !== null && trim7(value) !== "";
+    recordHasRatingScaleMetadata = (record = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
+    pickRatingScaleRecord = (question = {}) => {
+      const scale = isObj13(question.scale) ? question.scale : null;
+      if (scale && recordHasRatingScaleMetadata(scale)) return scale;
+      const ratingScale = isObj13(question.ratingScale) ? question.ratingScale : null;
+      if (ratingScale && recordHasRatingScaleMetadata(ratingScale)) return ratingScale;
+      return scale || ratingScale || question;
+    };
+    normalizeRatingLabel = (value, fallback) => {
+      const label = trim7(value);
+      return normalizeQuestionPrompt(label || String(fallback)).slice(0, 120);
+    };
+    normalizeRatingScale = (question = {}) => {
+      const scale = pickRatingScaleRecord(question);
+      if (!recordHasRatingScaleMetadata(scale) && !recordHasRatingScaleMetadata(question)) return null;
+      const min = safeNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
+      const max = safeNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
+      const normalizedMin = min ?? 0;
+      const normalizedMax = max ?? 10;
+      if (normalizedMax <= normalizedMin) return { min: 0, max: 10, minLabel: "0", maxLabel: "10" };
+      return {
+        min: normalizedMin,
+        max: normalizedMax,
+        minLabel: normalizeRatingLabel(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
+        maxLabel: normalizeRatingLabel(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax)
+      };
+    };
+    normalizeVoiceCredits = (value) => {
+      const numeric = Number(value);
+      return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 99;
     };
     normalizeSubmittedAt = (value) => {
       const text = trim7(value);
@@ -39243,14 +39292,40 @@ var init_resultsAnalysisGeneration = __esm({
       if (!isObj13(question)) return null;
       const questionId = normalizeQuestionId(question.questionId || question.questionID || question.id);
       if (!questionId) return null;
+      const type = normalizeQuestionType(question.type || question.questionType);
+      const scale = type === "rating" ? normalizeRatingScale(question) : null;
       return {
         questionId,
         id: questionId,
         prompt: normalizeQuestionPrompt(question.prompt || question.questionPrompt || question.questionText || question.text || question.title),
-        type: normalizeQuestionType(question.type || question.questionType),
+        type,
         options: Array.isArray(question.options) ? question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => normalizeQuestionPrompt(option).slice(0, 140)).filter(Boolean) : [],
-        tags: Array.isArray(question.tags) ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean) : []
+        tags: Array.isArray(question.tags) ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean) : [],
+        ...scale ? { scale } : {},
+        ...type === "quadratic" ? { voiceCredits: normalizeVoiceCredits(question.voiceCredits) } : {}
       };
+    };
+    selectRoundRobinResponses = ({ responseRows, questionIds, limit }) => {
+      const buckets = new Map(questionIds.map((questionId) => [questionId, []]));
+      responseRows.forEach((row) => {
+        const bucket = buckets.get(row.questionId);
+        if (bucket) bucket.push(row);
+      });
+      const out = [];
+      for (let offset = 0; out.length < limit; offset += 1) {
+        let added = false;
+        for (let questionIndex = 0; questionIndex < questionIds.length; questionIndex += 1) {
+          const questionId = questionIds[questionIndex];
+          const bucket = buckets.get(questionId) || [];
+          const row = offset < bucket.length ? bucket[(offset + questionIndex) % bucket.length] : null;
+          if (!row) continue;
+          out.push(row);
+          added = true;
+          if (out.length >= limit) break;
+        }
+        if (!added) break;
+      }
+      return out;
     };
     normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
       const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
@@ -39347,7 +39422,12 @@ var init_resultsAnalysisGeneration = __esm({
       });
       const cappedQuestions = sanitizedQuestions.slice(0, AI_QUESTION_CAP);
       const cappedQuestionIds = new Set(cappedQuestions.map((question) => question.questionId));
-      const aiResponses = responseRows.filter((row) => cappedQuestionIds.has(row.questionId)).slice(0, AI_RESPONSE_CAP).map((row) => ({
+      const aiResponseRows = selectRoundRobinResponses({
+        responseRows: responseRows.filter((row) => cappedQuestionIds.has(row.questionId)),
+        questionIds: cappedQuestions.map((question) => question.questionId),
+        limit: AI_RESPONSE_CAP
+      });
+      const aiResponses = aiResponseRows.map((row) => ({
         ...row.additionalComments ? { additional: row.additionalComments.slice(0, AI_LIMITS.maxResponseAdditionalChars) } : {},
         answer: row.answer.slice(0, AI_LIMITS.maxResponseAnswerChars),
         participantId: participantLabels.get(row.participantKey) || "participant_000",
@@ -39361,7 +39441,9 @@ var init_resultsAnalysisGeneration = __esm({
         prompt: question.prompt.slice(0, AI_LIMITS.maxQuestionPromptChars),
         type: question.type,
         options: question.options,
-        tags: question.tags
+        tags: question.tags,
+        ...question.scale ? { scale: question.scale } : {},
+        ...question.type === "quadratic" ? { voiceCredits: question.voiceCredits ?? 99 } : {}
       }));
       const aiSnapshot = {
         counts: {
@@ -40269,8 +40351,15 @@ var init_sessionWriteCoordinator = __esm({
         if (!isObjectRecord(value)) return false;
         if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
         const encryptedKeys = /* @__PURE__ */ new Set(["ciphertext", "cipherText", "encryptedContent", "encryptedKey", "encryptedPortion", "keyCipher", "payloadCiphertext", "wrappedKey"]);
-        if (Object.keys(value).some((key) => encryptedKeys.has(key))) return true;
+        if (Object.entries(value).some(([key, entry]) => encryptedKeys.has(key) && this.resultsAnalysisEncryptedEnvelopeValueHasContent(entry))) return true;
         return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
+      }
+      resultsAnalysisEncryptedEnvelopeValueHasContent(value) {
+        if (value == null || value === false) return false;
+        if (typeof value === "string") return value.trim() !== "";
+        if (Array.isArray(value)) return value.length > 0;
+        if (isObjectRecord(value)) return Object.keys(value).length > 0;
+        return true;
       }
       sanitizeResultsAnalysisAutoJob(payload = {}) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
@@ -75325,7 +75414,7 @@ var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim8 = (value) => String(value == null ? "" : value).trim();
 var lower4 = (value) => trim8(value).toLowerCase();
 var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var RATING_SCALE_METADATA_KEYS = [
+var RATING_SCALE_METADATA_KEYS2 = [
   "min",
   "minimum",
   "max",
@@ -75335,27 +75424,27 @@ var RATING_SCALE_METADATA_KEYS = [
   "maxLabel",
   "highLabel"
 ];
-var hasMetadataValue = (value) => value !== void 0 && value !== null && trim8(value) !== "";
-var recordHasRatingScaleMetadata = (record = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
-var pickRatingScaleRecord = (question = {}) => {
+var hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim8(value) !== "";
+var recordHasRatingScaleMetadata2 = (record = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record[key]));
+var pickRatingScaleRecord2 = (question = {}) => {
   const scale = isObj15(question.scale) ? question.scale : null;
-  if (scale && recordHasRatingScaleMetadata(scale)) return scale;
+  if (scale && recordHasRatingScaleMetadata2(scale)) return scale;
   const ratingScale = isObj15(question.ratingScale) ? question.ratingScale : null;
-  if (ratingScale && recordHasRatingScaleMetadata(ratingScale)) return ratingScale;
+  if (ratingScale && recordHasRatingScaleMetadata2(ratingScale)) return ratingScale;
   return scale || ratingScale || question;
 };
-var hasRatingScaleMetadata = (question = {}) => recordHasRatingScaleMetadata(pickRatingScaleRecord(question)) || recordHasRatingScaleMetadata(question);
+var hasRatingScaleMetadata = (question = {}) => recordHasRatingScaleMetadata2(pickRatingScaleRecord2(question)) || recordHasRatingScaleMetadata2(question);
 var toFiniteNumber = (value) => {
   const number2 = Number(value);
   return Number.isFinite(number2) ? number2 : null;
 };
-var normalizeRatingLabel = (value, fallback) => {
+var normalizeRatingLabel2 = (value, fallback) => {
   const label = trim8(value);
   return label || String(fallback);
 };
-var normalizeRatingScale = (question = {}) => {
+var normalizeRatingScale2 = (question = {}) => {
   if (!hasRatingScaleMetadata(question)) return null;
-  const scale = pickRatingScaleRecord(question);
+  const scale = pickRatingScaleRecord2(question);
   const min = toFiniteNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
   const max = toFiniteNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
   const normalizedMin = min ?? 0;
@@ -75366,11 +75455,11 @@ var normalizeRatingScale = (question = {}) => {
   return {
     min: normalizedMin,
     max: normalizedMax,
-    minLabel: normalizeRatingLabel(
+    minLabel: normalizeRatingLabel2(
       scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel,
       normalizedMin
     ),
-    maxLabel: normalizeRatingLabel(
+    maxLabel: normalizeRatingLabel2(
       scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel,
       normalizedMax
     )
@@ -75390,7 +75479,7 @@ var normalizeQuestion = (value = {}) => {
   const type = lower4(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
   const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj15(entry) ? entry.label || entry.value : entry)).filter(Boolean);
-  const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
+  const ratingScale = type === "rating" ? normalizeRatingScale2(question) : null;
   return {
     id: id2,
     prompt,
