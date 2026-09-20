@@ -3,6 +3,7 @@ import {
   buildInitialGeneratedResultsControllerState,
   resolveGeneratedResultsControllerState,
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
+import { SESSION_GENERATED_RESULTS_VIEW_KEYS } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from '../../domains/sessionResults/sessionResultsAnalysisBrowserSnapshot';
 import {
   readSessionResultsAnalysisArtifact,
@@ -87,6 +88,7 @@ const readChainId = (host: OnePageGeneratedResultsHost, sessionConfig: UnknownRe
       toRecord(host.props.network).chainId ||
       1,
   ) || 1;
+const GENERATED_RESULTS_VIEW_KEYS = new Set<string>(Object.values(SESSION_GENERATED_RESULTS_VIEW_KEYS));
 
 const defaultPorts: RuntimePorts = {
   now: () => Date.now(),
@@ -437,19 +439,23 @@ const enabledSectionsFromStatus = (statusBody: unknown): string[] => {
   return out;
 };
 
+const isGeneratedResultsViewMode = (value: unknown): boolean => GENERATED_RESULTS_VIEW_KEYS.has(toText(value));
+
 const applyGeneratedResultsStatusBody = (
   host: OnePageGeneratedResultsHost,
   statusBody: unknown,
   resultDraft: unknown,
 ): void => {
+  const currentResultsViewMode = host.state.resultsViewMode;
   const nextControllerState = resolveGeneratedResultsControllerState({
-    previousSelectedView: host.state.resultsViewMode,
+    previousSelectedView: currentResultsViewMode,
     statusBody,
   });
+  const shouldAdoptGeneratedViewMode = !!resultDraft && isGeneratedResultsViewMode(currentResultsViewMode);
   host.setState({
     generatedResultsStatusBody: statusBody,
     generatedResultsAnalysis: nextControllerState,
-    resultsViewMode: resultDraft ? nextControllerState.selectedView : host.state.resultsViewMode,
+    resultsViewMode: shouldAdoptGeneratedViewMode ? nextControllerState.selectedView : currentResultsViewMode,
   });
 };
 
