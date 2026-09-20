@@ -1,12 +1,8 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 
 import styles from './SessionWizard.module.scss';
 import type { AnyRecord } from '../shellTypes';
-import CETooltip from '../Shared/CETooltip';
-import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   SESSION_MODE_DEFAULT_REGISTRY_CHAIN_ID,
@@ -26,6 +22,7 @@ export type SessionModeProfileFieldProps = {
   customizing?: boolean;
   entryOnly?: boolean;
   showContinue?: boolean;
+  showPresetToggle?: boolean;
 };
 
 const HOSTING_PRESETS = [
@@ -48,12 +45,6 @@ const HOSTING_PRESETS = [
     entryRequirements: ['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)'],
   },
 ] as const;
-
-const ARCHITECTURE_README_URL = `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/README.md#architecture-at-a-glance`;
-const ARCHITECTURE_TOOLTIP_TARGET_ID = 'ce-session-mode-architecture-help';
-const ARCHITECTURE_TOOLTIP_ID = 'ce-session-mode-architecture-tooltip';
-const ARCHITECTURE_TOOLTIP_TEXT =
-  'Compare where session data is stored and which credentials each setup requires. Open the architecture guide for more detail.';
 
 const isProfile = (value: unknown): value is SessionModeProfile =>
   !!value &&
@@ -88,6 +79,7 @@ const SessionModeProfileField = ({
   customizing = false,
   entryOnly = false,
   showContinue = true,
+  showPresetToggle = true,
 }: SessionModeProfileFieldProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const selectedPreset = profile?.preset && profile.preset !== SESSION_MODE_PRESET_IDS.CUSTOM ? profile.preset : '';
@@ -189,37 +181,11 @@ const SessionModeProfileField = ({
     >
       {entryOnly ? (
         <>
-          <div className={styles.modeProfileEntryIntro}>
-            <span className={styles.modeProfileEntryPrompt}>
-              <span className={styles.modeProfileEntryEyebrow}>Choose a setup</span>
-              <a
-                id={ARCHITECTURE_TOOLTIP_TARGET_ID}
-                className={styles.modeProfileArchitectureLink}
-                href={ARCHITECTURE_README_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="View the deployment architecture diagram on GitHub"
-                aria-describedby={ARCHITECTURE_TOOLTIP_ID}
-              >
-                <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-              </a>
-              <CETooltip
-                id={ARCHITECTURE_TOOLTIP_ID}
-                target={ARCHITECTURE_TOOLTIP_TARGET_ID}
-                placement="top"
-                trigger="hover focus"
-                delay={0}
-                fade={false}
-              >
-                {ARCHITECTURE_TOOLTIP_TEXT}
-              </CETooltip>
-            </span>
-          </div>
           <div className={styles.modePresetCards} role="radiogroup" aria-label="Session hosting profile">
             {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, true))}
           </div>
         </>
-      ) : (
+      ) : showPresetToggle ? (
         <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
           {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, false))}
           <button
@@ -237,7 +203,7 @@ const SessionModeProfileField = ({
             <span className={styles.modePresetSoon}>Soon</span>
           </button>
         </div>
-      )}
+      ) : null}
 
       {entryOnly && profile ? (
         <div className={`${styles.modeSavedProfile} ${styles.modeSavedProfileEntry}`}>
@@ -257,11 +223,11 @@ const SessionModeProfileField = ({
           type="button"
           className={`${styles.moreOptionsToggle} ${customizing ? styles.moreOptionsToggleActive : ''}`}
           onClick={onCustomize}
-          aria-label={customizing ? 'Finish customizing session settings' : 'Customize session settings'}
+          aria-label={customizing ? 'Finish customizing session settings' : 'Advanced session settings'}
           aria-pressed={customizing}
           data-testid={E2E_TESTIDS.WIZARD_MODE_ADVANCED}
         >
-          {customizing ? 'Done' : 'Customize'}
+          {customizing ? 'Done' : 'Advanced'}
         </button>
       ) : null}
 

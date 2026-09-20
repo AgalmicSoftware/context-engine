@@ -18,6 +18,11 @@ jest.mock('./SessionWizardHeader', () => (props: any) => (
     <button type="button" onClick={props.onEnterNormalMode}>
       normal
     </button>
+    {props.onBackToProfileSelection ? (
+      <button type="button" onClick={props.onBackToProfileSelection}>
+        back
+      </button>
+    ) : null}
     <button type="button" onClick={props.onToggleDisplaySettings}>
       display
     </button>
@@ -475,6 +480,18 @@ describe('SessionWizardShell', () => {
     expect(screen.queryByTestId('shell-worker')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-publish')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-modals')).not.toBeInTheDocument();
+  });
+
+  it('passes the profile-selection Back callback to the header without gating setup content', () => {
+    const props = baseProps();
+    props.onBackToProfileSelection = jest.fn();
+
+    render(<SessionWizardShell {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'back' }));
+
+    expect(props.onBackToProfileSelection).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('shell-normal-rail')).toBeInTheDocument();
   });
 
   it('places custom profile settings in the relevant flow sections and keeps privacy ahead of access rules', () => {

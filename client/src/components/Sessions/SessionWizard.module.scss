@@ -108,6 +108,40 @@ $muted-text: var(--ce-panel-text-muted);
   max-width: 100%;
 }
 
+.headerTitleBlockWithBack {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerBackButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: fit-content;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--ce-radius-pill);
+  background: transparent;
+  color: var(--ce-color-white);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-action-accent-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
+    outline-offset: 3px;
+  }
+}
+
 .headerActions {
   display: flex;
   flex: 0 1 auto;
@@ -131,7 +165,11 @@ $muted-text: var(--ce-panel-text-muted);
   align-items: stretch;
 
   .headerTitleBlock {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-basis: 100%;
+    gap: 12px;
     min-width: 0;
     text-align: center;
 
@@ -241,6 +279,8 @@ $muted-text: var(--ce-panel-text-muted);
   font-weight: 700;
   letter-spacing: 0.01em;
   text-transform: none;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .normalModeCardSummary {
@@ -268,6 +308,17 @@ $muted-text: var(--ce-panel-text-muted);
 
   .normalModeCardNumber {
     color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  }
+}
+
+.normalModeCardCompact {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+
+  .normalModeCardNumber {
+    position: static;
+    inset: auto;
   }
 }
 
@@ -1365,8 +1416,12 @@ $muted-text: var(--ce-panel-text-muted);
   .normalModeCard {
     min-width: 0;
     min-height: 78px;
-    padding: 26px 8px 10px;
+    padding: 24px 6px 9px;
     border-radius: var(--ce-radius-10);
+  }
+
+  .normalModeCardCompact {
+    padding: 9px 6px;
   }
 
   .normalModeCardNumber {
@@ -1381,8 +1436,8 @@ $muted-text: var(--ce-panel-text-muted);
   }
 
   .normalModeCardTitle {
-    font-size: 0.9rem;
-    line-height: 1.15;
+    font-size: 0.78rem;
+    line-height: 1.12;
   }
 
   .normalModeCardSummary {
@@ -2854,21 +2909,6 @@ $muted-text: var(--ce-panel-text-muted);
   gap: 18px;
 }
 
-.modeProfileEntryIntro {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 620px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.modeProfileEntryPrompt {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
 .modeProfileArchitectureLink {
   display: inline-flex;
   align-items: center;
@@ -2891,14 +2931,6 @@ $muted-text: var(--ce-panel-text-muted);
     outline-offset: 3px;
     border-radius: var(--ce-radius-round);
   }
-}
-
-.modeProfileEntryEyebrow {
-  color: var(--ce-text-inverse);
-  font-size: 0.82rem;
-  font-weight: 850;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
 }
 
 .modePresetCards {

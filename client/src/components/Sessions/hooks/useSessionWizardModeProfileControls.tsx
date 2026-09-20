@@ -24,6 +24,7 @@ type SessionWizardModeProfileControlsProps<Draft extends SessionModeDraft, Secti
   setCollapsedSections: Dispatch<SetStateAction<Sections>>;
   setDraft: Dispatch<SetStateAction<Draft>>;
   showContinue: boolean;
+  showPresetToggle?: boolean;
 };
 
 export type SessionWizardModeProfileControls = {
@@ -59,6 +60,7 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
   setCollapsedSections,
   setDraft,
   showContinue,
+  showPresetToggle = true,
 }: SessionWizardModeProfileControlsProps<Draft, Sections>): SessionWizardModeProfileControls => {
   const handleChange = useCallback(
     (profile: SessionModeProfile, compiled: { storageProfile: UnknownRecord }) => {
@@ -95,6 +97,7 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
         customizing={customizing}
         entryOnly={entryOnly}
         showContinue={showContinue}
+        showPresetToggle={showPresetToggle}
       />
     ),
     privacy: <SessionModeProfileSections {...sharedSectionProps} section="privacy" />,

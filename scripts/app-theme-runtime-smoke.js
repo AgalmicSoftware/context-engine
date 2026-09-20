@@ -655,7 +655,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
 
         return {
-          eyebrowRatio: textRatio('[class*="modeProfileEntryEyebrow"]'),
+          architectureHelpRatio: textRatio('[aria-label="View the deployment architecture diagram on GitHub"]'),
           providerRatio: textRatio(
             '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardProvider"]',
           ),
@@ -2939,7 +2939,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Session Setup should not use the superseded gas label',
     );
     [
-      ['Choose a setup', sessionSetupContrastState.eyebrowRatio],
+      ['Session Setup architecture help', sessionSetupContrastState.architectureHelpRatio],
       ['Cloudflare provider', sessionSetupContrastState.providerRatio],
       ['Cloudflare description', sessionSetupContrastState.descriptionRatio],
       ['setup requirement pill', sessionSetupContrastState.requirementRatio],

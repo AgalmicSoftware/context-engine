@@ -88,7 +88,7 @@ describe('SessionWizard session header image controls', () => {
       }
 
       await waitFor(() => {
-        expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
         expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
         expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
           'src',

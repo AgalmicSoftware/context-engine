@@ -14,9 +14,10 @@ Related docs:
 ## What a New Session Needs
 
 The first `/new` screen presents the two implemented setup paths as large cards
-with their required inputs. After a creator chooses one, the cards collapse to
-the compact Hosting selector in the wizard header so the profile can still be
-changed. The Centralized card summarizes its inputs as
+with their required inputs. After a creator chooses one, the chosen profile
+appears in the setup title. Use **Back** beside the title to return to the setup
+cards without clearing the current draft, or use **Advanced** to open the extra
+settings supported by that profile. The Centralized card summarizes its inputs as
 `Cloudflare account / OpenAI API Key` and explains that session settings and
 responses are stored in Cloudflare without a blockchain requirement. The
 decentralized card explains that session data is stored on Arweave while session
@@ -67,7 +68,7 @@ Important:
 
 ### Mode-aligned optional settings
 
-`Customize` reveals only settings supported by the selected profile:
+**Advanced** reveals only settings supported by the selected profile:
 
 | Selected profile | Optional settings shown |
 | --- | --- |
@@ -77,9 +78,9 @@ Important:
 
 Pure Cloudflare setup does not display or persist block numbers, registry
 contracts, Surveys contracts, faucet settings, or an Ethereum network. Choosing
-`Customize` does not override this capability boundary.
+**Advanced** does not override this capability boundary.
 
-The metadata **Optional details** area (**More options** in Customize) contains
+The metadata **Optional details** area (**More options** in Advanced settings) contains
 the settings that most sessions can leave at their defaults. **Session colors**
 is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
@@ -344,9 +345,10 @@ registry compatibility path only when its registry identity and positive chain
 are present; legacy chain fields never turn a validated chain-free Worker
 profile into a hybrid.
 
-After selection, the profile remains visible in the setup header. `Customize`
-switches to Advanced mode and opens Privacy instead of opening a separate
-technical popover. Profile settings follow the existing stages:
+After selection, the profile remains visible in the setup title. **Back** returns
+to the setup cards while preserving the draft, and **Advanced** opens Privacy
+instead of opening a separate technical popover. Profile settings follow the
+existing stages:
 
 - Privacy owns storage, encryption, decryption access, result visibility, and
   small-group protection. Switching from Arweave to Cloudflare installs an
@@ -393,13 +395,15 @@ The normal-mode wizard is effectively four stages:
 3. Worker
 4. Deploy Session
 
+The step rail keeps equal-sized tiles: inactive stages show only their step number, and the selected stage shows its title.
+
 ### 1. Naming and session details
 
 Enter the core session metadata:
 
 - `sessionName`
 - `sessionInfo`
-- **Optional details** (**More options** in Customize) → **Session colors** →
+- **Optional details** (**More options** in Advanced settings) → **Session colors** →
   **Color scheme**. Session colors is the final optional field group and is
   collapsed by default. Expand it to choose `Context Engine`, `Ocean`, or
   `Amber`; the compact preview updates immediately. This controls only

@@ -124,6 +124,7 @@ export type SessionWizardShellProps = {
   onDismissNewSessionRequirementsBanner: IntroStatusRailProps['onDismissRequirements'];
   onEnterAdvancedMode: HeaderProps['onEnterAdvancedMode'];
   onEnterNormalMode: HeaderProps['onEnterNormalMode'];
+  onBackToProfileSelection?: HeaderProps['onBackToProfileSelection'];
   onManualGasLimitChange: PublishSectionProps['onManualGasLimitChange'];
   onManualGasPriceGweiChange: PublishSectionProps['onManualGasPriceGweiChange'];
   onManualMaxFeePerGasGweiChange: PublishSectionProps['onManualMaxFeePerGasGweiChange'];
@@ -305,6 +306,7 @@ const SessionWizardShell = ({
   onDismissNewSessionRequirementsBanner,
   onEnterAdvancedMode,
   onEnterNormalMode,
+  onBackToProfileSelection,
   onManualGasLimitChange,
   onManualGasPriceGweiChange,
   onManualMaxFeePerGasGweiChange,
@@ -425,6 +427,7 @@ const SessionWizardShell = ({
       onCloseDisplaySettings={onCloseDisplaySettings}
       onEnterAdvancedMode={onEnterAdvancedMode}
       onEnterNormalMode={onEnterNormalMode}
+      onBackToProfileSelection={onBackToProfileSelection}
       onRegistryChainIdChange={onRegistryChainIdChange}
       onToggleDisplaySettings={onToggleDisplaySettings}
       registryAddress={registryAddress}

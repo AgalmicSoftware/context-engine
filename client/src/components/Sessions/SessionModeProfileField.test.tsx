@@ -15,19 +15,10 @@ describe('SessionModeProfileField', () => {
     expect(
       screen.queryByText('Select the infrastructure path that matches the inputs you have available.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Choose a setup')).toBeInTheDocument();
-    const architectureHelp = screen.getByRole('link', {
-      name: 'View the deployment architecture diagram on GitHub',
-    });
-    expect(architectureHelp).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/README.md#architecture-at-a-glance',
-    );
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-    fireEvent.mouseEnter(architectureHelp);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'Compare where session data is stored and which credentials each setup requires.',
-    );
+    expect(screen.queryByText('Choose a setup')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'View the deployment architecture diagram on GitHub' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     const cloudflareRequirements = within(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).getByRole('list', {
@@ -67,7 +58,7 @@ describe('SessionModeProfileField', () => {
     expect(within(selector).queryByRole('radio', { name: /Corporate/i })).not.toBeInTheDocument();
   });
 
-  it('collapses the chosen entry card into the compact hosting selector', () => {
+  it('can collapse the chosen entry card into the compact hosting selector outside the new-session gate', () => {
     const Harness = () => {
       const [profile, setProfile] = React.useState<ReturnType<typeof cloneSessionModePreset> | null>(null);
       const [entryOnly, setEntryOnly] = React.useState(true);
@@ -96,6 +87,25 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByText('Soon')).toBeInTheDocument();
   });
 
+  it('can hide the compact hosting selector while keeping Advanced reachable', () => {
+    const onCustomize = jest.fn();
+    render(
+      <SessionModeProfileField
+        registryChainId={11155420}
+        value={cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)}
+        onChange={jest.fn()}
+        onCustomize={onCustomize}
+        showContinue={false}
+        showPresetToggle={false}
+      />,
+    );
+
+    expect(screen.queryByRole('radiogroup', { name: 'Session hosting profile' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced session settings' }));
+
+    expect(onCustomize).toHaveBeenCalledTimes(1);
+  });
+
   it('sends customization into the wizard instead of opening a header popover', () => {
     const onCustomize = jest.fn();
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
@@ -109,7 +119,7 @@ describe('SessionModeProfileField', () => {
       />,
     );
 
-    const customizeButton = screen.getByRole('button', { name: 'Customize session settings' });
+    const customizeButton = screen.getByRole('button', { name: 'Advanced session settings' });
     expect(customizeButton).toHaveAttribute('aria-pressed', 'false');
     expect(customizeButton).toHaveAttribute('data-testid', E2E_TESTIDS.WIZARD_MODE_ADVANCED);
     fireEvent.click(customizeButton);

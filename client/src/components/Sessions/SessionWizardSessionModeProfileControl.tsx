@@ -12,6 +12,7 @@ export type SessionWizardSessionModeProfileControlProps = {
   customizing?: boolean;
   entryOnly?: boolean;
   showContinue?: boolean;
+  showPresetToggle?: boolean;
 };
 
 const SessionWizardSessionModeProfileControl = ({
@@ -24,6 +25,7 @@ const SessionWizardSessionModeProfileControl = ({
   customizing,
   entryOnly,
   showContinue,
+  showPresetToggle,
 }: SessionWizardSessionModeProfileControlProps) => (
   <SessionModeProfileField
     registryChainId={registryChainId}
@@ -35,6 +37,7 @@ const SessionWizardSessionModeProfileControl = ({
     customizing={customizing}
     entryOnly={entryOnly}
     showContinue={showContinue}
+    showPresetToggle={showPresetToggle}
   />
 );
 

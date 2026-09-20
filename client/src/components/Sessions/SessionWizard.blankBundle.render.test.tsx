@@ -55,16 +55,24 @@ const buildMockSponsoredBundle = () => ({
 });
 
 const selectDecentralizedProfile = async () => {
-  const preset = screen.getByTestId('ce-new-preset-trustless_public_decentralized');
+  let preset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
+  if (!preset) {
+    const backButton = screen.queryByRole('button', { name: 'Back' });
+    if (backButton) {
+      fireEvent.click(backButton);
+      preset = await screen.findByTestId('ce-new-preset-trustless_public_decentralized');
+    }
+  }
+  expect(preset).toBeInTheDocument();
   const originalConfirm = window.confirm;
   window.confirm = jest.fn(() => true);
   try {
-    fireEvent.click(preset);
+    fireEvent.click(preset as HTMLElement);
   } finally {
     window.confirm = originalConfirm;
   }
   await waitFor(() => {
-    expect(preset).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
   });
 };
 

@@ -20,7 +20,15 @@ const expectSponsoredStatusText = async (expectedText) => {
 };
 
 const selectCloudflarePreset = async () => {
-  const preset = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
+  let preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (!preset) {
+    const backButton = screen.queryByRole('button', { name: 'Back' });
+    if (backButton) {
+      fireEvent.click(backButton);
+      preset = await screen.findByTestId('ce-new-preset-fast_cheap_cloudflare');
+    }
+  }
+  expect(preset).toBeInTheDocument();
   const originalConfirm = window.confirm;
   window.confirm = jest.fn(() => true);
   try {
@@ -29,7 +37,7 @@ const selectCloudflarePreset = async () => {
     window.confirm = originalConfirm;
   }
   await waitFor(() => {
-    expect(preset).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
   });
 };
 

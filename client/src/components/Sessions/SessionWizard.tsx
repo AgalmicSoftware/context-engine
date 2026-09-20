@@ -2882,6 +2882,7 @@ const SessionWizard = ({
     setCollapsedSections,
     setDraft,
     showContinue: showSessionModeProfileEntryStep || !isNewSessionWizardRoute,
+    showPresetToggle: !isNewSessionWizardRoute,
   });
 
   return (
@@ -2965,6 +2966,11 @@ const SessionWizard = ({
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}
+      onBackToProfileSelection={
+        isNewSessionWizardRoute && effectiveSessionModeProfileStepComplete
+          ? () => setSessionModeProfileStepComplete(false)
+          : undefined
+      }
       onManualGasLimitChange={setManualGasLimit}
       onManualGasPriceGweiChange={setManualGasPriceGwei}
       onManualMaxFeePerGasGweiChange={setManualMaxFeePerGasGwei}

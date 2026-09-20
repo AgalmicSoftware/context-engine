@@ -20,11 +20,10 @@ describe('SessionModeProfileField theme contrast styles', () => {
     expect(source).toMatch(/\.modePresetCardDescription\s*\{[\s\S]*?color:\s*var\(--ce-session-setup-muted\);/);
   });
 
-  it('keeps the setup-choice title and eyebrow prominent on narrow screens', () => {
+  it('keeps the setup-choice heading and architecture help aligned on narrow screens', () => {
     expect(source).toMatch(
-      /\.headerProfileSelectionStep\s*\{[\s\S]*?\.headerTitleBlock\s*\{[\s\S]*?h1\s*\{[\s\S]*?font-size:\s*clamp\(28px, 4vw, 32px\);/,
+      /\.headerProfileSelectionStep\s*\{[\s\S]*?\.headerTitleBlock\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center;[\s\S]*?gap:\s*12px;[\s\S]*?h1\s*\{[\s\S]*?font-size:\s*clamp\(28px, 4vw, 32px\);/,
     );
-    expect(source).toMatch(/\.modeProfileEntryEyebrow\s*\{[\s\S]*?font-size:\s*0\.82rem;[\s\S]*?font-weight:\s*850;/);
     expect(source).toMatch(/\.modeProfileArchitectureLink\s*\{[\s\S]*?font-size:\s*0\.9rem;/);
   });
 

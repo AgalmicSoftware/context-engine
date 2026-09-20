@@ -1,7 +1,11 @@
 import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Input } from 'reactstrap';
 
 import styles from './SessionWizard.module.scss';
+import CETooltip from '../Shared/CETooltip';
+import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type RegistryChainOption = {
@@ -15,6 +19,7 @@ type SessionWizardHeaderProps = {
   onCloseDisplaySettings: () => void;
   onEnterAdvancedMode: () => void;
   onEnterNormalMode: () => void;
+  onBackToProfileSelection?: () => void;
   onRegistryChainIdChange: (value: string) => void;
   onToggleDisplaySettings: () => void;
   registryAddress?: string;
@@ -36,8 +41,15 @@ type SessionWizardHeaderProps = {
   showNetworkSelector?: boolean;
 };
 
+const ARCHITECTURE_README_URL = `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/README.md#architecture-at-a-glance`;
+const ARCHITECTURE_TOOLTIP_TARGET_ID = 'ce-session-mode-architecture-help';
+const ARCHITECTURE_TOOLTIP_ID = 'ce-session-mode-architecture-tooltip';
+const ARCHITECTURE_TOOLTIP_TEXT =
+  'Compare where session data is stored and which credentials each setup requires. Open the architecture guide for more detail.';
+
 const SessionWizardHeader = ({
   isNormalMode = true,
+  onBackToProfileSelection,
   onRegistryChainIdChange,
   registryAddress = '',
   registryChainId = '',
@@ -51,11 +63,51 @@ const SessionWizardHeader = ({
 }: SessionWizardHeaderProps): React.ReactElement => {
   return (
     <header className={`${styles.header} ${sessionModeProfileSelectionStep ? styles.headerProfileSelectionStep : ''}`}>
-      <div className={styles.headerTitleBlock}>
+      <div
+        className={`${styles.headerTitleBlock} ${
+          !sessionModeProfileSelectionStep && onBackToProfileSelection ? styles.headerTitleBlockWithBack : ''
+        }`}
+      >
+        {!sessionModeProfileSelectionStep && onBackToProfileSelection ? (
+          <button
+            type="button"
+            className={styles.headerBackButton}
+            data-ce-control-appearance="frameless"
+            onClick={onBackToProfileSelection}
+          >
+            <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
+            <span>Back</span>
+          </button>
+        ) : null}
         <h1>
           Session Setup
           {!sessionModeProfileSelectionStep && sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}
         </h1>
+        {sessionModeProfileSelectionStep ? (
+          <>
+            <a
+              id={ARCHITECTURE_TOOLTIP_TARGET_ID}
+              className={styles.modeProfileArchitectureLink}
+              href={ARCHITECTURE_README_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="View the deployment architecture diagram on GitHub"
+              aria-describedby={ARCHITECTURE_TOOLTIP_ID}
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+            </a>
+            <CETooltip
+              id={ARCHITECTURE_TOOLTIP_ID}
+              target={ARCHITECTURE_TOOLTIP_TARGET_ID}
+              placement="top"
+              trigger="hover focus"
+              delay={0}
+              fade={false}
+            >
+              {ARCHITECTURE_TOOLTIP_TEXT}
+            </CETooltip>
+          </>
+        ) : null}
       </div>
       <div className={styles.headerActions}>
         <div className={styles.headerControlStack}>

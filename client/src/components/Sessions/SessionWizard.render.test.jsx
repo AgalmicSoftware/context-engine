@@ -982,7 +982,7 @@ describe('SessionWizard rendered validation', () => {
         'false',
       );
       expect(screen.queryByText('Custom')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Customize session settings' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Advanced session settings' })).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
@@ -993,12 +993,10 @@ describe('SessionWizard rendered validation', () => {
       fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
       expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
-      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
-        'aria-checked',
-        'true',
-      );
+      expect(screen.queryByTestId('ce-new-preset-trustless_public_decentralized')).not.toBeInTheDocument();
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Customize session settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Advanced session settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 
       enableAdvancedMode();
@@ -1011,6 +1009,26 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
     },
   );
+
+  it('returns to the setup chooser without clearing draft fields', async () => {
+    window.history.replaceState({}, '', '/session/new');
+    renderSessionWizard();
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+    const sessionInfoInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO);
+    fireEvent.change(sessionInfoInput, {
+      target: { value: 'Temporary browser verification description.' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME));
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).toHaveValue(
+      'Temporary browser verification description.',
+    );
+  });
 
   it('keeps the pure Worker /new profile off registry and block-RPC ports', async () => {
     const blockNumberSpy = jest
