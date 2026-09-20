@@ -938,7 +938,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByRole('button', { name: 'Copy memory augmentation prompt' })).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('Prompt');
-    expect(screen.getByRole('button', { name: 'About the interview prompt' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About the interview prompt' })).not.toBeInTheDocument();
     expect(screen.queryByText(/allows your agent to predict your responses/i)).not.toBeInTheDocument();
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
@@ -956,8 +956,6 @@ describe('SessionVoiceModeModal', () => {
     );
     expect(copyButton).toHaveAccessibleName('Memory augmentation prompt copied');
     expect(copyButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'About the interview prompt' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
     await act(async () => fireEvent.keyDown(copyButton, { key: ' ', code: 'Space' }));
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
     const promptCard = copyButton.parentElement?.parentElement;
@@ -969,6 +967,10 @@ describe('SessionVoiceModeModal', () => {
     expect(promptToggle).toHaveAccessibleName('Prompt');
     const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
     expect(copyButton.closest('[class]')?.parentElement?.parentElement).toContainElement(displayedPrompt);
+    const helpButton = displayedPrompt.querySelector('[aria-label="About the interview prompt"]');
+    expect(helpButton).toBeInTheDocument();
+    fireEvent.click(helpButton!);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     const plainPrompt = buildExternalInterviewKickoff({
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,
@@ -1003,6 +1005,7 @@ describe('SessionVoiceModeModal', () => {
     expect(promptToggle).toHaveAccessibleName('Prompt');
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About the interview prompt' })).not.toBeInTheDocument();
   });
 
   it('shows a collapsed responder transcript disclosure after the voice interview ends', async () => {

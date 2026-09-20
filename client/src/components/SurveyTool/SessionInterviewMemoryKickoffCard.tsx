@@ -64,14 +64,6 @@ export default function SessionInterviewMemoryKickoffCard({
         <div className={styles.sessionAgentKickoffActions}>
           <button
             type="button"
-            id="ce-interview-agent-prompt-help"
-            className={styles.sessionInterviewHeaderButton}
-            aria-label="About the interview prompt"
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-          <button
-            type="button"
             className={styles.sessionAgentKickoffToggle}
             onClick={onTogglePrompt}
             aria-expanded={showAgentPrompt}
@@ -86,15 +78,6 @@ export default function SessionInterviewMemoryKickoffCard({
               }`}
             />
           </button>
-          <UncontrolledTooltip
-            target="ce-interview-agent-prompt-help"
-            placement="top-end"
-            fade={false}
-            trigger="hover focus"
-            autohide={false}
-          >
-            Allows your agent to predict your responses and raise better interview questions.
-          </UncontrolledTooltip>
         </div>
       </div>
       {showAgentPrompt ? (
@@ -104,6 +87,25 @@ export default function SessionInterviewMemoryKickoffCard({
           data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
           data-ce-no-background-copy="true"
         >
+          <div className={styles.sessionAgentKickoffPromptHelpRow}>
+            <button
+              type="button"
+              id="ce-interview-agent-prompt-help"
+              className={styles.sessionInterviewHeaderButton}
+              aria-label="About the interview prompt"
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} />
+            </button>
+            <UncontrolledTooltip
+              target="ce-interview-agent-prompt-help"
+              placement="top-end"
+              fade={false}
+              trigger="hover focus"
+              autohide={false}
+            >
+              Allows your agent to predict your responses and raise better interview questions.
+            </UncontrolledTooltip>
+          </div>
           <SessionInterviewPrompt prompt={kickoff} />
         </div>
       ) : null}
