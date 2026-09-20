@@ -1400,6 +1400,10 @@ $muted-text: var(--ce-panel-text-muted);
     align-items: center;
   }
 
+  .header:not(.headerProfileSelectionStep) h1 {
+    font-size: clamp(18px, 3.05vw, 24px);
+  }
+
   .header:not(.headerProfileSelectionStep) .headerTitleBlock {
     flex: 1 1 100%;
     width: 100%;

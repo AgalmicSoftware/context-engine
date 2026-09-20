@@ -20,7 +20,7 @@ describe('SessionWizardHeader', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the profile control without a duplicate Normal or Advanced switch', () => {
+  it('renders the profile control without a duplicate Normal or Custom switch', () => {
     render(
       <SessionWizardHeader
         {...baseProps}
@@ -34,7 +34,7 @@ describe('SessionWizardHeader', () => {
     const hostingControl = screen.getByTestId('hosting-profile-control');
     expect(hostingControl).toBeInTheDocument();
     expect(screen.queryByText('Normal')).not.toBeInTheDocument();
-    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(screen.queryByText('Custom')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
   });
 

@@ -16,7 +16,7 @@ Related docs:
 The first `/new` screen presents the two implemented setup paths as large cards
 with their required inputs. After a creator chooses one, the chosen profile
 appears in the setup title. Use **Back** beside the title to return to the setup
-cards without clearing the current draft, or use **Advanced** to open the extra
+cards without clearing the current draft, or use **Custom** to open the extra
 settings supported by that profile. The Centralized card summarizes its inputs as
 `Cloudflare account / OpenAI API Key` and explains that session settings and
 responses are stored in Cloudflare without a blockchain requirement. The
@@ -68,7 +68,7 @@ Important:
 
 ### Mode-aligned optional settings
 
-**Advanced** reveals only settings supported by the selected profile:
+**Custom** reveals only settings supported by the selected profile:
 
 | Selected profile | Optional settings shown |
 | --- | --- |
@@ -78,9 +78,9 @@ Important:
 
 Pure Cloudflare setup does not display or persist block numbers, registry
 contracts, Surveys contracts, faucet settings, or an Ethereum network. Choosing
-**Advanced** does not override this capability boundary.
+**Custom** does not override this capability boundary.
 
-The metadata **Optional details** area (**More options** in Advanced settings) contains
+The metadata **Optional details** area (**More options** in Custom settings) contains
 the settings that most sessions can leave at their defaults. **Session colors**
 is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
@@ -348,9 +348,10 @@ are present; legacy chain fields never turn a validated chain-free Worker
 profile into a hybrid.
 
 After selection, the profile remains visible in the setup title. **Back** returns
-to the setup cards while preserving the draft, and **Advanced** opens Privacy
-instead of opening a separate technical popover. Profile settings follow the
-existing stages:
+to the setup cards while preserving the draft, and **Custom** opens Privacy
+instead of opening a separate technical popover. When Custom is active,
+**Back to templates** returns to the guided setup while keeping the current
+custom settings in the draft. Profile settings follow the existing stages:
 
 - Privacy owns storage, encryption, decryption access, result visibility, and
   small-group protection. Switching from Arweave to Cloudflare installs an
@@ -405,7 +406,7 @@ Enter the core session metadata:
 
 - `sessionName`
 - `sessionInfo`
-- **Optional details** (**More options** in Advanced settings) → **Session colors** →
+- **Optional details** (**More options** in Custom settings) → **Session colors** →
   **Color scheme**. Session colors is the final optional field group and is
   collapsed by default. Expand it to choose `Context Engine`, `Ocean`, or
   `Amber`; the compact preview updates immediately. This controls only

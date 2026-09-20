@@ -995,7 +995,7 @@ describe('SessionWizard rendered validation', () => {
         'false',
       );
       expect(screen.queryByText('Custom')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Advanced session settings' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Custom session settings' })).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
@@ -1008,7 +1008,7 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
       expect(screen.queryByTestId('ce-new-preset-trustless_public_decentralized')).not.toBeInTheDocument();
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Advanced session settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Custom session settings' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 

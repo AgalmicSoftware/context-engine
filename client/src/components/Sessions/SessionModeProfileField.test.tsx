@@ -87,7 +87,7 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByText('Soon')).toBeInTheDocument();
   });
 
-  it('can hide the compact hosting selector while keeping Advanced reachable', () => {
+  it('can hide the compact hosting selector while keeping Custom reachable', () => {
     const onCustomize = jest.fn();
     render(
       <SessionModeProfileField
@@ -101,7 +101,7 @@ describe('SessionModeProfileField', () => {
     );
 
     expect(screen.queryByRole('radiogroup', { name: 'Session hosting profile' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced session settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom session settings' }));
 
     expect(onCustomize).toHaveBeenCalledTimes(1);
   });
@@ -119,7 +119,7 @@ describe('SessionModeProfileField', () => {
       />,
     );
 
-    const customizeButton = screen.getByRole('button', { name: 'Advanced session settings' });
+    const customizeButton = screen.getByRole('button', { name: 'Custom session settings' });
     expect(customizeButton).toHaveAttribute('aria-pressed', 'false');
     expect(customizeButton).toHaveAttribute('data-testid', E2E_TESTIDS.WIZARD_MODE_ADVANCED);
     fireEvent.click(customizeButton);
@@ -142,11 +142,11 @@ describe('SessionModeProfileField', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Finish customizing session settings' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Back to templates' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Finish customizing session settings' })).toHaveTextContent('Done');
+    expect(screen.getByRole('button', { name: 'Back to templates' })).toHaveTextContent('Back to templates');
     fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
 
     expect(onSelectPreset).toHaveBeenCalledTimes(1);

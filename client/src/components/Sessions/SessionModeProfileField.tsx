@@ -223,11 +223,11 @@ const SessionModeProfileField = ({
           type="button"
           className={`${styles.moreOptionsToggle} ${customizing ? styles.moreOptionsToggleActive : ''}`}
           onClick={onCustomize}
-          aria-label={customizing ? 'Finish customizing session settings' : 'Advanced session settings'}
+          aria-label={customizing ? 'Back to templates' : 'Custom session settings'}
           aria-pressed={customizing}
           data-testid={E2E_TESTIDS.WIZARD_MODE_ADVANCED}
         >
-          {customizing ? 'Done' : 'Advanced'}
+          {customizing ? 'Back to templates' : 'Custom'}
         </button>
       ) : null}
 
