@@ -1021,7 +1021,11 @@ or a restricted invitation.
 
 To separate an event cohort, create an open Group named for the event, choose
 session member visibility, and distribute its auto-join link to participants.
-Visitors using the ordinary session URL are not automatically added. Visitors
+Visitors using the ordinary session URL are not automatically added. The invitation notice displays the public Group name before sign-in using the
+exact session-bound discovery endpoint; it falls back to the Group ID when
+public discovery is unavailable. The compact notice reads “Group name: Will be
+joined upon sign-in” with Cancel auto-join; sign-in uses the existing page login
+control. Visitors
 who follow the auto-join link sign in first; the client then calls the existing
 `/groups/join` endpoint automatically. The app remembers one pending invitation
 in tab-scoped session storage for up to 24 hours, including across navigation

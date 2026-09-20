@@ -288,14 +288,6 @@
   font-size: 0.95rem;
 }
 
-.workerGroupAutoJoinNotice {
-  overflow-wrap: anywhere;
-
-  > span {
-    min-width: 0;
-  }
-}
-
 .workerGroupImage {
   width: min(100%, 240px);
   aspect-ratio: 16 / 9;

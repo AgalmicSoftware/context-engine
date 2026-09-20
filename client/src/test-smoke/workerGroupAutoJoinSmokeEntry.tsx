@@ -52,6 +52,9 @@ function SmokeSession() {
   };
   return (
     <>
+      <button type="button" onClick={signIn}>
+        Log in
+      </button>
       <WorkerGroupAutoJoin
         sessionConfig={sessionConfig}
         sessionSlug={sessionSlug}

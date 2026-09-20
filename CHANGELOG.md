@@ -9,7 +9,8 @@ All notable changes to this project will be documented in this file.
 - Added Cloudflare Group auto-join links on open, session-visible Groups.
   Session links retain the target across navigation and refresh before sign-in,
   join immediately after login, recognize existing membership, and clear
-  completed or cancelled intent.
+  completed or cancelled intent. A compact notice names the Group
+  before sign-in and offers cancellation alongside the status.
 
 - Refreshed About functionality copy with accounts, gated content, and interviews.
   Added collapsible related-work and recognition sections with project-specific

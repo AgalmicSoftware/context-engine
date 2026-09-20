@@ -84,10 +84,16 @@ describe('WorkerGroupAutoJoin', () => {
     const changed = jest.fn();
     window.addEventListener('ce:worker-groups-changed', changed);
     const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
-    expect(screen.getByText('Sign in to join this group automatically.')).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(props.toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(screen.getByText('Will be joined upon sign-in', { exact: false })).toBeInTheDocument();
+    await flush();
+    expect(screen.getByText('Participants 2026:')).toBeInTheDocument();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(joins()).toHaveLength(0);
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+    expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Group invitation')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Participants 2026: Will be joined upon sign-in');
     rerender(<WorkerGroupAutoJoin {...props} />);
     await flush();
     expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
@@ -104,6 +110,54 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()).toHaveLength(1);
     expect(changed).toHaveBeenCalledTimes(1);
     window.removeEventListener('ce:worker-groups-changed', changed);
+  });
+
+  it.each(['unreachable', 'identity-mismatch'])(
+    'falls back to the group ID if public metadata is %s without blocking sign-in',
+    async (variant) => {
+      const original = fetchMock.getMockImplementation();
+      fetchMock.mockImplementationOnce(async () => {
+        if (variant === 'unreachable') throw new Error('Offline');
+        return response({
+          sessionId: '0x22222222222222222222222222222222',
+          groups: [{ ...group, label: 'Wrong group' }],
+        });
+      });
+      const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+      await flush();
+      expect(screen.getByText('participants-2026:')).toBeInTheDocument();
+      expect(screen.queryByText(/Wrong group/)).not.toBeInTheDocument();
+      expect(getToken).not.toHaveBeenCalled();
+      fetchMock.mockImplementation(original!);
+      rerender(<WorkerGroupAutoJoin {...props} />);
+      await flush();
+      expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+      expect(joins()).toHaveLength(1);
+    },
+  );
+
+  it('does not replace a newer invitation label with a late public lookup', async () => {
+    let resolveOld: (response: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    await flush();
+    fetchMock.mockImplementation(async () =>
+      response({ groups: [{ ...group, groupId: 'other-group', label: 'Other participants' }] }),
+    );
+    act(() => {
+      window.history.pushState({}, '', '/session/alpha?joinGroup=other-group');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await flush();
+    expect(screen.getByText('Other participants:')).toBeInTheDocument();
+    await act(async () => resolveOld(response({ groups: [group] })));
+    expect(screen.getByText('Other participants:')).toBeInTheDocument();
+    expect(getToken).not.toHaveBeenCalled();
   });
 
   it('allows cancellation before sign-in without leaving a retry on refresh', async () => {
@@ -344,7 +398,7 @@ describe('WorkerGroupAutoJoin', () => {
       window.history.pushState({}, '', '/session/alpha?joinGroup=participants-2026');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(screen.getByText('Sign in to join this group automatically.')).toBeInTheDocument();
+    expect(screen.getByText('Will be joined upon sign-in', { exact: false })).toBeInTheDocument();
     rerender(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
     await flush();
     expect(joins()).toHaveLength(2);

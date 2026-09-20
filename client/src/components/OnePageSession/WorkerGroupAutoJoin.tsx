@@ -13,7 +13,8 @@ import {
   savePendingAutoJoin,
   type WorkerGroupAutoJoinIntent,
 } from '../../domains/worker/workerGroupAutoJoinIntent';
-import styles from './OnePageSession.module.scss';
+import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
+import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
 export type WorkerGroupAutoJoinProps = {
   sessionConfig: unknown;
@@ -59,8 +60,28 @@ function AutoJoinIntent({
   const finishedRef = useRef(false);
   const completedAccountRef = useRef<string>();
   const cancelRef = useRef(() => {});
+  const [groupLabel, setGroupLabel] = useState(groupId);
   const [retry, setRetry] = useState(0);
   const [progress, setProgress] = useState<Progress>({ phase: 'loading', message: 'Preparing to join group…' });
+
+  useEffect(() => {
+    if (ready || finishedRef.current) return undefined;
+    let active = true;
+    void import('../../domains/worker/workerGroupPorts')
+      .then(async ({ loadPublicWorkerGroups }) => {
+        if (!active) return;
+        const groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug });
+        const group = groups.find((candidate) => candidate.groupId === groupId);
+        if (active && group) setGroupLabel(group.label);
+      })
+      .catch(() => {
+        // An unavailable public label must not block sign-in. Use the group ID
+        // until authenticated discovery can provide its validated name.
+      });
+    return () => {
+      active = false;
+    };
+  }, [ready, workerUrl, sessionId, sessionSlug, groupId]);
 
   useEffect(() => {
     if (!ready || finishedRef.current) return undefined;
@@ -99,11 +120,13 @@ function AutoJoinIntent({
         if (!active) return;
         const membership = overview.memberships.find(({ group }) => group.groupId === groupId);
         if (membership) {
+          setGroupLabel(membership.group.label);
           complete(`You’re already in ${membership.group.label}.`);
           return;
         }
         const group = overview.groups.find((candidate) => candidate.groupId === groupId);
         if (!group) throw new Error('This group is unavailable in this session.');
+        setGroupLabel(group.label);
         if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
         setProgress({ phase: 'joining', message: `Joining ${group.label}…` });
         await joinWorkerGroup({ ...request, groupId });
@@ -128,35 +151,22 @@ function AutoJoinIntent({
   const done = progress.phase === 'done';
   if (done && completedAccountRef.current && completedAccountRef.current !== account) return null;
   return (
-    <div
-      className={`${styles.workerGroupNotice} ${styles.workerGroupAutoJoinNotice}`}
-      data-testid="ce-session-worker-group-auto-join"
+    <WorkerGroupAutoJoinNotice
+      groupLabel={!ready && !done ? groupLabel : undefined}
+      message={!ready && !done ? 'Will be joined upon sign-in' : progress.message}
+      isError={progress.phase === 'error'}
     >
-      <span role={progress.phase === 'error' ? 'alert' : 'status'}>
-        {!ready && !done ? 'Sign in to join this group automatically.' : progress.message}
-      </span>
-      {!ready && !done ? (
-        <button
-          type="button"
-          className={styles.telegramPrimaryButton}
-          onClick={() => {
-            if (typeof props.toggleLoginModal === 'function') props.toggleLoginModal(true);
-          }}
-        >
-          Sign in
-        </button>
-      ) : null}
       {ready && progress.phase === 'error' ? (
-        <button type="button" className={styles.telegramSecondaryButton} onClick={() => setRetry((value) => value + 1)}>
+        <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>
           Retry
         </button>
       ) : null}
       {!done && progress.phase !== 'joining' ? (
-        <button type="button" className={styles.telegramSecondaryButton} onClick={cancel}>
+        <button type="button" className={styles.secondaryButton} onClick={cancel}>
           Cancel auto-join
         </button>
       ) : null}
-    </div>
+    </WorkerGroupAutoJoinNotice>
   );
 }
 
@@ -250,19 +260,19 @@ export default function WorkerGroupAutoJoin(props: Props) {
       />
     );
   return (
-    <div
-      className={`${styles.workerGroupNotice} ${styles.workerGroupAutoJoinNotice}`}
-      data-testid="ce-session-worker-group-auto-join"
+    <WorkerGroupAutoJoinNotice
+      groupLabel={intent.groupId}
+      message={error || 'Preparing your group invitation…'}
+      isError={!!error}
     >
-      <span role={error ? 'alert' : 'status'}>{error || 'Preparing your group invitation…'}</span>
       {error ? (
-        <button type="button" className={styles.telegramSecondaryButton} onClick={() => setRetry((value) => value + 1)}>
+        <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>
           Retry
         </button>
       ) : null}
       <button
         type="button"
-        className={styles.telegramSecondaryButton}
+        className={styles.secondaryButton}
         onClick={() => {
           clearPendingAutoJoin(intent);
           finishWorkerGroupAutoJoin(intent.sessionSlug, intent.groupId);
@@ -271,6 +281,6 @@ export default function WorkerGroupAutoJoin(props: Props) {
       >
         Cancel auto-join
       </button>
-    </div>
+    </WorkerGroupAutoJoinNotice>
   );
 }

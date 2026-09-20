@@ -40,11 +40,21 @@ async function main() {
     const link = `${baseUrl}/session/${sessionSlug}?joinGroup=${group.groupId}&view=questions#questions`;
     await page.goto(link);
     const banner = page.getByTestId('ce-session-worker-group-auto-join');
-    await banner.getByText('Sign in to join this group automatically.').waitFor();
+    await banner.getByText('Participants 2026:', { exact: true }).waitFor();
     assert.equal(joins, 0);
+    assert.equal(await banner.getByRole('button').count(), 1);
+    assert.equal(await banner.getByRole('heading').count(), 0);
+    // The actual name is visible before authentication at narrow and wider widths.
+    for (const width of [390, 646, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+      if (width >= 646) assert.ok((await banner.boundingBox()).height <= 44, 'Invitation must remain a thin single row');
+      await page.screenshot({ path: path.join(os.tmpdir(), `ce-auto-join-invitation-${width}.png`) });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     // The app shell owns joining; its collapsed Groups panel is not needed.
     assert.equal(await page.getByTestId('ce-session-worker-groups-native').count(), 0);
-    await banner.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
     await banner.getByText('Joined Participants 2026.', { exact: true }).waitFor();
     assert.equal(joins, 1);
     assert.equal(new URL(page.url()).search, '?view=questions');
@@ -64,7 +74,7 @@ async function main() {
     assert.equal(joins, 1);
     // Reopening the invitation recognizes membership without another POST.
     await page.goto(link);
-    await banner.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
     await banner.getByText('You’re already in Participants 2026.').waitFor();
     assert.equal(joins, 1);
     // Cancellation consumes the intent before authentication.
@@ -77,16 +87,16 @@ async function main() {
     // A pending invitation survives client navigation and a refresh away from
     // the session, and still joins its original group after login.
     await page.goto(link);
-    await banner.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     await page.getByRole('link', { name: 'Navigate away before signing in' }).click();
     await page.reload();
-    await banner.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
     await banner.getByText('Joined Participants 2026.', { exact: true }).waitFor();
     assert.equal(joins, 2);
     assert.equal(new URL(page.url()).pathname, '/about');
     assert.equal(await page.evaluate(() => sessionStorage.getItem('ce:worker-group-auto-join:v1')), null);
     await page.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${'a'.repeat(80)}`);
-    await banner.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     console.log('PASS: Cloudflare auto-join smoke (sign-in, collapsed groups, join, cleanup, existing member, cancellation, navigation/refresh before login, mobile layout)');
   } finally { await browser.close(); }
