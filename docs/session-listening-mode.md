@@ -91,7 +91,13 @@ likewise read `corsWorkerUrl` from registered session metadata. A newly shared,
 Worker-canonical session still needs an explicit discovery link unless its app
 deployment bundles the Worker origin or serves the session from that origin.
 
-The interviewer starts directly with a topic-relevant question, without a greeting or preamble. It follows the responder's direction, chooses relevant existing questions, and asks useful follow-ups.
+The interviewer starts directly with a topic-relevant question, without a
+greeting or preamble. It follows the responder's direction, chooses relevant
+existing questions, and asks useful follow-ups. Sessions may add
+`interviewMode.steeringPrompt` for owner-authored interview guidance. The value
+is trimmed, capped at 3000 characters, and inserted as its own paragraph after
+the fixed two-line realtime preamble and before the opening question. Empty
+values are omitted.
 
 In Group Conversation mode, the recorder keeps the captured transcript when the participant records more.
 When an eligible completed transcript segment is available and no transcription chunk is pending, the client asks
@@ -105,6 +111,7 @@ Session `interviewMode` settings are available in the wizard and admin metadata 
 | --- | --- | --- |
 | `openingMode` | `auto` | Generate an opening from session information and public questions; `owner` uses the owner's text. |
 | `openingPrompt` | empty | Owner-written opening, required in owner mode. |
+| `steeringPrompt` | empty | Optional owner-authored guidance inserted into the live interviewer instructions before the opening question; capped at 3000 characters. |
 | `autoRegenerate` | `false` | Refresh the generated opening when enough questions have been added. |
 | `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |

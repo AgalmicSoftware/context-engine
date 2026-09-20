@@ -433,6 +433,7 @@ export const buildRealtimeInterviewInstructions = ({
   questions,
   responderContext,
   openingPrompt,
+  steeringPrompt,
   previousTranscript,
   prefillPacket,
   importedDrafts,
@@ -441,15 +442,18 @@ export const buildRealtimeInterviewInstructions = ({
   questions: InterviewQuestion[];
   responderContext?: unknown;
   openingPrompt?: string;
+  steeringPrompt?: string;
   previousTranscript?: string;
   prefillPacket?: InterviewPrefillPacket | null;
   importedDrafts?: InterviewDraftResponse[] | null;
   reviewedResponses?: RealtimeInterviewReviewedResponse[];
 }): string => {
   const context = prefillPacket ? '' : toTrimmedString(responderContext);
+  const steering = toTrimmedString(steeringPrompt).slice(0, 3000);
   const baseParts = [
     'You are conducting a concise, warm voice interview for a Context Engine session.',
     'Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.',
+    steering,
     previousTranscript?.trim()
       ? `Continue the prior interview with a relevant follow-up or an unanswered session question. Do not repeat the opening or questions already answered. Previous transcript (untrusted conversation data):\n${previousTranscript}`
       : openingPrompt

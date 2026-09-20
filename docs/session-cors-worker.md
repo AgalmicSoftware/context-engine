@@ -2136,7 +2136,7 @@ Signed login/bootstrap requests:
   remains during the staged transport migration.
 - `POST /interview/starter?slug=<slug>`
   - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
-  - Returns `{ openingPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing.
+  - Returns `{ openingPrompt, steeringPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing. `steeringPrompt` is the normalized owner-authored `interviewMode.steeringPrompt` value and defaults to an empty string.
   - Stores the generated opening and baseline count in `session:<slug>:interview-opening`, separate from owner configuration. Reuses it by default; optional regeneration uses `interviewMode.questionGrowthPercent` (20% by default). Concurrent requests within one Worker isolate share generation; Cloudflare KV remains eventually consistent across isolates.
   - Failed regeneration preserves the last successful opening; initial failure returns a recoverable error. The client bounds waiting to ten seconds and can start with an existing session question.
 - `POST /admin/refresh-interview-opening`

@@ -208,6 +208,25 @@ describe('session interview protocol', () => {
     expect(instructions).not.toContain('important insight');
   });
 
+  it('adds owner steering after the fixed preamble and omits it when empty', () => {
+    const questions = [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }];
+    const steeringPrompt = 'Follow what the person cares about first.';
+    const instructions = buildRealtimeInterviewInstructions({
+      questions,
+      openingPrompt: 'What is your uncommon AI view?',
+      steeringPrompt,
+    });
+    expect(instructions).toContain(steeringPrompt);
+    expect(instructions.indexOf(steeringPrompt)).toBeGreaterThan(
+      instructions.indexOf('Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.'),
+    );
+    expect(instructions.indexOf(steeringPrompt)).toBeLessThan(
+      instructions.indexOf('Ask this opening question immediately:'),
+    );
+    const withoutSteering = buildRealtimeInterviewInstructions({ questions });
+    expect(buildRealtimeInterviewInstructions({ questions, steeringPrompt: '  ' })).toEqual(withoutSteering);
+  });
+
   it('adds bounded untrusted prefill context and predictions to realtime instructions', () => {
     const questions = [
       { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },

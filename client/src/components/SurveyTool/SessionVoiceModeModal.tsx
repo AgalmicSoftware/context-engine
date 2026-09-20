@@ -528,6 +528,7 @@ function SessionInterviewPanel({
         questions,
         responderContext,
         openingPrompt: interviewOpening.opening,
+        steeringPrompt: interviewOpening.steeringPrompt,
         previousTranscript: transcriptRef.current,
         prefillPacket: validatedPrefillPacket,
         importedDrafts,

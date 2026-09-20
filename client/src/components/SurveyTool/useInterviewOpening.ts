@@ -55,6 +55,7 @@ export function useInterviewOpening({
   }, [workerUrl, sessionSlug, hasQuestions, settings.openingMode]);
   return {
     opening: settings.openingMode === 'owner' ? settings.openingPrompt : opening,
+    steeringPrompt: settings.steeringPrompt,
     notice,
     loading: settings.openingMode === 'auto' && loading,
   };

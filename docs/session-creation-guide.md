@@ -91,7 +91,13 @@ while Voice interview modes is enabled; turning it off hides those controls whil
 preserving their configured values for re-enable. The details expose the OpenAI
 **Interview voice model**, defaulting to `gpt-live-1`; `/new` publishes this as
 `interviewMode.realtimeModel` for both Worker-canonical and Arweave-backed
-sessions. It also lets owners supply an opening question or use the default generated opening. Automatic regeneration and discovery of new questions during a call are off by default; when enabled their default addition threshold is 20%. Question suggestions are optional and off by default. Admin refresh is on by default. Generation waits for public questions and uses the session Worker's OpenAI key. See [Interview settings and lifecycle](session-listening-mode.md#interview).
+sessions. It also lets owners supply an opening question, add an optional
+`interviewMode.steeringPrompt`, or use the default generated opening.
+Automatic regeneration and discovery of new questions during a call are off by
+default; when enabled their default addition threshold is 20%. Question
+suggestions are optional and off by default. Admin refresh is on by default.
+Generation waits for public questions and uses the session Worker's OpenAI key.
+See [Interview settings and lifecycle](session-listening-mode.md#interview).
 
 **Results AI views** default to manual generation. The shared session setting is
 `resultsAnalysis` with `generationMode` (`manual`, `automatic`, or `both`),
@@ -425,6 +431,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.transcription`
 - `interviewMode.realtimeModel` (OpenAI interview voice; defaults to
   `gpt-live-1`)
+- `interviewMode.steeringPrompt` (optional owner-authored interview guidance;
+  defaults to empty and is capped at 3000 characters)
 
 What gets stored where:
 

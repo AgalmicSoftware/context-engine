@@ -43,11 +43,19 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().followNewQuestions, false);
   assert.equal(normalizeInterviewSettings().questionGrowthPercent, 20);
   assert.equal(normalizeInterviewSettings().allowManualRefresh, true);
+  assert.equal(normalizeInterviewSettings().steeringPrompt, '');
+  assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
+  assert.equal(
+    normalizeInterviewSettings({ steeringPrompt: ` ${'x'.repeat(3100)} ` }).steeringPrompt.length,
+    3000,
+  );
   for (const value of [
     { openingMode: 'invalid' },
     { openingMode: 'owner', openingPrompt: ' ' },
     { followNewQuestions: 'true' },
     { questionGrowthPercent: 0 },
+    { steeringPrompt: 42 },
+    { steeringPrompt: 'x'.repeat(3001) },
   ])
     assert.equal(validInterviewSettings(value), false);
   assert.equal(hasInterviewQuestionGrowth(42, 50, 20), false);
@@ -67,8 +75,14 @@ test('waits for questions then generates once without an admin step', async () =
 });
 test('owner opening bypasses AI and is not overwritten', async () => {
   const f = fixture();
-  f.args.config.interviewMode = { openingMode: 'owner', openingPrompt: 'What is your expertise in AI?' };
-  assert.equal((await resolveInterviewStarter(f.args)).openingPrompt, 'What is your expertise in AI?');
+  f.args.config.interviewMode = {
+    openingMode: 'owner',
+    openingPrompt: 'What is your expertise in AI?',
+    steeringPrompt: 'Ask for a concrete example.',
+  };
+  const result = await resolveInterviewStarter(f.args);
+  assert.equal(result.openingPrompt, 'What is your expertise in AI?');
+  assert.equal(result.steeringPrompt, 'Ask for a concrete example.');
   assert.equal(f.calls(), 0);
 });
 test('regeneration accumulates additions from the last successful generation', async () => {

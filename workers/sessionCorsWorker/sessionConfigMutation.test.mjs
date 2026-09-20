@@ -305,6 +305,8 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     { interviewMode: { openingMode: 'owner', openingPrompt: '' } },
     { interviewMode: { followNewQuestions: 'true' } },
     { interviewMode: { questionGrowthPercent: 0 } },
+    { interviewMode: { steeringPrompt: 42 } },
+    { interviewMode: { steeringPrompt: 'x'.repeat(3001) } },
   ]) {
     const result = applySessionConfigMutation({
       existingConfig: cloneJson(profileBearingConfig),
@@ -589,6 +591,7 @@ test('set-config preserves owner opening and optional interview features', () =>
     realtimeModel: 'gpt-live-1',
     openingMode: 'owner',
     openingPrompt: 'Which AI view is overlooked?',
+    steeringPrompt: 'Follow what the participant cares about first.',
     autoRegenerate: false,
     questionGrowthPercent: 20,
     followNewQuestions: true,

@@ -45,6 +45,14 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
       ) : (
         <p>Generated when an interview first has accessible questions. Reused until refreshed.</p>
       )}
+      <Label for={`${id}-steering`}>Interview steering prompt</Label>
+      <Input
+        id={`${id}-steering`}
+        type="textarea"
+        maxLength={3000}
+        value={settings.steeringPrompt}
+        onChange={(e) => change('steeringPrompt', e.target.value)}
+      />
       {(['autoRegenerate', 'followNewQuestions', 'suggestQuestions', 'allowManualRefresh'] as const).map((key) => (
         <Label key={key} style={{ display: 'block', marginTop: 12 }}>
           <input
