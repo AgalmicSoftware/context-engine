@@ -45,6 +45,8 @@ const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =
   'Checked: use the default rules, allowing session admins and agents authorized for storage to access encrypted data. Unchecked: customize access below using session roles, authorized agents, or SBT holders, and choose whether any or all rules must match.';
 const HIDE_SMALL_GROUPS_TOOLTIP =
   'Checked: show anonymized group summaries only when a group meets the minimum size (at least 2 people). A minimum of 5 hides groups of 1–4. Unchecked: disable anonymized group summaries. Groups and responses are kept.';
+const EXPORT_POLICY_TOOLTIP =
+  'Choose what session admins can download. Raw results include individual responses; encrypted records keep their contents unreadable until decrypted. Complete-session exports include the session data available to the exporter. Exporting selected channels is not available yet. These options do not grant additional access.';
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
   { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
@@ -60,9 +62,13 @@ const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; la
 
 const EXPORT_SCOPE_OPTIONS: Array<{ value: SessionModeExportScope; label: string; available?: boolean }> = [
   { value: 'admin_raw', label: 'Admins can export raw results' },
-  { value: 'all_session', label: 'Export the complete session' },
-  { value: 'selected_surfaces', label: 'Export selected channels only (not available yet)', available: false },
-  { value: 'encrypted_envelopes_only', label: 'Export encrypted records only' },
+  { value: 'all_session', label: 'Admins can export the complete session' },
+  {
+    value: 'selected_surfaces',
+    label: 'Admins can export selected channels only (not available yet)',
+    available: false,
+  },
+  { value: 'encrypted_envelopes_only', label: 'Admins can export encrypted records only' },
 ];
 
 const SURFACE_LABELS: Array<{ value: SessionModeSurface; label: string; fixed?: boolean }> = [
@@ -218,9 +224,20 @@ const SessionModeProfileSections = ({
           <h3>Export policy</h3>
           <p>Choose what session administrators can download after deployment.</p>
         </div>
-        <Label className={styles.modeFieldLabel} htmlFor="ce-new-export-policy">
-          Export policy
-        </Label>
+        <div className={styles.modeCheckboxWithTooltip}>
+          <Label className={styles.modeFieldLabel} htmlFor="ce-new-export-policy">
+            Export policy
+          </Label>
+          {renderInfoTooltip
+            ? renderInfoTooltip({
+                id: 'ce-new-export-policy-info',
+                content: EXPORT_POLICY_TOOLTIP,
+                ariaLabel: 'About export policy',
+                testId: 'ce-new-export-policy-info',
+                placement: 'top',
+              })
+            : null}
+        </div>
         <Input
           id="ce-new-export-policy"
           type="select"

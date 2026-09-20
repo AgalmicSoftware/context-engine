@@ -333,7 +333,9 @@ describe('SessionModeProfileSections', () => {
     renderSection('publish');
 
     const exportPolicy = screen.getByRole('combobox', { name: 'Export policy' });
-    expect(within(exportPolicy).getByRole('option', { name: /Export selected channels only/i })).toBeDisabled();
+    expect(
+      within(exportPolicy).getByRole('option', { name: /Admins can export selected channels only/i }),
+    ).toBeDisabled();
     expect(screen.queryByRole('group', { name: 'Channels included in exports' })).not.toBeInTheDocument();
     expect(screen.queryByText('Results visibility')).not.toBeInTheDocument();
   });
