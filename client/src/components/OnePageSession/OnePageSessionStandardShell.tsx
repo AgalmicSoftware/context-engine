@@ -416,7 +416,9 @@ export default function OnePageSessionStandardShell({
       : generatedHasArtifact
         ? 'Refresh AI Views'
         : 'Generate AI Views';
-  const sectionsGridClassName = [styles.sectionsGrid, !isDemoSlug ? styles.sectionsGridTwoUp : '']
+  const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
+  const showContextSection = isDemoSlug || !!sessionContext;
+  const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
   const pileSubmitRailActive = !showQuestions && pileSubmitRailVisible;
@@ -440,8 +442,6 @@ export default function OnePageSessionStandardShell({
   const loadFullCorpusButtonLabel =
     corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
   const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
-  const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showContextSection = isDemoSlug || !!sessionContext;
 
   return (
     <div className={styles.onePageDemoContainer}>

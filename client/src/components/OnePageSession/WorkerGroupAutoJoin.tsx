@@ -160,6 +160,16 @@ function AutoJoinIntent({
       message={!ready && !done ? 'Will be joined upon sign-in' : progress.message}
       isError={progress.phase === 'error'}
     >
+      {done ? (
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={() => setProgress({ phase: 'done', message: '' })}
+          aria-label="Dismiss group notice"
+        >
+          Dismiss
+        </button>
+      ) : null}
       {ready && progress.phase === 'error' ? (
         <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>
           Retry

@@ -1089,7 +1089,8 @@ so signing in elsewhere joins the intended group. This works even with the
 Groups section collapsed and records native Worker
 membership rather than minting an on-chain SBT. Existing members are recognized
 without another join request or a success banner. A new join confirmation disappears
-after ten seconds and does not return on reload. Worker capacity, deadlines, and authorization
+after ten seconds and does not return on reload. Completed join and cancellation
+notices also have a Dismiss button to hide them immediately. Worker capacity, deadlines, and authorization
 remain authoritative; failures expose an explicit Retry action. Success or
 cancellation clears the saved invitation and removes its matching `joinGroup`
 parameter without disturbing other URL parameters. Account changes invalidate

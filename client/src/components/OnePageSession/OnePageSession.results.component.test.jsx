@@ -877,6 +877,9 @@ describe('OnePageSession results routing', () => {
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
+    const sectionsGrid = screen.getByTestId('ce-demo-documents-section').parentElement;
+    expect(sectionsGrid).toHaveClass(styles.sectionsGrid);
+    expect(sectionsGrid).not.toHaveClass(styles.sectionsGridTwoUp);
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
     const context = screen.getByTestId('ce-session-context');
     expect(within(context).queryByRole('heading', { name: 'Context' })).not.toBeInTheDocument();

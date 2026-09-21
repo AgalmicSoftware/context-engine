@@ -1,5 +1,10 @@
 # Polis report answer sections
 
+Session pages with Context content place the collapsed Groups, Context, and
+Results sections in one three-column row at desktop widths, including
+Worker-hosted sessions. Sessions without Context keep a two-column row; mobile
+sections stack vertically, and an expanded section spans the available width.
+
 The Polis-style report groups **Binary**, **Freeform**,
 **Ratings**, **Multiple choice**, and **Quadratic allocation** under **All
 Questions**, below the Participants Graph. Each type has a collapsible heading. These sections use a white, print-friendly layout.
