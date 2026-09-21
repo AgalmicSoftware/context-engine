@@ -103,6 +103,9 @@ const normalizeQuestion = (value = {}) => {
     prompt,
     type,
     options,
+    ...(type === 'multichoice'
+      ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) }
+      : {}),
     ...(ratingScale ? { scale: ratingScale } : {}),
     ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
   };

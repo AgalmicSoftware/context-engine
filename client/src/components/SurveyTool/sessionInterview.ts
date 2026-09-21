@@ -21,11 +21,12 @@ export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtime
 export const INTERVIEW_MODE_QUERY_VALUE = 'interview';
 export const GROUP_CONVERSATION_MODE_QUERY_VALUE = 'recordGroup';
 export const INTERVIEW_PREFILL_FRAGMENT_KEY = 'prefill';
-export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v4';
+export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v5';
 const SUPPORTED_INTERVIEW_PROMPT_VERSIONS = new Set([
   'ce-interview-brief-v1',
   'ce-interview-brief-v2',
   'ce-interview-brief-v3',
+  'ce-interview-brief-v4',
   INTERVIEW_PROMPT_VERSION,
 ]);
 const BINARY_RESPONSE_OPTIONS = ['Agree', 'Unsure', 'Disagree'];
@@ -40,6 +41,7 @@ export type InterviewQuestion = {
   prompt: string;
   type: string;
   options: string[];
+  singleSelect?: boolean;
   scale?: RatingScale;
   voiceCredits?: number;
 };
@@ -184,11 +186,17 @@ const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQues
       if (question?.type === 'quadratic') {
         if (validateQuadraticAllocation(answer, question)) return normalized;
       } else if (question?.options.length) {
-        const matchingOption = question.options.find(
-          (option) => option.toLowerCase() === toTrimmedString(answer).toLowerCase(),
+        const candidates = Array.isArray(answer) ? answer : [answer];
+        const matches = candidates.map((candidate) =>
+          typeof candidate === 'string'
+            ? question.options.find((option) => option.toLowerCase() === candidate.trim().toLowerCase())
+            : undefined,
         );
-        if (!matchingOption) return normalized;
-        answer = matchingOption;
+        if (!matches.length || matches.some((option) => !option)) return normalized;
+        const selected = [...new Set(matches)] as string[];
+        const multiple = question.type === 'multichoice' && !question.singleSelect;
+        if (!multiple && selected.length !== 1) return normalized;
+        answer = multiple ? selected : selected[0];
       } else if (question?.type === 'rating') {
         const numericAnswer = Number(answer);
         if (!Number.isFinite(numericAnswer)) return normalized;
@@ -275,6 +283,9 @@ export const normalizeInterviewQuestions = (questions: unknown): InterviewQuesti
         prompt,
         type,
         options,
+        ...(type === 'multichoice'
+          ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) }
+          : {}),
         ...(type === 'rating' && hasRatingScaleMetadata(question) ? { scale: normalizeRatingScale(question) } : {}),
         ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
       };
@@ -293,9 +304,19 @@ export const canonicalizeInterviewQuestions = (questions: InterviewQuestion[]): 
       left.id.localeCompare(right.id) || left.prompt.localeCompare(right.prompt) || left.type.localeCompare(right.type),
   );
 
-export const hashInterviewQuestions = async (questions: InterviewQuestion[]): Promise<string> => {
+export const hashInterviewQuestions = async (
+  questions: InterviewQuestion[],
+  promptVersion = INTERVIEW_PROMPT_VERSION,
+): Promise<string> => {
   if (!globalThis.crypto?.subtle) throw new Error('Secure question-set validation is unavailable in this browser.');
-  const bytes = new TextEncoder().encode(JSON.stringify(canonicalizeInterviewQuestions(questions)));
+  // v1–v4 catalogs omitted selection mode. Keep those links readable while v5
+  // binds the hash to the question's actual single/multiple-selection contract.
+  const canonical = canonicalizeInterviewQuestions(questions).map((question) => {
+    if (promptVersion === INTERVIEW_PROMPT_VERSION) return question;
+    const { singleSelect: _singleSelect, ...legacyQuestion } = question;
+    return legacyQuestion;
+  });
+  const bytes = new TextEncoder().encode(JSON.stringify(canonical));
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 };
@@ -429,7 +450,7 @@ export const buildExternalInterviewKickoff = ({
     '',
     'Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions; do not seek new access or invent a position.',
     '',
-    'Use first-person for direct statements and reasonable inferences; give inferences lower confidence and basis. responderContext: concise question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit unsupported/personal-irrelevant material; do not request or add a name. Never prefix with "(Agent):". Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings must use each catalog question scale; quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).',
+    'Use first-person for direct statements and reasonable inferences; give inferences lower confidence and basis. responderContext: concise question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit unsupported/personal-irrelevant material; do not request or add a name. Never prefix with "(Agent):". Omit only questions with no signal; binary answers must match one listed option; multichoice answers use one exact option when singleSelect is true, otherwise an array of exact options; ratings must use each catalog question scale; quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).',
     '',
     'Return only: one short research-coverage line, a question/answer/confidence/basis table, the exact single-line JSON packet, and its review link.',
     '',
@@ -479,7 +500,7 @@ export const buildRealtimeInterviewInstructions = ({
     `Questions:\n${questions
       .map(
         (question, index) =>
-          `${index + 1}. [${question.id}] (${question.type}${question.type === 'rating' ? describeRatingScale(question) : ''}${question.type === 'quadratic' ? `; ${question.voiceCredits ?? 99} voice credits` : ''}) ${question.prompt}${
+          `${index + 1}. [${question.id}] (${question.type}${question.type === 'rating' ? describeRatingScale(question) : question.type === 'multichoice' ? (question.singleSelect ? '; choose one option' : '; choose one or more options') : ''}${question.type === 'quadratic' ? `; ${question.voiceCredits ?? 99} voice credits` : ''}) ${question.prompt}${
             question.options.length ? ` Options: ${question.options.join(' | ')}` : ''
           }`,
       )
@@ -514,6 +535,7 @@ Rules:
 - Use only the supplied transcript and responder context. Never invent evidence.
 - Include a reviewable draft when there is a direct statement or a defensible indirect signal. Low-confidence inference is allowed only when the evidence field explains its basis. Omit only questions with no relevant signal at all.
 - For quadratic questions, return a signed integer array in option order. The sum of squared votes must not exceed voiceCredits (99 default); unused credits and all-neutral zeros are valid.
+- For multichoice questions with singleSelect true, return one exact option string. Otherwise return an array of one or more exact option strings, preserving all selections supported by the responder. Binary questions always take one option. Never collapse a multiple-selection answer to one choice.
 - Match the question type and listed options exactly when options exist. For rating questions, return a JSON number on the stated scale (for example, 4), not prose or "4/10".
 - Interviewer turns supply question context only; never treat their suggestions as the responder's beliefs. Resolve short replies such as "four", "yes", or "no" against the preceding question. Check every explicit responder answer, including numeric ratings, before returning drafts.
 - Use additionalComments for relevant explanations, qualifications, or examples from the interview that do not fit the main answer, especially for binary, rating, and choice questions. Preserve the responder's meaning without inventing details or repeating the main answer.

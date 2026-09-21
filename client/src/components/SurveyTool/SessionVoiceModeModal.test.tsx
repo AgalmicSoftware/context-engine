@@ -1166,6 +1166,58 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
+  it.each(['ce-interview-brief-v4', 'ce-interview-brief-v5'])(
+    'submits unedited multi-select and single-select drafts using their catalog settings (%s)',
+    async (promptVersion) => {
+      const questionPool = [
+        { id: 'multi', prompt: 'Pick topics', type: 'multichoice', options: ['Parks', 'Transit'], singleSelect: false },
+        {
+          id: 'single',
+          prompt: 'Pick a priority',
+          type: 'multichoice',
+          options: ['Parks', 'Transit'],
+          singleSelect: true,
+        },
+      ];
+      const prefillPacket = {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion,
+        source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
+        responderContext: {},
+        responses: [
+          { questionId: 'multi', answer: ['Parks', 'Transit'], confidence: 0.8 },
+          { questionId: 'single', answer: 'Transit', confidence: 0.8 },
+        ],
+      };
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          questionPool={questionPool}
+          prefillPacket={prefillPacket}
+        />,
+      );
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      expect(screen.getAllByRole('checkbox', { name: 'Transit' })).toHaveLength(2);
+      expect(
+        screen
+          .getAllByRole('checkbox', { name: 'Transit' })
+          .every((checkbox) => (checkbox as HTMLInputElement).checked),
+      ).toBe(true);
+      expect(mockedHashInterviewQuestions).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'multi', singleSelect: false })]),
+        promptVersion,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('multi', ['Parks', 'Transit']));
+      expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('single', 'Transit');
+      await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledWith(['multi', 'single']));
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+    },
+  );
+
   it('maps imported context into reviewable drafts and never selects replacement of an existing draft silently', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },

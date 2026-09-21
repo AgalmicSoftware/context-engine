@@ -2145,6 +2145,17 @@ Signed login/bootstrap requests:
     the 0-10 rating range, and the additive self-reported research-coverage count
     fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.
+  - Choice questions expose `singleSelect`: true allows one option; false (the
+    default for multichoice) allows multiple options. Legacy `oneSelectionOnly`
+    and `singleChoice` flags normalize to the same setting. The v5 prefill
+    contract uses a single option string for single-select and an array of exact
+    option labels for multi-select. Voice instructions, mapping, review controls,
+    and submission preserve this setting. Unknown options and multiple distinct
+    choices for a single-select question are rejected, never silently truncated.
+  - `ce-interview-brief-v5` hashes include selection mode. Previously generated
+    v1–v4 links remain readable using their original catalog hash format, while
+    their draft answers are validated against the current question settings.
+    Deploy both client and Worker changes before generating v5 prefills.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     on-chain discovery requires configured block limits and is capped at a

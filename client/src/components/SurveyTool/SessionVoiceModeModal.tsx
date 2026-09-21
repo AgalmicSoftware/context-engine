@@ -363,7 +363,10 @@ function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
-          const currentQuestionSetHash = await hashInterviewQuestions(questions);
+          const currentQuestionSetHash = await hashInterviewQuestions(
+            questions,
+            prefillPacket.promptVersion || 'ce-interview-brief-v1',
+          );
           if (disposedRef.current) return;
           if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
             throw new Error(

@@ -274,3 +274,45 @@ describe('SessionInterviewDraftCard styles', () => {
     );
   });
 });
+
+describe('interview multiple-choice review', () => {
+  it.each([false, true])('uses the question selection setting (singleSelect: %s)', (singleSelect) => {
+    const question = {
+      id: 'choice',
+      type: 'multichoice',
+      prompt: 'Pick topics',
+      options: ['Parks', 'Transit'],
+      singleSelect,
+    };
+    const draft = { questionId: 'choice', answer: ['Parks'], confidence: 0.8 };
+    const onEdit = jest.fn();
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
+      return (
+        <SessionInterviewDraftCard
+          draft={draft}
+          edited={edited}
+          question={question}
+          selected
+          existing={false}
+          disabled={false}
+          onSelect={jest.fn()}
+          onEdit={(patch) => {
+            onEdit(patch);
+            setEdited((value) => ({ ...value, ...patch }));
+          }}
+        />
+      );
+    }
+    render(<Review />);
+    expect(screen.getByRole('checkbox', { name: 'Parks' })).toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Transit' }));
+    expect(onEdit).toHaveBeenLastCalledWith({
+      answer: singleSelect ? ['Transit'] : ['Parks', 'Transit'],
+      userEditedFields: ['answer'],
+    });
+    expect(screen.getByRole('checkbox', { name: 'Transit' })).toBeChecked();
+    if (singleSelect) expect(screen.getByRole('checkbox', { name: 'Parks' })).not.toBeChecked();
+    else expect(screen.getByRole('checkbox', { name: 'Parks' })).toBeChecked();
+  });
+});
