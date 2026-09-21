@@ -55,6 +55,9 @@ import {
 
 type UnknownRecord = SessionInterviewModalRecord;
 
+// Temporarily disable group suggestions and their background requests together.
+const INTERVIEW_GROUP_SUGGESTIONS_ENABLED = false;
+
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
   onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
@@ -273,7 +276,7 @@ function SessionInterviewPanel({
     sessionSlug,
   });
   const generatedGroupRecommendationState = useSessionInterviewGroupRecommendations({
-    active: !isInterviewBusy && !mapping,
+    active: INTERVIEW_GROUP_SUGGESTIONS_ENABLED && !isInterviewBusy && !mapping,
     request: groupRecommendationRequest,
     questions,
     sessionConfig,
@@ -901,12 +904,16 @@ function SessionInterviewPanel({
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
           ) : null}
-          {!isInterviewBusy && !mapping && canManuallyRefreshGroupRecommendations && !groupRecommendationRequest ? (
+          {INTERVIEW_GROUP_SUGGESTIONS_ENABLED &&
+          !isInterviewBusy &&
+          !mapping &&
+          canManuallyRefreshGroupRecommendations &&
+          !groupRecommendationRequest ? (
             <Button outline onClick={refreshGroupRecommendations}>
               Refresh group suggestions
             </Button>
           ) : null}
-          {!isInterviewBusy && !mapping ? (
+          {INTERVIEW_GROUP_SUGGESTIONS_ENABLED && !isInterviewBusy && !mapping ? (
             <SessionInterviewRecommendedGroups
               recommendations={generatedGroupRecommendations}
               account={account}
