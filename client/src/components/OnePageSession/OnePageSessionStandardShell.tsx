@@ -243,7 +243,6 @@ const renderSessionContext = (context: SessionContextView | null) => {
   if (!context) return null;
   return (
     <section className={styles.sessionContextSection} aria-label={context.title} data-testid="ce-session-context">
-      <h3>{context.title}</h3>
       {context.paragraphs.map((paragraph, index) => (
         <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>
       ))}

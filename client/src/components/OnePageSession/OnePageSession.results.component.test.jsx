@@ -842,7 +842,7 @@ describe('OnePageSession results routing', () => {
     expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
     const context = screen.getByTestId('ce-session-context');
-    expect(within(context).getByRole('heading', { name: 'Context' })).toBeInTheDocument();
+    expect(within(context).queryByRole('heading', { name: 'Context' })).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-demo-documents-section')).toContainElement(context);
     expect(context).toHaveTextContent('EDDY 2026 brings together academics and practitioners');
     expect(context).toHaveTextContent('<script>alert("nope")</script> This text must render literally.');
