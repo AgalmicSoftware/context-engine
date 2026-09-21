@@ -242,7 +242,6 @@ export const startSessionRealtimeInterview = async ({
   signal?.addEventListener('abort', externalAbort, { once: true });
   if (signal?.aborted) externalAbort();
   const run = <T>(promise: Promise<T>) => abortable(promise, controller.signal);
-  let microphone: MediaStream;
 
   try {
     controller.signal.throwIfAborted();

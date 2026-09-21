@@ -231,7 +231,7 @@ export const ROADMAP_SECTIONS: RoadmapSection[] = [
       },
       {
         status: 'complete',
-        text: 'Run binary, rating, multiple-choice, and freeform questions with conviction weighting and comments.',
+        text: 'Run binary, rating, multiple-choice, quadratic allocation, and freeform questions with conviction weighting and comments.',
       },
       {
         status: 'complete',

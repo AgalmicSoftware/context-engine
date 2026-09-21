@@ -127,7 +127,6 @@ const UserPageQuestionSection = ({
             data-ce-control-appearance="frameless"
             onClick={onShowSurveysTab}
             aria-label="Show Surveys"
-            data-ce-control-appearance="frameless"
           >
             Survey
           </button>
@@ -189,7 +188,6 @@ const UserPageQuestionSection = ({
             data-ce-control-appearance="frameless"
             onClick={onShowSurveysTab}
             aria-label="Show Surveys"
-            data-ce-control-appearance="frameless"
           >
             Surveys
           </button>

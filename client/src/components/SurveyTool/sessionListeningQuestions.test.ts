@@ -25,6 +25,11 @@ describe('sessionListeningQuestions', () => {
     });
     expect(build(25).id).not.toBe(build(99).id);
   });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('builds a transcript-aware generation prompt for listening mode', () => {
     const prompt = buildListeningQuestionPrompt('Speaker A raised budget timing. Speaker B disagreed.', {
       count: 3,

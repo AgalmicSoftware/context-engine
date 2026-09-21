@@ -159,7 +159,6 @@ const UserPageHeader = ({
               data-ce-control-appearance="frameless"
               aria-label="Edit nickname"
               title="Edit nickname"
-              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -171,7 +170,6 @@ const UserPageHeader = ({
               data-ce-control-appearance="frameless"
               aria-label="Set username"
               title="Set username"
-              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -206,7 +204,6 @@ const UserPageHeader = ({
               data-ce-control-appearance="frameless"
               aria-label="View address on explorer"
               title="View address on explorer"
-              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faExternalLinkAlt} />
             </a>
@@ -219,7 +216,6 @@ const UserPageHeader = ({
               style={bookmarkButtonDisplayState.iconStyle}
               aria-label={bookmarkButtonDisplayState.ariaLabel}
               title={bookmarkButtonDisplayState.title}
-              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faBookmark} />
             </button>
