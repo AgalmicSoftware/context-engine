@@ -12,7 +12,10 @@ const {
   findMissingExpectedText,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
+  isDemoReadyInterviewRoute,
+  isDemoStorageListFixtureRequest,
   isExpectedLoadedMediaAbort,
+  isLocalSmokeBaseUrl,
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
@@ -24,8 +27,8 @@ const {
 } = require('./vite-navigation-smoke');
 
 test('default navigation smoke covers session modes, Docs, its legacy contracts alias, and benchmarks', () => {
-  assert.ok(DEFAULT_ROUTES.includes('/session/new'));
-  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
+  assert.ok(DEFAULT_ROUTES.includes('/new'));
+  assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionModePresets);
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
   assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));
@@ -79,6 +82,42 @@ test('normalizeRoutes accepts comma-separated routes and adds leading slashes', 
 test('resolveViewport supports the maintained mobile smoke alias', () => {
   assert.deepEqual(resolveViewport('mobile'), { width: 390, height: 844 });
   assert.deepEqual(resolveViewport('desktop'), { width: 1440, height: 1000 });
+});
+
+test('demo Worker smoke fixtures are local-only and match exact storage-list resources', () => {
+  assert.equal(isLocalSmokeBaseUrl('http://127.0.0.1:3100'), true);
+  assert.equal(isLocalSmokeBaseUrl('http://localhost:3100/path'), true);
+  assert.equal(isLocalSmokeBaseUrl('https://contextengine.xyz'), false);
+
+  assert.equal(
+    isDemoStorageListFixtureRequest(
+      'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100',
+    ),
+    true,
+  );
+  assert.equal(
+    isDemoStorageListFixtureRequest(
+      'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/read?id=question-1',
+    ),
+    false,
+  );
+  assert.equal(
+    isDemoStorageListFixtureRequest(
+      'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=groups&limit=100',
+    ),
+    false,
+  );
+  assert.equal(
+    isDemoStorageListFixtureRequest('https://other-worker.example/storage/list?resource=questions'),
+    false,
+  );
+});
+
+test('demo interview ready fixture requires the explicit Worker discovery route', () => {
+  const worker = encodeURIComponent('https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev');
+  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=interview&worker=${worker}`), true);
+  assert.equal(isDemoReadyInterviewRoute('/session/demo?mode=interview'), false);
+  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=recordGroup&worker=${worker}`), false);
 });
 
 test('normalizeLayoutProbeSelectors keeps default browser layout checks and accepts overrides', () => {
