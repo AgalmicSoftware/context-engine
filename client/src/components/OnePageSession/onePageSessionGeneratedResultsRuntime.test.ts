@@ -237,8 +237,8 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
   it('preserves a Report click made while a background artifact request is pending', async () => {
     const host = buildHost({ ok: false });
     host.state.resultsViewMode = 'circles';
-    let resolveArtifact: (value: unknown) => void = () => {};
-    const artifactPromise = new Promise((resolve) => {
+    let resolveArtifact: (value: Record<string, unknown>) => void = () => {};
+    const artifactPromise = new Promise<Record<string, unknown>>((resolve) => {
       resolveArtifact = resolve;
     });
 

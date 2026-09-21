@@ -66,7 +66,9 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
     expect(onEdit).toHaveBeenLastCalledWith({ answer: [3, -2], userEditedFields: ['answer'] });
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
-    if (injected) expect(renderAnswerInput).toHaveBeenLastCalledWith('q-budget', [3, -2], expect.any(Function), question);
+    if (injected) {
+      expect(renderAnswerInput.mock.calls.at(-1)).toEqual(['q-budget', [3, -2], expect.any(Function), question]);
+    }
   });
 
   it('shows full prose by default and enters edit mode by keyboard without Agent/User labels', () => {

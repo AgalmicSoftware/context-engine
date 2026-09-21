@@ -34,7 +34,7 @@ jest.mock('../SBTs/SBTFilter', () => (props: any) => {
 });
 const mockQuestionFilter = jest.fn((..._args: any[]) => null);
 jest.mock('./QuestionFilter', () => {
-  const ReactActual = jest.requireActual('react');
+  const ReactActual = jest.requireActual<typeof React>('react');
   return ReactActual.forwardRef((props: any, ref: any) => {
     mockQuestionFilter(props);
     ReactActual.useImperativeHandle(ref, () => ({
@@ -53,7 +53,7 @@ const mockSingleQuestionResponse = jest.fn((..._args: any[]) => null);
 jest.mock('./SingleQuestionResponse', () => (props: any) => {
   mockSingleQuestionResponse(props);
   if (props.question?.type === 'quadratic') {
-    const ActualResponse = jest.requireActual('./SingleQuestionResponse').default;
+    const ActualResponse = jest.requireActual<typeof import('./SingleQuestionResponse')>('./SingleQuestionResponse').default;
     return <ActualResponse {...props} />;
   }
   return null;
@@ -324,7 +324,7 @@ const findLinkByHref = async (href: string): Promise<HTMLAnchorElement> => {
         HTMLAnchorElement | undefined) || null;
     expect(link).toBeTruthy();
   });
-  return link as HTMLAnchorElement;
+  return link as unknown as HTMLAnchorElement;
 };
 
 const buildSyncStatusDisplay = (
@@ -337,7 +337,7 @@ const buildSyncStatusDisplay = (
   showQuickRefresh: true,
   viewMode: 'questions',
   question: {
-    color: 'warning',
+    color: 'info',
     label: 'Remaining Blocks: 20 (Current: 80 / Latest: 100)',
     progress: 80,
     remainingBlocks: 20,
@@ -1134,8 +1134,8 @@ describe('SurveyResults survey/response links', () => {
 
     await waitFor(() => {
       const individualCalls = mockSingleQuestionResponse.mock.calls
-        .map((call) => call[0])
-        .filter((props) => props?.aggregatorResponseMode === false);
+        .map((call) => call[0] as Record<string, unknown>)
+        .filter((props) => props.aggregatorResponseMode === false);
       expect(individualCalls.length).toBeGreaterThan(0);
       expect(JSON.stringify(individualCalls)).not.toContain('Old answer');
       expect(individualCalls[individualCalls.length - 1]).toEqual(

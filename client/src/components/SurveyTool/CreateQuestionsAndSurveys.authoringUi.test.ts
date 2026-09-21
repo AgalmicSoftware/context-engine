@@ -25,6 +25,19 @@ import {
   selectManagedNetBucketSnapshot,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
 
+type RenderTreeNode = {
+  props: Record<string, unknown>;
+  type?: unknown;
+};
+
+const asRenderTreeNode = (node: unknown): RenderTreeNode => node as RenderTreeNode;
+const clickTreeNode = (node: unknown): void => {
+  (asRenderTreeNode(node).props.onClick as () => void)?.();
+};
+const changeTreeNode = (node: unknown, value: string): void => {
+  (asRenderTreeNode(node).props.onChange as (event: { target: { value: string } }) => void)?.({ target: { value } });
+};
+
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -289,14 +302,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const [budgetToggle] = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
     expect(treeHasText(budgetToggle, `Credits: ${budget}`)).toBe(true);
-    expect(budgetToggle.props['aria-expanded']).toBe(false);
+    expect(asRenderTreeNode(budgetToggle).props['aria-expanded']).toBe(false);
     expect(collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')).toHaveLength(0);
-    budgetToggle.props.onClick();
+    clickTreeNode(budgetToggle);
     const budgetInputs = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
     expect(budgetInputs).toHaveLength(1);
-    expect(budgetInputs[0].props.value).toBe(budget);
+    expect(asRenderTreeNode(budgetInputs[0]).props.value).toBe(budget);
   });
 
   it('starts each quadratic question from the type picker with its own 99-credit budget', () => {
@@ -307,25 +320,25 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const [button] = collectTreeNodes(instance.renderTypeSelector(),
       (node) => node?.props?.['aria-label'] === 'Add Quadratic allocation question');
 
-    button.props.onClick();
+    clickTreeNode(button);
     instance.handleQuestionChange(0, 'voiceCredits', 25);
-    button.props.onClick();
+    clickTreeNode(button);
 
     expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 99]);
     const toggles = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
     expect(treeHasText(toggles[0], 'Credits: 25')).toBe(true);
     expect(treeHasText(toggles[1], 'Credits: 99')).toBe(true);
-    toggles[1].props.onClick();
+    clickTreeNode(toggles[1]);
     const [slider] = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
-    expect(slider.props).toMatchObject({ type: 'range', min: '1', step: '1', value: 99 });
-    slider.props.onChange({ target: { value: '144' } });
+    expect(asRenderTreeNode(slider).props).toMatchObject({ type: 'range', min: '1', step: '1', value: 99 });
+    changeTreeNode(slider, '144');
     expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 144]);
     const updatedToggles = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
     expect(treeHasText(updatedToggles[1], 'Credits: 144')).toBe(true);
-    updatedToggles[1].props.onClick();
+    clickTreeNode(updatedToggles[1]);
     expect(collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')).toHaveLength(0);
     expect(instance.state.questions[1].voiceCredits).toBe(144);
@@ -340,12 +353,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     ] });
     const [toggle] = collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
-    toggle.props.onClick();
+    clickTreeNode(toggle);
     const getSlider = () => collectTreeNodes(instance.render(),
       (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')[0];
-    expect(getSlider().props).toMatchObject({ value: 2500, max: 2500 });
-    getSlider().props.onChange({ target: { value: '1200' } });
-    expect(getSlider().props).toMatchObject({ value: 1200, max: 2500 });
+    expect(asRenderTreeNode(getSlider()).props).toMatchObject({ value: 2500, max: 2500 });
+    changeTreeNode(getSlider(), '1200');
+    expect(asRenderTreeNode(getSlider()).props).toMatchObject({ value: 1200, max: 2500 });
   });
 
   it('hides survey/question gate controls when the active session exposes no selectable gates', () => {
@@ -395,8 +408,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         {
           id: 'gate_1',
           label: 'Edge Session',
+          displayLabel: 'Edge Session',
           badgeLabel: 'Edge Session',
           color: '#5affc2',
+          mode: 'any' as const,
+          requireAll: false,
+          sbtAddress: '',
+          sbtAddresses: [] as string[],
+          resourceKey: 'default',
         },
       ],
       defaultGateId: 'gate_1',
@@ -521,7 +540,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       return collectTreeNodes(
         instance.render(),
         (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/'),
-      ).map((node) => node.props.href);
+      ).map((node) => asRenderTreeNode(node).props.href);
     };
 
     const debateLinks = buildSurveyLinks('DEBATE');

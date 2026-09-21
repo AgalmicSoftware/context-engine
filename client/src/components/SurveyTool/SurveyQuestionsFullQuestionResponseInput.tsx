@@ -17,6 +17,11 @@ type SurveyQuestionRecord = {
   id: string;
   type: string;
   options?: unknown[];
+  scale?: unknown;
+  min?: unknown;
+  max?: unknown;
+  minLabel?: unknown;
+  maxLabel?: unknown;
   voiceCredits?: unknown;
 };
 

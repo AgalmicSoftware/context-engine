@@ -40,7 +40,7 @@ describe('surveyQuestionsJsonRuntime', () => {
   it('passes the captured session recruitment source into response JSON payloads', () => {
     sessionStorage.clear();
     captureSessionRecruitmentSource('alpha', '?src=partner-outreach');
-    const buildResponsePayload = jest.fn(() => ({ responses: [] }));
+    const buildResponsePayload = jest.fn((_payload: unknown) => ({ responses: [] }));
     const runtime = createSurveyQuestionsJsonRuntime({
       buildResponsePayload,
       propsRef: { current: { sessionSlug: 'alpha', account: '0xUser' } },

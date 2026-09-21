@@ -171,7 +171,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       nextValue: 8,
       persistStrategy: 'event-sensitive',
     });
-    expect(ratingChange.event).toBe(event);
+    expect((ratingChange as { event?: unknown }).event).toBe(event);
     expect(shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(ratingChange)).toBe(true);
 
     const ratingCommit = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
