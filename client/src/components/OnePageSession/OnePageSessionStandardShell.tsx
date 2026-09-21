@@ -221,9 +221,10 @@ const normalizeSessionContextLinks = (raw: unknown): SessionContextLink[] => {
 
 const normalizeSessionContextView = (config: unknown): SessionContextView | null => {
   const record = config && typeof config === 'object' ? (config as UnknownRecord) : {};
-  const rawContext = record.sessionContext && typeof record.sessionContext === 'object'
-    ? (record.sessionContext as UnknownRecord)
-    : null;
+  const rawContext =
+    record.sessionContext && typeof record.sessionContext === 'object'
+      ? (record.sessionContext as UnknownRecord)
+      : null;
   if (!rawContext) return null;
   const paragraphs = (Array.isArray(rawContext.paragraphs) ? rawContext.paragraphs : [rawContext.body])
     .map((entry) => toTrimmedText(entry, 1400))
@@ -433,6 +434,7 @@ export default function OnePageSessionStandardShell({
     corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
   const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
+  const showContextSection = isDemoSlug || !!sessionContext;
 
   return (
     <div className={styles.onePageDemoContainer}>
@@ -471,8 +473,6 @@ export default function OnePageSessionStandardShell({
             </span>
           </div>
         </div>
-
-        {renderSessionContext(sessionContext)}
 
         {showQuestions ? (
           <div className={styles.pileHeaderRow} data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}>
@@ -626,7 +626,7 @@ export default function OnePageSessionStandardShell({
           />
         </Suspense>
 
-        {isDemoSlug && (
+        {showContextSection && (
           <div
             className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
             data-testid="ce-demo-documents-section"
@@ -653,7 +653,7 @@ export default function OnePageSessionStandardShell({
                   </div>
                 )}
               </h2>
-              {showDocuments && (
+              {showDocuments && isDemoSlug && (
                 <div className={styles.sectionHeaderActionsScroller}>
                   <div className={styles.sectionHeaderActions}>
                     <a
@@ -682,14 +682,17 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                  <CorpusViewer
-                    onAtlasIssueOpen={onCorpusAtlasIssueOpen}
-                    showGithubLink={false}
-                    externalLoadRequestNonce={corpusViewerLoadRequestNonce}
-                    onExternalLoadStateChange={onCorpusViewerLoadStateChange}
-                  />
-                </Suspense>
+                {renderSessionContext(sessionContext)}
+                {isDemoSlug && (
+                  <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
+                    <CorpusViewer
+                      onAtlasIssueOpen={onCorpusAtlasIssueOpen}
+                      showGithubLink={false}
+                      externalLoadRequestNonce={corpusViewerLoadRequestNonce}
+                      onExternalLoadStateChange={onCorpusViewerLoadStateChange}
+                    />
+                  </Suspense>
+                )}
               </div>
             )}
           </div>

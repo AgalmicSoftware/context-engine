@@ -839,8 +839,11 @@ describe('OnePageSession results routing', () => {
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
     const context = screen.getByTestId('ce-session-context');
     expect(within(context).getByRole('heading', { name: 'Context' })).toBeInTheDocument();
+    expect(screen.getByTestId('ce-demo-documents-section')).toContainElement(context);
     expect(context).toHaveTextContent('EDDY 2026 brings together academics and practitioners');
     expect(context).toHaveTextContent('<script>alert("nope")</script> This text must render literally.');
     expect(context.querySelector('script')).toBeNull();
@@ -1829,7 +1832,11 @@ describe('OnePageSession results routing', () => {
 
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     const previousTimer = subject._generatedResultsViewerRefreshTimer;
-    subject.props = { ...subject.props, slug: 'other', sessionConfig: { ...subject.props.sessionConfig, slug: 'other' } };
+    subject.props = {
+      ...subject.props,
+      slug: 'other',
+      sessionConfig: { ...subject.props.sessionConfig, slug: 'other' },
+    };
     subject.kickoffLightSbtUniverseScan = jest.fn();
     subject.clearUnsupportedAutoMintState = jest.fn();
     subject.scheduleBuildAggregator = jest.fn();
