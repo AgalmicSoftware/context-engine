@@ -25,6 +25,7 @@ export type SurveyFilterState = {
   topQuestions: number | null;
   questionTypes: string[];
   sbtFilter: unknown;
+  workerGroupFilter?: unknown;
   aiFilter: string | null;
   aiTopN: number | null;
   aiCombine: boolean;
@@ -60,43 +61,13 @@ const defaultEmptyFilterState: SurveyFilterState = {
  * @returns {boolean} True if the object is effectively empty, false otherwise.
  */
 function isEffectivelyEmpty(filterStateObj: FilterStateRecord): boolean {
-  // This function assumes filterStateObj is a non-null, actual object,
-  // as serializeFilterState handles null/undefined checks before calling this.
-
-  if (Object.keys(filterStateObj).length === 0) {
-    return true; // An empty object {} is effectively empty.
-  }
-
-  // Check if all properties present in filterStateObj match their default values,
-  // and that properties defined in defaultEmptyFilterState but missing in filterStateObj
-  // are consistent with their defaults (e.g., a missing 'topQuestions' is fine if default is null).
-  for (const key in defaultEmptyFilterState) {
-    if (hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key)) {
-      const valueInObj = filterStateObj[key];
-      const defaultValue = defaultEmptyFilterState[key as keyof SurveyFilterState];
-
-      if (hasOwn(filterStateObj, key)) {
-        // If the key exists in filterStateObj, its value must match the default.
-        // JSON.stringify is used for simple deep comparison of values.
-        if (JSON.stringify(valueInObj) !== JSON.stringify(defaultValue)) {
-          return false;
-        }
-      } else {
-        // If key is not in filterStateObj, it's implicitly default. This is fine.
-        // For example, if defaultEmptyFilterState.topQuestions is null,
-        // and filterStateObj doesn't have 'topQuestions', it's considered matching default.
-      }
-    }
-  }
-
-  // Check for any keys in filterStateObj that are not part of the default structure.
-  for (const key in filterStateObj) {
-    if (hasOwn(filterStateObj, key) && !hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key)) {
-      return false; // Found an extraneous key not in defaultEmptyFilterState
-    }
-  }
-
-  return true;
+  // Missing fields implicitly use their defaults. Only inspect supplied own keys.
+  return Object.keys(filterStateObj).every((key) =>
+    key === 'workerGroupFilter'
+      ? filterStateObj[key] == null
+      : hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key) &&
+        JSON.stringify(filterStateObj[key]) === JSON.stringify(defaultEmptyFilterState[key as keyof SurveyFilterState]),
+  );
 }
 
 /**
@@ -143,6 +114,15 @@ export function serializeFilterState(filterStateObj: FilterStateRecord | null | 
  * @returns {object} The filter state object. Returns a new instance of the default
  *                   empty filter state if the string is invalid or an error occurs.
  */
+// Share decoding between lenient URL restoration and strict pasted-filter validation.
+const decodeFilterState = (value: string): unknown => {
+  let base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = base64.length % 4;
+  if (padding === 1) throw new Error('Filter state string is malformed.');
+  base64 += padding === 2 ? '==' : padding === 3 ? '=' : '';
+  return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
+};
+
 export function deserializeFilterState(base64UrlString: string | null | undefined): SurveyFilterState {
   // Create a new instance of the default state for fallback, ensuring arrays are new instances.
   const newDefaultStateInstance: SurveyFilterState = {
@@ -156,27 +136,7 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
   }
 
   try {
-    // Convert Base64URL back to standard Base64
-    let base64String = base64UrlString
-      .replace(/-/g, '+') // Replace '-' with '+'
-      .replace(/_/g, '/'); // Replace '_' with '/'
-
-    // Add Base64 padding if necessary. Standard Base64 decoders might require it.
-    // The length of a Base64 string (sans padding) must be a multiple of 4 when padded.
-    const paddingLength = base64String.length % 4;
-    if (paddingLength === 2) {
-      base64String += '==';
-    } else if (paddingLength === 3) {
-      base64String += '=';
-    }
-    // If paddingLength is 1, the Base64 string is malformed. window.atob will throw.
-
-    // Standard pattern for UTF-8 safety with atob:
-    // 1. window.atob to decode Base64 string into a (potentially multi-byte) Latin1 string.
-    // 2. escape to convert Latin1 string (with multi-byte chars as single chars) to %xx sequences.
-    // 3. decodeURIComponent to correctly interpret these %xx sequences as UTF-8.
-    const jsonString = decodeURIComponent(escape(window.atob(base64String)));
-    const parsedValue: unknown = JSON.parse(jsonString);
+    const parsedValue = decodeFilterState(base64UrlString);
     if (!isRecord(parsedValue)) {
       return newDefaultStateInstance;
     }
@@ -202,6 +162,7 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
           ? (parsedObj.questionTypes as string[])
           : [...defaultEmptyFilterState.questionTypes],
       sbtFilter: hasOwn(parsedObj, 'sbtFilter') ? parsedObj.sbtFilter : defaultEmptyFilterState.sbtFilter,
+      ...(hasOwn(parsedObj, 'workerGroupFilter') ? { workerGroupFilter: parsedObj.workerGroupFilter } : {}),
       aiFilter,
       aiTopN,
       aiCombine,
@@ -218,13 +179,7 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
           : defaultEmptyFilterState.responseStatus,
     };
 
-    // Ensure no extraneous keys are carried over if not part of defaultEmptyFilterState
-    for (const key in finalState) {
-      if (!hasOwn(defaultEmptyFilterState as unknown as FilterStateRecord, key)) {
-        delete (finalState as FilterStateRecord)[key];
-      }
-    }
-
+    // finalState explicitly enumerates supported fields; unknown URL keys are discarded.
     return finalState;
   } catch (error) {
     cacheLog.error('Error deserializing filter state:', error);
@@ -237,19 +192,7 @@ export function deserializeFilterStateStrict(base64UrlString: string | null | un
     throw new Error('Filter state string is empty.');
   }
 
-  let base64String = base64UrlString.replace(/-/g, '+').replace(/_/g, '/');
-  const paddingLength = base64String.length % 4;
-  if (paddingLength === 1) {
-    throw new Error('Filter state string is malformed.');
-  }
-  if (paddingLength === 2) {
-    base64String += '==';
-  } else if (paddingLength === 3) {
-    base64String += '=';
-  }
-
-  const jsonString = decodeURIComponent(escape(window.atob(base64String)));
-  const parsedValue: unknown = JSON.parse(jsonString);
+  const parsedValue = decodeFilterState(base64UrlString);
   if (!isRecord(parsedValue)) {
     throw new Error('Filter state must decode to an object.');
   }

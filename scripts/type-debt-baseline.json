@@ -79,12 +79,12 @@
     "tsNocheck": 0,
     "colonAny": 904,
     "asAny": 76,
-    "asUnknownAs": 44,
+    "asUnknownAs": 40,
     "promiseAny": 2,
     "arrayAny": 0,
     "recordAny": 42,
     "aliasAny": 3,
-    "aliasAnyUsage": 742,
+    "aliasAnyUsage": 741,
     "mapSetAny": 4
   }
 }

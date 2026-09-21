@@ -1,3 +1,4 @@
+import { GROUP_FILTER_ROLES } from '../../domains/worker/workerGroupResultsFilter';
 import type { SessionResultsAnalysisResponseInput } from '../../utilities/sessionResultsExport';
 
 type SurveyResultsAnalysisRecord = Record<string, unknown>;
@@ -139,7 +140,15 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
     const questionId = questionIdPort(response) || String(questionIdFallback || '').trim();
     if (!questionId) return;
     const questionData = toRecord(questions[questionId.toLowerCase()] || questions[questionId]);
-    const answer = readSurveyResultsAnalysisTextField(response.answer);
+    const questionType = questionTypePort(response, questionData);
+    const rawAnswer = Array.isArray(response.answer) ? response.answer : toRecord(response.answer).value;
+    // Keep option-indexed allocations intact until analysis validates and labels them.
+    const answer =
+      questionType === 'quadratic'
+        ? Array.isArray(rawAnswer)
+          ? rawAnswer
+          : ''
+        : readSurveyResultsAnalysisTextField(response.answer);
     const additional = readSurveyResultsAnalysisTextField(response.additional);
     if (!answer && !additional) return;
     rows.push({
@@ -148,7 +157,7 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
       participantAddress: responder,
       questionId,
       questionPrompt: questionPromptPort(response, questionData),
-      questionType: questionTypePort(response, questionData),
+      questionType,
     });
   };
 
@@ -252,6 +261,26 @@ export const buildSurveyResultsAnalysisSegmentDimensionsForExport = ({
       values: tagValues,
     });
   }
+
+  const nativeFilter = toRecord(toRecord(filterState).workerGroupFilter);
+  const nativeValues = GROUP_FILTER_ROLES.flatMap((role) => {
+    const entries = nativeFilter[role];
+    return (Array.isArray(entries) ? entries : []).map((entry) => {
+      const group = toRecord(entry);
+      return {
+        id: `${role}:${String(group.groupId || '')}`,
+        count: Number(participantCount) || 0,
+        label: `${role.startsWith('creator') ? 'Creator' : 'Responder'} ${role.endsWith('Include') ? 'include' : 'exclude'}: ${String(group.label || group.groupId || '')}`,
+      };
+    });
+  });
+  if (nativeValues.length)
+    dimensions.push({
+      id: 'active_worker_group_filters',
+      label: 'Active Group Filters',
+      source: 'workerGroupFilter',
+      values: nativeValues,
+    });
 
   const sbtFilter = toRecord(toRecord(filterState).sbtFilter);
   const sbtCounts = new Map<string, SurveyResultsAnalysisCountBucket>();

@@ -150,6 +150,114 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
   assert.equal(source.snapshot.responses[0].participantId, 'participant_001');
 });
 
+test('worker-canonical source accepts public response envelopes with empty encrypted fields while rejecting non-empty encrypted envelopes', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qmeta1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Public answer?', type: 'text' },
+  });
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qmeta2',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q2', prompt: 'Research answer?', type: 'text' },
+  });
+  const publicAnswer = {
+    value: 'plain public answer',
+    encrypted: false,
+    hash: '',
+    encryptedPortion: '',
+  };
+  const publicAdditional = {
+    value: 'plain public comment',
+    encrypted: false,
+    hash: '',
+    encryptedPortion: '',
+  };
+  await putPayload({
+    kv,
+    resource: 'responses',
+    id: 'public-normal',
+    metadata: { responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+    payload: {
+      sessionSlug: 'session-a',
+      sessionId,
+      questionId: 'q1',
+      answer: publicAnswer,
+      additional: publicAdditional,
+    },
+  });
+  await putPayload({
+    kv,
+    resource: 'responses',
+    id: 'public-research',
+    metadata: { responder: '0x2222222222222222222222222222222222222222', createdAt: '2026-09-17T00:01:00.000Z' },
+    payload: {
+      sessionSlug: 'session-a',
+      sessionId,
+      questionId: 'q2',
+      answer: publicAnswer,
+      additional: publicAdditional,
+      interviewProvenance: {
+        includeAiProvenance: true,
+        includePredictionComparison: true,
+        source: { platform: 'claude', modelId: 'self_reported', verification: 'self_reported' },
+        originalPrediction: {
+          answer: publicAnswer,
+          additionalComments: publicAdditional,
+          confidence: 0.7,
+          evidence: 'Synthetic evidence.',
+        },
+        predictionComparison: {
+          original: { answer: publicAnswer, additionalComments: publicAdditional },
+          submitted: { answer: publicAnswer, additionalComments: publicAdditional },
+          changedFields: [],
+          userEditedFields: [],
+          redactedFields: [],
+        },
+      },
+    },
+  });
+  await putPayload({
+    kv,
+    resource: 'responses',
+    id: 'locked-nonempty-string',
+    metadata: { responder: '0x3333333333333333333333333333333333333333', createdAt: '2026-09-17T00:02:00.000Z' },
+    payload: {
+      sessionSlug: 'session-a',
+      sessionId,
+      questionId: 'q1',
+      answer: { value: 'secret', encrypted: false, hash: '', encryptedPortion: 'ciphertext' },
+    },
+  });
+  await putPayload({
+    kv,
+    resource: 'responses',
+    id: 'locked-nonempty-object',
+    metadata: { responder: '0x4444444444444444444444444444444444444444', createdAt: '2026-09-17T00:03:00.000Z' },
+    payload: {
+      sessionSlug: 'session-a',
+      sessionId,
+      questionId: 'q2',
+      answer: { value: 'secret', encrypted: false, hash: '', encryptedKey: { wrapped: 'key' } },
+    },
+  });
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.equal(source.counts.responseCount, 2);
+  assert.equal(source.counts.excludedCount, 2);
+  assert.equal(source.counts.lockedCount, 2);
+  assert.deepEqual(
+    source.snapshot.responses.map((response) => response.answer).sort(),
+    ['plain public answer', 'plain public answer'],
+  );
+  assert.equal(source.snapshot.responses.some((response) => response.additional === 'plain public comment'), true);
+});
+
 test('worker-canonical queued responses apply ACL, encryption, and trusted metadata ordering before generation', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
@@ -222,6 +330,93 @@ test('AI input prioritizes answered questions before the question cap while wate
   assert.equal(source.aiSnapshot.counts.participants, 420);
   assert.equal(source.counts.aiInputParticipantCount, 420);
   assert.equal(source.participantDigests.length, 430);
+});
+
+test('AI input response cap samples round-robin across answered questions and preserves question metadata', async () => {
+  const questions = Array.from({ length: 42 }, (_, index) => {
+    const questionId = `q${String(index + 1).padStart(3, '0')}`;
+    if (index === 2) {
+      return {
+        questionId,
+        prompt: 'Rate implementation confidence.',
+        type: 'rating',
+        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+      };
+    }
+    if (index === 41) {
+      return {
+        questionId,
+        prompt: 'Allocate support.',
+        type: 'quadratic',
+        options: ['Summarize', 'Moderate', 'Decide'],
+        voiceCredits: 25,
+      };
+    }
+    return { questionId, prompt: `Question ${index + 1}`, type: index % 2 ? 'binary' : 'freeform', options: index % 2 ? ['Agree', 'Unsure', 'Disagree'] : [] };
+  });
+  const responses = questions.flatMap((question) =>
+    Array.from({ length: 30 }, (_, index) => ({
+      questionId: question.questionId,
+      participantId: `participant-${String(index + 1).padStart(2, '0')}`,
+      answer: question.type === 'quadratic' ? [2, -1, 0] : question.type === 'rating' ? 7 : `answer ${index + 1} for ${question.questionId}`,
+    })));
+  const body = {
+      source: {
+        kind: 'admin-snapshot',
+        snapshot: {
+          sessionSlug: 'session-a',
+          sessionId,
+          questions,
+          responses,
+        },
+      },
+    };
+  const source = await loadAdminSnapshotResultsAnalysisSource({
+    body,
+    slug: 'session-a',
+    config,
+  });
+  assert.equal(source.ok, true);
+  assert.equal(source.counts.responseCount, 1260);
+  assert.equal(source.counts.aiInputResponseCount, 420);
+  assert.equal(source.counts.aiInputQuestionCount, 42);
+  assert.equal(source.counts.aiInputParticipantCount, 30);
+  const aiQuestionIds = new Set(source.aiSnapshot.questions.map((question) => question.id));
+  assert.equal(aiQuestionIds.size, 42);
+  for (const question of questions) assert.equal(aiQuestionIds.has(question.questionId), true);
+  assert.equal(new Set(source.aiSnapshot.responses.map((response) => response.participantId)).size, 30);
+  const countsByQuestion = source.aiSnapshot.responses.reduce((counts, row) => {
+    counts.set(row.questionId, (counts.get(row.questionId) || 0) + 1);
+    return counts;
+  }, new Map());
+  assert.equal(Math.min(...countsByQuestion.values()), 10);
+  assert.equal(Math.max(...countsByQuestion.values()), 10);
+  assert.deepEqual(
+    source.aiSnapshot.questions.find((question) => question.id === 'q003').scale,
+    { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+  );
+  assert.equal(source.aiSnapshot.questions.find((question) => question.id === 'q042').voiceCredits, 25);
+  assert.equal(source.snapshot.questions.find((question) => question.id === 'q042').voiceCredits, 25);
+
+  const shuffledResponses = [...responses].sort((left, right) =>
+    `${right.participantId}:${left.questionId}`.localeCompare(`${left.participantId}:${right.questionId}`));
+  const shuffledSource = await loadAdminSnapshotResultsAnalysisSource({
+    body: {
+      source: {
+        kind: 'admin-snapshot',
+        snapshot: {
+          sessionSlug: 'session-a',
+          sessionId,
+          questions,
+          responses: shuffledResponses,
+        },
+      },
+    },
+    slug: 'session-a',
+    config,
+  });
+  assert.equal(shuffledSource.ok, true);
+  assert.deepEqual(shuffledSource.aiSnapshot.responses, source.aiSnapshot.responses);
 });
 
 test('generated artifact preserves client schema and rejects unknown source refs', () => {

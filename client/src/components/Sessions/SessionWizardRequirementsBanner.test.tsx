@@ -40,7 +40,10 @@ describe('SessionWizardRequirementsBanner', () => {
       'mailto:contextengine@protonmail.com',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /dismiss session setup requirements/i }));
+    const dismissButton = screen.getByRole('button', { name: /dismiss session setup requirements/i });
+    expect(dismissButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
+
+    fireEvent.click(dismissButton);
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
@@ -61,7 +64,7 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
   });
 
-  it('renders exact resolved AI provider labels without an OpenAI-only link', () => {
+  it('links only OpenAI resolved AI provider labels', () => {
     render(
       <SessionWizardRequirementsBanner
         fundingRequirementLabel="OP Sepolia ETH"
@@ -71,8 +74,33 @@ describe('SessionWizardRequirementsBanner', () => {
       />,
     );
 
-    expect(screen.getByText(/Anthropic key, OpenRouter key, OpenAI key/)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('listitem')).toHaveTextContent(
+      'Anthropic key, OpenRouter key, OpenAI key for text and transcription',
+    );
+    expect(screen.getByRole('link', { name: 'OpenAI key' })).toHaveAttribute(
+      'href',
+      SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey,
+    );
+    expect(screen.getByRole('link', { name: 'OpenAI key' })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: 'OpenAI key' })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByRole('link', { name: 'Anthropic key' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'OpenRouter key' })).not.toBeInTheDocument();
+  });
+
+  it('links the resolved OpenAI fallback when provider labels are unavailable', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey']}
+      />,
+    );
+
+    expect(screen.getByRole('listitem')).toHaveTextContent('OpenAI API Key for text and transcription');
+    expect(screen.getByRole('link', { name: 'OpenAI API Key' })).toHaveAttribute(
+      'href',
+      SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey,
+    );
   });
 
   it('renders the Wrapped token in addition to the native Cloudflare requirements', () => {
@@ -119,15 +147,19 @@ describe('SessionWizardRequirementsBanner', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
     );
-    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+    expect(screen.getByText('OpenAI key')).toBeInTheDocument();
+    expect(screen.getByText('for text and transcription')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'OpenAI key' })).toHaveAttribute(
+      'href',
+      SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey,
+    );
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/turnkey tool/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'contextengine@protonmail.com' })).not.toBeInTheDocument();
   });
 
-  it('renders the native Cloudflare account requirement as a concise dashboard link', () => {
+  it('renders the native Cloudflare account requirement as a concise dashboard link', async () => {
     render(
       <SessionWizardRequirementsBanner
         fundingRequirementLabel="OP Sepolia ETH"
@@ -140,6 +172,10 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(cloudflareAccount).toHaveAttribute('href', SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount);
     expect(cloudflareAccount).toHaveAttribute('target', '_blank');
     expect(cloudflareAccount).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(
+      screen.queryByRole('button', { name: 'Why log in to Cloudflare before continuing?' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Log in to your Cloudflare account in this browser/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Worker step deploys the full Session Worker/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Context Engine deploy helper/i)).not.toBeInTheDocument();
   });
@@ -155,7 +191,7 @@ describe('SessionWizardRequirementsBanner', () => {
     );
 
     expect(screen.getByText(/compatible Session Worker/i)).toHaveTextContent(
-      'A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.',
+      'A compatible Session Worker provides the web runtime; the Ethereum registry and Arweave remain canonical.',
     );
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toBeInTheDocument();
     expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();

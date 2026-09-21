@@ -15,6 +15,7 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
+import { captureSessionRecruitmentSource, readSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
 import { writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
@@ -485,6 +486,36 @@ describe('OnePageSession view gating', () => {
     expect(subject.state.telegramAgentQuestionsStatus).toBe('idle');
     expect(subject.state.telegramAgentQuestions).toEqual([]);
     expect(subject.state.showQuestions).toBe(true);
+  });
+
+  it('captures a new session recruitment source when the mounted session switches slugs', () => {
+    sessionStorage.clear();
+    const priorUrl = window.location.href;
+
+    try {
+      const subject = createSubject({
+        slug: 'alpha',
+        sessionConfig: { ...buildProps().sessionConfig, slug: 'alpha' },
+      });
+      captureSessionRecruitmentSource('alpha', '?src=alpha-source');
+      expect(readSessionRecruitmentSource('alpha')).toBe('alpha-source');
+
+      const prevProps = subject.props;
+      const prevState = { ...subject.state };
+      subject.props = {
+        ...prevProps,
+        slug: 'beta',
+        sessionConfig: { ...prevProps.sessionConfig, slug: 'beta' },
+      };
+      window.history.replaceState({}, '', '/session/beta?src=beta-source');
+
+      subject.componentDidUpdate(prevProps, prevState);
+
+      expect(readSessionRecruitmentSource('alpha')).toBe('alpha-source');
+      expect(readSessionRecruitmentSource('beta')).toBe('beta-source');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
   });
 
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {

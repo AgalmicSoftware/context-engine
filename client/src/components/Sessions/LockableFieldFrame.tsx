@@ -65,6 +65,7 @@ const LockableFieldFrame = ({
           id={tooltipId}
           className={styles.tooltipTrigger}
           data-testid={tooltipTestId || undefined}
+          data-ce-control-appearance="frameless"
           role="button"
           tabIndex={0}
           aria-label={tooltipAriaLabel || `${label} info`}

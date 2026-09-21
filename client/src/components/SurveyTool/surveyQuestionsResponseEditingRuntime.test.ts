@@ -186,6 +186,52 @@ describe('surveyQuestionsResponseEditingRuntime', () => {
     expect(afterImportance).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves sequenced interview draft writes when the state ref has not refreshed yet', () => {
+    const stateRef = createStateRef();
+    let latestState = stateRef.current;
+    const setState = jest.fn((updater: unknown, callback?: () => void | Promise<void>) => {
+      const patch =
+        typeof updater === 'function'
+          ? (updater as (prev: SurveyQuestionsLegacyRecord) => SurveyQuestionsLegacyRecord)(latestState)
+          : (updater as SurveyQuestionsLegacyRecord);
+      latestState = {
+        ...latestState,
+        ...patch,
+      };
+      callback?.();
+    });
+    const runtime = createSurveyQuestionsResponseEditingRuntime(
+      createContext({
+        buildAdditionalUpdatePlan: jest.fn(() => ({
+          changed: true,
+          nextAdditionalState: { value: 'reviewed note' },
+        })),
+        buildAnswerUpdatePlan: jest.fn(() => ({
+          changed: true,
+          nextAnswerState: { encrypted: false, value: 'Agree' },
+        })),
+        setState,
+        stateRef,
+      }),
+    );
+
+    runtime.handleAnswer(0, 'q1', 'Agree', { persistDraft: false });
+    runtime.handleAdditional(0, 'q1', 'reviewed note', { persistDraft: false });
+    runtime.handleImportance(0, 'q1', 70, { persistDraft: false });
+    runtime.handleConviction(0, 'q1', 70, { persistDraft: false });
+
+    expect(latestState.surveysResponseState[0]).toEqual(
+      expect.objectContaining({
+        additionalComments: { q1: { value: 'reviewed note' } },
+        answers: { q1: { encrypted: false, value: 'Agree' } },
+        importance: { q1: 70 },
+        conviction: { q1: 70 },
+      }),
+    );
+    expect(stateRef.current.surveysResponseState[0].answers).toEqual({});
+    expect(stateRef.current.surveysResponseState[0].importance).toEqual({});
+  });
+
   it('routes answer encryption toggles through the normalized builder input', () => {
     const toggleInputs: SurveyQuestionsLegacyRecord[] = [];
     const buildAnswerEncryptionToggleResponseState = jest.fn((prev, input) => {

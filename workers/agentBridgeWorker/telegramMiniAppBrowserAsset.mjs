@@ -1671,6 +1671,33 @@ export function renderTelegramMiniAppBrowserAsset({
       .resultColumns { grid-template-columns: 1fr; }
       .filterSearchRow { grid-template-columns: minmax(0, 1fr) 44px auto; }
     }
+
+    .quadraticHeader { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .quadraticHeader p { margin: 0; }
+    .quadraticNeutral { display: grid; place-items: center; margin-left: auto; padding: 0; width: 44px; min-height: 44px; font-size: 16px; color: var(--text); background: transparent; border: 0; text-decoration: none; opacity: 0.5; }
+    .quadraticNeutral:hover:not(:disabled), .quadraticNeutral:focus-visible { opacity: 1; }
+    .quadraticNeutral svg { width: 16px; height: 16px; fill: currentColor; }
+    .quadraticHelp { position: relative; }
+    .quadraticHelp summary { cursor: pointer; display: grid; place-items: center; width: 44px; height: 44px; }
+    .quadraticHelp p { position: absolute; z-index: 30; top: 100%; left: -100px; width: min(270px, 75vw); padding: 12px; color: var(--text); background: var(--surface-soft); border: 1px solid var(--muted); border-radius: 8px; font-size: 13px; box-shadow: 0 4px 12px var(--shadow-dark); }
+    .quadraticOption { display: block; margin-top: 12px; --vote-color: var(--text); }
+    .quadraticOption[data-direction=positive] { --vote-color: var(--ok); }
+    .quadraticOption[data-direction=negative] { --vote-color: var(--danger); }
+    .quadraticHeading { display: grid; grid-template-columns: minmax(0, 1fr) auto 5.5rem; align-items: baseline; gap: 8px; overflow-wrap: anywhere; }
+    .quadraticHeading strong { font-size: 18px; color: var(--vote-color); }
+    .quadraticCost { font-size: 12px; text-align: right; }
+    .quadraticScale { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+    .quadraticScale span:first-child, .quadraticScale span:last-child { font-size: 16px; font-weight: 700; }
+    .quadraticScale span:first-child { color: var(--danger); }
+    .quadraticScale span:last-child { color: var(--ok); }
+    .quadraticResultsTable .positive { color: var(--ok); }
+    .quadraticResultsTable .negative { color: var(--danger); }
+    input.quadraticSlider { appearance: none; -webkit-appearance: none; width: 100%; height: 44px; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; --track: linear-gradient(to right, var(--muted) 0 var(--vote-start), var(--vote-color) var(--vote-start) var(--vote-end), var(--muted) var(--vote-end) 100%); }
+    input.quadraticSlider::-webkit-slider-runnable-track { height: 4px; background: var(--track); border-radius: 2px; }
+    input.quadraticSlider::-moz-range-track { height: 4px; background: var(--track); border-radius: 2px; }
+    input.quadraticSlider::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; border: 0; background: var(--vote-color); box-shadow: none; }
+    input.quadraticSlider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--vote-color); box-shadow: none; }
+    input.quadraticSlider:focus-visible, .quadraticHelp summary:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   </style>
 </head>
 <body>
@@ -1859,6 +1886,7 @@ export function renderTelegramMiniAppBrowserAsset({
               <div class="resultFilterOptions" id="resultFilterOptions"></div>
             </div>
           </section>
+          <section id="quadraticResults" aria-label="Quadratic allocation results" hidden></section>
           <div class="resultColumns">
             <section class="resultSection collapsed" id="divisiveSection" aria-label="Most difference questions">
               <button class="collapsibleHeader" id="toggleDivisiveSection" type="button" aria-expanded="false">
@@ -1937,6 +1965,7 @@ export function renderTelegramMiniAppBrowserAsset({
           </button>
         </div>
         <div class="questionTypeButtons" id="addQuestionTypes"></div>
+        <label id="addQuestionBudgetWrap" hidden>Voice credits per respondent <input id="addQuestionBudget" type="number" min="1" step="1" value="99"></label>
         <div class="addQuestionControls">
           <div class="addQuestionUrlControls" id="addQuestionUrlControls" hidden>
             <div class="addQuestionUrlRow">
@@ -2280,6 +2309,7 @@ export function renderTelegramMiniAppBrowserAsset({
       groupAnalysisSection: document.getElementById('groupAnalysisSection'),
       toggleGroupAnalysisSection: document.getElementById('toggleGroupAnalysisSection'),
       resultsSummary: document.getElementById('resultsSummary'),
+      quadraticResults: document.getElementById('quadraticResults'),
       consensusResults: document.getElementById('consensusResults'),
       divisiveResults: document.getElementById('divisiveResults'),
       resultGroups: document.getElementById('resultGroups'),
@@ -2297,6 +2327,8 @@ export function renderTelegramMiniAppBrowserAsset({
       closeAddQuestion: document.getElementById('closeAddQuestion'),
       addQuestionTitleSession: document.getElementById('addQuestionTitleSession'),
       addQuestionTypes: document.getElementById('addQuestionTypes'),
+      addQuestionBudgetWrap: document.getElementById('addQuestionBudgetWrap'),
+      addQuestionBudget: document.getElementById('addQuestionBudget'),
       toggleAddQuestionUrl: document.getElementById('toggleAddQuestionUrl'),
       addQuestionUrlControls: document.getElementById('addQuestionUrlControls'),
       addQuestionUrl: document.getElementById('addQuestionUrl'),
@@ -2356,6 +2388,7 @@ export function renderTelegramMiniAppBrowserAsset({
       ['agree_unsure_disagree', 'Agree'],
       ['rating', 'Rating'],
       ['multichoice', 'Multi-choice'],
+      ['quadratic', 'Quadratic allocation'],
       ['freeform', 'Freeform'],
     ];
     const URL_GENERATED_QUESTION_COUNT = 5;
@@ -2495,6 +2528,7 @@ export function renderTelegramMiniAppBrowserAsset({
       if (question?.questionType === 'rating') {
         return answer.value === undefined || answer.value === null ? '' : String(answer.value);
       }
+      if (question?.questionType === 'quadratic') return Array.isArray(answer.value) ? answer.value.map((vote, index) => (question.options[index] || ('Option ' + (index + 1))) + ': ' + (vote > 0 ? '+' : '') + vote).join('; ') : '';
       if (question?.questionType === 'multichoice') {
         return Array.isArray(answer.values) ? answer.values.join(', ') : '';
       }
@@ -2695,6 +2729,7 @@ export function renderTelegramMiniAppBrowserAsset({
       freeform: 'Freeform input',
       rating: 'Rating',
       multichoice: 'Multiple choice',
+      quadratic: 'Quadratic allocation',
     })[String(type || '')] || String(type || 'Question');
     const questionTypeFilterValue = (question) => {
       const type = String(question?.questionType || '').trim();
@@ -3080,7 +3115,7 @@ export function renderTelegramMiniAppBrowserAsset({
       const prediction = agentOnlyPredictionFor(question);
       if (!prediction?.valueLabel) return null;
       const questionType = questionTypeFilterValue(question);
-      const stacked = questionType === 'freeform' || questionType === 'multichoice';
+      const stacked = ['freeform', 'multichoice', 'quadratic'].includes(questionType);
       const row = document.createElement('div');
       row.className = 'agentOnlyBadgeRow' + (stacked ? ' stackedPredictionRow' : '');
       const badge = document.createElement('span');
@@ -3270,6 +3305,56 @@ export function renderTelegramMiniAppBrowserAsset({
           updateFooterControls();
         };
         mount.append(label, input);
+      } else if (question.questionType === 'quadratic') {
+        const budget = question.voiceCredits ?? 99;
+        const votes = Array.isArray(draft.value) ? draft.value.slice() : question.options.map(() => 0);
+        const header = document.createElement('div'); header.className = 'quadraticHeader';
+        const status = document.createElement('p'); status.setAttribute('role', 'status');
+        const help = document.createElement('details'); help.className = 'quadraticHelp';
+        const helpToggle = document.createElement('summary'); helpToggle.textContent = '?'; helpToggle.setAttribute('aria-label', 'How voice credits work');
+        const helpText = document.createElement('p');
+        helpText.textContent = 'Votes cost their square: +7 or −7 uses 49 credits. Share your ' + budget + ' credits across the options. You may leave credits unused.';
+        help.append(helpToggle, helpText);
+        const spent = () => votes.reduce((total, vote) => total + vote * vote, 0);
+        const updateStatus = () => { status.textContent = (budget - spent()) + ' credits left'; };
+        updateStatus(); header.append(status, help); mount.appendChild(header);
+        question.options.forEach((option, index) => {
+          const row = document.createElement('label'); row.className = 'quadraticOption';
+          const heading = document.createElement('span'); heading.className = 'quadraticHeading';
+          const name = document.createElement('span'); name.textContent = option;
+          const voteLabel = document.createElement('strong');
+          const cost = document.createElement('span'); cost.className = 'quadraticCost';
+          heading.append(name, voteLabel, cost);
+          const input = document.createElement('input');
+          input.type = 'range'; input.step = '1'; input.className = 'quadraticSlider';
+          const limit = Math.floor(Math.sqrt(budget));
+          input.min = -limit; input.max = limit; input.setAttribute('aria-label', option);
+          const refresh = () => {
+            const vote = votes[index]; input.value = vote;
+            voteLabel.textContent = (vote > 0 ? '+' : '') + vote;
+            const creditCost = (vote * vote) + ' credits';
+            cost.textContent = vote === 0 ? '' : creditCost;
+            input.setAttribute('aria-valuetext', voteLabel.textContent + ' votes, ' + creditCost + (vote === 0 ? ', neutral' : vote > 0 ? ', support' : ', oppose'));
+            row.dataset.direction = vote > 0 ? 'positive' : vote < 0 ? 'negative' : 'neutral';
+            input.style.setProperty('--vote-start', Math.min(50, 50 + vote / limit * 50) + '%');
+            input.style.setProperty('--vote-end', Math.max(50, 50 + vote / limit * 50) + '%');
+          };
+          refresh();
+          input.oninput = () => {
+            const requested = Number(input.value);
+            const affordable = Math.floor(Math.sqrt(budget - (spent() - votes[index] * votes[index])));
+            votes[index] = Math.max(-affordable, Math.min(affordable, requested));
+            draft.value = votes.slice(); refresh();
+            activate(question); markAnswerChanged(question); updateStatus();
+            refreshQuestionSubmitButton(question, input); scheduleDraftAutosave(question); updateFooterControls();
+          };
+          row.append(heading, input); mount.appendChild(row);
+        });
+        const scale = document.createElement('div'); scale.className = 'quadraticScale'; scale.setAttribute('aria-hidden', 'true');
+        ['− Oppose', '+ Support'].forEach((text) => { const label = document.createElement('span'); label.textContent = text; scale.appendChild(label); });
+        const neutral = document.createElement('button'); neutral.type = 'button'; neutral.className = 'quadraticNeutral'; neutral.setAttribute('aria-label', 'Reset'); neutral.title = 'Reset all votes to neutral'; neutral.innerHTML = '<svg aria-hidden="true" focusable="false" viewBox="0 0 512 512" fill="currentColor"><path d="M212.333 224.333H12c-6.627 0-12-5.373-12-12V12C0 5.373 5.373 0 12 0h48c6.627 0 12 5.373 12 12v78.112C117.773 39.279 184.26 7.47 258.175 8.007c136.906.994 246.448 111.623 246.157 248.532C504.041 393.258 393.12 504 256.333 504c-64.089 0-122.496-24.313-166.51-64.215-5.099-4.622-5.334-12.554-.467-17.42l33.967-33.967c4.474-4.474 11.662-4.717 16.401-.525C170.76 415.336 211.58 432 256.333 432c97.268 0 176-78.716 176-176 0-97.267-78.716-176-176-176-58.496 0-110.28 28.476-142.274 72.333h98.274c6.627 0 12 5.373 12 12v48c0 6.627-5.373 12-12 12z"></path></svg>';
+        neutral.onclick = () => { draft.value = question.options.map(() => 0); activate(question); markAnswerChanged(question); scheduleDraftAutosave(question); renderQuestionStack(); updateFooterControls(); };
+        header.appendChild(neutral); mount.append(scale);
       } else if (question.questionType === 'multichoice') {
         const wrap = document.createElement('div');
         wrap.className = 'choices';
@@ -3675,9 +3760,10 @@ export function renderTelegramMiniAppBrowserAsset({
       const nextQuestionType = formatted?.questionType || state.addQuestionType;
       if (formatted?.questionType) state.addQuestionType = formatted.questionType;
       state.addQuestionPrompt = formatted?.prompt || raw;
-      state.addQuestionOptions = nextQuestionType === 'multichoice'
+      state.addQuestionOptions = ['multichoice', 'quadratic'].includes(nextQuestionType)
         ? (Array.isArray(formatted?.options) ? formatted.options.join('\\n') : state.addQuestionOptions)
         : '';
+      if (nextQuestionType === 'quadratic' && formatted?.voiceCredits !== undefined) el.addQuestionBudget.value = formatted.voiceCredits;
       if (Array.isArray(formatted?.tags) && formatted.tags.length) {
         state.addQuestionTags = formatted.tags.join(', ');
       }
@@ -4617,6 +4703,30 @@ export function renderTelegramMiniAppBrowserAsset({
         (topicMap.counts?.answeredQuestions || 0) + ' answered questions | ' +
         (topicMap.counts?.responses || 0) + ' responses' + cache;
     }
+    function renderQuadraticResults(rows) {
+      el.quadraticResults.innerHTML = '';
+      el.quadraticResults.hidden = !rows.length;
+      rows.forEach((row) => {
+        const heading = document.createElement('h3'); heading.textContent = row.prompt;
+        const table = document.createElement('table');
+        table.className = 'quadraticResultsTable';
+        table.setAttribute('aria-label', 'Quadratic allocation results');
+        table.style.width = '100%';
+        const head = table.createTHead().insertRow();
+        ['Option', 'Positive', 'Negative', 'Net'].forEach((text, index) => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = text; th.className = index === 1 ? 'positive' : index === 2 ? 'negative' : ''; head.appendChild(th); });
+        const body = table.createTBody();
+        row.options.forEach((option) => {
+          const tr = body.insertRow();
+          [option.label, option.positive, option.negative, option.net].forEach((value, index) => { const td = tr.insertCell(); td.textContent = String(value); if (index > 0) td.className = value > 0 ? 'positive' : value < 0 ? 'negative' : ''; });
+        });
+        el.quadraticResults.append(heading);
+        if (row.excludedResponses > 0) {
+          const excluded = document.createElement('p'); excluded.textContent = row.excludedResponses + ' encrypted or invalid responses excluded.';
+          el.quadraticResults.append(excluded);
+        }
+        el.quadraticResults.append(table);
+      });
+    }
     function renderResults() {
       const sessions = ensureResultsSessionSlug();
       const currentSession = sessions.find((session) => session.sessionSlug === state.resultsSessionSlug) || {};
@@ -4654,6 +4764,7 @@ export function renderTelegramMiniAppBrowserAsset({
       renderResultFilterControls();
       renderResultRows(el.consensusResults, consensusRows, 'No binary question responses yet.', 'consensus', state.resultVisibleCounts.consensus, el.moreConsensusResults);
       renderResultRows(el.divisiveResults, divisiveRows, 'No divisive binary question responses yet.', 'divisive', state.resultVisibleCounts.divisive, el.moreDivisiveResults);
+      renderQuadraticResults(state.resultsData?.questions?.quadratic || []);
       renderResultGroups(state.resultsData?.groups || []);
       renderTopicMap(state.resultsData?.topicMap || null);
     }
@@ -5496,7 +5607,8 @@ export function renderTelegramMiniAppBrowserAsset({
         el.addQuestionMic.setAttribute('aria-label', 'Dictate question');
       }
       el.addQuestionOptions.value = state.addQuestionOptions;
-      el.addQuestionOptions.hidden = state.addQuestionType !== 'multichoice';
+      el.addQuestionOptions.hidden = !['multichoice', 'quadratic'].includes(state.addQuestionType);
+      el.addQuestionBudgetWrap.hidden = state.addQuestionType !== 'quadratic';
       el.submitAddQuestion.disabled = state.addQuestionSaving || !state.addQuestionSessionSlug || !state.addQuestionPrompt.trim();
       el.addQuestionSummary.textContent = state.addQuestionSaving
         ? 'Adding question...'
@@ -6233,6 +6345,7 @@ export function renderTelegramMiniAppBrowserAsset({
             launch,
             sessionSlug: state.addQuestionSessionSlug,
             questionType: state.addQuestionType,
+            ...(state.addQuestionType === 'quadratic' ? { voiceCredits: Number(el.addQuestionBudget.value) } : {}),
             prompt: state.addQuestionPrompt,
             options,
             sessionContext: state.addQuestionSessionContext,
@@ -6278,6 +6391,7 @@ export function renderTelegramMiniAppBrowserAsset({
             url,
             count: URL_GENERATED_QUESTION_COUNT,
             questionType: state.addQuestionType,
+            ...(state.addQuestionType === 'quadratic' ? { voiceCredits: Number(el.addQuestionBudget.value) } : {}),
           }),
         });
         body = await response.json().catch(() => ({}));

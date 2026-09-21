@@ -41,6 +41,12 @@ const LIT_ENCRYPTION_TOOLTIP =
   'Lit encrypts data before upload and uses on-chain access conditions to control decryption. It requires a registry network, an RPC connection, and Lit credentials.';
 const CLOUDFLARE_ENCRYPTION_TOOLTIP =
   'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
+const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =
+  'Checked: use the default rules, allowing session admins and agents authorized for storage to access encrypted data. Unchecked: customize access below using session roles, authorized agents, or SBT holders, and choose whether any or all rules must match.';
+const HIDE_SMALL_GROUPS_TOOLTIP =
+  'Checked: show anonymized group summaries only when a group meets the minimum size (at least 2 people). A minimum of 5 hides groups of 1–4. Unchecked: disable anonymized group summaries. Groups and responses are kept.';
+const EXPORT_POLICY_TOOLTIP =
+  'Choose what session admins can download. Raw results include individual responses; encrypted records keep their contents unreadable until decrypted. Complete-session exports include the session data available to the exporter. Exporting selected channels is not available yet. These options do not grant additional access.';
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
   { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
@@ -56,9 +62,13 @@ const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; la
 
 const EXPORT_SCOPE_OPTIONS: Array<{ value: SessionModeExportScope; label: string; available?: boolean }> = [
   { value: 'admin_raw', label: 'Admins can export raw results' },
-  { value: 'all_session', label: 'Export the complete session' },
-  { value: 'selected_surfaces', label: 'Export selected channels only (not available yet)', available: false },
-  { value: 'encrypted_envelopes_only', label: 'Export encrypted records only' },
+  { value: 'all_session', label: 'Admins can export the complete session' },
+  {
+    value: 'selected_surfaces',
+    label: 'Admins can export selected channels only (not available yet)',
+    available: false,
+  },
+  { value: 'encrypted_envelopes_only', label: 'Admins can export encrypted records only' },
 ];
 
 const SURFACE_LABELS: Array<{ value: SessionModeSurface; label: string; fixed?: boolean }> = [
@@ -214,9 +224,20 @@ const SessionModeProfileSections = ({
           <h3>Export policy</h3>
           <p>Choose what session administrators can download after deployment.</p>
         </div>
-        <Label className={styles.modeFieldLabel} htmlFor="ce-new-export-policy">
-          Export policy
-        </Label>
+        <div className={styles.modeCheckboxWithTooltip}>
+          <Label className={styles.modeFieldLabel} htmlFor="ce-new-export-policy">
+            Export policy
+          </Label>
+          {renderInfoTooltip
+            ? renderInfoTooltip({
+                id: 'ce-new-export-policy-info',
+                content: EXPORT_POLICY_TOOLTIP,
+                ariaLabel: 'About export policy',
+                testId: 'ce-new-export-policy-info',
+                placement: 'top',
+              })
+            : null}
+        </div>
         <Input
           id="ce-new-export-policy"
           type="select"
@@ -397,28 +418,38 @@ const SessionModeProfileSections = ({
               <li>Data is encrypted before Cloudflare stores it.</li>
               <li>The session worker decrypts it only after checking access.</li>
             </ul>
-            <Label check className={styles.modeCheckboxLabel}>
-              <Input
-                type="checkbox"
-                checked={useDefaultCloudflareAccessRules}
-                onChange={(event) =>
-                  updateProfile((draft) => {
-                    if (event.target.checked) {
-                      setWorkerEnvelopeCondition(draft);
-                      return;
-                    }
-                    const configured = cloneAccessConditions(draft.storage.payloadAccessControl?.accessConditions);
-                    setWorkerEnvelopeCondition(
-                      draft,
-                      configured.conditions.length
-                        ? configured
-                        : cloneAccessConditions(DEFAULT_CUSTOM_ACCESS_CONDITIONS),
-                    );
+            <div className={styles.modeCheckboxWithTooltip}>
+              <Label check className={styles.modeCheckboxLabel}>
+                <Input
+                  type="checkbox"
+                  checked={useDefaultCloudflareAccessRules}
+                  onChange={(event) =>
+                    updateProfile((draft) => {
+                      if (event.target.checked) {
+                        setWorkerEnvelopeCondition(draft);
+                        return;
+                      }
+                      const configured = cloneAccessConditions(draft.storage.payloadAccessControl?.accessConditions);
+                      setWorkerEnvelopeCondition(
+                        draft,
+                        configured.conditions.length
+                          ? configured
+                          : cloneAccessConditions(DEFAULT_CUSTOM_ACCESS_CONDITIONS),
+                      );
+                    })
+                  }
+                />
+                <span className={styles.modeCheckboxText}>Use default Cloudflare access rules</span>
+              </Label>
+              {renderInfoTooltip
+                ? renderInfoTooltip({
+                    id: 'ce-new-default-cloudflare-access-rules-info',
+                    content: DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP,
+                    ariaLabel: 'About default Cloudflare access rules',
+                    testId: 'ce-new-default-cloudflare-access-rules-info',
                   })
-                }
-              />{' '}
-              Use default Cloudflare access rules
-            </Label>
+                : null}
+            </div>
             {useDefaultCloudflareAccessRules ? (
               <p className={styles.helperText}>
                 The worker grants storage access to configured admins and agents granted the storage scope.
@@ -469,22 +500,32 @@ const SessionModeProfileSections = ({
           ))}
         </Input>
         <div className={styles.modeCheckboxRow}>
-          <Label check className={styles.modeCheckboxLabel}>
-            <Input
-              type="checkbox"
-              checked={profile.results.exposure?.anonymizedGroupsEnabled === true}
-              onChange={(event) =>
-                updateProfile((draft) => {
-                  draft.results.exposure = {
-                    aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
-                    anonymizedGroupsEnabled: event.target.checked,
-                    minGroupSize: Math.max(2, Number(draft.results.exposure?.minGroupSize || 2) || 2),
-                  };
+          <div className={styles.modeCheckboxWithTooltip}>
+            <Label check className={styles.modeCheckboxLabel}>
+              <Input
+                type="checkbox"
+                checked={profile.results.exposure?.anonymizedGroupsEnabled === true}
+                onChange={(event) =>
+                  updateProfile((draft) => {
+                    draft.results.exposure = {
+                      aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
+                      anonymizedGroupsEnabled: event.target.checked,
+                      minGroupSize: Math.max(2, Number(draft.results.exposure?.minGroupSize || 2) || 2),
+                    };
+                  })
+                }
+              />
+              <span className={styles.modeCheckboxText}>Hide small groups in summaries</span>
+            </Label>
+            {renderInfoTooltip
+              ? renderInfoTooltip({
+                  id: 'ce-new-hide-small-groups-info',
+                  content: HIDE_SMALL_GROUPS_TOOLTIP,
+                  ariaLabel: 'About hiding small groups in summaries',
+                  testId: 'ce-new-hide-small-groups-info',
                 })
-              }
-            />{' '}
-            Hide small groups in summaries
-          </Label>
+              : null}
+          </div>
           {profile.results.exposure?.anonymizedGroupsEnabled ? (
             <MinGroupSizeInput profile={profile} updateProfile={updateProfile} />
           ) : null}
@@ -754,6 +795,7 @@ const WorkerEnvelopeOptions = ({
               type="button"
               className={styles.modeRuleRemove}
               aria-label={`Remove ${RULE_LABELS[condition.kind]} rule`}
+              data-ce-control-appearance="frameless"
               onClick={() => {
                 const next = cloneAccessConditions(profile.encryption.accessConditions);
                 next.conditions.splice(index, 1);

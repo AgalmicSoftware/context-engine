@@ -20,6 +20,7 @@ export type SurveyResultsDemoSurfaceProps = {
   isQuestionCacheReady?: PolisReportProps['isQuestionCacheReady'];
   isResponsesCacheReady?: PolisReportProps['isResponsesCacheReady'];
   network?: PolisReportProps['network'];
+  sessionConfig?: PolisReportProps['sessionConfig'];
   networkChainId?: PolisReportProps['networkChainId'];
   onAtlasModalClose: () => void;
   onAtlasNodeOpen: (nodeId: unknown) => void;
@@ -38,6 +39,7 @@ const SurveyResultsDemoSurface = ({
   isResponsesCacheReady,
   network,
   networkChainId,
+  sessionConfig,
   onAtlasModalClose,
   onAtlasNodeOpen,
   questionResponses,
@@ -52,6 +54,7 @@ const SurveyResultsDemoSurface = ({
           questionResponses={questionResponses}
           network={network}
           networkChainId={networkChainId}
+          sessionConfig={sessionConfig}
           disclaimersActive={true}
           filterState={filterState}
           defaultTags={defaultTags}

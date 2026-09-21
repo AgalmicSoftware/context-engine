@@ -14,14 +14,15 @@ Related docs:
 ## What a New Session Needs
 
 The first `/new` screen presents the two implemented setup paths as large cards
-with their required inputs. After a creator chooses one, the cards collapse to
-the compact Hosting selector in the wizard header so the profile can still be
-changed. The Centralized card summarizes its inputs as
+with their required inputs. After a creator chooses one, the chosen profile
+appears in the setup title. Use **Back** beside the title to return to the setup
+cards without clearing the current draft, or use **Custom** to open the extra
+settings supported by that profile. The Centralized card summarizes its inputs as
 `Cloudflare account / OpenAI API Key` and explains that session settings and
-responses are stored in Cloudflare without a blockchain requirement. The
-decentralized card explains that session data is stored on Arweave while session
-identity is recorded in an EVM registry; its pills list the OpenAI, Arweave,
-RPC, and testnet-gas inputs without exposing internal runtime terminology.
+responses are stored in Cloudflare. The decentralized card explains that session
+data is stored on Arweave while session identity and question logic are recorded
+in Ethereum smart contracts; its pills list the OpenAI,
+Arweave, Ethereum RPC URL, and Ethereum Gas requirements.
 
 For the default `Centralized (Cloudflare)` preset, the user needs a Cloudflare
 account and one API key for the selected AI provider. The native path is a
@@ -43,12 +44,12 @@ Use this matrix when choosing a non-default profile:
 | Input                                                      | Why it is needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Required?                                                                    | Can a sponsored bundle cover it?                                      |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Passkey account                                            | Supplies the admin identity and signs worker or on-chain actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Yes; the default path creates it in the app                                  | No                                                                    |
-| EVM Gas (TX Fees)                                          | Pays registry/SBT transactions; this is OP Sepolia ETH on the default chain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Decentralized or other on-chain profiles only                                | Partially                                                             |
-| Session Worker                                             | Hosts the web runtime. For Cloudflare profiles it also owns canonical config, auth, AI, storage, fetch, and optional faucet routes. For decentralized profiles it assists the web runtime while the EVM registry and Arweave remain canonical.                                                                                                                                                                                                                                                                                                                             | Yes for every reachable `/new` profile                                       | Yes, if the sponsor gives you a deploy-ready bundle                   |
+| Ethereum Gas (TX Fees)                                          | Pays registry/SBT transactions; this is OP Sepolia ETH on the default chain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Decentralized or other on-chain profiles only                                | Partially                                                             |
+| Session Worker                                             | Hosts the web runtime. For Cloudflare profiles it also owns canonical config, auth, AI, storage, fetch, and optional faucet routes. For decentralized profiles it assists the web runtime while the Ethereum registry and Arweave remain canonical.                                                                                                                                                                                                                                                                                                                             | Yes for every reachable `/new` profile                                       | Yes, if the sponsor gives you a deploy-ready bundle                   |
 | Cloudflare API token                                       | Deploys the dedicated Bridge for Agent Session Wrapped and powers the explicit legacy deploy-helper fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Agent Session Wrapped or explicit legacy fallback only; not the native default | Indirectly, through the separate legacy short-lived deploy-grant path |
 | AI provider key(s)                                         | Powers AI generation, chat, and transcription routes for every provider selected by the session's models                                                                                                                                                                                                                                                                                                                                                                                                                                                              | One or more for every reachable `/new` profile                               | Yes                                                                   |
 | Arweave JWK                                                | Pays for Arweave metadata/payload uploads                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Decentralized or explicitly Arweave-backed profiles only                     | Yes                                                                   |
-| EVM RPC URL                                                | Provides chain reads and writes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes                                                                   |
+| Ethereum RPC URL                                                | Provides chain reads and writes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes                                                                   |
 | Faucet private key                                         | Lets the session sponsor small OP Sepolia ETH grants for onboarding/publish support                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Optional                                                                     | Yes                                                                   |
 | Lit credentials for gated fields or Lit-encrypted payloads | Needed only when the session uses worker-mediated Lit/Chipotle encryption, `lit-arweave`, or Cloudflare `encryption: "lit"`. The manual `/new` setup asks only for one Lit API key; E2E/deploy env should prefer `LIT_USAGE_API_KEY`, while `litAccountApiKey` remains the internal worker-secret field backing the visible input. The worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy when needed. Cloudflare `encryption: "none"` and `encryption: "worker_envelope"` profiles do not require a Lit key. | Optional                                                                     | Yes                                                                   |
 
@@ -67,7 +68,7 @@ Important:
 
 ### Mode-aligned optional settings
 
-`Customize` reveals only settings supported by the selected profile:
+**Custom** reveals only settings supported by the selected profile:
 
 | Selected profile | Optional settings shown |
 | --- | --- |
@@ -76,19 +77,27 @@ Important:
 | Decentralized | Block/time limits, Surveys, Group Factory and Session Registry contracts, and optional testnet faucet settings |
 
 Pure Cloudflare setup does not display or persist block numbers, registry
-contracts, Surveys contracts, faucet settings, or an EVM network. Choosing
-`Customize` does not override this capability boundary.
+contracts, Surveys contracts, faucet settings, or an Ethereum network. Choosing
+**Custom** does not override this capability boundary.
 
-The metadata **Optional details** area (**More options** in Customize) contains
+The metadata **Optional details** area (**More options** in Custom settings) contains
 the settings that most sessions can leave at their defaults. **Session colors**
 is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
 dropdown in the same area, constrained to **All participants** or **Admins
 only** rather than accepting freeform config text. **Voice interview modes**
-defaults on. Its adjacent **Interview settings** group exposes the
-OpenAI **Interview voice model**, defaulting to `gpt-live-1`; `/new`
-publishes this as `interviewMode.realtimeModel` for both Worker-canonical and
-Arweave-backed sessions. It also lets owners supply an opening question or use the default generated opening. Automatic regeneration and discovery of new questions during a call are off by default; when enabled their default addition threshold is 20%. Question suggestions are optional and off by default. Admin refresh is on by default. Generation waits for public questions and uses the session Worker's OpenAI key. See [Interview settings and lifecycle](session-listening-mode.md#interview).
+defaults on. Its bordered panel shows the **Interview settings** details only
+while Voice interview modes is enabled; turning it off hides those controls while
+preserving their configured values for re-enable. The details expose the OpenAI
+**Interview voice model**, defaulting to `gpt-live-1`; `/new` publishes this as
+`interviewMode.realtimeModel` for both Worker-canonical and Arweave-backed
+sessions. It also lets owners supply an opening question, add an optional
+`interviewMode.steeringPrompt`, or use the default generated opening.
+Automatic regeneration and discovery of new questions during a call are off by
+default; when enabled their default addition threshold is 20%. Question
+suggestions are optional and off by default. Admin refresh is on by default.
+Generation waits for public questions and uses the session Worker's OpenAI key.
+See [Interview settings and lifecycle](session-listening-mode.md#interview).
 
 **Results AI views** default to manual generation. The shared session setting is
 `resultsAnalysis` with `generationMode` (`manual`, `automatic`, or `both`),
@@ -223,6 +232,8 @@ to the legacy fallback. See
 for its account selection, one-attempt handling, expiration, and revocation
 requirements.
 
+The Worker setup section also separates daily request budgets for signed-in and anonymous users. `Authenticated requests per wallet per day` controls signed Worker credentials. `Anonymous requests per IP per day` controls anonymous public reads plus enabled AI, transcription, and realtime routes for everyone sharing the same public IP address, such as shared Wi-Fi. New sessions default the anonymous IP field to `0`, which disables this Worker-level shared-IP daily cap while leaving provider limits and access policy in force. Imported older configs that omit the field leave it blank so the Worker can keep its legacy fallback to the authenticated wallet budget.
+
 ### 2. AI provider keys
 
 Provide a key for every provider used by the selected fast, thinking, and
@@ -304,7 +315,7 @@ Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is t
 
 The first screen is the session-mode choice. A blank draft has nothing
 preselected. If this browser already has an explicit saved profile, the header
-offers `Resume in-progress session setup` instead of silently discarding or
+offers `Resume existing setup` instead of silently discarding or
 replacing it. Choosing a new preset immediately opens the
 four-stage setup with fields prefilled from the chosen mode; there is no
 separate Continue action for a new selection:
@@ -314,11 +325,11 @@ separate Continue action for a new selection:
   (`worker_envelope`) enabled by default. After selection, the requirements
   banner lists exactly a Cloudflare account and one `OpenAI API Key`. It does
   not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
-- `Decentralized (Arweave + EVM)` compiles to the Arweave +
-  EVM-registry session shape. Its requirements banner lists a compatible
-  Session Worker for the web runtime, the Arweave wallet/JWK, EVM RPC URL, EVM
+- `Decentralized (Ethereum + Arweave)` compiles to the Arweave +
+  Ethereum smart-contract session shape. Its requirements banner lists a compatible
+  Session Worker for the web runtime, the Arweave wallet/JWK, Ethereum RPC URL, Ethereum
   gas for transaction fees, an `OpenAI API Key`, and an optional Lit key needed when encryption is enabled. The
-  Worker assists the browser runtime; the EVM registry and Arweave remain the
+  Worker assists the browser runtime; the Ethereum registry and Arweave remain the
   canonical authority and metadata store.
 
 The validated version-1 profile, rather than legacy top-level fields, determines
@@ -331,7 +342,7 @@ which capabilities are reachable:
 | Custom Cloudflare, Worker envelope         | Session Worker + Cloudflare; `encryption: "worker_envelope"` | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
 | Custom Cloudflare + explicit `sbt_onchain` | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
 | Custom Cloudflare + Lit                    | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
-| Decentralized or custom Arweave            | EVM registry + Arweave; Session Worker-assisted web runtime; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
+| Decentralized or custom Arweave            | Ethereum registry + Arweave; Session Worker-assisted web runtime; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
 
 Telegram, Mini App, Agent Session Wrapped, result-visibility, and export choices
 do not change that ownership split. Mini App requires Telegram. Profiles marked
@@ -342,9 +353,11 @@ registry compatibility path only when its registry identity and positive chain
 are present; legacy chain fields never turn a validated chain-free Worker
 profile into a hybrid.
 
-After selection, the profile remains visible in the setup header. `Customize`
-switches to Advanced mode and opens Privacy instead of opening a separate
-technical popover. Profile settings follow the existing stages:
+After selection, the profile remains visible in the setup title. **Back** returns
+to the setup cards while preserving the draft, and **Custom** opens Privacy
+instead of opening a separate technical popover. When Custom is active,
+**Back to templates** returns to the guided setup while keeping the current
+custom settings in the draft. Profile settings follow the existing stages:
 
 - Privacy owns storage, encryption, decryption access, result visibility, and
   small-group protection. Switching from Arweave to Cloudflare installs an
@@ -391,13 +404,18 @@ The normal-mode wizard is effectively four stages:
 3. Worker
 4. Deploy Session
 
+The step rail keeps equal-sized tiles: inactive stages show only their step number, and the selected stage shows its title.
+
 ### 1. Naming and session details
 
 Enter the core session metadata:
 
 - `sessionName`
 - `sessionInfo`
-- **Optional details** (**More options** in Customize) → **Session colors** →
+- `sessionContext` for optional public background shown on the session page as
+  plain text and HTTPS links; it is not executable HTML and must not contain
+  secrets.
+- **Optional details** (**More options** in Custom settings) → **Session colors** →
   **Color scheme**. Session colors is the final optional field group and is
   collapsed by default. Expand it to choose `Context Engine`, `Ocean`, or
   `Amber`; the compact preview updates immediately. This controls only
@@ -416,6 +434,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.transcription`
 - `interviewMode.realtimeModel` (OpenAI interview voice; defaults to
   `gpt-live-1`)
+- `interviewMode.steeringPrompt` (optional owner-authored interview guidance;
+  defaults to empty and is capped at 3000 characters)
 
 What gets stored where:
 
@@ -484,7 +504,8 @@ or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
 Before publishing a worker-canonical session, the **Session Access** section can
-queue Groups through the same form used by normal Worker Group creation. Each
+queue Groups through the same form used by normal Worker Group creation. Queued
+Group drafts collapse independently while preserving their edits. Each
 draft supports a name, description, image URL or local image file, tags, public
 HTTPS reference URLs, member limit, self-join deadline, group-admin address,
 join mode, and member visibility. Durable text and URL metadata stays in the

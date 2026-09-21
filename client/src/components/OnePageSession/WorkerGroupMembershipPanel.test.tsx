@@ -132,6 +132,8 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(groupTitle).toHaveClass('miniSbtName');
     expect(groupCard).toHaveClass('sbtItem', 'workerGroupCard');
     expect(groupCard.parentElement).toHaveClass('sbtGrid', 'workerGroupCardGrid');
+    expect(screen.queryByRole('button', { name: 'Copy auto-join link for Open reviewers' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Open reviewers group link' })).toBeInTheDocument();
     expect(screen.getByText('Visible before sign-in.')).toHaveClass('workerGroupCardDescription');
     expect(screen.queryByText(/visible without signing in/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Details')).not.toBeInTheDocument();
@@ -140,7 +142,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(openGroupDetailsButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     fireEvent.click(openGroupDetailsButton);
     expect(window.open).toHaveBeenCalledWith(
-      'http://localhost/group/open-reviewers?sessionName=alpha',
+      'http://localhost/group/open-reviewers?sessionName=alpha&worker=https%3A%2F%2Fsession-worker.example',
       '_blank',
       'noopener,noreferrer',
     );
@@ -213,10 +215,19 @@ describe('WorkerGroupMembershipPanel', () => {
       'href',
       'https://docs.example.test/brief',
     );
-    expect(screen.getByRole('link', { name: /back to groups/i })).toHaveAttribute('href', '/groups?sessionName=alpha');
+    expect(screen.getByRole('link', { name: /back to groups/i })).toHaveAttribute(
+      'href',
+      '/groups?sessionName=alpha&worker=https%3A%2F%2Fsession-worker.example',
+    );
     expect(screen.getByRole('button', { name: 'Sign in to join Open reviewers' })).toHaveTextContent(/^Join$/);
     expect(screen.queryByRole('button', { name: 'View Open reviewers members' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open group details for Open reviewers' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy auto-join link for Open reviewers' }));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        'http://localhost/session/alpha?joinGroup=open-reviewers&worker=https%3A%2F%2Fsession-worker.example',
+      ),
+    );
   });
 
   it('shows the member count in detail only when the signed-in participant membership supplies it', async () => {
@@ -777,7 +788,8 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(copiedGroupLink.pathname).toBe('/group/invited-reviewers');
     expect(copiedGroupLink.hash).toBe('');
     expect(copiedGroupLink.searchParams.get('sessionName')).toBe('alpha');
-    expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionName']);
+    expect(copiedGroupLink.searchParams.get('worker')).toBe('https://session-worker.example');
+    expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionName', 'worker']);
     expect(copiedGroupLink.searchParams.has('inv')).toBe(false);
     expect(copiedGroupLink.searchParams.has('agentToken')).toBe(false);
     expect(screen.getByText(/contains no invitation token or credential/i)).toBeInTheDocument();

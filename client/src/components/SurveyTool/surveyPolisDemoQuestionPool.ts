@@ -14,7 +14,8 @@ export type PolisDemoQuestionPoolEntry = {
   key_tension?: string;
   sources?: string;
   nodeId?: string;
-  options?: string[];
+  options?: unknown[];
+  voiceCredits?: unknown;
   singleSelect?: boolean;
 };
 
@@ -57,18 +58,29 @@ export const buildPolisDemoQuestionPool = (
   const comments = isRecord(source) && Array.isArray(source.comments) ? source.comments.filter(isRecord) : [];
 
   return comments
-    .map((comment, index) => {
+    .map((comment, index): PolisDemoQuestionPoolEntry | null => {
       const id = readString(comment.commentId || `demo-polis-${index + 1}`).toLowerCase();
       const prompt = readString(comment.commentBody || comment.prompt || comment.question);
       if (!id || !prompt) return null;
 
       const category = readString(comment.category);
       const nodeId = readString(comment.nodeId);
-      const tags = [category, nodeId].filter(Boolean);
+      const tags = [
+        ...new Set(
+          [...(Array.isArray(comment.tags) ? comment.tags.map(readString) : []), category, nodeId].filter(Boolean),
+        ),
+      ];
       const keyTension = readString(comment.key_tension);
       const sources = readString(comment.sources);
       const type = normalizePolisQuestionType(comment.type);
-      const options = type === 'multichoice' ? readPollOptions(comment, source === demoPolisData) : [];
+      const options =
+        type === 'quadratic'
+          ? Array.isArray(comment.options)
+            ? [...comment.options]
+            : []
+          : type === 'multichoice'
+            ? readPollOptions(comment, source === demoPolisData)
+            : [];
 
       return {
         id,
@@ -81,7 +93,9 @@ export const buildPolisDemoQuestionPool = (
         ...(keyTension ? { key_tension: keyTension } : {}),
         ...(sources ? { sources } : {}),
         ...(nodeId ? { nodeId } : {}),
-        ...(options.length ? { options, singleSelect: true } : {}),
+        ...(options.length ? { options } : {}),
+        ...(type === 'multichoice' && options.length ? { singleSelect: true } : {}),
+        ...(type === 'quadratic' ? { voiceCredits: comment.voiceCredits ?? 99 } : {}),
       };
     })
     .filter((question): question is PolisDemoQuestionPoolEntry => !!question);

@@ -209,6 +209,63 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
   });
 
+  it('preserves an explicit Report tab selection during viewer artifact refreshes', async () => {
+    const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
+    host.state.resultsViewMode = 'polis';
+
+    await loadGeneratedResultsArtifactForHost(host, {
+      ports: {
+        readQuestionsCache: () => ({}),
+        readArtifact: async () => ({
+          ok: true,
+          viewerAuthorized: true,
+          sessionSlug: 'edge',
+          sessionId: `0x${'1'.repeat(32)}`,
+          settings,
+          artifact: { ...artifact, inputSignature: 'refresh-same-session' },
+          snapshot: { questions: [], responses: [] },
+          source: { responseCount: 30, participantCount: 30 },
+        }),
+      },
+    });
+
+    expect(host.state.generatedResultsAnalysis?.viewerAuthorized).toBe(true);
+    expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
+    expect(host.state.resultsViewMode).toBe('polis');
+  });
+
+  it('preserves a Report click made while a background artifact request is pending', async () => {
+    const host = buildHost({ ok: false });
+    host.state.resultsViewMode = 'circles';
+    let resolveArtifact: (value: Record<string, unknown>) => void = () => {};
+    const artifactPromise = new Promise<Record<string, unknown>>((resolve) => {
+      resolveArtifact = resolve;
+    });
+
+    const loadPromise = loadGeneratedResultsArtifactForHost(host, {
+      ports: {
+        readQuestionsCache: () => ({}),
+        readArtifact: async () => artifactPromise,
+      },
+    });
+    host.state.resultsViewMode = 'polis';
+    resolveArtifact({
+      ok: true,
+      viewerAuthorized: true,
+      sessionSlug: 'edge',
+      sessionId: `0x${'1'.repeat(32)}`,
+      settings,
+      artifact,
+      snapshot: { questions: [], responses: [] },
+      source: { responseCount: 1, participantCount: 1 },
+    });
+    await loadPromise;
+
+    expect(host.state.generatedResultsAnalysis?.viewerAuthorized).toBe(true);
+    expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
+    expect(host.state.resultsViewMode).toBe('polis');
+  });
+
   it('reloads viewer artifacts even when stale prior session state was running', async () => {
     const host = buildHost(
       buildStatusBody({

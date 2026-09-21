@@ -39,6 +39,7 @@ export type SessionWizardWorkerDeployRuntime = {
   workerSecretsEnabled?: boolean;
   workerAllowOrigins?: string;
   workerLimitPerWallet?: string | number;
+  workerLimitPerAnonymousIp?: string | number;
   embeddedDeployHelperEnabled?: boolean;
   deployHelperUrl?: string;
   latestChainBlock?: number | null;

@@ -28,7 +28,7 @@ numberOfSeedStatementsOrPrompts: <NumSeedStatements> (STRICT — generate exactl
 
 -----
 
-TypeOfQuestionsToInclude: <Types> (of possible binary, multichoice, rating, freeform question types). The default is all 4 but the output must follow the specified types.
+TypeOfQuestionsToInclude: <Types> (of possible binary, multichoice, rating, freeform, quadratic question types). The default is all 5 but the output must follow the specified types.
 
 -----
 
@@ -46,9 +46,10 @@ Transcript Handling (if applicable):
 
 For each generated question:
 
-1. Ensure it matches one of the specified question types (binary, rating, freeform, or multichoice).
+1. Ensure it matches one of the specified question types (binary, rating, freeform, multichoice, or quadratic).
 2. Make the question understandable to an intelligent public while remaining relevant and meaningful to **experts appropriate to the topic**.
 3. For multichoice questions, provide 3–5 relevant and distinct options that cover a range of potential viewpoints or solutions, and append a final option labeled exactly "None / Comment" as the **last** option (only if relevant based on context).
+For quadratic questions, include at least two distinct nonblank options and "voiceCredits": 99 (or the requested positive integer budget). Respondents assign signed integer votes in option order with sum(vote²) <= voiceCredits. Zero is neutral and unused credits are allowed.
 4. Phrase binary questions as clear statements that can be agreed or disagreed with.
 5. For rating questions, ensure they are asking about likelihood, importance, or degree of concern that can be meaningfully quantified on a scale.
 6. Craft freeform questions to elicit detailed, nuanced responses on complex issues that don't fit neatly into other categories.

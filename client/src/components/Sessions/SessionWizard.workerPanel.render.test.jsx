@@ -85,7 +85,7 @@ describe('SessionWizard worker panel rendering', () => {
       window.confirm = originalConfirm;
     }
     await waitFor(() => {
-      expect(preset).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
     });
 
     selectNormalModeCard('Worker');

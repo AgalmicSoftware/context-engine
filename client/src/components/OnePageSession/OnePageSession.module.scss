@@ -356,6 +356,54 @@
   }
 }
 
+.sessionContextSection {
+  width: min(100%, 980px);
+  margin: 1.25rem auto 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-session-chrome) 88%, var(--ce-status-info));
+  color: var(--ce-session-chrome-contrast);
+  text-align: left;
+
+  h3 {
+    margin: 0 0 0.55rem;
+    color: var(--ce-session-chrome-contrast);
+    font-family: var(--ce-font-body);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 0.55rem 0 0;
+    color: color-mix(in srgb, var(--ce-session-chrome-contrast) 86%, transparent);
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+}
+
+.sessionContextLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ce-action-accent);
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+}
+
 .workerGroupCardLinkButton {
   display: inline-flex;
   align-items: center;
@@ -1130,11 +1178,65 @@
   }
 }
 
-.sectionHeaderIconButton {
-  flex: 0 0 54px;
-  width: 54px;
-  min-width: 54px;
-  padding-inline: 0;
+.sectionHeaderRow.workerGroupsHeaderRow {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+
+  .sectionHeader {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+  }
+
+  .sectionHeaderText {
+    flex-wrap: wrap;
+  }
+
+  .sectionHeaderActionsScroller {
+    flex: 0 0 auto;
+    width: auto;
+    padding-left: 0;
+    overflow: visible;
+  }
+}
+
+.sectionHeaderRow.groupsHeaderRow {
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.groupsHeaderRow .sectionHeaderActionsScroller {
+  flex: 0 0 auto;
+  width: auto;
+  margin-left: auto;
+  padding-left: 0;
+}
+
+.groupsRefreshButton {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ce-panel-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.8;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+  }
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
 }
 
 /* The content area inside each collapsible section */
@@ -1517,13 +1619,6 @@
     font-size: 0.95rem;
   }
 
-  .sectionHeaderIconButton {
-    flex-basis: 48px;
-    width: 48px;
-    min-width: 48px;
-    padding-inline: 0;
-  }
-
   .pileHeaderRow {
     align-items: center;
     flex-wrap: nowrap;
@@ -1718,13 +1813,6 @@
     min-height: 50px;
     padding: 12px 18px;
     font-size: 1rem;
-  }
-
-  .sectionHeaderIconButton {
-    flex-basis: 50px;
-    width: 50px;
-    min-width: 50px;
-    padding-inline: 0;
   }
 
   .sectionHeaderViewModeButton {

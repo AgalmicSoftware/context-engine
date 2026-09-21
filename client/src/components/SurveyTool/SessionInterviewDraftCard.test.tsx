@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
+import fs from 'fs';
+import path from 'path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 import type { InterviewDraftResponse } from './sessionInterview';
+
+const readDraftCardScss = () => fs.readFileSync(path.join(__dirname, 'SessionInterviewDraftCard.module.scss'), 'utf8');
 
 describe('SessionInterviewDraftCard sliders', () => {
   it('exposes both modes and preserves their independent values when editing', () => {
@@ -42,6 +47,56 @@ describe('SessionInterviewDraftCard sliders', () => {
 });
 
 describe('SessionInterviewDraftCard readable draft editors', () => {
+  it.each([true, false])('preserves numeric quadratic drafts through review controls (injected: %s)', (injected) => {
+    const draft = { questionId: 'q-budget', answer: [3, -4], confidence: 0.6 };
+    const question = {
+      id: 'q-budget',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    const onEdit = jest.fn();
+    const renderAnswerInput = jest.fn((questionId, value, onChange) => (
+      <QuadraticAllocationInput
+        questionId={questionId}
+        options={question.options}
+        voiceCredits={question.voiceCredits}
+        value={value}
+        onChange={onChange}
+      />
+    ));
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
+      return (
+        <SessionInterviewDraftCard
+          draft={draft}
+          edited={edited}
+          question={question}
+          selected
+          existing={false}
+          disabled={false}
+          onSelect={jest.fn()}
+          renderAnswerInput={injected ? renderAnswerInput : undefined}
+          onEdit={(patch) => {
+            onEdit(patch);
+            setEdited((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+    render(<Review />);
+    expect(screen.getByRole('slider', { name: 'Parks' })).toHaveValue('3');
+    expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+    expect(screen.queryByRole('button', { name: /Draft answer for/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
+    expect(onEdit).toHaveBeenLastCalledWith({ answer: [3, -2], userEditedFields: ['answer'] });
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
+    if (injected) {
+      expect(renderAnswerInput.mock.calls.at(-1)).toEqual(['q-budget', [3, -2], expect.any(Function), question]);
+    }
+  });
+
   it('shows full prose by default and enters edit mode by keyboard without Agent/User labels', () => {
     const draft = {
       questionId: 'q1',
@@ -125,7 +180,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
   });
 
-  it('wraps injected prose editors with focus, border-aware autosize and a Done editing return path', async () => {
+  it('wraps injected prose editors with focus, bounded autosize and a Done editing return path', async () => {
     const renderAnswerInput = jest.fn((_questionId, value, onChange) => (
       <textarea
         aria-label="Injected answer"
@@ -135,7 +190,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
           if (!node) return;
           Object.defineProperty(node, 'scrollHeight', { configurable: true, value: 120 });
         }}
-        style={{ boxSizing: 'border-box', borderTopWidth: '3px', borderBottomWidth: '4px' }}
+        style={{ boxSizing: 'border-box', borderTopWidth: '3px', borderBottomWidth: '4px', maxHeight: '96px' }}
       />
     ));
     render(
@@ -155,9 +210,9 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     fireEvent.click(screen.getByRole('button', { name: /Draft answer for Explain this/i }));
     const injected = screen.getByLabelText('Injected answer') as HTMLTextAreaElement;
     expect(injected).toHaveFocus();
-    await waitFor(() => expect(injected.style.height).toBe('127px'));
+    await waitFor(() => expect(injected.style.height).toBe('96px'));
     expect(injected.style.overflow).toBe('hidden');
-    expect(injected.style.overflowY).toBe('hidden');
+    expect(injected.style.overflowY).toBe('auto');
     fireEvent.click(screen.getByRole('button', { name: 'Done editing' }));
     expect(screen.getByRole('button', { name: /Draft answer for Explain this/i })).toBeInTheDocument();
   });
@@ -202,5 +257,20 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     );
     expect(renderAnswerInput).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /Draft answer for Explain this/i })).toHaveTextContent('Freeform draft');
+  });
+});
+
+describe('SessionInterviewDraftCard styles', () => {
+  it('keeps long freeform editors scrollable and the AI marker borderless', () => {
+    const scss = readDraftCardScss();
+
+    expect(scss).toMatch(/\.autosizeTextArea\s*\{[\s\S]*?max-height:\s*min\(34vh, 320px\);[\s\S]*?overflow:\s*hidden;/);
+    expect(scss).toMatch(
+      /\.injectedEditorShell textarea\s*\{[\s\S]*?max-height:\s*min\(34vh, 320px\);[\s\S]*?overflow:\s*hidden;[\s\S]*?overflow-y:\s*hidden;/,
+    );
+    expect(scss).not.toMatch(/\.injectedEditorShell textarea\s*\{[\s\S]*?overflow(?:-y)?:\s*[^;]+!important/);
+    expect(scss).toMatch(
+      /\.agentCommentMarker\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
+    );
   });
 });

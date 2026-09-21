@@ -28,6 +28,13 @@ type ApplyCachedResponseEntryToSlice = ({
   response: Record<string, unknown>;
 }) => boolean;
 
+type PileResponseValueShape = {
+  answers?: Record<string, unknown> | null;
+  importance?: Record<string, unknown> | null;
+  conviction?: Record<string, unknown> | null;
+  additionalComments?: Record<string, unknown> | null;
+};
+
 type PileControllerState = Record<string, unknown> & {
   pileQuestions?: unknown;
   activePileIndex?: unknown;
@@ -65,6 +72,24 @@ const normalizeResponseSlice = (
     additionalComments: { ...((cloned as Partial<PileResponseSlice>).additionalComments || {}) },
   };
 };
+
+export const hasPileResponseSliceValues = (slice: PileResponseValueShape | null | undefined): boolean => {
+  if (!slice || typeof slice !== 'object') return false;
+  return (
+    Object.keys(slice.answers || {}).length > 0 ||
+    Object.keys(slice.additionalComments || {}).length > 0 ||
+    Object.keys(slice.importance || {}).length > 0 ||
+    Object.keys(slice.conviction || {}).length > 0
+  );
+};
+
+export const shouldInitializePileResponses = ({
+  submissionComplete = false,
+  currentSlice = null,
+}: {
+  submissionComplete?: boolean;
+  currentSlice?: PileResponseValueShape | null;
+} = {}): boolean => !submissionComplete && !hasPileResponseSliceValues(currentSlice);
 
 export type PileCachePrefillStatePlan = {
   shouldSkip: boolean;

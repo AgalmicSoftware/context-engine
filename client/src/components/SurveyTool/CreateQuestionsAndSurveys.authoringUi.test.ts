@@ -25,6 +25,19 @@ import {
   selectManagedNetBucketSnapshot,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
 
+type RenderTreeNode = {
+  props: Record<string, unknown>;
+  type?: unknown;
+};
+
+const asRenderTreeNode = (node: unknown): RenderTreeNode => node as RenderTreeNode;
+const clickTreeNode = (node: unknown): void => {
+  (asRenderTreeNode(node).props.onClick as () => void)?.();
+};
+const changeTreeNode = (node: unknown, value: string): void => {
+  (asRenderTreeNode(node).props.onChange as (event: { target: { value: string } }) => void)?.({ target: { value } });
+};
+
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -146,6 +159,48 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(instance.state.questions[1]).toMatchObject({ prompt: 'New?', tags: ['new'] });
   });
 
+  it('appends listening-mode preformed questions without undoing edits and removes submitted drafts', () => {
+    const original = { id: 'q1', type: 'freeform', prompt: 'Original?', tags: ['original'] };
+    const removed = { id: 'q2', type: 'freeform', prompt: 'Removed?' };
+    const added = { id: 'q3', type: 'freeform', prompt: 'New?', tags: ['new'] };
+    const instance = makeInstance({
+      appendPreformedQuestions: true,
+      preformedQuestions: [original, removed],
+      preformedMode: 'questions',
+    });
+    instance.setState({
+      questions: [
+        { ...original, prompt: 'My edited question?', tags: ['manual'] },
+        { ...removed, prompt: 'Still visible before upload?' },
+      ],
+      questionsAddedSuccessfully: true,
+      uploadedQuestions: [{ questionId: 'q2' }],
+    });
+    const prevProps = instance.props;
+    const prevState = instance.state;
+    Object.assign(instance, { props: { ...prevProps, preformedQuestions: [original, removed, added] } });
+
+    instance.componentDidUpdate(prevProps, prevState);
+
+    expect(instance.state.questions.map(({ id }) => id)).toEqual(['q1', 'q3']);
+    expect(instance.state.questions[0]).toMatchObject({ prompt: 'My edited question?', tags: ['manual'] });
+    expect(instance.state.questions[1]).toMatchObject({ prompt: 'New?', tags: ['new'] });
+  });
+
+  it('prunes uploaded question IDs from append-mode drafts after submit success', () => {
+    const instance = makeInstance({ appendPreformedQuestions: true, preformedMode: 'questions' });
+    instance.setState({
+      questions: [
+        { id: 'q1', type: 'freeform', prompt: 'Uploaded already?' },
+        { id: 'q2', type: 'freeform', prompt: 'Still a draft?' },
+      ],
+    });
+
+    instance.removeUploadedQuestionDrafts([{ questionId: 'Q1' }]);
+
+    expect(instance.state.questions.map(({ id }) => id)).toEqual(['q2']);
+  });
+
   it('renders the survey/questions toggle immediately on initial load', () => {
     const instance = makeInstance();
 
@@ -228,6 +283,113 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(treeHasText(modeSwitches[0], 'from URL / Content')).toBe(true);
   });
 
+  it.each([25, undefined])('preserves the AI quadratic budget %s when opening the editor', (voiceCredits) => {
+    const instance = makeInstance();
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    const options = ['Parks', 'Transit'];
+
+    instance.handleAutoQuestionsGenerated(
+      [{ type: 'quadratic', prompt: 'Allocate support', options, voiceCredits }],
+      [],
+      '',
+    );
+
+    const budget = voiceCredits ?? 99;
+    expect(instance.state.questions[0]).toMatchObject({
+      type: 'quadratic',
+      options,
+      voiceCredits: budget,
+      id: instance.generateQuestionId('quadratic', 'Allocate support', options, false, budget),
+    });
+    const [budgetToggle] = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
+    expect(treeHasText(budgetToggle, `Credits: ${budget}`)).toBe(true);
+    expect(asRenderTreeNode(budgetToggle).props['aria-expanded']).toBe(false);
+    expect(
+      collectTreeNodes(instance.render(), (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget'),
+    ).toHaveLength(0);
+    clickTreeNode(budgetToggle);
+    const budgetInputs = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget',
+    );
+    expect(budgetInputs).toHaveLength(1);
+    expect(asRenderTreeNode(budgetInputs[0]).props.value).toBe(budget);
+  });
+
+  it('starts each quadratic question from the type picker with its own 99-credit budget', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.setState({ showAutoTool: false, questions: [] });
+    const [button] = collectTreeNodes(
+      instance.renderTypeSelector(),
+      (node) => node?.props?.['aria-label'] === 'Add Quadratic allocation question',
+    );
+
+    clickTreeNode(button);
+    instance.handleQuestionChange(0, 'voiceCredits', 25);
+    clickTreeNode(button);
+
+    expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 99]);
+    const toggles = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
+    expect(treeHasText(toggles[0], 'Credits: 25')).toBe(true);
+    expect(treeHasText(toggles[1], 'Credits: 99')).toBe(true);
+    clickTreeNode(toggles[1]);
+    const [slider] = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget',
+    );
+    expect(asRenderTreeNode(slider).props).toMatchObject({ type: 'range', min: '1', step: '1', value: 99 });
+    changeTreeNode(slider, '144');
+    expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 144]);
+    const updatedToggles = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
+    expect(treeHasText(updatedToggles[1], 'Credits: 144')).toBe(true);
+    clickTreeNode(updatedToggles[1]);
+    expect(
+      collectTreeNodes(instance.render(), (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget'),
+    ).toHaveLength(0);
+    expect(instance.state.questions[1].voiceCredits).toBe(144);
+  });
+
+  it('keeps a larger saved budget within a stable slider range while editing', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.setState({
+      showAutoTool: false,
+      questions: [
+        {
+          uiKey: 'large-budget',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 2500,
+        },
+      ],
+    });
+    const [toggle] = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
+    clickTreeNode(toggle);
+    const getSlider = () =>
+      collectTreeNodes(instance.render(), (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')[0];
+    expect(asRenderTreeNode(getSlider()).props).toMatchObject({ value: 2500, max: 2500 });
+    changeTreeNode(getSlider(), '1200');
+    expect(asRenderTreeNode(getSlider()).props).toMatchObject({ value: 1200, max: 2500 });
+  });
+
   it('hides survey/question gate controls when the active session exposes no selectable gates', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({
@@ -275,8 +437,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         {
           id: 'gate_1',
           label: 'Edge Session',
+          displayLabel: 'Edge Session',
           badgeLabel: 'Edge Session',
           color: '#5affc2',
+          mode: 'any' as const,
+          requireAll: false,
+          sbtAddress: '',
+          sbtAddresses: [] as string[],
+          resourceKey: 'default',
         },
       ],
       defaultGateId: 'gate_1',
@@ -401,7 +569,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       return collectTreeNodes(
         instance.render(),
         (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/'),
-      ).map((node) => node.props.href);
+      ).map((node) => asRenderTreeNode(node).props.href);
     };
 
     const debateLinks = buildSurveyLinks('DEBATE');

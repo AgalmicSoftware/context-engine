@@ -124,6 +124,7 @@ type QuestionSummary = {
   prompt: string;
   type: string;
   options: unknown[];
+  voiceCredits?: unknown;
   arweaveTxId: string;
   responseCount: number;
   sessionSlug: string;
@@ -138,6 +139,7 @@ const buildTagAiContentRevision = (questions: QuestionSummary[]): string =>
         prompt: question.prompt,
         type: question.type,
         options: question.options,
+        voiceCredits: question.voiceCredits,
         arweaveTxId: question.arweaveTxId,
         responseCount: question.responseCount,
         sessionSlug: normalizeSessionSlug(question.sessionSlug),
@@ -171,6 +173,7 @@ type QuestionCacheQuestion = {
   prompt?: string;
   type?: string;
   options?: unknown[];
+  voiceCredits?: unknown;
   arweaveTxId?: string;
   sessionSlug?: string;
   tags?: unknown[];
@@ -601,6 +604,7 @@ const collectTagPageData = ({
           prompt: String(question?.prompt || 'Untitled question').trim() || 'Untitled question',
           type: String(question?.type || 'freeform').trim() || 'freeform',
           options: Array.isArray(question?.options) ? question.options : [],
+          ...(question?.type === 'quadratic' ? { voiceCredits: question.voiceCredits } : {}),
           arweaveTxId: String(question?.arweaveTxId || '').trim(),
           responseCount: Object.keys(responsesById?.[resolvedQuestionId] || {}).length,
           sessionSlug: normalizeSessionSlug(question?.sessionSlug || sessionSlug),
@@ -1256,6 +1260,7 @@ export const TagPageView = ({
                     <button
                       type="button"
                       className={styles.sessionSelectorToggle}
+                      data-ce-control-appearance="frameless"
                       aria-label="Tag page session selector"
                       aria-expanded={sessionSelectorOpen}
                       data-testid="ce-tag-page-session-selector-toggle"

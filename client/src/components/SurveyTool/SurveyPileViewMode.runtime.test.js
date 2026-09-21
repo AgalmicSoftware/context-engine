@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -27,7 +27,9 @@ import {
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
 import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
+import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
   const React = require('react');
@@ -52,19 +54,22 @@ jest.mock('./SessionListeningPanel', () => {
   };
 });
 
+let mockVoiceModeProps;
 jest.mock('./SessionVoiceModeModal', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: (props) =>
-      props.isOpen
+    default: (props) => {
+      mockVoiceModeProps = props;
+      return props.isOpen
         ? React.createElement('div', {
             'data-testid': 'mock-voice-mode-modal',
             'data-mode': props.mode || 'chooser',
             'data-prefill-model': props.prefillPacket?.source?.modelId || '',
             'data-prefill-confidence': String(props.prefillPacket?.responses?.[0]?.confidence ?? ''),
           })
-        : null,
+        : null;
+    },
   };
 });
 
@@ -195,6 +200,20 @@ const renderPile = (props = {}, options = {}) =>
 const applyPatch = (state, patch) => ({ ...state, ...patch });
 
 describe('SurveyPileViewMode runtime surface', () => {
+  it('shows submission failures beside the shared controls and clears them on retry', () => {
+    const { rerender } = render(
+      renderPileInteractionSurface(
+        buildSurfaceProps({
+          submissionError: 'Response upload failed. Please try again.',
+        }),
+      ),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Response upload failed. Please try again.');
+    expect(screen.getByTestId('active-q1')).not.toContainElement(screen.getByRole('alert'));
+    rerender(renderPileInteractionSurface(buildSurfaceProps({ submissionError: '' })));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     window.history.pushState({}, '', '/');
     jest.clearAllMocks();
@@ -248,6 +267,32 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByRole('checkbox', { name: 'Session memory' })).toBeInTheDocument();
   });
 
+  it('edits signed quadratic votes in the pile using the question budget', async () => {
+    renderPile({
+      questionPool: [
+        {
+          id: 'quadratic-q',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+    const parks = await screen.findByLabelText('Parks');
+    fireEvent.change(parks, { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Transit'), { target: { value: '-4' } });
+    expect(screen.getByTestId('ce-quadratic-budget')).toHaveTextContent('0 credits left');
+    fireEvent.change(parks, { target: { value: '4' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(parks).toHaveValue('3');
+  });
+
   it('updates a pile rating through the shared slider persistence helper', async () => {
     renderPile({
       questionPool: [{ id: 'rating-q1', type: 'rating', prompt: 'Rate this from zero to ten' }],
@@ -266,6 +311,68 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     await waitFor(() => expect(slider).toHaveValue('7'));
     expect(screen.getByText('7')).toBeInTheDocument();
+  });
+
+  it('resets mounted pile responses when the session slug changes', async () => {
+    const question = { id: 'rating-q1', type: 'rating', prompt: 'Rate the active session' };
+    const harness = renderPile({
+      sessionSlug: 'session-a',
+      questionPool: [question],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Rate the active session')).toBeInTheDocument();
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '7' } });
+    await waitFor(() => expect(slider).toHaveValue('7'));
+
+    harness.rerenderSurveyQuestions({ sessionSlug: 'session-b' });
+
+    await waitFor(() => expect(screen.getByRole('slider')).toHaveValue('0'));
+  });
+
+  it('resets mounted pile responses when a same-slug Worker identity changes', async () => {
+    const question = { id: 'rating-q1', type: 'rating', prompt: 'Rate the Worker-backed session' };
+    const buildSessionConfig = (sessionId, corsWorkerUrl) => ({
+      slug: 'demo',
+      sessionId,
+      corsWorkerUrl,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          mode: 'authorized_read',
+        },
+      },
+    });
+    const harness = renderPile({
+      sessionSlug: 'demo',
+      sessionConfig: buildSessionConfig('0x11111111111111111111111111111111', 'https://worker-a.example/'),
+      questionPool: [question],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Rate the Worker-backed session')).toBeInTheDocument();
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '7' } });
+    await waitFor(() => expect(slider).toHaveValue('7'));
+
+    harness.rerenderSurveyQuestions({
+      sessionConfig: buildSessionConfig('0x22222222222222222222222222222222', 'https://worker-b.example/'),
+    });
+
+    await waitFor(() => expect(screen.getByRole('slider')).toHaveValue('0'));
   });
 
   it('advances pile navigation while early questionPool questions are visible', async () => {
@@ -424,6 +531,174 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
   });
 
+  it('lets the interview modal close and navigate to session results after submit success', async () => {
+    const onPopState = jest.fn();
+    window.addEventListener('popstate', onPopState);
+    renderPile({ activeSessionSlug: 'demo' }, { route: '/session/demo?mode=interview#drafts' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+
+    try {
+      await act(async () => {
+        mockVoiceModeProps.onViewResults();
+      });
+    } finally {
+      window.removeEventListener('popstate', onPopState);
+    }
+
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    expect(window.location.pathname).toBe('/questions/results');
+    expect(window.location.search).toContain('session=demo');
+    expect(onPopState).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves explicit worker query and drops modal state when interview results navigation runs', async () => {
+    const onPopState = jest.fn();
+    window.addEventListener('popstate', onPopState);
+    renderPile(
+      { activeSessionSlug: 'demo' },
+      { route: '/session/demo?mode=interview&worker=https%3A%2F%2Fworker.custom.example%2Fedge#drafts' },
+    );
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+
+    try {
+      await act(async () => {
+        mockVoiceModeProps.onViewResults();
+      });
+    } finally {
+      window.removeEventListener('popstate', onPopState);
+    }
+
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    expect(window.location.pathname).toBe('/questions/results');
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('session')).toBe('demo');
+    expect(params.get('worker')).toBe('https://worker.custom.example/edge');
+    expect(params.has('mode')).toBe(false);
+    expect(window.location.hash).toBe('');
+    expect(onPopState).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders newly discovered quadratic interview questions before the pile cache catches up', async () => {
+    renderPile({}, { route: '/session/demo?mode=interview' });
+    await screen.findByTestId('mock-voice-mode-modal');
+    const question = {
+      id: 'live-quadratic',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    const onChange = jest.fn();
+    render(mockVoiceModeProps.renderAnswerInput(question.id, [3, -4], onChange, question));
+    expect(screen.getByRole('slider', { name: 'Parks' })).toHaveValue('3');
+    expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+    fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
+    expect(onChange).toHaveBeenCalledWith([3, -2]);
+  });
+
+  it('imports a valid prefill hash when the mounted session URL changes', async () => {
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'b'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude', modelId: 'claude-live-return', verification: 'self_reported' },
+      responderContext: { summary: 'Synthetic live return context.' },
+      responses: [{ questionId: 'q1', answer: 'Returned draft', confidence: 0.74 }],
+    });
+    const rendered = renderPile(
+      { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
+      { route: '/session/demo?mode=interview' },
+    );
+    const modal = await screen.findByTestId('mock-voice-mode-modal');
+    expect(modal).toHaveAttribute('data-mode', 'interview');
+    expect(modal).toHaveAttribute('data-prefill-model', '');
+
+    act(() => {
+      window.history.replaceState({}, '', `/session/demo?mode=interview#prefill=${encoded}`);
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 2 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-live-return'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.74');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('can import the same valid prefill again after the URL hash is cleared', async () => {
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'd'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude', modelId: 'claude-repeat-return', verification: 'self_reported' },
+      responderContext: { summary: 'Repeat valid context.' },
+      responses: [{ questionId: 'q1', answer: 'Repeat draft', confidence: 0.67 }],
+    });
+    const rendered = renderPile(
+      { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
+      { route: `/session/demo?mode=interview#prefill=${encoded}` },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-repeat-return'),
+    );
+    await waitFor(() => expect(window.location.hash).toBe(''));
+
+    mockVoiceModeProps.onClose();
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 2 });
+
+    act(() => {
+      window.history.replaceState({}, '', `/session/demo?mode=interview#prefill=${encoded}`);
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 3 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-repeat-return'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.67');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('recovers when a mounted session receives an invalid prefill before a fresh valid prefill', async () => {
+    const rendered = renderPile(
+      { activeSessionSlug: 'demo', questionsCacheNonce: 1 },
+      { route: '/session/demo?mode=interview' },
+    );
+    await screen.findByTestId('mock-voice-mode-modal');
+
+    act(() => {
+      window.history.replaceState({}, '', '/session/demo?mode=interview#prefill=invalid');
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 2 });
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', '');
+
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'c'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude', modelId: 'claude-fresh-return', verification: 'self_reported' },
+      responderContext: { summary: 'Fresh valid context.' },
+      responses: [{ questionId: 'q1', answer: 'Fresh draft', confidence: 0.81 }],
+    });
+    act(() => {
+      window.history.replaceState({}, '', `/session/demo?mode=interview#prefill=${encoded}`);
+    });
+    rendered.rerenderSurveyQuestions({ activeSessionSlug: 'demo', questionsCacheNonce: 3 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-fresh-return'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.81');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
   it('keeps an imported prefill through initialization and clears it only after mount', async () => {
     const encoded = encodeInterviewPrefillPacket({
       version: 1,
@@ -541,6 +816,58 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(provenance).not.toHaveProperty('originalPrediction');
     expect(provenance).not.toHaveProperty('predictionRevisions');
     expect(provenance).not.toHaveProperty('unselectedDrafts');
+  });
+
+  it('captures the first URL source for the session without adding it to interview provenance', async () => {
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/session/demo?src=partner-outreach&src=ignored&mode=interview#prefill=abc');
+    expect(
+      buildPileRuntimeInitialState({
+        props: { sessionSlug: 'demo' },
+        buildWarmPileSeedState: () => null,
+      }),
+    ).toEqual(expect.any(Object));
+    expect(readSessionRecruitmentSource('demo')).toBe('partner-outreach');
+    window.history.replaceState({}, '', '/session/demo?src=second-source');
+    buildPileRuntimeInitialState({
+      props: { sessionSlug: 'demo' },
+      buildWarmPileSeedState: () => null,
+    });
+    expect(readSessionRecruitmentSource('demo')).toBe('partner-outreach');
+
+    const engine = {
+      props: { sessionConfig: {} },
+      state: {
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'Reviewed answer' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+      },
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+
+    await recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'Reviewed answer', confidence: 0.8 }],
+      { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
+      true,
+    );
+
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1.source).toMatchObject({
+      platform: 'claude',
+      modelId: 'claude-example',
+      verification: 'self_reported',
+    });
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1.source).not.toHaveProperty('urlSource');
   });
 
   it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {
@@ -1101,6 +1428,25 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByText('Early visible question')).toBeInTheDocument();
     expect(container.querySelector('.pileLoadingProgressList')).toBeNull();
     expect(container.querySelector('.pileCardActive')).not.toBeNull();
+  });
+
+  it('renders pile rating controls with per-question scale metadata', () => {
+    renderPile({
+      questionPool: [
+        {
+          id: 'rating-q1',
+          type: 'rating',
+          prompt: 'Rate readiness',
+          scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+        },
+      ],
+    });
+
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('min', '1');
+    expect(slider).toHaveAttribute('max', '10');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.getByText('10')).toBeInTheDocument();
   });
 
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', async () => {

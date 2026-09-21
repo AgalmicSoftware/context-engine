@@ -1,6 +1,7 @@
 export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   openingMode: 'auto',
   openingPrompt: '',
+  steeringPrompt: '',
   autoRegenerate: false,
   questionGrowthPercent: 20,
   followNewQuestions: false,
@@ -14,6 +15,9 @@ export const normalizeInterviewSettings = (value = {}) => {
     openingPrompt: String(source.openingPrompt || '')
       .trim()
       .slice(0, 1200),
+    steeringPrompt: String(source.steeringPrompt || '')
+      .trim()
+      .slice(0, 3000),
     autoRegenerate: source.autoRegenerate === true,
     questionGrowthPercent: Number.isFinite(source.questionGrowthPercent)
       ? Math.max(1, Math.min(100, source.questionGrowthPercent))
@@ -28,6 +32,11 @@ export const validInterviewSettings = (value = {}) => {
   if (
     value.openingPrompt !== undefined &&
     (typeof value.openingPrompt !== 'string' || value.openingPrompt.length > 1200)
+  )
+    return false;
+  if (
+    value.steeringPrompt !== undefined &&
+    (typeof value.steeringPrompt !== 'string' || value.steeringPrompt.length > 3000)
   )
     return false;
   if (value.openingMode === 'owner' && !value.openingPrompt?.trim()) return false;

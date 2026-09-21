@@ -178,6 +178,7 @@ describe('SurveyResultsQuestionSummary', () => {
       expect.objectContaining({
         activeSessionSlug: 'session-one',
         aggregatorResponseMode: true,
+        showAggregatorBookmark: false,
         network: { id: 84532 },
       }),
     );

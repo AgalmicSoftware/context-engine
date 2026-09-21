@@ -15,6 +15,7 @@ import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
+import { captureSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
@@ -89,6 +90,7 @@ import {
   sanitizeSbtAutoMintQueryForStorage,
 } from './onePageSessionAutoMintRuntime';
 import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
+import { readWorkerGroupAutoJoinId, removeWorkerGroupAutoJoinQuery } from '../../domains/worker/workerGroupAutoJoin';
 import {
   buildOnePageSessionAggregatorCacheResult,
   resolveOnePageSessionSurveySlug,
@@ -96,6 +98,7 @@ import {
 } from './onePageSessionAggregatorCacheRuntime';
 
 const demoLog = createLogger('demo');
+const GENERATED_RESULTS_VIEWER_REFRESH_INTERVAL_MS = 15_000;
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 type OnePageGlobalState = typeof globalThis & {
   ENABLE_CE_UI_PERF_STATS?: boolean;
@@ -283,6 +286,9 @@ class OnePageSession extends Component<any, any> {
     this._autoOpenResultsTimer = null;
     this._generatedResultsIdentityKey = '';
     this._generatedResultsRequestSeq = 0;
+    this._generatedResultsViewerRefreshTimer = null;
+    this._generatedResultsViewerRefreshInFlight = false;
+    this._generatedResultsViewerRefreshPromise = null;
     this.originalURL = '';
 
     // refs
@@ -384,6 +390,7 @@ class OnePageSession extends Component<any, any> {
   componentDidMount() {
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
     this.recordOriginalURL(routeUiState.showQuestions ? buildOnePageSessionCanonicalBaseUrl(this.props) : null);
+    captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
     this.kickoffLightSbtUniverseScan(this.props);
 
     // Make redirect flag group-aware (avoid cross-group bleed)
@@ -411,6 +418,7 @@ class OnePageSession extends Component<any, any> {
     }
 
     this._aggregatorInputSig = this.buildAggregatorInputSignature(this.props, this.state);
+    this.scheduleGeneratedResultsViewerRefresh();
 
     this.bootstrapTelegramSession();
   }
@@ -423,6 +431,7 @@ class OnePageSession extends Component<any, any> {
       clearTimeout(this._autoOpenResultsTimer);
       this._autoOpenResultsTimer = null;
     }
+    this.clearGeneratedResultsViewerRefresh();
     this._generatedResultsIdentityKey = '';
     this._generatedResultsRequestSeq = 0;
     if (this._autoMintCountdownTimer) {
@@ -580,6 +589,46 @@ class OnePageSession extends Component<any, any> {
     });
   }
 
+  clearGeneratedResultsViewerRefresh() {
+    if (this._generatedResultsViewerRefreshTimer) {
+      clearInterval(this._generatedResultsViewerRefreshTimer);
+      this._generatedResultsViewerRefreshTimer = null;
+    }
+    this._generatedResultsViewerRefreshInFlight = false;
+    this._generatedResultsViewerRefreshPromise = null;
+  }
+
+  scheduleGeneratedResultsViewerRefresh() {
+    if (!this.state.showResults) {
+      this.clearGeneratedResultsViewerRefresh();
+      return;
+    }
+    if (this._generatedResultsViewerRefreshTimer) return;
+    this._generatedResultsViewerRefreshTimer = setInterval(
+      () => this.runGeneratedResultsViewerRefreshTick(),
+      GENERATED_RESULTS_VIEWER_REFRESH_INTERVAL_MS,
+    );
+  }
+
+  runGeneratedResultsViewerRefreshTick() {
+    if (!this.state.showResults) {
+      this.clearGeneratedResultsViewerRefresh();
+      return;
+    }
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if (this.state.generatedResultsAnalysis?.isRunning || this._generatedResultsViewerRefreshInFlight) return;
+    this._generatedResultsViewerRefreshInFlight = true;
+    const refreshPromise = Promise.resolve(this.loadGeneratedResultsArtifact());
+    this._generatedResultsViewerRefreshPromise = refreshPromise;
+    refreshPromise
+      .catch((error) => demoLog.warn('OnePageSession: generated results refresh', error))
+      .finally(() => {
+        if (this._generatedResultsViewerRefreshPromise !== refreshPromise) return;
+        this._generatedResultsViewerRefreshInFlight = false;
+        this._generatedResultsViewerRefreshPromise = null;
+      });
+  }
+
   handleGeneratedResultsGenerate(refresh: boolean = true) {
     return generateResultsForHost(this, {
       refresh,
@@ -591,6 +640,9 @@ class OnePageSession extends Component<any, any> {
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
     const slugChanged = prevSlug !== nextSlug;
+    if (slugChanged) {
+      captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
+    }
     const telegramTargetChanged =
       getAgentClientLoginEnvelopeMemoryKey(
         resolveAgentClientLoginIdentityTarget({
@@ -630,6 +682,8 @@ class OnePageSession extends Component<any, any> {
     const generatedIdentityChanged = currentGeneratedIdentityKey !== previousGeneratedIdentityKey;
     if (generatedIdentityChanged) {
       this._generatedResultsIdentityKey = currentGeneratedIdentityKey;
+      this._generatedResultsRequestSeq = Number(this._generatedResultsRequestSeq || 0) + 1;
+      this.clearGeneratedResultsViewerRefresh();
       this.resetGeneratedResultsAnalysis();
     }
     if (telegramIdentityChanged) {
@@ -744,6 +798,11 @@ class OnePageSession extends Component<any, any> {
       (showResultsVisible && (loginJustCompleted || generatedIdentityChanged || aggregatorInvalidated))
     ) {
       void this.loadGeneratedResultsArtifact();
+    }
+    if (showResultsVisible) {
+      this.scheduleGeneratedResultsViewerRefresh();
+    } else {
+      this.clearGeneratedResultsViewerRefresh();
     }
 
     // Start automint right after login
@@ -1017,7 +1076,8 @@ class OnePageSession extends Component<any, any> {
     const cleanCredentialPath = buildSbtAutoMintCredentialCleanPath(
       new URL(nextUrl || '/', window.location.origin).href,
     );
-    this.originalURL = cleanCredentialPath || nextUrl || '';
+    // Section toggles restore this URL; consumed Worker joins must not return.
+    this.originalURL = removeWorkerGroupAutoJoinQuery(cleanCredentialPath || nextUrl || '');
   }
 
   /* =======================
@@ -1996,6 +2056,7 @@ class OnePageSession extends Component<any, any> {
 
   resetDemoURL() {
     if (this.hasAutoMintIntent() && !this.state.mintSuccess) return;
+    if (readWorkerGroupAutoJoinId(window.location.search)) return;
     this.recordOriginalURL();
 
     const fallbackURL = buildOnePageSessionCanonicalBaseUrl(this.props);

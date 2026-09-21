@@ -20,7 +20,7 @@ describe('SessionWizardHeader', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the profile control without a duplicate Normal or Advanced switch', () => {
+  it('renders the profile control without a duplicate Normal or Custom switch', () => {
     render(
       <SessionWizardHeader
         {...baseProps}
@@ -34,25 +34,64 @@ describe('SessionWizardHeader', () => {
     const hostingControl = screen.getByTestId('hosting-profile-control');
     expect(hostingControl).toBeInTheDocument();
     expect(screen.queryByText('Normal')).not.toBeInTheDocument();
-    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(screen.queryByText('Custom')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
   });
 
-  it('gives the initial profile cards the full header surface before setup continues', () => {
+  it('gives the initial profile cards the full header surface before setup continues', async () => {
     render(
       <SessionWizardHeader
         {...baseProps}
         sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting cards</div>}
+        sessionModeProfileResumeControl={
+          <button type="button" data-testid={E2E_TESTIDS.WIZARD_MODE_RESUME}>
+            Resume existing setup
+          </button>
+        }
         sessionModeProfileLabel="Centralized"
         sessionModeProfileSelectionStep
       />,
     );
 
     expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
+    const architectureHelp = screen.getByRole('link', {
+      name: 'View the deployment architecture diagram on GitHub',
+    });
+    expect(architectureHelp).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/README.md#architecture-at-a-glance',
+    );
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    fireEvent.mouseEnter(architectureHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Compare where session data is stored and which credentials each setup requires.',
+    );
     expect(screen.queryByRole('heading', { name: /Centralized/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId('hosting-profile-control')).toHaveTextContent('hosting cards');
+    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    const hostingControl = screen.getByTestId('hosting-profile-control');
+    expect(resumeButton).toHaveAccessibleName('Resume existing setup');
+    expect(hostingControl).toHaveTextContent('hosting cards');
+    expect(Boolean(resumeButton.compareDocumentPosition(hostingControl) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
+  });
+
+  it('renders a separate Back control after profile selection without changing the heading name', () => {
+    const onBackToProfileSelection = jest.fn();
+    render(
+      <SessionWizardHeader
+        {...baseProps}
+        sessionModeProfileLabel="Centralized"
+        onBackToProfileSelection={onBackToProfileSelection}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Session Setup (Centralized)' })).toBeInTheDocument();
+    const backButton = screen.getByRole('button', { name: 'Back' });
+    expect(backButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
+    fireEvent.click(backButton);
+
+    expect(onBackToProfileSelection).toHaveBeenCalledTimes(1);
   });
 
   it('does not reintroduce a display-mode menu for sponsored setup links', () => {

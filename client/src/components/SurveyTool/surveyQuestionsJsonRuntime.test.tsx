@@ -1,4 +1,5 @@
 import { createSurveyQuestionsJsonRuntime } from './surveyQuestionsJsonRuntime';
+import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 
 describe('surveyQuestionsJsonRuntime', () => {
   it('delegates comment toggles through the runtime strategy when present', () => {
@@ -34,5 +35,42 @@ describe('surveyQuestionsJsonRuntime', () => {
     runtime.toggleComments('q2', false);
 
     expect(buildCommentsToggleState).toHaveBeenCalledWith({ showComments: {} }, 'q2', false);
+  });
+
+  it('passes the captured session recruitment source into response JSON payloads', () => {
+    sessionStorage.clear();
+    captureSessionRecruitmentSource('alpha', '?src=partner-outreach');
+    const buildResponsePayload = jest.fn((_payload: unknown) => ({ responses: [] }));
+    const runtime = createSurveyQuestionsJsonRuntime({
+      buildResponsePayload,
+      propsRef: { current: { sessionSlug: 'alpha', account: '0xUser' } },
+      stateRef: {
+        current: {
+          questionPool: [{ id: 'q1', prompt: 'Question?' }],
+          pileQuestions: [],
+          surveysResponseState: [{ answers: { q1: { value: 'Yes' } }, additionalComments: {} }],
+        },
+      },
+      resolveEffectiveSlug: () => 'alpha',
+      resolveFieldEncryptionAudience: () => null,
+      getQuestionEncryptionGates: () => [],
+      resolveFieldEncryptionGateId: () => null,
+      normalizeFieldAudienceMode: () => 'default',
+      resolveResponseJsonContext: () => ({ sessionConfig: {} }),
+      resolveSlugForIds: () => 'alpha',
+      readSurveysCacheRef: () => ({}),
+      surveyResponseStoragePort: {
+        sanitizeQuestionPromptForResponsePayload: (q: { prompt?: string }) => q.prompt || '',
+      },
+      getConvictionFromSlice: () => null,
+      getImportanceFromSlice: () => null,
+      inst: { _surveyJsonMetaCache: {} },
+    });
+
+    runtime.prepareJsonAndHash(0);
+
+    expect(buildResponsePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ recruitmentSource: 'partner-outreach' }),
+    );
   });
 });

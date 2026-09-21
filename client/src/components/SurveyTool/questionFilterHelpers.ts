@@ -1,3 +1,4 @@
+import { hasWorkerGroupSelection } from '../../domains/worker/workerGroupResultsFilter';
 import { toStr } from '../../utilities/shared/primitives.js';
 
 type ResponseStatusFilterStateInput = {
@@ -72,6 +73,7 @@ export const isQuestionFilterStateDefault = (filterStateToTest: unknown): boolea
     questionTypes?: unknown;
     responseStatus?: { responded?: unknown; notResponded?: unknown } | null;
     sbtFilter?: unknown;
+    workerGroupFilter?: unknown;
     selectedTags?: unknown;
     topQuestions?: unknown;
   };
@@ -108,6 +110,7 @@ export const isQuestionFilterStateDefault = (filterStateToTest: unknown): boolea
     isTopQuestionsDefault &&
     isQuestionTypesDefault &&
     isSbtFilterDefault &&
+    !hasWorkerGroupSelection(filterState.workerGroupFilter) &&
     isAiFilterDefault &&
     isAiTopNDefault &&
     isAiCombineDefault &&

@@ -170,9 +170,14 @@
     &:hover,
     &:focus {
       opacity: 1;
-      background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+      background: transparent;
       outline: none;
       transform: translateY(-1px);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
     }
   }
 
@@ -439,10 +444,9 @@
   .communityTab .sessionSelectorToggle {
     width: 30px;
     height: 30px;
-    border: 2px solid;
-    border-color: var(--ce-border-raised);
-    background: var(--ce-control-face);
-    box-shadow: var(--ce-shadow-raised);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
     color: var(--ce-control-text);
     opacity: 1;
     transition: none;
@@ -451,7 +455,7 @@
   .communityTab .sessionSelectorToggle:hover,
   .communityTab .sessionSelectorToggle:focus {
     transform: none;
-    background: var(--ce-surface-alt);
+    background: transparent;
   }
 
   .communityTab .content {

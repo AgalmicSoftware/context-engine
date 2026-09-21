@@ -100,6 +100,7 @@ type PileEmptyStateProps = {
 };
 
 export type PileInteractionSurfaceProps = {
+  submissionError?: string;
   showHologramAssistant: boolean;
   toggleHologramAssistant: VoidHandler;
   showMiniBackgroundSpinner: boolean;
@@ -542,6 +543,7 @@ const renderPileEmptyState = ({
 };
 
 export const renderPileInteractionSurface = ({
+  submissionError,
   showHologramAssistant,
   toggleHologramAssistant,
   showMiniBackgroundSpinner,
@@ -702,6 +704,11 @@ export const renderPileInteractionSurface = ({
           handleNext,
         })}
       </div>
+    )}
+    {submissionError && (
+      <p className={styles.pileSubmitError} role="alert">
+        {submissionError}
+      </p>
     )}
   </div>
 );

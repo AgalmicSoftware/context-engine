@@ -326,6 +326,17 @@ const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
 const pathKey = (path: string[]): string => path.join('.');
 
+const resolveSessionWizardLimitHydrationKey = (limits: unknown): string => {
+  if (!limits || typeof limits !== 'object' || Array.isArray(limits)) return '';
+  const record = limits as UnknownRecord;
+  const hasWallet = Object.prototype.hasOwnProperty.call(record, 'perWalletPerDay');
+  const hasAnonymousIp = Object.prototype.hasOwnProperty.call(record, 'perAnonymousIpPerDay');
+  if (!hasWallet && !hasAnonymousIp) return '';
+  const nextWallet = hasWallet ? toStr(record.perWalletPerDay).trim() : '';
+  const nextAnonymousIp = hasAnonymousIp ? toStr(record.perAnonymousIpPerDay).trim() : '';
+  return `${nextWallet}|${hasAnonymousIp ? nextAnonymousIp : '<inherit>'}`;
+};
+
 const buildProvisionedSponsoredContextState = (value: unknown): ProvisionedSponsoredContextState => {
   const context = value && typeof value === 'object' ? (value as UnknownRecord) : {};
   return {
@@ -529,6 +540,7 @@ const SessionWizard = ({
   const jsonCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const compactSessionHeaderInputRef = useRef<HTMLInputElement | null>(null);
   const embeddedDeployHelperHydrationKeyRef = useRef('');
+  const workerLimitDraftHydrationKeyRef = useRef(resolveSessionWizardLimitHydrationKey(draft?.limits));
   const isMountedRef = useRef(true);
   const selectorSourceSessionConfig = useMemo(() => {
     return resolveSessionWizardSelectorSourceConfig({
@@ -622,6 +634,8 @@ const SessionWizard = ({
     setWorkerAllowOrigins,
     workerLimitPerWallet,
     setWorkerLimitPerWallet,
+    workerLimitPerAnonymousIp,
+    setWorkerLimitPerAnonymousIp,
   } = useSessionWizardWorkerState<ProvisionedSponsoredContextState>({
     cachedWizard,
     deployHelperUrlDefault: CLOUDFLARE_DEPLOY_HELPER_URL,
@@ -629,6 +643,23 @@ const SessionWizard = ({
     defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
     buildProvisionedSponsoredContextState,
   });
+
+  useEffect(() => {
+    const limits = draft?.limits;
+    if (!limits || typeof limits !== 'object' || Array.isArray(limits)) return;
+    const record = limits as UnknownRecord;
+    const hasWallet = Object.prototype.hasOwnProperty.call(record, 'perWalletPerDay');
+    const hasAnonymousIp = Object.prototype.hasOwnProperty.call(record, 'perAnonymousIpPerDay');
+    if (!hasWallet && !hasAnonymousIp) return;
+    const nextWallet = hasWallet ? toStr(record.perWalletPerDay).trim() : '';
+    const nextAnonymousIp = hasAnonymousIp ? toStr(record.perAnonymousIpPerDay).trim() : '';
+    const hydrationKey = resolveSessionWizardLimitHydrationKey(record);
+    if (workerLimitDraftHydrationKeyRef.current === hydrationKey) return;
+    setWorkerLimitPerWallet(nextWallet);
+    setWorkerLimitPerAnonymousIp(nextAnonymousIp);
+    workerLimitDraftHydrationKeyRef.current = hydrationKey;
+  }, [draft?.limits, setWorkerLimitPerAnonymousIp, setWorkerLimitPerWallet]);
+
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
   const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -936,6 +967,8 @@ const SessionWizard = ({
       workerSecretsEnabled,
       effectivePersistWorkerSecrets,
       workerSecrets,
+      workerLimitPerWallet,
+      workerLimitPerAnonymousIp,
       deployForm,
       deployComplete,
       deployWorkerUrl,
@@ -963,6 +996,8 @@ const SessionWizard = ({
     workerSecretsEnabled,
     effectivePersistWorkerSecrets,
     workerSecrets,
+    workerLimitPerWallet,
+    workerLimitPerAnonymousIp,
     deployForm,
     deployComplete,
     deployWorkerUrl,
@@ -2366,6 +2401,7 @@ const SessionWizard = ({
     workerSecretsEnabled,
     workerAllowOrigins,
     workerLimitPerWallet,
+    workerLimitPerAnonymousIp,
     embeddedDeployHelperEnabled,
     deployHelperUrl,
     latestChainBlock,
@@ -2846,6 +2882,7 @@ const SessionWizard = ({
     setCollapsedSections,
     setDraft,
     showContinue: showSessionModeProfileEntryStep || !isNewSessionWizardRoute,
+    showPresetToggle: !isNewSessionWizardRoute,
   });
 
   return (
@@ -2929,6 +2966,11 @@ const SessionWizard = ({
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}
+      onBackToProfileSelection={
+        isNewSessionWizardRoute && effectiveSessionModeProfileStepComplete
+          ? () => setSessionModeProfileStepComplete(false)
+          : undefined
+      }
       onManualGasLimitChange={setManualGasLimit}
       onManualGasPriceGweiChange={setManualGasPriceGwei}
       onManualMaxFeePerGasGweiChange={setManualMaxFeePerGasGwei}
@@ -2977,6 +3019,7 @@ const SessionWizard = ({
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
       sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
       sessionModeProfileControl={sessionModeProfileControls.header}
+      sessionModeProfileResumeControl={sessionModeProfileControls.resume}
       sessionModeProfilePrivacyControl={sessionModeProfileControls.privacy}
       sessionModeProfileWorkerControl={sessionModeProfileControls.worker}
       sessionModeProfilePublishControl={sessionModeProfileControls.publish}
@@ -3018,6 +3061,10 @@ const SessionWizard = ({
       updateEncryptionGate={updateEncryptionGate}
       visibleWorkerResourceKeys={visibleWorkerResourceKeys}
       workerAllowOrigins={workerAllowOrigins}
+      workerLimitPerWallet={workerLimitPerWallet}
+      setWorkerLimitPerWallet={setWorkerLimitPerWallet}
+      workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
+      setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
       workerMode={workerMode}
       workerSecretsEnabled={workerSecretsEnabled}
       workerUrlAutoFilled={workerUrlAutoFilled}

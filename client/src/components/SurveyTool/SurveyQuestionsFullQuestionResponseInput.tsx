@@ -1,3 +1,4 @@
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 import React from 'react';
 
 import BinaryChoiceInput from './BinaryChoiceInput';
@@ -16,6 +17,12 @@ type SurveyQuestionRecord = {
   id: string;
   type: string;
   options?: unknown[];
+  scale?: unknown;
+  min?: unknown;
+  max?: unknown;
+  minLabel?: unknown;
+  maxLabel?: unknown;
+  voiceCredits?: unknown;
 };
 
 type SurveyAnswerRecord = {
@@ -120,6 +127,18 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
   };
 
   switch (inputDescriptor.kind) {
+    case 'quadratic':
+      return (
+        <QuadraticAllocationInput
+          questionId={question.id}
+          options={question.options}
+          voiceCredits={question.voiceCredits}
+          value={answer.value}
+          disabled={isSubmitting}
+          deferDragUpdates={singleQuestionMode}
+          onChange={emitAnswerChange}
+        />
+      );
     case 'multichoice': {
       return (
         <MultichoiceQuestionInput
@@ -136,12 +155,14 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
       return inputDescriptor.useDeferredRating || onDeferredRatingCommit ? (
         <DeferredRatingSlider
           value={inputDescriptor.ratingValue}
+          scale={inputDescriptor.ratingScale}
           disabled={inputDescriptor.disabled}
           onCommit={emitDeferredRatingCommit}
         />
       ) : (
         <FullQuestionRatingInput
           value={inputDescriptor.ratingValue}
+          scale={inputDescriptor.ratingScale}
           disabled={inputDescriptor.disabled}
           onChange={emitRatingChange}
           onChangeComplete={emitRatingChangeComplete}

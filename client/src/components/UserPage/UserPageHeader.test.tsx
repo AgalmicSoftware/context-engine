@@ -128,7 +128,7 @@ describe('UserPageHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: /Compare/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
 
-    const copyAddressButton = container.querySelector(`button.${styles.copyButton}:not([aria-label])`);
+    const copyAddressButton = screen.getByRole('button', { name: 'Copy address' });
     expect(copyAddressButton).not.toBeNull();
     fireEvent.click(copyAddressButton as HTMLElement);
 

@@ -58,6 +58,12 @@ const normalizeQuestionIdList = (value: unknown): string[] =>
   Array.isArray(value)
     ? Array.from(new Set(value.map((entry) => toStr(entry).trim().toLowerCase()).filter(Boolean)))
     : [];
+const isTemporaryDemoCompatibilitySeed = (value: unknown): boolean => {
+  const config = isPlainObject(value) ? value : null;
+  const seed = isPlainObject(config?.demoCompatibilitySeed) ? config.demoCompatibilitySeed : null;
+  return seed?.temporary === true;
+};
+
 const normalizeSessionSlugList = (value: unknown): string[] => {
   const source = Array.isArray(value) ? value : [value];
   const seen = new Set();
@@ -182,6 +188,19 @@ const resolveSurveyToolNetworkScopedSessionContext = ({
       effectiveNetworkSourceSlug = fallbackResolved.sessionSlug || fallbackSlug || '';
       break;
     }
+  }
+
+  // Fixture-only demo previews are intentionally local compatibility sessions.
+  // They have no authority profile or registry, but their checked-in question
+  // fixtures still need a deterministic cache scope to render offline.
+  if (
+    resolved.sessionSlug !== '' &&
+    projection.source === 'missing' &&
+    effectiveNetworkId == null &&
+    isTemporaryDemoCompatibilitySeed(resolved.sessionConfig)
+  ) {
+    effectiveNetworkId = readPositiveNumber(resolved.sessionConfig?.networkChainId);
+    effectiveNetworkSourceSlug = effectiveNetworkId ? resolved.sessionSlug : '';
   }
 
   // The empty-slug "general" record is a standalone tool template rather

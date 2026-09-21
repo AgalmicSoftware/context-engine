@@ -19,9 +19,10 @@ $text-color: var(--ce-border);
   background: $pastel-bg;
   border: 1px solid $pastel-border;
   border-radius: var(--ce-radius-6);
-  color: $text-color; // --- MODIFICATION START ---
-  max-height: 70vh; // make minified/inline version scrollable on phones  overflow-y: auto;
-  -webkit-overflow-scrolling: touch; // --- MODIFICATION END ---
+  color: $text-color;
+  max-height: 70vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 
   @media (max-width: 600px) {
     padding: 0.75rem;

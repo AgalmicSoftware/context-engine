@@ -1,3 +1,13 @@
+.optionGroup {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+}
+
 .provenanceOption,
 .researchConsent {
   display: flex;
@@ -21,6 +31,10 @@
   gap: 10px;
 }
 
+.researchConsent .provenanceOption {
+  min-width: 0;
+}
+
 .researchHelp {
   appearance: none;
   display: inline-flex;
@@ -29,16 +43,16 @@
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--ce-status-success-text);
   cursor: help;
 }
 
 .researchHelp:hover,
 .researchHelp:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 80%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   color: var(--ce-text-inverse);
   outline: 2px solid var(--ce-action-accent);
   outline-offset: 2px;
@@ -56,9 +70,29 @@
   line-height: 1.45;
 }
 
+.metadata[open] {
+  max-height: min(28vh, 300px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 .metadata summary {
   cursor: pointer;
   font-weight: 850;
+}
+
+.metadata[open] summary {
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--ce-surface-sunken) 92%, transparent);
+  z-index: 1;
+}
+
+.metadataBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
 }
 
 .metadata a {
@@ -94,6 +128,20 @@
 .metadata ul {
   margin: 0;
   padding-left: 18px;
+}
+
+@media (max-width: 520px) {
+  .researchConsent {
+    align-items: flex-start;
+  }
+
+  .metadata dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metadata dd {
+    margin-bottom: 6px;
+  }
 }
 
 .srOnly {

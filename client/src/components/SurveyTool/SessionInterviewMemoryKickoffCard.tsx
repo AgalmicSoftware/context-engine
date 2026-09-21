@@ -55,9 +55,7 @@ export default function SessionInterviewMemoryKickoffCard({
               <span>{promptCopied ? 'Copied' : 'Copy'}</span>
             </span>
             <span>
-              {promptCopied
-                ? ' prompt to clipboard'
-                : ' and paste this prompt into Claude or ChatGPT to augment interview'}
+              {promptCopied ? ' prompt to clipboard' : ' Let your AI agent draft your answers, then correct it.'}
             </span>
           </span>
         </div>

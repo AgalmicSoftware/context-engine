@@ -1,3 +1,4 @@
+import { validateQuadraticQuestion } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { resolveSponsoredGateStateForResource, SPONSORED_GATE_STATES } from '../../utilities/web3/sponsoredAccess.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -19,6 +20,7 @@ type CreateSurveyQuestionIdGenerator = (
   prompt: unknown,
   options: unknown,
   singleSelect: unknown,
+  voiceCredits?: unknown,
 ) => unknown;
 type BuildCreateSurveyQuestionOptionListArgs = {
   generateQuestionId?: CreateSurveyQuestionIdGenerator;
@@ -222,13 +224,13 @@ export const resolveQuestionSingleSelect = (question: QuestionSelectionInput = {
   !!(question.singleSelect || question.oneSelectionOnly);
 
 export const normalizeAuthoringQuestionOptions = (questionType: unknown, options: unknown): string[] | undefined => {
-  if (!isMultichoiceQuestionType(questionType)) return undefined;
+  if (!isMultichoiceQuestionType(questionType) && questionType !== 'quadratic') return undefined;
   if (!Array.isArray(options)) return [];
   return options.map(toOptionText);
 };
 
 export const normalizePayloadQuestionOptions = (questionType: unknown, options: unknown): string[] | undefined => {
-  if (!isMultichoiceQuestionType(questionType)) return undefined;
+  if (!isMultichoiceQuestionType(questionType) && questionType !== 'quadratic') return undefined;
   if (!Array.isArray(options)) return undefined;
   const normalizedOptions: string[] = [];
   options.forEach((option) => {
@@ -288,6 +290,7 @@ export const buildCreateSurveyQuestionOptionList = ({
     questionToUpdate.prompt,
     questionToUpdate.options,
     questionToUpdate.singleSelect,
+    questionToUpdate.voiceCredits,
   );
   updatedQuestions[qIndex] = questionToUpdate;
   return updatedQuestions;
@@ -307,12 +310,13 @@ export const buildCreateSurveyQuestionFieldUpdateList = ({
   };
   const fieldKey = key as string;
   questionToUpdate[fieldKey] = value;
-  if (fieldKey === 'prompt' || fieldKey === 'type' || fieldKey === 'singleSelect') {
+  if (fieldKey === 'prompt' || fieldKey === 'type' || fieldKey === 'singleSelect' || fieldKey === 'voiceCredits') {
     questionToUpdate.id = generateQuestionId(
       questionToUpdate.type,
       questionToUpdate.prompt,
       questionToUpdate.options || [],
       questionToUpdate.singleSelect,
+      questionToUpdate.voiceCredits,
     );
   }
   updatedQuestions[qIndex] = questionToUpdate;
@@ -342,7 +346,8 @@ export const buildCreateSurveyNewQuestionDraft = ({
       uiKey,
       type,
       prompt: '',
-      options: isMultichoice ? [] : undefined,
+      options: type === 'quadratic' ? ['', ''] : isMultichoice ? [] : undefined,
+      ...(type === 'quadratic' ? { voiceCredits: 99 } : {}),
       singleSelect: isMultichoice ? false : undefined,
       associatedSurveyId: '',
       tags: [],
@@ -532,6 +537,11 @@ export const getCreateSurveyValidationError = ({
   const blankQuestionIndex = findFirstBlankQuestionPromptIndex(questions);
   if (blankQuestionIndex !== -1) {
     return `Question ${blankQuestionIndex + 1} prompt cannot be blank.`;
+  }
+  for (const [index, question] of (Array.isArray(questions) ? questions : []).entries()) {
+    if (question?.type !== 'quadratic') continue;
+    const error = validateQuadraticQuestion(question);
+    if (error) return `Question ${index + 1}: ${error}`;
   }
   const duplicateOption = findFirstDuplicateMultichoiceOptionQuestion(questions);
   if (duplicateOption.index !== -1) {
@@ -1221,7 +1231,7 @@ Prefer short, reusable tags (1-3 words), dedupe tags, and avoid personally ident
 Question Prompt: ${JSON.stringify(String(questionText || ''))}
 Question Type: ${JSON.stringify(String(questionType || ''))}`;
 
-  if (questionType === 'multichoice' && questionOptions && questionOptions.length > 0) {
+  if (['multichoice', 'quadratic'].includes(questionType) && questionOptions && questionOptions.length > 0) {
     prompt += `\nQuestion Options: ${JSON.stringify(questionOptions.map((opt) => String(opt || '')))}`;
   }
 

@@ -4,10 +4,9 @@ import type {
   SurveyQuestionsPrimarySubmitPlan,
 } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsSubmitPendingStats } from './surveyQuestionsSubmitController.js';
+import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 
-export type SurveyQuestionsJsonRuntime = SurveyQuestionsLegacyRecord;
-
-export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyRecord): SurveyQuestionsJsonRuntime => {
+export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyRecord) => {
   const {
     SurveyQuestionsJsonTree,
     buildCommentsToggleState,
@@ -154,6 +153,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       getConvictionFromSlice,
       getImportanceFromSlice,
       sanitizeQuestionPromptForResponsePayload: surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload,
+      recruitmentSource: readSessionRecruitmentSource(resolveEffectiveSlug(propsRef.current)),
     });
   };
 
@@ -183,7 +183,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       fallbackTotal: stateRef.current.modifiedCount || 0,
     });
     const pendingEditCount = pendingStats.total;
-    const planBase: SurveyQuestionsLegacyRecord = {
+    const planBase = {
       account: propsRef.current.account,
       draftSlug: '',
       isStandalone: propsRef.current.isStandalone,

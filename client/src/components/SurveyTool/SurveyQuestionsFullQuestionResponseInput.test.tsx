@@ -96,6 +96,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       kind: 'rating',
       questionId: 'q2',
       ratingValue: 7,
+      ratingScale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
       disabled: false,
       useDeferredRating: true,
     });
@@ -119,6 +120,36 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     });
   });
 
+  it('honors per-question rating scale metadata in full-question descriptors and sliders', () => {
+    const descriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+      question: { id: 'q-rating', type: 'rating', scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } },
+      answer: { value: 0 },
+    });
+
+    expect(descriptor).toEqual({
+      kind: 'rating',
+      questionId: 'q-rating',
+      ratingValue: 1,
+      ratingScale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+      disabled: false,
+      useDeferredRating: true,
+    });
+
+    render(
+      <SurveyQuestionsFullQuestionResponseInput
+        question={{ id: 'q-rating', type: 'rating', scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } }}
+        answer={{ value: 0 }}
+        onDeferredRatingCommit={jest.fn()}
+      />,
+    );
+
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('min', '1');
+    expect(slider).toHaveAttribute('max', '10');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.getByText('10')).toBeInTheDocument();
+  });
+
   it('describes response input actions with question identity and dispatch readiness', () => {
     const inputDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
       question: { id: 'q-rating', type: 'rating' },
@@ -140,7 +171,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       nextValue: 8,
       persistStrategy: 'event-sensitive',
     });
-    expect(ratingChange.event).toBe(event);
+    expect((ratingChange as { event?: unknown }).event).toBe(event);
     expect(shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(ratingChange)).toBe(true);
 
     const ratingCommit = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
@@ -428,4 +459,37 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     expect(onAnswerChange).not.toHaveBeenCalled();
     expect(onToggleAnswerEncryption).not.toHaveBeenCalled();
   });
+});
+
+it('renders signed quadratic votes in the full response view and forwards valid allocations', () => {
+  const onAnswerChange = jest.fn();
+  render(
+    <SurveyQuestionsFullQuestionResponseInput
+      question={{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }}
+      answer={{ value: [3, -4] }}
+      onAnswerChange={onAnswerChange}
+    />,
+  );
+  expect(screen.getByTestId('ce-quadratic-budget')).toHaveTextContent('0 credits left');
+  fireEvent.change(screen.getByLabelText('Parks'), { target: { value: '-2' } });
+  expect(onAnswerChange).toHaveBeenCalledWith([-2, -4]);
+});
+
+it('defers only pointer drags on the standalone question route', () => {
+  const onAnswerChange = jest.fn();
+  render(
+    <SurveyQuestionsFullQuestionResponseInput
+      question={{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }}
+      answer={{ value: [3, -4] }}
+      singleQuestionMode
+      onAnswerChange={onAnswerChange}
+    />,
+  );
+  const slider = screen.getByLabelText('Parks');
+  fireEvent.pointerDown(slider);
+  fireEvent.change(slider, { target: { value: '-2' } });
+  expect(onAnswerChange).not.toHaveBeenCalled();
+  expect(screen.getByTestId('ce-quadratic-budget')).toHaveTextContent('5 credits left');
+  fireEvent.pointerUp(window);
+  expect(onAnswerChange).toHaveBeenCalledWith([-2, -4]);
 });

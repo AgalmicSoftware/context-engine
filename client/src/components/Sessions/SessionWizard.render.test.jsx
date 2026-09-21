@@ -727,10 +727,23 @@ describe('SessionWizard rendered validation', () => {
     expect(policy).toHaveAccessibleName('Who can create groups?');
     expect(policy).toHaveValue('participants');
     expect(screen.queryByRole('textbox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
-    const realtimeModel = screen.getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
+    const interviewPanel = screen.getByRole('region', { name: 'Voice interview settings' });
+    const interviewToggle = within(interviewPanel).getByLabelText('Voice interview modes');
+    expect(interviewToggle).toBeChecked();
+    const realtimeModel = within(interviewPanel).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
     expect(realtimeModel).toHaveValue('gpt-live-1');
     fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-2' } });
     expect(realtimeModel).toHaveValue('gpt-realtime-2');
+    fireEvent.click(interviewToggle);
+    expect(within(interviewPanel).queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
+    expect(screen.getByText('Results analysis')).toBeInTheDocument();
+    expect(policy).toBeInTheDocument();
+    expect(within(interviewPanel).queryByText('Results analysis')).not.toBeInTheDocument();
+    expect(within(interviewPanel).queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
+    fireEvent.click(within(interviewPanel).getByLabelText('Voice interview modes'));
+    expect(within(interviewPanel).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).toHaveValue(
+      'gpt-realtime-2',
+    );
 
     const colorsToggle = screen.getByRole('button', { name: 'Session colors expand' });
     expect(colorsToggle).toHaveAttribute('aria-expanded', 'false');
@@ -982,7 +995,7 @@ describe('SessionWizard rendered validation', () => {
         'false',
       );
       expect(screen.queryByText('Custom')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Customize session settings' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Custom session settings' })).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
@@ -993,12 +1006,10 @@ describe('SessionWizard rendered validation', () => {
       fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
       expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
-      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
-        'aria-checked',
-        'true',
-      );
+      expect(screen.queryByTestId('ce-new-preset-trustless_public_decentralized')).not.toBeInTheDocument();
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Customize session settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Custom session settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 
       enableAdvancedMode();
@@ -1011,6 +1022,34 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
     },
   );
+
+  it('returns to the setup chooser without clearing draft fields', async () => {
+    window.history.replaceState({}, '', '/session/new');
+    renderSessionWizard();
+
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+    const sessionInfoInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO);
+    fireEvent.change(sessionInfoInput, {
+      target: { value: 'Temporary browser verification description.' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    const centralizedCard = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
+    expect(centralizedCard).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).not.toBeInTheDocument();
+
+    const resumeButtons = screen.getAllByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    expect(resumeButtons).toHaveLength(1);
+    expect(resumeButtons[0]).toHaveAccessibleName('Resume existing setup');
+    expect(Boolean(resumeButtons[0].compareDocumentPosition(centralizedCard) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(
+      true,
+    );
+    fireEvent.click(resumeButtons[0]);
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO)).toHaveValue(
+      'Temporary browser verification description.',
+    );
+  });
 
   it('keeps the pure Worker /new profile off registry and block-RPC ports', async () => {
     const blockNumberSpy = jest
@@ -1103,7 +1142,9 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
     expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME));
+    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    expect(resumeButton).toHaveAccessibleName('Resume existing setup');
+    fireEvent.click(resumeButton);
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Saved custom session');
     expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();

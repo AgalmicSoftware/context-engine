@@ -1,3 +1,4 @@
+import { validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 import { isPreviewPrincipal } from './agentPrincipal.mjs';
 import {
   safeString,
@@ -653,6 +654,7 @@ export function base64urlToHex(value = '') {
 
 function normalizeAnswerForPayload(answer = {}) {
   const type = lower(answer.questionType || answer.controlType || 'freeform');
+  if (type === 'quadratic') return { questionType: 'quadratic', value: answer.value };
   if (type === 'rating' || type === 'rating_button') {
     const value = Number(answer.value ?? answer.rating ?? answer.answer ?? answer.label);
     return { questionType: 'rating', value: Number.isFinite(value) ? Math.max(0, Math.min(10, value)) : 0 };
@@ -686,6 +688,10 @@ export function buildTelegramResponsePayload({
   createdAt = null,
 } = {}) {
   const normalized = normalizeAnswerForPayload(answer);
+  if (questionRef.questionType === 'quadratic' || normalized.questionType === 'quadratic') {
+    const error = validateQuadraticAllocation(normalized.value, questionRef);
+    if (error) throw new Error(error);
+  }
   const comments = safeString(answer.comments || answer.additionalComments);
   const payload = {
     timeStamp: createdAt ? new Date(createdAt).getTime() : Date.now(),
@@ -701,7 +707,7 @@ export function buildTelegramResponsePayload({
       encryptionAudience: 'public',
       encryptionGateId: '',
       audienceMode: 'explicit',
-      hash: ['binary', 'multichoice', 'rating'].includes(normalized.questionType)
+      hash: ['binary', 'multichoice', 'rating', 'quadratic'].includes(normalized.questionType)
         ? ''
         : ethers.utils.id(String(normalized.value || '')),
       encryptedPortion: '',

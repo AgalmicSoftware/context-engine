@@ -144,10 +144,16 @@ const cacheLog = createLogger('cache');
 const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
 const CONTEXT_SAVE_LOGIN_REQUIRED_CODE = 'context_save_login_required';
-const generateSurveyGeneratorQuestionId = (type: string, prompt: string, options: string[] = []): string => {
-  return generateSharedQuestionId(type, prompt, options);
+const generateSurveyGeneratorQuestionId = (
+  type: string,
+  prompt: string,
+  options: string[] = [],
+  singleSelect = false,
+  voiceCredits = 99,
+): string => {
+  return generateSharedQuestionId(type, prompt, options, singleSelect, voiceCredits);
 };
-type SurveyGeneratorQuestionTypeKey = 'binary' | 'multichoice' | 'rating' | 'freeform';
+type SurveyGeneratorQuestionTypeKey = 'binary' | 'multichoice' | 'rating' | 'freeform' | 'quadratic';
 type SurveyGeneratorGateMode = 'any' | 'all';
 type SurveyGeneratorNetwork = UnknownRecord & {
   id?: string | number | null;
@@ -388,6 +394,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     // defaults
     binary: true,
     multichoice: true,
+    quadratic: false,
     rating: false,
     freeform: false,
   });
@@ -1623,6 +1630,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           <button
             type="button"
             className={styles.sessionSelectorToggle}
+            data-ce-control-appearance="frameless"
             aria-label="AudioSurveyGenerator session selector"
             data-testid="ce-database-session-selector-toggle"
             onClick={() => setShowSessionSelector((value: boolean) => !value)}
@@ -2071,6 +2079,15 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                       </div>
                     </div>
 
+                    <button
+                      type="button"
+                      className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.quadratic)}
+                      onClick={() => toggleQuestionType('quadratic')}
+                      aria-pressed={!!questionTypes.quadratic}
+                    >
+                      <div className={styles.typeTitle}>Quadratic allocation</div>
+                      <div className={styles.typePreviewRow}>99 voice credits · ± votes</div>
+                    </button>
                     <div
                       className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
                       onClick={() => toggleQuestionType('rating')}

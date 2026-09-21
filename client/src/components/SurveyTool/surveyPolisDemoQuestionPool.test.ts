@@ -39,7 +39,9 @@ describe('surveyPolisDemoQuestionPool', () => {
           options: LEGACY_DEMO_POLL_OPTIONS,
           singleSelect: true,
         });
-        expect(new Set(question.options?.map((option) => option.toLowerCase())).size).toBe(question.options?.length);
+        expect(new Set(question.options?.map((option) => String(option).toLowerCase())).size).toBe(
+          question.options?.length,
+        );
         expect(question.options?.length).toBeGreaterThanOrEqual(2);
       } else {
         expect(question.type).toBe(comment.type);
@@ -72,6 +74,13 @@ describe('surveyPolisDemoQuestionPool', () => {
       resolvePolisDemoQuestionPool({
         displaySlug: 'edge',
         sourceSlug: '',
+      }),
+    ).toEqual([]);
+    expect(
+      resolvePolisDemoQuestionPool({
+        displaySlug: 'demo-2',
+        sourceSlug: 'demo-2',
+        pathname: '/session/demo-2/questions',
       }),
     ).toEqual([]);
   });

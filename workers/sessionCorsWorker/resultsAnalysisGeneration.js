@@ -107,11 +107,19 @@ const ENCRYPTED_ENVELOPE_KEYS = new Set([
   'wrappedKey',
 ]);
 
+const encryptedEnvelopeValueHasContent = (value) => {
+  if (value == null || value === false) return false;
+  if (typeof value === 'string') return trim(value) !== '';
+  if (Array.isArray(value)) return value.length > 0;
+  if (isObj(value)) return Object.keys(value).length > 0;
+  return true;
+};
+
 const valueLooksEncrypted = (value, depth = 0) => {
   if (depth > 5) return false;
   if (!isObj(value)) return false;
   if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-  if (Object.keys(value).some((key) => ENCRYPTED_ENVELOPE_KEYS.has(key))) return true;
+  if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
   return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
 };
 
@@ -145,10 +153,55 @@ const rowLooksLocked = (row) => {
 const normalizeQuestionId = (value) => trim(value).slice(0, 128);
 const normalizeQuestionPrompt = (value) => trim(value).replace(/\s+/g, ' ').slice(0, 1200);
 const normalizeQuestionType = (value) => trim(value).slice(0, 64) || 'text';
+const RATING_SCALE_METADATA_KEYS = [
+  'min',
+  'minimum',
+  'max',
+  'maximum',
+  'minLabel',
+  'lowLabel',
+  'maxLabel',
+  'highLabel',
+];
 
 const safeNumber = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+};
+
+const hasMetadataValue = (value) => value !== undefined && value !== null && trim(value) !== '';
+const recordHasRatingScaleMetadata = (record = {}) =>
+  RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
+const pickRatingScaleRecord = (question = {}) => {
+  const scale = isObj(question.scale) ? question.scale : null;
+  if (scale && recordHasRatingScaleMetadata(scale)) return scale;
+  const ratingScale = isObj(question.ratingScale) ? question.ratingScale : null;
+  if (ratingScale && recordHasRatingScaleMetadata(ratingScale)) return ratingScale;
+  return scale || ratingScale || question;
+};
+const normalizeRatingLabel = (value, fallback) => {
+  const label = trim(value);
+  return normalizeQuestionPrompt(label || String(fallback)).slice(0, 120);
+};
+const normalizeRatingScale = (question = {}) => {
+  const scale = pickRatingScaleRecord(question);
+  if (!recordHasRatingScaleMetadata(scale) && !recordHasRatingScaleMetadata(question)) return null;
+  const min = safeNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
+  const max = safeNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
+  const normalizedMin = min ?? 0;
+  const normalizedMax = max ?? 10;
+  if (normalizedMax <= normalizedMin) return { min: 0, max: 10, minLabel: '0', maxLabel: '10' };
+  return {
+    min: normalizedMin,
+    max: normalizedMax,
+    minLabel: normalizeRatingLabel(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
+    maxLabel: normalizeRatingLabel(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax),
+  };
+};
+
+const normalizeVoiceCredits = (value) => {
+  const numeric = Number(value);
+  return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 99;
 };
 
 const normalizeSubmittedAt = (value) => {
@@ -279,18 +332,45 @@ const normalizeQuestionRecord = (question) => {
   if (!isObj(question)) return null;
   const questionId = normalizeQuestionId(question.questionId || question.questionID || question.id);
   if (!questionId) return null;
+  const type = normalizeQuestionType(question.type || question.questionType);
+  const scale = type === 'rating' ? normalizeRatingScale(question) : null;
   return {
     questionId,
     id: questionId,
     prompt: normalizeQuestionPrompt(question.prompt || question.questionPrompt || question.questionText || question.text || question.title),
-    type: normalizeQuestionType(question.type || question.questionType),
+    type,
     options: Array.isArray(question.options)
       ? question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => normalizeQuestionPrompt(option).slice(0, 140)).filter(Boolean)
       : [],
     tags: Array.isArray(question.tags)
       ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean)
       : [],
+    ...(scale ? { scale } : {}),
+    ...(type === 'quadratic' ? { voiceCredits: normalizeVoiceCredits(question.voiceCredits) } : {}),
   };
+};
+
+const selectRoundRobinResponses = ({ responseRows, questionIds, limit }) => {
+  const buckets = new Map(questionIds.map((questionId) => [questionId, []]));
+  responseRows.forEach((row) => {
+    const bucket = buckets.get(row.questionId);
+    if (bucket) bucket.push(row);
+  });
+  const out = [];
+  for (let offset = 0; out.length < limit; offset += 1) {
+    let added = false;
+    for (let questionIndex = 0; questionIndex < questionIds.length; questionIndex += 1) {
+      const questionId = questionIds[questionIndex];
+      const bucket = buckets.get(questionId) || [];
+      const row = offset < bucket.length ? bucket[(offset + questionIndex) % bucket.length] : null;
+      if (!row) continue;
+      out.push(row);
+      added = true;
+      if (out.length >= limit) break;
+    }
+    if (!added) break;
+  }
+  return out;
 };
 
 const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
@@ -392,9 +472,12 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     });
   const cappedQuestions = sanitizedQuestions.slice(0, AI_QUESTION_CAP);
   const cappedQuestionIds = new Set(cappedQuestions.map((question) => question.questionId));
-  const aiResponses = responseRows
-    .filter((row) => cappedQuestionIds.has(row.questionId))
-    .slice(0, AI_RESPONSE_CAP)
+  const aiResponseRows = selectRoundRobinResponses({
+    responseRows: responseRows.filter((row) => cappedQuestionIds.has(row.questionId)),
+    questionIds: cappedQuestions.map((question) => question.questionId),
+    limit: AI_RESPONSE_CAP,
+  });
+  const aiResponses = aiResponseRows
     .map((row) => ({
       ...(row.additionalComments ? { additional: row.additionalComments.slice(0, AI_LIMITS.maxResponseAdditionalChars) } : {}),
       answer: row.answer.slice(0, AI_LIMITS.maxResponseAnswerChars),
@@ -410,6 +493,8 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     type: question.type,
     options: question.options,
     tags: question.tags,
+    ...(question.scale ? { scale: question.scale } : {}),
+    ...(question.type === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
   }));
   const aiSnapshot = {
     counts: {

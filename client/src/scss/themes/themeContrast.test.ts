@@ -140,4 +140,33 @@ describe('bundled app-theme contrast', () => {
     const values = themeValues(css, 'classic-95');
     assertContrast(values, 'nav-tab-inactive', 'titlebar-bg', 3, 'canvas');
   });
+
+  test.each(['context-engine', 'classic-95'])('%s color-blind mode keeps response text legible', (themeId) => {
+    const values = themeValues(css, themeId);
+    const selectors = [':root[data-ce-color-vision=color-blind]'];
+    if (themeId === 'classic-95') selectors.push(':root[data-ce-color-vision=color-blind][data-ce-theme=classic-95]');
+    selectors.forEach((selector) => {
+      const start = css.indexOf(`${selector} {`);
+      expect(start).toBeGreaterThan(-1);
+      const block = css.slice(start, css.indexOf('}', start));
+      for (const match of block.matchAll(/--ce-([a-z0-9-]+):\s*([^;]+);/g)) values[match[1]] = match[2].trim();
+    });
+    ['agree', 'unsure', 'disagree'].forEach((stance) => {
+      assertContrast(values, `response-${stance}-text`, `response-${stance}-bg`, 4.5, 'surface');
+      expect(
+        contrastRatio(parseColor('#000000'), parseColor(values[`binary-choice-${stance}-bg`])),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+    ['agree', 'disagree'].forEach((stance) => {
+      expect(
+        contrastRatio(parseColor(values[`response-${stance}-document-text`]), parseColor('#ffffff')),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+    ['success', 'warning', 'danger'].forEach((status) =>
+      assertContrast(values, `status-${status}-text`, 'surface', 4.5),
+    );
+    expect(values['binary-choice-agree-bg']).toBe('#56b4e9');
+    expect(values['binary-choice-disagree-bg']).toBe('#e69f00');
+    expect(values['chart-series-1']).toBe(values['data-series-1']);
+  });
 });

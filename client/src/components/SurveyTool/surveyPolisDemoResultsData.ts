@@ -1,4 +1,5 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { hasSimulatedDemoResponses, resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets.js';
 import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -38,7 +39,12 @@ const resolveTypedAnswer = (
   questionType: string,
   value: unknown,
   question: SurveyResultsQuestionRecord,
-): string | null => {
+): string | number[] | null => {
+  if (questionType === 'quadratic') {
+    return validateQuadraticAllocation(value, { options: question.options, voiceCredits: question.voiceCredits })
+      ? null
+      : [...(value as number[])];
+  }
   if (questionType === 'multichoice') {
     const answer = readString(value);
     const options = Array.isArray(question.options) ? question.options.map((option) => readString(option)) : [];

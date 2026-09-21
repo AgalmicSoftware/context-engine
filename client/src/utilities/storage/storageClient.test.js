@@ -23,7 +23,7 @@ const { fetchWorkerWithAuth } = require('../worker/workerAuth.js');
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 
-const buildSingleQuestionResponsePayload = ({ answer, additional, questionType }) =>
+const buildSingleQuestionResponsePayload = ({ answer, additional, questionType, options, voiceCredits }) =>
   buildResponsePayload({
     isStandalone: false,
     singleQuestionMode: true,
@@ -36,7 +36,7 @@ const buildSingleQuestionResponsePayload = ({ answer, additional, questionType }
       importance: {},
       conviction: {},
     },
-    questionPool: [{ id: 'q1', type: questionType, prompt: 'Matrix question' }],
+    questionPool: [{ id: 'q1', type: questionType, prompt: 'Matrix question', options, voiceCredits }],
     pileQuestions: [],
     resolveFieldEncryptionAudience: () => 'self',
     getQuestionEncryptionGates: () => [],
@@ -218,6 +218,38 @@ describe('storageClient', () => {
       }),
     );
   });
+
+  test.each(['arweave', 'cloudflare'])(
+    'preserves quadratic definitions and response arrays through %s storage',
+    async (backend) => {
+      const question = { id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
+      const response = buildSingleQuestionResponsePayload({
+        questionType: question.type,
+        options: question.options,
+        voiceCredits: 25,
+        answer: [3, -4],
+        additional: '',
+      });
+      expect(response.answer.value).toEqual([3, -4]);
+      for (const [resource, payload] of [
+        ['questions', question],
+        ['responses', response],
+      ]) {
+        await uploadDataToSessionStorage(payload, 'json', {
+          resource,
+          sessionSlug: 'matrix-session',
+          sessionConfig: { storageProfile: { backend, resources: { questions: 'active', responses: 'active' } } },
+        });
+        if (backend === 'arweave') {
+          expect(arweaveClient.uploadDataToArweave).toHaveBeenLastCalledWith(payload, 'json', expect.any(Object));
+        } else {
+          const request = JSON.parse(fetchWorkerWithAuth.mock.calls.at(-1)[1].body);
+          expect(request.data).toEqual(payload);
+          expect(request.resource).toBe(resource);
+        }
+      }
+    },
+  );
 
   test('uses an existing Worker credential for Cloudflare file uploads without triggering another auth flow', async () => {
     const fetchImpl = jest.fn().mockResolvedValue(

@@ -31,7 +31,7 @@ const WorkerDeployHelperToggle = ({ checked, onChange, renderInfoTooltip }: Work
           data-testid={E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED}
           onChange={(e) => onChange(!!e.target.checked)}
         />
-        <span>Enable embedded deploy-helper on this worker</span>
+        <span className={styles.workerToggleText}>Enable embedded deploy-helper on this worker</span>
         {renderTooltip({
           id: 'gw-embedded-deploy-helper-tip',
           content:

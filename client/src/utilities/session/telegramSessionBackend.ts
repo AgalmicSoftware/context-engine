@@ -1,3 +1,4 @@
+import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
 import {
@@ -67,6 +68,12 @@ export const buildTelegramPreferenceAnswer = (
   const comments = toStr(source.comments);
   if (questionType === 'binary') return { questionType: 'binary', value: normalizeAnswerValue(source.value), comments };
   if (questionType === 'rating') return { questionType: 'rating', value: Number(source.value), comments };
+  if (questionType === 'quadratic') {
+    const value = source.value ?? source.values;
+    const error = validateQuadraticAllocation(value, question);
+    if (error) throw new Error(error);
+    return { questionType, value, comments };
+  }
   if (questionType === 'multichoice') {
     const values = Array.isArray(source.values)
       ? source.values.map(toStr).filter(Boolean)

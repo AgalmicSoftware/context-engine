@@ -1,0 +1,51 @@
+.controls {
+  color: var(--ce-document-text);
+  p {
+    margin: 0 0 0.75rem;
+  }
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.field {
+  min-width: 0;
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  select {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.4rem;
+    border-radius: 0.4rem;
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+    border: 1px solid var(--ce-border-strong);
+  }
+}
+.selections,
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.controls button {
+  color: var(--ce-control-text);
+  background: var(--ce-control-face);
+  border: 1px solid var(--ce-border-strong);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+@media (max-width: 480px) {
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}

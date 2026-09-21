@@ -1,3 +1,4 @@
+import { formatQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 /** @file CompareAddresses.tsx */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -118,7 +119,7 @@ export {
   resolveCompareVisualSectionStyle,
 } from './compareAddressStyles';
 
-type CompareQuestionType = 'binary' | 'rating' | 'multichoice' | 'freeform' | 'unknown';
+type CompareQuestionType = 'binary' | 'rating' | 'multichoice' | 'freeform' | 'quadratic' | 'unknown';
 type CompareDrillTone = 'agree' | 'disagree' | 'unsure' | 'info' | 'muted';
 type CompareSectionKey = 'agree' | 'dis';
 type ComparisonTone = 'agreement' | 'disagreement';
@@ -182,6 +183,7 @@ interface CompareQuestionEntry {
   prompt: string;
   type: CompareQuestionType;
   responses: CompareQuestionResponse[];
+  options?: unknown[];
 }
 
 interface ComparisonBullets {
@@ -414,7 +416,7 @@ const normalizeQuestionType = (rawType: unknown): CompareQuestionType => {
   }
   if (['text', 'open', 'open-ended', 'open_ended'].includes(t)) return 'freeform';
   if (['scale', 'likert'].includes(t)) return 'rating';
-  if (['binary', 'rating', 'multichoice', 'freeform'].includes(t)) return t as CompareQuestionType;
+  if (['binary', 'rating', 'multichoice', 'freeform', 'quadratic'].includes(t)) return t as CompareQuestionType;
   return 'unknown';
 };
 
@@ -472,10 +474,11 @@ const buildQuestionEntries = (
       const qidLower = String(qidRaw || '').toLowerCase();
       const prompt = toCleanText(q?.prompt) || getQuestionPrompt(qidLower, sessionSlug) || 'Unknown Question';
       const type = normalizeQuestionType(q?.type || '');
-      const entry = map.get(qidLower) || {
+      const entry: CompareQuestionEntry = map.get(qidLower) || {
         id: qidRaw,
         prompt,
         type,
+        options: Array.isArray(q.options) ? q.options : [],
         responses: [],
       };
       if (!entry.prompt) entry.prompt = prompt;
@@ -1337,7 +1340,8 @@ const CompareAddress = ({
         const responded = new Set<number>();
         entry.responses.forEach((r) => {
           responded.add(r.userIndex);
-          const answerText = toCleanText(r.answer);
+          const answerText =
+            entry.type === 'quadratic' ? formatQuadraticAllocation(r.answer, entry.options) : toCleanText(r.answer);
           if (!answerText) return;
           responses.push({
             label: r.label || labelForIndex(r.userIndex),
@@ -1385,6 +1389,7 @@ const CompareAddress = ({
         { key: 'rating', label: 'Rating questions', builder: buildRatingNode },
         { key: 'multichoice', label: 'Multichoice questions', builder: buildMultichoiceNode },
         { key: 'freeform', label: 'Freeform questions', builder: buildFreeformNode },
+        { key: 'quadratic', label: 'Quadratic allocation questions', builder: buildFreeformNode },
       ];
 
       const mappedNodes = sections.map<CompareDrillNode | null>((section) => {

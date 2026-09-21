@@ -360,7 +360,12 @@ POST /api/agent/questions/create
 
 Max 20 questions per call. To add 50 questions, send 20 + 20 + 10. Use concise,
 plain-language prompts with tags. Supported `questionType` values include
-`binary`, `rating`, `multichoice`, and `freeform`.
+`binary`, `rating`, `multichoice`, `quadratic`, and `freeform`.
+
+For `quadratic`, include at least two distinct ordered `options` and a positive
+integer `voiceCredits` budget (99 by default). Answers use `value: [3, -4]` in
+option order: each vote costs its square, the total must fit the budget, and
+zero is neutral. Credits may remain unused. Preserve signs, order, and zeros.
 
 Pose an existing or ad hoc question to the Telegram group only when explicitly
 needed:

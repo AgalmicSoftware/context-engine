@@ -1,3 +1,4 @@
+import { formatQuadraticAllocation, validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 import {
   safeString,
   timingSafeEqualString,
@@ -1872,6 +1873,7 @@ function publicAgentQuestion(question = {}, { session = {} } = {}) {
     questionType,
     prompt,
     options,
+    ...(questionType === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
     ...(questionType === 'multichoice' && question.singleSelect === true ? { singleSelect: true } : {}),
     tags,
     answerable: Boolean(questionId && prompt && !locked && !unavailable),
@@ -1929,6 +1931,7 @@ function submitRecordAnswerForAgent(record = {}) {
     questionType,
     ...(label ? { label } : {}),
   };
+  if (questionType === 'quadratic') return { ...base, value: structured.value ?? answer.value, comments: safeString(structured.comments || answer.comments) };
   if (questionType === 'multichoice') {
     const values = Array.isArray(structured.values)
       ? structured.values.map(safeAnswerString).filter(Boolean)
@@ -2537,7 +2540,8 @@ function normalizeQuestionDraftInputs(input = {}) {
         .replace(/\s+/g, ' ')
         .slice(0, 1000),
       questionType: safeString(entry.questionType || entry.type || input.questionType || 'binary') || 'binary',
-      options: Array.isArray(entry.options) ? entry.options.map(safeString).filter(Boolean).slice(0, 12) : [],
+      options: Array.isArray(entry.options) ? entry.options.map(safeString).filter(Boolean).slice(0, (entry.questionType || entry.type || input.questionType) === 'quadratic' ? Infinity : 12) : [],
+      ...((entry.questionType || entry.type || input.questionType) === 'quadratic' ? { voiceCredits: entry.voiceCredits ?? input.voiceCredits ?? 99 } : {}),
       tags: normalizeQuestionTags(entry.tags || input.tags),
       sessionContext: safeString(
         entry.sessionContext ||
@@ -3957,6 +3961,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
       prompt: draft.prompt,
       questionType: draft.questionType,
       options: draft.options,
+      voiceCredits: draft.voiceCredits ?? 99,
       ratingScale: draft.ratingScale || draft.rating_scale || null,
       tags: draft.tags,
       sessionContext: draft.sessionContext || sessionContextFromPolicySession(context.session),
@@ -4836,6 +4841,7 @@ function normalizeMiniAppLaunchDrafts(input = {}, questionIds = []) {
       if (text) normalized.text = text;
       if (comments) normalized.comments = comments;
       if (value) normalized.value = value;
+      if (Array.isArray(draft.value) && draft.value.every(Number.isSafeInteger)) normalized.value = draft.value;
       if (values.length) normalized.values = values;
       if (Object.keys(normalized).length) out[questionId] = normalized;
     });
@@ -5674,6 +5680,11 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
   const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : { value: answer };
   const questionType = safeString(question.questionType || source.questionType || 'freeform');
   const comments = safeString(source.comments || source.additionalComments || source.reason || source.rationale);
+  if (questionType === 'quadratic') {
+    const value = source.value ?? source.answer;
+    if (validateQuadraticAllocation(value, question)) return null;
+    return { label: formatQuadraticAllocation(value, question.options), value: { questionType, value, comments }, controlType: 'quadratic_allocation' };
+  }
   if (questionType === 'binary') {
     const raw = lower(firstValue(source.value, source.answer, source.choice, source.stance, source.label));
     const value =
@@ -6031,6 +6042,7 @@ async function handleCreateQuestionsRequest({ env = {}, context = {}, input = {}
         prompt,
         questionType: question.questionType || question.type || 'binary',
         options: question.options,
+        voiceCredits: question.voiceCredits ?? 99,
         ratingScale: question.ratingScale ||
           question.rating_scale || {
             min: question.min,
@@ -6152,6 +6164,7 @@ async function handlePoseRequest({ env = {}, context = {}, input = {}, fetchImpl
       prompt,
       questionType: input.questionType || 'freeform',
       options: input.options,
+      voiceCredits: input.voiceCredits ?? 99,
       ratingScale: input.ratingScale ||
         input.rating_scale || {
           min: input.min,

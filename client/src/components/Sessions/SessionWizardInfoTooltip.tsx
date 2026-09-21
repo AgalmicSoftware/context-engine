@@ -35,6 +35,7 @@ const SessionWizardInfoTooltip = ({
         id={id}
         className={styles.tooltipTrigger}
         data-testid={testId || undefined}
+        data-ce-control-appearance="frameless"
         role="button"
         tabIndex={0}
         aria-label={ariaLabel}

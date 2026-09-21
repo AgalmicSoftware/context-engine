@@ -10,6 +10,7 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
   rating: 'Rating',
   multichoice: 'Multichoice',
   binary: 'Binary',
+  quadratic: 'Quadratic allocation',
 };
 
 const normalizeQuestionTypeLabel = (type: unknown): string => {
@@ -51,7 +52,7 @@ export default function InterviewSuggestedQuestionPrompt({
     <div className={styles.interviewQuestionPrompt}>
       <div className={styles.interviewQuestionSummary}>
         <span className={styles.interviewQuestionTypeBadge}>{label}</span>
-        {label === 'Multichoice' && normalizedOptions.length > 0 && (
+        {['Multichoice', 'Quadratic allocation'].includes(label) && normalizedOptions.length > 0 && (
           <span className={styles.interviewQuestionOptions}>Options: {normalizedOptions.join(' · ')}</span>
         )}
       </div>

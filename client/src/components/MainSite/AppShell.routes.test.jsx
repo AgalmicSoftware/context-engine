@@ -21,6 +21,7 @@ import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbac
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache.js';
 import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
@@ -2850,6 +2851,78 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-all-sessions-mode', 'false');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', 'edge');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-config-slug', 'edge');
+  });
+
+  it.each([
+    ['/group/participants', false],
+    ['/groups', false],
+    ['/group/participants', true],
+    ['/groups', true],
+    ['/sbts/group-worker', true],
+  ])('discovers the exact Worker session on %s (cached hint: %s)', async (path, cachedHint) => {
+    const workerOrigin = 'https://group-worker.example.com';
+    const workerConfig = {
+      slug: 'group-worker',
+      sessionId: '0xabcdefabcdefabcdefabcdefabcdefab',
+      configRevision: 'group-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    if (cachedHint) {
+      expect(
+        upsertWorkerCanonicalSessionBootstrap({
+          slug: workerConfig.slug,
+          sessionIdHex: workerConfig.sessionId,
+          workerOrigin,
+          config: workerConfig,
+        }).status,
+      ).toBe('cached');
+    }
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, sessionSlug: workerConfig.slug, config: workerConfig }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const subject = createSubject({
+      path,
+      search: `?sessionName=${workerConfig.slug}${cachedHint ? '' : `&worker=${encodeURIComponent(workerOrigin)}`}`,
+      sessionConfig: null,
+    });
+    const view = render(subject.render());
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    expect(mockSBTsPage).not.toHaveBeenCalled();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+    expect(await screen.findByTestId('mock-sbts-page')).toBeInTheDocument();
+    expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
+    expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.workerGroupId).toBe(
+      path.startsWith('/group/') ? 'participants' : undefined,
+    );
+  });
+
+  it('shows a helpful unavailable state for an undiscoverable named Group instead of the SBT list', async () => {
+    const subject = createSubject({
+      path: '/group/participants',
+      search: '?sessionName=unknown-worker',
+      sessionConfig: null,
+    });
+    render(subject.render());
+    expect(await screen.findByRole('heading', { name: 'Group unavailable' })).toBeInTheDocument();
+    expect(screen.getByText(/use the full shared link/i)).toBeInTheDocument();
+    expect(mockSBTsPage).not.toHaveBeenCalled();
+    expect(screen.queryByText(/blocks left/i)).not.toBeInTheDocument();
+  });
+
+  it('fails closed for an invalid Worker hint on a group detail link', async () => {
+    const subject = createSubject({
+      path: '/group/participants',
+      search: '?sessionName=group-worker&worker=https%3A%2F%2Fsecret%40worker.example.com',
+      sessionConfig: null,
+    });
+    render(subject.render());
+    expect(await screen.findByTestId('ce-worker-canonical-discovery-error')).toBeInTheDocument();
+    expect(mockSBTsPage).not.toHaveBeenCalled();
   });
 
   it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {

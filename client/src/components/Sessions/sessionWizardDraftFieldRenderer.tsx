@@ -507,14 +507,34 @@ export const buildSessionWizardDraftFieldRenderer = ({
       );
     }
 
-    if (path.length === 0 && key === 'interviewMode')
+    if (path.length === 0 && key === 'interviewMode') return null;
+
+    if (path.length === 0 && key === 'interviewModeEnabled') {
+      const interviewEnabled = value !== false;
       return (
-        <InterviewSettingsFields
-          key={keyString}
-          value={value}
-          onChange={(next) => updateDraftValue(['interviewMode'], next)}
-        />
+        <section key={keyString} className={styles.interviewModePanel} aria-label="Voice interview settings">
+          <LockableFieldFrame
+            {...fieldFrameProps}
+            labelInlineControl={
+              <Input
+                type="checkbox"
+                checked={interviewEnabled}
+                onChange={(e) => updateDraftValue(currentPath, !!e.target.checked)}
+                className={`${styles.inlineCheckbox} ${styles.interviewModeToggleCheckbox}`}
+              />
+            }
+          />
+          {interviewEnabled ? (
+            <div className={styles.interviewModePanelBody}>
+              <InterviewSettingsFields
+                value={draft.interviewMode}
+                onChange={(next) => updateDraftValue(['interviewMode'], next)}
+              />
+            </div>
+          ) : null}
+        </section>
       );
+    }
 
     if (path.length === 0 && key === 'resultsAnalysis') {
       const backgroundAutoSupported = supportsBackgroundResultsAnalysis(draft);

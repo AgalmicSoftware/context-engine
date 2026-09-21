@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
   buildClusterAnalysisDataKey,
@@ -23,7 +23,7 @@ import PolisReport, {
   resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
-import { d3Report } from './polisReportRuntime';
+import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -139,9 +139,9 @@ const openSettingsRow = () => {
 };
 
 describe('PolisReport report palette', () => {
-  it('keeps opinion-group colors on the original D3 categorical palette', () => {
-    expect(POLIS_CLUSTER_COLORS).toBe(d3Report.schemeCategory10);
-    expect(POLIS_CLUSTER_COLORS).not.toEqual(expect.arrayContaining([expect.stringContaining('--ce-data-series-')]));
+  it('shares runtime categorical colors with other report charts', () => {
+    expect(POLIS_CLUSTER_COLORS).toBe(CHART_SERIES_COLORS);
+    expect(POLIS_CLUSTER_COLORS).toHaveLength(10);
   });
 });
 
@@ -228,9 +228,7 @@ describe('PolisReport cache read options', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('No readable responses match the current filters.')).not.toBeInTheDocument();
       expect(computePolisConversationMath).toHaveBeenCalledWith(
         [[1, -1, 0]],
         expect.objectContaining({ qLegacy: 'Legacy prompt' }),
@@ -396,13 +394,13 @@ describe('PolisReport cache read options', () => {
   it('keeps participant graph tooltip copy aligned with the Polis graph modes', () => {
     expect(REPORT_DEFAULT_EMBEDDING_LABEL).toBe('Polis Auto');
     expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe(
-      "This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic grouping.",
+      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering.",
     );
     expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe(
-      "Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
+      "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
     );
     expect(OPINION_GROUPS_TOOLTIP_TEXT).toBe(
-      "Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.",
+      "Leave K on auto to use Polis Auto's automatic clustering, or set K manually when exploring UMAP or SVD/PCA layouts.",
     );
   });
 
@@ -566,7 +564,7 @@ describe('PolisReport cache read options', () => {
     expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
     expect(screen.queryByText('Scanning session blocks')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.POLIS_REPORT_LOADING_PROGRESS)).not.toBeInTheDocument();
-    expect(screen.getByText('No non-encrypted binary responses found, or no Demo data loaded.')).toBeInTheDocument();
+    expect(screen.getByText('No readable responses match the current filters.')).toBeInTheDocument();
   });
 
   it('shows neutral hydrate loading copy while keeping hydrate progress details when counts exist', () => {
@@ -789,7 +787,7 @@ describe('PolisReport demo data defaults', () => {
     );
     const demo2Dataset = getPolisDemoDatasetForSlug('demo-2', { allowFallback: false });
     expect(demo2Dataset).not.toBe(getPolisDemoDatasetForSlug('demo', { allowFallback: false }));
-    expect(demo2Dataset?.comments).toHaveLength(40);
+    expect(demo2Dataset?.comments).toHaveLength(49);
     expect(demo2Dataset?.clusterAnalysis).toHaveLength(3);
   });
 
@@ -800,6 +798,87 @@ describe('PolisReport demo data defaults', () => {
 
     expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
+  });
+
+  it.each(['demo', 'demo-2'])('renders all answer sections from the built-in %s data', (slug) => {
+    const { rerender } = render(<PolisReport {...baseReportProps} slug={slug} />);
+    ['binary', 'freeform', 'rating', 'multichoice', 'quadratic'].forEach((type) => {
+      expect(screen.getByTestId(`ce-polis-answers-${type}`)).toBeInTheDocument();
+    });
+    const sections = screen.getByTestId('ce-polis-answer-sections');
+    expect(
+      screen.getByText('Participants Graph').compareDocumentPosition(sections) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'All Questions' })).toContainElement(sections);
+    ['Binary', 'Freeform', 'Ratings', 'Multiple choice', 'Quadratic allocation'].forEach((name) => {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
+    });
+    expect(screen.getByText('Which AI governance measures would you support or oppose?')).toBeInTheDocument();
+    rerender(<PolisReport {...baseReportProps} slug={slug} filterState={{ selectedTags: ['education'] }} />);
+    expect(screen.queryByText('Which AI governance measures would you support or oppose?')).not.toBeInTheDocument();
+    expect(screen.getByText('Which uses of AI in education would you support or oppose?')).toBeInTheDocument();
+    rerender(<PolisReport {...baseReportProps} slug={slug} filterState={{ selectedTags: ['no-demo-matches'] }} />);
+    expect(screen.queryByTestId('ce-polis-answers-quadratic')).not.toBeInTheDocument();
+  });
+
+  it('opens every type when All Questions reopens and preserves View more state', () => {
+    render(<PolisReport {...baseReportProps} slug="demo" />);
+    const parent = screen.getByRole('button', { name: 'All Questions' });
+    const binary = screen.getByTestId('ce-polis-answers-binary');
+    const ratings = screen.getByTestId('ce-polis-answers-rating');
+    expect(binary.querySelector('svg[aria-label^="Agree"]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Binary' }));
+    fireEvent.click(within(ratings).getByRole('button', { name: 'View more (2)' }));
+    expect(ratings.querySelectorAll('article')).toHaveLength(3);
+    fireEvent.click(parent);
+    expect(binary).not.toBeVisible();
+    expect(ratings).not.toBeVisible();
+    fireEvent.click(parent);
+    expect(binary).toBeVisible();
+    expect(ratings).toBeVisible();
+    expect(ratings.querySelectorAll('article')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Binary' }));
+    expect(binary.querySelector('svg[aria-label^="Agree"]')).toBeNull();
+    expect(ratings.querySelectorAll('article')).toHaveLength(3);
+  });
+
+  it('previews the five most divisive binary questions and expands the remaining questions in score order', () => {
+    const scores = [0.1, 0.9, 0.5, 0.8, 0.4, 0.7, 0.3];
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 1, nComments: 7, totalVotes: 7, votesPerVoterAvg: 7 },
+      participantCoords: [],
+      statementCoords: [],
+      clusterAssignments: [],
+      clusterCount: 0,
+      repQuestions: {},
+      commentStats: scores.map((extremity, commentIndex) => ({ extremity, commentIndex })),
+    });
+    const rows = Object.fromEntries(
+      scores.map((_, index) => [
+        `q${index}`,
+        [
+          {
+            responder: 'person-a',
+            response: {
+              type: 'binary',
+              prompt: `Binary example ${index}`,
+              answer: { value: 'Agree' },
+            },
+          },
+        ],
+      ]),
+    );
+    render(<PolisReport {...baseReportProps} questionResponses={rows} />);
+    const section = screen.getByTestId('ce-polis-answers-binary');
+    const prompts = () =>
+      [...section.querySelectorAll('[data-pdf-keep-together]')].map(
+        (el) => el.textContent.match(/Binary example (\d)/)?.[1],
+      );
+    expect(prompts()).toEqual(['1', '3', '5', '2', '4']);
+    fireEvent.click(within(section).getByRole('button', { name: 'View more (2)' }));
+    expect(prompts()).toEqual(['1', '3', '5', '2', '4', '6', '0']);
+    fireEvent.click(within(section).getByRole('button', { name: 'View less' }));
+    expect(prompts()).toEqual(['1', '3', '5', '2', '4']);
   });
 
   it('shows the demo data toggle as enabled by default for demo-1', () => {
@@ -826,20 +905,20 @@ describe('PolisReport demo data defaults', () => {
     const demoToggle = screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE);
     expect(demoToggle).toBeChecked();
     expect(demoToggle).not.toBeDisabled();
+    expect(screen.getByTestId('ce-polis-answers-quadratic')).toBeInTheDocument();
 
     fireEvent.click(demoToggle);
 
     expect(demoToggle).not.toBeChecked();
     await waitFor(() => {
+      expect(screen.queryByTestId('ce-polis-answers-quadratic')).not.toBeInTheDocument();
       expect(screen.queryByText('None (Demo Data Active)')).not.toBeInTheDocument();
-      expect(
-        screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('No readable responses match the current filters.')).not.toBeInTheDocument();
       expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
     });
   });
 
-  it('includes the participants list in the global collapse and expand controls', async () => {
+  it('includes the participants list and answer sections in the global collapse and expand controls', async () => {
     const demoDataset = getPolisDemoDatasetForSlug('demo');
     const participant = Array.isArray(demoDataset?.participantsVotes)
       ? demoDataset.participantsVotes.find((entry) => entry?.xid || entry?.participant)
@@ -876,6 +955,8 @@ describe('PolisReport demo data defaults', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse All' }));
+    expect(screen.getByRole('button', { name: 'All Questions' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Ratings', hidden: true })).toHaveAttribute('aria-expanded', 'false');
 
     expect(screen.getByText('List of Participants')).toBeInTheDocument();
     expect(screen.queryByTitle(participantLabel)).not.toBeInTheDocument();
@@ -883,6 +964,9 @@ describe('PolisReport demo data defaults', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand All' }));
 
     expect(screen.getByTitle(participantLabel)).toBeInTheDocument();
+    ['Binary', 'Freeform', 'Ratings', 'Multiple choice', 'Quadratic allocation'].forEach((name) => {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
+    });
   });
 
   it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
@@ -1123,9 +1207,7 @@ describe('PolisReport demo data defaults', () => {
       />,
     );
 
-    expect(
-      screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No readable responses match the current filters.')).not.toBeInTheDocument();
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
   });
 
@@ -1277,13 +1359,47 @@ describe('PolisReport demo data defaults', () => {
     ).toBe(true);
   });
 
-  it('labels missing demo representative differences as unavailable', async () => {
+  it('shows actual response percentages even when demo representative differences are missing', async () => {
     render(<PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />);
 
     fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
 
-    expect(await screen.findAllByText(/difference from the overall conversation is unavailable/i)).not.toHaveLength(0);
+    expect(await screen.findAllByText(/% (agree|disagree) in this cluster · \d+% overall/)).not.toHaveLength(0);
     expect(screen.queryByText(/by 0\.0 percentage points/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['agree', '50% agree in this cluster · 33% overall'],
+    ['disagree', '0% disagree in this cluster · 33% overall'],
+  ])('compares %s percentages using respondents, including unsure votes', (stance, expected) => {
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 4, nComments: 2, totalVotes: 4, votesPerVoterAvg: 1 },
+      participantCoords: [],
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0, 0, 1, 0],
+      clusterCount: 2,
+      repQuestions: {
+        0: [{ questionIndex: 0, label: '#1', prompt: 'A test statement', repfulFor: stance, difference: null }],
+      },
+    });
+    const responses = {
+      q1: ['Agree', 'Unsure', 'Disagree'].map((value, index) => ({
+        responder: `person-${index}`,
+        response: { type: 'binary', prompt: 'A test statement', answer: { value } },
+      })),
+      q2: [
+        {
+          responder: 'person-3',
+          response: { type: 'binary', prompt: 'Another statement', answer: { value: 'Agree' } },
+        },
+      ],
+    };
+    render(<PolisReport {...baseReportProps} questionResponses={responses} />);
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Clusters' }));
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText(/percentage points/)).not.toBeInTheDocument();
   });
 
   it('skips precomputed cluster analysis when the fixture version does not match', () => {
@@ -1442,4 +1558,246 @@ describe('PolisReport demo data defaults', () => {
     expect(out.questions).not.toContain('c-rating');
     expect(out.questions).not.toContain('c-freeform');
   });
+});
+
+describe('Polis mixed answer report filtering', () => {
+  const makeRows = (type, values) =>
+    values.map((value, i) => ({
+      responder: `person-${i}`,
+      response: JSON.stringify({ type, prompt: `${type} prompt`, answer: { value } }),
+    }));
+  const metadata = {
+    rating: { type: 'rating', prompt: 'Tagged rating', tags: [' Mobility '] },
+    quadratic: { type: 'quadratic', prompt: 'Tagged allocation', tags: ['mobility'], options: ['Bus', 'Garden'] },
+    emptyTags: { type: 'freeform', tags: [] },
+    otherTag: { type: 'freeform', tags: ['housing'] },
+  };
+  const responses = {
+    rating: makeRows('rating', [0, 8]),
+    quadratic: makeRows('quadratic', [[2, -3]]),
+    emptyTags: makeRows('freeform', ['Untagged']),
+    otherTag: makeRows('freeform', ['Other tag']),
+    unknown: makeRows('freeform', ['Unknown tags']),
+  };
+
+  beforeEach(() => {
+    cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+      namespace === 'questionsCache' ? { 84532: { questions: metadata } } : {},
+    );
+  });
+
+  it('filters by question tags, excludes missing tags, and updates the displayed sections when filters change', () => {
+    const { rerender } = render(
+      <PolisReport
+        {...baseReportProps}
+        questionResponses={responses}
+        filterState={{ selectedTags: ['MOBILITY'] }}
+        disclaimersActive
+      />,
+    );
+    expect(screen.getByText('Tagged rating')).toBeInTheDocument();
+    expect(screen.getByText('Tagged allocation')).toBeInTheDocument();
+    expect(screen.queryByText('Untagged')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unknown tags')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Only non-encrypted, binary/)).not.toBeInTheDocument();
+    rerender(
+      <PolisReport {...baseReportProps} questionResponses={responses} filterState={{ selectedTags: ['housing'] }} />,
+    );
+    expect(screen.queryByText('Tagged rating')).not.toBeInTheDocument();
+    expect(screen.getByText('Other tag')).toBeInTheDocument();
+    rerender(
+      <PolisReport {...baseReportProps} questionResponses={responses} filterState={{ selectedTags: ['missing'] }} />,
+    );
+    expect(screen.getByText('No readable responses match the current filters.')).toBeInTheDocument();
+  });
+
+  it('ranks non-binary questions by response count after tag and type filtering', () => {
+    expect(
+      Object.keys(
+        applyFilterStateToAggregator(
+          responses,
+          { id: 84532 },
+          { selectedTags: ['mobility'], topQuestions: { count: 1, by: 'responses' } },
+          '',
+        ),
+      ),
+    ).toEqual(['rating']);
+    expect(
+      Object.keys(applyFilterStateToAggregator(responses, { id: 84532 }, { questionTypes: ['quadratic'] }, '')),
+    ).toEqual(['quadratic']);
+  });
+});
+
+it('filters demo answer sections and binary analysis by the same question tags', () => {
+  const dataset = {
+    comments: [
+      { commentId: 'binary', commentBody: 'Binary excluded', type: 'binary', tags: ['other'] },
+      {
+        commentId: 'rating',
+        commentBody: 'Demo tagged rating',
+        type: 'rating',
+        scale: { min: 0, max: 10 },
+        tags: ['included'],
+      },
+    ],
+    participantsVotes: [{ participant: 'person-a', votes: { 0: 1 }, responses: { 1: { value: 0 } } }],
+  };
+  render(
+    <PolisReport
+      {...baseReportProps}
+      slug="demo-fixture"
+      demoDataFirstLoad
+      demoDataBySlug={{ 'demo-fixture': dataset }}
+      filterState={{ selectedTags: ['included'] }}
+    />,
+  );
+  expect(screen.getByText('Demo tagged rating')).toBeInTheDocument();
+  expect(screen.queryByText('Binary excluded')).not.toBeInTheDocument();
+  expect(screen.queryByText('Summary and Statistics')).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'All Questions' })).toContainElement(
+    screen.getByTestId('ce-polis-answers-rating'),
+  );
+  expect(screen.queryByRole('button', { name: 'Binary' })).not.toBeInTheDocument();
+});
+
+it('renders named quadratic totals from a scoped Worker cache and filters its question tags', () => {
+  const sessionConfig = {
+    slug: 'worker-session',
+    sessionId: `0x${'2'.repeat(32)}`,
+    corsWorkerUrl: 'https://polis-worker.example.test',
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    storageProfile: {
+      backend: 'cloudflare',
+      resources: { questions: 'active', surveys: 'active' },
+      payloadAccessControl: { gate: 'role_gate', encryption: 'worker_envelope', mode: 'authorized_read' },
+    },
+  };
+  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache'
+      ? {
+          worker: withWorkerCanonicalCacheIdentity(
+            {
+              questions: {
+                quadratic: {
+                  type: 'quadratic',
+                  prompt: 'Worker allocation',
+                  tags: ['included'],
+                  options: ['Garden', 'Transit'],
+                  voiceCredits: 200,
+                },
+              },
+            },
+            identity,
+          ),
+        }
+      : {},
+  );
+  const questionResponses = {
+    quadratic: [{ responder: 'person-a', response: { type: 'quadratic', answer: { value: [12, -5] } } }],
+  };
+  const { rerender } = render(
+    <PolisReport
+      {...baseReportProps}
+      network={null}
+      slug="worker-session"
+      sessionConfig={sessionConfig}
+      questionResponses={questionResponses}
+      filterState={{ selectedTags: ['included'] }}
+    />,
+  );
+  expect(screen.getByText('Worker allocation')).toBeInTheDocument();
+  expect(screen.getByText('Garden')).toBeInTheDocument();
+  expect(screen.getAllByText('+12')).toHaveLength(2);
+  rerender(
+    <PolisReport
+      {...baseReportProps}
+      network={null}
+      slug="worker-session"
+      sessionConfig={sessionConfig}
+      questionResponses={questionResponses}
+      filterState={{ selectedTags: ['other'] }}
+    />,
+  );
+  expect(screen.queryByText('Worker allocation')).not.toBeInTheDocument();
+});
+
+it('uses native Group members for all answer sections and blocks unreadable cohorts without changing SBT filters', async () => {
+  const tokenSpy = jest
+    .spyOn(require('../../utilities/worker/workerAuth'), 'getWorkerSessionToken')
+    .mockResolvedValue('synthetic-token');
+  const memberSpy = jest.spyOn(require('../../domains/worker/workerGroupPorts'), 'loadWorkerGroupMembers');
+  const account = '0x' + 'a'.repeat(40),
+    outsider = '0x' + 'b'.repeat(40);
+  const sessionConfig = {
+    slug: 'group-report',
+    sessionIdHex: '0x' + '3'.repeat(32),
+    corsWorkerUrl: 'https://group-report.example',
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  };
+  const group = {
+    groupId: 'eddy-2026',
+    label: 'EDDY-2026',
+    sessionSlug: sessionConfig.slug,
+    joinMode: 'open',
+    memberVisibility: 'session',
+  };
+  memberSpy.mockResolvedValue({
+    group,
+    members: [{ principal: { kind: 'passkey_account', address: account } }],
+    nextCursor: '',
+    memberCount: 1,
+  });
+  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: sessionConfig.slug });
+  const metadata = { q: { type: 'freeform', prompt: 'Group feedback', creator: account } };
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache'
+      ? {
+          worker: withWorkerCanonicalCacheIdentity({ questions: metadata }, identity),
+          84532: { questions: metadata },
+        }
+      : {},
+  );
+  const selection = {
+    sessionSlug: sessionConfig.slug,
+    sessionId: sessionConfig.sessionIdHex,
+    workerUrl: sessionConfig.corsWorkerUrl,
+    creatorInclude: [],
+    creatorExclude: [],
+    responderInclude: [group],
+    responderExclude: [],
+  };
+  const responses = {
+    q: [
+      { responder: account, response: { type: 'freeform', answer: { value: 'Member-only feedback' } } },
+      { responder: outsider, response: { type: 'freeform', answer: { value: 'Outside feedback' } } },
+    ],
+  };
+  const props = { ...baseReportProps, account, sessionConfig, slug: sessionConfig.slug, questionResponses: responses };
+  try {
+    const { rerender } = render(<PolisReport {...props} filterState={{ workerGroupFilter: selection }} />);
+    expect(screen.queryByText('Outside feedback')).not.toBeInTheDocument();
+    await screen.findByText('Member-only feedback');
+    expect(screen.queryByText('Outside feedback')).not.toBeInTheDocument();
+    rerender(
+      <PolisReport
+        {...props}
+        filterState={{ workerGroupFilter: { ...selection, responderInclude: [], responderExclude: [group] } }}
+      />,
+    );
+    await screen.findByText('Outside feedback');
+    expect(screen.queryByText('Member-only feedback')).not.toBeInTheDocument();
+    memberSpy.mockRejectedValue(new Error('worker_group_member_list_forbidden'));
+    rerender(<PolisReport {...props} account={outsider} filterState={{ workerGroupFilter: selection }} />);
+    expect(screen.queryByText('Outside feedback')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('permission'));
+    rerender(
+      <PolisReport {...props} sessionConfig={{ chainId: 84532 }} filterState={{ workerGroupFilter: selection }} />,
+    );
+    await screen.findByText('Outside feedback');
+    expect(screen.getByText('Member-only feedback')).toBeInTheDocument();
+  } finally {
+    tokenSpy.mockRestore();
+    memberSpy.mockRestore();
+  }
 });

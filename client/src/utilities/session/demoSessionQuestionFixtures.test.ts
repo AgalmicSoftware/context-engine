@@ -11,6 +11,23 @@ import {
 import { classifySessionModeProfileSupport } from './sessionModeProfile';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
+  it('preserves quadratic metadata in session demo question adapters', () => {
+    const comments = demo2QuestionSeed.comments as Array<Record<string, unknown>>;
+    comments.push({
+      commentId: 'quadratic-fixture',
+      commentBody: 'Allocate support',
+      type: 'quadratic',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    });
+    try {
+      const question = getTemporaryDemoSessionQuestionFixtures('demo-2').find((q) => q.prompt === 'Allocate support');
+      expect(question).toMatchObject({ type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 });
+      expect(question?.singleSelect).toBeUndefined();
+    } finally {
+      comments.pop();
+    }
+  });
   it('maps the demo polis comments to temporary demo-1 question metadata', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-1', {
       sessionName: 'Demo Session',
@@ -174,6 +191,21 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       },
     });
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
+  });
+
+  it('does not seed fallback questions for the fifth realtime demo route', () => {
+    const config = (demoSessions as Record<string, any>)['demo-interview-5'];
+
+    expect(getTemporaryDemoSessionQuestionFixtures('demo-interview-5', config)).toEqual([]);
+    expect(config).toMatchObject({
+      sessionId: '0xa0dfc46736b8288854ae2c4156877879',
+      corsWorkerUrl: 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev/',
+      workerCanonicalCleanRoute: true,
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        evm: { registryChainId: null },
+      },
+    });
   });
 
   it('uses question-specific poll choices for demo-interview without changing legacy demo sessions', () => {

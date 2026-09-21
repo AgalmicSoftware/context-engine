@@ -1,3 +1,4 @@
+import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 /**
  * @file compareUsers.js
  * @module compareUsers
@@ -318,6 +319,11 @@ export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedSt
     } else if (type === 'rating') {
       const v = normalizeRatingSignedValue(ans);
       if (v !== 0) tokens.set(makeToken(qid), { sign: v > 0 ? 1 : -1, weight: Math.abs(v) * impMul });
+    } else if (type === 'quadratic' && Array.isArray(ans) && ans.length >= 2 && ans.every(Number.isSafeInteger)) {
+      ans.forEach((vote, index) => {
+        if (vote !== 0)
+          tokens.set(makeToken(qid, String(index)), { sign: vote > 0 ? 1 : -1, weight: Math.abs(vote) * impMul });
+      });
     } else if (type === 'multichoice') {
       const arr = Array.isArray(ans) ? ans : typeof ans === 'string' ? [ans] : [];
       for (const opt of arr) {
@@ -706,17 +712,18 @@ export function fallbackBullets(users: CompareUser[] = []): { agreements: string
     }
 
     // Disagreements via answer diffs on same prompt
-    const normalizeFallbackAnswer = (answer: unknown): unknown => {
+    const normalizeFallbackAnswer = (answer: unknown, preserveOrder = false): unknown => {
       if (Array.isArray(answer)) {
-        return answer.map((entry) => normalizeFallbackAnswer(entry)).sort();
+        const normalized = answer.map((entry) => normalizeFallbackAnswer(entry, preserveOrder));
+        return preserveOrder ? normalized : normalized.sort();
       }
       if (answer && typeof answer === 'object') {
         const answerRecord = asRecord(answer);
         if (Object.prototype.hasOwnProperty.call(answerRecord, 'value')) {
-          return normalizeFallbackAnswer(answerRecord.value);
+          return normalizeFallbackAnswer(answerRecord.value, preserveOrder);
         }
         if (Object.prototype.hasOwnProperty.call(answerRecord, 'answer')) {
-          return normalizeFallbackAnswer(answerRecord.answer);
+          return normalizeFallbackAnswer(answerRecord.answer, preserveOrder);
         }
       }
       return answer;
@@ -725,7 +732,7 @@ export function fallbackBullets(users: CompareUser[] = []): { agreements: string
       const m = new Map<string, unknown>();
       (u?.questions || []).forEach((q) => {
         const key = (q?.prompt || '').trim().toLowerCase();
-        if (key) m.set(key, normalizeFallbackAnswer(q?.answer));
+        if (key) m.set(key, normalizeFallbackAnswer(q?.answer, q?.type === 'quadratic'));
       });
       return m;
     });
@@ -970,12 +977,14 @@ export function buildUsersFromCaches(
       if (!isNonBlankAnswer(ans)) return;
 
       const qData = combinedQuestions[qid] || {};
+      if (qData.type === 'quadratic' && validateQuadraticAllocation(ans, qData)) return;
       qSeen.add(qid);
       questions.push({
         id: qid,
         type: String(qData.type || objRecord.type || 'unknown'),
         prompt: String(qData.prompt || objRecord.prompt || 'Unknown Question'),
         answer: ans,
+        ...(qData.type === 'quadratic' ? { options: qData.options, voiceCredits: getVoiceCredits(qData) } : {}),
         importance: extractImportance(obj),
         additionalComment: extractAdditionalComment(obj) || undefined,
       });
@@ -1007,12 +1016,14 @@ export function buildUsersFromCaches(
         if (!isNonBlankAnswer(val)) return;
 
         const qData = combinedQuestions[qid] || {};
+        if (qData.type === 'quadratic' && validateQuadraticAllocation(val, qData)) return;
         qSeen.add(qid);
         questions.push({
           id: qid,
           type: String(qData.type || r.type || 'unknown'),
           prompt: String(qData.prompt || r.prompt || 'Unknown Question'),
           answer: val,
+          ...(qData.type === 'quadratic' ? { options: qData.options, voiceCredits: getVoiceCredits(qData) } : {}),
           importance: extractImportance(r),
           additionalComment: extractAdditionalComment(r) || undefined,
         });

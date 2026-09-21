@@ -15,6 +15,30 @@ export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
   optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
 });
 
+const isOpenAiProviderLabel = (label: string): boolean => /\bopenai\b/i.test(label);
+
+const renderResolvedAiProviderKeyLabels = (labels: readonly string[]): React.ReactNode => {
+  const resolvedLabels = labels.length ? labels : ['OpenAI API Key'];
+
+  return resolvedLabels.map((label, index) => (
+    <React.Fragment key={`${label}-${index}`}>
+      {index > 0 ? ', ' : null}
+      {isOpenAiProviderLabel(label) ? (
+        <a
+          href={SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.newSessionBannerLink}
+        >
+          {label}
+        </a>
+      ) : (
+        label
+      )}
+    </React.Fragment>
+  ));
+};
+
 type SessionWizardRequirementsBannerProps = {
   cloudflareTokenSlug?: string;
   fundingRequirementHref?: string;
@@ -64,6 +88,7 @@ const SessionWizardRequirementsBanner = ({
           className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
           aria-label="Dismiss session setup requirements"
           title="Dismiss session setup requirements"
+          data-ce-control-appearance="frameless"
           onClick={onDismiss}
         >
           <FontAwesomeIcon icon={faTimes} />
@@ -109,17 +134,13 @@ const SessionWizardRequirementsBanner = ({
           ) : null}
           {hasResolvedRequirements && requires('sessionWorker') ? (
             <li>
-              A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.
+              A compatible Session Worker provides the web runtime; the Ethereum registry and Arweave remain canonical.
             </li>
           ) : null}
           {requires('aiProviderKey') ? (
             <li>
               {hasResolvedRequirements ? (
-                requiredAiProviderKeyLabels.length ? (
-                  requiredAiProviderKeyLabels.join(', ')
-                ) : (
-                  'OpenAI API Key'
-                )
+                renderResolvedAiProviderKeyLabels(requiredAiProviderKeyLabels)
               ) : (
                 <>
                   <a

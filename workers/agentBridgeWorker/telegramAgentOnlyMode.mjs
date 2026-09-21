@@ -1,3 +1,4 @@
+import { formatQuadraticAllocation, validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 import {
   safeString,
   lower,
@@ -1358,6 +1359,11 @@ function normalizeAgentTokenUsage(value = {}) {
 
 function normalizeAnswerForSchema(answer = {}, schema = {}) {
   const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
+  if (schema.kind === 'quadratic') {
+    const value = source.value;
+    if (validateQuadraticAllocation(value, schema)) return { ok: false, reason: 'answer_quadratic_invalid' };
+    return { ok: true, answer: { value } };
+  }
   if (schema.kind === 'choice' || schema.kind === 'rating') {
     const raw = Object.hasOwn(source, 'value') ? source.value : (source.answer ?? source.rating);
     const scaleValues = Array.isArray(schema.values) && schema.values.length
@@ -1574,6 +1580,7 @@ export function canonicalAgentOnlyAnswerProjection(answer = {}, schema = {}) {
   const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
   const questionType = lower(source.questionType);
   const schemaKind = lower(schema.kind);
+  if (schemaKind === 'quadratic' || questionType === 'quadratic') return { value: source.value };
   const rawValues = Array.isArray(source.values)
     ? source.values
     : (Array.isArray(source.value)
@@ -1901,6 +1908,7 @@ export async function submitAgentOnlyTokenVotesBulk({
 
 function answerLabelForSchema(answer = {}, schema = {}) {
   if (!answer || typeof answer !== 'object') return '';
+  if (schema.kind === 'quadratic') return formatQuadraticAllocation(answer.value, schema.options);
   if (schema.kind === 'multichoice') return (Array.isArray(answer.values) ? answer.values : []).map(safeString).filter(Boolean).join(', ');
   if (schema.kind === 'text') return safeString(answer.text);
   const value = answer.value;
@@ -2253,6 +2261,7 @@ function wrappedAnswerFormatForSchema(schema = {}) {
   const kind = safeString(schema?.kind);
   if (kind === 'text') return 'freeform text';
   if (kind === 'multichoice') return 'multichoice selection';
+  if (kind === 'quadratic') return 'quadratic allocation';
   if (kind === 'choice' || kind === 'rating') {
     const rawValues = Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema);
     const values = rawValues.map((value) => lower(answerScalarString(value)));
@@ -2761,7 +2770,7 @@ ${evidence}`,
       prompt: `${common}
 
 Screen 3 of 5: "What your agent predicted".
-Show three compact sections: "Questions you would care about most" with question prompts only, "High-confidence predictions" with question, predicted answer, confidence, and "Cautious predictions" with question, predicted answer, confidence. High-confidence and cautious rows must be actual predicted human responses, not questions about the principal or image-generation analysis. Render binary answers as one selected pill only: green Agree, yellow Unsure, or red Disagree. For rating rows show scale context like 7/10. For multichoice/freeform rows show the selected option/text, never Agree/Unsure/Disagree pills. No N/A rows.
+Show three compact sections: "Questions you would care about most" with question prompts only, "High-confidence predictions" with question, predicted answer, confidence, and "Cautious predictions" with question, predicted answer, confidence. High-confidence and cautious rows must be actual predicted human responses, not questions about the principal or image-generation analysis. Render binary answers as one selected pill only: green Agree, yellow Unsure, or red Disagree. For rating rows show scale context like 7/10. For quadratic rows show each option with signed votes and squared credit cost within its question budget; zero is neutral. For multichoice/freeform rows show the selected option/text, never Agree/Unsure/Disagree pills. No N/A rows.
 
 ${evidence}`,
     },
@@ -2996,7 +3005,7 @@ Supporting evidence for optional playful guesses:
 - Use the Most Important, High-Confidence, Cautious, Agent-about-user, and style evidence already provided in this prompt.
 - Do not use stored favorite/book/movie/game answer rows as source data; those rows are not part of the current research question set.
 
-Answer rendering rules: use the supplied "answer format" on each prediction row. Only rows with answer format "binary choice" may render Agree, Unsure, or Disagree as large rounded choice pills/buttons. Never render Agree/Unsure/Disagree pills for rating scale, multichoice selection, or freeform text rows. For rating scale rows, show the numeric value with scale context like "7/10". For multichoice selection rows, show the selected option text as text or option chips, never as Agree/Unsure/Disagree. For freeform rows, show the short text answer in quotes or a compact text chip.
+Answer rendering rules: use the supplied "answer format" on each prediction row. Only rows with answer format "binary choice" may render Agree, Unsure, or Disagree as large rounded choice pills/buttons. Never render Agree/Unsure/Disagree pills for rating scale, multichoice selection, or freeform text rows. For rating scale rows, show the numeric value with scale context like "7/10". For multichoice selection rows, show the selected option text as text or option chips, never as Agree/Unsure/Disagree. For quadratic allocation rows, show each option with signed whole-number votes and squared credit costs. Positive supports, negative opposes, zero is neutral; all costs must fit the question budget (99 default). For freeform rows, show the short text answer in quotes or a compact text chip.
 
 Binary answer styling: for binary choice prediction rows only, render exactly one selected answer pill, matching the supplied predicted answer. If the prediction is Agree, show only the green Agree pill; if Unsure, show only the yellow Unsure pill; if Disagree, show only the red Disagree pill. Never show all three Agree/Unsure/Disagree options in a row, and never show the unselected choices. Use large rounded choice pills/buttons on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The selected pill should feel like a primary response control, not a small tag.
 

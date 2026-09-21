@@ -668,6 +668,7 @@ var init_interviewSettings = __esm({
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
       openingMode: "auto",
       openingPrompt: "",
+      steeringPrompt: "",
       autoRegenerate: false,
       questionGrowthPercent: 20,
       followNewQuestions: false,
@@ -679,6 +680,7 @@ var init_interviewSettings = __esm({
       return {
         openingMode: source.openingMode === "owner" ? "owner" : "auto",
         openingPrompt: String(source.openingPrompt || "").trim().slice(0, 1200),
+        steeringPrompt: String(source.steeringPrompt || "").trim().slice(0, 3e3),
         autoRegenerate: source.autoRegenerate === true,
         questionGrowthPercent: Number.isFinite(source.questionGrowthPercent) ? Math.max(1, Math.min(100, source.questionGrowthPercent)) : 20,
         followNewQuestions: source.followNewQuestions === true,
@@ -689,6 +691,8 @@ var init_interviewSettings = __esm({
     validInterviewSettings = (value = {}) => {
       if (value.openingMode !== void 0 && !["auto", "owner"].includes(value.openingMode)) return false;
       if (value.openingPrompt !== void 0 && (typeof value.openingPrompt !== "string" || value.openingPrompt.length > 1200))
+        return false;
+      if (value.steeringPrompt !== void 0 && (typeof value.steeringPrompt !== "string" || value.steeringPrompt.length > 3e3))
         return false;
       if (value.openingMode === "owner" && !value.openingPrompt?.trim()) return false;
       if (value.questionGrowthPercent !== void 0 && (!Number.isFinite(value.questionGrowthPercent) || value.questionGrowthPercent < 1 || value.questionGrowthPercent > 100))
@@ -1592,6 +1596,7 @@ var init_workerSessionConfig = __esm({
       "configRevision",
       "sessionName",
       "sessionInfo",
+      "sessionContext",
       "sessionHeaderImg",
       "sessionEndsAt",
       "interviewModeEnabled",
@@ -1634,6 +1639,7 @@ var init_workerSessionConfig = __esm({
       "configRevision",
       "sessionName",
       "sessionInfo",
+      "sessionContext",
       "sessionHeaderImg",
       "sessionEndsAt",
       "interviewModeEnabled",
@@ -5513,6 +5519,7 @@ var init_sessionConfigMutation = __esm({
       "configRevision",
       "sessionName",
       "sessionInfo",
+      "sessionContext",
       "appearance",
       "sessionHeaderImg",
       "sessionEndsAt",
@@ -39016,7 +39023,7 @@ var init_aiProviderExecution = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr20, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, safeNumber, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr20, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeVoiceCredits, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_resultsAnalysisSettings();
@@ -39095,11 +39102,18 @@ var init_resultsAnalysisGeneration = __esm({
       "payloadCiphertext",
       "wrappedKey"
     ]);
+    encryptedEnvelopeValueHasContent = (value) => {
+      if (value == null || value === false) return false;
+      if (typeof value === "string") return trim7(value) !== "";
+      if (Array.isArray(value)) return value.length > 0;
+      if (isObj13(value)) return Object.keys(value).length > 0;
+      return true;
+    };
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
       if (!isObj13(value)) return false;
       if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-      if (Object.keys(value).some((key) => ENCRYPTED_ENVELOPE_KEYS.has(key))) return true;
+      if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
       return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
     };
     valueFromAnswerLike = (value) => {
@@ -39130,9 +39144,51 @@ var init_resultsAnalysisGeneration = __esm({
     normalizeQuestionId = (value) => trim7(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim7(value).replace(/\s+/g, " ").slice(0, 1200);
     normalizeQuestionType = (value) => trim7(value).slice(0, 64) || "text";
+    RATING_SCALE_METADATA_KEYS = [
+      "min",
+      "minimum",
+      "max",
+      "maximum",
+      "minLabel",
+      "lowLabel",
+      "maxLabel",
+      "highLabel"
+    ];
     safeNumber = (value) => {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : null;
+    };
+    hasMetadataValue = (value) => value !== void 0 && value !== null && trim7(value) !== "";
+    recordHasRatingScaleMetadata = (record = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
+    pickRatingScaleRecord = (question = {}) => {
+      const scale = isObj13(question.scale) ? question.scale : null;
+      if (scale && recordHasRatingScaleMetadata(scale)) return scale;
+      const ratingScale = isObj13(question.ratingScale) ? question.ratingScale : null;
+      if (ratingScale && recordHasRatingScaleMetadata(ratingScale)) return ratingScale;
+      return scale || ratingScale || question;
+    };
+    normalizeRatingLabel = (value, fallback) => {
+      const label = trim7(value);
+      return normalizeQuestionPrompt(label || String(fallback)).slice(0, 120);
+    };
+    normalizeRatingScale = (question = {}) => {
+      const scale = pickRatingScaleRecord(question);
+      if (!recordHasRatingScaleMetadata(scale) && !recordHasRatingScaleMetadata(question)) return null;
+      const min = safeNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
+      const max = safeNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
+      const normalizedMin = min ?? 0;
+      const normalizedMax = max ?? 10;
+      if (normalizedMax <= normalizedMin) return { min: 0, max: 10, minLabel: "0", maxLabel: "10" };
+      return {
+        min: normalizedMin,
+        max: normalizedMax,
+        minLabel: normalizeRatingLabel(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
+        maxLabel: normalizeRatingLabel(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax)
+      };
+    };
+    normalizeVoiceCredits = (value) => {
+      const numeric = Number(value);
+      return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 99;
     };
     normalizeSubmittedAt = (value) => {
       const text = trim7(value);
@@ -39239,14 +39295,40 @@ var init_resultsAnalysisGeneration = __esm({
       if (!isObj13(question)) return null;
       const questionId = normalizeQuestionId(question.questionId || question.questionID || question.id);
       if (!questionId) return null;
+      const type = normalizeQuestionType(question.type || question.questionType);
+      const scale = type === "rating" ? normalizeRatingScale(question) : null;
       return {
         questionId,
         id: questionId,
         prompt: normalizeQuestionPrompt(question.prompt || question.questionPrompt || question.questionText || question.text || question.title),
-        type: normalizeQuestionType(question.type || question.questionType),
+        type,
         options: Array.isArray(question.options) ? question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => normalizeQuestionPrompt(option).slice(0, 140)).filter(Boolean) : [],
-        tags: Array.isArray(question.tags) ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean) : []
+        tags: Array.isArray(question.tags) ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean) : [],
+        ...scale ? { scale } : {},
+        ...type === "quadratic" ? { voiceCredits: normalizeVoiceCredits(question.voiceCredits) } : {}
       };
+    };
+    selectRoundRobinResponses = ({ responseRows, questionIds, limit }) => {
+      const buckets = new Map(questionIds.map((questionId) => [questionId, []]));
+      responseRows.forEach((row) => {
+        const bucket = buckets.get(row.questionId);
+        if (bucket) bucket.push(row);
+      });
+      const out = [];
+      for (let offset = 0; out.length < limit; offset += 1) {
+        let added = false;
+        for (let questionIndex = 0; questionIndex < questionIds.length; questionIndex += 1) {
+          const questionId = questionIds[questionIndex];
+          const bucket = buckets.get(questionId) || [];
+          const row = offset < bucket.length ? bucket[(offset + questionIndex) % bucket.length] : null;
+          if (!row) continue;
+          out.push(row);
+          added = true;
+          if (out.length >= limit) break;
+        }
+        if (!added) break;
+      }
+      return out;
     };
     normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
       const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
@@ -39343,7 +39425,12 @@ var init_resultsAnalysisGeneration = __esm({
       });
       const cappedQuestions = sanitizedQuestions.slice(0, AI_QUESTION_CAP);
       const cappedQuestionIds = new Set(cappedQuestions.map((question) => question.questionId));
-      const aiResponses = responseRows.filter((row) => cappedQuestionIds.has(row.questionId)).slice(0, AI_RESPONSE_CAP).map((row) => ({
+      const aiResponseRows = selectRoundRobinResponses({
+        responseRows: responseRows.filter((row) => cappedQuestionIds.has(row.questionId)),
+        questionIds: cappedQuestions.map((question) => question.questionId),
+        limit: AI_RESPONSE_CAP
+      });
+      const aiResponses = aiResponseRows.map((row) => ({
         ...row.additionalComments ? { additional: row.additionalComments.slice(0, AI_LIMITS.maxResponseAdditionalChars) } : {},
         answer: row.answer.slice(0, AI_LIMITS.maxResponseAnswerChars),
         participantId: participantLabels.get(row.participantKey) || "participant_000",
@@ -39357,7 +39444,9 @@ var init_resultsAnalysisGeneration = __esm({
         prompt: question.prompt.slice(0, AI_LIMITS.maxQuestionPromptChars),
         type: question.type,
         options: question.options,
-        tags: question.tags
+        tags: question.tags,
+        ...question.scale ? { scale: question.scale } : {},
+        ...question.type === "quadratic" ? { voiceCredits: question.voiceCredits ?? 99 } : {}
       }));
       const aiSnapshot = {
         counts: {
@@ -40265,8 +40354,15 @@ var init_sessionWriteCoordinator = __esm({
         if (!isObjectRecord(value)) return false;
         if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
         const encryptedKeys = /* @__PURE__ */ new Set(["ciphertext", "cipherText", "encryptedContent", "encryptedKey", "encryptedPortion", "keyCipher", "payloadCiphertext", "wrappedKey"]);
-        if (Object.keys(value).some((key) => encryptedKeys.has(key))) return true;
+        if (Object.entries(value).some(([key, entry]) => encryptedKeys.has(key) && this.resultsAnalysisEncryptedEnvelopeValueHasContent(entry))) return true;
         return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
+      }
+      resultsAnalysisEncryptedEnvelopeValueHasContent(value) {
+        if (value == null || value === false) return false;
+        if (typeof value === "string") return value.trim() !== "";
+        if (Array.isArray(value)) return value.length > 0;
+        if (isObjectRecord(value)) return Object.keys(value).length > 0;
+        return true;
       }
       sanitizeResultsAnalysisAutoJob(payload = {}) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
@@ -74910,6 +75006,18 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
   };
 };
 
+// workers/sessionCorsWorker/anonymousRateLimitPolicy.js
+var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
+var resolveAnonymousIpDailyLimit = (config = {}) => {
+  const limits = isObj14(config?.limits) ? config.limits : {};
+  if (Object.prototype.hasOwnProperty.call(limits, "perAnonymousIpPerDay")) {
+    const explicitLimit = limits.perAnonymousIpPerDay;
+    if (isNonNegativeInteger(explicitLimit)) return explicitLimit;
+  }
+  return limits.perWalletPerDay || 0;
+};
+
 // workers/sessionCorsWorker/interviewStarter.js
 init_interviewSettings();
 init_aiDefaults();
@@ -74925,7 +75033,58 @@ var RPC_CHUNK_SIZE = 1e5;
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim8 = (value) => String(value == null ? "" : value).trim();
 var lower4 = (value) => trim8(value).toLowerCase();
-var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var RATING_SCALE_METADATA_KEYS2 = [
+  "min",
+  "minimum",
+  "max",
+  "maximum",
+  "minLabel",
+  "lowLabel",
+  "maxLabel",
+  "highLabel"
+];
+var hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim8(value) !== "";
+var recordHasRatingScaleMetadata2 = (record = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record[key]));
+var pickRatingScaleRecord2 = (question = {}) => {
+  const scale = isObj15(question.scale) ? question.scale : null;
+  if (scale && recordHasRatingScaleMetadata2(scale)) return scale;
+  const ratingScale = isObj15(question.ratingScale) ? question.ratingScale : null;
+  if (ratingScale && recordHasRatingScaleMetadata2(ratingScale)) return ratingScale;
+  return scale || ratingScale || question;
+};
+var hasRatingScaleMetadata = (question = {}) => recordHasRatingScaleMetadata2(pickRatingScaleRecord2(question)) || recordHasRatingScaleMetadata2(question);
+var toFiniteNumber = (value) => {
+  const number2 = Number(value);
+  return Number.isFinite(number2) ? number2 : null;
+};
+var normalizeRatingLabel2 = (value, fallback) => {
+  const label = trim8(value);
+  return label || String(fallback);
+};
+var normalizeRatingScale2 = (question = {}) => {
+  if (!hasRatingScaleMetadata(question)) return null;
+  const scale = pickRatingScaleRecord2(question);
+  const min = toFiniteNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
+  const max = toFiniteNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
+  const normalizedMin = min ?? 0;
+  const normalizedMax = max ?? 10;
+  if (normalizedMax <= normalizedMin) {
+    return { min: 0, max: 10, minLabel: "0", maxLabel: "10" };
+  }
+  return {
+    min: normalizedMin,
+    max: normalizedMax,
+    minLabel: normalizeRatingLabel2(
+      scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel,
+      normalizedMin
+    ),
+    maxLabel: normalizeRatingLabel2(
+      scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel,
+      normalizedMax
+    )
+  };
+};
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower4(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -74933,18 +75092,21 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj14(value) ? value : {};
+  const question = isObj15(value) ? value : {};
   const id2 = lower4(question.id || question.questionId);
   const prompt = trim8(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /connect.+decrypt|encrypted prompt/i.test(prompt)) return null;
   const type = lower4(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj14(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj15(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const ratingScale = type === "rating" ? normalizeRatingScale2(question) : null;
   return {
     id: id2,
     prompt,
     type,
-    options
+    options,
+    ...ratingScale ? { scale: ratingScale } : {},
+    ...type === "quadratic" ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}
   };
 };
 var dedupeQuestions = (questions = []) => {
@@ -75002,15 +75164,15 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return dedupeQuestions(questions);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj14(config.contracts) ? config.contracts : {};
-  const surveys = isObj14(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  const contracts = isObj15(config.contracts) ? config.contracts : {};
+  const surveys = isObj15(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
   return trim8(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
   const chainId = trim8(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj14(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj14(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj14(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj14(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj14(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const rpcConfig = isObj15(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj15(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj15(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj15(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj15(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
@@ -75062,7 +75224,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj14(payload.session) ? payload.session : {};
+  const session = isObj15(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -75084,7 +75246,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response2.ok) continue;
       const payload = await response2.json();
-      if (isObj14(payload)) return payload;
+      if (isObj15(payload)) return payload;
     } catch {
     }
   }
@@ -75158,14 +75320,16 @@ var inFlight = /* @__PURE__ */ new WeakMap();
 var cacheKey = (slug) => `session:${slug}:interview-opening`;
 var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = false }) => {
   const settings = normalizeInterviewSettings(config?.interviewMode);
+  const withSteeringPrompt = (value) => ({ ...value, steeringPrompt: settings.steeringPrompt });
   if (config?.interviewModeEnabled === false || config?.interviewMode?.enabled === false)
     throw new Error("Interview mode is disabled.");
   if (refresh && !settings.allowManualRefresh) throw new Error("Manual opening refresh is disabled for this session.");
-  if (settings.openingMode === "owner") return { openingPrompt: settings.openingPrompt, source: "owner" };
+  if (settings.openingMode === "owner")
+    return withSteeringPrompt({ openingPrompt: settings.openingPrompt, source: "owner" });
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
   const cached = await read(env, cacheKey(slug));
-  if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return cached;
+  if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const questions = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
     slug,
@@ -75173,9 +75337,9 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
     storageRoute: deps.storageRoute,
     fetch: deps.fetch
   });
-  if (!questions.length) return cached || { openingPrompt: "", source: "waiting-for-questions" };
+  if (!questions.length) return withSteeringPrompt(cached || { openingPrompt: "", source: "waiting-for-questions" });
   if (cached?.openingPrompt && !refresh && !hasInterviewQuestionGrowth(cached.questionCount, questions.length, settings.questionGrowthPercent))
-    return cached;
+    return withSteeringPrompt(cached);
   let pending = inFlight.get(env.GROUP_KV);
   if (!pending) {
     pending = /* @__PURE__ */ new Map();
@@ -75217,13 +75381,13 @@ ${JSON.stringify({ title: config.sessionName, info: config.sessionInfo, question
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     await write(env, cacheKey(slug), value);
-    return value;
+    return withSteeringPrompt(value);
   })();
   pending.set(slug, generation);
   try {
     return await generation;
   } catch (error) {
-    if (cached?.openingPrompt && !refresh) return { ...cached, warning: error.message };
+    if (cached?.openingPrompt && !refresh) return withSteeringPrompt({ ...cached, warning: error.message });
     throw error;
   } finally {
     pending.delete(slug);
@@ -75251,7 +75415,7 @@ var dispatchInterviewStarterRequest = async ({ request, env, slugHint, baseHeade
     env,
     slug,
     address: deps.resolveAnonymousRateIdentity(request),
-    limit: config.limits?.perWalletPerDay || 0,
+    limit: resolveAnonymousIpDailyLimit(config),
     route: "interview-starter"
   }))
     return deps.json({ error: "Rate limit exceeded." }, 429, cors.headers);
@@ -75296,7 +75460,7 @@ var dispatchAnonymousRouteEntry = async ({
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
   const headers = corsContext?.headers;
-  const limit = config?.limits?.perWalletPerDay || 0;
+  const limit = resolveAnonymousIpDailyLimit(config);
   const anonymousIdentity = deps?.resolveAnonymousRateIdentity?.(request);
   const anonymousRateAllowed = await deps?.checkRateLimit?.({
     env,
@@ -75331,7 +75495,7 @@ init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 var trim9 = (value) => String(value == null ? "" : value).trim();
-var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
   const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
   const body = [
@@ -75359,7 +75523,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj15(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj16(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
   const instructions = trim9(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
@@ -75370,7 +75534,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj15(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj16(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim9(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
@@ -76194,7 +76358,7 @@ var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
 var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
@@ -76333,7 +76497,7 @@ var parseJsonIfPossible = (value) => {
 };
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj16(body)) {
+  if (isObj17(body)) {
     const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
@@ -76377,7 +76541,7 @@ var fetchChipotleJson = async ({
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj16(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj17(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -76388,8 +76552,8 @@ var resolveLitChipotleRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj16(body) ? body : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj17(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -76420,8 +76584,8 @@ var resolveLitChipotleProvisioningRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj16(body) ? body : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj17(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -76656,7 +76820,7 @@ var resolveConfigMappedChipotleRpcUrls = ({
 } = {}) => {
   const normalizedChainId = toChainId(chainId);
   if (!normalizedChainId) return [];
-  const map = isObj16(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+  const map = isObj17(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
   const mapped = normalizeChipotleRpcCandidateList(
     map[normalizedChainId] || map[String(normalizedChainId)] || []
   );
@@ -76679,7 +76843,7 @@ var resolveSessionChipotleRpcUrl = ({
   chainId = 0,
   op = ""
 } = {}) => {
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
   const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
@@ -76720,7 +76884,7 @@ var buildSessionBootstrapMetadata = ({
   request = {},
   sessionSlug = ""
 } = {}) => {
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const slugSegment = normalizeSessionScopedNameSegment(
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
@@ -76747,7 +76911,7 @@ var createLitChipotleAccount = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const response2 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
@@ -76978,7 +77142,7 @@ var provisionLitChipotleAction = async ({
   if (!toTrimmedString15(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const actionRequest = isObj16(request) ? request : {};
+  const actionRequest = isObj17(request) ? request : {};
   const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
@@ -77026,9 +77190,9 @@ var bootstrapLitChipotleSession = async ({
   sessionSlug = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestBody = isObj16(request) ? request : {};
+  const requestBody = isObj17(request) ? request : {};
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
@@ -77306,7 +77470,7 @@ var executeLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleApiKey(runtime);
-  const actionRequest = isObj16(request) ? request : {};
+  const actionRequest = isObj17(request) ? request : {};
   const code = toTrimmedString15(actionRequest.code);
   const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -77356,8 +77520,8 @@ var executeSessionLitChipotleAction = async ({
   requesterAddress = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj16(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj16(request) ? request : {};
+  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj17(request) ? request : {};
   const runtime = resolveLitChipotleRuntime({
     env,
     config,
@@ -79349,9 +79513,9 @@ var dispatchSessionConfigBootstrapRequest = async ({
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v4";
 var trim10 = (value) => String(value == null ? "" : value).trim();
-var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj17(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj18(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
@@ -79362,6 +79526,20 @@ var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((e
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
+var normalizeRecruitmentSource = (value) => {
+  const normalized = trim10(value).replace(/\s+/g, "-").slice(0, 128);
+  return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
+};
+var normalizeJoinGroup = (value) => {
+  const normalized = trim10(value).toLowerCase();
+  return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
+};
+var copySafeReturnParams = (sourceUrl, targetUrl) => {
+  const recruitmentSources = sourceUrl.searchParams.getAll("src").map(normalizeRecruitmentSource).filter(Boolean);
+  if (recruitmentSources.length === 1) targetUrl.searchParams.set("src", recruitmentSources[0]);
+  const joinGroups = sourceUrl.searchParams.getAll("joinGroup").map(normalizeJoinGroup).filter(Boolean);
+  if (joinGroups.length === 1) targetUrl.searchParams.set("joinGroup", joinGroups[0]);
+};
 var safeServedWorkerOrigin = (value) => {
   try {
     const url = new URL(trim10(value));
@@ -79382,9 +79560,9 @@ var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
     if (!allowedOrigins.length || !allowedOrigins.includes(url.origin)) return "";
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
+    const safeUrl = new URL(`${url.origin}${url.pathname}`);
+    copySafeReturnParams(url, safeUrl);
+    return safeUrl.toString().replace(/\/$/, "");
   } catch {
     return "";
   }
@@ -79420,7 +79598,9 @@ var buildInterviewBriefDocument = ({
   answerContract: {
     binary: ["Agree", "Unsure", "Disagree"],
     rating: { min: 0, max: 10, step: 1 },
-    multichoice: "Use one exact question option."
+    ratingScaleOverrides: "Use a question.scale object when present; otherwise use the default rating contract.",
+    multichoice: "Use one exact question option.",
+    quadratic: "Signed integer array in option order; sum(vote\xB2) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed."
   },
   researchCoverageContract: {
     countFields: [
@@ -79467,7 +79647,7 @@ var dispatchInterviewBriefRequest = async ({
       env,
       slug,
       address: deps?.resolveAnonymousRateIdentity?.(request),
-      limit: config?.limits?.perWalletPerDay || 0,
+      limit: resolveAnonymousIpDailyLimit(config),
       route: "interview-brief"
     });
     if (!rateAllowed) return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers);

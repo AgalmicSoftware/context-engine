@@ -655,7 +655,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
 
         return {
-          eyebrowRatio: textRatio('[class*="modeProfileEntryEyebrow"]'),
+          architectureHelpRatio: textRatio('[aria-label="View the deployment architecture diagram on GitHub"]'),
           providerRatio: textRatio(
             '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardProvider"]',
           ),
@@ -696,7 +696,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.waitForSelector('svg[class*="clusterSwatchSvg"] circle', { timeout: 15000 });
     classicReportClusterColors = await page
       .locator('svg[class*="clusterSwatchSvg"] circle')
-      .evaluateAll((circles) => circles.map((circle) => circle.getAttribute('fill')));
+      .evaluateAll((circles) => circles.map((circle) => getComputedStyle(circle).fill));
     await sessionGroupsToggle.click();
     await sessionGroupLinkButton.waitFor({
       state: 'visible',
@@ -2285,7 +2285,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const currentReportClusterColors = routeCase.requiresReadableSessionSurface
     ? await page
         .locator('svg[class*="clusterSwatchSvg"] circle')
-        .evaluateAll((circles) => circles.map((circle) => circle.getAttribute('fill')))
+        .evaluateAll((circles) => circles.map((circle) => getComputedStyle(circle).fill))
     : null;
   const currentDocumentEndFooterState = routeCase.requiresDocumentEndFooter
     ? await page.locator('footer').evaluate((element) => ({
@@ -2939,7 +2939,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Session Setup should not use the superseded gas label',
     );
     [
-      ['Choose a setup', sessionSetupContrastState.eyebrowRatio],
+      ['Session Setup architecture help', sessionSetupContrastState.architectureHelpRatio],
       ['Cloudflare provider', sessionSetupContrastState.providerRatio],
       ['Cloudflare description', sessionSetupContrastState.descriptionRatio],
       ['setup requirement pill', sessionSetupContrastState.requirementRatio],
@@ -3100,7 +3100,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(preloginThemeSettingsState.accessibleName, 'App theme', 'Theme selector should retain its accessible name');
     assert.equal(
       preloginThemeSettingsState.defaultOptionText,
-      'Deployment theme: Context Engine',
+      'Context Engine (default)',
       'Theme selector should identify the configured deployment theme',
     );
     assert.equal(
@@ -3222,7 +3222,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     });
   }
   if (routeCase.requiresReadableSessionSurface) {
-    const originalReportClusterColors = ['#1f77b4', '#ff7f0e', '#2ca02c'];
+    const originalReportClusterColors = ['rgb(31, 119, 180)', 'rgb(255, 127, 14)', 'rgb(44, 160, 44)'];
     assert.deepEqual(
       classicReportClusterColors,
       originalReportClusterColors,

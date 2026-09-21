@@ -335,6 +335,28 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
   });
 
+  it('blocks deployment when Worker request limits are invalid', async () => {
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.workerLimitPerAnonymousIp = '-1';
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual({
+      ok: false,
+      error: expect.stringMatching(/anonymous requests per IP per day/i),
+    });
+    expect(options.updateDeploymentState).toHaveBeenCalledWith({
+      deployStatus: expect.stringMatching(/fix worker request limits/i),
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('blocks deployment after terminal worker publication even when the form has rotated to a fresh session ID', async () => {
     const options = buildDeployHookOptions();
     const runtime = options.refs.runtimeRef.current as SessionWizardWorkerDeployRuntime & {

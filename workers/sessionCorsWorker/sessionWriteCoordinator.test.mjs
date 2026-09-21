@@ -2215,6 +2215,56 @@ test('SessionWriteCoordinator preserves queued results-analysis ACL and lock met
 	assert.equal(job.committedResponses[0].payload.locked, true);
 });
 
+test('SessionWriteCoordinator keeps empty public encrypted envelopes unlocked and marks non-empty encrypted envelopes locked', async () => {
+	const publicState = createTransactionalState();
+	const publicCoordinator = new SessionWriteCoordinator(publicState.state, {}, { now: () => 1_000 });
+	const publicResult = await publicCoordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-public',
+		committedResponses: [{
+			metadata: {
+				id: 'public',
+				responder: '0x1111111111111111111111111111111111111111',
+				createdAt: '2026-09-17T00:00:00.000Z',
+			},
+			payload: {
+				sessionSlug: 'session-a',
+				questionId: 'q1',
+				answer: { value: 'public', encrypted: false, hash: '', encryptedPortion: '' },
+				additional: { value: 'public note', encrypted: false, hash: '', encryptedPortion: '' },
+			},
+		}],
+	});
+	assert.equal(publicResult.ok, true);
+	const publicJob = publicState.store.get('results-analysis-auto-job-v1');
+	assert.equal(publicJob.committedResponses[0].payload.locked, undefined);
+	assert.equal(publicJob.committedResponses[0].payload.answer.encryptedPortion, '');
+	assert.equal(publicJob.committedResponses[0].payload.additional.encryptedPortion, '');
+
+	const lockedState = createTransactionalState();
+	const lockedCoordinator = new SessionWriteCoordinator(lockedState.state, {}, { now: () => 1_000 });
+	const lockedResult = await lockedCoordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-locked',
+		committedResponses: [{
+			metadata: {
+				id: 'locked',
+				responder: '0x2222222222222222222222222222222222222222',
+				createdAt: '2026-09-17T00:00:00.000Z',
+			},
+			payload: {
+				sessionSlug: 'session-a',
+				questionId: 'q1',
+				answer: { value: 'secret', encrypted: false, hash: '', encryptedPortion: 'ciphertext' },
+			},
+		}],
+	});
+	assert.equal(lockedResult.ok, true);
+	const lockedJob = lockedState.store.get('results-analysis-auto-job-v1');
+	assert.equal(lockedJob.committedResponses[0].payload.locked, true);
+	assert.equal(lockedJob.committedResponses[0].payload.answer.encryptedPortion, 'ciphertext');
+});
+
 
 test('SessionWriteCoordinator keeps below-threshold automatic jobs for bounded delayed rechecks', async () => {
 	let now = 1_000;

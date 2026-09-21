@@ -14,6 +14,28 @@ import {
 describe('SessionWizard deploy payload rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
+  it('preserves a restored anonymous IP zero limit when the cached draft only has wallet limits', async () => {
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionName: 'Restored Limit Session',
+          slug: 'restored-limit-session',
+          limits: { perWalletPerDay: 5 },
+        },
+        workerLimitPerWallet: '5',
+        workerLimitPerAnonymousIp: '0',
+      }),
+    );
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(await screen.findByLabelText('Authenticated requests per wallet per day')).toHaveValue(5);
+    expect(screen.getByLabelText('Anonymous requests per IP per day')).toHaveValue(0);
+  });
+
   it('ignores a stale cached Cloudflare account id in the deploy-helper payload', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');

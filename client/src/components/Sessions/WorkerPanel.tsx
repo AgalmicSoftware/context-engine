@@ -62,6 +62,10 @@ export type WorkerPanelProps = {
   renderResourceCard?: (resourceKey: string, index: number) => React.ReactNode;
   workerAllowOrigins: string;
   setWorkerAllowOrigins: (value: string) => void;
+  workerLimitPerWallet: string;
+  setWorkerLimitPerWallet: (value: string) => void;
+  workerLimitPerAnonymousIp: string;
+  setWorkerLimitPerAnonymousIp: (value: string) => void;
   defaultAllowedOrigins: string;
   shouldUseSponsoredAutoDeployFlow: boolean;
   deployForm?: DeployForm;
@@ -125,6 +129,10 @@ const WorkerPanel = ({
   renderResourceCard,
   workerAllowOrigins,
   setWorkerAllowOrigins,
+  workerLimitPerWallet,
+  setWorkerLimitPerWallet,
+  workerLimitPerAnonymousIp,
+  setWorkerLimitPerAnonymousIp,
   defaultAllowedOrigins,
   shouldUseSponsoredAutoDeployFlow,
   deployForm = {},
@@ -196,6 +204,7 @@ const WorkerPanel = ({
         className={styles.panelHeader}
         onClick={onToggleCollapsed}
         data-testid={E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE}
+        data-ce-control-appearance="frameless"
       >
         <span className={styles.panelTitle}>{isNormalMode ? 'Worker Setup' : 'Worker deployment & secrets'}</span>
         <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
@@ -208,8 +217,7 @@ const WorkerPanel = ({
               <div className={styles.workerModeCopy}>
                 <div className={styles.workerModeTitle}>Bring your own worker</div>
                 <div className={styles.workerModeSummary}>
-                  Deploy your own worker or paste a worker URL you control. Shared hosted worker support is planned
-                  separately.
+                  Deploy your own worker or paste a worker URL you control.
                 </div>
               </div>
             ) : (
@@ -266,6 +274,10 @@ const WorkerPanel = ({
             renderResource={renderResource}
             workerAllowOrigins={workerAllowOrigins}
             setWorkerAllowOrigins={setWorkerAllowOrigins}
+            workerLimitPerWallet={workerLimitPerWallet}
+            setWorkerLimitPerWallet={setWorkerLimitPerWallet}
+            workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
+            setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
             defaultAllowedOrigins={defaultAllowedOrigins}
           />
           <WorkerDeploySection

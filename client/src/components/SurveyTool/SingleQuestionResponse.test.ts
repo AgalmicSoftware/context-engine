@@ -286,6 +286,30 @@ describe('SingleQuestionResponse card actions', () => {
       '/question/q-general',
     );
   });
+
+  it.each(['mini', 'fullscreen'])('shows quadratic options and the custom budget in %s question previews', (mode) => {
+    const subject = createSubject({
+      mode,
+      questionOnly: true,
+      question: {
+        id: 'q-allocation',
+        type: 'quadratic',
+        prompt: 'Allocate support',
+        options: ['Parks', 'Transit'],
+        voiceCredits: 25,
+      },
+    });
+    const preview = findElement(
+      subject.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-question-preview',
+    );
+    expect(preview).not.toBeNull();
+    const html = renderToStaticMarkup(preview);
+    expect(html).toContain('25 voice credits');
+    expect(html).toContain('Parks');
+    expect(html).toContain('Transit');
+    expect(html).not.toMatch(/<(button|input)/);
+  });
 });
 
 describe('SingleQuestionResponse masked prompt copy', () => {
@@ -487,6 +511,30 @@ describe('SingleQuestionResponse aggregator memoization', () => {
     expect(markup).toContain('No freeform responses available.');
   });
 
+  it('aggregates latest quadratic allocations and counts neutral, masked, and invalid answers correctly', () => {
+    const record = (responder: string, timestamp: number, value: unknown, encrypted = false) => ({
+      responder,
+      timestamp,
+      response: { answer: { value, encrypted } },
+    });
+    const subject = createSubject({
+      question: { id: 'q-allocation', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 },
+      allResponses: [
+        record('a', 1, [5, 0]),
+        record('a', 2, [3, -4]),
+        record('b', 1, [-2, 4], true), // Decrypted values retain their encryption flag.
+        record('c', 1, [0, 0]),
+        record('d', 1, [5, 0]),
+        record('d', 2, '*', true),
+        record('e', 1, [4, 4]),
+      ],
+    });
+    const markup = renderToStaticMarkup(subject.renderAggregatorByType());
+    expect(markup).toContain('2 encrypted or invalid responses excluded.');
+    expect(markup).toMatch(/Parks<\/th><td[^>]*>3<\/td><td[^>]*>-2<\/td><td[^>]*>1<\/td>/);
+    expect(markup).toMatch(/Transit<\/th><td[^>]*>4<\/td><td[^>]*>-4<\/td><td[^>]*>0<\/td>/);
+  });
+
   it('applies custom SurveyResults aggregator card classes without affecting the default component styles', () => {
     const subject = createSubject({
       aggregatorResponseMode: true,
@@ -508,6 +556,10 @@ describe('SingleQuestionResponse aggregator memoization', () => {
     expect(outerCard).toBeTruthy();
     expect(innerPanel).toBeTruthy();
     expect(renderToStaticMarkup(tree)).toContain('No binary responses available.');
+    expect(findElement(tree, (node) => node?.props?.title === 'Bookmark Question')).not.toBeNull();
+    const embeddedTree = createSubject({ ...subject.props, showAggregatorBookmark: false }).render();
+    expect(findElement(embeddedTree, (node) => node?.props?.title === 'Bookmark Question')).toBeNull();
+    expect(findElement(embeddedTree, (node) => node?.props?.title === 'View question page')).not.toBeNull();
   });
 });
 
@@ -548,6 +600,32 @@ describe('SingleQuestionResponse rating rendering', () => {
 
     expect(findElement(tree, (node) => nodeHasClassName(node, styles.ratingBar))).toBeNull();
     expect(renderToStaticMarkup(tree)).toContain('No answer provided.');
+  });
+
+  it('renders read-only ratings against per-question scale metadata', () => {
+    const subject = createSubject({
+      mode: 'fullscreen',
+      question: {
+        id: 'q1',
+        type: 'rating',
+        prompt: 'Rate this',
+        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+      },
+      response: {
+        answer: { value: '1', encrypted: false },
+        additional: { value: '', encrypted: false },
+      },
+    });
+
+    const tree = subject.renderSinglePersonView();
+    const bar = findElement(tree, (node) => nodeHasClassName(node, styles.ratingBar));
+    const label = findElement(tree, (node) => nodeHasClassName(node, styles.ratingValueLabel));
+
+    expect(bar).not.toBeNull();
+    expect(bar.props.style.width).toBe('0%');
+    expect(renderToStaticMarkup(label)).toContain('1/10');
+    expect(renderToStaticMarkup(tree)).toContain('Strongly oppose');
+    expect(renderToStaticMarkup(tree)).toContain('Strongly support');
   });
 });
 

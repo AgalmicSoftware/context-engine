@@ -637,6 +637,11 @@ export class SurveySelector extends Component<any, any> {
     const liveContextMatches = this._questionCountStateContextKey === contextKey;
     const snapshot = this._stickyQuestionCountSnapshot || null;
     const hasMatchingSnapshot = !!snapshot?.hasValue && snapshot.contextKey === contextKey;
+    const fallbackQuestionPool = Array.isArray(propsIn.questionPool) ? propsIn.questionPool : [];
+    const fallbackQuestionCount = fallbackQuestionPool.length;
+    const fallbackEncryptedCount = fallbackQuestionPool.filter(
+      (question) => String((question as { prompt?: unknown })?.prompt || '').trim() === '[encrypted]',
+    ).length;
 
     if (liveContextMatches) {
       if (!loadingActive || liveCount > 0 || liveEncryptedCount > 0) {
@@ -645,11 +650,17 @@ export class SurveySelector extends Component<any, any> {
       if (hasMatchingSnapshot) {
         return { count: snapshot.count, encryptedCount: snapshot.encryptedCount };
       }
+      if (fallbackQuestionCount > 0) {
+        return { count: fallbackQuestionCount, encryptedCount: fallbackEncryptedCount };
+      }
       return { count: liveCount, encryptedCount: liveEncryptedCount };
     }
 
     if (loadingActive && hasMatchingSnapshot) {
       return { count: snapshot.count, encryptedCount: snapshot.encryptedCount };
+    }
+    if (loadingActive && fallbackQuestionCount > 0) {
+      return { count: fallbackQuestionCount, encryptedCount: fallbackEncryptedCount };
     }
 
     return { count: 0, encryptedCount: 0 };
@@ -1147,7 +1158,8 @@ export class SurveySelector extends Component<any, any> {
   handleFilteredQuestionCountUpdate = (count: unknown, encryptedCount: unknown): void => {
     // Keep UI stable while cache warms or if a transient 0 arrives.
     const hasFallbackQuestionPool = Array.isArray(this.props.questionPool) && this.props.questionPool.length > 0;
-    if (!this.props.isQuestionCacheReady && !hasFallbackQuestionPool) return;
+    const numericCount = Math.max(0, Number(count || 0));
+    if (!this.props.isQuestionCacheReady && !hasFallbackQuestionPool && numericCount === 0) return;
     this.commitQuestionCountState(count, encryptedCount, {
       rememberStable: true,
       ignoreTransientZero: true,
@@ -1325,7 +1337,10 @@ export class SurveySelector extends Component<any, any> {
         });
       } else if (questionSelectorLoading) {
         dropdownTitle = this.renderQuestionSelectorLabel({
-          prefixLabel: questionSelectorCounts.count > 0 && filteredQuestionCount > 0 ? 'Questions' : 'Loading...',
+          prefixLabel:
+            questionSelectorCounts.count > 0 && (filteredQuestionCount > 0 || hasFallbackQuestionPool)
+              ? 'Questions'
+              : 'Loading...',
           count: questionSelectorCounts.count,
           encryptedCount: questionSelectorCounts.encryptedCount,
           showEncryptedCount: false,
@@ -1670,6 +1685,7 @@ export class SurveySelector extends Component<any, any> {
             lit={this.props.lit}
             litHooks={this.props.litHooks}
             network={this.props.network}
+            networkChainId={this.props.networkChainId}
             toggleLoginModal={this.props.toggleLoginModal}
             loginComplete={this.props.loginComplete}
             cache={this.props.cache}
@@ -2054,6 +2070,8 @@ export class QuestionsDashboard extends Component<any, any> {
               network={this.props.network}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
               sessionSlug={this.props.sessionSlug}
+              sessionConfig={this.props.sessionConfig}
+              networkChainId={this.props.networkChainId}
               refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
               refreshQuestionMetadata={this.props.refreshQuestionMetadata}
               refreshQuestionResponses={this.props.refreshQuestionResponses}

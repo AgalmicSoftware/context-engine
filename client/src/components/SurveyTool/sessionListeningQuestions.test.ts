@@ -1,10 +1,35 @@
+import { callAI } from '../../utilities/ai/aiClient.js';
 import {
   buildListeningQuestionPrompt,
   buildListeningQuestionStatements,
+  generateQuestionsFromListeningTranscript,
   parseListeningQuestionResponse,
 } from './sessionListeningQuestions';
+import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
+
+jest.mock('../../utilities/ai/aiClient.js', () => ({
+  callAI: jest.fn(),
+}));
+
+const mockCallAI = callAI as jest.MockedFunction<typeof callAI>;
 
 describe('sessionListeningQuestions', () => {
+  it('includes a generated quadratic budget in the listening question identity', () => {
+    const question = { prompt: 'Allocate support', questionType: 'quadratic', options: ['Parks', 'Transit'] };
+    const build = (voiceCredits: number) =>
+      buildListeningQuestionStatements({ questions: [{ ...question, voiceCredits }] }).statements[0];
+    expect(build(25)).toMatchObject({
+      voiceCredits: 25,
+      options: question.options,
+      id: generateQuestionId('quadratic', question.prompt, question.options, false, 25),
+    });
+    expect(build(25).id).not.toBe(build(99).id);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('builds a transcript-aware generation prompt for listening mode', () => {
     const prompt = buildListeningQuestionPrompt('Speaker A raised budget timing. Speaker B disagreed.', {
       count: 3,
@@ -43,6 +68,36 @@ describe('sessionListeningQuestions', () => {
 
     expect(prompt).toContain('* SourceType: document');
     expect(prompt).toContain('* MultiSpeakerHint: likely_multiple_speakers');
+  });
+
+  it('adds prior generated prompts to the model context and requests the configured thinking tier', async () => {
+    mockCallAI.mockResolvedValue(`{
+      "surveyTitle": "Follow-up",
+      "questions": [
+        { "prompt": "What evidence should the group review next?", "questionType": "freeform", "tags": ["evidence"] }
+      ]
+    }`);
+
+    await generateQuestionsFromListeningTranscript(
+      'The group discussed budget timing, evidence thresholds, operational risk, and accountability tradeoffs in enough detail.',
+      {
+        sessionSlug: 'demo',
+        existingQuestionPrompts: ['Which budget tradeoff matters most?'],
+      },
+    );
+
+    expect(callAI).toHaveBeenCalledWith(
+      expect.stringContaining('Already drafted questions from this conversation:'),
+      expect.objectContaining({
+        sessionSlug: 'demo',
+        taskType: 'generate',
+        thinking: true,
+      }),
+    );
+    expect(callAI).toHaveBeenCalledWith(
+      expect.stringContaining('Which budget tradeoff matters most?'),
+      expect.anything(),
+    );
   });
 
   it('parses AI JSON and builds reviewable question statements', () => {

@@ -135,6 +135,10 @@ const buildDemoQuestionFromComment = (
     question.options = readCommentPollOptions(fixture, comment, targetSlug);
     question.singleSelect = true;
   }
+  if (type === 'quadratic') {
+    question.options = Array.isArray(comment.options) ? [...comment.options] : [];
+    question.voiceCredits = comment.voiceCredits ?? 99;
+  }
   if (type === 'rating' && comment.scale && typeof comment.scale === 'object' && !Array.isArray(comment.scale)) {
     question.scale = { ...comment.scale };
   }

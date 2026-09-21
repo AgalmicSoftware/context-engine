@@ -115,7 +115,12 @@ const EncryptionPanel = ({
   return (
     <section id="session-wizard-section-encryption" className={`${styles.panel} ${styles.encryptionPanel}`}>
       <div className={styles.panelHeaderRow}>
-        <button type="button" className={styles.panelHeader} onClick={onToggleCollapsed}>
+        <button
+          type="button"
+          className={styles.panelHeader}
+          data-ce-control-appearance="frameless"
+          onClick={onToggleCollapsed}
+        >
           <span className={styles.panelTitle}>
             {isWorkerCanonical
               ? showOnChainGateControls
@@ -128,7 +133,7 @@ const EncryptionPanel = ({
               id: 'gw-encryption-visibility',
               content:
                 isWorkerCanonical && !showOnChainGateControls
-                  ? 'The Session Worker authenticates passkeys and applies its configured roles and Groups. No chain, contract, RPC, Lit credential, wallet, faucet, or gas is required.'
+                  ? 'Create groups below to control who can access context, questions, results, and other session information. Group membership is linked to each participant’s passkey login, so you can restrict information to selected groups.'
                   : `${translate('gates')} control who can decrypt locked fields and access sponsored AI and other protected resources. Leave this open for a public link, or attach ${translate('sbtLower')} ${translate('gatesLower')} for members-only access.`,
               placement: 'right',
               testId: 'ce-wizard-tooltip-gw-encryption-visibility',

@@ -236,6 +236,7 @@ const SurveyResultsQuestionSummary = ({
       renderDefaultSummary={() => (
         <SingleQuestionResponse
           aggregatorResponseMode={true}
+          showAggregatorBookmark={false}
           question={questionForResponse}
           allResponses={model.displayResponses}
           network={network}

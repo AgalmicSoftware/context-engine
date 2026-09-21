@@ -400,8 +400,8 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Questions:</span>
                   <span className={styles.featureText}>
-                    Supports binary, rating, multiple-choice, and freeform questions, with optional conviction weighting
-                    and comments.
+                    Supports binary, rating, multiple-choice, quadratic allocation, and freeform questions, with
+                    optional conviction weighting and comments.
                   </span>
                 </li>
                 <li className={styles.featureItem}>

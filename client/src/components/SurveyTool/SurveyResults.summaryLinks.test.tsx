@@ -34,7 +34,7 @@ jest.mock('../SBTs/SBTFilter', () => (props: any) => {
 });
 const mockQuestionFilter = jest.fn((..._args: any[]) => null);
 jest.mock('./QuestionFilter', () => {
-  const ReactActual = jest.requireActual('react');
+  const ReactActual = jest.requireActual<typeof React>('react');
   return ReactActual.forwardRef((props: any, ref: any) => {
     mockQuestionFilter(props);
     ReactActual.useImperativeHandle(ref, () => ({
@@ -52,6 +52,11 @@ jest.mock('../PolisReport/PolisReport', () => (props: any) => {
 const mockSingleQuestionResponse = jest.fn((..._args: any[]) => null);
 jest.mock('./SingleQuestionResponse', () => (props: any) => {
   mockSingleQuestionResponse(props);
+  if (props.question?.type === 'quadratic') {
+    const ActualResponse =
+      jest.requireActual<typeof import('./SingleQuestionResponse')>('./SingleQuestionResponse').default;
+    return <ActualResponse {...props} />;
+  }
   return null;
 });
 const mockDemoAnalysisWorkspace = jest.fn((..._args: any[]) => null);
@@ -320,7 +325,7 @@ const findLinkByHref = async (href: string): Promise<HTMLAnchorElement> => {
         HTMLAnchorElement | undefined) || null;
     expect(link).toBeTruthy();
   });
-  return link as HTMLAnchorElement;
+  return link as unknown as HTMLAnchorElement;
 };
 
 const buildSyncStatusDisplay = (
@@ -333,7 +338,7 @@ const buildSyncStatusDisplay = (
   showQuickRefresh: true,
   viewMode: 'questions',
   question: {
-    color: 'warning',
+    color: 'info',
     label: 'Remaining Blocks: 20 (Current: 80 / Latest: 100)',
     progress: 80,
     remainingBlocks: 20,
@@ -427,6 +432,56 @@ describe('SurveyResults multichoice aggregator summary', () => {
     expect(screen.getByText('1 (50.00%)')).toBeInTheDocument();
     expect(screen.getByText('Gamma')).toBeInTheDocument();
     expect(screen.getByText('0 (0.00%)')).toBeInTheDocument();
+  });
+
+  it('renders quadratic totals through the real results module using each respondent’s latest allocation', async () => {
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: 'Allocate project support',
+              type: 'quadratic',
+              options: ['Parks', 'Transit'],
+              voiceCredits: 99,
+            },
+          },
+          questionResponses: {
+            q1: {
+              [RESPONDER_ONE]: { type: 'quadratic', answer: { value: [7, 0] }, timeStamp: 1 },
+              [RESPONDER_ONE.toUpperCase()]: { type: 'quadratic', answer: { value: [3, -4] }, timeStamp: 2 },
+              [RESPONDER_TWO]: { type: 'quadratic', answer: { value: [-2, 5] }, timeStamp: 1 },
+            },
+          },
+        }),
+      },
+    });
+
+    renderQuestionResults({ activeSessionSlug: 'demo', sessionSlug: 'demo' });
+    await waitForText('Allocate project support');
+    await expandQuestionCard('Allocate project support');
+
+    const results = await screen.findByTestId('ce-quadratic-results');
+    const table = within(results).getByRole('table', { name: 'Quadratic allocation results' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Option', 'Positive', 'Negative', 'Net']);
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) =>
+          within(row)
+            .getAllByRole('cell')
+            .map((cell) => cell.textContent),
+        ),
+    ).toEqual([
+      ['3', '-2', '1'],
+      ['5', '-4', '1'],
+    ]);
   });
 
   it('keeps the SurveyResults multichoice summary renderer when question metadata is still missing', async () => {
@@ -1096,8 +1151,8 @@ describe('SurveyResults survey/response links', () => {
 
     await waitFor(() => {
       const individualCalls = mockSingleQuestionResponse.mock.calls
-        .map((call) => call[0])
-        .filter((props) => props?.aggregatorResponseMode === false);
+        .map((call) => call[0] as Record<string, unknown>)
+        .filter((props) => props.aggregatorResponseMode === false);
       expect(individualCalls.length).toBeGreaterThan(0);
       expect(JSON.stringify(individualCalls)).not.toContain('Old answer');
       expect(individualCalls[individualCalls.length - 1]).toEqual(

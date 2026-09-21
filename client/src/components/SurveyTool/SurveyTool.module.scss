@@ -288,7 +288,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 12px;
   font-weight: 600;
   color: var(--ce-color-white);
   font-size: 1.5em;
@@ -387,6 +388,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
     &.unsure {
       background-color: var(--ce-binary-choice-unsure-bg);
+      color: var(--ce-color-black);
     }
 
     &.disagree {
@@ -1503,7 +1505,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.25em;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   opacity: 0.86;
   margin: 0;
   line-height: 1.1;
@@ -2677,6 +2679,22 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   max-width: 520px;
 }
 
+.sessionListeningPanelEmbedded {
+  max-width: 100%;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ce-panel-text);
+  box-shadow: none;
+  overflow: visible;
+}
+
+.sessionListeningPanelEmbedded .sessionListeningTitle {
+  color: var(--ce-panel-text);
+}
+
 .sessionListeningHeader,
 .sessionListeningActions {
   display: flex;
@@ -3218,6 +3236,136 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionListeningPanelEmbedded .sessionListeningCreateWrap {
+  :global([class*='createSurveyContainer']) {
+    background: transparent !important;
+    color: var(--ce-panel-text) !important;
+    box-shadow: none !important;
+  }
+
+  h3,
+  h4,
+  label,
+  strong,
+  :global([class*='toggleLabel']),
+  :global([class*='inheritToggle']),
+  :global([class*='optionItem']),
+  :global([class*='singleSelectLabel']),
+  :global([class*='questionMetadata']),
+  :global([class*='tagsManagerContainer']),
+  :global([class*='questionId']),
+  :global([class*='surveyIdPreview']),
+  :global([class*='aiPromptMeta']),
+  :global([class*='uploadedQuestionsList']) {
+    color: var(--ce-panel-text) !important;
+    opacity: 1 !important;
+  }
+
+  :global([class*='questionContainer']),
+  :global([class*='typeSelectorBlock']),
+  :global([class*='surveySubmissionConfirmation']) {
+    background: color-mix(in srgb, var(--ce-panel-text) 8%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 18%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--ce-overlay-base) 20%, transparent) !important;
+  }
+
+  :global([class*='surveyTitleInput']),
+  :global([class*='docUrlInput']),
+  :global([class*='questionPromptInput']),
+  :global([class*='optionInput']),
+  :global([class*='questionTypeSelect']),
+  :global([class*='associatedSurveyInput']),
+  :global([class*='tagInputField']),
+  :global([class*='tagsInput']) {
+    background: color-mix(in srgb, var(--ce-overlay-surface) 68%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 22%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+    caret-color: var(--ce-panel-text) !important;
+
+    &::placeholder {
+      color: color-mix(in srgb, var(--ce-panel-text) 62%, transparent) !important;
+    }
+  }
+
+  :global([class*='questionTypeText']),
+  :global([class*='typeSelectorLabel']),
+  :global([class*='typeTitle']) {
+    color: var(--ce-status-info-text) !important;
+    opacity: 1 !important;
+  }
+
+  :global([class*='typeButton']),
+  :global([class*='jsonPromptBar']) button,
+  :global([class*='tagInputGroup']),
+  :global([class*='modeSwitchButton']),
+  :global([class*='copySurveyLinkButton']),
+  :global([class*='copyQuestionIdButton']),
+  :global([class*='bookmarkQuestionButton']),
+  :global([class*='removeQuestionButton']),
+  :global([class*='removeOptionButton']),
+  :global([class*='addOptionButton']),
+  :global([class*='addTagButton']),
+  :global([class*='magicTagButton']),
+  :global([class*='clearFormButton']) {
+    background: color-mix(in srgb, var(--ce-panel-text) 10%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 24%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+    opacity: 1 !important;
+  }
+
+  :global([class*='typeButton']):hover,
+  :global([class*='jsonPromptBar']) button:hover,
+  :global([class*='jsonPromptBar']) button:focus-visible,
+  :global([class*='copySurveyLinkButton']):hover,
+  :global([class*='copyQuestionIdButton']):hover,
+  :global([class*='bookmarkQuestionButton']):hover,
+  :global([class*='addOptionButton']):hover,
+  :global([class*='addTagButton']):hover,
+  :global([class*='magicTagButton']):hover {
+    background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-info-text) 46%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  :global([class*='filterBubble']),
+  :global([class*='pill']) {
+    background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-info-text) 36%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  :global([class*='pillAgree']) {
+    background: color-mix(in srgb, var(--ce-status-success-text) 82%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 46%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
+  }
+
+  :global([class*='pillDisagree']) {
+    background: color-mix(in srgb, var(--ce-status-danger-text) 82%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-error) 44%, transparent) !important;
+    color: var(--ce-status-error) !important;
+  }
+
+  :global([class*='pillUnsure']) {
+    background: color-mix(in srgb, var(--ce-status-warning-text) 90%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-warning) 46%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
+  }
+
+  :global([class*='freeformPreview']),
+  :global([class*='ratingPreviewWrap']),
+  :global([class*='jsonDisplay']) {
+    background: color-mix(in srgb, var(--ce-overlay-surface) 58%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-panel-text) 18%, transparent) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  a {
+    color: var(--ce-status-info-text) !important;
+  }
+}
+
 .sessionVoiceModeModal {
   display: flex;
   flex-direction: column;
@@ -3257,6 +3405,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     padding: 18px;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     color: var(--ce-panel-text);
   }
 
@@ -3369,6 +3518,26 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewContext {
   display: grid;
   gap: 7px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+
+  summary {
+    cursor: pointer;
+    color: var(--ce-panel-text);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.35;
+    list-style-position: inside;
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 3px;
+    }
+  }
 
   label {
     margin: 0;
@@ -3564,8 +3733,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewResearchHelp {
   align-self: flex-start;
   padding: 2px 4px;
-  background: transparent;
+  border: 0;
+  background: transparent !important;
   color: var(--ce-panel-text);
+  box-shadow: none !important;
 
   &:focus-visible {
     outline: 2px solid var(--ce-focus-ring);
@@ -3969,6 +4140,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: grid;
   gap: 14px;
   margin-top: 14px;
+  padding-bottom: 6px;
 }
 
 .sessionInterviewSuggestions {
@@ -4249,26 +4421,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewReviewActions {
   position: sticky;
   bottom: -18px;
-  z-index: 2;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 14px;
   margin: 0 -18px -18px;
   padding: 12px 18px;
   border-top: 1px solid var(--ce-card-border);
   background: var(--ce-surface-sunken);
   box-shadow: 0 -10px 24px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
-
-  &:has(.sessionInterviewMetadata) {
-    position: relative;
-    bottom: auto;
-    flex-direction: column;
-    align-items: stretch;
-    margin: 0;
-    padding: 12px 0 0;
-    box-shadow: none;
-  }
 }
 
 .sessionInterviewProvenance {
@@ -4292,6 +4455,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex: 1 1 auto;
   flex-direction: column;
   gap: 6px;
+  min-width: min(100%, 280px);
+  max-width: min(100%, 620px);
+}
+
+.sessionInterviewReviewActions .sessionInterviewSubmitButton {
+  flex: 0 0 min(100%, 280px);
+  margin-left: auto;
 }
 
 @media (max-width: 480px) {
@@ -4308,11 +4478,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .sessionInterviewReviewActions {
-    position: static;
-    margin: 0;
-    padding: 14px 0;
+    bottom: -18px;
+    margin: 0 -18px -18px;
+    padding: 12px 18px;
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .sessionInterviewConsentOptions {
+    max-width: 100%;
+  }
+
+  .sessionInterviewReviewActions .sessionInterviewSubmitButton {
+    width: 100%;
+    flex-basis: auto;
+    margin-left: 0;
   }
 }
 
@@ -4342,12 +4522,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-/* Container for Card + Controls Side-by-Side */
+/* Card and submission feedback; desktop controls sit on the side rails. */
 .pileInteractionUnit {
   --pile-desktop-submit-rail-offset: 42px;
   --pile-desktop-rail-gap: 24px;
   --pile-card-width: min(550px, 90vw);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
@@ -5612,9 +5793,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .fullQuestionFooter .importanceText,
   .fullQuestionFooter .convictionToggleLine,
+  .fullQuestionFooter .convictionToggleButton,
+  .fullQuestionFooter .convictionToggleDivider,
+  .fullQuestionFooter .convictionToggleValue,
   .pileCardFooter .importanceText,
   .pileCardFooter .convictionToggleLine,
+  .pileCardFooter .convictionToggleButton,
+  .pileCardFooter .convictionToggleDivider,
+  .pileCardFooter .convictionToggleValue,
   .lockAudiencePopover .convictionToggleLine,
+  .lockAudiencePopover .convictionToggleButton,
+  .lockAudiencePopover .convictionToggleDivider,
+  .lockAudiencePopover .convictionToggleValue,
   .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailItem,
   .lockAudiencePopover .lockAudienceCaretButton {
@@ -5635,12 +5825,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .fullQuestionFooter .convictionToggleLine:hover,
   .fullQuestionFooter .convictionToggleLine:focus-visible,
   .fullQuestionFooter .convictionToggleButtonActive,
+  .fullQuestionFooter .convictionToggleButton:hover,
+  .fullQuestionFooter .convictionToggleButton:focus-visible,
   .pileCardFooter .convictionToggleLine:hover,
   .pileCardFooter .convictionToggleLine:focus-visible,
   .pileCardFooter .convictionToggleButtonActive,
+  .pileCardFooter .convictionToggleButton:hover,
+  .pileCardFooter .convictionToggleButton:focus-visible,
   .lockAudiencePopover .convictionToggleLine:hover,
   .lockAudiencePopover .convictionToggleLine:focus-visible,
-  .lockAudiencePopover .convictionToggleButtonActive {
+  .lockAudiencePopover .convictionToggleButtonActive,
+  .lockAudiencePopover .convictionToggleButton:hover,
+  .lockAudiencePopover .convictionToggleButton:focus-visible {
     color: var(--ce-control-text) !important;
     opacity: 1;
     text-shadow: none;
@@ -5698,9 +5894,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-/* Once the question controls move below the card, Classic 95 no longer needs
- * the desktop side-rail reserve. Keep every action visible in a compact
- * toolbar so pointer focus cannot open a menu over the lower session panels. */
+/* Compact Classic 95 uses the shared action menu when Submit needs the space.
+ * Open upward to keep the lower session panels accessible. */
 @media (max-width: 768px) {
   @container ce-theme style(--ce-layout-profile: desktop-window) {
     .pileInteractionUnit {
@@ -5744,20 +5939,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     .pileActionsMenuEligible .pileActionMenuToggle {
-      display: none;
+      display: flex;
     }
 
-    .pileActionsMenuEligible .pileActionButtonGroup,
-    .pileActionsMenuEligible:focus-within .pileActionButtonGroup,
-    .pileActionsMenuEligible:hover .pileActionButtonGroup {
-      position: static;
-      display: flex;
-      flex-direction: row;
-      min-width: 0;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      box-shadow: none;
+    .pileControls > .pileActions.pileActionsMenuEligible {
+      position: relative;
+    }
+
+    .pileActionsMenuEligible .pileActionButtonGroup {
+      top: auto;
+      bottom: calc(100% + 8px);
+      background: var(--ce-surface-raised);
+      border: var(--ce-border-control-width) solid var(--ce-border-raised);
+      box-shadow: var(--ce-shadow-raised);
+    }
+
+    .pileActions.pileActionsMenuEligible .pileActionButtonGroup .actionButton,
+    .pileActions.pileActionsMenuEligible .pileActionButtonGroup .actionButton:hover:not(:disabled),
+    .pileActions.pileActionsMenuEligible .pileActionButtonGroup .actionButton:focus-visible {
+      color: var(--ce-control-text) !important;
     }
 
     .pileActions .pileActionButtonGroup .actionButton {
@@ -5874,6 +6074,26 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     .pileActionButtonGroup {
       flex-direction: row;
       justify-content: center;
+    }
+
+    .pileActionsMenuEligible .pileActionButtonGroup {
+      flex-direction: column;
+    }
+
+    .pileControls:has(.pileActionsMenuEligible) {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        'footer footer'
+        'actions nav';
+    }
+
+    .pileControls > .pileActions.pileActionsMenuEligible {
+      width: auto;
+      justify-self: start;
+    }
+
+    .pileControls:has(.pileActionsMenuEligible) > .pileNav {
+      justify-self: end;
     }
   }
 }
@@ -6289,6 +6509,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .ratingValueDisplay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
   color: var(--ce-color-white);
   font-size: 1.5rem;
   font-weight: 600;
@@ -6522,7 +6745,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .convictionToggleLine {
   background: transparent;
   border: none;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   font-size: 1.06rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -6549,7 +6772,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .convictionToggleButton {
   background: transparent;
   border: none;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   padding: 0;
   margin: 0;
   cursor: pointer;
@@ -6562,7 +6785,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .convictionToggleDivider {
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   opacity: 0.5;
   font-weight: 600;
 }
@@ -6690,6 +6913,48 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: inherit;
   margin-left: 0.35rem;
   opacity: 0.5;
+}
+
+// Allocation options need room to grow; shared pile navigation and submission stay outside this card.
+.pileCardInner.pileQuadraticCard {
+  color: var(--ce-panel-text);
+  height: auto;
+  min-height: 400px;
+  .pileCardBody {
+    height: auto;
+    overflow: visible;
+    gap: 1rem;
+    padding: 1.25rem;
+    color: var(--ce-panel-text);
+  }
+  .pileCardHeader {
+    min-height: 0;
+    margin-bottom: 0;
+  }
+  .pileCardMainContent {
+    overflow: visible;
+    padding: 0;
+  }
+}
+.pileSubmitError {
+  width: 100%;
+  margin: 0.75rem 0 0;
+  color: var(--ce-status-error);
+  overflow-wrap: anywhere;
+}
+
+.quadraticQuestionContainer {
+  width: 100%;
+  min-width: 0;
+}
+
+.pileCardActive:has(.pileQuadraticCard) {
+  position: relative;
+  height: auto;
+}
+
+.pileCardContainer:has(.pileQuadraticCard) {
+  height: auto;
 }
 
 .sessionInterviewTranscriptArea {

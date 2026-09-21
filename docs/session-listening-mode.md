@@ -83,14 +83,27 @@ greeting through `session.instructions.append`; it does not send
 `response.create` or a second `session.start`. No live task backend is invoked:
 a client delegation receives a factual notice that drafting happens after Stop.
 
-The shipped `demo-interview` client record enables question suggestions and pins its deployed Worker, so its
-route is simply `/session/demo-interview?mode=interview`; it does not require a
-`worker=` discovery parameter. Registry-backed sessions likewise read
-`corsWorkerUrl` from registered session metadata. A newly shared,
+The shipped `demo-interview` client record pins its deployed Worker and enables question suggestions.
+The shipped `demo-interview-5` record is a trusted clean-route discovery stub:
+`/session/demo-interview-5?mode=interview` bootstraps and verifies the live config from its pinned
+Worker, so the public URL does not require a visible `worker=` parameter. Registry-backed sessions
+likewise read `corsWorkerUrl` from registered session metadata. A newly shared,
 Worker-canonical session still needs an explicit discovery link unless its app
 deployment bundles the Worker origin or serves the session from that origin.
 
-The interviewer starts directly with a topic-relevant question, without a greeting or preamble. It follows the responder's direction, chooses relevant existing questions, and asks useful follow-ups.
+The interviewer starts directly with a topic-relevant question, without a
+greeting or preamble. It follows the responder's direction, chooses relevant
+existing questions, and asks useful follow-ups. Sessions may add
+`interviewMode.steeringPrompt` for owner-authored interview guidance. The value
+is trimmed, capped at 3000 characters, and inserted as its own paragraph after
+the fixed two-line realtime preamble and before the opening question. Empty
+values are omitted.
+
+In Group Conversation mode, the recorder keeps the captured transcript when the participant records more.
+When an eligible completed transcript segment is available and no transcription chunk is pending, the client asks
+the configured session AI to draft questions automatically. New drafts append to the existing editor, while exact
+ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
+remains available after a generation error; the client does not auto-retry unchanged transcript text in a loop.
 
 Session `interviewMode` settings are available in the wizard and admin metadata editor:
 
@@ -98,6 +111,7 @@ Session `interviewMode` settings are available in the wizard and admin metadata 
 | --- | --- | --- |
 | `openingMode` | `auto` | Generate an opening from session information and public questions; `owner` uses the owner's text. |
 | `openingPrompt` | empty | Owner-written opening, required in owner mode. |
+| `steeringPrompt` | empty | Optional owner-authored guidance inserted into the live interviewer instructions before the opening question; capped at 3000 characters. |
 | `autoRegenerate` | `false` | Refresh the generated opening when enough questions have been added. |
 | `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
@@ -130,8 +144,10 @@ by session time; legacy Realtime sessions use completed input transcriptions.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
 maps the transcript and any responder context imported by an AI prefill link
-to response drafts. Imported context remains editable but the context field
-stays hidden during a normal voice-only interview. Drafts may include comments,
+to response drafts. Imported context remains editable in a collapsed
+**Imported responder context** disclosure; during a normal voice-only interview
+that context editor is absent, keeping the microphone as the primary action.
+Drafts may include comments,
 importance, and conviction only when the evidence explicitly supports them.
 Every generated draft also carries a confidence value from 0 to 1. The review
 panel labels this **AI-estimated confidence**, describing the AI’s estimate of
@@ -162,8 +178,12 @@ selected-state button. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
 response state has rehydrated. Canceling sign-in leaves the review open without
-submitting; after a successful submit the modal remains open so suggested
-questions can still be reviewed or uploaded separately. The **Submit responses**
+submitting; after a successful submit the submit button changes to
+**Responses submitted**, and a **View results** action appears after five seconds
+when a results handler is available. The modal remains open so suggested
+questions can still be reviewed or uploaded separately. Editing a draft after
+submission clears the success/results affordance until the reviewer submits
+again. The **Submit responses**
 and **Upload Questions** actions share the pile view’s submit styling. **Upload
 Questions** remains inside Suggested new questions and uses the normal question
 upload flow. Stopping alone never submits answers.
@@ -172,8 +192,9 @@ imported. When it is retained, submitted response metadata keeps the
 prompt/question-set revision and self-reported source platform/model. A separate
 **Share AI draft changes for research** checkbox appears when imported or
 voice-generated AI drafts or prediction revisions are being reviewed, and it is
-off by default. An **AI prefill metadata · model** or **AI research metadata**
-disclosure explains the included platform, revision, question-set hash, coverage
+off by default. The platform checkbox is labeled **Include platform/model
+provenance**. An **AI prefill metadata** disclosure explains the included
+platform, revision, question-set hash, coverage
 counts, prediction fields, selected/unselected draft counts, and excluded
 metadata according to the visible consent controls.
 Consented research records the original AI prediction, saved prediction
@@ -198,10 +219,12 @@ platform/model provenance choice.
 ## Ordinary ChatGPT or Claude, without MCP
 
 Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
-to augment interview** footer card beneath the microphone. Clicking its heading
-or enlarged top-right clipboard copies the request without opening the preview.
-The **Prompt** dropdown inside the card expands the instruction and collapses it
-again; the preview starts collapsed. A question-mark tooltip to the left of **Prompt** explains:
+to augment interview** footer card beneath the microphone when the interview has
+not already been opened from a ChatGPT or Claude prefill packet. Clicking its
+heading or enlarged top-right clipboard copies the request without opening the
+preview. The **Prompt** dropdown inside the card expands the instruction and
+collapses it again; the preview starts collapsed and remains collapsed after a
+successful copy. A question-mark tooltip to the left of **Prompt** explains:
 “Allows your agent to predict your responses and raise better interview questions.”
 The tooltip is available on hover and keyboard focus. The copied request begins:
 
@@ -239,7 +262,7 @@ in a Context Engine link. The copied prompt asks capable interfaces to render
 that long URL as an **Open prefilled interview** Markdown link rather than
 showing the encoded payload; raw-URL fallback remains allowed for interfaces
 without clickable Markdown. The packet records the session slug, question-set
-hash, prompt version, an optional responder summary, proposed response drafts, per-draft
+hash, prompt version, concise question-relevant responder context, proposed response drafts, per-draft
 confidence and basis, source platform, exact model ID when available, and
 `self_reported` verification. It also carries self-reported research coverage:
 distinct prior chats, memory items, and connected sources searched and used,
@@ -273,6 +296,16 @@ history, and validates the AI-authored response drafts against the current
 questions and listed options. Current direct responses are not re-authored by a
 different mapping model, so their source attribution and confidence remain
 faithful to the external AI. Every proposed answer remains a local review draft.
+When the participant starts or continues the live voice interview after a valid
+prefill is loaded, the realtime interviewer receives a bounded JSON background
+block with the imported summary/facts, question-matched predictions, and any
+fields the participant already edited in review. That block is labeled as
+untrusted, unconfirmed AI prediction data: the interviewer can ask useful
+confirmation, correction, and gap-filling follow-ups, but it must not treat
+predicted answers as spoken beliefs, skip all predicted questions, or override
+later spoken clarifications. If the prefill hash is stale or belongs to a
+different question set, the live interviewer is not started with the imported
+context.
 The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.

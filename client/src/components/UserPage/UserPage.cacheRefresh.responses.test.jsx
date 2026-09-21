@@ -46,6 +46,44 @@ describe('UserPage cache refresh response hydration', () => {
     expect(instance.state.questionCreationInfo[0].prompt).toBe('Who goes there?');
   });
 
+  it('preserves quadratic option labels and custom credits in profile responses and created questions', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000bb';
+    const instance = makeInstance({ viewAddress });
+    const question = {
+      id: 'q-allocation',
+      creator: viewAddress,
+      prompt: 'Priorities',
+      type: 'quadratic',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) =>
+      name === 'questionsCache'
+        ? [
+            {
+              slug: 'edge',
+              data: {
+                84532: {
+                  questions: { [question.id]: question },
+                  questionResponses: {
+                    [question.id]: { [viewAddress]: { answer: { value: [3, -4] } } },
+                  },
+                },
+              },
+            },
+          ]
+        : [],
+    );
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    for (const entries of [instance.state.questionResponseInfo, instance.state.questionCreationInfo]) {
+      expect(entries[0]).toMatchObject({ id: question.id, options: question.options, voiceCredits: 25 });
+    }
+    expect(instance.state.detailedQuestionResponses[question.id].answer.value).toEqual([3, -4]);
+  });
+
   it('does not mutate cached survey or question records when creator metadata is inferred', () => {
     const viewAddress = '0x00000000000000000000000000000000000000bb';
     const networkID = '84532';

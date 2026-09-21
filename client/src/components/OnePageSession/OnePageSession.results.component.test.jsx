@@ -565,6 +565,24 @@ describe('OnePageSession results routing', () => {
     }
   });
 
+  it('preserves pending Worker auto-join links and never restores completed intent on section toggles', () => {
+    const priorUrl = window.location.href;
+    try {
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026&view=questions#questions');
+      const subject = new OnePageSession(buildProps());
+      subject.hasAutoMintIntent = jest.fn(() => false);
+      subject.recordOriginalURL();
+      subject.resetDemoURL();
+      expect(window.location.search).toContain('joinGroup=participants-2026');
+      window.history.replaceState({}, '', '/session/alpha?view=questions#questions');
+      subject.resetDemoURL();
+      expect(window.location.search).toBe('?view=questions');
+      expect(window.location.hash).toBe('#questions');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('opens the questions view and auto-opens results when the session route is /questions/results', async () => {
     const priorUrl = window.location.href;
 
@@ -786,6 +804,78 @@ describe('OnePageSession results routing', () => {
 
     expect(loadSpy).toHaveBeenCalledTimes(1);
     expect(callbackThis).toBe(sessionRef.current);
+  });
+
+  it('renders structured session context as escaped text and official links', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/edge']}>
+        <OnePageSession
+          {...props}
+          slug="edge"
+          sessionConfig={{
+            ...props.sessionConfig,
+            sessionContext: {
+              title: 'Context',
+              paragraphs: [
+                'EDDY 2026 brings together academics and practitioners working on digital democracy.',
+                '<script>alert("nope")</script> This text must render literally.',
+              ],
+              links: [
+                {
+                  label: 'Official EDDY 2026 event page',
+                  url: 'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna',
+                },
+                {
+                  label: 'Ignored unsafe link',
+                  url: 'javascript:alert(1)',
+                },
+              ],
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+    const context = screen.getByTestId('ce-session-context');
+    expect(within(context).queryByRole('heading', { name: 'Context' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-demo-documents-section')).toContainElement(context);
+    expect(context).toHaveTextContent('EDDY 2026 brings together academics and practitioners');
+    expect(context).toHaveTextContent('<script>alert("nope")</script> This text must render literally.');
+    expect(context.querySelector('script')).toBeNull();
+    expect(within(context).getByRole('link', { name: /Official EDDY 2026 event page/i })).toHaveAttribute(
+      'href',
+      'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna',
+    );
+    expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
+  });
+
+  it('does not render an empty session context section', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/edge']}>
+        <OnePageSession
+          {...props}
+          slug="edge"
+          sessionConfig={{
+            ...props.sessionConfig,
+            sessionContext: {
+              title: 'Context',
+              paragraphs: ['   '],
+              links: [{ label: 'Unsupported', url: 'http://example.org/source' }],
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
   });
 
   it('shows a Retry action for automatic-only generated analysis failures and a Recheck action after polling expires', async () => {
@@ -1623,6 +1713,144 @@ describe('OnePageSession results routing', () => {
 
     expect(subject._generatedResultsRequestSeq).toBeGreaterThan(previousSeq);
     expect(loadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidates pending generated viewer loads on hidden session changes without starting a replacement load', async () => {
+    const prevProps = buildProps();
+    const nextProps = {
+      ...buildProps(),
+      slug: 'next-session',
+      sessionConfig: { ...buildProps().sessionConfig, slug: 'next-session' },
+    };
+    const subject = createSubject(nextProps);
+    subject.state = { ...subject.state, showResults: false };
+    const previousSeq = subject._generatedResultsRequestSeq;
+    const loadSpy = jest.spyOn(subject, 'loadGeneratedResultsArtifact').mockResolvedValue(undefined);
+    subject.kickoffLightSbtUniverseScan = jest.fn();
+    subject.clearUnsupportedAutoMintState = jest.fn();
+    subject.scheduleBuildAggregator = jest.fn();
+
+    subject.componentDidUpdate(
+      { ...prevProps, slug: 'prev-session', sessionConfig: { ...prevProps.sessionConfig, slug: 'prev-session' } },
+      { ...subject.state, showResults: false },
+    );
+
+    expect(subject._generatedResultsRequestSeq).toBeGreaterThan(previousSeq);
+    expect(loadSpy).not.toHaveBeenCalled();
+  });
+
+  it('periodically rechecks generated artifacts while ready signed-out results remain visible', async () => {
+    jest.useFakeTimers();
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      showResults: true,
+      generatedResultsAnalysis: { status: 'ready' },
+      generatedResultsStatusBody: {
+        ok: true,
+        viewerAuthorized: true,
+        sessionSlug: 'edge',
+        state: { lastGood: { draftId: 'old', artifact: { kind: 'ce_session_results_analysis_artifact' } } },
+      },
+    };
+    const loadSpy = jest.spyOn(subject, 'loadGeneratedResultsArtifact').mockImplementation(async () => {
+      subject.state = {
+        ...subject.state,
+        generatedResultsStatusBody: {
+          ok: true,
+          viewerAuthorized: true,
+          sessionSlug: 'edge',
+          state: { lastGood: { draftId: 'new', artifact: { kind: 'ce_session_results_analysis_artifact' } } },
+        },
+      };
+    });
+
+    subject.scheduleGeneratedResultsViewerRefresh();
+    jest.advanceTimersByTime(15_000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.generatedResultsStatusBody.state.lastGood.draftId).toBe('new');
+    subject.clearGeneratedResultsViewerRefresh();
+  });
+
+  it('does not overlap generated artifact refreshes when a recheck is still in flight', async () => {
+    jest.useFakeTimers();
+    const subject = createSubject();
+    subject.state = { ...subject.state, showResults: true };
+    let resolveLoad;
+    const loadSpy = jest.spyOn(subject, 'loadGeneratedResultsArtifact').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+
+    subject.scheduleGeneratedResultsViewerRefresh();
+    jest.advanceTimersByTime(30_000);
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+
+    resolveLoad();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.advanceTimersByTime(15_000);
+    expect(loadSpy).toHaveBeenCalledTimes(2);
+    subject.clearGeneratedResultsViewerRefresh();
+  });
+
+  it('does not invalidate manual generated-results runs with viewer refresh polling', async () => {
+    jest.useFakeTimers();
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      showResults: true,
+      generatedResultsAnalysis: { isRunning: true },
+    };
+    const previousSeq = subject._generatedResultsRequestSeq;
+    const loadSpy = jest.spyOn(subject, 'loadGeneratedResultsArtifact').mockResolvedValue(undefined);
+
+    subject.scheduleGeneratedResultsViewerRefresh();
+    jest.advanceTimersByTime(30_000);
+
+    expect(loadSpy).not.toHaveBeenCalled();
+    expect(subject._generatedResultsRequestSeq).toBe(previousSeq);
+    subject.clearGeneratedResultsViewerRefresh();
+  });
+
+  it('pauses generated artifact refreshes while hidden and cleans up when results unmount or sessions change', async () => {
+    jest.useFakeTimers();
+    const subject = createSubject();
+    subject.state = { ...subject.state, showResults: true };
+    const loadSpy = jest.spyOn(subject, 'loadGeneratedResultsArtifact').mockResolvedValue(undefined);
+    const originalHidden = document.hidden;
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    subject.scheduleGeneratedResultsViewerRefresh();
+    jest.advanceTimersByTime(15_000);
+    expect(loadSpy).not.toHaveBeenCalled();
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    const previousTimer = subject._generatedResultsViewerRefreshTimer;
+    subject.props = {
+      ...subject.props,
+      slug: 'other',
+      sessionConfig: { ...subject.props.sessionConfig, slug: 'other' },
+    };
+    subject.kickoffLightSbtUniverseScan = jest.fn();
+    subject.clearUnsupportedAutoMintState = jest.fn();
+    subject.scheduleBuildAggregator = jest.fn();
+    subject.componentDidUpdate(
+      { ...buildProps(), slug: 'edge', sessionConfig: { ...buildProps().sessionConfig, slug: 'edge' } },
+      { ...subject.state, showResults: true },
+    );
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+    expect(subject._generatedResultsViewerRefreshTimer).not.toBe(previousTimer);
+
+    subject.componentWillUnmount();
+    jest.advanceTimersByTime(15_000);
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+    Object.defineProperty(document, 'hidden', { configurable: true, value: originalHidden });
   });
 
   it('resyncs local filter state when defaultFilterState changes across session switch', async () => {

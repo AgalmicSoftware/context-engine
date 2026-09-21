@@ -1,3 +1,4 @@
+import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type {
   SurveyQuestionsLegacyRecord,
   SurveyQuestionsLegacyValue,
@@ -296,7 +297,7 @@ export const createSurveyQuestionsSubmitRuntime = (
 
       // Compute changed set once (used for encrypt + submit)
       const surveyIndex: SurveyQuestionsLegacyValue = submitContext.surveyIndex;
-      const { changedQids }: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
+      const { changedQids, changedMap }: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
       let activeSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
@@ -305,6 +306,17 @@ export const createSurveyQuestionsSubmitRuntime = (
         importance: {},
         conviction: {},
       };
+      for (const question of (stateRef.current.questionPool?.length
+        ? stateRef.current.questionPool
+        : stateRef.current.pileQuestions) || []) {
+        if (question.type !== 'quadratic' || !changedQids.has(question.id)) continue;
+        // The diff stores per-field flags, not a list of field names.
+        if (changedMap?.[question.id] && !changedMap[question.id].answer) continue;
+        const value = activeSlice.answers?.[question.id]?.value;
+        if (value === '' || value === undefined || value === null) continue;
+        const error = validateQuadraticAllocation(value, question);
+        if (error) throw new Error(error);
+      }
       activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, changedQids);
 
       // Only encrypt when there are changed encrypted fields

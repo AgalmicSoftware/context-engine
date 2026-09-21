@@ -37,6 +37,17 @@ The Settings selector is enabled by default. Set
 hides user theme selection. The preference remains restricted to the bundled
 registry and cannot load CSS, URLs, or arbitrary token maps.
 
+**Color-blind mode** is available in Settings → Theme, independently of the
+theme selector. It persists locally as `ce:color-vision`, restores before paint,
+and synchronizes across tabs. The shared palette uses blue for support/agree,
+orange for oppose/disagree, and gray for unsure. Response labels and signed
+values remain present. Semantic response, status, and chart-series tokens update
+across both themes; report text uses darker shades on white paper. Polis binary
+bars use the same `--ce-binary-choice-*` tokens as the pile inputs. Report SVG
+colors are resolved on the PDF capture clone so exports retain the preference.
+The palette overlay lives in `scss/themes/_color-vision.scss`; categorical SVG
+charts use `chartColors.ts` token references instead of fixed JavaScript colors.
+
 ## Adding A Bundled Theme
 
 1. Add a values-only SCSS definition beside the existing theme files.
@@ -120,8 +131,17 @@ directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
 controls. Signed-out Settings keeps it in the final `Appearance & colors`
 section. This selector changes the complete app theme; it is separate from a
 session's curated color scheme and does not accept arbitrary color values. Its
-deployment option reads `Deployment theme: <theme label>` for a valid embedded
-choice, or `Deployment theme: default` when that choice cannot be named.
+default option reads `<theme label> (default)` for a valid embedded
+choice, or `Default` when that choice cannot be named. Native dropdown options
+use paired document text and surface colors for readability. The theme bar
+uses the same border opacity as adjacent quick controls without dimming its
+text. Opening Config scrolls its start into view only when clipped by the
+screen or account dialog. Selected reasoning buttons retain the paired accent
+text color even when session defaults disable editing.
+
+At compact widths, Classic 95 uses the same question-action overflow trigger
+as Context Engine when pending answers make room for Submit necessary. Its
+menu opens above the toolbar on a raised surface.
 
 ## Session Color Schemes
 
@@ -165,12 +185,12 @@ control states without component selectors in a theme file.
 | Documents              | `--ce-document-*`                                                             | readable light/document-style content                                          |
 | Panel and overlay copy | `--ce-panel-text*`, `--ce-overlay-text*`                                      | foregrounds paired with panel or overlay surfaces                              |
 | Controls               | `--ce-control-*`, `--ce-input-*`, `--ce-titlebar-*`, `--ce-nav-tab-inactive`  | inputs, buttons, disabled states, title bars, and inactive title-bar tab icons |
-| Authoring               | `--ce-authoring-*`                                                           | paired question/survey workspace, section, control, input, and copy colors     |
+| Authoring              | `--ce-authoring-*`                                                            | paired question/survey workspace, section, control, input, and copy colors     |
 | Actions and status     | `--ce-action-*`, `--ce-status-*`, `--ce-link`                                 | interactive, validation, risk, and state semantics                             |
 | Data series            | `--ce-data-series-1` through `--ce-data-series-8`                             | categorical charts and visualizations                                          |
 | Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |
 | Data visualization     | `--ce-data-viz-*`                                                             | plot surfaces, axes, labels, points, active points, and point strokes          |
-| Brand media            | `--ce-brand-logo-*`, `--ce-recognition-logo-*`, `--ce-welcome-artwork-*` | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |
+| Brand media            | `--ce-brand-logo-*`, `--ce-recognition-logo-*`, `--ce-welcome-artwork-*`      | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |
 | Edges and elevation    | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*`, `--ce-tool-card-*`           | flat, raised, inset, pressed, submit, and Tool Explorer card states            |
 | Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
 | Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |
@@ -194,12 +214,12 @@ the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1.
 
 ## Typography
 
-| Token                     | `context-engine`                | `classic-95`                        |
-| ------------------------- | ------------------------------- | ----------------------------------- |
+| Token                     | `context-engine`                | `classic-95`                           |
+| ------------------------- | ------------------------------- | -------------------------------------- |
 | `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks |
 | `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks |
-| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack          |
-| `--ce-font-button-weight` | `600`                           | `400`                               |
+| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack             |
+| `--ce-font-button-weight` | `600`                           | `400`                                  |
 
 Guideline:
 
@@ -291,9 +311,10 @@ Use this shared blue CTA family for actual end-of-flow create and submit actions
 ## Literal Ownership And Usage Rules
 
 - Do not introduce hardcoded theme-semantic colors. The baseline is zero.
-- The exact raw-value owners are the two bundled app-theme maps, the bundled
-  session-scheme map, the deterministic fixed-light standalone export, the
-  fixed-media QR/bitmap constants, and the deterministic blockie generator.
+- The exact raw-value owners are the two bundled app-theme maps, the
+  color-vision palette overlay, the bundled session-scheme map, the
+  deterministic fixed-light standalone export, the fixed-media QR/bitmap
+  constants, and the deterministic blockie generator.
   The checker has no directory-wide or ad hoc exception mechanism.
 - Fixed QR/bitmap colors are intentionally independent of app appearance for
   scanning and copied-image determinism. Standalone HTML/PDF exports remain

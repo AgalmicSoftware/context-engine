@@ -1,7 +1,10 @@
 /** @file SurveyResults.tsx */
 
-import React, { useLayoutEffect, useReducer, useRef } from 'react';
+import React, { useLayoutEffect, useMemo, useReducer, useRef } from 'react';
 import { connect } from 'react-redux';
+import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
+import { asGroupRecord } from '../../domains/worker/workerGroupResultsFilter';
+import { projectWorkerGroupResultsState } from './surveyResultsWorkerGroups';
 import { Form, Card, CardHeader, CardBody, FormText, InputGroup, InputGroupText, Collapse } from 'reactstrap';
 
 import '../../assets/css/contextEngine.scss';
@@ -377,6 +380,7 @@ export type SurveyResultsState = SurveyResultsRecord & {
   filteredResponsesCount: number;
   filterLoading: boolean;
   filterState: SurveyResultsFilterState;
+  workerGroupAllowedQuestionIds?: string[];
   htmlReportAnalysisArtifact: SessionResultsGeneratedAnalysisArtifact | null;
   htmlReportAnalysisError: string;
   htmlReportAnalysisGenerating: boolean;
@@ -561,7 +565,27 @@ type SurveyResultsInstanceFields = {
 };
 
 const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
-  const [state, dispatch] = useReducer(surveyResultsReducer, props, createInitialSurveyResultsState);
+  const [rawState, dispatch] = useReducer(surveyResultsReducer, props, createInitialSurveyResultsState);
+  const groupSlug = String(props.sessionSlug ?? props.activeSessionSlug ?? '');
+  const groupResolution = useWorkerGroupResultsFilter({
+    sessionConfig: props.sessionConfig,
+    sessionSlug: groupSlug,
+    account: props.account,
+    provider: props.provider,
+    selection: rawState.filterState.workerGroupFilter,
+  });
+  const state = useMemo(() => {
+    if (!groupResolution.cohort.active) return rawState;
+    const node = readSurveyToolScopedCacheNode({
+      cache: surveyResultsCachePort.peekCacheSync('questionsCache', groupSlug, { clone: false }),
+      cacheScope: WORKER_CANONICAL_CACHE_SCOPE_KEY,
+      sessionConfig: props.sessionConfig,
+      sessionSlug: groupSlug,
+    });
+    return projectWorkerGroupResultsState(rawState, asGroupRecord(node?.questions), groupResolution.cohort);
+    // Cache metadata is mutated in place; the nonce also invalidates this projection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawState, groupResolution.cohort, groupSlug, props.sessionConfig, props.questionsCacheNonce]);
   const stateRef = useRef(state);
   stateRef.current = state;
   const propsRef = useRef(props);
@@ -2288,6 +2312,17 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }, []);
 
   return renderSurveyResultsRenderSurface({
+    workerGroupFilterNotice:
+      groupResolution.cohort.active && groupResolution.cohort.message ? (
+        <div role={groupResolution.cohort.status === 'error' ? 'alert' : 'status'}>
+          {groupResolution.cohort.message}
+          {groupResolution.cohort.status === 'error' && (
+            <button type="button" onClick={groupResolution.refresh}>
+              Retry Group filter
+            </button>
+          )}
+        </div>
+      ) : null,
     applyDecryptedOverrideToResponse,
     closeModal,
     displayStyles: {

@@ -33,14 +33,14 @@ export function QuestionStanceBar({ votes = [] }: { votes?: Array<number | null 
         <rect x={0} y={0} width={width} height={height} fill="none" stroke="currentColor" strokeWidth={1} />
         {concreteVotes.length > 0 ? (
           <>
-            <rect x={0} y={0} width={agreeWidth} height={height} fill="var(--ce-status-success)" />
-            <rect x={agreeWidth} y={0} width={unsureWidth} height={height} fill="var(--ce-status-warning)" />
+            <rect x={0} y={0} width={agreeWidth} height={height} fill="var(--ce-binary-choice-agree-bg)" />
+            <rect x={agreeWidth} y={0} width={unsureWidth} height={height} fill="var(--ce-binary-choice-unsure-bg)" />
             <rect
               x={agreeWidth + unsureWidth}
               y={0}
               width={disagreeWidth}
               height={height}
-              fill="var(--ce-status-danger)"
+              fill="var(--ce-binary-choice-disagree-bg)"
             />
           </>
         ) : null}
@@ -77,8 +77,8 @@ export function QuestionStanceCard({
       ) : (
         <div className={styles.voteRow}>
           <span className={styles.voteSummary}>
-            <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
-            {unsures}
+            <strong>Agree:</strong> {agrees} / <strong>Unsure:</strong> {unsures} / <strong>Disagree:</strong>{' '}
+            {disagrees}
           </span>
           <QuestionStanceBar votes={concreteVotes} />
         </div>

@@ -31,6 +31,7 @@ import {
   type SessionWizardWorkerPublishEvidence,
 } from './sessionWizardWorkerPublishEvidence';
 import { canonicalizeSessionWizardJson, fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
+import { buildSessionWizardWorkerLimits, validateSessionWizardWorkerLimits } from './sessionWizardWorkerRuntimeSupport';
 
 type RuntimeRef = {
   current: SessionWizardWorkerDeployRuntime | null;
@@ -168,6 +169,13 @@ export const createSessionWizardPublishRuntimeController = ({
   }): AnyRecord => {
     const evidenceRuntime = evidence.runtime;
     const evidenceDraft = evidence.draft;
+    const limitValidationError = validateSessionWizardWorkerLimits({
+      perWalletPerDay: evidenceRuntime.workerLimitPerWallet,
+      perAnonymousIpPerDay: evidenceRuntime.workerLimitPerAnonymousIp,
+    });
+    if (limitValidationError) {
+      throw new Error(`Fix Worker request limits before publishing: ${limitValidationError}`);
+    }
     return buildWorkerConfig({
       slug: evidenceDraft.slug,
       draft: evidenceDraft,
@@ -176,9 +184,10 @@ export const createSessionWizardPublishRuntimeController = ({
         rpcUrl: resolveWorkerRpcUrl(),
         rpcUrlsByChainId: resolveWorkerRpcUrlMap(),
         allowOrigins: parseAllowOriginsInput(),
-        limits: Number(evidenceRuntime.workerLimitPerWallet || 0)
-          ? { perWalletPerDay: Number(evidenceRuntime.workerLimitPerWallet) }
-          : {},
+        limits: buildSessionWizardWorkerLimits({
+          perWalletPerDay: evidenceRuntime.workerLimitPerWallet,
+          perAnonymousIpPerDay: evidenceRuntime.workerLimitPerAnonymousIp,
+        }),
         scopes: {},
         embeddedDeployHelperEnabled: evidenceRuntime.embeddedDeployHelperEnabled,
       },

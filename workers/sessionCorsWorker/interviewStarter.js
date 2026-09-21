@@ -1,3 +1,4 @@
+import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
@@ -10,14 +11,16 @@ const cacheKey = (slug) => `session:${slug}:interview-opening`;
 
 export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = false }) => {
   const settings = normalizeInterviewSettings(config?.interviewMode);
+  const withSteeringPrompt = (value) => ({ ...value, steeringPrompt: settings.steeringPrompt });
   if (config?.interviewModeEnabled === false || config?.interviewMode?.enabled === false)
     throw new Error('Interview mode is disabled.');
   if (refresh && !settings.allowManualRefresh) throw new Error('Manual opening refresh is disabled for this session.');
-  if (settings.openingMode === 'owner') return { openingPrompt: settings.openingPrompt, source: 'owner' };
+  if (settings.openingMode === 'owner')
+    return withSteeringPrompt({ openingPrompt: settings.openingPrompt, source: 'owner' });
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
   const cached = await read(env, cacheKey(slug));
-  if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return cached;
+  if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const questions = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
     slug,
@@ -25,13 +28,13 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
     storageRoute: deps.storageRoute,
     fetch: deps.fetch,
   });
-  if (!questions.length) return cached || { openingPrompt: '', source: 'waiting-for-questions' };
+  if (!questions.length) return withSteeringPrompt(cached || { openingPrompt: '', source: 'waiting-for-questions' });
   if (
     cached?.openingPrompt &&
     !refresh &&
     !hasInterviewQuestionGrowth(cached.questionCount, questions.length, settings.questionGrowthPercent)
   )
-    return cached;
+    return withSteeringPrompt(cached);
   // Coalesce concurrent starts within this Worker isolate; cache writes never replace owner config.
   let pending = inFlight.get(env.GROUP_KV);
   if (!pending) {
@@ -73,13 +76,13 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
       generatedAt: new Date().toISOString(),
     };
     await write(env, cacheKey(slug), value);
-    return value;
+    return withSteeringPrompt(value);
   })();
   pending.set(slug, generation);
   try {
     return await generation;
   } catch (error) {
-    if (cached?.openingPrompt && !refresh) return { ...cached, warning: error.message };
+    if (cached?.openingPrompt && !refresh) return withSteeringPrompt({ ...cached, warning: error.message });
     throw error;
   } finally {
     pending.delete(slug);
@@ -109,7 +112,7 @@ export const dispatchInterviewStarterRequest = async ({ request, env, slugHint, 
       env,
       slug,
       address: deps.resolveAnonymousRateIdentity(request),
-      limit: config.limits?.perWalletPerDay || 0,
+      limit: resolveAnonymousIpDailyLimit(config),
       route: 'interview-starter',
     }))
   )

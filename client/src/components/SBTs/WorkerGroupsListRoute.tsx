@@ -148,6 +148,7 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
             <button
               type="button"
               className={styles.workerRouteRefreshButton}
+              data-ce-control-appearance="frameless"
               aria-label="Refresh groups"
               title="Refresh groups"
               onClick={() => setWorkerGroupsRefreshNonce((nonce) => nonce + 1)}

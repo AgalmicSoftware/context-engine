@@ -1,3 +1,4 @@
+import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
 import {
   loadBrowserModuleWithRetry,
   resolveDefaultExport,
@@ -67,6 +68,7 @@ export type SessionResultsReportQuestion = {
   options: string[];
   prompt: string;
   responseCount: number;
+  voiceCredits?: number;
   tags: string[];
   type: string;
 };
@@ -254,6 +256,7 @@ const normalizeReportQuestion = (value: unknown): SessionResultsReportQuestion =
     responseCount: toFiniteCount(record.responseCount),
     tags: toStringArray(record.tags),
     type: toSafeString(record.type).trim(),
+    ...(record.type === 'quadratic' ? { voiceCredits: getVoiceCredits(record) } : {}),
   };
 };
 
@@ -426,7 +429,7 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
               <td>${escapeHtml(question.type || 'unknown')}</td>
               <td>${escapeHtml(question.responseCount)}</td>
               <td>${escapeHtml(question.tags.join(', '))}</td>
-              <td>${escapeHtml(question.options.join(', '))}</td>
+              <td>${escapeHtml(question.options.join(', '))}${question.type === 'quadratic' ? `<div class="ce-report-muted">${escapeHtml(getVoiceCredits(question))} voice credits</div>` : ''}</td>
             </tr>`,
             )
             .join('')}

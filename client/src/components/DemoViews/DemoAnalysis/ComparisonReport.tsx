@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import * as d3 from 'd3';
+import { CHART_SERIES_COLORS } from '../../../utilities/ui/chartColors';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faInfoCircle, faTags } from '@fortawesome/free-solid-svg-icons';
 import { buildComparisonReportRows } from '../../../utilities/demo/demoAnalysisMath.js';
@@ -324,10 +325,10 @@ const ComparisonReport = ({
     return { tagCounts, displayTags };
   }, [analysisRows]);
 
-  const groupColorScale = useMemo<ColorScale>(() => d3.scaleOrdinal<string | number, string>(d3.schemeCategory10), []);
+  const groupColorScale = useMemo<ColorScale>(() => d3.scaleOrdinal<string | number, string>(CHART_SERIES_COLORS), []);
   const tagColorScale = useMemo(() => {
     const tagIDs = tagInfo.displayTags.map((tag) => tag.tagID);
-    return d3.scaleOrdinal<string | number, string>(d3.schemeTableau10).domain(tagIDs);
+    return d3.scaleOrdinal<string | number, string>(CHART_SERIES_COLORS).domain(tagIDs);
   }, [tagInfo.displayTags]);
 
   const selectedTagIDs = useMemo(

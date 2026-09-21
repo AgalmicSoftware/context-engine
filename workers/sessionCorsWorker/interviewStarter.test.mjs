@@ -43,11 +43,19 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().followNewQuestions, false);
   assert.equal(normalizeInterviewSettings().questionGrowthPercent, 20);
   assert.equal(normalizeInterviewSettings().allowManualRefresh, true);
+  assert.equal(normalizeInterviewSettings().steeringPrompt, '');
+  assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
+  assert.equal(
+    normalizeInterviewSettings({ steeringPrompt: ` ${'x'.repeat(3100)} ` }).steeringPrompt.length,
+    3000,
+  );
   for (const value of [
     { openingMode: 'invalid' },
     { openingMode: 'owner', openingPrompt: ' ' },
     { followNewQuestions: 'true' },
     { questionGrowthPercent: 0 },
+    { steeringPrompt: 42 },
+    { steeringPrompt: 'x'.repeat(3001) },
   ])
     assert.equal(validInterviewSettings(value), false);
   assert.equal(hasInterviewQuestionGrowth(42, 50, 20), false);
@@ -67,8 +75,14 @@ test('waits for questions then generates once without an admin step', async () =
 });
 test('owner opening bypasses AI and is not overwritten', async () => {
   const f = fixture();
-  f.args.config.interviewMode = { openingMode: 'owner', openingPrompt: 'What is your expertise in AI?' };
-  assert.equal((await resolveInterviewStarter(f.args)).openingPrompt, 'What is your expertise in AI?');
+  f.args.config.interviewMode = {
+    openingMode: 'owner',
+    openingPrompt: 'What is your expertise in AI?',
+    steeringPrompt: 'Ask for a concrete example.',
+  };
+  const result = await resolveInterviewStarter(f.args);
+  assert.equal(result.openingPrompt, 'What is your expertise in AI?');
+  assert.equal(result.steeringPrompt, 'Ask for a concrete example.');
   assert.equal(f.calls(), 0);
 });
 test('regeneration accumulates additions from the last successful generation', async () => {
@@ -144,4 +158,54 @@ test('starter route preserves CORS and rate limits; public callers cannot force 
   f.args.config.sessionEndsAt = '2000-01-01T00:00:00Z';
   assert.equal((await dispatchInterviewStarterRequest(args)).status, 410);
   assert.equal(f.calls(), 1);
+});
+
+test('starter route resolves anonymous IP daily budgets before generation', async () => {
+  const cases = [
+    {
+      name: 'explicit zero disables anonymous limiter while wallet limit stays positive',
+      limits: { perWalletPerDay: 12, perAnonymousIpPerDay: 0 },
+      expectedLimit: 0,
+    },
+    {
+      name: 'malformed anonymous limit keeps legacy wallet fallback',
+      limits: { perWalletPerDay: 12, perAnonymousIpPerDay: null },
+      expectedLimit: 12,
+    },
+  ];
+
+  for (const entry of cases) {
+    const f = fixture();
+    f.args.config.limits = entry.limits;
+    let capturedRateLimit = null;
+    const deps = {
+      ...f.args.deps,
+      evaluateAnonymousRouteAccess: async () => ({ ok: true }),
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+      getSessionConfig: async () => f.args.config,
+      getCorsContext: async () => ({ ok: true, headers: new Headers() }),
+      checkRateLimit: async (value) => {
+        capturedRateLimit = value;
+        return false;
+      },
+      resolveAnonymousRateIdentity: () => 'anon:starter',
+      json: (value, status, headers) => Response.json(value, { status, headers }),
+    };
+    const response = await dispatchInterviewStarterRequest({
+      ...f.args,
+      request: new Request('https://worker.example/interview/starter?slug=demo', { method: 'POST' }),
+      deps,
+      constants: {},
+    });
+
+    assert.equal(response.status, 429, entry.name);
+    assert.equal(f.calls(), 0, entry.name);
+    assert.deepEqual(capturedRateLimit, {
+      env: f.args.env,
+      slug: 'demo',
+      address: 'anon:starter',
+      limit: entry.expectedLimit,
+      route: 'interview-starter',
+    }, entry.name);
+  }
 });

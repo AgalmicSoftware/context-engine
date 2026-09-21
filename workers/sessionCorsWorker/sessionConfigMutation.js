@@ -28,6 +28,7 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'configRevision',
   'sessionName',
   'sessionInfo',
+  'sessionContext',
   'appearance',
   'sessionHeaderImg',
   'sessionEndsAt',

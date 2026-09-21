@@ -8,8 +8,13 @@ import {
   getSessionConfigBySlug,
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
-import { getVerifiedWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache.js';
 import {
+  getVerifiedWorkerCanonicalSessionBootstrap,
+  readSessionWorkerConfigCache,
+} from '../../utilities/session/sessionWorkerConfigCache.js';
+import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection.js';
+import {
+  parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
   validateWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery.js';
@@ -61,6 +66,21 @@ type ResolveSessionRouteOptions = {
   resolveSessionSlugFromPathToken: (sessionToken: string) => string;
   resolveStandardSessionRoute?: typeof resolveMainSiteSessionRouteContext;
   getVerifiedConfig?: typeof getVerifiedWorkerCanonicalSessionBootstrap;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const resolveTrustedBundledWorkerOrigin = (sessionConfig: SessionConfig | null | undefined): string => {
+  if (!isRecord(sessionConfig) || sessionConfig.workerCanonicalCleanRoute !== true) return '';
+  const profile = isRecord(sessionConfig.sessionModeProfile) ? sessionConfig.sessionModeProfile : {};
+  const authority = isRecord(profile.authority) ? profile.authority : {};
+  if (authority.mode !== 'worker_canonical') return '';
+  try {
+    return parseSessionWorkerDiscoveryOrigin(sessionConfig.corsWorkerUrl);
+  } catch {
+    return '';
+  }
 };
 
 const emptyWorkerRouteState = (): WorkerCanonicalRouteState => ({
@@ -224,6 +244,36 @@ export const resolveMainSiteAdminWorkerRoute = ({
   });
 };
 
+export const resolveMainSiteGroupWorkerRoute = ({
+  searchStr,
+  workerSessionSlug,
+  sessionConfig,
+  controller,
+}: ResolveWorkerRouteStateOptions & { sessionConfig: unknown }): WorkerCanonicalRouteState => {
+  const options = { searchStr, workerSessionSlug, controller };
+  if (new URLSearchParams(searchStr).has('worker') || !workerSessionSlug) return resolveWorkerRouteState(options);
+  const slug = normalizeSessionSlug(workerSessionSlug);
+  const exactConfig =
+    isRecord(sessionConfig) && normalizeSessionSlug(sessionConfig.slug) === slug ? sessionConfig : null;
+  // An exact configured registry session takes precedence over old local hints.
+  if (exactConfig && !claimsWorkerCanonicalAuthority(exactConfig)) return emptyWorkerRouteState();
+  const records = Object.values(readSessionWorkerConfigCache().bySession).filter(
+    (record) => record.authorityMode === 'worker_canonical' && normalizeSessionSlug(record.slug) === slug,
+  );
+  if (!exactConfig && records.length > 1) {
+    return {
+      ...emptyWorkerRouteState(),
+      kind: 'error',
+      error: 'Several Workers match this session. Open the original session link to choose the correct one.',
+    };
+  }
+  const origin = exactConfig?.corsWorkerUrl || (records.length === 1 ? records[0].workerOrigin : '');
+  if (!origin && !exactConfig) return emptyWorkerRouteState();
+  // Persisted config is only a discovery hint. Every fresh page must fetch and
+  // verify the Worker identity before rendering groups or authorizing actions.
+  return resolveWorkerRouteState({ ...options, searchStr: `?worker=${encodeURIComponent(String(origin || ''))}` });
+};
+
 export const resolveMainSiteSessionRouteForRender = ({
   sessionTokenRaw,
   searchStr,
@@ -238,20 +288,40 @@ export const resolveMainSiteSessionRouteForRender = ({
     controller,
     getVerifiedConfig,
   });
+  const buildWorkerSessionRoute = (route: WorkerCanonicalRouteState): MainSiteSessionRouteResolution => ({
+    ...route,
+    sessionRoute:
+      route.kind === 'error'
+        ? null
+        : {
+            sessionIdFromPath: null,
+            configBySessionId: null,
+            sessionSlug: route.workerSessionSlug,
+            sessionConfig: route.sessionConfig,
+            hasUnresolvedSessionId: false,
+          },
+  });
+
   if (workerRoute.kind !== 'standard') {
-    return {
-      ...workerRoute,
-      sessionRoute:
-        workerRoute.kind === 'error'
-          ? null
-          : {
-              sessionIdFromPath: null,
-              configBySessionId: null,
-              sessionSlug: workerRoute.workerSessionSlug,
-              sessionConfig: workerRoute.sessionConfig,
-              hasUnresolvedSessionId: false,
-            },
-    };
+    return buildWorkerSessionRoute(workerRoute);
+  }
+
+  const routeSlug = normalizeSessionSlug(
+    sessionTokenRaw ? resolveSessionSlugFromPathToken(sessionTokenRaw) || sessionTokenRaw : DEFAULT_SESSION_SLUG,
+  );
+  const registrySessionConfig = routeSlug ? sessionRegistryReadsPort.getSessionConfig(routeSlug) : null;
+  const bundledDisplayConfig = registrySessionConfig
+    ? null
+    : getDemoSessionConfigBySlug(routeSlug, { allowDemoFallback: true });
+  const bundledWorkerOrigin = resolveTrustedBundledWorkerOrigin(bundledDisplayConfig);
+  if (bundledWorkerOrigin) {
+    const trustedWorkerRoute = resolveWorkerRouteState({
+      searchStr: `?worker=${encodeURIComponent(bundledWorkerOrigin)}`,
+      workerSessionSlug: routeSlug,
+      controller,
+      getVerifiedConfig,
+    });
+    if (trustedWorkerRoute.kind !== 'standard') return buildWorkerSessionRoute(trustedWorkerRoute);
   }
 
   return {

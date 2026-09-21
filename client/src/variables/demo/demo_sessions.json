@@ -404,6 +404,24 @@
       }
     }
   },
+  "demo-interview-5": {
+    "slug": "demo-interview-5",
+    "sessionId": "0xa0dfc46736b8288854ae2c4156877879",
+    "sessionName": "Demo Interview 5",
+    "sessionInfo": "Worker-canonical public demo interview session. The clean route bootstraps its live config from the pinned Worker.",
+    "corsWorkerUrl": "https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev/",
+    "workerCanonicalCleanRoute": true,
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      }
+    }
+  },
   "demo-1": {
     "networkChainId": 11155420,
     "slug": "demo-1",

@@ -40,6 +40,33 @@
   padding-right: 28px;
 }
 
+.miniQuestionContainer .questionTitleBody.quadraticResponseBody {
+  padding-right: 28px;
+  padding-bottom: 36px;
+
+  .miniQuestionSummary {
+    padding-right: 36px;
+  }
+
+  @media (max-width: 768px) {
+    padding-right: 15px;
+  }
+}
+
+.quadraticAggregatorBody {
+  display: flex;
+  flex-direction: column;
+  background: var(--ce-overlay-surface-alt);
+  border-radius: inherit;
+
+  .cardLinksContainer {
+    position: static;
+    order: 1;
+    align-self: flex-end;
+    padding: 0 1rem 0.75rem;
+  }
+}
+
 /* Also protect fullscreen/minimized variants explicitly (keeps mini padding from being overridden elsewhere) */
 .fullscreenQuestionContainer .questionTitleBody {
   padding-right: 112px;
@@ -74,7 +101,7 @@
 
 .questionPromptText {
   margin: 0;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   font-size: 1.04rem;
   font-weight: 700;
   line-height: 1.6;
@@ -442,6 +469,34 @@
   cursor: default;
 }
 
+.readOnlyQuadratic {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  color: var(--ce-panel-text);
+  overflow-wrap: anywhere;
+}
+
+.readOnlyQuadraticTrack {
+  position: relative;
+  height: 4px;
+  margin: 10px 0 4px;
+  border-radius: var(--ce-radius-pill);
+  background: var(--ce-panel-text-muted);
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ce-panel-text);
+    transform: translate(-50%, -50%);
+  }
+}
+
 .ratingTrack {
   flex: 1 1 auto;
   min-width: 0;
@@ -463,6 +518,16 @@
   font-weight: 700;
   color: var(--ce-color-white);
   opacity: 0.7;
+}
+
+.ratingEndpointLabel {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ce-color-white);
+  opacity: 0.64;
+  overflow-wrap: anywhere;
 }
 
 .readOnlyMultichoice {

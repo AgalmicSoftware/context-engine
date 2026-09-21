@@ -340,7 +340,7 @@ export const pickBetterQuestionPayload = (
   const merged = { ...existingQuestion, ...incomingQuestion };
   const mergedType = toLowerString(incomingQuestion.type ?? existingQuestion.type);
   if (
-    (mergedType === 'multichoice' || mergedType === 'poll') &&
+    (mergedType === 'multichoice' || mergedType === 'poll' || mergedType === 'quadratic') &&
     hasNonEmptyQuestionOptions(existingQuestion) &&
     !hasNonEmptyQuestionOptions(incomingQuestion)
   ) {

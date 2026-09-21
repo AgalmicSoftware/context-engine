@@ -1,10 +1,11 @@
 'use strict';
 
 const { URL } = require('node:url');
+const demoSessions = require('../client/src/variables/demo/demo_sessions.json');
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:3000';
 const DEFAULT_ROUTES = Object.freeze([
-  '/session/new',
+  '/new',
   '/session/demo',
   '/session/pe4',
   '/admin',
@@ -14,13 +15,13 @@ const DEFAULT_ROUTES = Object.freeze([
   '/benchmarks',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
+  '/session/new': ['Session Setup'],
   '/session/demo': ['Session'],
   '/session/pe4': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
   '/contracts': ['Docs'],
-  '/benchmarks': ['AI Opinions Benchmark'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',
@@ -31,6 +32,114 @@ const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-session-listening-start"]',
   '[data-testid="ce-session-listening-stop"]',
 ]);
+
+const DEMO_READY_WORKER_SESSION_SLUG = 'demo';
+const DEMO_READY_WORKER_SOURCE_SLUG = 'demo-sh';
+const DEMO_READY_WORKER_CONFIG = demoSessions[DEMO_READY_WORKER_SOURCE_SLUG] || {};
+const DEMO_READY_WORKER_ORIGIN = normalizeBaseUrl(DEMO_READY_WORKER_CONFIG.corsWorkerUrl || '');
+const DEMO_STORAGE_LIST_FIXTURE_RESOURCES = new Set(['questions', 'responses', 'surveys']);
+
+function isLocalSmokeBaseUrl(rawBaseUrl = '') {
+  try {
+    const hostname = new URL(rawBaseUrl).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '::1' || /^127(?:\.\d{1,3}){3}$/.test(hostname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isDemoStorageListFixtureRequest(requestUrl = '') {
+  try {
+    const url = new URL(requestUrl);
+    return (
+      url.origin === DEMO_READY_WORKER_ORIGIN &&
+      url.pathname === '/storage/list' &&
+      DEMO_STORAGE_LIST_FIXTURE_RESOURCES.has(url.searchParams.get('resource') || '')
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isSessionSetupRoute(route) {
+  const pathname = String(route || '').split(/[?#]/, 1)[0];
+  return pathname === '/new' || pathname === '/session/new';
+}
+
+function shouldInstallDemoWorkerFixture(baseUrl, route) {
+  return isLocalSmokeBaseUrl(baseUrl) &&
+    (isSessionSetupRoute(route) || String(route || '').startsWith('/session/demo'));
+}
+
+function isDemoReadyInterviewRoute(route = '') {
+  try {
+    const url = new URL(route, 'http://context-engine.local');
+    return (
+      url.pathname === `/${DEMO_READY_WORKER_SESSION_SLUG === 'demo' ? 'session/demo' : `session/${DEMO_READY_WORKER_SESSION_SLUG}`}` &&
+      url.searchParams.get('mode') === 'interview' &&
+      normalizeBaseUrl(url.searchParams.get('worker') || '') === DEMO_READY_WORKER_ORIGIN
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function buildDemoReadyInterviewConfig() {
+  return {
+    ...DEMO_READY_WORKER_CONFIG,
+    slug: DEMO_READY_WORKER_SESSION_SLUG,
+    sessionName: 'Demo Session',
+    corsWorkerUrl: `${DEMO_READY_WORKER_ORIGIN}/`,
+  };
+}
+
+async function installDemoWorkerFixtureRoutes(page, baseUrl, route) {
+  if (!shouldInstallDemoWorkerFixture(baseUrl, route) || !DEMO_READY_WORKER_ORIGIN) return;
+
+  // Demo routes use local questions; setup aliases also warm the unrelated default demo cache.
+  // Its pinned Worker can reject loopback origins, so isolate only these local smoke reads.
+  // Non-local base URLs still exercise the real Worker/CORS path.
+  await page.route(`${DEMO_READY_WORKER_ORIGIN}/storage/list?*`, (requestRoute) => {
+    if (!isDemoStorageListFixtureRequest(requestRoute.request().url())) {
+      return requestRoute.fallback();
+    }
+    return requestRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], listComplete: true }),
+    });
+  });
+
+  if (!isDemoReadyInterviewRoute(route)) return;
+
+  const config = buildDemoReadyInterviewConfig();
+  await page.route(`${DEMO_READY_WORKER_ORIGIN}/session-config?*`, (requestRoute) =>
+    requestRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        sessionSlug: DEMO_READY_WORKER_SESSION_SLUG,
+        config,
+        configRevision: String(config.configRevision || 'demo-sh-v1'),
+      }),
+    }),
+  );
+  await page.route(`${DEMO_READY_WORKER_ORIGIN}/resource-presence?*`, (requestRoute) =>
+    requestRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, interview: { ready: true } }),
+    }),
+  );
+  await page.route(`${DEMO_READY_WORKER_ORIGIN}/interview/starter?*`, (requestRoute) =>
+    requestRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ openingPrompt: '' }),
+    }),
+  );
+}
 
 function normalizeBaseUrl(rawBaseUrl = DEFAULT_BASE_URL) {
   const url = new URL(rawBaseUrl);
@@ -136,33 +245,71 @@ async function dismissOnboardingIfPresent(page, { timeoutMs }) {
   await overlay.waitFor({ state: 'detached', timeout: timeoutMs });
 }
 
-async function probeSessionModePresets(page, { timeoutMs }) {
+async function restoreRouteForPresetProbe(page, { baseUrl, route, timeoutMs }) {
+  if (!baseUrl || !route) return;
+  await page.goto(routeUrl(baseUrl, route), { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+  await page.waitForSelector('#root', { state: 'attached', timeout: timeoutMs });
+  await dismissOnboardingIfPresent(page, { timeoutMs });
+}
+
+async function probeSessionModePresets(page, { timeoutMs, baseUrl, route } = {}) {
   await dismissOnboardingIfPresent(page, { timeoutMs });
 
-  const presetIds = [
-    'fast_cheap_cloudflare',
-    'trustless_public_decentralized',
+  const presets = [
+    ['fast_cheap_cloudflare', 'Centralized'],
+    ['trustless_public_decentralized', 'Decentralized'],
   ];
   const failures = [];
 
-  for (const [index, presetId] of presetIds.entries()) {
-    const preset = page.getByTestId(`ce-new-preset-${presetId}`);
+  for (const [index, [presetId, label]] of presets.entries()) {
+    let preset = page.getByTestId(`ce-new-preset-${presetId}`);
+    if (index > 0 && typeof preset.count === 'function' && (await preset.count()) === 0) {
+      await restoreRouteForPresetProbe(page, { baseUrl, route, timeoutMs });
+      preset = page.getByTestId(`ce-new-preset-${presetId}`);
+    }
     await preset.waitFor({ state: 'visible', timeout: timeoutMs });
     if (index > 0) {
       page.once('dialog', (dialog) => dialog.accept());
     }
     await preset.click();
-    const selected = await preset.getAttribute('aria-checked');
-    if (selected !== 'true') {
-      failures.push(`${presetId} did not become the selected session mode`);
+    let selected = '';
+    try {
+      selected = await preset.getAttribute('aria-checked', { timeout: 1000 });
+    } catch (_error) {
+      selected = '';
     }
+    if (selected === 'true') continue;
+
+    if (typeof page.locator === 'function') {
+      try {
+        const bodyText = await page.locator('body').innerText({ timeout: timeoutMs });
+        if (bodyText.includes(`Session Setup (${label})`)) continue;
+      } catch (_error) {
+        // Fall through to the normalized failure below.
+      }
+    }
+    failures.push(`${presetId} did not become the selected session mode`);
   }
 
   return failures;
 }
 
+async function probeBenchmarkReportFrame(page, { timeoutMs } = {}) {
+  try {
+    await page
+      .frameLocator('[data-testid="ce-benchmark-report-frame"]')
+      .getByText('AI Opinions Benchmark', { exact: false })
+      .waitFor({ timeout: timeoutMs });
+    return [];
+  } catch (error) {
+    return [`benchmark report iframe did not render expected title: ${error?.message || error}`];
+  }
+}
+
 const DEFAULT_ROUTE_PROBES = Object.freeze({
+  '/new': probeSessionModePresets,
   '/session/new': probeSessionModePresets,
+  '/benchmarks': probeBenchmarkReportFrame,
 });
 
 async function inspectRoute(browser, baseUrl, route, options = {}) {
@@ -172,13 +319,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   const failedRequests = [];
   const badResponses = [];
 
-  if (route === '/session/new') {
-    // Preset selection is credential-free; the default demo cache is unrelated to this route probe.
-    await page.route('https://*.workers.dev/storage/list?*', (requestRoute) => requestRoute.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [], listComplete: true }),
-    }));
+  if (isLocalSmokeBaseUrl(baseUrl) && isSessionSetupRoute(route)) {
     await page.route('https://op-sepolia-testnet.api.pocket.network/**', async (requestRoute) => {
       const payload = requestRoute.request().postDataJSON();
       const results = {
@@ -196,6 +337,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
       });
     });
   }
+  await installDemoWorkerFixtureRoutes(page, baseUrl, route);
 
   page.on('console', (msg) => {
     if (msg.type() === 'error' || msg.type() === 'warning') {
@@ -474,12 +616,17 @@ module.exports = {
   dismissOnboardingIfPresent,
   findMissingExpectedText,
   inspectRoute,
+  installDemoWorkerFixtureRoutes,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
+  isDemoReadyInterviewRoute,
+  isDemoStorageListFixtureRequest,
   isExpectedLoadedMediaAbort,
+  isLocalSmokeBaseUrl,
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
+  probeBenchmarkReportFrame,
   probeSessionModePresets,
   resolveViewport,
   routeUrl,

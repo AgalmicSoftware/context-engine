@@ -206,10 +206,13 @@ const manualChunkGroups = [
 
 export const resolveManualChunk = (id) => {
   const normalizedId = String(id || '').split(path.sep).join('/');
-  // Keep the synchronous question seed cacheable without folding it back into
-  // AppShell; the full demo-2 results fixture remains owned by lazy consumers.
+  // Keep synchronous demo question seeds cacheable without folding them back
+  // into AppShell; full demo result fixtures remain owned by lazy consumers.
   if (normalizedId.includes('/src/variables/demo/demo_2_question_seed.json')) {
     return 'demo-2-question-seed';
+  }
+  if (normalizedId.includes('/src/variables/demo/demo_polis_data.json')) {
+    return 'demo-polis-data';
   }
   if (!normalizedId.includes('/node_modules/')) return undefined;
   // Preserve import() boundaries for document export and its dependencies.

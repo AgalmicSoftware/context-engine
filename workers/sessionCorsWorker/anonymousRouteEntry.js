@@ -1,3 +1,5 @@
+import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
+
 export const dispatchAnonymousRouteEntry = async ({
   path,
   anonymousRoute,
@@ -28,7 +30,7 @@ export const dispatchAnonymousRouteEntry = async ({
   if (!corsContext?.ok) return corsContext?.response;
   const headers = corsContext?.headers;
 
-  const limit = config?.limits?.perWalletPerDay || 0;
+  const limit = resolveAnonymousIpDailyLimit(config);
   const anonymousIdentity = deps?.resolveAnonymousRateIdentity?.(request);
   const anonymousRateAllowed = await deps?.checkRateLimit?.({
     env,

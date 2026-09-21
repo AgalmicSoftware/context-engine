@@ -4,6 +4,8 @@ import {
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
+  hasPileResponseSliceValues,
+  shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import type { PileResponseSlice } from './surveyPileResponseWindow';
 
@@ -76,6 +78,86 @@ const buildSynchronousSetState =
   };
 
 describe('surveyPileResponseController', () => {
+  it('detects existing submitted pile ratings before response initialization', () => {
+    expect(
+      hasPileResponseSliceValues({
+        answers: {},
+        importance: { q1: 70 },
+        conviction: {},
+        additionalComments: {},
+      }),
+    ).toBe(true);
+    expect(
+      hasPileResponseSliceValues({
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }),
+    ).toBe(false);
+  });
+
+  it('preserves submitted pile values while still initializing empty reset slices', () => {
+    expect(
+      shouldInitializePileResponses({
+        submissionComplete: false,
+        currentSlice: {
+          answers: {},
+          importance: { q1: 70 },
+          conviction: { q1: 70 },
+          additionalComments: {},
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldInitializePileResponses({
+        submissionComplete: false,
+        currentSlice: {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldInitializePileResponses({
+        submissionComplete: true,
+        currentSlice: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('backfills visible pile questions when initialization is skipped for an existing response slice', () => {
+    const initializeResponseState = jest.fn();
+    const rehydrateVisiblePileWindow = jest.fn();
+
+    const plan = executePileQuestionSetHydration({
+      resultSignature: 'q1|q2',
+      initializeResponses: shouldInitializePileResponses({
+        submissionComplete: false,
+        currentSlice: {
+          answers: { q1: { value: 'Agree', encrypted: false } },
+          importance: { q1: 70 },
+          conviction: { q1: 70 },
+          additionalComments: {},
+        },
+      }),
+      initializeResponseState,
+      rehydrateVisiblePileWindow,
+    });
+
+    expect(plan?.shouldInitializeResponses).toBe(false);
+    expect(initializeResponseState).not.toHaveBeenCalled();
+    expect(rehydrateVisiblePileWindow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        autoDecryptReason: 'pile-hydration',
+      }),
+    );
+  });
+
   it('seeds pile baseline from cache-prefilled responses when no edit baseline exists', () => {
     const plan = buildPileCachePrefillStatePlan({
       pileQuestions: [{ id: 'q1' }],

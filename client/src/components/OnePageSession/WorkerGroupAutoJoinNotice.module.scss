@@ -1,0 +1,65 @@
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto 12px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 20%, transparent);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-session-chrome);
+  color: var(--ce-session-chrome-contrast);
+  font-family: var(--ce-font-body);
+}
+
+.message {
+  min-width: 0;
+  margin: 0;
+  padding-block: 3px;
+  color: inherit;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.secondaryButton {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 24%, transparent);
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  color: var(--ce-session-chrome-contrast);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ce-session-chrome-contrast) 8%, transparent);
+    border-color: var(--ce-session-chrome-contrast);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-session-focus);
+    outline-offset: 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .notice {
+    width: calc(100% - 32px);
+    gap: 8px;
+    padding-inline: 8px;
+  }
+}

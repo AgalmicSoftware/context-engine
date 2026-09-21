@@ -19,7 +19,7 @@ describe('AppThemeSelector', () => {
     expect(screen.queryByText('App theme')).not.toBeInTheDocument();
     expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Deployment theme: Context Engine',
+      'Context Engine (default)',
       'Context Engine',
       'Classic 95',
     ]);
@@ -39,6 +39,6 @@ describe('AppThemeSelector', () => {
 
     render(<AppThemeSelector />);
 
-    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Deployment theme: default');
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Default');
   });
 });

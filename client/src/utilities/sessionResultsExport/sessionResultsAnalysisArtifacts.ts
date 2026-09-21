@@ -1,3 +1,9 @@
+import {
+  formatQuadraticAllocation,
+  getVoiceCredits,
+  validateQuadraticAllocation,
+} from '../../../../shared/questions/quadraticAllocation.mjs';
+
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND = 'ce_session_results_analysis_artifact';
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION = 1;
 
@@ -44,6 +50,7 @@ export type SessionResultsAnalysisQuestionInput = {
   prompt: string;
   tags?: string[];
   type?: string;
+  voiceCredits?: number;
 };
 
 export type SessionResultsAnalysisSectionKey = (typeof SESSION_RESULTS_ANALYSIS_SECTION_KEYS)[number];
@@ -338,16 +345,28 @@ export const buildSessionResultsAnalysisAiPayload = ({
             .filter(Boolean)
         : [],
       type: normalizeAiText(question?.type),
+      ...(question?.type === 'quadratic' ? { voiceCredits: getVoiceCredits(question) } : {}),
     }))
     .filter((question) => question.id || question.prompt);
 
+  const questionsById = new Map(
+    questions.map((question) => [toSafeString(question?.id).trim().toLowerCase(), question]),
+  );
   const normalizedResponses = responses
     .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses)
     .map((response) => {
-      const answer = truncateAiText(
-        getResponseText(response?.answer),
-        SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAnswerChars,
-      );
+      const question = questionsById.get(toSafeString(response?.questionId).trim().toLowerCase());
+      const questionType = question?.type || toSafeString(response?.questionType);
+      const allocation = Array.isArray(response?.answer) ? response.answer : toPlainRecord(response?.answer).value;
+      // Label against the full option list before applying context limits; slicing
+      // options first would detach later votes from their option names.
+      const answerText =
+        questionType === 'quadratic'
+          ? question && !validateQuadraticAllocation(allocation, question)
+            ? formatQuadraticAllocation(allocation, question.options)
+            : ''
+          : getResponseText(response?.answer);
+      const answer = truncateAiText(answerText, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAnswerChars);
       const additional = truncateAiText(
         getResponseText(response?.additional),
         SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAdditionalChars,
@@ -360,7 +379,7 @@ export const buildSessionResultsAnalysisAiPayload = ({
         participantId: participant.syntheticId,
         questionId: normalizeAiText(response?.questionId),
         questionPrompt: normalizeAiText(response?.questionPrompt),
-        questionType: normalizeAiText(response?.questionType),
+        questionType: normalizeAiText(questionType),
       };
     })
     .filter(Boolean) as SessionResultsAnalysisAiResponse[];
@@ -522,6 +541,9 @@ Privacy rules:
 - You may reason from raw answer text, but your summaries must paraphrase instead of quoting identifiable freeform responses.
 - Keep participant references as synthetic IDs such as participant_001.
 - The input is capped by inputLimits to protect context windows. Work only from included data and mention uncertainty in summaries when the visible sample is thin.
+
+Question semantics:
+- Quadratic allocations use signed whole-number votes per named option: positive supports and negative opposes. The sum of squared votes spends voiceCredits (99 by default); unused credits are allowed. Aggregate signed votes, not credit costs. An all-zero allocation is an explicit neutral response, not missing data.
 
 Generate this JSON shape:
 ${jsonShape}

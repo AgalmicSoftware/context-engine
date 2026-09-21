@@ -1,3 +1,4 @@
+import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
@@ -123,7 +124,9 @@ import {
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
+  shouldInitializePileResponses,
 } from './surveyPileResponseController';
+import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
 import type { PileResponseSlice } from './surveyPileResponseWindow';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -145,6 +148,7 @@ import {
   type InterviewPrefillPacket,
   type SessionVoiceMode,
 } from './sessionInterview';
+import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 import {
   getUsableSessionWorkerUrl,
   resolveConfiguredSessionWorkerUrlFromConfig,
@@ -301,7 +305,7 @@ import {
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { resolvePayloadStorageRef } from '../../utilities/storage/storageRefs.js';
-import { normalizeRatingValue, RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
+import { normalizeRatingScale } from '../../utilities/survey/ratingValue.js';
 
 import {
   EMPTY_QUESTION_POOL,
@@ -511,26 +515,41 @@ export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./Crea
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 export const LazySessionVoiceModeModal = React.lazy(() => import('./SessionVoiceModeModal'));
 
+const readInterviewPrefillStateForProps = (props: SurveyQuestionsProps = {}, hash: unknown) => {
+  const hasPrefill = hasInterviewPrefillHash(hash);
+  if (!hasPrefill) {
+    return { hasPrefill: false, packet: null as InterviewPrefillPacket | null, error: '' };
+  }
+  const packet = readInterviewPrefillFromHash(hash);
+  const effectiveSlug = String(resolveEffectiveSlug(props) || '')
+    .trim()
+    .toLowerCase();
+  if (packet && (!effectiveSlug || packet.sessionSlug === effectiveSlug)) {
+    return { hasPrefill: true, packet, error: '' };
+  }
+  return {
+    hasPrefill: true,
+    packet: null as InterviewPrefillPacket | null,
+    error: packet
+      ? 'This interview prefill link belongs to a different session.'
+      : 'This interview prefill link is invalid or incomplete. Ask the AI for a fresh link.',
+  };
+};
+
 export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
   const props = engine.props || {};
+  if (typeof window !== 'undefined') {
+    captureSessionRecruitmentSource(resolveEffectiveSlug(props), window.location.search || '');
+  }
   const interviewEnabled = isInterviewFeatureEnabled(props.sessionConfig);
   const initialVoiceMode =
     interviewEnabled && typeof window !== 'undefined' ? resolveSessionVoiceMode(window.location.search || '') : null;
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
   if (interviewEnabled && typeof window !== 'undefined') {
-    const hasPrefill = hasInterviewPrefillHash(window.location.hash || '');
-    const packet = readInterviewPrefillFromHash(window.location.hash || '');
-    const effectiveSlug = String(resolveEffectiveSlug(props) || '')
-      .trim()
-      .toLowerCase();
-    if (packet && (!effectiveSlug || packet.sessionSlug === effectiveSlug)) {
-      initialPrefillPacket = packet;
-    } else if (hasPrefill) {
-      initialInterviewPrefillError = packet
-        ? 'This interview prefill link belongs to a different session.'
-        : 'This interview prefill link is invalid or incomplete. Ask the AI for a fresh link.';
-    }
+    const prefillState = readInterviewPrefillStateForProps(props, window.location.hash || '');
+    initialPrefillPacket = prefillState.packet;
+    initialInterviewPrefillError = prefillState.error;
   }
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
   if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
@@ -677,15 +696,16 @@ export const createPileViewRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy 
   },
 });
 
-const mergeQuestionResponsesForPile = mergeQuestionResponses as unknown as (
-  target?: PileQuestionResponsesMap,
-  source?: unknown,
-) => PileQuestionResponsesMap;
+const mergeQuestionResponsesForPile = (
+  target: PileQuestionResponsesMap = {},
+  source: unknown = {},
+): PileQuestionResponsesMap => {
+  mergeQuestionResponses(target, source && typeof source === 'object' ? (source as Record<string, unknown>) : {});
+  return target;
+};
 
-const doesQuestionProgressMatchSlugForPile = doesQuestionProgressMatchSlug as unknown as (
-  progressSlugValue: unknown,
-  currentSlug: string,
-) => boolean;
+const doesQuestionProgressMatchSlugForPile = (progressSlugValue: unknown, currentSlug: string): boolean =>
+  doesQuestionProgressMatchSlug(String(progressSlugValue || ''), currentSlug);
 
 const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
   if (!engine || typeof engine !== 'object') return engine;
@@ -730,6 +750,7 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     toggleSessionVoiceModeModal: bindPileEngineMethod(engine, toggleSessionVoiceModeModal),
     selectSessionVoiceMode: bindPileEngineMethod(engine, selectSessionVoiceMode),
     closeSessionVoiceModeModal: bindPileEngineMethod(engine, closeSessionVoiceModeModal),
+    viewResultsFromSessionVoiceModeModal: bindPileEngineMethod(engine, viewResultsFromSessionVoiceModeModal),
     recordInterviewProvenance: bindPileEngineMethod(engine, recordInterviewProvenance),
     toggleHologramAssistant: bindPileEngineMethod(engine, toggleHologramAssistant),
     toggleConviction: bindPileEngineMethod(engine, toggleConviction),
@@ -1332,6 +1353,43 @@ const scheduleLoadAndSortQuestions = (engine: PileViewModeEngine, delayMs: any =
   );
 };
 
+const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
+  if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return false;
+  const hash = window.location.hash || '';
+  const prefillState = readInterviewPrefillStateForProps(engine.props || {}, hash);
+  if (!prefillState.hasPrefill) {
+    engine._lastConsumedInterviewPrefillHash = '';
+    return false;
+  }
+  if (engine._lastConsumedInterviewPrefillHash === hash) return false;
+  if (engine.state.interviewPrefillPacket && !prefillState.packet) {
+    engine._lastConsumedInterviewPrefillHash = hash;
+    try {
+      window.history.replaceState({}, '', clearInterviewPrefillHash(window.location));
+    } catch (e) {
+      surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
+    }
+    return true;
+  }
+  engine._lastConsumedInterviewPrefillHash = hash;
+  engine.setState(
+    {
+      showVoiceModeModal: true,
+      sessionVoiceMode: prefillState.packet ? 'interview' : engine.state.sessionVoiceMode || null,
+      interviewPrefillPacket: prefillState.packet,
+      interviewPrefillError: prefillState.error,
+    },
+    () => {
+      try {
+        window.history.replaceState({}, '', clearInterviewPrefillHash(window.location));
+      } catch (e) {
+        surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
+      }
+    },
+  );
+  return true;
+};
+
 const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   engine._isMounted = true;
   // Regression guard: consume the prefill during pure initialization, but clear it only after mount.
@@ -1364,6 +1422,7 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
 };
 
 const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, prevState: any) => {
+  consumeInterviewPrefillHashIfPresent(engine);
   const diffInputsChanged = engine.didEditDiffInputsChange(prevProps, prevState);
   if (diffInputsChanged) {
     engine.invalidateDiffCaches();
@@ -1394,6 +1453,19 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   const networkChanged = prevProps.network?.id !== engine.props.network?.id;
   const accountChanged = (prevProps.account || '').toLowerCase() !== (engine.props.account || '').toLowerCase();
   const providerChanged = prevProps.provider !== engine.props.provider;
+  const previousEffectiveSlug = resolveEffectiveSlug(prevProps);
+  const nextEffectiveSlug = resolveEffectiveSlug(engine.props);
+  const previousWorkerTarget = resolveSurveyToolWorkerTargetSignature({
+    sessionConfig: prevProps.sessionConfig,
+    sessionSlug: previousEffectiveSlug,
+  });
+  const nextWorkerTarget = resolveSurveyToolWorkerTargetSignature({
+    sessionConfig: engine.props.sessionConfig,
+    sessionSlug: nextEffectiveSlug,
+  });
+  const sessionIdentityChanged =
+    normalizeSessionSlugValue(previousEffectiveSlug) !== normalizeSessionSlugValue(nextEffectiveSlug) ||
+    previousWorkerTarget.key !== nextWorkerTarget.key;
 
   const cacheReadyTick =
     (prevProps.isQuestionCacheReady !== engine.props.isQuestionCacheReady && engine.props.isQuestionCacheReady) ||
@@ -1425,6 +1497,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   const updatePlan = buildPileComponentUpdatePlan({
     networkChanged,
     accountChanged,
+    sessionIdentityChanged,
     cacheReadyTick,
     nonceTick,
     responseNonceTick,
@@ -1712,6 +1785,29 @@ const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
       engine.syncSessionVoiceModeQuery(null);
     },
   );
+};
+
+const appendCurrentWorkerHintToPath = (pathIn = ''): string => {
+  if (typeof window === 'undefined') return pathIn;
+  const worker = new URLSearchParams(window.location.search || '').get('worker')?.trim();
+  if (!worker) return pathIn;
+  const [pathAndSearch, fragment = ''] = String(pathIn || '').split('#');
+  const [pathname, search = ''] = pathAndSearch.split('?');
+  const params = new URLSearchParams(search);
+  if (!params.has('worker')) params.set('worker', worker);
+  const query = params.toString();
+  return `${pathname}${query ? `?${query}` : ''}${fragment ? `#${fragment}` : ''}`;
+};
+
+const viewResultsFromSessionVoiceModeModal = (engine: PileViewModeEngine) => {
+  engine.closeSessionVoiceModeModal();
+  if (typeof window === 'undefined') return;
+  const slug = resolveEffectiveSlug(engine.props);
+  const path = applyExistingGroupPrefix(
+    appendCurrentWorkerHintToPath(appendExplicitSessionHintToPath('/questions/results', slug)),
+  );
+  window.history.pushState({}, '', path);
+  window.dispatchEvent(new Event('popstate'));
 };
 
 export const recordInterviewProvenance = (
@@ -2170,7 +2266,10 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
       engine.runPileQuestionSetHydration({
         requestEpoch,
         resultSignature: loadResultPlan.resultSignature,
-        initializeResponses: !engine.state.submissionComplete,
+        initializeResponses: shouldInitializePileResponses({
+          submissionComplete: engine.state.submissionComplete,
+          currentSlice: engine.state.surveysResponseState?.[0],
+        }),
         forceOverwriteDraft: true,
         resetAutoDecryptLedger: true,
         autoDecryptReason: 'pile-hydration',
@@ -2679,6 +2778,17 @@ const renderPileResponseInput = (
         />
       );
 
+    case 'quadratic':
+      return (
+        <QuadraticAllocationInput
+          questionId={question.id}
+          options={engine.getQuestionOptionsForInput(question)}
+          voiceCredits={question.voiceCredits}
+          value={answer.value}
+          disabled={engine.state.isSubmitting}
+          onChange={updateAnswer}
+        />
+      );
     case 'multichoice': {
       const options = engine.getQuestionOptionsForInput(question);
       const isSingleSelect = isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question);
@@ -2696,12 +2806,13 @@ const renderPileResponseInput = (
     }
 
     case 'rating': {
-      const ratingValue = getNormalizedUiRatingValue(answer.value);
+      const ratingScale = normalizeRatingScale(question);
+      const ratingValue = getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max);
       return (
         <div className={styles.ratingContainer}>
           <CESlider
-            min={RATING_MIN}
-            max={RATING_MAX}
+            min={ratingScale.min}
+            max={ratingScale.max}
             step={1}
             value={ratingValue}
             onChange={(val: any, event: any) =>
@@ -2713,7 +2824,11 @@ const renderPileResponseInput = (
             disabled={engine.state.isSubmitting}
             className={styles.ratingSlider}
           />
-          <span className={styles.ratingValueDisplay}>{ratingValue}</span>
+          <span className={styles.ratingValueDisplay}>
+            <span>{ratingScale.minLabel}</span>
+            <span aria-label="Current rating">{ratingValue}</span>
+            <span>{ratingScale.maxLabel}</span>
+          </span>
         </div>
       );
     }
@@ -2933,6 +3048,7 @@ const renderPileCardShell = (
 ) => {
   return renderPileCardShellView({
     promptHeader: engine.renderPromptWithManualDecrypt(question),
+    questionType: question.type,
     questionComponent,
     questionContainerClass,
     footerSection,
@@ -3188,6 +3304,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({
+            submissionError: String(engine.state.submissionError || ''),
             showHologramAssistant,
             toggleHologramAssistant: engine.toggleHologramAssistant,
             showMiniBackgroundSpinner,
@@ -3304,11 +3421,14 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   if (!engine.props.loginComplete) return { status: 'login-required' as const };
                   return { status: 'failed' as const, message: 'Submission did not complete.' };
                 }}
-                renderAnswerInput={(questionId, value, onAnswerChange) =>
+                onViewResults={engine.viewResultsFromSessionVoiceModeModal}
+                renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion) =>
                   engine.renderPileResponseInput({
+                    // The live interview catalog can discover questions before the pile cache does.
                     question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
                       (question: { id: string }) => question.id === questionId,
-                    ) || { id: questionId, type: 'freeform' },
+                    ) ||
+                      interviewQuestion || { id: questionId, type: 'freeform' },
                     answer: { value },
                     onAnswerChange,
                     inputNamePrefix: 'interview-draft',

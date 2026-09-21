@@ -165,7 +165,9 @@ const OnePageSessionGroupsSection = ({
 
   return (
     <div className={`${styles.sectionContainer} ${showGroups ? styles.sectionExpanded : ''}`}>
-      <div className={styles.sectionHeaderRow}>
+      <div
+        className={`${styles.sectionHeaderRow} ${styles.groupsHeaderRow} ${usesWorkerNativeGroups ? styles.workerGroupsHeaderRow : ''}`}
+      >
         <h2 onClick={onToggleGroups} className={styles.sectionHeader} data-testid={E2E_TESTIDS.SESSION_GROUPS_TOGGLE}>
           {showGroups ? (
             <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
@@ -215,7 +217,8 @@ const OnePageSessionGroupsSection = ({
                 <button
                   type="button"
                   onClick={() => setWorkerGroupsRefreshNonce((nonce) => nonce + 1)}
-                  className={`${styles.sectionHeaderActionButton} ${styles.sectionHeaderIconButton}`}
+                  className={styles.groupsRefreshButton}
+                  data-ce-control-appearance="frameless"
                   aria-label="Refresh groups"
                   title="Refresh groups"
                 >

@@ -1,10 +1,6 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
-export type SurveyQuestionsProgressRuntime = SurveyQuestionsLegacyRecord;
-
-export const createSurveyQuestionsProgressRuntime = (
-  context: SurveyQuestionsLegacyRecord,
-): SurveyQuestionsProgressRuntime => {
+export const createSurveyQuestionsProgressRuntime = (context: SurveyQuestionsLegacyRecord) => {
   const {
     buildBookmarkedQuestionsState,
     buildClearedTransientSubmitFeedbackState,

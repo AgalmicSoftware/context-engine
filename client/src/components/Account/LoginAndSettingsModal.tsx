@@ -325,6 +325,8 @@ const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
   static displayName = 'LoginAndSettingsModal';
 
+  settingsPanelRef = React.createRef<HTMLDivElement>();
+
   state: LoginAndSettingsModalState = (() => {
     const initialSessionScanSlugs = normalizeSessionScanSlugs(
       this.props.selectedSessionSlugs || readSessionScanSlugs(),
@@ -1759,9 +1761,35 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   toggleAiSettingsPanel = () => {
-    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
-      aiSettingsOpen: !prevState.aiSettingsOpen,
-    }));
+    this.setState(
+      (prevState: Readonly<LoginAndSettingsModal['state']>) => ({
+        aiSettingsOpen: !prevState.aiSettingsOpen,
+      }),
+      this.revealSettingsPanel,
+    );
+  };
+
+  revealSettingsPanel = () => {
+    const panel = this.settingsPanelRef.current;
+    if (!this.state.aiSettingsOpen || !panel) return;
+
+    let visibleTop = 0;
+    let visibleBottom = window.innerHeight;
+    // The account dialog scrolls independently from the page on small screens.
+    for (let parent = panel.parentElement; parent; parent = parent.parentElement) {
+      if (/(auto|scroll|hidden|clip)/.test(window.getComputedStyle(parent).overflowY)) {
+        const bounds = parent.getBoundingClientRect();
+        visibleTop = Math.max(visibleTop, bounds.top);
+        visibleBottom = Math.min(visibleBottom, bounds.bottom);
+      }
+    }
+    const bounds = panel.getBoundingClientRect();
+    if (bounds.top < visibleTop || bounds.top + Math.min(80, bounds.height) > visibleBottom) {
+      panel.scrollIntoView({
+        block: 'start',
+        behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+      });
+    }
   };
 
   handleSessionScanScopeChange = (event: any) => {
@@ -2065,7 +2093,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     networkTooltipId = 'networkInfoTooltipPanel',
     showPanelNetwork = !overview.cryptoTerminology && overview.capabilities.showNetworkControls,
   }: any = {}) => (
-    <div className={styles.aiSettingsPanel}>
+    <div className={styles.aiSettingsPanel} ref={this.settingsPanelRef}>
       {showPanelNetwork
         ? this.renderPanelNetworkSummary({
             targetNetwork: overview.targetNetwork,

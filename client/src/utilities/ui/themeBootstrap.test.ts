@@ -29,4 +29,14 @@ describe('pre-paint theme bootstrap', () => {
     expect(document.documentElement.dataset.ceThemeSource).toBe('deployment');
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
+
+  test('restores color-blind mode before paint independently of the theme', () => {
+    window.localStorage.setItem('ce:color-vision', 'color-blind');
+    window.eval(source);
+    expect(document.documentElement.dataset.ceColorVision).toBe('color-blind');
+    expect(document.documentElement.dataset.ceTheme).toBe('classic-95');
+    window.localStorage.setItem('ce:color-vision', 'unknown');
+    window.eval(source);
+    expect(document.documentElement.dataset.ceColorVision).toBe('standard');
+  });
 });

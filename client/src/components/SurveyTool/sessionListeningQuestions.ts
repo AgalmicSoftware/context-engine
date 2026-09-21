@@ -20,6 +20,7 @@ export const LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS = [
 export const LISTENING_QUESTION_TYPES: QuestionTypeSelection = Object.freeze({
   binary: true,
   multichoice: true,
+  quadratic: true,
   rating: true,
   freeform: true,
 });
@@ -35,6 +36,7 @@ export type ListeningQuestionGenerationOptions = {
   workerUrl?: string;
   sourceTypeOverride?: string;
   multiSpeakerHintOverride?: string;
+  existingQuestionPrompts?: unknown[];
 };
 
 export type ListeningQuestionGenerationResult = {
@@ -52,9 +54,27 @@ export const buildListeningQuestionPrompt = (
     sessionInstructions = '',
     sourceTypeOverride = 'transcript',
     multiSpeakerHintOverride = 'likely_multiple_speakers',
+    existingQuestionPrompts = [],
   }: ListeningQuestionGenerationOptions = {},
 ) => {
-  const listeningInstructions = [LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS, String(sessionInstructions || '').trim()]
+  const existingPrompts = Array.isArray(existingQuestionPrompts)
+    ? existingQuestionPrompts
+        .map((prompt) => String(prompt || '').trim())
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+  const duplicateAvoidanceInstructions = existingPrompts.length
+    ? [
+        'Already drafted questions from this conversation:',
+        ...existingPrompts.map((prompt, index) => `${index + 1}. ${prompt}`),
+        'Generate genuinely new drafts. Do not repeat these prompts or restate the same concept with cosmetic wording changes.',
+      ].join('\n')
+    : '';
+  const listeningInstructions = [
+    LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS,
+    duplicateAvoidanceInstructions,
+    String(sessionInstructions || '').trim(),
+  ]
     .filter(Boolean)
     .join('\n\n');
 
@@ -84,8 +104,13 @@ export const parseListeningQuestionResponse = (raw: unknown): GeneratedAiQuestio
   return parsed;
 };
 
-export const generateListeningQuestionId = (type: string, prompt: string, options: string[] = []) =>
-  generateSharedQuestionId(type, prompt, options);
+export const generateListeningQuestionId = (
+  type: string,
+  prompt: string,
+  options: string[] = [],
+  singleSelect = false,
+  voiceCredits = 99,
+) => generateSharedQuestionId(type, prompt, options, singleSelect, voiceCredits);
 
 export const buildListeningQuestionStatements = (
   payload: GeneratedAiQuestionPayload,
@@ -118,6 +143,7 @@ export const generateQuestionsFromListeningTranscript = async (
     context: opts.context,
     workerUrl: opts.workerUrl,
     taskType: 'generate',
+    thinking: true,
   });
   const raw = parseListeningQuestionResponse(rawOutput);
   const { statements, surveyTitle } = buildListeningQuestionStatements(raw, opts);

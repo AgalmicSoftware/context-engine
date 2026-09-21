@@ -248,3 +248,43 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
     ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
   });
 });
+
+it('round-trips signed quadratic allocations through self-encrypted response envelopes', async () => {
+  Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  const provider = makeProvider(SIG_A);
+  const questionPool = [{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }];
+  const source = { answers: { 'quadratic-q': { encrypted: true, value: [3, -4] } }, additionalComments: {} };
+  const encrypted = await cryptoUtils.encryptMultipleAnswers(source, {
+    providerKind: provider,
+    account: ACCOUNT,
+    chainId: CHAIN_ID,
+    surveyId: SURVEY_ID,
+    questionPool,
+  });
+  expect(encrypted.answers['quadratic-q'].value).toBe('*');
+  expect(JSON.parse(encrypted.answers['quadratic-q'].encryptedPortion).meta.kind).toBe('quadratic');
+  const decrypted = await cryptoUtils.decryptMultipleAnswers(encrypted, questionPool, {
+    provider,
+    account: ACCOUNT,
+    chainId: CHAIN_ID,
+    surveyId: SURVEY_ID,
+  });
+  expect(decrypted.answers['quadratic-q'].value).toEqual([3, -4]);
+});
+
+it('rejects overspent quadratic values before requesting an encryption signature', async () => {
+  const provider = makeProvider(SIG_A);
+  await expect(
+    cryptoUtils.encryptMultipleAnswers(
+      { answers: { q1: { value: [4, -4], encrypted: true } } },
+      {
+        providerKind: provider,
+        account: ACCOUNT,
+        chainId: CHAIN_ID,
+        surveyId: SURVEY_ID,
+        questionPool: [{ id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }],
+      },
+    ),
+  ).rejects.toThrow(/exceeds/);
+  expect(provider.request.mock.calls.some(([payload]) => payload.method === 'eth_signTypedData_v4')).toBe(false);
+});

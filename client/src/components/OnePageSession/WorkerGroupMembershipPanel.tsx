@@ -24,6 +24,7 @@ import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
+import WorkerGroupAutoJoinLink from './WorkerGroupAutoJoinLink';
 import WorkerGroupCard from './WorkerGroupCard';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
@@ -299,7 +300,7 @@ const WorkerGroupDetailView = ({
 
   return (
     <div className={sbtPageStyles.sbtPage} data-testid="ce-worker-group-detail">
-      <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug })}>
+      <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug, workerUrl })}>
         ← Back to Groups
       </a>
       <article
@@ -805,7 +806,7 @@ const WorkerGroupMembershipPanel = ({
       if (typeof window === 'undefined' || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
       if (!sessionSlug) throw new Error('Session slug unavailable');
       const currentUrl = new URL(window.location.href);
-      const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId }), currentUrl.origin);
+      const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId, workerUrl }), currentUrl.origin);
       await navigator.clipboard.writeText(link.toString());
       if (targetKeyRef.current !== shareTargetKey) return;
       setShareState({
@@ -822,7 +823,7 @@ const WorkerGroupMembershipPanel = ({
   };
   const openGroupDetails = (groupId: string) => {
     if (typeof window === 'undefined' || !sessionSlug) return;
-    const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId }), window.location.origin);
+    const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId, workerUrl }), window.location.origin);
     window.open(link.toString(), '_blank', 'noopener,noreferrer');
   };
   const renderMembershipAction = (group: WorkerGroup, isMember: boolean) => {
@@ -915,11 +916,12 @@ const WorkerGroupMembershipPanel = ({
             onOpenMembers={handleOpenMembers}
           >
             {renderMembershipAction(selectedGroup, Boolean(selectedMembership))}
+            <WorkerGroupAutoJoinLink group={selectedGroup} sessionSlug={sessionSlug} workerUrl={workerUrl} />
           </WorkerGroupDetailView>
         ) : null}
         {status === 'ready' && !selectedGroup ? (
           <div className={styles.workerGroupDetailNotFound}>
-            <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug })}>
+            <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug, workerUrl })}>
               ← Back to Groups
             </a>
             <p>This group is not visible or no longer exists.</p>

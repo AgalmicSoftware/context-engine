@@ -57,6 +57,17 @@ type ResultsViewOption = {
   icon: React.ReactNode;
 };
 
+type SessionContextLink = {
+  label: string;
+  url: string;
+};
+
+type SessionContextView = {
+  title: string;
+  paragraphs: string[];
+  links: SessionContextLink[];
+};
+
 type OnePageSessionStandardShellProps = {
   account: unknown;
   aggregatorData: UnknownRecord | null;
@@ -182,6 +193,72 @@ const buildResultsViewOptions = (
         ]
       : []),
 ];
+
+const toTrimmedText = (value: unknown, maxLength = 2000) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLength);
+};
+
+const normalizeSessionContextLinks = (raw: unknown): SessionContextLink[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      const record = entry && typeof entry === 'object' ? (entry as UnknownRecord) : {};
+      const label = toTrimmedText(record.label, 120);
+      const url = toTrimmedText(record.url, 500);
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return null;
+      }
+      if (!label || parsedUrl.protocol !== 'https:') return null;
+      return { label, url };
+    })
+    .filter((entry): entry is SessionContextLink => !!entry)
+    .slice(0, 4);
+};
+
+const normalizeSessionContextView = (config: unknown): SessionContextView | null => {
+  const record = config && typeof config === 'object' ? (config as UnknownRecord) : {};
+  const rawContext =
+    record.sessionContext && typeof record.sessionContext === 'object'
+      ? (record.sessionContext as UnknownRecord)
+      : null;
+  if (!rawContext) return null;
+  const paragraphs = (Array.isArray(rawContext.paragraphs) ? rawContext.paragraphs : [rawContext.body])
+    .map((entry) => toTrimmedText(entry, 1400))
+    .filter(Boolean)
+    .slice(0, 4);
+  const links = normalizeSessionContextLinks(rawContext.links);
+  if (!paragraphs.length && !links.length) return null;
+  return {
+    title: toTrimmedText(rawContext.title, 80) || 'Context',
+    paragraphs,
+    links,
+  };
+};
+
+const renderSessionContext = (context: SessionContextView | null) => {
+  if (!context) return null;
+  return (
+    <section className={styles.sessionContextSection} aria-label={context.title} data-testid="ce-session-context">
+      {context.paragraphs.map((paragraph, index) => (
+        <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>
+      ))}
+      {context.links.length ? (
+        <div className={styles.sessionContextLinks}>
+          {context.links.map((link) => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
+              <FontAwesomeIcon icon={faExternalLinkAlt} />
+              <span>{link.label}</span>
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+};
 
 export default function OnePageSessionStandardShell({
   account,
@@ -355,6 +432,8 @@ export default function OnePageSessionStandardShell({
   const loadFullCorpusButtonLabel =
     corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
   const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
+  const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
+  const showContextSection = isDemoSlug || !!sessionContext;
 
   return (
     <div className={styles.onePageDemoContainer}>
@@ -546,7 +625,7 @@ export default function OnePageSessionStandardShell({
           />
         </Suspense>
 
-        {isDemoSlug && (
+        {showContextSection && (
           <div
             className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
             data-testid="ce-demo-documents-section"
@@ -573,7 +652,7 @@ export default function OnePageSessionStandardShell({
                   </div>
                 )}
               </h2>
-              {showDocuments && (
+              {showDocuments && isDemoSlug && (
                 <div className={styles.sectionHeaderActionsScroller}>
                   <div className={styles.sectionHeaderActions}>
                     <a
@@ -602,14 +681,17 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                  <CorpusViewer
-                    onAtlasIssueOpen={onCorpusAtlasIssueOpen}
-                    showGithubLink={false}
-                    externalLoadRequestNonce={corpusViewerLoadRequestNonce}
-                    onExternalLoadStateChange={onCorpusViewerLoadStateChange}
-                  />
-                </Suspense>
+                {renderSessionContext(sessionContext)}
+                {isDemoSlug && (
+                  <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
+                    <CorpusViewer
+                      onAtlasIssueOpen={onCorpusAtlasIssueOpen}
+                      showGithubLink={false}
+                      externalLoadRequestNonce={corpusViewerLoadRequestNonce}
+                      onExternalLoadStateChange={onCorpusViewerLoadStateChange}
+                    />
+                  </Suspense>
+                )}
               </div>
             )}
           </div>

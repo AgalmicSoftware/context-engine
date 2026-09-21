@@ -29,6 +29,10 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
       renderResourceCard={() => null}
       workerAllowOrigins="https://app.example"
       setWorkerAllowOrigins={() => {}}
+      workerLimitPerWallet=""
+      setWorkerLimitPerWallet={() => {}}
+      workerLimitPerAnonymousIp="0"
+      setWorkerLimitPerAnonymousIp={() => {}}
       defaultAllowedOrigins="https://app.example"
       shouldUseSponsoredAutoDeployFlow={false}
       deployForm={{}}
@@ -77,6 +81,15 @@ describe('WorkerPanel', () => {
     expect(screen.getByText('Worker Setup')).toBeInTheDocument();
   });
 
+  it('renders the Worker Setup header as a frameless toggle', () => {
+    renderWorkerPanel();
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE)).toHaveAttribute(
+      'data-ce-control-appearance',
+      'frameless',
+    );
+  });
+
   it('fires the collapse toggle handler when the header button is clicked', () => {
     const onToggleCollapsed = jest.fn();
     renderWorkerPanel({ onToggleCollapsed });
@@ -90,6 +103,33 @@ describe('WorkerPanel', () => {
     renderWorkerPanel();
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_MODE_TOGGLE)).toBeInTheDocument();
+  });
+
+  it('labels independent authenticated wallet and anonymous IP request limits', () => {
+    const setWorkerLimitPerWallet = jest.fn();
+    const setWorkerLimitPerAnonymousIp = jest.fn();
+    renderWorkerPanel({ setWorkerLimitPerWallet, setWorkerLimitPerAnonymousIp });
+
+    const walletLimit = screen.getByLabelText('Authenticated requests per wallet per day');
+    const anonymousLimit = screen.getByLabelText('Anonymous requests per IP per day');
+
+    expect(walletLimit).toHaveValue(null);
+    expect(anonymousLimit).toHaveValue(0);
+    expect(screen.getByText(/shared Wi-Fi/i)).toBeInTheDocument();
+    expect(screen.getByText(/provider limits and access policy/i)).toBeInTheDocument();
+
+    fireEvent.change(walletLimit, { target: { value: '9' } });
+    fireEvent.change(anonymousLimit, { target: { value: '12' } });
+
+    expect(setWorkerLimitPerWallet).toHaveBeenCalledWith('9');
+    expect(setWorkerLimitPerAnonymousIp).toHaveBeenCalledWith('12');
+  });
+
+  it('omits the planned shared hosted worker sentence from the custom-worker summary', () => {
+    renderWorkerPanel({ showSharedWorkerChoice: false });
+
+    expect(screen.getByText('Deploy your own worker or paste a worker URL you control.')).toBeInTheDocument();
+    expect(screen.queryByText(/Shared hosted worker support is planned separately/i)).not.toBeInTheDocument();
   });
 
   it('renders worker mode pills and fires the mode-change handler', () => {

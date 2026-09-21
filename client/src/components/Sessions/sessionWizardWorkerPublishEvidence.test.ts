@@ -111,11 +111,20 @@ describe('sessionWizardWorkerPublishEvidence', () => {
       },
     ],
     [
-      'Worker request limit',
+      'Worker wallet request limit',
       {
         runtime: {
           ...runtime,
           workerLimitPerWallet: '25',
+        },
+      },
+    ],
+    [
+      'Worker anonymous IP request limit',
+      {
+        runtime: {
+          ...runtime,
+          workerLimitPerAnonymousIp: '0',
         },
       },
     ],

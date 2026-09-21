@@ -1,6 +1,7 @@
 export type InterviewSettings = {
   openingMode: 'auto' | 'owner';
   openingPrompt: string;
+  steeringPrompt: string;
   autoRegenerate: boolean;
   questionGrowthPercent: number;
   followNewQuestions: boolean;

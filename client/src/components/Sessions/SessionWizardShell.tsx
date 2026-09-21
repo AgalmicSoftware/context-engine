@@ -124,6 +124,7 @@ export type SessionWizardShellProps = {
   onDismissNewSessionRequirementsBanner: IntroStatusRailProps['onDismissRequirements'];
   onEnterAdvancedMode: HeaderProps['onEnterAdvancedMode'];
   onEnterNormalMode: HeaderProps['onEnterNormalMode'];
+  onBackToProfileSelection?: HeaderProps['onBackToProfileSelection'];
   onManualGasLimitChange: PublishSectionProps['onManualGasLimitChange'];
   onManualGasPriceGweiChange: PublishSectionProps['onManualGasPriceGweiChange'];
   onManualMaxFeePerGasGweiChange: PublishSectionProps['onManualMaxFeePerGasGweiChange'];
@@ -173,6 +174,7 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
+  sessionModeProfileResumeControl?: React.ReactNode;
   sessionModeProfilePrivacyControl?: React.ReactNode;
   sessionModeProfileWorkerControl?: WorkerPanelProps['sessionModeProfileWorkerControl'];
   sessionModeProfilePublishControl?: PublishSectionProps['sessionModeProfilePublishControl'];
@@ -184,6 +186,8 @@ export type SessionWizardShellProps = {
   setDeployHelperUrl: WorkerPanelProps['setDeployHelperUrl'];
   setNormalModeBundleUrlOverride: WorkerPanelProps['setNormalModeBundleUrlOverride'];
   setWorkerAllowOrigins: WorkerPanelProps['setWorkerAllowOrigins'];
+  setWorkerLimitPerWallet: WorkerPanelProps['setWorkerLimitPerWallet'];
+  setWorkerLimitPerAnonymousIp: WorkerPanelProps['setWorkerLimitPerAnonymousIp'];
   setWorkerMode: WorkerPanelProps['onWorkerModeChange'];
   setWorkerSecretsEnabled: WorkerPanelProps['setWorkerSecretsEnabled'];
   setWorkerUrlAutoFilled: WorkerPanelProps['setWorkerUrlAutoFilled'];
@@ -212,6 +216,8 @@ export type SessionWizardShellProps = {
   updateEncryptionGate: EncryptionPanelBoundaryProps['updateEncryptionGate'];
   visibleWorkerResourceKeys: NonNullable<WorkerPanelProps['workerResourceKeys']>;
   workerAllowOrigins: WorkerPanelProps['workerAllowOrigins'];
+  workerLimitPerWallet: WorkerPanelProps['workerLimitPerWallet'];
+  workerLimitPerAnonymousIp: WorkerPanelProps['workerLimitPerAnonymousIp'];
   workerMode: WorkerPanelProps['workerMode'];
   workerSecretsEnabled: WorkerPanelProps['workerSecretsEnabled'];
   workerUrlAutoFilled: WorkerPanelProps['workerUrlAutoFilled'];
@@ -301,6 +307,7 @@ const SessionWizardShell = ({
   onDismissNewSessionRequirementsBanner,
   onEnterAdvancedMode,
   onEnterNormalMode,
+  onBackToProfileSelection,
   onManualGasLimitChange,
   onManualGasPriceGweiChange,
   onManualMaxFeePerGasGweiChange,
@@ -350,6 +357,7 @@ const SessionWizardShell = ({
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
   sessionModeProfileControl = null,
+  sessionModeProfileResumeControl = null,
   sessionModeProfilePrivacyControl = null,
   sessionModeProfileWorkerControl = null,
   sessionModeProfilePublishControl = null,
@@ -361,6 +369,8 @@ const SessionWizardShell = ({
   setDeployHelperUrl,
   setNormalModeBundleUrlOverride,
   setWorkerAllowOrigins,
+  setWorkerLimitPerWallet,
+  setWorkerLimitPerAnonymousIp,
   setWorkerMode,
   setWorkerSecretsEnabled,
   setWorkerUrlAutoFilled,
@@ -389,6 +399,8 @@ const SessionWizardShell = ({
   updateEncryptionGate,
   visibleWorkerResourceKeys,
   workerAllowOrigins,
+  workerLimitPerWallet,
+  workerLimitPerAnonymousIp,
   workerMode,
   workerSecretsEnabled,
   workerUrlAutoFilled,
@@ -417,6 +429,7 @@ const SessionWizardShell = ({
       onCloseDisplaySettings={onCloseDisplaySettings}
       onEnterAdvancedMode={onEnterAdvancedMode}
       onEnterNormalMode={onEnterNormalMode}
+      onBackToProfileSelection={onBackToProfileSelection}
       onRegistryChainIdChange={onRegistryChainIdChange}
       onToggleDisplaySettings={onToggleDisplaySettings}
       registryAddress={registryAddress}
@@ -425,6 +438,7 @@ const SessionWizardShell = ({
       registryChainOptions={registryChainOptions}
       renderInfoTooltip={renderSessionWizardInfoTooltip}
       sessionModeProfileControl={sessionModeProfileControl}
+      sessionModeProfileResumeControl={sessionModeProfileResumeControl}
       sessionModeProfileLabel={sessionModeProfileLabel}
       sessionModeProfileSelectionStep={showSessionModeProfileGate}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
@@ -547,6 +561,10 @@ const SessionWizardShell = ({
             renderResourceCard={renderResourceCard}
             workerAllowOrigins={workerAllowOrigins}
             setWorkerAllowOrigins={setWorkerAllowOrigins}
+            workerLimitPerWallet={workerLimitPerWallet}
+            setWorkerLimitPerWallet={setWorkerLimitPerWallet}
+            workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
+            setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
             defaultAllowedOrigins={defaultAllowedOrigins}
             shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
             deployForm={deployForm}

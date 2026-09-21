@@ -313,6 +313,7 @@ describe('AboutPage', () => {
     expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
     const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
     expect(within(foundations).getAllByText('Complete:')).toHaveLength(6);
+    expect(within(foundations).getByText(/quadratic allocation/)).toBeVisible();
     expect(screen.getAllByText('Planned:')).toHaveLength(14);
     expect(screen.getByText(/unlinkable per-response and per-SBT accounts, ZK\/FHE aggregation/)).toBeVisible();
     expect(screen.getByText(/affiliation proofs, encrypted claims, and conditional timelocks/)).toBeVisible();

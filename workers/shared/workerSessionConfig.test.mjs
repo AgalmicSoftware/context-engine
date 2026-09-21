@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { selectDeployWorkerSessionConfigFields } from './workerSessionConfig.mjs';
+import {
+  projectPublicWorkerSessionConfig,
+  selectDeployWorkerSessionConfigFields,
+} from './workerSessionConfig.mjs';
 
 const workerProfile = ({
   onChainSbt = false,
@@ -18,6 +21,11 @@ test('deploy config selection strips chain and SBT fields from pure Worker sessi
   const selected = selectDeployWorkerSessionConfigFields({
     sessionModeProfile: workerProfile(),
     sessionEndsAt: '2099-01-02T03:04:00.000Z',
+    sessionContext: {
+      title: 'Context',
+      paragraphs: ['Plain-text context for a public session.'],
+      links: [{ label: 'Official event page', url: 'https://example.org/event' }],
+    },
     defaultGroupTags: 'facilitators',
     defaultSbtTags: 'token-holders',
     networkChainId: 11155420,
@@ -29,6 +37,11 @@ test('deploy config selection strips chain and SBT fields from pure Worker sessi
   });
 
   assert.equal(selected.sessionEndsAt, '2099-01-02T03:04:00.000Z');
+  assert.deepEqual(selected.sessionContext, {
+    title: 'Context',
+    paragraphs: ['Plain-text context for a public session.'],
+    links: [{ label: 'Official event page', url: 'https://example.org/event' }],
+  });
   assert.equal(selected.defaultGroupTags, 'facilitators');
   assert.equal(Object.hasOwn(selected, 'defaultSbtTags'), false);
   assert.equal(Object.hasOwn(selected, 'networkChainId'), false);
@@ -70,4 +83,21 @@ test('deploy config selection preserves decentralized contracts', () => {
 
   assert.equal(selected.networkChainId, 11155420);
   assert.deepEqual(selected.contracts, contracts);
+});
+
+test('public config projection includes structured session context', () => {
+  const context = {
+    title: 'Context',
+    paragraphs: ['Public context for the session.'],
+    links: [{ label: 'Official source', url: 'https://example.org/source' }],
+  };
+  const projected = projectPublicWorkerSessionConfig({
+    slug: 'session-a',
+    sessionName: 'Session A',
+    sessionContext: context,
+    sessionSecrets: { openaiKey: 'must-not-project' },
+  });
+
+  assert.deepEqual(projected.sessionContext, context);
+  assert.equal(Object.hasOwn(projected, 'sessionSecrets'), false);
 });

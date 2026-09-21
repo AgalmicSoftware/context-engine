@@ -14,6 +14,8 @@ jest.mock('./sessionInterviewGroupRecommendations', () => ({
 
 const sessionConfig = { slug: 'demo', sessionId: `0x${'1'.repeat(32)}` };
 const workerUrl = 'https://worker.example';
+type HookProps = Parameters<typeof useSessionInterviewGroupRecommendations>[0];
+
 const questions = [
   {
     id: 'q1',
@@ -97,22 +99,25 @@ describe('useSessionInterviewGroupRecommendations', () => {
       .mocked(recommendInterviewGroups)
       .mockImplementation(({ transcript }) => (transcript === 'first' ? first.promise : second.promise));
 
-    const { result, rerender } = renderHook((props) => useSessionInterviewGroupRecommendations(props), {
-      initialProps: {
-        active: true,
-        request: request(1, 'first'),
-        questions,
-        sessionConfig,
-        sessionSlug: 'demo',
-        workerUrl,
-      },
+    const initialProps: HookProps = {
+      active: true,
+      request: request(1, 'first'),
+      questions,
+      sessionConfig,
+      sessionSlug: 'demo',
+      workerUrl,
+    };
+    const { result, rerender } = renderHook((props: HookProps) => useSessionInterviewGroupRecommendations(props), {
+      initialProps,
     });
 
     await waitFor(() => expect(recommendInterviewGroups).toHaveBeenCalledTimes(1));
     await act(async () => {
       first.resolve(readyResult([firstRecommendation]));
     });
-    await waitFor(() => expect(result.current).toEqual([firstRecommendation]));
+    await waitFor(() =>
+      expect(result.current).toEqual({ availability: 'available', recommendations: [firstRecommendation] }),
+    );
 
     rerender({
       active: true,
@@ -123,11 +128,60 @@ describe('useSessionInterviewGroupRecommendations', () => {
       workerUrl,
     });
 
-    expect(result.current).toEqual([]);
+    expect(result.current).toEqual({ availability: 'loading', recommendations: [] });
     await waitFor(() => expect(recommendInterviewGroups).toHaveBeenCalledTimes(2));
     await act(async () => {
       second.resolve(readyResult([secondRecommendation]));
     });
-    await waitFor(() => expect(result.current).toEqual([secondRecommendation]));
+    await waitFor(() =>
+      expect(result.current).toEqual({ availability: 'available', recommendations: [secondRecommendation] }),
+    );
+
+    rerender({
+      active: true,
+      request: null,
+      questions,
+      sessionConfig,
+      sessionSlug: 'demo',
+      workerUrl,
+    });
+
+    await waitFor(() => expect(result.current).toEqual({ availability: 'available', recommendations: [] }));
+
+    rerender({
+      active: true,
+      request: null,
+      questions,
+      sessionConfig,
+      sessionSlug: 'other-session',
+      workerUrl,
+    });
+
+    await waitFor(() => expect(result.current).toEqual({ availability: 'idle', recommendations: [] }));
+  });
+
+  it('reports empty availability when no configured groups are loadable', async () => {
+    jest.mocked(loadInterviewWorkerGroupCandidates).mockResolvedValue({
+      status: 'ready',
+      source: 'public',
+      sessionId: String(sessionConfig.sessionId),
+      sessionSlug: 'demo',
+      workerUrl,
+      candidates: [],
+    });
+
+    const { result } = renderHook((props: HookProps) => useSessionInterviewGroupRecommendations(props), {
+      initialProps: {
+        active: true,
+        request: request(1, 'first'),
+        questions,
+        sessionConfig,
+        sessionSlug: 'demo',
+        workerUrl,
+      },
+    });
+
+    await waitFor(() => expect(result.current).toEqual({ availability: 'empty', recommendations: [] }));
+    expect(recommendInterviewGroups).not.toHaveBeenCalled();
   });
 });

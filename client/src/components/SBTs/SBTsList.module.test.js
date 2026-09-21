@@ -31,15 +31,15 @@ describe('SBTsList module styles', () => {
     expect(scss).not.toMatch(/#featuredSBTsContainer/);
   });
 
-  it('keeps the Worker Groups mobile toolbar on one row with complete action borders', () => {
+  it('keeps the Worker Groups toolbar on one row with borderless refresh', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'SBTsList.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/\.createGroupButton\s*{[\s\S]*?border:\s*1px solid var\(--ce-action-accent\);/);
     expect(scss).toMatch(
-      /@media \(max-width:\s*768px\)[\s\S]*?\.workerRouteToolbar\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
+      /\.workerRouteSessionHero,\s*\.header \.createGroupButton\s*{[^}]*border:\s*1px solid color-mix\(in srgb, var\(--ce-color-white\) 50%, transparent\);/,
     );
     expect(scss).toMatch(
-      /\.workerRouteRefreshButton\s*{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-text-inverse\) 34%, transparent\);/,
+      /\.workerRouteToolbar\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
     );
+    expect(scss).toMatch(/\.workerRouteRefreshButton\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/);
   });
 });

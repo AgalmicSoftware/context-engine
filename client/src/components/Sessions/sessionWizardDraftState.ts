@@ -474,6 +474,8 @@ export const buildSessionWizardCacheWritePayload = ({
   manualMaxPriorityFeePerGasGwei = '',
   workerSecretsEnabled = true,
   workerSecrets = {},
+  workerLimitPerWallet = '',
+  workerLimitPerAnonymousIp = undefined,
   deployForm = {},
   deployComplete = false,
   deployWorkerUrl = '',
@@ -520,6 +522,10 @@ export const buildSessionWizardCacheWritePayload = ({
     workerSecretsEnabled,
     persistWorkerSecrets: false,
     workerSecrets: publicWorkerConfig,
+    workerLimitPerWallet: toStr(workerLimitPerWallet).trim(),
+    ...(workerLimitPerAnonymousIp === undefined
+      ? {}
+      : { workerLimitPerAnonymousIp: toStr(workerLimitPerAnonymousIp).trim() }),
     deployForm: durableDeployForm,
     // Remote requirement evidence is intentionally live-memory only. A reload
     // must replay the stable deployment request and reverify the same worker.

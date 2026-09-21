@@ -1,6 +1,15 @@
 /* @file PolisReport.module.scss */
 
 .polisReportContainer {
+  --report-control-blue: color-mix(in srgb, var(--ce-status-info) 76%, var(--ce-document-text));
+  --report-control-blue-hover: color-mix(in srgb, var(--ce-status-info) 64%, var(--ce-document-text));
+  --report-control-blue-tint: color-mix(in srgb, var(--ce-status-info) 14%, var(--ce-document-canvas));
+  --report-control-white: var(--ce-document-canvas);
+  --report-control-text: color-mix(in srgb, var(--ce-status-info) 60%, var(--ce-document-text));
+  --report-control-surface: var(--ce-document-surface);
+  --report-scroll-bg: var(--ce-status-info-soft);
+  --report-scroll-hover: color-mix(in srgb, var(--ce-status-info-soft) 82%, var(--ce-status-info));
+
   margin-top: 20px;
   border: 1px solid var(--ce-border-light);
   padding: 10px;
@@ -177,7 +186,7 @@
   --ce-beeswarm-axis-color: var(--ce-document-text-muted);
   --ce-beeswarm-label-color: var(--ce-document-text);
   --ce-beeswarm-axis-label-size: 14px;
-  --ce-beeswarm-point-color: steelblue;
+  --ce-beeswarm-point-color: var(--ce-data-series-1);
   --ce-beeswarm-point-active-color: var(--ce-status-warning);
   --ce-beeswarm-background: var(--ce-color-white);
   --ce-beeswarm-border: 1px solid var(--ce-border-light);
@@ -243,6 +252,38 @@
   font-weight: 600;
 }
 
+/* Question types sit inside one keyboard-accessible All Questions disclosure. */
+.polisReportContainer button.allQuestionsToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--report-control-blue);
+    outline-offset: 4px;
+  }
+}
+
+.allQuestionsToggleLabel {
+  margin-left: auto;
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.allQuestionsBody {
+  padding-left: 14px;
+  border-left: 2px solid var(--report-control-surface);
+}
+
 /* For color-coding cluster swatches */
 .clusterSwatchSvg {
   vertical-align: middle;
@@ -269,27 +310,113 @@
   margin-bottom: 12px;
 }
 
-/* Add a row for the top toggles */
-.settingsRow {
-  margin-bottom: 10px;
+/* Keep the report toolbar blue and white across app and report themes. */
+.polisReportContainer .settingsRow {
+  margin-bottom: 12px;
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   align-items: center;
-  background: color-mix(in srgb, var(--ce-document-text-muted) 36.9%, transparent);
-  padding: 10px;
+  justify-content: flex-start;
+  background: var(--report-control-surface);
+  color: var(--report-control-text);
+  color-scheme: light;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+
+  .settingsItem,
+  .settingsActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .demoToggleLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: var(--report-control-text);
+    font-size: 0.9rem;
+  }
+
+  input[type='checkbox'] {
+    accent-color: var(--report-control-blue);
+    margin: 0;
+  }
+
+  button,
+  .reportStyleSelect {
+    appearance: auto;
+    min-height: 40px;
+    max-width: 100%;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--report-control-blue);
+    border-radius: 10px;
+    background: var(--report-control-white);
+    color: var(--report-control-blue);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.4;
+    box-shadow: none;
+    text-shadow: none;
+    transform: none;
+    cursor: pointer;
+  }
+
+  button:hover,
+  .reportStyleSelect:hover {
+    background: var(--report-control-blue-tint);
+    color: var(--report-control-blue-hover);
+  }
+
+  button.downloadButton {
+    background: var(--report-control-blue);
+    color: var(--report-control-white);
+  }
+
+  button.downloadButton:hover {
+    background: var(--report-control-blue-hover);
+  }
+
+  button:disabled {
+    background: var(--report-control-blue-tint);
+    color: var(--report-control-blue-hover);
+    opacity: 1;
+    cursor: progress;
+  }
+
+  .reportStyleSelect option {
+    background: var(--report-control-white);
+    color: var(--report-control-text);
+  }
+
+  button:focus-visible,
+  select:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--report-control-blue);
+    outline-offset: 3px;
+  }
 }
 
-.reportSettingsToggle {
+.polisReportContainer button.reportSettingsToggle {
   appearance: none;
   background: transparent;
   border: 0;
   box-shadow: none;
-  color: inherit;
+  color: var(--report-control-blue);
   cursor: pointer;
   line-height: 1;
-  margin-right: 10px;
-  padding: 4px;
+  margin-right: 0;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 8px;
 
   &:hover,
   &:focus-visible {
@@ -299,7 +426,7 @@
   }
 
   &:hover {
-    opacity: 0.72;
+    color: var(--report-control-blue-hover);
   }
 
   &:focus:not(:focus-visible) {
@@ -501,11 +628,11 @@
   margin-top: 0;
 }
 
-.scrollButton {
-  background: var(--ce-action-primary);
-  border: 2px solid var(--ce-action-primary);
-  border-radius: var(--ce-radius-round);
-  color: var(--ce-action-primary-text);
+.polisReportContainer button.scrollButton {
+  background: var(--report-scroll-bg);
+  border: 1px solid var(--report-control-blue);
+  border-radius: 10px;
+  color: var(--report-control-blue-hover);
   width: 38px;
   height: 38px;
   padding: 0;
@@ -514,21 +641,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 30%, transparent);
-  transition:
-    background-color 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s;
+  box-shadow: none;
+  transition: background-color 0.2s;
 
   &:hover,
   &:focus-visible {
-    background: var(--ce-action-primary-hover);
-    border-color: var(--ce-action-primary-hover);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-action-primary) 38%, transparent);
+    background: var(--report-scroll-hover);
+    color: var(--report-control-blue-hover);
+    box-shadow: none;
   }
 
   &:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--ce-action-primary) 40%, var(--ce-color-white));
+    outline: 3px solid var(--report-control-blue);
     outline-offset: 2px;
   }
 }
@@ -727,18 +851,6 @@
 ==========================================================================
 */
 @media (max-width: 768px) {
-  /*
-   * 1. Top settings row: Make buttons and controls wrap instead of overflowing.
-   */
-  .settingsRow {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 10px;
-    > div {
-      margin-right: 0 !important; // Override inline styles from JSX
-    }
-  }
-
   .participantAddressLink {
     font-size: 0.95rem;
   }
@@ -797,16 +909,6 @@
   border-radius: var(--ce-radius-6);
   box-shadow: 0 18px 32px color-mix(in srgb, var(--ce-document-text) 10%, transparent);
   color: var(--ce-document-text);
-
-  .settingsRow {
-    background: color-mix(in srgb, var(--ce-text-inverse) 95%, transparent);
-    border: none;
-    border-radius: var(--ce-radius-6);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
-    justify-content: flex-start;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
 
   .heading {
     font-size: 1.55rem;
@@ -956,19 +1058,6 @@
     color: var(--ce-status-info);
   }
 
-  .scrollButton {
-    background: var(--ce-action-primary);
-    border: 2px solid var(--ce-action-primary);
-    color: var(--ce-action-primary-text);
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 30%, transparent);
-  }
-
-  .scrollButton:hover,
-  .scrollButton:focus-visible {
-    background: var(--ce-action-primary-hover);
-    border-color: var(--ce-action-primary-hover);
-  }
-
   .reportBeeswarm {
     --ce-beeswarm-background: var(--ce-color-white);
     --ce-beeswarm-border: none;
@@ -1064,16 +1153,6 @@
   box-shadow: 0 18px 40px color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
   color: var(--ce-document-border);
   color-scheme: dark;
-
-  .settingsRow {
-    background: var(--ce-document-text);
-    border: 1px solid var(--ce-document-border-strong);
-    border-radius: var(--ce-radius-6);
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
-    justify-content: flex-start;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
 
   .heading {
     font-size: 1.55rem;
@@ -1237,19 +1316,6 @@
     color: var(--ce-document-border);
   }
 
-  .scrollButton {
-    background: var(--ce-action-primary);
-    border: 2px solid var(--ce-action-primary);
-    color: var(--ce-action-primary-text);
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 35%, transparent);
-  }
-
-  .scrollButton:hover,
-  .scrollButton:focus-visible {
-    background: var(--ce-action-primary-hover);
-    border-color: var(--ce-action-primary-hover);
-  }
-
   .analysisNote {
     color: var(--ce-document-border);
   }
@@ -1336,4 +1402,80 @@
   border-radius: var(--ce-radius-6);
   padding: 24px;
   box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
+}
+
+.clusterHeader {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.clusterHeading {
+  white-space: nowrap;
+}
+
+.clusterHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  gap: 8px;
+}
+
+.clusterToggles {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.polisReportContainer .clusterHeader button.analyzeClustersBtn {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  border: 1px solid var(--report-control-blue);
+  border-radius: 10px;
+  background: var(--report-control-blue);
+  color: var(--report-control-white);
+  box-shadow: none;
+
+  &:hover:not(:disabled) {
+    background: var(--report-control-blue-hover);
+  }
+}
+
+.polisReportContainer .clusterHeader button.clusterToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.polisReportContainer .clusterHeader button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .clusterHeaderActions {
+    display: contents;
+  }
+
+  .clusterToggles {
+    margin-left: auto;
+  }
+
+  .clusterHeader .analyzeClustersBtn {
+    order: 1;
+  }
 }

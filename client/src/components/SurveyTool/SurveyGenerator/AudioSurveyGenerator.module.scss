@@ -61,8 +61,8 @@ $input-border: var(--ce-input-border);
   }
 
   .sessionSelectorToggle {
-    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+    border: 0;
+    background: transparent;
     color: $text-color;
     border-radius: var(--ce-radius-pill);
     width: 42px;

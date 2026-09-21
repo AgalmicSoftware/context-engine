@@ -1,6 +1,6 @@
 /** @file SurveyQuestions.tsx */
 
-import React, { useLayoutEffect, useReducer, useRef } from 'react';
+import React, { useImperativeHandle, useLayoutEffect, useReducer, useRef } from 'react';
 import {
   Dropdown,
   DropdownToggle,
@@ -602,7 +602,10 @@ import {
 } from './surveyQuestionsTypes.js';
 import { createSurveyQuestionsRuntimeMethods } from './surveyQuestionsRuntimeMethods';
 
-export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement => {
+const SurveyQuestionsInner = (
+  props: SurveyQuestionsProps,
+  ref: React.ForwardedRef<SurveyQuestionsLegacyValue>,
+): React.ReactElement => {
   const propsRef = useRef(props);
   propsRef.current = props;
   const bottomRef = useRef<any>(null);
@@ -2226,12 +2229,20 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useImperativeHandle(ref, () => ({
+    handlePrimarySubmitClick,
+    state: stateRef.current,
+  }));
+
   const runtimeStrategy: SurveyQuestionsLegacyValue = getRuntimeStrategy();
   if (typeof runtimeStrategy?.render === 'function') {
     return runtimeStrategy.render(engine);
   }
   return renderDefaultSurveyQuestionsRoute();
 };
+
+export const SurveyQuestions = React.forwardRef(SurveyQuestionsInner);
+SurveyQuestions.displayName = 'SurveyQuestions';
 
 // Preserve direct QuestionsDashboard/SurveySelector consumers without reviving the import cycle.
 (SurveySelector as SurveyQuestionsLegacyValue).SurveyQuestionsComponent = SurveyQuestions;

@@ -1,3 +1,6 @@
+import QuadraticAllocationResults from './QuadraticAllocationResults';
+import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
+import QuadraticAllocationResponse from './QuadraticAllocationResponse';
 /** @file SingleQuestionResponse.tsx */
 
 import React, { Component } from 'react';
@@ -25,6 +28,7 @@ import GateTooltip from '../Gates/GateTooltip';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import {
   getRatingFillPercent,
+  normalizeRatingScale,
   normalizeRatingValue,
   RATING_MAX,
   RATING_MIN,
@@ -125,6 +129,7 @@ type SingleQuestionResponseProps = SingleQuestionRecord & {
   aggregatorFreeformAnswerClassName?: string;
   aggregatorParagraphClassName?: string;
   aggregatorResponseMode?: unknown;
+  showAggregatorBookmark?: boolean;
   aggregatorTextClassName?: string;
   allResponses?: unknown;
   bodyClassName?: string;
@@ -428,6 +433,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       case 'rating':
         return this.renderRatingAggregator(answered);
 
+      case 'quadratic':
+        return <QuadraticAllocationResults responses={answered} question={aggregatorQuestion} />;
       case 'multichoice':
         return this.renderMultichoiceAggregator(answered, aggregatorQuestion);
 
@@ -914,6 +921,19 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
           No options available.
         </div>
       );
+    } else if (type === 'quadratic') {
+      const options = this.getMultichoiceOptions(questionRecord);
+      affordance = (
+        <div className={styles.readOnlyQuadratic} data-testid="ce-quadratic-question-preview">
+          <span>{String(getVoiceCredits(questionRecord))} voice credits · Support or oppose</span>
+          {options.map((option, index) => (
+            <div key={index}>
+              <span>{option}</span>
+              <div className={styles.readOnlyQuadraticTrack} aria-hidden="true" />
+            </div>
+          ))}
+        </div>
+      );
     } else if (type === 'rating') {
       affordance = (
         <div className={styles.readOnlyRating} aria-hidden="true">
@@ -944,11 +964,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.cardLinkButton}
+                  data-ce-control-appearance="frameless"
                   title="View on Arweave"
                   onClick={stopCardNavigation}
                   onMouseDown={stopCardNavigation}
                   onKeyDown={stopCardNavigation}
-                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon icon={faExternalLinkAlt} />
                 </a>
@@ -959,11 +979,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.cardLinkButton}
+                  data-ce-control-appearance="frameless"
                   title="View question page"
                   onClick={stopCardNavigation}
                   onMouseDown={stopCardNavigation}
                   onKeyDown={stopCardNavigation}
-                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon icon={faExpand} />
                 </a>
@@ -1147,6 +1167,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const questionBodyClassName = joinClassNames(
       styles.questionTitleBody,
       !hasCardActions && styles.questionTitleBodyNoLinks,
+      type === 'quadratic' && mode === 'mini' && !miniExpanded && styles.quadraticResponseBody,
       this.props.bodyClassName,
     );
     const cardLinksClassName = joinClassNames(styles.cardLinksContainer, this.props.linksContainerClassName);
@@ -1173,13 +1194,13 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
               {Boolean(id) && (
                 <button
                   onClick={this.handleBookmarkClick}
+                  data-ce-control-appearance="frameless"
                   className={joinClassNames(
                     cardLinkButtonClassName,
                     styles.bookmarkCardLinkButton,
                     isBookmarked ? styles.bookmarkCardLinkButtonActive : '',
                   )}
                   title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
-                  data-ce-control-appearance="frameless"
                 >
                   <FontAwesomeIcon
                     icon={faBookmark}
@@ -1195,8 +1216,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cardLinkButtonClassName}
-                  title="View on Arweave"
                   data-ce-control-appearance="frameless"
+                  title="View on Arweave"
                 >
                   <FontAwesomeIcon icon={faExternalLinkAlt} />
                 </a>
@@ -1213,8 +1234,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cardLinkButtonClassName}
-                  title="View question page"
                   data-ce-control-appearance="frameless"
+                  title="View question page"
                 >
                   <FontAwesomeIcon icon={faExpand} />
                 </a>
@@ -1356,6 +1377,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       const questionBodyClassName = joinClassNames(
         styles.questionTitleBody,
         !hasCardActions && styles.questionTitleBodyNoLinks,
+        aggregatorQuestion.type === 'quadratic' && styles.quadraticAggregatorBody,
         this.props.bodyClassName,
       );
       const cardLinksClassName = joinClassNames(styles.cardLinksContainer, this.props.linksContainerClassName);
@@ -1366,16 +1388,16 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
           <CardBody className={questionBodyClassName}>
             {hasCardActions && (
               <div className={cardLinksClassName}>
-                {Boolean(aggregatorQuestionId) && (
+                {Boolean(aggregatorQuestionId) && this.props.showAggregatorBookmark !== false && (
                   <button
                     onClick={this.handleBookmarkClick}
+                    data-ce-control-appearance="frameless"
                     className={joinClassNames(
                       cardLinkButtonClassName,
                       styles.bookmarkCardLinkButton,
                       isBookmarked ? styles.bookmarkCardLinkButtonActive : '',
                     )}
                     title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
-                    data-ce-control-appearance="frameless"
                   >
                     <FontAwesomeIcon
                       icon={faBookmark}
@@ -1391,8 +1413,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cardLinkButtonClassName}
-                    title="View on Arweave"
                     data-ce-control-appearance="frameless"
+                    title="View on Arweave"
                   >
                     <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </a>
@@ -1403,8 +1425,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cardLinkButtonClassName}
-                    title="View question page"
                     data-ce-control-appearance="frameless"
+                    title="View question page"
                   >
                     <FontAwesomeIcon icon={faExpand} />
                   </a>
@@ -1428,6 +1450,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
 
     switch (type) {
+      case 'quadratic':
+        return <QuadraticAllocationResponse value={value} question={this.props.question || {}} />;
       case 'multichoice': {
         const toLabel = (x: unknown) => {
           if (typeof x === 'string') return x;
@@ -1455,17 +1479,20 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       }
 
       case 'rating': {
-        const normalizedRatingValue = normalizeRatingValue(value, null);
+        const ratingScale = normalizeRatingScale(this.props.question || {});
+        const normalizedRatingValue = normalizeRatingValue(value, null, ratingScale);
         if (normalizedRatingValue === null) {
           return <div className={styles.freeformAnswer}>No answer provided.</div>;
         }
-        const ratingFillPercent = getRatingFillPercent(value, RATING_MIN);
+        const ratingFillPercent = getRatingFillPercent(value, ratingScale.min, ratingScale);
         return (
           <div className={styles.readOnlyRating}>
             <div className={styles.ratingTrack}>
               <div className={styles.ratingBar} style={resolveSingleQuestionRatingBarStyle(ratingFillPercent)} />
             </div>
-            <span className={styles.ratingValueLabel}>{`${normalizedRatingValue}/${RATING_MAX}`}</span>
+            <span className={styles.ratingEndpointLabel}>{ratingScale.minLabel}</span>
+            <span className={styles.ratingValueLabel}>{`${normalizedRatingValue}/${ratingScale.max}`}</span>
+            <span className={styles.ratingEndpointLabel}>{ratingScale.maxLabel}</span>
           </div>
         );
       }

@@ -206,6 +206,28 @@ describe('SurveyTool pile response sync and JSON controls', () => {
     // portable behavior is the reset plan plus the public auto-decrypt state patch.
   });
 
+  it('resets pile runtime context when the effective session identity changes', () => {
+    const updatePlan = buildPileComponentUpdatePlan({
+      sessionIdentityChanged: true,
+      loading: false,
+      showLongLoading: true,
+    });
+    const resetState = buildPileContextResetState({
+      submittedSinceLastEdit: true,
+    });
+
+    expect(updatePlan).toEqual({
+      shouldResetContext: true,
+      cacheUpdatePlan: { action: 'noop', delayMs: 80 },
+      shouldClearLongLoading: false,
+      shouldDisableBlockedAutoDecrypt: false,
+      queueAutoDecryptReasons: [],
+    });
+    expect(resetState.surveysResponseState).toEqual([{ ...EMPTY_PILE_RESPONSE_SLICE }]);
+    expect(resetState.editBaseline).toBeNull();
+    expect(resetState.submissionComplete).toBe(false);
+  });
+
   it('queues pile auto-decrypt refresh on response nonce updates while enabled and unblocked', () => {
     const plan = buildPileComponentUpdatePlan({
       responseNonceTick: true,

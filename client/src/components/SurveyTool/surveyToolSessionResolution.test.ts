@@ -521,6 +521,50 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).toHaveBeenCalledWith('alpha');
   });
 
+  it('uses the configured chain for temporary demo fixture previews without borrowing wallet scope', () => {
+    const resolveBySlug = makeResolveBySlug((slug) =>
+      slug === 'demo-2'
+        ? {
+            slug: 'demo-2',
+            networkChainId: 11155420,
+            demoCompatibilitySeed: { temporary: true },
+          }
+        : null,
+    );
+
+    const resolved = resolveSurveyToolQuestionsDashboardLoadContext({
+      sessionSlug: 'demo-2',
+      network: { id: 84532 },
+      resolveBySlug,
+    });
+
+    expect(resolved).toMatchObject({
+      sessionSlug: 'demo-2',
+      networkId: 11155420,
+      networkIdStr: '11155420',
+      networkSourceSlug: 'demo-2',
+    });
+  });
+
+  it('keeps fixture preview sessions without configured chains off cache scope', () => {
+    const resolveBySlug = makeResolveBySlug((slug) =>
+      slug === 'demo-local' ? { slug: 'demo-local', demoCompatibilitySeed: { temporary: true } } : null,
+    );
+
+    const resolved = resolveSurveyToolQuestionsDashboardLoadContext({
+      sessionSlug: 'demo-local',
+      network: { id: 84532 },
+      resolveBySlug,
+    });
+
+    expect(resolved).toMatchObject({
+      sessionSlug: 'demo-local',
+      networkId: null,
+      networkIdStr: '',
+      networkSourceSlug: '',
+    });
+  });
+
   it('keeps unresolved question-payload writes off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 

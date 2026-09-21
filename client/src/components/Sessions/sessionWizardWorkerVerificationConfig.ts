@@ -6,6 +6,7 @@ import {
   resolveSessionWizardWorkerFaucetConfigFromDraft,
   resolveSessionWizardWorkerRpcUrlFromDraft,
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
+  buildSessionWizardWorkerLimits,
 } from './sessionWizardWorkerRuntimeSupport';
 import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization.js';
 
@@ -47,9 +48,10 @@ export const buildSessionWizardWorkerVerificationConfig = ({
         networkId: resolvedRuntime.network?.id,
       }),
       allowOrigins: resolvedAllowOrigins,
-      limits: Number(resolvedRuntime.workerLimitPerWallet || 0)
-        ? { perWalletPerDay: Number(resolvedRuntime.workerLimitPerWallet) }
-        : {},
+      limits: buildSessionWizardWorkerLimits({
+        perWalletPerDay: resolvedRuntime.workerLimitPerWallet,
+        perAnonymousIpPerDay: resolvedRuntime.workerLimitPerAnonymousIp,
+      }),
       scopes: {},
       embeddedDeployHelperEnabled: resolvedRuntime.embeddedDeployHelperEnabled,
     },

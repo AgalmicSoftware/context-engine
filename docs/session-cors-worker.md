@@ -539,7 +539,12 @@ Admin test panel:
   requires a cached Worker JWT and then runs server-side `validateAdmin` before
   returning normalized `settings`, `capability`, and private admin job state for
   Generate/Refresh controls. Clients must treat malformed or mismatched 200
-  responses as unavailable.
+  responses as unavailable. While the public Results view is open, signed-out
+  viewers recheck the viewer artifact endpoint about every 15 seconds so a newly
+  generated successful artifact can appear without a full page reload. The
+  browser pauses this background recheck while the document is hidden, preserves
+  the last good artifact across transient errors or active generation, and does
+  not use admin credentials.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
@@ -563,6 +568,14 @@ Admin test panel:
   separate provider or model. Inputs are submitted responses only; Circles is
   the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
   from the session subject matter.
+- The Worker source snapshot keeps the full submitted-response counts distinct
+  from the bounded AI input counts. The AI input keeps rating endpoint metadata
+  (`scale.min`/`max` and endpoint labels) and quadratic `voiceCredits`, then
+  applies a deterministic cap that samples across questions and participants
+  instead of taking the first sorted rows. Public response envelopes may contain
+  empty encryption placeholders such as `encryptedPortion: ""`; those
+  placeholders are not treated as locked. Explicit locked flags or non-empty
+  encrypted envelope fields are still excluded from generated-results input.
 
 ### Local mocked generated-results browser smoke
 
@@ -761,6 +774,26 @@ preserve their originally supplied secret outside the bundle. The worker does no
 accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
+
+Question Results → Filter → Groups offers separate include/exclude choices for
+question creators and responders in Cloudflare sessions. Inclusion matches any
+selected Group; exclusion wins. Selections also apply to PolisReport answers,
+charts, participants and AI analysis, and to question-results exports. The native
+`workerGroupFilter` URL/bookmark state carries the canonical session ID, slug,
+Worker origin and Group IDs; it is separate from `sbtFilter`. Registry sessions
+retain SBT filters, including in PolisReport, and declared Worker/SBT hybrids
+retain their SBT controls.
+
+Filters resolve the authenticated `/groups/members` directory through every page
+before displaying a cohort. Signed-out, denied, incomplete and failed reads show
+an actionable status and never silently fall back to unfiltered answers. Member
+visibility still applies. Membership changes refresh the active filter; focus,
+manual refresh and a one-minute refresh also pick up changes from other clients.
+Passkey and EVM principals match response addresses; a selected Group containing
+Telegram/agent principals currently reports that those identities cannot yet be
+matched. Older Workers without the member-directory endpoint need an update.
+Clearing Group filters restores the unfiltered cohort while retaining other
+selected filters.
 
 Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic
 research buckets are separate profile data and never grant worker access, and
@@ -1010,6 +1043,50 @@ validated public document references and tags. Contract address, network, gas,
 transaction, and burn controls are never synthesized for a Worker-native
 group.
 
+Worker-canonical web sessions also support auto-joining an open, session-visible
+Group through `/session/<slug>?joinGroup=<groupId>`. **Copy auto-join link** on
+the expanded Group detail page builds this session link from the actual Group
+ID and includes the validated public `worker` origin so fresh browsers can
+discover the session. Ordinary Group and back-to-list links preserve this public
+Worker origin too, so expanded pages can verify the session in a fresh tab.
+Older Group links without `worker` recover an unambiguous, previously cached
+Worker origin for that exact session and verify its identity again before
+rendering. Cloudflare Group pages use Group loading states, never SBT block-scan
+progress. A named Group with no discoverable session shows an unavailable state
+instead of the on-chain list; a browser that has never opened the session needs
+the full shared link. Cached hints never override an explicit Worker URL or an
+exact configured registry session.
+The ordinary Group link still opens its details without joining. The
+auto-join link contains no credential and is shareable by anyone who can see
+the Group; it is a convenience for open joining, not proof of event attendance
+or a restricted invitation.
+
+To separate an event cohort, create an open Group named for the event, choose
+session member visibility, and distribute its auto-join link to participants.
+Visitors using the ordinary session URL are not automatically added. The invitation notice displays the public Group name before sign-in using the
+exact session-bound discovery endpoint; it falls back to the Group ID when
+public discovery is unavailable. The compact notice reads “Group name: Will be
+joined upon sign-in” with Cancel auto-join; sign-in uses the existing page login
+control. Visitors
+who follow the auto-join link sign in first; the client then calls the existing
+`/groups/join` endpoint automatically. The app remembers one pending invitation
+in tab-scoped session storage for up to 24 hours, including across navigation
+and refresh before sign-in. It retains the original session and Worker identity,
+so signing in elsewhere joins the intended group. This works even with the
+Groups section collapsed and records native Worker
+membership rather than minting an on-chain SBT. Existing members are recognized
+without another join request. Worker capacity, deadlines, and authorization
+remain authoritative; failures expose an explicit Retry action. Success or
+cancellation clears the saved invitation and removes its matching `joinGroup`
+parameter without disturbing other URL parameters. Account changes invalidate
+pending authentication; failures retain the invitation for explicit retry.
+No credentials are saved with an invitation. Browser storage restrictions can
+limit persistence to the current page.
+
+Native Group membership is separate from the existing on-chain SBT results
+filters. Auto-joining records the cohort membership, but does not itself filter
+the question set, response statistics, or generated analysis by that cohort.
+
 `memberVisibility` defaults to `admin_only`. `members` lets members see the
 group metadata and member identities, while `session` lets any authenticated
 session principal see both. Self-membership visibility is always allowed, but
@@ -1109,6 +1186,11 @@ Runtime:
     "configRevision": "6f0c2c84-f28b-4fa7-baba-d035f9767967",
     "sessionName": "Example session",
     "sessionInfo": "Worker-canonical example",
+    "sessionContext": {
+      "title": "Context",
+      "paragraphs": ["Optional public background shown as a plain-text Context section."],
+      "links": [{ "label": "Official source", "url": "https://example.org/session" }]
+    },
     "adminAddress": "0x0000000000000000000000000000000000000001",
     "corsWorkerUrl": "https://test-72-a1b2c3d4e5f6.example.workers.dev",
     "allowOrigins": ["https://app.example"],
@@ -1189,9 +1271,13 @@ Runtime:
       }
     },
     "ai": { "models": { "fast": { "provider": "openai", "model": "gpt-5" } } },
-    "limits": { "perWalletPerDay": 1000 }
+    "limits": { "perWalletPerDay": 1000, "perAnonymousIpPerDay": 0 }
   }
   ```
+
+  `sessionContext` is optional public presentation metadata. The client renders
+  its `title`, `paragraphs`, and HTTPS `links` as React text and anchors; it is
+  not executable HTML and must not contain secrets.
   For `"backend": "cloudflare"`, new `/new` configs default canonical CE payload
   resources (`docsContext`, `questions`, `surveys`, `responses`, media, and
   generated artifacts) to `"active"` unless an advanced draft explicitly stages
@@ -1213,6 +1299,7 @@ Runtime:
       writes do not. Callers cannot set it directly.
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
+    - `limits.perWalletPerDay` remains the authenticated per-wallet daily route budget and the legacy anonymous fallback. `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): omitted keeps the legacy `perWalletPerDay` fallback, `0` explicitly makes those anonymous route buckets unlimited, and a positive integer enforces that per-session/per-route anonymous identity budget. Malformed values fall back to `perWalletPerDay` rather than disabling limits.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
     - writes fail closed when open config subtrees contain secret-like keys,
@@ -1727,6 +1814,7 @@ Anonymous exception (AI/transcribe/realtime interview only):
 - If on-chain gate authority is unavailable/unresolved, anonymous access fails closed.
 - For the canonical default session slug (`""`), clients should send `X-Session-Slug: general` on anonymous-first attempts.
 - Anonymous requests are still rate-limited with an anonymous identity key.
+  The daily anonymous budget is `limits.perAnonymousIpPerDay` when that field is a non-negative integer; otherwise it falls back to the legacy `limits.perWalletPerDay`. This applies to anonymous AI/transcribe/realtime, public storage read/list, public group discovery, and interview starter/catalog routes. A value of `0` disables the anonymous daily IP bucket without changing authenticated per-wallet rate limits or nonce protections.
   - That rate identity now routes through a shared helper:
     native Cloudflare runtime prefers `CF-Connecting-IP`; otherwise the worker only uses a valid
     `X-Anonymous-Client-Id` as a best-effort sharding key and falls back to `anon:unknown`.
@@ -2070,7 +2158,7 @@ Signed login/bootstrap requests:
   remains during the staged transport migration.
 - `POST /interview/starter?slug=<slug>`
   - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
-  - Returns `{ openingPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing.
+  - Returns `{ openingPrompt, steeringPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing. `steeringPrompt` is the normalized owner-authored `interviewMode.steeringPrompt` value and defaults to an empty string.
   - Stores the generated opening and baseline count in `session:<slug>:interview-opening`, separate from owner configuration. Reuses it by default; optional regeneration uses `interviewMode.questionGrowthPercent` (20% by default). Concurrent requests within one Worker isolate share generation; Cloudflare KV remains eventually consistent across isolates.
   - Failed regeneration preserves the last successful opening; initial failure returns a recoverable error. The client bounds waiting to ten seconds and can start with an existing session question.
 - `POST /admin/refresh-interview-opening`

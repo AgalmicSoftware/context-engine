@@ -10,12 +10,17 @@ const {
   compactSmokeSummary,
   dismissOnboardingIfPresent,
   findMissingExpectedText,
+  installDemoWorkerFixtureRoutes,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
+  isDemoReadyInterviewRoute,
+  isDemoStorageListFixtureRequest,
   isExpectedLoadedMediaAbort,
+  isLocalSmokeBaseUrl,
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
+  probeBenchmarkReportFrame,
   probeSessionModePresets,
   resolveViewport,
   routeUrl,
@@ -24,14 +29,15 @@ const {
 } = require('./vite-navigation-smoke');
 
 test('default navigation smoke covers session modes, Docs, its legacy contracts alias, and benchmarks', () => {
-  assert.ok(DEFAULT_ROUTES.includes('/session/new'));
-  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
+  assert.ok(DEFAULT_ROUTES.includes('/new'));
+  assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionModePresets);
+  assert.equal(DEFAULT_ROUTE_PROBES['/benchmarks'], probeBenchmarkReportFrame);
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
   assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/docs'], ['Docs']);
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/contracts'], ['Docs']);
-  assert.deepEqual(DEFAULT_ROUTE_TEXT['/benchmarks'], ['AI Opinions Benchmark']);
+  assert.equal(DEFAULT_ROUTE_TEXT['/benchmarks'], undefined);
 });
 
 test('session mode probe selects both supported presets', async () => {
@@ -79,6 +85,68 @@ test('normalizeRoutes accepts comma-separated routes and adds leading slashes', 
 test('resolveViewport supports the maintained mobile smoke alias', () => {
   assert.deepEqual(resolveViewport('mobile'), { width: 390, height: 844 });
   assert.deepEqual(resolveViewport('desktop'), { width: 1440, height: 1000 });
+});
+
+test('demo Worker smoke fixtures are local-only and match exact storage-list resources', () => {
+  assert.equal(isLocalSmokeBaseUrl('http://127.0.0.1:3100'), true);
+  assert.equal(isLocalSmokeBaseUrl('http://localhost:3100/path'), true);
+  assert.equal(isLocalSmokeBaseUrl('https://contextengine.xyz'), false);
+
+  assert.equal(
+    isDemoStorageListFixtureRequest(
+      'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100',
+    ),
+    true,
+  );
+  assert.equal(
+    isDemoStorageListFixtureRequest(
+      'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/read?id=question-1',
+    ),
+    false,
+  );
+  assert.equal(
+    isDemoStorageListFixtureRequest(
+      'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=groups&limit=100',
+    ),
+    false,
+  );
+  assert.equal(
+    isDemoStorageListFixtureRequest('https://other-worker.example/storage/list?resource=questions'),
+    false,
+  );
+});
+
+test('demo interview ready fixture requires the explicit Worker discovery route', () => {
+  const worker = encodeURIComponent('https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev');
+  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=interview&worker=${worker}`), true);
+  assert.equal(isDemoReadyInterviewRoute('/session/demo?mode=interview'), false);
+  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=recordGroup&worker=${worker}`), false);
+});
+
+test('both session setup aliases receive the pinned demo cache fixture in local smoke', async () => {
+  for (const route of ['/new', '/session/new', '/session/new?mode=interview']) {
+    const handlers = [];
+    await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
+      'http://127.0.0.1:4173', route);
+    assert.equal(handlers.length, 1, `${route} should isolate the unrelated demo cache`);
+    assert.equal(handlers[0].pattern, 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?*');
+    let response;
+    await handlers[0].handler({
+      request: () => ({ url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100' }),
+      fulfill: async (value) => { response = value; },
+      fallback: async () => assert.fail('the pinned question list should use the fixture'),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse(response.body), { items: [], listComplete: true });
+  }
+  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
+});
+
+test('setup fixture preserves live Worker checks and unrelated session routes', async () => {
+  const page = { route: async () => assert.fail('no fixture should be installed') };
+  await installDemoWorkerFixtureRoutes(page, 'https://contextengine.sh', '/session/new');
+  await installDemoWorkerFixtureRoutes(page, 'https://contextengine.sh', '/new');
+  await installDemoWorkerFixtureRoutes(page, 'http://127.0.0.1:4173', '/session/new-project');
 });
 
 test('normalizeLayoutProbeSelectors keeps default browser layout checks and accepts overrides', () => {

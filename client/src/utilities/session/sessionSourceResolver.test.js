@@ -45,6 +45,17 @@ describe('sessionSourceResolver', () => {
     });
   });
 
+  it('exposes the bundled demo-interview-5 Worker config for clean demo links', () => {
+    expect(getDemoSessionConfigForDisplay('demo-interview-5')).toMatchObject({
+      slug: 'demo-interview-5',
+      sessionId: '0xa0dfc46736b8288854ae2c4156877879',
+      corsWorkerUrl: 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev/',
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+      },
+    });
+  });
+
   it('returns all demo sessions as normalized [key, config] pairs', () => {
     const entries = getAllDemoSessionConfigs();
 

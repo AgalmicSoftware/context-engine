@@ -552,6 +552,8 @@ describe('sessionWizardDraftState', () => {
         },
       ],
       effectivePersistWorkerSecrets: false,
+      workerLimitPerWallet: '7',
+      workerLimitPerAnonymousIp: '0',
       workerSecrets: {
         apiToken: 'secret',
         optional: '',
@@ -601,6 +603,8 @@ describe('sessionWizardDraftState', () => {
           },
         ],
         persistWorkerSecrets: false,
+        workerLimitPerWallet: '7',
+        workerLimitPerAnonymousIp: '0',
         workerSecrets: {
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litGroupId: 'group-1',

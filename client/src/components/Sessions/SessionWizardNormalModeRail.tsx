@@ -35,15 +35,19 @@ const SessionWizardNormalModeRail = ({
         <button
           key={card.key}
           type="button"
-          className={`${styles.normalModeCard} ${toneClass} ${isOpen ? styles.normalModeCardActive : ''}`}
+          className={`${styles.normalModeCard} ${toneClass} ${
+            isOpen ? styles.normalModeCardActive : styles.normalModeCardCompact
+          }`}
           onClick={() => onFocusSection(card.key)}
           aria-label={`Step ${card.stepNumber}: ${card.title}`}
         >
           <span className={styles.normalModeCardNumber}>{card.stepNumber}</span>
-          <span className={styles.normalModeCardContent}>
-            <span className={styles.normalModeCardTitle}>{card.title}</span>
-            {showExpandedDetails && <span className={styles.normalModeCardSummary}>{card.summary}</span>}
-          </span>
+          {isOpen ? (
+            <span className={styles.normalModeCardContent}>
+              <span className={styles.normalModeCardTitle}>{card.title}</span>
+              {showExpandedDetails && <span className={styles.normalModeCardSummary}>{card.summary}</span>}
+            </span>
+          ) : null}
         </button>
       );
     })}

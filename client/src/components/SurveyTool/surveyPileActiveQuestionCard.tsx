@@ -17,6 +17,7 @@ export type PileCardShellProps = {
   questionComponent: React.ReactNode;
   questionContainerClass: string;
   footerSection?: React.ReactNode;
+  questionType?: unknown;
 };
 
 export type PileGatedPromptCardProps = {
@@ -35,8 +36,9 @@ export const renderPileCardShell = ({
   questionComponent,
   questionContainerClass,
   footerSection,
+  questionType,
 }: PileCardShellProps): React.ReactElement => (
-  <Card className={styles.pileCardInner}>
+  <Card className={`${styles.pileCardInner} ${questionType === 'quadratic' ? styles.pileQuadraticCard : ''}`}>
     <CardBody className={styles.pileCardBody}>
       <div className={styles.pileCardHeader}>{promptHeader}</div>
 
@@ -80,4 +82,5 @@ export const renderPileActiveQuestionCard = ({
         questionComponent,
         questionContainerClass,
         footerSection,
+        questionType: question.type || question.questionType,
       });

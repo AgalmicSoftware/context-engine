@@ -1,3 +1,4 @@
+import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v4';
@@ -17,6 +18,23 @@ const normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw])
   .filter(Boolean);
 
 const isLocalHttpHostname = (hostname = '') => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(String(hostname));
+
+const normalizeRecruitmentSource = (value) => {
+  const normalized = trim(value).replace(/\s+/g, '-').slice(0, 128);
+  return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : '';
+};
+
+const normalizeJoinGroup = (value) => {
+  const normalized = trim(value).toLowerCase();
+  return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : '';
+};
+
+const copySafeReturnParams = (sourceUrl, targetUrl) => {
+  const recruitmentSources = sourceUrl.searchParams.getAll('src').map(normalizeRecruitmentSource).filter(Boolean);
+  if (recruitmentSources.length === 1) targetUrl.searchParams.set('src', recruitmentSources[0]);
+  const joinGroups = sourceUrl.searchParams.getAll('joinGroup').map(normalizeJoinGroup).filter(Boolean);
+  if (joinGroups.length === 1) targetUrl.searchParams.set('joinGroup', joinGroups[0]);
+};
 
 const safeServedWorkerOrigin = (value) => {
   try {
@@ -38,9 +56,9 @@ const safeSessionUrl = (value, { slug = '', allowOrigins } = {}) => {
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
     if (!allowedOrigins.length || !allowedOrigins.includes(url.origin)) return '';
-    url.search = '';
-    url.hash = '';
-    return url.toString().replace(/\/$/, '');
+    const safeUrl = new URL(`${url.origin}${url.pathname}`);
+    copySafeReturnParams(url, safeUrl);
+    return safeUrl.toString().replace(/\/$/, '');
   } catch {
     return '';
   }
@@ -82,7 +100,9 @@ export const buildInterviewBriefDocument = ({
   answerContract: {
     binary: ['Agree', 'Unsure', 'Disagree'],
     rating: { min: 0, max: 10, step: 1 },
+    ratingScaleOverrides: 'Use a question.scale object when present; otherwise use the default rating contract.',
     multichoice: 'Use one exact question option.',
+    quadratic: 'Signed integer array in option order; sum(vote²) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed.',
   },
   researchCoverageContract: {
     countFields: [
@@ -130,7 +150,7 @@ export const dispatchInterviewBriefRequest = async ({
       env,
       slug,
       address: deps?.resolveAnonymousRateIdentity?.(request),
-      limit: config?.limits?.perWalletPerDay || 0,
+      limit: resolveAnonymousIpDailyLimit(config),
       route: 'interview-brief',
     });
     if (!rateAllowed) return deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers);
@@ -179,6 +199,8 @@ export const __test__interviewBriefDispatch = {
   buildReviewUrl,
   canonicalizeQuestions,
   isInterviewEnabled,
+  normalizeJoinGroup,
+  normalizeRecruitmentSource,
   safeServedWorkerOrigin,
   safeSessionUrl,
 };

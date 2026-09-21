@@ -1,3 +1,4 @@
+import { validateQuadraticQuestion } from '../../shared/questions/quadraticAllocation.mjs';
 import {
   safeString,
   lower,
@@ -13,7 +14,7 @@ import { assignTelegramQuestionNumber } from './telegramQuestionNumbers.mjs';
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const PROPOSED_QUESTION_ID_PREFIX = 'ceq_';
 const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
-const SUPPORTED_QUESTION_TYPES = new Set(['binary', 'freeform', 'rating', 'multichoice']);
+const SUPPORTED_QUESTION_TYPES = new Set(['binary', 'freeform', 'rating', 'multichoice', 'quadratic']);
 const MAX_QUESTION_TAGS = 10;
 const MAX_QUESTION_TAG_LENGTH = 48;
 const MAX_QUESTION_GEO_REFS = 10;
@@ -358,6 +359,8 @@ function questionIdFromPrompt({
   sessionSlug = '',
   prompt = '',
   questionType = '',
+  options = [],
+  voiceCredits = 99,
   telegramUserId = '',
   chatId = '',
 } = {}) {
@@ -368,6 +371,7 @@ function questionIdFromPrompt({
     safeString(telegramUserId),
     safeString(chatId),
     normalizePrompt(prompt),
+    ...(questionType === 'quadratic' ? [JSON.stringify(options), String(voiceCredits)] : []),
   ].join('|');
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, '')}`;
 }
@@ -393,11 +397,12 @@ function proposedRecordToQuestion(record = {}) {
     proposed: true,
     createdAt: safeString(record.createdAt) || null,
   };
-  const options = normalizeOptions(record.options);
+  const options = questionType === 'quadratic' && Array.isArray(record.options) ? record.options : normalizeOptions(record.options);
   if (options.length) question.options = options;
   if (questionType === 'multichoice' && record.singleSelect === true) {
     question.singleSelect = true;
   }
+  if (questionType === 'quadratic') question.voiceCredits = record.voiceCredits ?? 99;
   if (questionType === 'rating') {
     const ratingScale = normalizeRatingScale(record.ratingScale || record.rating_scale, options);
     if (ratingScale) question.ratingScale = ratingScale;
@@ -449,6 +454,7 @@ export async function persistTelegramProposedQuestion({
   questionType = 'freeform',
   options = [],
   ratingScale = null,
+  voiceCredits = 99,
   tags = [],
   references = [],
   geoRefs = [],
@@ -461,7 +467,11 @@ export async function persistTelegramProposedQuestion({
   const slug = sanitizeSessionSlug(sessionSlug);
   const promptText = normalizePrompt(prompt);
   const type = normalizeQuestionType(questionType);
-  const normalizedOptions = normalizeOptions(options);
+  const normalizedOptions = type === 'quadratic' && Array.isArray(options) ? options.map((option) => typeof option === 'string' ? option.trim() : option) : normalizeOptions(options);
+  if (type === 'quadratic') {
+    const reason = validateQuadraticQuestion({ options: normalizedOptions, voiceCredits });
+    if (reason) return { ok: false, reason };
+  }
   const normalizedRatingScale = type === 'rating'
     ? normalizeRatingScale(ratingScale, normalizedOptions)
     : null;
@@ -492,6 +502,8 @@ export async function persistTelegramProposedQuestion({
     sessionSlug: slug,
     prompt: promptText,
     questionType: type,
+    options: normalizedOptions,
+    voiceCredits,
     telegramUserId,
     chatId,
   });
@@ -502,6 +514,7 @@ export async function persistTelegramProposedQuestion({
     questionType: type,
     prompt: promptText,
     options: normalizedOptions,
+    ...(type === 'quadratic' ? { voiceCredits } : {}),
     ...(normalizedRatingScale ? { ratingScale: normalizedRatingScale } : {}),
     ...(type === 'multichoice' && singleSelect === true ? { singleSelect: true } : {}),
     tags: normalizedTags,

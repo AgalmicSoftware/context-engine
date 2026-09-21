@@ -101,11 +101,21 @@ describe('SessionModeProfileSections', () => {
   });
 
   it('uses the explicit Cloudflare defaults and reveals plain-language custom rules only on override', () => {
-    const { onChange } = renderSection('privacy');
+    const { onChange } = renderSection('privacy', undefined, ({ testId, ariaLabel }) => (
+      <button type="button" data-testid={testId} aria-label={ariaLabel}>
+        ?
+      </button>
+    ));
 
     const useDefaultRules = screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' });
     expect(useDefaultRules).toBeChecked();
     expect(screen.getByText(/configured admins and agents granted the storage scope/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Grant access when')).not.toBeInTheDocument();
+
+    const defaultRulesInfo = screen.getByTestId('ce-new-default-cloudflare-access-rules-info');
+    expect(defaultRulesInfo).toHaveAccessibleName('About default Cloudflare access rules');
+    fireEvent.click(defaultRulesInfo);
+    expect(useDefaultRules).toBeChecked();
     expect(screen.queryByLabelText('Grant access when')).not.toBeInTheDocument();
 
     fireEvent.click(useDefaultRules);
@@ -323,7 +333,9 @@ describe('SessionModeProfileSections', () => {
     renderSection('publish');
 
     const exportPolicy = screen.getByRole('combobox', { name: 'Export policy' });
-    expect(within(exportPolicy).getByRole('option', { name: /Export selected channels only/i })).toBeDisabled();
+    expect(
+      within(exportPolicy).getByRole('option', { name: /Admins can export selected channels only/i }),
+    ).toBeDisabled();
     expect(screen.queryByRole('group', { name: 'Channels included in exports' })).not.toBeInTheDocument();
     expect(screen.queryByText('Results visibility')).not.toBeInTheDocument();
   });

@@ -16,14 +16,14 @@ describe('PolisReport graph scroll controls', () => {
     expect(scss).toMatch(/\.scrollButton\s*{[^}]*width:\s*38px;[^}]*height:\s*38px;/s);
   });
 
-  it('uses high-contrast action colors in each report theme', () => {
+  it('shares light-blue scroll controls with dark-blue icons across report themes', () => {
     const scss = readPolisReportScss();
     const scrollButtonBlocks = scss.match(/\.scrollButton\s*{[^}]*}/gs) ?? [];
 
-    expect(scrollButtonBlocks).toHaveLength(3);
+    expect(scrollButtonBlocks).toHaveLength(1);
     scrollButtonBlocks.forEach((block) => {
-      expect(block).toContain('background: var(--ce-action-primary);');
-      expect(block).toContain('color: var(--ce-action-primary-text);');
+      expect(block).toContain('background: var(--report-scroll-bg);');
+      expect(block).toContain('color: var(--report-control-blue-hover);');
     });
     expect(scss).toMatch(/&:focus-visible\s*{[^}]*outline:\s*3px solid/s);
   });

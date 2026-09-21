@@ -555,7 +555,7 @@ describe('sessionWizardWriteNormalization', () => {
         rpcUrl: ' https://rpc.example ',
         rpcUrlsByChainId: { [DEFAULT_CONFIG_CHAIN_ID]: ['https://rpc.example'] },
         allowOrigins: ['https://app.example'],
-        limits: { perWalletPerDay: 1000 },
+        limits: { perWalletPerDay: 1000, perAnonymousIpPerDay: 0 },
         scopes: { ai: true },
         embeddedDeployHelperEnabled: false,
         faucet: {

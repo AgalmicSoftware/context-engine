@@ -24,6 +24,10 @@ export type WorkerSecretsSectionProps = {
   renderResource?: (resourceKey: string, index: number) => React.ReactNode;
   workerAllowOrigins: string;
   setWorkerAllowOrigins: (value: string) => void;
+  workerLimitPerWallet: string;
+  setWorkerLimitPerWallet: (value: string) => void;
+  workerLimitPerAnonymousIp: string;
+  setWorkerLimitPerAnonymousIp: (value: string) => void;
   defaultAllowedOrigins: string;
 };
 
@@ -38,6 +42,10 @@ const WorkerSecretsSection = ({
   renderResource,
   workerAllowOrigins,
   setWorkerAllowOrigins,
+  workerLimitPerWallet,
+  setWorkerLimitPerWallet,
+  workerLimitPerAnonymousIp,
+  setWorkerLimitPerAnonymousIp,
   defaultAllowedOrigins,
 }: WorkerSecretsSectionProps) => {
   const t = typeof translate === 'function' ? translate : (key: string) => key;
@@ -114,6 +122,57 @@ const WorkerSecretsSection = ({
             placeholder={defaultAllowedOrigins}
             onChange={(e) => setWorkerAllowOrigins(e.target.value)}
           />
+        </FormGroup>
+        <FormGroup>
+          <Label className={styles.fieldLabelRow} for="ce-worker-limit-per-wallet">
+            <span>Authenticated requests per wallet per day</span>
+            {renderTooltip({
+              id: 'gw-limit-per-wallet',
+              content:
+                'Optional daily request budget for signed-in wallets. Leave blank for no authenticated wallet-specific daily cap.',
+              placement: 'right',
+              testId: 'ce-wizard-worker-tooltip-gw-limit-per-wallet',
+              ariaLabel: 'Authenticated wallet request limit info',
+            })}
+          </Label>
+          <Input
+            id="ce-worker-limit-per-wallet"
+            type="number"
+            min="0"
+            step="1"
+            value={workerLimitPerWallet}
+            placeholder="Unlimited"
+            onChange={(e) => setWorkerLimitPerWallet(e.target.value)}
+          />
+          <div className={styles.helperText}>
+            Authenticated users keep this budget separate from anonymous IP limits.
+          </div>
+        </FormGroup>
+        <FormGroup>
+          <Label className={styles.fieldLabelRow} for="ce-worker-limit-per-anonymous-ip">
+            <span>Anonymous requests per IP per day</span>
+            {renderTooltip({
+              id: 'gw-limit-per-anonymous-ip',
+              content:
+                'Daily budget for anonymous users sharing the same public IP address across public reads and enabled AI, transcription, and realtime routes. Use 0 to disable this Worker daily cap; provider limits and access policy still apply. Leave blank only when importing an older config that should inherit the wallet limit.',
+              placement: 'right',
+              testId: 'ce-wizard-worker-tooltip-gw-limit-per-anonymous-ip',
+              ariaLabel: 'Anonymous IP request limit info',
+            })}
+          </Label>
+          <Input
+            id="ce-worker-limit-per-anonymous-ip"
+            type="number"
+            min="0"
+            step="1"
+            value={workerLimitPerAnonymousIp}
+            placeholder="Inherit authenticated wallet limit"
+            onChange={(e) => setWorkerLimitPerAnonymousIp(e.target.value)}
+          />
+          <div className={styles.helperText}>
+            This applies before login to everyone on shared Wi-Fi or the same NAT IP. Enter 0 to disable this
+            Worker&apos;s shared-IP daily cap while keeping provider limits and access policy in force.
+          </div>
         </FormGroup>
       </div>
     </div>

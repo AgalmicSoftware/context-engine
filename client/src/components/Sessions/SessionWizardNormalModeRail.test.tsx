@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import SessionWizardNormalModeRail, { getNormalModeCardToneClassName } from './SessionWizardNormalModeRail';
 import type { NormalModeCard } from './sessionWizardNormalModeCards';
@@ -44,14 +44,24 @@ describe('SessionWizardNormalModeRail', () => {
     expect(screen.getByRole('region', { name: 'Session setup steps' })).toHaveStyle({
       '--session-wizard-card-count': '3',
     });
-    expect(screen.getByRole('button', { name: 'Step 1: Session Details' })).toHaveClass('normalModeCardReady');
-    expect(screen.getByRole('button', { name: 'Step 2: Privacy' })).toHaveClass('normalModeCardActive');
-    expect(screen.getByRole('button', { name: 'Step 3: Deploy Session' })).toHaveClass('normalModeCardPending');
-    expect(screen.getByText('Demo session')).toBeInTheDocument();
+    const sessionDetailsButton = screen.getByRole('button', { name: 'Step 1: Session Details' });
+    const privacyButton = screen.getByRole('button', { name: 'Step 2: Privacy' });
+    const deployButton = screen.getByRole('button', { name: 'Step 3: Deploy Session' });
+    expect(sessionDetailsButton).toHaveClass('normalModeCardReady');
+    expect(sessionDetailsButton).toHaveClass('normalModeCardCompact');
+    expect(privacyButton).toHaveClass('normalModeCardActive');
+    expect(deployButton).toHaveClass('normalModeCardPending');
+    expect(deployButton).toHaveClass('normalModeCardCompact');
+    expect(within(sessionDetailsButton).getByText('1')).toBeInTheDocument();
+    expect(within(deployButton).getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('Session Details')).not.toBeInTheDocument();
+    expect(screen.getByText('Privacy')).toBeInTheDocument();
+    expect(screen.queryByText('Deploy Session')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo session')).not.toBeInTheDocument();
     expect(screen.getByText('Open link by default')).toBeInTheDocument();
     expect(screen.queryByText('Set a worker URL before uploading metadata.')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Step 3: Deploy Session' }));
+    fireEvent.click(deployButton);
 
     expect(onFocusSection).toHaveBeenCalledWith('publish');
   });

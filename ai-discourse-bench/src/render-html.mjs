@@ -5013,6 +5013,37 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var hash = candidate.charAt(0) === '#' ? candidate : '#' + candidate;
         return /^#[a-z0-9][a-z0-9._~!$&'()*+,;=:@%/-]{0,255}$/i.test(hash) ? hash : '';
       }
+      function assignSharedHash(hash) {
+        var normalized = normalizeSharedHash(hash);
+        if (!normalized || window.location.hash === normalized) return;
+        window.location.hash = normalized;
+      }
+      function replaceSharedHash(hash) {
+        var normalized = normalizeSharedHash(hash);
+        if (!normalized) return;
+        if (window.history && window.history.replaceState) {
+          try {
+            window.history.replaceState(null, '', normalized);
+            return;
+          } catch (error) {
+            // Sandboxed srcdoc reports have an opaque origin; fall back to hash-only navigation.
+          }
+        }
+        assignSharedHash(normalized);
+      }
+      function pushSharedHash(hash) {
+        var normalized = normalizeSharedHash(hash);
+        if (!normalized) return;
+        if (window.history && window.history.pushState) {
+          try {
+            window.history.pushState(null, '', normalized);
+            return;
+          } catch (error) {
+            // Sandboxed srcdoc reports have an opaque origin; fall back to hash-only navigation.
+          }
+        }
+        assignSharedHash(normalized);
+      }
       function notifyParentHash() {
         if (window.parent === window) return;
         var hash = normalizeSharedHash(window.location.hash) || '#report';
@@ -5039,18 +5070,13 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var hash = normalizeSharedHash(event.data.hash);
         if (!hash) return;
         if (hash === '#report') {
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(null, '', hash);
-          } else if (window.location.hash !== hash) {
-            window.location.hash = hash;
-          }
+          replaceSharedHash(hash);
           setReportViewMode('report', { scroll: false });
           var benchmarkIntro = document.querySelector('[data-ce-benchmark-intro]');
           if (benchmarkIntro) scrollToReportViewTarget(benchmarkIntro);
           return;
         }
-        if (window.location.hash === hash) return;
-        window.location.hash = hash;
+        assignSharedHash(hash);
       });
       if (benchmarkDownloadButton) {
         benchmarkDownloadButton.addEventListener('click', function (event) {
@@ -5800,11 +5826,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         if (atlasIssueModalBody) atlasIssueModalBody.innerHTML = '';
         activeAtlasIssueId = '';
         if (updateHash && atlasIssueIdFromHash()) {
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(null, '', '#debate-atlas');
-          } else {
-            window.location.hash = 'debate-atlas';
-          }
+          replaceSharedHash('#debate-atlas');
           setReportViewMode('debate-atlas', { scroll: false });
         }
         if (restoreFocus && atlasIssueLastFocus && atlasIssueLastFocus.focus) {
@@ -5838,11 +5860,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         if (updateHash) {
           var nextHash = '#debate-atlas-' + encodeURIComponent(activeAtlasIssueId);
           if (window.location.hash !== nextHash) {
-            if (window.history && window.history.pushState) {
-              window.history.pushState(null, '', nextHash);
-            } else {
-              window.location.hash = nextHash;
-            }
+            pushSharedHash(nextHash);
           }
         }
         setReportViewMode('debate-atlas', { scroll: false });
@@ -5951,11 +5969,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           var nextHash = tagModalPreviousHash && tagModalPreviousHash.indexOf('#tag-') !== 0
             ? tagModalPreviousHash
             : '#report';
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(null, '', nextHash);
-          } else {
-            window.location.hash = nextHash.replace(/^#/, '');
-          }
+          replaceSharedHash(nextHash);
           setReportViewMode(modeFromHash(), { scroll: false });
         }
         if (restoreFocus && tagModalLastFocus && tagModalLastFocus.focus) {
@@ -5985,11 +5999,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         if (updateHash) {
           var nextHash = '#tag-' + encodeURIComponent(normalizedTag);
           if (window.location.hash !== nextHash) {
-            if (window.history && window.history.pushState) {
-              window.history.pushState(null, '', nextHash);
-            } else {
-              window.location.hash = nextHash;
-            }
+            pushSharedHash(nextHash);
           }
         }
         var closeButton = tagModal.querySelector('[data-ce-tag-modal-close]');
@@ -6752,22 +6762,14 @@ export const renderHtmlReport = (report) => `<!doctype html>
         button.addEventListener('click', function (event) {
           var nextMode = button.getAttribute('data-ce-report-view-mode') || 'report';
           event.preventDefault();
-          if (window.history && window.history.pushState) {
-            window.history.pushState(null, '', '#' + (nextMode === 'report' ? 'report' : nextMode));
-          } else {
-            window.location.hash = nextMode === 'report' ? 'report' : nextMode;
-          }
+          pushSharedHash('#' + (nextMode === 'report' ? 'report' : nextMode));
           setReportViewMode(nextMode, { scroll: true });
         });
       });
       if (rawResultsButton) {
         rawResultsButton.addEventListener('click', function (event) {
           event.preventDefault();
-          if (window.history && window.history.pushState) {
-            window.history.pushState(null, '', '#snapshot-json');
-          } else {
-            window.location.hash = 'snapshot-json';
-          }
+          pushSharedHash('#snapshot-json');
           setReportViewMode('snapshot-json', { scroll: false });
         });
       }
@@ -6778,11 +6780,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           if (knownModes.indexOf(nextMode) === -1 || nextMode === 'snapshot-json') {
             nextMode = 'report';
           }
-          if (window.history && window.history.pushState) {
-            window.history.pushState(null, '', '#' + nextMode);
-          } else {
-            window.location.hash = nextMode;
-          }
+          pushSharedHash('#' + nextMode);
           setReportViewMode(nextMode, { scroll: true });
         });
       });
@@ -7105,11 +7103,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           var restoreMode = knownModes.indexOf(lastNonRawResultsMode) === -1 || lastNonRawResultsMode === 'snapshot-json'
             ? 'report'
             : lastNonRawResultsMode;
-          if (window.history && window.history.pushState) {
-            window.history.pushState(null, '', '#' + restoreMode);
-          } else {
-            window.location.hash = restoreMode;
-          }
+          pushSharedHash('#' + restoreMode);
           setReportViewMode(restoreMode, { scroll: true });
         });
       });

@@ -25,6 +25,9 @@ type CachedWorkerState =
       deployForm?: unknown;
       provisionedSponsoredContext?: unknown;
       workerSecrets?: unknown;
+      draft?: unknown;
+      workerLimitPerWallet?: unknown;
+      workerLimitPerAnonymousIp?: unknown;
     }
   | null
   | undefined;
@@ -41,6 +44,32 @@ const resolveCachedDeployForm = (cachedWizard: CachedWorkerState): DeployFormSta
   cachedWizard?.deployForm && typeof cachedWizard.deployForm === 'object' && !Array.isArray(cachedWizard.deployForm)
     ? (cachedWizard.deployForm as DeployFormState)
     : {};
+
+const resolveCachedDraftLimits = (cachedWizard: CachedWorkerState): Record<string, unknown> => {
+  const draft = cachedWizard?.draft;
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return {};
+  const limits = (draft as { limits?: unknown }).limits;
+  return limits && typeof limits === 'object' && !Array.isArray(limits) ? (limits as Record<string, unknown>) : {};
+};
+
+const resolveCachedLimitValue = ({
+  cachedWizard,
+  topLevelKey,
+  limitsKey,
+  fallback,
+}: {
+  cachedWizard: CachedWorkerState;
+  topLevelKey: 'workerLimitPerWallet' | 'workerLimitPerAnonymousIp';
+  limitsKey: 'perWalletPerDay' | 'perAnonymousIpPerDay';
+  fallback: string;
+}): string => {
+  if (Object.prototype.hasOwnProperty.call(cachedWizard || {}, topLevelKey)) {
+    return toStr((cachedWizard as Record<string, unknown> | null | undefined)?.[topLevelKey]).trim();
+  }
+  const limits = resolveCachedDraftLimits(cachedWizard);
+  if (Object.prototype.hasOwnProperty.call(limits, limitsKey)) return toStr(limits[limitsKey]).trim();
+  return fallback;
+};
 
 const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   cachedWizard,
@@ -101,7 +130,22 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   });
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const [workerAllowOrigins, setWorkerAllowOrigins] = useState(defaultAllowedOrigins);
-  const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState('');
+  const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState(() =>
+    resolveCachedLimitValue({
+      cachedWizard,
+      topLevelKey: 'workerLimitPerWallet',
+      limitsKey: 'perWalletPerDay',
+      fallback: '',
+    }),
+  );
+  const [workerLimitPerAnonymousIp, setWorkerLimitPerAnonymousIp] = useState(() =>
+    resolveCachedLimitValue({
+      cachedWizard,
+      topLevelKey: 'workerLimitPerAnonymousIp',
+      limitsKey: 'perAnonymousIpPerDay',
+      fallback: cachedWizard ? '' : '0',
+    }),
+  );
 
   return {
     workerMode,
@@ -142,6 +186,8 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     setWorkerAllowOrigins,
     workerLimitPerWallet,
     setWorkerLimitPerWallet,
+    workerLimitPerAnonymousIp,
+    setWorkerLimitPerAnonymousIp,
   };
 };
 
