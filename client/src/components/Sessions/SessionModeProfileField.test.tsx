@@ -37,9 +37,7 @@ describe('SessionModeProfileField', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
-    expect(
-      screen.getByText('Session settings and responses are stored in Cloudflare.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Session settings and responses are stored in Cloudflare.')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Session data is stored on Arweave, with session identity and question logic recorded in Ethereum smart contracts.',
@@ -144,10 +142,7 @@ describe('SessionModeProfileField', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Back to templates' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Back to templates' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Back to templates' })).toHaveTextContent('Back to templates');
     fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
 

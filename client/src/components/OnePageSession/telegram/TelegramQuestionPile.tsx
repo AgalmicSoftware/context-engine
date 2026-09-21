@@ -111,7 +111,16 @@ const TelegramQuestionPile = ({
       />
     );
   } else if (type === 'quadratic') {
-    questionComponent = <QuadraticAllocationInput questionId={questionId} options={activeQuestion.options} voiceCredits={activeQuestion.voiceCredits} value={answer.value} disabled={isSubmitting} onChange={(value) => updateAnswer(questionId, { value })} />;
+    questionComponent = (
+      <QuadraticAllocationInput
+        questionId={questionId}
+        options={activeQuestion.options}
+        voiceCredits={activeQuestion.voiceCredits}
+        value={answer.value}
+        disabled={isSubmitting}
+        onChange={(value) => updateAnswer(questionId, { value })}
+      />
+    );
   } else if (type === 'multichoice') {
     questionComponent = (
       <MultichoiceQuestionInput

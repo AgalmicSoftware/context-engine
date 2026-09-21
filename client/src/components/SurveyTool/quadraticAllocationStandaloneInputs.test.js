@@ -5,14 +5,36 @@ import { renderTelegramMiniAppBrowserAsset } from '../../../../workers/agentBrid
 const asset = renderTelegramMiniAppBrowserAsset();
 const start = asset.indexOf('    function renderAnswerControls(');
 const end = asset.indexOf('    let activeDictation', start);
-const question = { type: 'quadratic', questionType: 'quadratic', voiceCredits: 99, options: ['Parks', 'Transit', 'Housing'], canAnswer: true };
+const question = {
+  type: 'quadratic',
+  questionType: 'quadratic',
+  voiceCredits: 99,
+  options: ['Parks', 'Transit', 'Housing'],
+  canAnswer: true,
+};
 
-afterEach(() => { document.body.innerHTML = ''; });
+afterEach(() => {
+  document.body.innerHTML = '';
+});
 
 it('telegram sliders show costs, clamp to the shared budget, and preserve signs', () => {
   const draft = { value: [0, 0, 0] };
-  const mount = document.createElement('div'); document.body.appendChild(mount);
-  const ports = { document, draftFor: () => draft, activate: jest.fn(), markAnswerChanged: jest.fn(), refreshQuestionSubmitButton: jest.fn(), scheduleDraftAutosave: jest.fn(), updateFooterControls: jest.fn(), MIC_ICON: '', shouldShowAnswerActions: () => false, seriesModeEnabled: () => false, applySubmitButtonState: jest.fn(), renderQuestionStack: jest.fn() };
+  const mount = document.createElement('div');
+  document.body.appendChild(mount);
+  const ports = {
+    document,
+    draftFor: () => draft,
+    activate: jest.fn(),
+    markAnswerChanged: jest.fn(),
+    refreshQuestionSubmitButton: jest.fn(),
+    scheduleDraftAutosave: jest.fn(),
+    updateFooterControls: jest.fn(),
+    MIC_ICON: '',
+    shouldShowAnswerActions: () => false,
+    seriesModeEnabled: () => false,
+    applySubmitButtonState: jest.fn(),
+    renderQuestionStack: jest.fn(),
+  };
   const render = vm.runInNewContext(asset.slice(start, end) + '\nrenderAnswerControls', ports);
   render(question, mount, { showComments: false });
   const ui = within(mount);

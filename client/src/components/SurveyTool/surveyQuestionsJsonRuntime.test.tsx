@@ -59,7 +59,9 @@ describe('surveyQuestionsJsonRuntime', () => {
       resolveResponseJsonContext: () => ({ sessionConfig: {} }),
       resolveSlugForIds: () => 'alpha',
       readSurveysCacheRef: () => ({}),
-      surveyResponseStoragePort: { sanitizeQuestionPromptForResponsePayload: (q: { prompt?: string }) => q.prompt || '' },
+      surveyResponseStoragePort: {
+        sanitizeQuestionPromptForResponsePayload: (q: { prompt?: string }) => q.prompt || '',
+      },
       getConvictionFromSlice: () => null,
       getImportanceFromSlice: () => null,
       inst: { _surveyJsonMetaCache: {} },
@@ -67,6 +69,8 @@ describe('surveyQuestionsJsonRuntime', () => {
 
     runtime.prepareJsonAndHash(0);
 
-    expect(buildResponsePayload).toHaveBeenCalledWith(expect.objectContaining({ recruitmentSource: 'partner-outreach' }));
+    expect(buildResponsePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ recruitmentSource: 'partner-outreach' }),
+    );
   });
 });

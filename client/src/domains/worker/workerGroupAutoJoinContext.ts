@@ -22,4 +22,3 @@ export const resolveWorkerGroupAutoJoinContext = (sessionConfig: unknown, sessio
     return null;
   return { sessionSlug: slug, sessionId, workerUrl, chainId: projection.hasOnChainComponent ? projection.chainId : 1 };
 };
-

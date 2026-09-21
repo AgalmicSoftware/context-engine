@@ -317,7 +317,12 @@ export function QuestionFilterQuestionTypesSection({
             </div>
           </button>
 
-          <button type="button" className={buildQuestionFilterTypeButtonClassName(styles, pendingSelectedTypes.includes('quadratic'))} onClick={() => onTypeSelection('quadratic')} aria-pressed={pendingSelectedTypes.includes('quadratic')}>
+          <button
+            type="button"
+            className={buildQuestionFilterTypeButtonClassName(styles, pendingSelectedTypes.includes('quadratic'))}
+            onClick={() => onTypeSelection('quadratic')}
+            aria-pressed={pendingSelectedTypes.includes('quadratic')}
+          >
             <div className={styles.typeTitle}>Quadratic allocation</div>
             <div className={styles.typePreviewRow}>99 voice credits · ± votes</div>
           </button>

@@ -6,7 +6,9 @@ import { SurveySelector } from './SurveySelector';
 jest.mock('./SurveyResults', () => ({
   __esModule: true,
   default: ({ isOpen, onClose }) =>
-    isOpen ? jest.requireActual('react').createElement('button', { onClick: onClose }, 'Close functional results') : null,
+    isOpen
+      ? jest.requireActual('react').createElement('button', { onClick: onClose }, 'Close functional results')
+      : null,
 }));
 
 jest.mock('./SurveySelector', () => ({

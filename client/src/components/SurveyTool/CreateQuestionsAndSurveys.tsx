@@ -1405,7 +1405,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     singleSelect: unknown = false,
     voiceCredits: unknown = 99,
   ): string => {
-    return generateSharedQuestionId(type, prompt, Array.isArray(options) ? options : [], singleSelect === true, Number(voiceCredits));
+    return generateSharedQuestionId(
+      type,
+      prompt,
+      Array.isArray(options) ? options : [],
+      singleSelect === true,
+      Number(voiceCredits),
+    );
   };
 
   handleTitleChange = (event: CreateSurveyInputValueEvent): void => {
@@ -1747,7 +1753,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         const sourceTags = Array.isArray(source?.tags) ? source.tags : [];
         const hasEncryptedOptions = !!row?.optionsEncrypted;
         const hasEncryptedTags = !!row?.tagsEncrypted;
-        const shouldHydrateOptions = ['multichoice', 'quadratic'].includes(sourceType) && hasEncryptedOptions && sourceOptions.length > 0;
+        const shouldHydrateOptions =
+          ['multichoice', 'quadratic'].includes(sourceType) && hasEncryptedOptions && sourceOptions.length > 0;
         const shouldHydrateTags = hasEncryptedTags && sourceTags.length > 0;
         return {
           ...row,
@@ -3212,7 +3219,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             </div>
           </button>
 
-          <button type="button" className={styles.typeButton} onClick={() => this.quickAdd('quadratic')} aria-label="Add Quadratic allocation question">
+          <button
+            type="button"
+            className={styles.typeButton}
+            onClick={() => this.quickAdd('quadratic')}
+            aria-label="Add Quadratic allocation question"
+          >
             <div className={styles.typeTitle}>Quadratic allocation</div>
             <div className={styles.quadraticPreview} aria-hidden="true">
               <span className={styles.quadraticPreviewNegative}>−</span>
@@ -3319,7 +3331,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           prompt: q.prompt,
           options: normalizePayloadQuestionOptions(q.type, q.options),
           singleSelect: resolvePayloadSingleSelect(q.type, q.singleSelect),
-              ...(q.type === 'quadratic' ? { voiceCredits: q.voiceCredits ?? 99 } : {}),
+          ...(q.type === 'quadratic' ? { voiceCredits: q.voiceCredits ?? 99 } : {}),
           tags: normalizeTagList(q.tags),
           associatedSurveyId: q.associatedSurveyId || '',
         })),
@@ -3335,7 +3347,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           prompt: q.prompt,
           options: normalizePayloadQuestionOptions(q.type, q.options),
           singleSelect: resolvePayloadSingleSelect(q.type, q.singleSelect),
-              ...(q.type === 'quadratic' ? { voiceCredits: q.voiceCredits ?? 99 } : {}),
+          ...(q.type === 'quadratic' ? { voiceCredits: q.voiceCredits ?? 99 } : {}),
           tags: normalizeTagList(q.tags),
         })),
       };
@@ -3654,10 +3666,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                         data-testid="ce-quadratic-author-budget-toggle"
                         aria-expanded={budgetOpen}
                         aria-controls={budgetPanelId}
-                        onClick={() => this.setState({
-                          activeQuadraticBudgetKey: budgetOpen ? '' : budgetKey,
-                          quadraticBudgetSliderMax: Math.max(999, voiceCredits),
-                        })}
+                        onClick={() =>
+                          this.setState({
+                            activeQuadraticBudgetKey: budgetOpen ? '' : budgetKey,
+                            quadraticBudgetSliderMax: Math.max(999, voiceCredits),
+                          })
+                        }
                       >
                         {`Credits: ${voiceCredits}`}
                       </button>
@@ -3665,7 +3679,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   </div>
                   {question.type === 'quadratic' && budgetOpen && (
                     <div id={budgetPanelId} className={styles.creditsPanel}>
-                      <label htmlFor={`quadratic-budget-${budgetKey}`}>Voice credits per respondent for this question</label>
+                      <label htmlFor={`quadratic-budget-${budgetKey}`}>
+                        Voice credits per respondent for this question
+                      </label>
                       <div className={styles.creditsSliderRow}>
                         <span aria-hidden="true">1</span>
                         <input
@@ -3676,7 +3692,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                           step="1"
                           value={voiceCredits}
                           data-testid="ce-quadratic-author-budget"
-                          onChange={(event) => this.handleQuestionChange(qIndex, 'voiceCredits', Number(event.target.value))}
+                          onChange={(event) =>
+                            this.handleQuestionChange(qIndex, 'voiceCredits', Number(event.target.value))
+                          }
                         />
                         <span aria-hidden="true">{this.state.quadraticBudgetSliderMax}</span>
                       </div>
@@ -3684,32 +3702,34 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     </div>
                   )}
                   {/* Single-select limits multichoice answers to one option. */}
-                  {question.type === 'multichoice' && <div className={styles.singleSelectToggle}>
-                    <label className={styles.singleSelectLabel}>
-                      <input
-                        type="checkbox"
-                        data-testid={E2E_TESTIDS.CREATE_QUESTION_SINGLE_SELECT}
-                        checked={!!question.singleSelect}
-                        onChange={(e: CreateSurveyCheckboxChangeEvent) =>
-                          this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)
-                        }
-                      />
-                      <span>One Selection Only</span>
-                      <FontAwesomeIcon
-                        icon={faQuestionCircle}
-                        className={styles.tooltip}
-                        id={`singleSelectTooltip-${question.uiKey || qIndex}`}
-                      />
-                      <CETooltip
-                        placement="right"
-                        trigger="hover focus click"
-                        target={`singleSelectTooltip-${question.uiKey || qIndex}`}
-                        className={styles.tooltipBubble}
-                      >
-                        Single-select limits respondents to one option. Multi-select allows multiple choices.
-                      </CETooltip>
-                    </label>
-                  </div>}
+                  {question.type === 'multichoice' && (
+                    <div className={styles.singleSelectToggle}>
+                      <label className={styles.singleSelectLabel}>
+                        <input
+                          type="checkbox"
+                          data-testid={E2E_TESTIDS.CREATE_QUESTION_SINGLE_SELECT}
+                          checked={!!question.singleSelect}
+                          onChange={(e: CreateSurveyCheckboxChangeEvent) =>
+                            this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)
+                          }
+                        />
+                        <span>One Selection Only</span>
+                        <FontAwesomeIcon
+                          icon={faQuestionCircle}
+                          className={styles.tooltip}
+                          id={`singleSelectTooltip-${question.uiKey || qIndex}`}
+                        />
+                        <CETooltip
+                          placement="right"
+                          trigger="hover focus click"
+                          target={`singleSelectTooltip-${question.uiKey || qIndex}`}
+                          className={styles.tooltipBubble}
+                        >
+                          Single-select limits respondents to one option. Multi-select allows multiple choices.
+                        </CETooltip>
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
               <div className={styles.questionMetadata}>

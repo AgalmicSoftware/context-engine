@@ -73,11 +73,29 @@ it('does not publish a late bank update after stopping', async () => {
 
 it('keeps live quadratic additions and their option order and budget available to the interviewer', async () => {
   const append = jest.fn<boolean, [string]>(() => true);
-  const quadratic = { id: 'new', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 };
-  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ questions: [...questions, quadratic] }) });
-  const { result } = renderHook(() => useInterviewQuestionUpdates({ initialQuestions: questions,
-    config: { interviewMode: { followNewQuestions: true } }, workerUrl: 'https://worker.example', sessionSlug: 'demo', active: true, append }));
+  const quadratic = {
+    id: 'new',
+    type: 'quadratic',
+    prompt: 'Allocate support',
+    options: ['Parks', 'Transit'],
+    voiceCredits: 25,
+  };
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => ({ questions: [...questions, quadratic] }) });
+  const { result } = renderHook(() =>
+    useInterviewQuestionUpdates({
+      initialQuestions: questions,
+      config: { interviewMode: { followNewQuestions: true } },
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'demo',
+      active: true,
+      append,
+    }),
+  );
   await act(async () => jest.advanceTimersByTimeAsync(30000));
   expect(result.current.questions.at(-1)).toEqual(quadratic);
-  expect(append).toHaveBeenCalledWith(expect.stringContaining('25 voice credits; options in order: ["Parks","Transit"]'));
+  expect(append).toHaveBeenCalledWith(
+    expect.stringContaining('25 voice credits; options in order: ["Parks","Transit"]'),
+  );
 });

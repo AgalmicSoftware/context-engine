@@ -2869,12 +2869,14 @@ describe('AppShell route render smoke', () => {
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     if (cachedHint) {
-      expect(upsertWorkerCanonicalSessionBootstrap({
-        slug: workerConfig.slug,
-        sessionIdHex: workerConfig.sessionId,
-        workerOrigin,
-        config: workerConfig,
-      }).status).toBe('cached');
+      expect(
+        upsertWorkerCanonicalSessionBootstrap({
+          slug: workerConfig.slug,
+          sessionIdHex: workerConfig.sessionId,
+          workerOrigin,
+          config: workerConfig,
+        }).status,
+      ).toBe('cached');
     }
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true, sessionSlug: workerConfig.slug, config: workerConfig }), {
@@ -2894,7 +2896,9 @@ describe('AppShell route render smoke', () => {
     view.rerender(subject.render());
     expect(await screen.findByTestId('mock-sbts-page')).toBeInTheDocument();
     expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
-    expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.workerGroupId).toBe(path.startsWith('/group/') ? 'participants' : undefined);
+    expect(mockSBTsPage.mock.calls.at(-1)?.[0]?.workerGroupId).toBe(
+      path.startsWith('/group/') ? 'participants' : undefined,
+    );
   });
 
   it('shows a helpful unavailable state for an undiscoverable named Group instead of the SBT list', async () => {

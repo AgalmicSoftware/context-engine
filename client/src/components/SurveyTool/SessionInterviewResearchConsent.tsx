@@ -6,7 +6,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
 import styles from './SessionInterviewResearchConsent.module.scss';
 
-const RESEARCH_DOC_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-interview-research.md';
+const RESEARCH_DOC_URL =
+  'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-interview-research.md';
 
 type Props = {
   packet: InterviewPrefillPacket;
@@ -147,8 +148,8 @@ export default function SessionInterviewResearchConsent({
           )}
           {includeProvenance || includeComparison ? (
             <p>
-              Also includes the time drafts were applied. The full interview transcript and imported conversation history
-              are not attached. See{' '}
+              Also includes the time drafts were applied. The full interview transcript and imported conversation
+              history are not attached. See{' '}
               <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
                 How research data is handled
               </a>

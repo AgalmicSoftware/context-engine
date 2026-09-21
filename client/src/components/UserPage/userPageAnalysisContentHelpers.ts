@@ -281,7 +281,9 @@ export const buildUserPageAnalysisCreatedSurveys = ({
       const qidLower = qid.toLowerCase();
       const qRaw = questionBucket[qidLower];
       const q = toAnalysisRecord(qRaw);
-      return qRaw ? { id: q.id || qidLower, type: q.type, prompt: q.prompt, ...quadraticMetadata(q) } : { id: qidLower };
+      return qRaw
+        ? { id: q.id || qidLower, type: q.type, prompt: q.prompt, ...quadraticMetadata(q) }
+        : { id: qidLower };
     });
     return {
       surveyId: sv.id,

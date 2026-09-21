@@ -764,7 +764,8 @@ const getQuestionKindMeta = (qId: unknown, opts: { questionPool?: QuestionLike[]
   if (!q) return { kind: 'freeform', options: [] };
   const t = String(q.type || 'freeform').toLowerCase();
   if (t === 'binary') return { kind: 'binary', options: ['Disagree', 'Unsure', 'Agree'] };
-  if (t === 'quadratic') return { kind: 'quadratic', options: Array.isArray(q.options) ? q.options : [], voiceCredits: q.voiceCredits };
+  if (t === 'quadratic')
+    return { kind: 'quadratic', options: Array.isArray(q.options) ? q.options : [], voiceCredits: q.voiceCredits };
   if (t === 'rating') return { kind: 'rating', options: [] };
   if (t === 'multichoice') return { kind: 'multichoice', options: Array.isArray(q.options) ? q.options : [] };
   return { kind: 'freeform', options: [] };

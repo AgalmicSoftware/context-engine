@@ -12,7 +12,12 @@ import type { InterviewDraftResponse, InterviewQuestion } from './sessionIntervi
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
-  renderAnswerInput?: (questionId: string, value: unknown, onChange: (value: unknown) => void, question?: InterviewQuestion) => React.ReactNode;
+  renderAnswerInput?: (
+    questionId: string,
+    value: unknown,
+    onChange: (value: unknown) => void,
+    question?: InterviewQuestion,
+  ) => React.ReactNode;
   renderAdditionalInput?: (questionId: string, value: string, onChange: (value: string) => void) => React.ReactNode;
   renderFieldLock?: (questionId: string, field: 'answer' | 'additional') => React.ReactNode;
 };
@@ -190,7 +195,13 @@ const DraftEditableText = ({
 
 const isNativeAnswerType = (question?: InterviewQuestion): boolean => {
   const type = String(question?.type || '').toLowerCase();
-  return type === 'binary' || type === 'rating' || type === 'multichoice' || type === 'multiple-choice' || type === 'quadratic';
+  return (
+    type === 'binary' ||
+    type === 'rating' ||
+    type === 'multichoice' ||
+    type === 'multiple-choice' ||
+    type === 'quadratic'
+  );
 };
 
 export default function SessionInterviewDraftCard({

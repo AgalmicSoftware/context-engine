@@ -44,9 +44,13 @@
   padding-right: 28px;
   padding-bottom: 36px;
 
-  .miniQuestionSummary { padding-right: 36px; }
+  .miniQuestionSummary {
+    padding-right: 36px;
+  }
 
-  @media (max-width: 768px) { padding-right: 15px; }
+  @media (max-width: 768px) {
+    padding-right: 15px;
+  }
 }
 
 .quadraticAggregatorBody {

@@ -521,7 +521,6 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).toHaveBeenCalledWith('alpha');
   });
 
-
   it('uses the configured chain for temporary demo fixture previews without borrowing wallet scope', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === 'demo-2'

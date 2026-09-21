@@ -53,7 +53,14 @@ it('keeps owner actions available while the suggested question is being edited',
 });
 
 it('labels quadratic suggestions correctly and shows their allocation options', () => {
-  render(<InterviewSuggestedQuestionPrompt prompt="Allocate support" type="quadratic" options={['Parks', 'Transit']} onChange={jest.fn()} />);
+  render(
+    <InterviewSuggestedQuestionPrompt
+      prompt="Allocate support"
+      type="quadratic"
+      options={['Parks', 'Transit']}
+      onChange={jest.fn()}
+    />,
+  );
   expect(screen.getByText('Quadratic allocation')).toBeInTheDocument();
   expect(screen.getByText('Options: Parks · Transit')).toBeInTheDocument();
   expect(screen.queryByText('Freeform')).not.toBeInTheDocument();

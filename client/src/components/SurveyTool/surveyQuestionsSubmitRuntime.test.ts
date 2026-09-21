@@ -363,33 +363,51 @@ describe('surveyQuestionsSubmitRuntime', () => {
   });
 });
 
-
 describe('quadratic submission boundary', () => {
-  it.each([[8, -6], [1.5, 0], ['3', -4], [1]])('rejects invalid allocation %j before encryption or upload', async (...values) => {
-    const context = createContext();
-    context.stateRef.current.questionPool = [{ id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 99 }];
-    context.stateRef.current.surveysResponseState[2].answers.q1.value = values;
-    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
-    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
-    expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
-    expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalled();
-  });
+  it.each([[8, -6], [1.5, 0], ['3', -4], [1]])(
+    'rejects invalid allocation %j before encryption or upload',
+    async (...values) => {
+      const context = createContext();
+      context.stateRef.current.questionPool = [
+        { id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 99 },
+      ];
+      context.stateRef.current.surveysResponseState[2].answers.q1.value = values;
+      await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+      expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+      expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+      expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalled();
+    },
+  );
 
   it.each(['cloudflare', 'smart-contracts'])('submits valid quadratic answers unchanged in %s mode', async (mode) => {
     const context = createContext();
-    context.propsRef.current.sessionConfig = mode === 'cloudflare' ? makeWorkerConfig('https://worker.example', 'fixture') : {};
-    context.stateRef.current.questionPool = [{ id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }];
+    context.propsRef.current.sessionConfig =
+      mode === 'cloudflare' ? makeWorkerConfig('https://worker.example', 'fixture') : {};
+    context.stateRef.current.questionPool = [
+      { id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 },
+    ];
     context.stateRef.current.surveysResponseState[2].answers.q1.value = [3, -4];
     await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
-    expect(context.submitSurveyResponse).toHaveBeenCalledWith(expect.objectContaining({ answers: { q1: { value: [3, -4] } } }), expect.any(Set), expect.any(Object));
+    expect(context.submitSurveyResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ answers: { q1: { value: [3, -4] } } }),
+      expect.any(Set),
+      expect.any(Object),
+    );
     expect(context.runSurveyQuestionsSubmitFailureController).not.toHaveBeenCalled();
   });
 
   it('allows a comment-only edit while the existing allocation remains encrypted', async () => {
     const context = createContext();
     context.stateRef.current.questionPool = [{ id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'] }];
-    context.stateRef.current.surveysResponseState[2].answers.q1 = { value: '*', encrypted: true, encryptedPortion: 'existing-envelope' };
-    context.getChangedQidsAndFields.mockReturnValue({ changedQids: new Set(['q1']), changedMap: { q1: { additional: 1 } } });
+    context.stateRef.current.surveysResponseState[2].answers.q1 = {
+      value: '*',
+      encrypted: true,
+      encryptedPortion: 'existing-envelope',
+    };
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { additional: 1 } },
+    });
     await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
     expect(context.submitSurveyResponse).toHaveBeenCalled();
   });

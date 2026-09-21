@@ -63,7 +63,8 @@ export function useSessionInterviewGroupRecommendations({
     [active, sessionSlug, workerUrl],
   );
   const requestKey = useMemo(
-    () => (active && request ? [request.requestId, availabilityScopeKey].map((value) => String(value || '')).join('\n') : ''),
+    () =>
+      active && request ? [request.requestId, availabilityScopeKey].map((value) => String(value || '')).join('\n') : '',
     [active, availabilityScopeKey, request],
   );
   const [recommendationState, setRecommendationState] = useState<{
@@ -81,12 +82,18 @@ export function useSessionInterviewGroupRecommendations({
     let canceled = false;
 
     const load = async () => {
-      setRecommendationState({ availability: 'loading', key: requestKey, scopeKey: availabilityScopeKey, recommendations: [] });
+      setRecommendationState({
+        availability: 'loading',
+        key: requestKey,
+        scopeKey: availabilityScopeKey,
+        recommendations: [],
+      });
       const catalog = await loadInterviewWorkerGroupCandidates({ sessionConfig, sessionSlug, workerUrl });
       if (canceled || requestRef.current !== requestId) return;
       if (catalog.status !== 'ready' || !catalog.candidates.length) {
         setRecommendationState({
-          availability: catalog.status === 'unsupported' ? 'unsupported' : catalog.status === 'error' ? 'error' : 'empty',
+          availability:
+            catalog.status === 'unsupported' ? 'unsupported' : catalog.status === 'error' ? 'error' : 'empty',
           key: requestKey,
           scopeKey: availabilityScopeKey,
           recommendations: [],
@@ -113,7 +120,12 @@ export function useSessionInterviewGroupRecommendations({
 
     void load().catch(() => {
       if (!canceled && requestRef.current === requestId)
-        setRecommendationState({ availability: 'error', key: requestKey, scopeKey: availabilityScopeKey, recommendations: [] });
+        setRecommendationState({
+          availability: 'error',
+          key: requestKey,
+          scopeKey: availabilityScopeKey,
+          recommendations: [],
+        });
     });
 
     return () => {

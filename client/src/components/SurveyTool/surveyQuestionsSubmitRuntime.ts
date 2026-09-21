@@ -306,7 +306,9 @@ export const createSurveyQuestionsSubmitRuntime = (
         importance: {},
         conviction: {},
       };
-      for (const question of (stateRef.current.questionPool?.length ? stateRef.current.questionPool : stateRef.current.pileQuestions) || []) {
+      for (const question of (stateRef.current.questionPool?.length
+        ? stateRef.current.questionPool
+        : stateRef.current.pileQuestions) || []) {
         if (question.type !== 'quadratic' || !changedQids.has(question.id)) continue;
         // The diff stores per-field flags, not a list of field names.
         if (changedMap?.[question.id] && !changedMap[question.id].answer) continue;

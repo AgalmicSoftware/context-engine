@@ -606,7 +606,6 @@ describe('compare user pure helpers', () => {
   });
 });
 
-
 it('compares quadratic positions as separate signed stances and ignores neutral votes', () => {
   const first = encodeStancesForUser({ questions: [{ id: 'q', type: 'quadratic', answer: [3, -4, 0] }] });
   const second = encodeStancesForUser({ questions: [{ id: 'q', type: 'quadratic', answer: [-4, 3, 0] }] });
@@ -616,9 +615,26 @@ it('compares quadratic positions as separate signed stances and ignores neutral 
   expect([...first.tokens.keys()]).toEqual([...second.tokens.keys()]);
 });
 
-
 it('retains quadratic option labels and budgets when preparing comparison analysis', () => {
-  const question = { id: 'q1', type: 'quadratic', prompt: 'Priorities', options: ['Parks', 'Transit'], voiceCredits: 25 };
-  const users = buildUsersFromCaches([ADDRESS_A], [], [{ 11155420: { questions: { q1: question }, questionResponses: { q1: { [ADDRESS_A]: { answer: { value: [3, -4] } } } } } }], []);
+  const question = {
+    id: 'q1',
+    type: 'quadratic',
+    prompt: 'Priorities',
+    options: ['Parks', 'Transit'],
+    voiceCredits: 25,
+  };
+  const users = buildUsersFromCaches(
+    [ADDRESS_A],
+    [],
+    [
+      {
+        11155420: {
+          questions: { q1: question },
+          questionResponses: { q1: { [ADDRESS_A]: { answer: { value: [3, -4] } } } },
+        },
+      },
+    ],
+    [],
+  );
   expect(users[0].questions[0]).toMatchObject({ options: ['Parks', 'Transit'], voiceCredits: 25, answer: [3, -4] });
 });

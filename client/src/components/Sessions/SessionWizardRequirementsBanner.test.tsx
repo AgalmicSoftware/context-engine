@@ -172,7 +172,9 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(cloudflareAccount).toHaveAttribute('href', SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount);
     expect(cloudflareAccount).toHaveAttribute('target', '_blank');
     expect(cloudflareAccount).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.queryByRole('button', { name: 'Why log in to Cloudflare before continuing?' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Why log in to Cloudflare before continuing?' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/Log in to your Cloudflare account in this browser/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Worker step deploys the full Session Worker/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Context Engine deploy helper/i)).not.toBeInTheDocument();

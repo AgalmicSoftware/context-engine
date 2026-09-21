@@ -24,11 +24,7 @@ describe('DeferredRatingSlider', () => {
   it('uses per-question rating endpoints while buffering commits', () => {
     const onCommit = jest.fn();
     render(
-      <DeferredRatingSlider
-        value={0}
-        scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }}
-        onCommit={onCommit}
-      />,
+      <DeferredRatingSlider value={0} scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }} onCommit={onCommit} />,
     );
 
     const slider = screen.getByRole('slider');

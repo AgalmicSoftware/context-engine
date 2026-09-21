@@ -89,7 +89,9 @@ const SessionWizardHeader = ({
           Session Setup
           {!sessionModeProfileSelectionStep && sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}
         </h1>
-        {showInlineProfileControl ? <div className={styles.headerTitleInlineControl}>{sessionModeProfileControl}</div> : null}
+        {showInlineProfileControl ? (
+          <div className={styles.headerTitleInlineControl}>{sessionModeProfileControl}</div>
+        ) : null}
         {sessionModeProfileSelectionStep ? (
           <>
             <a

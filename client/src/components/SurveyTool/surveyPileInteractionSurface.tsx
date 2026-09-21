@@ -705,6 +705,10 @@ export const renderPileInteractionSurface = ({
         })}
       </div>
     )}
-    {submissionError && <p className={styles.pileSubmitError} role="alert">{submissionError}</p>}
+    {submissionError && (
+      <p className={styles.pileSubmitError} role="alert">
+        {submissionError}
+      </p>
+    )}
   </div>
 );

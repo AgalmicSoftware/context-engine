@@ -422,14 +422,17 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()).toHaveLength(2);
   });
 
-  it.each(['', '%20'])('rejects an explicit blank Worker hint (%s) without joining the current session', async (worker) => {
-    window.history.replaceState({}, '', `/session/alpha?joinGroup=participants-2026&worker=${worker}`);
-    render(<WorkerGroupAutoJoin {...props} />);
-    await flush();
-    expect(getToken).not.toHaveBeenCalled();
-    expect(joins()).toHaveLength(0);
-    expect(readPendingAutoJoin()).toBeNull();
-  });
+  it.each(['', '%20'])(
+    'rejects an explicit blank Worker hint (%s) without joining the current session',
+    async (worker) => {
+      window.history.replaceState({}, '', `/session/alpha?joinGroup=participants-2026&worker=${worker}`);
+      render(<WorkerGroupAutoJoin {...props} />);
+      await flush();
+      expect(getToken).not.toHaveBeenCalled();
+      expect(joins()).toHaveLength(0);
+      expect(readPendingAutoJoin()).toBeNull();
+    },
+  );
 
   it('ignores malformed or ambiguous links and ordinary session visits', async () => {
     for (const search of ['', '?joinGroup=../bad', '?joinGroup=a&joinGroup=b']) {

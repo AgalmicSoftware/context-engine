@@ -1340,7 +1340,8 @@ const CompareAddress = ({
         const responded = new Set<number>();
         entry.responses.forEach((r) => {
           responded.add(r.userIndex);
-          const answerText = entry.type === 'quadratic' ? formatQuadraticAllocation(r.answer, entry.options) : toCleanText(r.answer);
+          const answerText =
+            entry.type === 'quadratic' ? formatQuadraticAllocation(r.answer, entry.options) : toCleanText(r.answer);
           if (!answerText) return;
           responses.push({
             label: r.label || labelForIndex(r.userIndex),

@@ -201,9 +201,13 @@ const applyPatch = (state, patch) => ({ ...state, ...patch });
 
 describe('SurveyPileViewMode runtime surface', () => {
   it('shows submission failures beside the shared controls and clears them on retry', () => {
-    const { rerender } = render(renderPileInteractionSurface(buildSurfaceProps({
-      submissionError: 'Response upload failed. Please try again.',
-    })));
+    const { rerender } = render(
+      renderPileInteractionSurface(
+        buildSurfaceProps({
+          submissionError: 'Response upload failed. Please try again.',
+        }),
+      ),
+    );
     expect(screen.getByRole('alert')).toHaveTextContent('Response upload failed. Please try again.');
     expect(screen.getByTestId('active-q1')).not.toContainElement(screen.getByRole('alert'));
     rerender(renderPileInteractionSurface(buildSurfaceProps({ submissionError: '' })));
@@ -265,9 +269,20 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('edits signed quadratic votes in the pile using the question budget', async () => {
     renderPile({
-      questionPool: [{ id: 'quadratic-q', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 }],
-      cacheHasLoaded: false, isQuestionCacheReady: true, isResponsesCacheReady: false,
-      isSBTCacheReady: false, isSurveyCacheReady: false,
+      questionPool: [
+        {
+          id: 'quadratic-q',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
     });
     const parks = await screen.findByLabelText('Parks');
     fireEvent.change(parks, { target: { value: '3' } });
@@ -566,7 +581,13 @@ describe('SurveyPileViewMode runtime surface', () => {
   it('renders newly discovered quadratic interview questions before the pile cache catches up', async () => {
     renderPile({}, { route: '/session/demo?mode=interview' });
     await screen.findByTestId('mock-voice-mode-modal');
-    const question = { id: 'live-quadratic', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 };
+    const question = {
+      id: 'live-quadratic',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
     const onChange = jest.fn();
     render(mockVoiceModeProps.renderAnswerInput(question.id, [3, -4], onChange, question));
     expect(screen.getByRole('slider', { name: 'Parks' })).toHaveValue('3');
@@ -799,11 +820,7 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('captures the first URL source for the session without adding it to interview provenance', async () => {
     sessionStorage.clear();
-    window.history.replaceState(
-      {},
-      '',
-      '/session/demo?src=partner-outreach&src=ignored&mode=interview#prefill=abc',
-    );
+    window.history.replaceState({}, '', '/session/demo?src=partner-outreach&src=ignored&mode=interview#prefill=abc');
     expect(
       buildPileRuntimeInitialState({
         props: { sessionSlug: 'demo' },

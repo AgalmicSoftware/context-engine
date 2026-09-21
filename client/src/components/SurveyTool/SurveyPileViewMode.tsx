@@ -700,14 +700,12 @@ const mergeQuestionResponsesForPile = (
   target: PileQuestionResponsesMap = {},
   source: unknown = {},
 ): PileQuestionResponsesMap => {
-  mergeQuestionResponses(target, source && typeof source === 'object' ? source as Record<string, unknown> : {});
+  mergeQuestionResponses(target, source && typeof source === 'object' ? (source as Record<string, unknown>) : {});
   return target;
 };
 
-const doesQuestionProgressMatchSlugForPile = (
-  progressSlugValue: unknown,
-  currentSlug: string,
-): boolean => doesQuestionProgressMatchSlug(String(progressSlugValue || ''), currentSlug);
+const doesQuestionProgressMatchSlugForPile = (progressSlugValue: unknown, currentSlug: string): boolean =>
+  doesQuestionProgressMatchSlug(String(progressSlugValue || ''), currentSlug);
 
 const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
   if (!engine || typeof engine !== 'object') return engine;
@@ -1805,7 +1803,9 @@ const viewResultsFromSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.closeSessionVoiceModeModal();
   if (typeof window === 'undefined') return;
   const slug = resolveEffectiveSlug(engine.props);
-  const path = applyExistingGroupPrefix(appendCurrentWorkerHintToPath(appendExplicitSessionHintToPath('/questions/results', slug)));
+  const path = applyExistingGroupPrefix(
+    appendCurrentWorkerHintToPath(appendExplicitSessionHintToPath('/questions/results', slug)),
+  );
   window.history.pushState({}, '', path);
   window.dispatchEvent(new Event('popstate'));
 };
@@ -2779,7 +2779,16 @@ const renderPileResponseInput = (
       );
 
     case 'quadratic':
-      return <QuadraticAllocationInput questionId={question.id} options={engine.getQuestionOptionsForInput(question)} voiceCredits={question.voiceCredits} value={answer.value} disabled={engine.state.isSubmitting} onChange={updateAnswer} />;
+      return (
+        <QuadraticAllocationInput
+          questionId={question.id}
+          options={engine.getQuestionOptionsForInput(question)}
+          voiceCredits={question.voiceCredits}
+          value={answer.value}
+          disabled={engine.state.isSubmitting}
+          onChange={updateAnswer}
+        />
+      );
     case 'multichoice': {
       const options = engine.getQuestionOptionsForInput(question);
       const isSingleSelect = isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question);
@@ -3418,7 +3427,8 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                     // The live interview catalog can discover questions before the pile cache does.
                     question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
                       (question: { id: string }) => question.id === questionId,
-                    ) || interviewQuestion || { id: questionId, type: 'freeform' },
+                    ) ||
+                      interviewQuestion || { id: questionId, type: 'freeform' },
                     answer: { value },
                     onAnswerChange,
                     inputNamePrefix: 'interview-draft',

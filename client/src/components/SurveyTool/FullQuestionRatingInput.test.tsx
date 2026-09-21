@@ -23,12 +23,7 @@ describe('FullQuestionRatingInput', () => {
   });
 
   it('renders per-question rating endpoints and applies them to the slider', () => {
-    render(
-      <FullQuestionRatingInput
-        value={1}
-        scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }}
-      />,
-    );
+    render(<FullQuestionRatingInput value={1} scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }} />);
 
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('min', '1');

@@ -364,7 +364,9 @@ const readQuestionDataForCsv = (networkQuestions: unknown, questionId: string): 
 };
 
 const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string =>
-  ['multichoice', 'quadratic'].includes(String(questionData.type)) && Array.isArray(questionData.options) ? questionData.options.join(';') : '';
+  ['multichoice', 'quadratic'].includes(String(questionData.type)) && Array.isArray(questionData.options)
+    ? questionData.options.join(';')
+    : '';
 
 export const buildSurveyResultsQuestionsCsvExport = (
   filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = [],
@@ -379,7 +381,7 @@ export const buildSurveyResultsQuestionsCsvExport = (
       quoteCsvCell(question?.type),
       quoteCsvCell(tags),
       quoteCsvCell(options),
-      quoteCsvCell(question.type === 'quadratic' ? question.voiceCredits ?? 99 : ''),
+      quoteCsvCell(question.type === 'quadratic' ? (question.voiceCredits ?? 99) : ''),
     ].join(',');
   });
 
@@ -430,7 +432,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseFieldValueForCsv(answer, 'additional', 'encrypted'),
           getResponseFieldValueForCsv(answer, 'additional', 'hash'),
           formatTsForCsv(ms),
-          questionData.type === 'quadratic' ? questionData.voiceCredits ?? 99 : '',
+          questionData.type === 'quadratic' ? (questionData.voiceCredits ?? 99) : '',
         ]
           .map(quoteResponseCsvCell)
           .join(',');
@@ -484,7 +486,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseFieldValueForCsv(parsedValue, 'additional', 'encrypted'),
           getResponseFieldValueForCsv(parsedValue, 'additional', 'hash'),
           formatTsForCsv(ms),
-          questionData.type === 'quadratic' ? questionData.voiceCredits ?? 99 : '',
+          questionData.type === 'quadratic' ? (questionData.voiceCredits ?? 99) : '',
         ]
           .map(quoteResponseCsvCell)
           .join(',');

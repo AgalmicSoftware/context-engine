@@ -1252,8 +1252,13 @@
   opacity: 0.8;
 
   &:hover,
-  &:focus-visible { opacity: 1; }
-  &:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+  &:focus-visible {
+    opacity: 1;
+  }
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
 }
 
 /* The content area inside each collapsible section */

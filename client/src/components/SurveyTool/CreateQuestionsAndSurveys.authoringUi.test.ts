@@ -290,24 +290,33 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     instance.saveToLocalStorage = jest.fn();
     const options = ['Parks', 'Transit'];
 
-    instance.handleAutoQuestionsGenerated([
-      { type: 'quadratic', prompt: 'Allocate support', options, voiceCredits },
-    ], [], '');
+    instance.handleAutoQuestionsGenerated(
+      [{ type: 'quadratic', prompt: 'Allocate support', options, voiceCredits }],
+      [],
+      '',
+    );
 
     const budget = voiceCredits ?? 99;
     expect(instance.state.questions[0]).toMatchObject({
-      type: 'quadratic', options, voiceCredits: budget,
+      type: 'quadratic',
+      options,
+      voiceCredits: budget,
       id: instance.generateQuestionId('quadratic', 'Allocate support', options, false, budget),
     });
-    const [budgetToggle] = collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    const [budgetToggle] = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
     expect(treeHasText(budgetToggle, `Credits: ${budget}`)).toBe(true);
     expect(asRenderTreeNode(budgetToggle).props['aria-expanded']).toBe(false);
-    expect(collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')).toHaveLength(0);
+    expect(
+      collectTreeNodes(instance.render(), (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget'),
+    ).toHaveLength(0);
     clickTreeNode(budgetToggle);
-    const budgetInputs = collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
+    const budgetInputs = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget',
+    );
     expect(budgetInputs).toHaveLength(1);
     expect(asRenderTreeNode(budgetInputs[0]).props.value).toBe(budget);
   });
@@ -317,30 +326,39 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     instance.updateSurveyHash = jest.fn();
     instance.saveToLocalStorage = jest.fn();
     instance.setState({ showAutoTool: false, questions: [] });
-    const [button] = collectTreeNodes(instance.renderTypeSelector(),
-      (node) => node?.props?.['aria-label'] === 'Add Quadratic allocation question');
+    const [button] = collectTreeNodes(
+      instance.renderTypeSelector(),
+      (node) => node?.props?.['aria-label'] === 'Add Quadratic allocation question',
+    );
 
     clickTreeNode(button);
     instance.handleQuestionChange(0, 'voiceCredits', 25);
     clickTreeNode(button);
 
     expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 99]);
-    const toggles = collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    const toggles = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
     expect(treeHasText(toggles[0], 'Credits: 25')).toBe(true);
     expect(treeHasText(toggles[1], 'Credits: 99')).toBe(true);
     clickTreeNode(toggles[1]);
-    const [slider] = collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget');
+    const [slider] = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget',
+    );
     expect(asRenderTreeNode(slider).props).toMatchObject({ type: 'range', min: '1', step: '1', value: 99 });
     changeTreeNode(slider, '144');
     expect(instance.state.questions.map(({ voiceCredits }) => voiceCredits)).toEqual([25, 144]);
-    const updatedToggles = collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    const updatedToggles = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
     expect(treeHasText(updatedToggles[1], 'Credits: 144')).toBe(true);
     clickTreeNode(updatedToggles[1]);
-    expect(collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')).toHaveLength(0);
+    expect(
+      collectTreeNodes(instance.render(), (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget'),
+    ).toHaveLength(0);
     expect(instance.state.questions[1].voiceCredits).toBe(144);
   });
 
@@ -348,14 +366,25 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const instance = makeInstance();
     instance.updateSurveyHash = jest.fn();
     instance.saveToLocalStorage = jest.fn();
-    instance.setState({ showAutoTool: false, questions: [
-      { uiKey: 'large-budget', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 2500 },
-    ] });
-    const [toggle] = collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle');
+    instance.setState({
+      showAutoTool: false,
+      questions: [
+        {
+          uiKey: 'large-budget',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 2500,
+        },
+      ],
+    });
+    const [toggle] = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget-toggle',
+    );
     clickTreeNode(toggle);
-    const getSlider = () => collectTreeNodes(instance.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')[0];
+    const getSlider = () =>
+      collectTreeNodes(instance.render(), (node) => node?.props?.['data-testid'] === 'ce-quadratic-author-budget')[0];
     expect(asRenderTreeNode(getSlider()).props).toMatchObject({ value: 2500, max: 2500 });
     changeTreeNode(getSlider(), '1200');
     expect(asRenderTreeNode(getSlider()).props).toMatchObject({ value: 1200, max: 2500 });

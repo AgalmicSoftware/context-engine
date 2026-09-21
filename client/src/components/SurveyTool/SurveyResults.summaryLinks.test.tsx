@@ -53,7 +53,8 @@ const mockSingleQuestionResponse = jest.fn((..._args: any[]) => null);
 jest.mock('./SingleQuestionResponse', () => (props: any) => {
   mockSingleQuestionResponse(props);
   if (props.question?.type === 'quadratic') {
-    const ActualResponse = jest.requireActual<typeof import('./SingleQuestionResponse')>('./SingleQuestionResponse').default;
+    const ActualResponse =
+      jest.requireActual<typeof import('./SingleQuestionResponse')>('./SingleQuestionResponse').default;
     return <ActualResponse {...props} />;
   }
   return null;
@@ -439,8 +440,11 @@ describe('SurveyResults multichoice aggregator summary', () => {
         demo: buildQuestionCache({
           questions: {
             q1: {
-              id: 'q1', prompt: 'Allocate project support', type: 'quadratic',
-              options: ['Parks', 'Transit'], voiceCredits: 99,
+              id: 'q1',
+              prompt: 'Allocate project support',
+              type: 'quadratic',
+              options: ['Parks', 'Transit'],
+              voiceCredits: 99,
             },
           },
           questionResponses: {
@@ -460,11 +464,24 @@ describe('SurveyResults multichoice aggregator summary', () => {
 
     const results = await screen.findByTestId('ce-quadratic-results');
     const table = within(results).getByRole('table', { name: 'Quadratic allocation results' });
-    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent))
-      .toEqual(['Option', 'Positive', 'Negative', 'Net']);
-    expect(within(table).getAllByRole('row').slice(1).map(row =>
-      within(row).getAllByRole('cell').map(cell => cell.textContent)))
-      .toEqual([['3', '-2', '1'], ['5', '-4', '1']]);
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Option', 'Positive', 'Negative', 'Net']);
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) =>
+          within(row)
+            .getAllByRole('cell')
+            .map((cell) => cell.textContent),
+        ),
+    ).toEqual([
+      ['3', '-2', '1'],
+      ['5', '-4', '1'],
+    ]);
   });
 
   it('keeps the SurveyResults multichoice summary renderer when question metadata is still missing', async () => {

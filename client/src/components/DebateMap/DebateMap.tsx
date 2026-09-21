@@ -1321,7 +1321,13 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
       );
     }
 
-    if (questionType === 'quadratic') return <div>{String(question.voiceCredits ?? 99)} voice credits · signed votes cost their square. {getQuestionOptions(question).join(' · ')}</div>;
+    if (questionType === 'quadratic')
+      return (
+        <div>
+          {String(question.voiceCredits ?? 99)} voice credits · signed votes cost their square.{' '}
+          {getQuestionOptions(question).join(' · ')}
+        </div>
+      );
     if (questionType === 'multichoice') {
       const options = getQuestionOptions(question);
       if (options.length === 0) {

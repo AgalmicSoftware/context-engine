@@ -220,7 +220,13 @@ export type GeneratedSurveyStatementsInput = {
   questionTypes: QuestionTypeSelection;
   count: number;
   fallbackTitle?: unknown;
-  generateQuestionId?: (type: string, prompt: string, options?: string[], singleSelect?: boolean, voiceCredits?: number) => string;
+  generateQuestionId?: (
+    type: string,
+    prompt: string,
+    options?: string[],
+    singleSelect?: boolean,
+    voiceCredits?: number,
+  ) => string;
 };
 
 export type GeneratedSurveyStatementsResult = {
@@ -531,9 +537,16 @@ export const buildGeneratedSurveyStatements = ({
   });
 
   const statements = questions.map((question) => ({
-    id: question.questionType === 'quadratic'
-      ? generateQuestionId(question.questionType, question.prompt, question.options || [], false, question.voiceCredits ?? 99)
-      : generateQuestionId(question.questionType, question.prompt, question.options || []),
+    id:
+      question.questionType === 'quadratic'
+        ? generateQuestionId(
+            question.questionType,
+            question.prompt,
+            question.options || [],
+            false,
+            question.voiceCredits ?? 99,
+          )
+        : generateQuestionId(question.questionType, question.prompt, question.options || []),
     type: question.questionType,
     prompt: question.prompt,
     options: ['multichoice', 'quadratic'].includes(question.questionType) ? question.options : undefined,

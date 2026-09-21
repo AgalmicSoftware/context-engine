@@ -80,9 +80,7 @@ describe('SessionInterviewResearchConsent', () => {
     expect(scss).toMatch(
       /\.optionGroup\s*\{[\s\S]*?padding:\s*8px;[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-text-inverse\) 14%, transparent\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 5%, transparent\);/,
     );
-    expect(scss).toMatch(
-      /\.metadata\[open\]\s*\{[\s\S]*?max-height:\s*min\(28vh, 300px\);[\s\S]*?overflow:\s*auto;/,
-    );
+    expect(scss).toMatch(/\.metadata\[open\]\s*\{[\s\S]*?max-height:\s*min\(28vh, 300px\);[\s\S]*?overflow:\s*auto;/);
     expect(scss).toMatch(
       /\.metadata\[open\] summary\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-surface-sunken, #171941\) 92%, transparent\);/,
     );

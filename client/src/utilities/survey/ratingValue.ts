@@ -31,7 +31,8 @@ const isBlankRatingValue = (value: unknown): value is string => typeof value ===
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-const hasMetadataValue = (value: unknown): boolean => value !== undefined && value !== null && String(value).trim() !== '';
+const hasMetadataValue = (value: unknown): boolean =>
+  value !== undefined && value !== null && String(value).trim() !== '';
 
 const recordHasRatingScaleMetadata = (record: Record<string, unknown>): boolean =>
   RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));

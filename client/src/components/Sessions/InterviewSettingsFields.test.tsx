@@ -17,7 +17,5 @@ it('exposes conservative generation defaults and an editable owner opening', () 
   fireEvent.change(screen.getByLabelText('Interview steering prompt'), {
     target: { value: 'Follow the responder first.' },
   });
-  expect(onChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({ steeringPrompt: 'Follow the responder first.' }),
-  );
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ steeringPrompt: 'Follow the responder first.' }));
 });

@@ -289,12 +289,20 @@ describe('SingleQuestionResponse card actions', () => {
 
   it.each(['mini', 'fullscreen'])('shows quadratic options and the custom budget in %s question previews', (mode) => {
     const subject = createSubject({
-      mode, questionOnly: true,
-      question: { id: 'q-allocation', type: 'quadratic', prompt: 'Allocate support',
-        options: ['Parks', 'Transit'], voiceCredits: 25 },
+      mode,
+      questionOnly: true,
+      question: {
+        id: 'q-allocation',
+        type: 'quadratic',
+        prompt: 'Allocate support',
+        options: ['Parks', 'Transit'],
+        voiceCredits: 25,
+      },
     });
-    const preview = findElement(subject.render(),
-      (node) => node?.props?.['data-testid'] === 'ce-quadratic-question-preview');
+    const preview = findElement(
+      subject.render(),
+      (node) => node?.props?.['data-testid'] === 'ce-quadratic-question-preview',
+    );
     expect(preview).not.toBeNull();
     const html = renderToStaticMarkup(preview);
     expect(html).toContain('25 voice credits');
@@ -504,15 +512,20 @@ describe('SingleQuestionResponse aggregator memoization', () => {
   });
 
   it('aggregates latest quadratic allocations and counts neutral, masked, and invalid answers correctly', () => {
-    const record = (responder: string, timestamp: number, value: unknown, encrypted = false) =>
-      ({ responder, timestamp, response: { answer: { value, encrypted } } });
+    const record = (responder: string, timestamp: number, value: unknown, encrypted = false) => ({
+      responder,
+      timestamp,
+      response: { answer: { value, encrypted } },
+    });
     const subject = createSubject({
       question: { id: 'q-allocation', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 },
       allResponses: [
-        record('a', 1, [5, 0]), record('a', 2, [3, -4]),
+        record('a', 1, [5, 0]),
+        record('a', 2, [3, -4]),
         record('b', 1, [-2, 4], true), // Decrypted values retain their encryption flag.
         record('c', 1, [0, 0]),
-        record('d', 1, [5, 0]), record('d', 2, '*', true),
+        record('d', 1, [5, 0]),
+        record('d', 2, '*', true),
         record('e', 1, [4, 4]),
       ],
     });

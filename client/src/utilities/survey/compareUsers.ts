@@ -321,7 +321,8 @@ export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedSt
       if (v !== 0) tokens.set(makeToken(qid), { sign: v > 0 ? 1 : -1, weight: Math.abs(v) * impMul });
     } else if (type === 'quadratic' && Array.isArray(ans) && ans.length >= 2 && ans.every(Number.isSafeInteger)) {
       ans.forEach((vote, index) => {
-        if (vote !== 0) tokens.set(makeToken(qid, String(index)), { sign: vote > 0 ? 1 : -1, weight: Math.abs(vote) * impMul });
+        if (vote !== 0)
+          tokens.set(makeToken(qid, String(index)), { sign: vote > 0 ? 1 : -1, weight: Math.abs(vote) * impMul });
       });
     } else if (type === 'multichoice') {
       const arr = Array.isArray(ans) ? ans : typeof ans === 'string' ? [ans] : [];

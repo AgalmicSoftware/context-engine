@@ -16,7 +16,12 @@ export const resolveDeferredRatingSliderStyle = (): React.CSSProperties => ({
   width: '200px',
 });
 
-const DeferredRatingSlider = ({ value, scale = DEFAULT_RATING_SCALE, disabled = false, onCommit }: DeferredRatingSliderProps) => (
+const DeferredRatingSlider = ({
+  value,
+  scale = DEFAULT_RATING_SCALE,
+  disabled = false,
+  onCommit,
+}: DeferredRatingSliderProps) => (
   <DeferredCommitSlider
     value={value}
     min={scale.min}

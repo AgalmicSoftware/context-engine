@@ -49,9 +49,7 @@ it('composes auto-join with same-session workflow links without copying private 
       'https://worker.example/',
       '/session/alpha?mode=interview&src=partner&groups=EDDY-2026&agentToken=private&worker=https%3A%2F%2Fold.example#prefill=abc&secret=hidden',
     ),
-  ).toBe(
-    '/session/alpha?mode=interview&src=partner&joinGroup=participants&worker=https%3A%2F%2Fworker.example',
-  );
+  ).toBe('/session/alpha?mode=interview&src=partner&joinGroup=participants&worker=https%3A%2F%2Fworker.example');
 
   expect(
     buildWorkerGroupAutoJoinPath(

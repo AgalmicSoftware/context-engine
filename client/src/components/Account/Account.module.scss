@@ -2277,7 +2277,11 @@ h1 {
   min-height: 56px;
   width: 100%;
   padding: 7px 10px 7px 14px;
-  border-color: color-mix(in srgb, var(--ce-settings-control-border) calc(var(--ce-settings-control-opacity) * 100%), transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--ce-settings-control-border) calc(var(--ce-settings-control-opacity) * 100%),
+    transparent
+  );
   border-style: solid;
   border-width: var(--ce-settings-control-border-width);
   border-radius: var(--ce-radius-10);

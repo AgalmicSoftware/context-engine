@@ -128,7 +128,17 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
 
   switch (inputDescriptor.kind) {
     case 'quadratic':
-      return <QuadraticAllocationInput questionId={question.id} options={question.options} voiceCredits={question.voiceCredits} value={answer.value} disabled={isSubmitting} deferDragUpdates={singleQuestionMode} onChange={emitAnswerChange} />;
+      return (
+        <QuadraticAllocationInput
+          questionId={question.id}
+          options={question.options}
+          voiceCredits={question.voiceCredits}
+          value={answer.value}
+          disabled={isSubmitting}
+          deferDragUpdates={singleQuestionMode}
+          onChange={emitAnswerChange}
+        />
+      );
     case 'multichoice': {
       return (
         <MultichoiceQuestionInput

@@ -56,9 +56,15 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => (props: MockSingleQuesti
 describe('SimUserPage', () => {
   it('retains quadratic labels and custom budgets for simulated response cards', () => {
     const page = new SimUserPage({});
-    expect(page.buildQuestionCardData({ question: 'Allocate support', questionType: 'quadratic',
-      options: ['Parks', 'Transit'], voiceCredits: 25, answer: { value: [3, -4] },
-    })).toMatchObject({
+    expect(
+      page.buildQuestionCardData({
+        question: 'Allocate support',
+        questionType: 'quadratic',
+        options: ['Parks', 'Transit'],
+        voiceCredits: 25,
+        answer: { value: [3, -4] },
+      }),
+    ).toMatchObject({
       question: { type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 },
       response: { answer: { value: [3, -4] } },
     });

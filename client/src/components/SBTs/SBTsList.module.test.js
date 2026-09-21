@@ -40,8 +40,6 @@ describe('SBTsList module styles', () => {
     expect(scss).toMatch(
       /\.workerRouteToolbar\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
     );
-    expect(scss).toMatch(
-      /\.workerRouteRefreshButton\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/,
-    );
+    expect(scss).toMatch(/\.workerRouteRefreshButton\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/);
   });
 });

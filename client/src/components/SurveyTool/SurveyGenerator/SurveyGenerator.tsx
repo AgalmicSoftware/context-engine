@@ -144,7 +144,13 @@ const cacheLog = createLogger('cache');
 const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
 const CONTEXT_SAVE_LOGIN_REQUIRED_CODE = 'context_save_login_required';
-const generateSurveyGeneratorQuestionId = (type: string, prompt: string, options: string[] = [], singleSelect = false, voiceCredits = 99): string => {
+const generateSurveyGeneratorQuestionId = (
+  type: string,
+  prompt: string,
+  options: string[] = [],
+  singleSelect = false,
+  voiceCredits = 99,
+): string => {
   return generateSharedQuestionId(type, prompt, options, singleSelect, voiceCredits);
 };
 type SurveyGeneratorQuestionTypeKey = 'binary' | 'multichoice' | 'rating' | 'freeform' | 'quadratic';
@@ -2073,7 +2079,12 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                       </div>
                     </div>
 
-                    <button type="button" className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.quadratic)} onClick={() => toggleQuestionType('quadratic')} aria-pressed={!!questionTypes.quadratic}>
+                    <button
+                      type="button"
+                      className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.quadratic)}
+                      onClick={() => toggleQuestionType('quadratic')}
+                      aria-pressed={!!questionTypes.quadratic}
+                    >
                       <div className={styles.typeTitle}>Quadratic allocation</div>
                       <div className={styles.typePreviewRow}>99 voice credits · ± votes</div>
                     </button>

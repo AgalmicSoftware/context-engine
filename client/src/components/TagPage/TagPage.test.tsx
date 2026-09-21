@@ -457,12 +457,25 @@ describe('TagPage', () => {
   });
 
   it('preserves the quadratic budget and options in tagged question previews', () => {
-    mockListNamespaceEntriesSync.mockImplementation((namespace) => namespace === 'questionsCache' ? [
-      buildQuestionsEntry({ slug: 'edge', questions: { q1: {
-        id: 'q1', type: 'quadratic', prompt: 'Allocate support', tags: ['governance'],
-        options: ['Parks', 'Transit'], voiceCredits: 25,
-      } } }),
-    ] : []);
+    mockListNamespaceEntriesSync.mockImplementation((namespace) =>
+      namespace === 'questionsCache'
+        ? [
+            buildQuestionsEntry({
+              slug: 'edge',
+              questions: {
+                q1: {
+                  id: 'q1',
+                  type: 'quadratic',
+                  prompt: 'Allocate support',
+                  tags: ['governance'],
+                  options: ['Parks', 'Transit'],
+                  voiceCredits: 25,
+                },
+              },
+            }),
+          ]
+        : [],
+    );
     renderTagPage({ entry: '/tag/governance' });
     const preview = screen.getByTestId('ce-quadratic-question-preview');
     expect(preview).toHaveTextContent('25 voice credits');

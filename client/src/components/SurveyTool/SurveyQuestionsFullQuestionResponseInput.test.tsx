@@ -461,13 +461,15 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
   });
 });
 
-
 it('renders signed quadratic votes in the full response view and forwards valid allocations', () => {
   const onAnswerChange = jest.fn();
-  render(<SurveyQuestionsFullQuestionResponseInput
-    question={{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }}
-    answer={{ value: [3, -4] }} onAnswerChange={onAnswerChange}
-  />);
+  render(
+    <SurveyQuestionsFullQuestionResponseInput
+      question={{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }}
+      answer={{ value: [3, -4] }}
+      onAnswerChange={onAnswerChange}
+    />,
+  );
   expect(screen.getByTestId('ce-quadratic-budget')).toHaveTextContent('0 credits left');
   fireEvent.change(screen.getByLabelText('Parks'), { target: { value: '-2' } });
   expect(onAnswerChange).toHaveBeenCalledWith([-2, -4]);
@@ -475,10 +477,14 @@ it('renders signed quadratic votes in the full response view and forwards valid 
 
 it('defers only pointer drags on the standalone question route', () => {
   const onAnswerChange = jest.fn();
-  render(<SurveyQuestionsFullQuestionResponseInput
-    question={{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }}
-    answer={{ value: [3, -4] }} singleQuestionMode onAnswerChange={onAnswerChange}
-  />);
+  render(
+    <SurveyQuestionsFullQuestionResponseInput
+      question={{ id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 }}
+      answer={{ value: [3, -4] }}
+      singleQuestionMode
+      onAnswerChange={onAnswerChange}
+    />,
+  );
   const slider = screen.getByLabelText('Parks');
   fireEvent.pointerDown(slider);
   fireEvent.change(slider, { target: { value: '-2' } });

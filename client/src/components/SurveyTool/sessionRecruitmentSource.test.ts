@@ -34,9 +34,7 @@ describe('sessionRecruitmentSource', () => {
   });
 
   it('stores no full URL, search string, hash, or unrelated query fields', () => {
-    expect(
-      captureSessionRecruitmentSource('alpha', '?src=partner&agentToken=private#prefill=secret'),
-    ).toBe('partner');
+    expect(captureSessionRecruitmentSource('alpha', '?src=partner&agentToken=private#prefill=secret')).toBe('partner');
     const raw = sessionStorage.getItem('ce:session-recruitment-source:v1:alpha') || '';
     expect(raw).toContain('"source":"partner"');
     expect(raw).not.toContain('agentToken');

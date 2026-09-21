@@ -10,7 +10,8 @@ export default function QuadraticAllocationResults({
   question: { options?: unknown; voiceCredits?: unknown };
 }) {
   const summary = summarizeQuadraticAllocations(responses, question);
-  const voteClass = (value: number) => value > 0 ? styles.positiveVotes : value < 0 ? styles.negativeVotes : undefined;
+  const voteClass = (value: number) =>
+    value > 0 ? styles.positiveVotes : value < 0 ? styles.negativeVotes : undefined;
   return (
     <div className={styles.results} data-testid="ce-quadratic-results">
       {summary.excludedResponses > 0 && <p>{summary.excludedResponses} encrypted or invalid responses excluded.</p>}
@@ -18,8 +19,12 @@ export default function QuadraticAllocationResults({
         <thead>
           <tr>
             <th scope="col">Option</th>
-            <th scope="col" className={styles.positiveVotes}>Positive</th>
-            <th scope="col" className={styles.negativeVotes}>Negative</th>
+            <th scope="col" className={styles.positiveVotes}>
+              Positive
+            </th>
+            <th scope="col" className={styles.negativeVotes}>
+              Negative
+            </th>
             <th scope="col">Net</th>
           </tr>
         </thead>
