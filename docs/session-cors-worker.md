@@ -718,6 +718,14 @@ document state before another operation can consume it. Explicit Worker/SBT and
 Worker/Lit hybrids restore only the chain-dependent controls their validated
 profile requires, under an **Advanced on-chain access** label.
 
+Worker response refreshes retain question readiness and reuse previously read,
+immutable response references for the same verified Worker and session identity.
+New response references are still discovered on each refresh. Verified clean
+session links initialize the same caches as explicit `?worker=` links. Opening
+another session section does not replay an already consumed interview launch or
+prefill packet. Sessions with all generated AI views disabled show only the
+standard Polis report and raw results.
+
 ### Worker Envelope Encryption
 
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:

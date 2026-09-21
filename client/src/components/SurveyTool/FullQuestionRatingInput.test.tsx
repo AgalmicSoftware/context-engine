@@ -22,14 +22,19 @@ describe('FullQuestionRatingInput', () => {
     expect(onChangeComplete).toHaveBeenCalled();
   });
 
-  it('renders per-question rating endpoints and applies them to the slider', () => {
-    render(<FullQuestionRatingInput value={1} scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }} />);
+  it('shows only the current rating while applying the question endpoints to the slider', () => {
+    render(
+      <FullQuestionRatingInput
+        value={1}
+        scale={{ min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' }}
+      />,
+    );
 
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('min', '1');
     expect(slider).toHaveAttribute('max', '10');
-    expect(screen.getAllByText('1')).toHaveLength(2);
-    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.queryByText('Almost none of it')).not.toBeInTheDocument();
+    expect(screen.queryByText('All of it')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
   });
 

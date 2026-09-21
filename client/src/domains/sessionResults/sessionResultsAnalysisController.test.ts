@@ -16,6 +16,21 @@ describe('sessionResultsAnalysisController', () => {
     expect(state.status).toBe('unauthorized');
   });
 
+  it('does not offer AI generation when all generated views are disabled', () => {
+    const settings = { views: { circles: false, breakdown: false, riskMatrix: false } };
+    expect(
+      shouldOfferGeneratedResultsAuthorization({
+        account: '0xadmin',
+        sessionConfig: { adminAddress: '0xadmin', resultsAnalysis: settings },
+      }),
+    ).toBe(false);
+    const state = resolveGeneratedResultsControllerState({
+      statusBody: { ok: true, adminAuthorized: true, settings },
+    });
+    expect(state.canGenerate).toBe(false);
+    expect(state.viewOptions).toEqual([]);
+  });
+
   it('maps status draft snapshots into renderable generated view state', () => {
     const state = resolveGeneratedResultsControllerState({
       previousSelectedView: 'breakdown',

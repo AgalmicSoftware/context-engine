@@ -43,9 +43,7 @@ const FullQuestionRatingInput = ({
       />
     </div>
     <FormText className={styles.ratingLabelText}>
-      <span>{scale.minLabel}</span>
       <span aria-label="Current rating">{value}</span>
-      <span>{scale.maxLabel}</span>
     </FormText>
   </>
 );

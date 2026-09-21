@@ -36,6 +36,19 @@ const buildOnePageSessionPublicRoute = (pathname: unknown = '') => {
   return `${basePath}${normalizedPath}` || normalizedPath;
 };
 
+export const removeOnePageSessionInterviewIntent = (path: string): string => {
+  const url = new URL(path, window.location.origin);
+  if (['interview', 'recordGroup'].includes(url.searchParams.get('mode') || '')) {
+    url.searchParams.delete('mode');
+  }
+  const fragment = new URLSearchParams(url.hash.slice(1));
+  if (fragment.has('prefill')) {
+    fragment.delete('prefill');
+    url.hash = fragment.toString();
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+
 export const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
   try {
     const slug = resolveEffectiveSlug(props);

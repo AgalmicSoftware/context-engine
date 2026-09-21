@@ -831,7 +831,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId('mock-create-questions')).not.toBeVisible();
   });
 
-  it('does not mount group recommendations while interview mapping is still running', async () => {
+  it('keeps group recommendations disabled during mapping and draft review', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
       availability: 'available',
       recommendations: [
@@ -874,7 +874,10 @@ describe('SessionVoiceModeModal', () => {
     await act(async () => {
       finishMapping?.([]);
     });
-    expect(await screen.findByTestId('mock-group-recommendations')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-group-recommendations')).not.toBeInTheDocument();
+    expect(
+      mockedUseSessionInterviewGroupRecommendations.mock.calls.every(([options]) => options.active === false),
+    ).toBe(true);
   });
 
   it('offers the two large requested voice-mode choices', () => {
@@ -1296,7 +1299,7 @@ describe('SessionVoiceModeModal', () => {
     }
   });
 
-  it('shows manual group refresh after edits only when a group catalog was available', async () => {
+  it('hides manual group refresh after edits even when a group catalog was available', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
       availability: 'available',
       recommendations: [],
@@ -1320,7 +1323,7 @@ describe('SessionVoiceModeModal', () => {
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
     await editReadableDraftText('Draft answer for What matters?', 'Edited answer');
-    expect(screen.getByRole('button', { name: 'Refresh group suggestions' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
   });
 
   it('hides manual group refresh after edits when the session has no configured groups', async () => {

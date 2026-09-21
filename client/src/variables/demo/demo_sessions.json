@@ -1,4 +1,21 @@
 {
+  "eddy26": {
+    "slug": "eddy26",
+    "sessionId": "0x864a48dfbde5a8ef4b5ac60a2980d842",
+    "sessionName": "EDDY 2026 - Bridging theory and practice",
+    "corsWorkerUrl": "https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/",
+    "workerCanonicalCleanRoute": true,
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      }
+    }
+  },
   "general": {
     "networkChainId": 11155420,
     "slug": "",

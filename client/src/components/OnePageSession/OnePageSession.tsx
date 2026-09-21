@@ -72,6 +72,7 @@ import {
 import {
   buildOnePageSessionCanonicalBaseUrl,
   buildOnePageSessionRawResultsRoute,
+  removeOnePageSessionInterviewIntent,
   resolveOnePageSessionAggregatorCacheScope,
   resolveOnePageSessionRouteUiState,
 } from './onePageSessionRouteRuntime';
@@ -1076,8 +1077,10 @@ class OnePageSession extends Component<any, any> {
     const cleanCredentialPath = buildSbtAutoMintCredentialCleanPath(
       new URL(nextUrl || '/', window.location.origin).href,
     );
-    // Section toggles restore this URL; consumed Worker joins must not return.
-    this.originalURL = removeWorkerGroupAutoJoinQuery(cleanCredentialPath || nextUrl || '');
+    // Section toggles restore this URL; consumed joins and interview launches must not return.
+    this.originalURL = removeOnePageSessionInterviewIntent(
+      removeWorkerGroupAutoJoinQuery(cleanCredentialPath || nextUrl || ''),
+    );
   }
 
   /* =======================

@@ -361,6 +361,24 @@ describe('createSessionResponseHydrationController', () => {
       isResponsesCacheReady: true,
       questionResponsesNonce: 1,
     });
+
+    host.dgWrite('userCache', 'demo-sh', {});
+    loadWorkerResponses.mockResolvedValueOnce([]);
+    host.setState({ isQuestionCacheReady: true });
+    await controller.refreshQuestionResponses([QUESTION_ID_A], { slug: 'demo-sh' });
+    expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+    expect(loadWorkerResponses).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        cachedStorageRefIds: new Set(['worker-response-ref']),
+      }),
+    );
+    expect(host.getStored('userCache', 'demo-sh')[RESPONDER_LOWER].worker.data.questionResponses).toEqual([
+      expect.objectContaining({
+        questionId: QUESTION_ID_A,
+        response: expect.objectContaining({ answer: { value: true } }),
+      }),
+    ]);
+    expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
   });
 
   it('starts same-slug Worker B independently, clears empty B, and discards delayed Worker A responses', async () => {

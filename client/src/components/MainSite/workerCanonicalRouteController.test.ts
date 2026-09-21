@@ -37,6 +37,8 @@ describe('workerCanonicalRouteController', () => {
     expect(controller.hasVerifiedRoute(bootstrap.sessionSlug, bootstrap.workerOrigin)).toBe(true);
     expect(controller.hasVerifiedRoute(bootstrap.sessionSlug, 'https://other.example.com')).toBe(false);
     expect(readState().sessionPathResolutionNonce).toBe(1);
+    expect(controller.isSessionSlug('worker-session')).toBe(true);
+    expect(controller.getActiveVerifiedConfig('worker-session')).toBe(bootstrap.config);
     window.history.replaceState({}, '', '/session/worker-session?worker=https%3A%2F%2Fworker.example.com');
     expect(controller.isSessionSlug('worker-session')).toBe(true);
     expect(controller.isSessionSlug('other-session')).toBe(false);
@@ -75,6 +77,12 @@ describe('workerCanonicalRouteController', () => {
     window.history.replaceState({}, '', '/session/worker-session?worker=https%3A%2F%2Fsecond.example.com');
     expect(controller.getActiveVerifiedConfig('worker-session')).toBe(secondConfig);
     window.history.replaceState({}, '', '/session/worker-session?worker=https%3A%2F%2Ffirst.example.com');
+    expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
+    window.history.replaceState({}, '', '/session/worker-session?worker=');
+    expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
+    window.history.replaceState({}, '', '/session/worker-session');
+    expect(controller.getActiveVerifiedConfig('worker-session')).toBe(secondConfig);
+    window.history.replaceState({}, '', '/session/other-session');
     expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
   });
 
