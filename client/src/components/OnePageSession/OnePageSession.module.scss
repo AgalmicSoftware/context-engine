@@ -361,21 +361,22 @@
   margin: 1.25rem auto 1rem;
   padding: 1rem 1.15rem;
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
-  border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-card-bg) 92%, var(--ce-status-info-soft));
-  color: var(--ce-text-primary);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-session-chrome) 88%, var(--ce-status-info));
+  color: var(--ce-session-chrome-contrast);
   text-align: left;
 
   h3 {
     margin: 0 0 0.55rem;
-    font-family: var(--ce-font-heading);
+    color: var(--ce-session-chrome-contrast);
+    font-family: var(--ce-font-body);
     font-size: 1rem;
     font-weight: 800;
   }
 
   p {
     margin: 0.55rem 0 0;
-    color: var(--ce-text-secondary);
+    color: color-mix(in srgb, var(--ce-session-chrome-contrast) 86%, transparent);
     font-size: 0.95rem;
     line-height: 1.55;
   }
