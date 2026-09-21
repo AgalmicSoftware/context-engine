@@ -1773,14 +1773,14 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.controlGroup select \{[^}]*background: #f8fafc/);
   assert.doesNotMatch(html, /\.controlGroup select \{[^}]*font: inherit/);
   assert.match(html, /\.numberInputWrapper \{ display: flex; align-items: center; border: 1px solid var\(--ce-color-border-light\); border-radius: var\(--ce-radius-4\); overflow: hidden; \}/);
-  assert.match(html, /\.clusterNumberInput \{ width: 50px; height: 28px; text-align: center; border: none; font-size: 1rem;/);
+  assert.match(html, /\.clusterNumberInput \{ color: #111827; background: #fff; -webkit-text-fill-color: currentColor; width: 50px; height: 28px; text-align: center; border: none; font-size: 1rem;/);
   assert.doesNotMatch(html, /\.clusterNumberInput \{[^}]*background: #f8fafc/);
   assert.doesNotMatch(html, /\.clusterNumberInput \{[^}]*color: #344054/);
   assert.doesNotMatch(html, /\.clusterNumberInput \{[^}]*font: inherit/);
   assert.match(html, /\.stepperButton \{ width: 30px; height: 30px; border: none; background-color: #f7f7f7;/);
   assert.match(html, /\.controlGroup select:disabled, \.clusterNumberInput:disabled, \.stepperButton:disabled, \.clusterAutoButton:disabled \{ opacity: 1; cursor: default; color: inherit; -webkit-text-fill-color: currentColor; \}/);
   assert.doesNotMatch(html, /\.controlGroup select:disabled, \.clusterNumberInput:disabled, \.stepperButton:disabled, \.clusterAutoButton:disabled \{ opacity: 0\.7; cursor: not-allowed; \}/);
-  assert.match(html, /\.clusterAutoButton \{ margin-left: 6px; cursor: pointer; \}/);
+  assert.match(html, /\.clusterAutoButton \{ margin-left: 6px; cursor: pointer; color: #111827; background: #f7f7f7; -webkit-text-fill-color: currentColor; \}/);
   assert.match(html, /\.clusterAutoButtonActive \{ background: #e5e7eb; box-shadow: inset 0 0 0 1px #9ca3af; \}/);
   assert.match(html, /class="graphSection aidb-graph-layout"/);
   assert.match(html, /<div class="graphItem">\s*<svg width="500" height="400"/);

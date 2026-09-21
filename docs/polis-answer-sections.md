@@ -5,7 +5,9 @@ The Polis-style report groups **Binary**, **Freeform**,
 Questions**, below the Participants Graph. Each type has a collapsible heading. These sections use a white, print-friendly layout.
 The report settings toolbar uses blue actions, white controls, and one pale
 gray surface across report styles; controls wrap on narrow screens. Graph scroll
-arrows use light-blue buttons with dark-blue icons. The Opinion Clusters heading
+arrows use light-blue buttons with dark-blue icons. The cluster count input,
+stepper buttons, and Auto button use explicit dark text on light surfaces; Auto
+retains readable hover text and a visible keyboard focus outline. The Opinion Clusters heading
 shares a row with Analyze clusters and compact minus/plus controls for collapsing
 and expanding all clusters. These icon controls use 50% opacity and accessible
 labels; all header actions are omitted from PDF exports. Representative statements

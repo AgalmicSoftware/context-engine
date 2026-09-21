@@ -3960,18 +3960,20 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .controlGroup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .controlGroup select { padding: 4px; }
     .numberInputWrapper { display: flex; align-items: center; border: 1px solid var(--ce-color-border-light); border-radius: var(--ce-radius-4); overflow: hidden; }
-    .clusterNumberInput { width: 50px; height: 28px; text-align: center; border: none; font-size: 1rem; -moz-appearance: textfield; }
+    .polisReportContainer .clusterNumberInput { color: #111827; background: #fff; -webkit-text-fill-color: currentColor; width: 50px; height: 28px; text-align: center; border: none; font-size: 1rem; -moz-appearance: textfield; }
     .clusterNumberInput::-webkit-outer-spin-button,
     .clusterNumberInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .clusterNumberInput:focus { outline: 2px solid #03a9f4; outline-offset: -1px; }
-    .stepperButton { width: 30px; height: 30px; border: none; background-color: #f7f7f7; cursor: pointer; font-weight: bold; font-size: 1.1rem; line-height: 1; color: #555; transition: background-color 0.2s; }
-    .stepperButton:hover { background-color: #e9e9e9; }
+    .polisReportContainer button.stepperButton { width: 30px; height: 30px; border: none; background-color: #f7f7f7; cursor: pointer; font-weight: bold; font-size: 1.1rem; line-height: 1; color: #111827; transition: background-color 0.2s; }
+    .polisReportContainer button.stepperButton:hover { background-color: #e9e9e9; }
     .controlGroup select:disabled, .clusterNumberInput:disabled, .stepperButton:disabled, .clusterAutoButton:disabled { opacity: 1; cursor: default; color: inherit; -webkit-text-fill-color: currentColor; }
     .stepperButton:disabled:hover { background-color: #f7f7f7; }
     .stepperButton:first-child { border-right: 1px solid var(--ce-color-border-light); }
     .stepperButton:last-of-type { border-left: 1px solid var(--ce-color-border-light); }
-    .clusterAutoButton { margin-left: 6px; cursor: pointer; }
-    .clusterAutoButtonActive { background: #e5e7eb; box-shadow: inset 0 0 0 1px #9ca3af; }
+    .polisReportContainer button.clusterAutoButton { margin-left: 6px; cursor: pointer; color: #111827; background: #f7f7f7; -webkit-text-fill-color: currentColor; }
+    .polisReportContainer button.clusterAutoButton:hover { color: #111827; background: #e9e9e9; }
+    .polisReportContainer button.clusterAutoButton:focus-visible { outline: 2px solid #1d4ed8; outline-offset: -2px; }
+    .polisReportContainer button.clusterAutoButtonActive { background: #e5e7eb; box-shadow: inset 0 0 0 1px #9ca3af; }
     .aidb-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .aidb-layer-toggles { flex: 1 1 100%; flex-wrap: wrap; }
     .aidb-layer-toggles label { cursor: pointer; }

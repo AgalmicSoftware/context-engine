@@ -673,7 +673,10 @@
   overflow: hidden;
 }
 
-.clusterNumberInput {
+.polisReportContainer .clusterNumberInput {
+  color: var(--ce-document-text);
+  background: var(--ce-document-canvas);
+  -webkit-text-fill-color: currentColor;
   width: 50px;
   height: 28px;
   text-align: center;
@@ -691,7 +694,7 @@
   }
 }
 
-.stepperButton {
+.polisReportContainer button.stepperButton {
   width: 30px;
   height: 30px;
   border: none;
@@ -700,7 +703,7 @@
   font-weight: bold;
   font-size: 1.1rem;
   line-height: 1;
-  color: var(--ce-text-muted);
+  color: var(--ce-document-text);
   transition: background-color 0.2s;
   &:hover {
     background-color: var(--ce-document-border);
@@ -710,6 +713,23 @@
   }
   &:last-child {
     border-left: 1px solid var(--ce-color-border-light);
+  }
+}
+
+.polisReportContainer button.clusterAutoButton {
+  margin-left: 6px;
+  color: var(--ce-document-text);
+  background: var(--ce-document-surface);
+  -webkit-text-fill-color: currentColor;
+
+  &:hover {
+    color: var(--ce-document-text);
+    background: var(--ce-document-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--report-control-blue);
+    outline-offset: -2px;
   }
 }
 

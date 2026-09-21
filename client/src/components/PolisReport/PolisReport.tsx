@@ -2812,7 +2812,7 @@ export default function PolisReport({
                             <button
                               type="button"
                               onClick={() => setManualClusterCount('')}
-                              style={{ marginLeft: '6px' }}
+                              className={styles.clusterAutoButton}
                             >
                               Auto
                             </button>
