@@ -196,7 +196,7 @@ describe('workerCanonicalResponseHydration', () => {
       listComplete: true,
       cursor: null,
     });
-    const readSessionStorageBlob = jest.fn(
+    const readSessionStorageBlob = jest.fn<Promise<Response>, [Record<string, unknown>]>(
       async () =>
         new Response(
           JSON.stringify({
