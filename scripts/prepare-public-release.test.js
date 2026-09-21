@@ -185,6 +185,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
     );
     writeFile(
       sourceDir,
+      path.join('Claude outputs', 'eddy-2026', 'readiness-report.md'),
+      'private local agent output\n',
+    );
+    writeFile(
+      sourceDir,
       path.join('grant-applications', 'legacy-draft.md'),
       'legacy private application state\n',
     );
@@ -352,6 +357,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'Demo Integration Package')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'Claude outputs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);

@@ -34,6 +34,7 @@ EOF
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
+Claude outputs
 outreach-and-applications
 grant-applications
 client/public/skill.md
@@ -108,6 +109,7 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 TODO
 contextEngine-cc
+Claude outputs
 outreach-and-applications
 grant-applications
 CLAUDE.md
