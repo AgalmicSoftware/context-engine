@@ -118,7 +118,7 @@ function AutoJoinIntent({
         const membership = overview.memberships.find(({ group }) => group.groupId === groupId);
         if (membership) {
           setGroupLabel(membership.group.label);
-          complete(`You’re already in ${membership.group.label}.`);
+          complete('');
           return;
         }
         const group = overview.groups.find((candidate) => candidate.groupId === groupId);
@@ -137,6 +137,12 @@ function AutoJoinIntent({
     return stop;
   }, [account, ready, props.provider, sessionId, sessionSlug, workerUrl, chainId, groupId, retry, intent, onConsumed]);
 
+  useEffect(() => {
+    if (progress.phase !== 'done' || !progress.message) return;
+    const timer = setTimeout(() => setProgress({ phase: 'done', message: '' }), 10_000);
+    return () => clearTimeout(timer);
+  }, [progress]);
+
   const cancel = () => {
     cancelRef.current();
     finishedRef.current = true;
@@ -146,6 +152,7 @@ function AutoJoinIntent({
     setProgress({ phase: 'done', message: 'Auto-join cancelled.' });
   };
   const done = progress.phase === 'done';
+  if (done && !progress.message) return null;
   if (done && completedAccountRef.current && completedAccountRef.current !== account) return null;
   return (
     <WorkerGroupAutoJoinNotice

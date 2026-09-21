@@ -42,7 +42,7 @@
     border-radius: 999px;
     box-shadow: none;
     text-shadow: none;
-    color: var(--ce-status-info-text);
+    color: var(--ce-document-text);
     padding: 9px 18px;
     min-height: 40px;
     font: inherit;
@@ -77,11 +77,11 @@
     transform: none;
   }
   .sectionHeading button.sectionToggle:hover {
-    color: var(--ce-status-info-text);
+    color: var(--ce-document-text);
   }
   .sectionContent button.more:focus-visible,
   .sectionHeading button.sectionToggle:focus-visible {
-    outline: 2px solid var(--ce-status-info-text);
+    outline: 2px solid var(--ce-document-text);
     outline-offset: 3px;
   }
 }

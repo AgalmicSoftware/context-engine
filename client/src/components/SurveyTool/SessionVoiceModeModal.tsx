@@ -60,7 +60,7 @@ const INTERVIEW_GROUP_SUGGESTIONS_ENABLED = false;
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
-  onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
+  onSubmitResponses?: (questionIds?: string[]) => InterviewSubmitResult | Promise<InterviewSubmitResult>;
   onViewResults?: () => void;
   onClose: () => void;
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
@@ -321,6 +321,11 @@ function SessionInterviewPanel({
     setPendingSubmitAfterLogin(false);
     setStatus('Review drafts');
   }, [activeSubmitContextToken, baseSubmitContextToken, pendingSubmitAfterLogin]);
+  useEffect(() => {
+    if (pendingSubmitAfterLogin && authenticatedForSubmit && loginModalToggled) {
+      toggleLoginModal?.(false);
+    }
+  }, [authenticatedForSubmit, loginModalToggled, pendingSubmitAfterLogin, toggleLoginModal]);
   useEffect(() => {
     const wasOpen = previousLoginModalToggledRef.current;
     const isOpen = Boolean(loginModalToggled);

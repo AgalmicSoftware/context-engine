@@ -59,6 +59,7 @@ async function main() {
     assert.equal(await page.getByTestId('ce-session-worker-groups-native').count(), 0);
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
     await banner.getByText('Joined Participants 2026.', { exact: true }).waitFor();
+    await banner.waitFor({ state: 'hidden', timeout: 12000 });
     assert.equal(joins, 1);
     assert.equal(new URL(page.url()).search, '?view=questions');
     assert.equal(new URL(page.url()).hash, '#questions');
@@ -140,7 +141,7 @@ async function main() {
     // Reopening the invitation recognizes membership without another POST.
     await page.goto(link);
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
-    await banner.getByText('You’re already in Participants 2026.').waitFor();
+    await banner.waitFor({ state: 'hidden' });
     assert.equal(joins, 1);
     // Cancellation consumes the intent before authentication.
     member = false;

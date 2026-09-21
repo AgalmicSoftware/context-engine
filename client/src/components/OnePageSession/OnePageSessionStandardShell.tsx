@@ -157,6 +157,8 @@ type OnePageSessionStandardShellProps = {
   onKickoffAutoMintIfNeeded: () => void;
   onLoadFullCorpusClick: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenResults: () => void;
+  onViewSessionResults?: () => void;
+  resultsSectionRef?: React.Ref<HTMLDivElement>;
   onPileSubmitRailVisibilityChange: (visible: unknown) => void;
   onResultsModalClose: () => void;
   onResultsModeChange: (resultsViewMode: string) => void;
@@ -349,6 +351,8 @@ export default function OnePageSessionStandardShell({
   onKickoffAutoMintIfNeeded,
   onLoadFullCorpusClick,
   onOpenResults,
+  onViewSessionResults,
+  resultsSectionRef,
   onPileSubmitRailVisibilityChange,
   onResultsModalClose,
   onResultsModeChange,
@@ -502,6 +506,7 @@ export default function OnePageSessionStandardShell({
         ) : (
           <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
             <MemoSurveyPage
+              onViewSessionResults={onViewSessionResults}
               minifiedMode="pile"
               account={account}
               provider={provider}
@@ -701,7 +706,10 @@ export default function OnePageSessionStandardShell({
           </div>
         )}
 
-        <div className={`${styles.sectionContainer} ${showResults ? styles.sectionExpanded : ''}`}>
+        <div
+          ref={resultsSectionRef}
+          className={`${styles.sectionContainer} ${showResults ? styles.sectionExpanded : ''}`}
+        >
           <div className={styles.sectionHeaderRow}>
             <h2
               onClick={onToggleResults}

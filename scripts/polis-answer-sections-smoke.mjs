@@ -83,7 +83,17 @@ export async function probePolisAnswerSections(page) {
     });
     assert.ok(button.radius >= 20, `${theme}: expansion buttons must be rounded`);
     assert.equal(button.shadow, 'none', `${theme}: expansion buttons must have no heavy theme shadow`);
-    assert.notEqual(button.color, button.background, `${theme}: expansion text must remain legible`);
+    const luminance = (color) => {
+      const rgb = color.match(/[\d.]+/g).slice(0, 3).map((value) => {
+        const channel = Number(value) / (color.startsWith('color(srgb ') ? 1 : 255);
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    };
+    const text = luminance(button.color);
+    const background = luminance(button.background);
+    const contrast = (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
+    assert.ok(contrast >= 4.5, `${theme}: expansion text must meet 4.5:1 contrast (got ${contrast.toFixed(2)}, ${button.color} on ${button.background})`);
   }
   await page.getByTestId('ce-settings-theme').selectOption('context-engine');
   await page.getByRole('combobox', { name: 'Question tag' }).selectOption('housing');
@@ -130,8 +140,8 @@ export async function probeBuiltInPolisDemo(page, slug) {
 }
 
 export async function runSmoke() {
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ headless: true });
+  const browsers = await import('playwright');
+  const browser = await browsers[process.env.BROWSER || 'chromium'].launch({ headless: true });
   try {
     for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport });
