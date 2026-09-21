@@ -10,6 +10,7 @@ const {
   compactSmokeSummary,
   dismissOnboardingIfPresent,
   findMissingExpectedText,
+  installDemoWorkerFixtureRoutes,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   isDemoReadyInterviewRoute,
@@ -120,6 +121,32 @@ test('demo interview ready fixture requires the explicit Worker discovery route'
   assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=interview&worker=${worker}`), true);
   assert.equal(isDemoReadyInterviewRoute('/session/demo?mode=interview'), false);
   assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=recordGroup&worker=${worker}`), false);
+});
+
+test('both session setup aliases receive the pinned demo cache fixture in local smoke', async () => {
+  for (const route of ['/new', '/session/new', '/session/new?mode=interview']) {
+    const handlers = [];
+    await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
+      'http://127.0.0.1:4173', route);
+    assert.equal(handlers.length, 1, `${route} should isolate the unrelated demo cache`);
+    assert.equal(handlers[0].pattern, 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?*');
+    let response;
+    await handlers[0].handler({
+      request: () => ({ url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100' }),
+      fulfill: async (value) => { response = value; },
+      fallback: async () => assert.fail('the pinned question list should use the fixture'),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse(response.body), { items: [], listComplete: true });
+  }
+  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
+});
+
+test('setup fixture preserves live Worker checks and unrelated session routes', async () => {
+  const page = { route: async () => assert.fail('no fixture should be installed') };
+  await installDemoWorkerFixtureRoutes(page, 'https://contextengine.sh', '/session/new');
+  await installDemoWorkerFixtureRoutes(page, 'https://contextengine.sh', '/new');
+  await installDemoWorkerFixtureRoutes(page, 'http://127.0.0.1:4173', '/session/new-project');
 });
 
 test('normalizeLayoutProbeSelectors keeps default browser layout checks and accepts overrides', () => {

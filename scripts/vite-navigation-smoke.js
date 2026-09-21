@@ -15,6 +15,7 @@ const DEFAULT_ROUTES = Object.freeze([
   '/benchmarks',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
+  '/session/new': ['Session Setup'],
   '/session/demo': ['Session'],
   '/session/pe4': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
@@ -60,8 +61,14 @@ function isDemoStorageListFixtureRequest(requestUrl = '') {
   }
 }
 
+function isSessionSetupRoute(route) {
+  const pathname = String(route || '').split(/[?#]/, 1)[0];
+  return pathname === '/new' || pathname === '/session/new';
+}
+
 function shouldInstallDemoWorkerFixture(baseUrl, route) {
-  return isLocalSmokeBaseUrl(baseUrl) && String(route || '').startsWith('/session/demo');
+  return isLocalSmokeBaseUrl(baseUrl) &&
+    (isSessionSetupRoute(route) || String(route || '').startsWith('/session/demo'));
 }
 
 function isDemoReadyInterviewRoute(route = '') {
@@ -89,9 +96,9 @@ function buildDemoReadyInterviewConfig() {
 async function installDemoWorkerFixtureRoutes(page, baseUrl, route) {
   if (!shouldInstallDemoWorkerFixture(baseUrl, route) || !DEMO_READY_WORKER_ORIGIN) return;
 
-  // Built-in demo routes reconstruct fixture questions locally. The pinned demo-sh Worker may
-  // reject localhost/127.0.0.1 during local smoke runs, so only local smokes receive this
-  // exact storage-list fixture. Non-local base URLs still exercise the real Worker/CORS path.
+  // Demo routes use local questions; setup aliases also warm the unrelated default demo cache.
+  // Its pinned Worker can reject loopback origins, so isolate only these local smoke reads.
+  // Non-local base URLs still exercise the real Worker/CORS path.
   await page.route(`${DEMO_READY_WORKER_ORIGIN}/storage/list?*`, (requestRoute) => {
     if (!isDemoStorageListFixtureRequest(requestRoute.request().url())) {
       return requestRoute.fallback();
@@ -301,6 +308,7 @@ async function probeBenchmarkReportFrame(page, { timeoutMs } = {}) {
 
 const DEFAULT_ROUTE_PROBES = Object.freeze({
   '/new': probeSessionModePresets,
+  '/session/new': probeSessionModePresets,
   '/benchmarks': probeBenchmarkReportFrame,
 });
 
@@ -311,13 +319,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   const failedRequests = [];
   const badResponses = [];
 
-  if (route === '/new') {
-    // Preset selection is credential-free; the default demo cache is unrelated to this route probe.
-    await page.route('https://*.workers.dev/storage/list?*', (requestRoute) => requestRoute.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [], listComplete: true }),
-    }));
+  if (isLocalSmokeBaseUrl(baseUrl) && isSessionSetupRoute(route)) {
     await page.route('https://op-sepolia-testnet.api.pocket.network/**', async (requestRoute) => {
       const payload = requestRoute.request().postDataJSON();
       const results = {
@@ -614,6 +616,7 @@ module.exports = {
   dismissOnboardingIfPresent,
   findMissingExpectedText,
   inspectRoute,
+  installDemoWorkerFixtureRoutes,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   isDemoReadyInterviewRoute,
