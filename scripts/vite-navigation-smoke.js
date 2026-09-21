@@ -21,7 +21,6 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
   '/contracts': ['Docs'],
-  '/benchmarks': ['AI Opinions Benchmark'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',
@@ -288,8 +287,21 @@ async function probeSessionModePresets(page, { timeoutMs, baseUrl, route } = {})
   return failures;
 }
 
+async function probeBenchmarkReportFrame(page, { timeoutMs } = {}) {
+  try {
+    await page
+      .frameLocator('[data-testid="ce-benchmark-report-frame"]')
+      .getByText('AI Opinions Benchmark', { exact: false })
+      .waitFor({ timeout: timeoutMs });
+    return [];
+  } catch (error) {
+    return [`benchmark report iframe did not render expected title: ${error?.message || error}`];
+  }
+}
+
 const DEFAULT_ROUTE_PROBES = Object.freeze({
   '/new': probeSessionModePresets,
+  '/benchmarks': probeBenchmarkReportFrame,
 });
 
 async function inspectRoute(browser, baseUrl, route, options = {}) {
@@ -611,6 +623,7 @@ module.exports = {
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
+  probeBenchmarkReportFrame,
   probeSessionModePresets,
   resolveViewport,
   routeUrl,

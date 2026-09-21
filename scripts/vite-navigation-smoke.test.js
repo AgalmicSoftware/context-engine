@@ -19,6 +19,7 @@ const {
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
+  probeBenchmarkReportFrame,
   probeSessionModePresets,
   resolveViewport,
   routeUrl,
@@ -29,12 +30,13 @@ const {
 test('default navigation smoke covers session modes, Docs, its legacy contracts alias, and benchmarks', () => {
   assert.ok(DEFAULT_ROUTES.includes('/new'));
   assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionModePresets);
+  assert.equal(DEFAULT_ROUTE_PROBES['/benchmarks'], probeBenchmarkReportFrame);
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
   assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/docs'], ['Docs']);
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/contracts'], ['Docs']);
-  assert.deepEqual(DEFAULT_ROUTE_TEXT['/benchmarks'], ['AI Opinions Benchmark']);
+  assert.equal(DEFAULT_ROUTE_TEXT['/benchmarks'], undefined);
 });
 
 test('session mode probe selects both supported presets', async () => {

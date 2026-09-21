@@ -163,6 +163,9 @@ test('publication intro explains the benchmark and does not overstate preview ar
     },
   });
   const html = renderHtmlReport(report);
+  assert.match(html, /function replaceSharedHash\(hash\) \{[\s\S]*?try \{[\s\S]*?window\.history\.replaceState\(null, '', normalized\);[\s\S]*?catch \(error\) \{[\s\S]*?Sandboxed srcdoc reports have an opaque origin; fall back to hash-only navigation\.[\s\S]*?assignSharedHash\(normalized\);/);
+  assert.match(html, /function pushSharedHash\(hash\) \{[\s\S]*?try \{[\s\S]*?window\.history\.pushState\(null, '', normalized\);[\s\S]*?catch \(error\) \{[\s\S]*?Sandboxed srcdoc reports have an opaque origin; fall back to hash-only navigation\.[\s\S]*?assignSharedHash\(normalized\);/);
+  assert.match(html, /if \(hash === '#report'\) \{[\s\S]*?replaceSharedHash\(hash\);[\s\S]*?setReportViewMode\('report', \{ scroll: false \}\);/);
   const previewNotice = html.match(/<div class="aidb-preview-notice"[\s\S]*?<\/div>/)?.[0] || '';
   const introStart = html.indexOf('data-ce-benchmark-intro');
   const resultsStart = html.indexOf('data-ce-results-section');
