@@ -583,6 +583,30 @@ describe('OnePageSession results routing', () => {
     }
   });
 
+  it('does not restore consumed interview or prefill intent when sections reopen', () => {
+    const priorUrl = window.location.href;
+    try {
+      window.history.replaceState(
+        {},
+        '',
+        '/session/alpha?mode=interview&worker=https%3A%2F%2Fworker.example&src=event#prefill=packet',
+      );
+      const subject = new OnePageSession(buildProps());
+      subject.hasAutoMintIntent = jest.fn(() => false);
+      subject.recordOriginalURL();
+      expect(window.location.search).toContain('mode=interview');
+      expect(window.location.hash).toBe('#prefill=packet');
+      window.history.replaceState({}, '', '/session/alpha?worker=https%3A%2F%2Fworker.example&src=event');
+      subject.resetDemoURL();
+      expect(new URLSearchParams(window.location.search).get('mode')).toBeNull();
+      expect(new URLSearchParams(window.location.search).get('worker')).toBe('https://worker.example');
+      expect(new URLSearchParams(window.location.search).get('src')).toBe('event');
+      expect(window.location.hash).toBe('');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('opens the questions view and auto-opens results when the session route is /questions/results', async () => {
     const priorUrl = window.location.href;
 
@@ -883,7 +907,7 @@ describe('OnePageSession results routing', () => {
       adminAuthorized: true,
       viewerAuthorized: true,
       artifact: null,
-      viewOptions: [],
+      viewOptions: [{ key: 'circles', label: 'Circles' }],
       status: 'ready',
       statusLabel: 'No generated view yet.',
     };
@@ -1037,6 +1061,16 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
     expect(check).toHaveBeenCalledTimes(2);
     expect(authorize).not.toHaveBeenCalled();
+
+    view.rerender(
+      <OnePageSessionStandardShell
+        {...shellProps}
+        generatedResultsAuthAvailable={false}
+        generatedResultsAnalysis={{ ...baseGeneratedState, viewOptions: [], canGenerate: false }}
+      />,
+    );
+    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
   });
   it('renders the Raw Results action only while results are expanded and styles it like the other demo mode buttons', async () => {
     render(<OnePageSession {...buildProps()} />);

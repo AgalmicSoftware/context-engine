@@ -145,6 +145,24 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
+  it('bootstraps the public EDDY route without a Worker query parameter', () => {
+    const resolveStandardSessionRoute = jest.fn();
+    const result = resolveMainSiteSessionRouteForRender({
+      sessionTokenRaw: 'eddy26',
+      searchStr: '?mode=interview&joinGroup=eddy-2026',
+      controller,
+      resolveSessionSlugFromPathToken: (token) => token,
+      resolveStandardSessionRoute,
+    });
+    expect(result).toMatchObject({
+      kind: 'bootstrap',
+      workerOrigin: 'https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev',
+      workerSessionSlug: 'eddy26',
+      sessionRoute: { sessionSlug: 'eddy26', sessionConfig: null },
+    });
+    expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
+  });
+
   it('keeps registry-resolved demo-interview-5 routes on the standard path', () => {
     const registryConfig = {
       slug: 'demo-interview-5',

@@ -23,6 +23,7 @@ export const createWorkerCanonicalRouteController = (
   host: WorkerCanonicalRouteControllerHost,
 ): WorkerCanonicalRouteController => {
   const verifiedRouteKeys = new Set<string>();
+  const verifiedOriginsBySlug = new Map<string, string>();
   const verifiedConfigsByRoute = new Map<string, Record<string, unknown>>();
   const getVerifiedConfig = (slug: unknown, workerOrigin: unknown): Record<string, unknown> | null =>
     verifiedConfigsByRoute.get(buildVerifiedRouteKey(slug, workerOrigin)) || null;
@@ -33,7 +34,7 @@ export const createWorkerCanonicalRouteController = (
     const matchesExplicitRoute = !!routeSlug && routeSlug === normalizedSlug;
     try {
       const workerOrigin = parseSessionWorkerDiscoveryQuery(search);
-      return !!workerOrigin && matchesExplicitRoute;
+      return matchesExplicitRoute && (!!workerOrigin || verifiedOriginsBySlug.has(normalizedSlug));
     } catch {
       // Invalid explicit worker targets still suppress chain scans while the
       // route fails closed; query data itself never grants worker authority.
@@ -46,7 +47,11 @@ export const createWorkerCanonicalRouteController = (
       if (!isSessionSlug(slug)) return null;
       try {
         const search = typeof window !== 'undefined' ? window.location.search || '' : '';
-        const workerOrigin = parseSessionWorkerDiscoveryQuery(search);
+        // A clean route still uses its live-verified Worker for cache hydration.
+        // Explicit targets must never fall back to a previously verified origin.
+        const workerOrigin = new URLSearchParams(search).has('worker')
+          ? parseSessionWorkerDiscoveryQuery(search)
+          : verifiedOriginsBySlug.get(normalizeSessionSlug(slug));
         return workerOrigin ? getVerifiedConfig(slug, workerOrigin) : null;
       } catch {
         return null;
@@ -66,6 +71,7 @@ export const createWorkerCanonicalRouteController = (
           verifiedConfigsByRoute.delete(existingKey);
         }
       }
+      verifiedOriginsBySlug.set(normalizedSlug, bootstrap.workerOrigin);
       verifiedRouteKeys.add(routeKey);
       verifiedConfigsByRoute.set(routeKey, bootstrap.config);
       host.setState((previousState) => ({

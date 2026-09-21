@@ -51,11 +51,13 @@ export const loadWorkerResponses = async (
     providerLike,
     sessionSlug,
     sessionConfig,
+    cachedStorageRefIds,
   }: {
     account?: unknown;
     providerLike?: unknown;
     sessionSlug: string;
     sessionConfig: UnknownRecord;
+    cachedStorageRefIds?: ReadonlySet<string>;
   },
   deps: WorkerCanonicalResponseHydrationDeps = {},
 ): Promise<WorkerCanonicalResponseRow[]> => {
@@ -103,6 +105,8 @@ export const loadWorkerResponses = async (
         const metadata = isRecord(item.metadata) ? item.metadata : {};
         const storageRefId = readString(storageRef.id);
         if (!storageRefId) return null;
+        // Response payloads are immutable; an edit receives a new storage reference.
+        if (cachedStorageRefIds?.has(storageRefId)) return null;
         const response = await readBlob({
           storageRef,
           sessionSlug: target.sessionSlug,

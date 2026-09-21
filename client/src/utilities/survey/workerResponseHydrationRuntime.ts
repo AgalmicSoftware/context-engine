@@ -15,6 +15,7 @@ export type WorkerResponseHydrationLoader = (options: {
   providerLike?: unknown;
   sessionSlug: string;
   sessionConfig: CacheRecord;
+  cachedStorageRefIds?: ReadonlySet<string>;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
 export type WorkerResponseHydrationRun = {
@@ -82,18 +83,35 @@ export const hydrateWorkerCanonicalResponses = async ({
   const loadRows = loadWorkerResponses || workerHydration.loadWorkerResponses;
   if (shouldStop()) return;
 
-  const initializedQuestions = await updateQuestionsCacheAtomic((current) =>
-    targetIsCurrent()
+  let cachedStorageRefIds = new Set<string>();
+  let cachedRows: WorkerCanonicalResponseRow[] = [];
+  const initializedQuestions = await updateQuestionsCacheAtomic((current) => {
+    const merged = targetIsCurrent()
       ? workerHydration.mergeWorkerQuestionResponses(current, [], sessionSlug, run.identity)
-      : current || {},
-  );
+      : current || {};
+    // Only reuse refs after the merge has checked the exact Worker/session identity.
+    const worker = (merged as CacheRecord).worker as CacheRecord | undefined;
+    cachedStorageRefIds = new Set(Object.keys((worker?.workerResponseStorageRefs as CacheRecord) || {}));
+    const responses = (worker?.questionResponses || {}) as Record<string, Record<string, CacheRecord>>;
+    const metadata = (worker?.questionResponsesMeta || {}) as Record<string, Record<string, CacheRecord>>;
+    cachedRows = Object.entries(responses).flatMap(([questionId, byResponder]) =>
+      Object.entries(byResponder).map(([responder, response]) => ({
+        questionId,
+        responder,
+        response,
+        storageRefId: '',
+        timestamp: Number(metadata[questionId]?.[responder]?.ts || 0),
+      })),
+    );
+    return merged;
+  });
   if (!initializedQuestions) {
     throw createPersistenceError(`Failed to initialize Worker questions cache for ${sessionSlug}`);
   }
   if (shouldStop()) return;
 
   const initializedUsers = await updateUserCacheAtomic((current) =>
-    targetIsCurrent() ? workerHydration.mergeWorkerUserResponses(current, [], run.identity) : current || {},
+    targetIsCurrent() ? workerHydration.mergeWorkerUserResponses(current, cachedRows, run.identity) : current || {},
   );
   if (!initializedUsers) {
     throw createPersistenceError(`Failed to initialize Worker user cache for ${sessionSlug}`);
@@ -105,6 +123,7 @@ export const hydrateWorkerCanonicalResponses = async ({
     providerLike: getProviderLike(),
     sessionSlug,
     sessionConfig,
+    cachedStorageRefIds,
   });
   if (shouldStop()) return;
 

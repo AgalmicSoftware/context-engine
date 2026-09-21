@@ -157,7 +157,9 @@ export const shouldOfferGeneratedResultsAuthorization = ({
   const accountLower = toText(account).toLowerCase();
   const adminAddress = toText(config.adminAddress || toRecord(config.__registry).adminAddress).toLowerCase();
   const hasHatAuthority = !!toText(config.adminHatId) && !!toText(config.hatsAddress);
-  if (!accountLower) return false;
+  if (!accountLower || !Object.values(normalizeResultsAnalysisSettings(config.resultsAnalysis).views).some(Boolean)) {
+    return false;
+  }
   return hasHatAuthority || (!!adminAddress && adminAddress === accountLower);
 };
 
@@ -222,6 +224,7 @@ export const resolveGeneratedResultsControllerState = ({
   const canRetryAutomaticFailure = !!lastFailure && settings.generationMode === 'automatic';
   const canCheckStatus = viewerAuthorized && pollExpired;
   const canGenerate =
+    viewOptions.length > 0 &&
     adminAuthorized &&
     !canCheckStatus &&
     !hasActiveJob &&

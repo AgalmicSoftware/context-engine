@@ -187,6 +187,46 @@ describe('workerCanonicalResponseHydration', () => {
     ]);
   });
 
+  it('reuses cached immutable refs while reading newly submitted edits', async () => {
+    const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
+      items: ['cached', 'edited'].map((id) => ({
+        storageRef: { backend: 'cloudflare', id },
+        metadata: { responder: 'participant', createdAt: '2026-07-22T12:00:01.000Z' },
+      })),
+      listComplete: true,
+      cursor: null,
+    });
+    const readSessionStorageBlob = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            questionID: 'question-a',
+            sessionId: SESSION_ID,
+            sessionSlug: 'demo-sh',
+            answer: { value: false },
+          }),
+        ),
+    );
+    const rows = await loadWorkerResponses(
+      {
+        sessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+        cachedStorageRefIds: new Set(['cached']),
+      },
+      { listSessionStorageRefsPage, readSessionStorageBlob },
+    );
+    expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
+    expect(readSessionStorageBlob).toHaveBeenCalledWith(
+      expect.objectContaining({ storageRef: expect.objectContaining({ id: 'edited' }) }),
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({
+        storageRefId: 'edited',
+        response: expect.objectContaining({ answer: { value: false } }),
+      }),
+    ]);
+  });
+
   it('fails closed on a repeated incomplete-page cursor', async () => {
     const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
       items: [],

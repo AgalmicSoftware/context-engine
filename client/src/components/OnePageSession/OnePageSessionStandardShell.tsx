@@ -399,7 +399,11 @@ export default function OnePageSessionStandardShell({
   const generatedCanGenerate = generatedState.canGenerate === true && !generatedIsRunning;
   const showGeneratedCheckAction =
     generatedCanCheckStatus || (generatedResultsAuthAvailable && generatedState.adminAuthorized !== true);
-  const showGeneratedGenerateAction = generatedState.adminAuthorized === true && !generatedCanCheckStatus;
+  const showGeneratedGenerateAction =
+    generatedState.adminAuthorized === true &&
+    Array.isArray(generatedState.viewOptions) &&
+    generatedState.viewOptions.length > 0 &&
+    !generatedCanCheckStatus;
   const generatedCheckActionLabel = generatedCanCheckStatus ? 'Recheck AI Views' : 'Check AI Views';
   const generatedActionLabel = generatedIsRunning
     ? 'Generating AI Views…'

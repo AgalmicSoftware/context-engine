@@ -1548,6 +1548,11 @@ export const createSessionResponseHydrationController = (
     opts: RefreshQuestionResponsesOptions = {},
   ): Promise<void> => {
     const slug = normalizeSessionSlug((opts?.slug ?? getActiveSessionSlug()) || '');
+    if (resolveWorkerResponseHydrationRun({ sessionConfig: getSessionCfg(slug), sessionSlug: slug })) {
+      // Worker refreshes update responses only; there is no chain question scan to restart.
+      await fetchQuestionResponsesChunkedForGroup(slug);
+      return;
+    }
     const forceFull = !!opts?.forceFull;
     const responderLower = String(opts?.responder || getAccount() || '')
       .trim()
