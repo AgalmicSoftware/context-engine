@@ -1186,6 +1186,11 @@ Runtime:
     "configRevision": "6f0c2c84-f28b-4fa7-baba-d035f9767967",
     "sessionName": "Example session",
     "sessionInfo": "Worker-canonical example",
+    "sessionContext": {
+      "title": "Context",
+      "paragraphs": ["Optional public background shown as a plain-text Context section."],
+      "links": [{ "label": "Official source", "url": "https://example.org/session" }]
+    },
     "adminAddress": "0x0000000000000000000000000000000000000001",
     "corsWorkerUrl": "https://test-72-a1b2c3d4e5f6.example.workers.dev",
     "allowOrigins": ["https://app.example"],
@@ -1269,6 +1274,10 @@ Runtime:
     "limits": { "perWalletPerDay": 1000, "perAnonymousIpPerDay": 0 }
   }
   ```
+
+  `sessionContext` is optional public presentation metadata. The client renders
+  its `title`, `paragraphs`, and HTTPS `links` as React text and anchors; it is
+  not executable HTML and must not contain secrets.
   For `"backend": "cloudflare"`, new `/new` configs default canonical CE payload
   resources (`docsContext`, `questions`, `surveys`, `responses`, media, and
   generated artifacts) to `"active"` unless an advanced draft explicitly stages

@@ -806,6 +806,75 @@ describe('OnePageSession results routing', () => {
     expect(callbackThis).toBe(sessionRef.current);
   });
 
+  it('renders structured session context as escaped text and official links', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/edge']}>
+        <OnePageSession
+          {...props}
+          slug="edge"
+          sessionConfig={{
+            ...props.sessionConfig,
+            sessionContext: {
+              title: 'Context',
+              paragraphs: [
+                'EDDY 2026 brings together academics and practitioners working on digital democracy.',
+                '<script>alert("nope")</script> This text must render literally.',
+              ],
+              links: [
+                {
+                  label: 'Official EDDY 2026 event page',
+                  url: 'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna',
+                },
+                {
+                  label: 'Ignored unsafe link',
+                  url: 'javascript:alert(1)',
+                },
+              ],
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const context = screen.getByTestId('ce-session-context');
+    expect(within(context).getByRole('heading', { name: 'Context' })).toBeInTheDocument();
+    expect(context).toHaveTextContent('EDDY 2026 brings together academics and practitioners');
+    expect(context).toHaveTextContent('<script>alert("nope")</script> This text must render literally.');
+    expect(context.querySelector('script')).toBeNull();
+    expect(within(context).getByRole('link', { name: /Official EDDY 2026 event page/i })).toHaveAttribute(
+      'href',
+      'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna',
+    );
+    expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
+  });
+
+  it('does not render an empty session context section', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/edge']}>
+        <OnePageSession
+          {...props}
+          slug="edge"
+          sessionConfig={{
+            ...props.sessionConfig,
+            sessionContext: {
+              title: 'Context',
+              paragraphs: ['   '],
+              links: [{ label: 'Unsupported', url: 'http://example.org/source' }],
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
+  });
+
   it('shows a Retry action for automatic-only generated analysis failures and a Recheck action after polling expires', async () => {
     const baseGeneratedState = {
       adminAuthorized: true,

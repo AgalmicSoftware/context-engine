@@ -271,6 +271,11 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
       kind: 'set-config',
       incomingConfig: {
         sessionEndsAt: '2030-01-02T03:04:00Z',
+        sessionContext: {
+          title: 'Context',
+          paragraphs: ['Plain-text context survives worker-canonical config validation.'],
+          links: [{ label: 'Official source', url: 'https://example.org/source' }],
+        },
         defaultTags: 'governance,ai',
         defaultGroupTags: 'facilitators,reviewers',
         questionsGenPrompt: 'Prefer concrete tradeoffs.',
@@ -285,6 +290,11 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.config.sessionEndsAt, '2030-01-02T03:04:00Z');
+  assert.deepEqual(result.config.sessionContext, {
+    title: 'Context',
+    paragraphs: ['Plain-text context survives worker-canonical config validation.'],
+    links: [{ label: 'Official source', url: 'https://example.org/source' }],
+  });
   assert.equal(result.config.defaultGroupTags, 'facilitators,reviewers');
   assert.equal(result.config.interviewModeEnabled, false);
   assert.deepEqual(result.config.interviewMode, {

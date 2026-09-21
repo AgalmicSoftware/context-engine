@@ -356,6 +356,53 @@
   }
 }
 
+.sessionContextSection {
+  width: min(100%, 980px);
+  margin: 1.25rem auto 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+  border-radius: var(--ce-radius-10);
+  background: color-mix(in srgb, var(--ce-card-bg) 92%, var(--ce-status-info-soft));
+  color: var(--ce-text-primary);
+  text-align: left;
+
+  h3 {
+    margin: 0 0 0.55rem;
+    font-family: var(--ce-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 0.55rem 0 0;
+    color: var(--ce-text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+}
+
+.sessionContextLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ce-action-accent);
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+}
+
 .workerGroupCardLinkButton {
   display: inline-flex;
   align-items: center;

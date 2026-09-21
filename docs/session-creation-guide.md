@@ -412,6 +412,9 @@ Enter the core session metadata:
 
 - `sessionName`
 - `sessionInfo`
+- `sessionContext` for optional public background shown on the session page as
+  plain text and HTTPS links; it is not executable HTML and must not contain
+  secrets.
 - **Optional details** (**More options** in Custom settings) → **Session colors** →
   **Color scheme**. Session colors is the final optional field group and is
   collapsed by default. Expand it to choose `Context Engine`, `Ocean`, or
