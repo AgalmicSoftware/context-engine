@@ -35,11 +35,54 @@ const label = (value: unknown): string => (typeof value === 'string' ? value.tri
 export function reportQuestionMetadata(meta: unknown, payload: ReportRecord): ReportRecord {
   return { ...payload, ...record(meta) };
 }
+export function normalizePolisBinaryVote(value: unknown): -1 | 0 | 1 | null {
+  if (value === 1) return 1;
+  if (value === -1) return -1;
+  if (value === 0) return 0;
+  if (value === true) return 1;
+  if (value === false) return -1;
+
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return null;
+  if (
+    normalized === 'agree' ||
+    normalized === 'yes' ||
+    normalized === 'y' ||
+    normalized === 'true' ||
+    normalized === '1'
+  ) {
+    return 1;
+  }
+  if (
+    normalized === 'disagree' ||
+    normalized === 'no' ||
+    normalized === 'n' ||
+    normalized === 'false' ||
+    normalized === '-1'
+  ) {
+    return -1;
+  }
+  if (
+    normalized === 'unsure' ||
+    normalized === 'unknown' ||
+    normalized === 'maybe' ||
+    normalized === 'neutral' ||
+    normalized === '0'
+  ) {
+    return 0;
+  }
+  return null;
+}
+
 export function readReportAnswer(payload: ReportRecord, question: ReportRecord): unknown {
   const answer = record(payload.answer);
   if (answer.encrypted || answer.value === '*' || answer.value == null) return null;
   const value = answer.value;
   switch (question.type || question.questionType) {
+    case 'binary':
+      return normalizePolisBinaryVote(value);
     case 'freeform':
       return label(value) || null;
     case 'rating': {
@@ -69,14 +112,15 @@ export function readReportAnswer(payload: ReportRecord, question: ReportRecord):
   }
 }
 
-export function buildReportAnswerQuestions(
+type ReportScope = { sessionSlug?: string; allowDemo?: boolean };
+
+function collectReportAnswers(
   aggregator: unknown,
-  metadata: Record<string, ReportRecord> = {},
-  { sessionSlug = '', allowDemo = false }: { sessionSlug?: string; allowDemo?: boolean } = {},
-): ReportAnswerQuestion[] {
-  const questions: ReportAnswerQuestion[] = [];
-  Object.entries(record(aggregator)).forEach(([id, rows]) => {
-    if (!Array.isArray(rows)) return;
+  metadata: Record<string, ReportRecord>,
+  { sessionSlug = '', allowDemo = false }: ReportScope,
+) {
+  return Object.entries(record(aggregator)).flatMap(([id, rows]) => {
+    if (!Array.isArray(rows)) return [];
     const allowed = rows
       .map((row) => ({ row: record(row), payload: parseReportResponse(record(row).response) }))
       .filter(
@@ -86,8 +130,8 @@ export function buildReportAnswerQuestions(
           isResponseAllowedForSessionSlug(payload, sessionSlug),
       );
     const meta = reportQuestionMetadata(metadata[id.toLowerCase()], allowed[0]?.payload || {});
-    const type = String(meta.type || meta.questionType || '') as AnswerType;
-    if (!Object.hasOwn(answerTypeTitles, type)) return;
+    const type = String(meta.type || meta.questionType || '') as AnswerType | 'binary';
+    if (type !== 'binary' && !Object.hasOwn(answerTypeTitles, type)) return [];
     // Aggregators normally contain the latest answer per participant. Deduplicate
     // defensively so overlapping survey/standalone rows never inflate totals.
     const values = new Map<string, unknown>();
@@ -98,7 +142,37 @@ export function buildReportAnswerQuestions(
       const value = readReportAnswer(payload, meta);
       if (value !== null) values.set(responder, value);
     });
-    if (!values.size) return;
+    return values.size ? [{ id, meta, type, values }] : [];
+  });
+}
+
+export function buildReportResponseStats(
+  aggregator: unknown,
+  metadata: Record<string, ReportRecord> = {},
+  scope: ReportScope = {},
+) {
+  const questions = collectReportAnswers(aggregator, metadata, scope);
+  const count = (entries: typeof questions) => {
+    const participants = new Set(entries.flatMap(({ values }) => [...values.keys()])).size;
+    const responses = entries.reduce((total, { values }) => total + values.size, 0);
+    return {
+      participants,
+      questions: entries.length,
+      responses,
+      responsesPerParticipant: participants ? responses / participants : 0,
+    };
+  };
+  return { all: count(questions), binary: count(questions.filter(({ type }) => type === 'binary')) };
+}
+
+export function buildReportAnswerQuestions(
+  aggregator: unknown,
+  metadata: Record<string, ReportRecord> = {},
+  scope: ReportScope = {},
+): ReportAnswerQuestion[] {
+  const questions: ReportAnswerQuestion[] = [];
+  collectReportAnswers(aggregator, metadata, scope).forEach(({ id, meta, type, values }) => {
+    if (type === 'binary') return;
     const scale = record(meta.scale);
     const min = typeof scale.min === 'number' ? scale.min : 0;
     const max = typeof scale.max === 'number' ? scale.max : 10;

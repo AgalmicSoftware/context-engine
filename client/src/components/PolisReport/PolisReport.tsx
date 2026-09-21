@@ -105,7 +105,7 @@ import {
   shouldAutoEnablePolisDemoData,
 } from './polisReportRuntime';
 import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSections';
-import { buildReportAnswerQuestions } from './polisReportAnswers';
+import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
 import { readPolisReportCacheContext } from './polisReportRuntime';
 import {
   buildPolisDemoSurveyResultsNetworkData,
@@ -783,6 +783,10 @@ export default function PolisReport({
     );
     return {
       filtered,
+      responseStats: buildReportResponseStats(filtered, metadata, {
+        sessionSlug: activeReportSlug,
+        allowDemo: effectiveUseDemoData,
+      }),
       answers: buildReportAnswerQuestions(filtered, metadata, {
         sessionSlug: activeReportSlug,
         allowDemo: effectiveUseDemoData,
@@ -2609,94 +2613,110 @@ export default function PolisReport({
           <p className={styles.noData}>No readable responses match the current filters.</p>
         ) : (
           <>
-            {stats && (
-              <>
-                <div className={styles.sectionCollapse}>
-                  <div
-                    className={styles.sectionHeaderRow}
-                    style={{ width: '100%', cursor: 'pointer' }}
-                    onClick={() => setStatsOpen(!statsOpen)}
-                  >
-                    <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
-                      <FontAwesomeIcon icon={faCaretUp} style={{ marginRight: '6px' }} />
-                      Summary and Statistics
-                    </h5>
-                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                      <PolisReportSectionToggleLabel open={statsOpen} />
-                    </div>
+            {reportData.responseStats.all.responses > 0 && (
+              <div className={styles.sectionCollapse}>
+                <div
+                  className={styles.sectionHeaderRow}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                  onClick={() => setStatsOpen(!statsOpen)}
+                >
+                  <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
+                    <FontAwesomeIcon icon={faCaretUp} style={{ marginRight: '6px' }} />
+                    Summary and Statistics
+                  </h5>
+                  <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                    <PolisReportSectionToggleLabel open={statsOpen} />
                   </div>
-                  {statsOpen ? (
-                    <div className={styles.statsSectionCollapsible}>
-                      <div className={styles.statsSection}>
-                        <div className={styles.statsRow}>
-                          <div className={styles.statsItem}>
-                            <span className={styles.statLabel}>
-                              Participants
-                              {renderTooltipReference(
-                                'Participants who voted or wrote statements in the conversation.',
-                              )}
-                              :
-                            </span>
-                            <span className={styles.statValue}>{stats.nParticipants}</span>
-                          </div>
-                          <div className={styles.statsItem}>
-                            <span className={styles.statLabel}>
-                              Statements
-                              {renderTooltipReference(
-                                'Number of statements (questions) with a binary vote option available.',
-                              )}
-                              :
-                            </span>
-                            <span className={styles.statValue}>{stats.nComments}</span>
-                          </div>
-                          <div className={styles.statsItem}>
-                            <span className={styles.statLabel}>
-                              Votes
-                              {renderTooltipReference(
-                                'Total agree or disagree clicks recorded across all statements by participants.',
-                              )}
-                              :
-                            </span>
-                            <span className={styles.statValue}>{stats.totalVotes}</span>
-                          </div>
-                          <div className={styles.statsItem}>
-                            <span className={styles.statLabel}>
-                              Votes/Voter Avg
-                              {renderTooltipReference('The average number of vote actions each participant made.')}:
-                            </span>
-                            <span className={styles.statValue}>{stats.votesPerVoterAvg.toFixed(2)}</span>
-                          </div>
+                </div>
+                {statsOpen ? (
+                  <div className={styles.statsSectionCollapsible}>
+                    <div className={styles.statsSection}>
+                      <div className={styles.statsRow}>
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>
+                            Participants
+                            {renderTooltipReference(
+                              'Participants with at least one readable response of any type. The binary subset answered Agree, Unsure, or Disagree.',
+                            )}
+                            :
+                          </span>
+                          <span className={styles.statValue}>
+                            {reportData.responseStats.all.participants} ({reportData.responseStats.binary.participants}{' '}
+                            Binary)
+                          </span>
                         </div>
-                        <div className={styles.statsRow}>
-                          <div className={styles.statsItem}>
-                            <span className={styles.statLabel}>
-                              Active Filters
-                              {renderTooltipReference('Summary of all active filters applied to this data.')}:
-                            </span>
-                            <div className={styles.statValue}>{renderActiveFilters()}</div>
-                          </div>
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>
+                            Questions
+                            {renderTooltipReference(
+                              'Questions with at least one readable response, across all question types.',
+                            )}
+                            :
+                          </span>
+                          <span className={styles.statValue}>
+                            {reportData.responseStats.all.questions} ({reportData.responseStats.binary.questions}{' '}
+                            Binary)
+                          </span>
                         </div>
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>
+                            Responses
+                            {renderTooltipReference(
+                              'One response per participant and question, including all question types. Multiple selections count as one response; edits replace earlier answers. Binary includes Agree, Unsure, and Disagree.',
+                            )}
+                            :
+                          </span>
+                          <span className={styles.statValue}>
+                            {reportData.responseStats.all.responses} ({reportData.responseStats.binary.responses}{' '}
+                            Binary)
+                          </span>
+                        </div>
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>
+                            Responses/Participant Avg
+                            {renderTooltipReference(
+                              'Responses divided by participants with readable answers. The binary average uses only participants with binary answers.',
+                            )}
+                            :
+                          </span>
+                          <span className={styles.statValue}>
+                            {reportData.responseStats.all.responsesPerParticipant.toFixed(2)} (
+                            {reportData.responseStats.binary.responsesPerParticipant.toFixed(2)} Binary)
+                          </span>
+                        </div>
+                      </div>
+                      <div className={styles.statsRow}>
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>
+                            Active Filters
+                            {renderTooltipReference('Summary of all active filters applied to this data.')}:
+                          </span>
+                          <div className={styles.statValue}>{renderActiveFilters()}</div>
+                        </div>
+                      </div>
 
-                        {/* Added row for network and block info */}
-                        <div className={styles.statsRow}>
-                          {hasBlockchainContext ? (
-                            <div className={styles.statsItem}>
-                              <span className={styles.statLabel}>Blockchain:</span>
-                              <span className={styles.statValue}>
-                                {formatBlockchainNetworkLabel(network, networkChainId)}
-                              </span>
-                            </div>
-                          ) : null}
+                      {/* Added row for network and block info */}
+                      <div className={styles.statsRow}>
+                        {hasBlockchainContext ? (
                           <div className={styles.statsItem}>
-                            <span className={styles.statLabel}>Timestamp:</span>
-                            <span className={styles.statValue}>{getUTCDataTimestamp()}</span>
+                            <span className={styles.statLabel}>Blockchain:</span>
+                            <span className={styles.statValue}>
+                              {formatBlockchainNetworkLabel(network, networkChainId)}
+                            </span>
                           </div>
+                        ) : null}
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>Timestamp:</span>
+                          <span className={styles.statValue}>{getUTCDataTimestamp()}</span>
                         </div>
                       </div>
                     </div>
-                  ) : null}
-                </div>
-
+                  </div>
+                ) : null}
+              </div>
+            )}
+            {stats && (
+              <>
                 {/* CONSENSUS SECTION */}
                 <div className={styles.sectionCollapse}>
                   <div

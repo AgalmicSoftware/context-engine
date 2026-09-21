@@ -1653,7 +1653,8 @@ it('filters demo answer sections and binary analysis by the same question tags',
   );
   expect(screen.getByText('Demo tagged rating')).toBeInTheDocument();
   expect(screen.queryByText('Binary excluded')).not.toBeInTheDocument();
-  expect(screen.queryByText('Summary and Statistics')).not.toBeInTheDocument();
+  expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+  expect(screen.getAllByText('1 (0 Binary)')).toHaveLength(3);
   expect(screen.getByRole('region', { name: 'All Questions' })).toContainElement(
     screen.getByTestId('ce-polis-answers-rating'),
   );
@@ -1800,4 +1801,23 @@ it('uses native Group members for all answer sections and blocks unreadable coho
     tokenSpy.mockRestore();
     memberSpy.mockRestore();
   }
+});
+
+it('updates all-type summary counts on response nonce changes without waiting for binary analysis', () => {
+  const responses = {
+    text: [{ responder: 'person-a', response: { type: 'freeform', prompt: 'Explain', answer: { value: 'First' } } }],
+  };
+  const { rerender } = render(
+    <PolisReport {...baseReportProps} questionResponses={responses} questionResponsesNonce={1} />,
+  );
+  expect(screen.getAllByText('1 (0 Binary)')).toHaveLength(3);
+  // Cache hydration may append to the same aggregator object after submission.
+  responses.text.push({
+    responder: 'person-b',
+    response: { type: 'freeform', prompt: 'Explain', answer: { value: 'Second' } },
+  });
+  rerender(<PolisReport {...baseReportProps} questionResponses={responses} questionResponsesNonce={2} />);
+  expect(screen.getAllByText('2 (0 Binary)')).toHaveLength(2);
+  expect(screen.getByText('1 (0 Binary)')).toBeInTheDocument();
+  expect(screen.getByText('1.00 (0.00 Binary)')).toBeInTheDocument();
 });

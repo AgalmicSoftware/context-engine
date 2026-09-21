@@ -49,6 +49,9 @@ export async function probeColorVision(page, reload) {
 export async function probePolisAnswerSections(page) {
   const ratings = page.getByTestId('ce-polis-answers-rating');
   await ratings.waitFor();
+  for (const value of ['8 (4 Binary)', '10 (1 Binary)', '33 (4 Binary)', '4.13 (1.00 Binary)']) {
+    assert.equal(await page.getByText(value, { exact: true }).count(), 1, `Summary must include all answer types: ${value}`);
+  }
   assert.equal(await ratings.locator('article').count(), 1, 'Answer sections must start with previews open');
   const followsGraph = await page.getByTestId('ce-polis-answer-sections').evaluate((sections) => {
     const headings = [...document.querySelectorAll('h5')];
@@ -100,6 +103,10 @@ export async function probePolisAnswerSections(page) {
   assert.equal(await page.getByText('How well does local transport work?').count(), 0);
   assert.equal(await page.getByTestId('ce-polis-answers-multichoice').count(), 0);
   assert.equal(await written.getByRole('button', { name: /View more/ }).count(), 0, 'Filtering must update the remaining count');
+  assert.equal(await page.getByText('Summary and Statistics', { exact: true }).count(), 1, 'Nonbinary-only filters retain the summary');
+  for (const value of ['2 (0 Binary)', '3 (0 Binary)', '4 (0 Binary)', '2.00 (0.00 Binary)']) {
+    assert.equal(await page.getByText(value, { exact: true }).count(), 1, `Summary must follow filters: ${value}`);
+  }
   await page.getByRole('combobox', { name: 'Question tag' }).selectOption('empty');
   assert.equal(await page.getByText('No readable responses match the current filters.').count(), 1);
   await page.getByRole('combobox', { name: 'Question tag' }).selectOption('');
@@ -171,7 +178,7 @@ export async function runSmoke() {
       if (process.env.BUILT_IN_DEMOS === '1') {
         for (const slug of ['demo', 'demo-2']) await probeBuiltInPolisDemo(page, slug);
       }
-      console.log(JSON.stringify({ ok: true, viewport, checks: ['previews open by default', 'question types nested under All Questions', 'parent reopen opens all previews', 'top question', 'single view more control', 'rounded buttons in both themes', 'tag filters', 'empty sections', 'mobile overflow', 'shared response colors', 'color-blind mode in both themes', 'reload persistence', ...(process.env.OUTPUT_DIR ? ['color-blind PDF download', 'expansion restored'] : [])] }));
+      console.log(JSON.stringify({ ok: true, viewport, checks: ['all-type statistics with binary subset', 'filtered nonbinary summary', 'previews open by default', 'question types nested under All Questions', 'parent reopen opens all previews', 'top question', 'single view more control', 'rounded buttons in both themes', 'tag filters', 'empty sections', 'mobile overflow', 'shared response colors', 'color-blind mode in both themes', 'reload persistence', ...(process.env.OUTPUT_DIR ? ['color-blind PDF download', 'expansion restored'] : [])] }));
       await page.close();
     }
   } finally { await browser.close(); }

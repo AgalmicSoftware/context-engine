@@ -594,11 +594,6 @@ const answerFromMeanScore = (score) => {
   return 'Unsure';
 };
 
-const concreteVoteCount = (summary = {}) => {
-  const { agree, disagree } = answerTotals(summary);
-  return agree + disagree;
-};
-
 const normalizeAnalysisTopicCircles = (report) => {
   const overlayTopics = report.analysisOverlay?.debateAtlas?.topicCircles;
   const measuredTopics = report.debateAtlas?.topicCircles || [];
@@ -1804,12 +1799,13 @@ const renderModePane = ({
 const renderSummaryStats = (report) => {
   const runsWithIssues = Object.values(report.polisReport?.byModel || {})
     .reduce((sum, summary) => sum + (summary.invalid || 0), 0);
-  const modelSummaries = Object.values(report.polisReport?.byModel || {});
-  const totalConcreteVotes = modelSummaries.reduce((sum, summary) => sum + concreteVoteCount(summary), 0);
-  const voters = modelSummaries.filter((summary) => concreteVoteCount(summary) > 0).length;
-  const averageVotes = voters
-    ? totalConcreteVotes / voters
-    : 0;
+  // Match the live participant/question unit: repeated model runs are averaged
+  // in the CE export, and Unsure is a submitted response rather than missing data.
+  const rows = Object.values(buildContextEnginePolisExport(report).questionResponses);
+  const participants = new Set(rows.flatMap((answers) => answers.map((answer) => answer.responder))).size;
+  const responses = rows.reduce((sum, answers) => sum + answers.length, 0);
+  const average = participants ? responses / participants : 0;
+  const binaryCount = (value) => `${escapeHtml(value)} (${escapeHtml(value)} Binary)`;
   const activeFilter = report.mode === 'persona'
     ? `Persona mode: ${report.personaProfile?.label || report.personaId || 'Unknown'} (weights-only)`
     : 'None';
@@ -1820,10 +1816,10 @@ const renderSummaryStats = (report) => {
     bodyClassName: 'statsSectionCollapsible',
     body: `<div class="statsSection" data-benchmark-id="${escapeHtml(report.benchmarkId || '')}" data-benchmark-mode="${escapeHtml(report.mode || 'self')}" data-benchmark-issue-count="${escapeHtml(runsWithIssues)}"${personaAttribute}>
       <div class="statsRow">
-        <div class="statsItem">${renderStatLabel('Participants', 'Participants who voted or wrote statements in the conversation.')}<span class="statValue">${escapeHtml(report.counts?.models ?? 0)}</span></div>
-        <div class="statsItem">${renderStatLabel('Statements', 'Number of statements (questions) with a binary vote option available.')}<span class="statValue">${escapeHtml(report.counts?.questions ?? 0)}</span></div>
-        <div class="statsItem">${renderStatLabel('Votes', 'Total agree or disagree clicks recorded across all statements by participants.')}<span class="statValue">${escapeHtml(totalConcreteVotes)}</span></div>
-        <div class="statsItem">${renderStatLabel('Votes/Voter Avg', 'The average number of vote actions each participant made.')}<span class="statValue">${escapeHtml(averageVotes.toFixed(2))}</span></div>
+        <div class="statsItem">${renderStatLabel('Participants', 'Model participants with at least one readable averaged response. All benchmark questions are binary.')}<span class="statValue">${binaryCount(participants)}</span></div>
+        <div class="statsItem">${renderStatLabel('Questions', 'Questions with at least one readable response.')}<span class="statValue">${binaryCount(rows.length)}</span></div>
+        <div class="statsItem">${renderStatLabel('Responses', 'One averaged response per model and question, including Agree, Unsure, and Disagree. Repeated runs are nested observations.')}<span class="statValue">${binaryCount(responses)}</span></div>
+        <div class="statsItem">${renderStatLabel('Responses/Participant Avg', 'Responses divided by model participants with readable answers.')}<span class="statValue">${binaryCount(average.toFixed(2))}</span></div>
       </div>
       <div class="statsRow">
         <div class="statsItem">${renderStatLabel('Active Filters', 'Summary of all active filters applied to this data.')}<div class="statValue"><span>${escapeHtml(activeFilter)}</span></div></div>

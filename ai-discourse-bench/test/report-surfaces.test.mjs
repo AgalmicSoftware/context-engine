@@ -826,7 +826,7 @@ test('Debate Map contributor context distinguishes partial model coverage', asyn
   assert.match(issueTemplate, /Two models must answer the same question/);
 });
 
-test('Summary stats count only concrete agree and disagree votes like live Polis', async () => {
+test('Summary stats count averaged model/question responses without multiplying repeated runs', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -854,11 +854,11 @@ test('Summary stats count only concrete agree and disagree votes like live Polis
   const html = renderHtmlReport(report);
 
   assert.equal(report.counts.runs, 3);
-  assert.match(html, /<span class="statLabel">Votes<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1<\/span>/);
-  assert.match(html, /<span class="statLabel">Votes\/Voter Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.00<\/span>/);
+  assert.match(html, /<span class="statLabel">Responses<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1 \(1 Binary\)<\/span>/);
+  assert.match(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.00 \(1\.00 Binary\)<\/span>/);
   assert.match(html, /\(Total: 2\)/);
-  assert.doesNotMatch(html, /<span class="statLabel">Votes<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">3<\/span>/);
-  assert.doesNotMatch(html, /<span class="statLabel">Votes\/Voter Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.50<\/span>/);
+  assert.doesNotMatch(html, /<span class="statLabel">Responses<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">3 \(3 Binary\)<\/span>/);
+  assert.doesNotMatch(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.50 \(1\.50 Binary\)<\/span>/);
 });
 
 test('analysis overlay populates risk matrix popups and Debate Map generated surfaces', async () => {
@@ -1100,7 +1100,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   const polisContainerMarkup = html.slice(polisContainerStart, modeSurfacesStart);
 
   assert.equal(report.participants.length, 2);
-  assert.match(html, /<span class="statLabel">Participants<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">2<\/span>/);
+  assert.match(html, /<span class="statLabel">Participants<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">2 \(2 Binary\)<\/span>/);
   assert.match(html, /<div id="root">\s*<div data-testid="ce-page-session-root">\s*<div class="onePageDemoContainer">/);
   assert.match(html, /<div class="onePageDemoContainer">/);
   assert.match(html, /#root \{ padding-right: 2%; padding-left: 2%; \}/);
@@ -1190,9 +1190,9 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.statValue \{ color: var\(--ce-color-border\); \}/);
   assert.match(html, /\.statsRow \{ display: flex; flex-wrap: wrap; margin-bottom: 6px; \}/);
   assert.match(html, /\.tooltipIcon \{ display: inline-block; margin-left: 4px; color: #555; cursor: help;/);
-  assert.match(html, /class="pdfIgnore aidb-inline-tooltip-reference" style="display: inline-flex;" title="Participants who voted or wrote statements in the conversation\."/);
+  assert.match(html, /class="pdfIgnore aidb-inline-tooltip-reference" style="display: inline-flex;" title="Model participants with at least one readable averaged response\. All benchmark questions are binary\."/);
   assert.match(html, /data-icon="question-circle" class="svg-inline--fa fa-question-circle tooltipIcon"/);
-  assert.match(html, /<div class="statsRow">\s*<div class="statsItem"><span class="statLabel">Participants<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">2<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Statements<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Votes<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">2<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Votes\/Voter Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.00<\/span><\/div>\s*<\/div>/);
+  assert.match(html, /<div class="statsRow">\s*<div class="statsItem"><span class="statLabel">Participants<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">2 \(2 Binary\)<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Questions<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1 \(1 Binary\)<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Responses<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">2 \(2 Binary\)<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.00 \(1\.00 Binary\)<\/span><\/div>\s*<\/div>/);
   assert.match(html, /<div class="statsSection" data-benchmark-id="ai-discourse-bench-v0-sample-200-first-1" data-benchmark-mode="self" data-benchmark-issue-count="0">/);
   assert.match(html, /<div class="statsRow">\s*<div class="statsItem"><span class="statLabel">Active Filters<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><div class="statValue"><span>None<\/span><\/div><\/div>\s*<\/div>/);
   assert.match(html, /<div class="statsRow">\s*<div class="statsItem"><span class="statLabel">Blockchain:<\/span><span class="statValue">Unknown<\/span><\/div>\s*<div class="statsItem"><span class="statLabel">Timestamp:<\/span><span class="statValue">[^<]+ UTC<\/span><\/div>\s*<\/div>/);
@@ -2436,4 +2436,17 @@ test('report input helpers merge separate local model smoke artifacts', async ()
   assert.deepEqual(modelRoster.models.map((model) => model.id), ['model-a', 'model-b']);
   assert.equal(runsFile.runs.length, 2);
   assert.equal(runsFile.sourceRunFiles, 2);
+});
+
+
+test('Summary statistics include an Unsure-only participant as one binary response', async () => {
+  const questionBank = limitQuestionBank(await readJson(new URL('../data/question-bank.sample.json', import.meta.url)), 1);
+  const modelRoster = { schemaVersion: 1, models: [{ id: 'model-a', label: 'Model A', model: 'provider/model-a', provider: 'mock', traits: {} }] };
+  const runsFile = { schemaVersion: 1, benchmarkId: questionBank.benchmarkId, mode: 'self', runs: [
+    { modelId: 'model-a', questionId: questionBank.questions[0].id, polarity: 'canonical', normalizedAnswer: 'Unsure' },
+    { modelId: 'model-a', questionId: questionBank.questions[0].id, polarity: 'canonical', normalizedAnswer: 'Unsure' },
+  ] };
+  const html = renderHtmlReport(buildResultsReport({ questionBank, modelRoster, runsFile }));
+  assert.match(html, /<span class="statLabel">Participants[\s\S]*?<span class="statValue">1 \(1 Binary\)<\/span>/);
+  assert.match(html, /<span class="statLabel">Responses[\s\S]*?<span class="statValue">1 \(1 Binary\)<\/span>/);
 });

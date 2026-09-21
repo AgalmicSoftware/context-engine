@@ -13,6 +13,17 @@ show the percentage agreeing (or disagreeing) in the cluster alongside the overa
 percentage. Both use responses to that question, including Unsure and excluding
 missing answers, within the current report filters; overall includes the cluster.
 
+**Summary and Statistics** counts participants, answered questions, responses,
+and average responses per participant across all five question types. Each value
+shows its binary subset in parentheses, such as `42 (18 Binary)`. One participant's
+answer to one question counts once: editing replaces that answer, and selecting
+several options or allocating across several choices still counts as one response.
+Binary includes Agree, Unsure, and Disagree. The binary average uses participants
+with binary answers; the overall average uses all participants with readable
+answers. The summary follows the same filters as the answer sections, updates when
+new responses reach the report, and remains visible for nonbinary-only results.
+Polis clustering and participant graphs continue to use binary answers only.
+
 A section appears only when at least one of its questions has a valid readable
 answer after filtering. All Questions starts open with each type’s preview visible.
 Collapsing the parent hides every type; reopening it opens all type previews,
