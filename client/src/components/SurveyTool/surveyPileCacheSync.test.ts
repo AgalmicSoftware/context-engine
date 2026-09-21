@@ -165,6 +165,72 @@ describe('surveyPileCacheSync', () => {
     ).toBe(true);
   });
 
+  it('keeps optimistic pile state while no pile questions are available to verify cache catch-up', () => {
+    expect(
+      isPileCacheConsistentWithBaseline({
+        baseline: {
+          answers: { q1: { value: 'Agree' } },
+          importance: { q1: 70 },
+          conviction: {},
+        },
+        renderedIds: [],
+        questionResponses: {
+          q1: {
+            '0xabc': {
+              answer: { value: 'Agree' },
+              importance: 70,
+            },
+          },
+        },
+        account: '0xabc',
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps optimistic pile state when cache omits an explicitly submitted importance rating', () => {
+    const baseline = {
+      answers: { q1: { value: 'Agree' } },
+      additionalComments: { q1: { value: 'Reviewed note' } },
+      importance: { q1: 70 },
+      conviction: { q1: 70 },
+    };
+
+    expect(
+      isPileCacheConsistentWithBaseline({
+        baseline,
+        renderedIds: ['q1'],
+        questionResponses: {
+          q1: {
+            '0xabc': {
+              answer: { value: 'Agree' },
+              additional: { value: 'Reviewed note' },
+              conviction: 70,
+            },
+          },
+        },
+        account: '0xabc',
+      }),
+    ).toBe(false);
+
+    expect(
+      isPileCacheConsistentWithBaseline({
+        baseline,
+        renderedIds: ['q1'],
+        questionResponses: {
+          q1: {
+            '0xabc': {
+              answer: { value: 'Agree' },
+              additional: { value: 'Reviewed note' },
+              importance: 70,
+              conviction: 70,
+            },
+          },
+        },
+        account: '0xabc',
+      }),
+    ).toBe(true);
+  });
+
   it('treats stale cleared pile cache answers as inconsistent with the optimistic baseline', () => {
     expect(
       isPileCacheConsistentWithBaseline({

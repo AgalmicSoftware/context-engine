@@ -145,6 +145,7 @@ export const buildPileAutoDecryptUpdatePlan = ({
 export const buildPileComponentUpdatePlan = ({
   networkChanged = false,
   accountChanged = false,
+  sessionIdentityChanged = false,
   cacheReadyTick = false,
   nonceTick = false,
   responseNonceTick = false,
@@ -167,6 +168,7 @@ export const buildPileComponentUpdatePlan = ({
 }: {
   networkChanged?: boolean;
   accountChanged?: boolean;
+  sessionIdentityChanged?: boolean;
   cacheReadyTick?: boolean;
   nonceTick?: boolean;
   responseNonceTick?: boolean;
@@ -187,7 +189,7 @@ export const buildPileComponentUpdatePlan = ({
   autoDecryptJustEnabled?: boolean;
   commentsChanged?: boolean;
 } = {}): PileComponentUpdatePlan => {
-  if (networkChanged || accountChanged) {
+  if (networkChanged || accountChanged || sessionIdentityChanged) {
     return {
       shouldResetContext: true,
       cacheUpdatePlan: { action: 'noop', delayMs: 80 },

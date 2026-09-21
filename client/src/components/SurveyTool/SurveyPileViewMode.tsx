@@ -124,7 +124,9 @@ import {
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
+  shouldInitializePileResponses,
 } from './surveyPileResponseController';
+import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
 import type { PileResponseSlice } from './surveyPileResponseWindow';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -1453,6 +1455,19 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   const networkChanged = prevProps.network?.id !== engine.props.network?.id;
   const accountChanged = (prevProps.account || '').toLowerCase() !== (engine.props.account || '').toLowerCase();
   const providerChanged = prevProps.provider !== engine.props.provider;
+  const previousEffectiveSlug = resolveEffectiveSlug(prevProps);
+  const nextEffectiveSlug = resolveEffectiveSlug(engine.props);
+  const previousWorkerTarget = resolveSurveyToolWorkerTargetSignature({
+    sessionConfig: prevProps.sessionConfig,
+    sessionSlug: previousEffectiveSlug,
+  });
+  const nextWorkerTarget = resolveSurveyToolWorkerTargetSignature({
+    sessionConfig: engine.props.sessionConfig,
+    sessionSlug: nextEffectiveSlug,
+  });
+  const sessionIdentityChanged =
+    normalizeSessionSlugValue(previousEffectiveSlug) !== normalizeSessionSlugValue(nextEffectiveSlug) ||
+    previousWorkerTarget.key !== nextWorkerTarget.key;
 
   const cacheReadyTick =
     (prevProps.isQuestionCacheReady !== engine.props.isQuestionCacheReady && engine.props.isQuestionCacheReady) ||
@@ -1484,6 +1499,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   const updatePlan = buildPileComponentUpdatePlan({
     networkChanged,
     accountChanged,
+    sessionIdentityChanged,
     cacheReadyTick,
     nonceTick,
     responseNonceTick,
@@ -2250,7 +2266,10 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
       engine.runPileQuestionSetHydration({
         requestEpoch,
         resultSignature: loadResultPlan.resultSignature,
-        initializeResponses: !engine.state.submissionComplete,
+        initializeResponses: shouldInitializePileResponses({
+          submissionComplete: engine.state.submissionComplete,
+          currentSlice: engine.state.surveysResponseState?.[0],
+        }),
         forceOverwriteDraft: true,
         resetAutoDecryptLedger: true,
         autoDecryptReason: 'pile-hydration',

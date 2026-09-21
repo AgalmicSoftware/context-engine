@@ -133,27 +133,36 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
-    const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(stateRef.current.surveysResponseState || [])];
-    const slice: SurveyQuestionsLegacyValue = { ...sourceSlice };
-    slice.answers = {
-      ...(slice.answers || {}),
-      [questionId]: plan.nextAnswerState,
-    };
-
-    if (plan.nextAdditionalState) {
-      slice.additionalComments = {
-        ...(slice.additionalComments || {}),
-        [questionId]: plan.nextAdditionalState,
-      };
-    }
-
-    newSurveysResponseState[surveyIndex] = slice;
-
     setState(
-      buildSurveyUserEditResponseStatePatch(
-        newSurveysResponseState,
-        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
-      ),
+      (prev: SurveyQuestionsLegacyValue) => {
+        const baseState: SurveyQuestionsLegacyValue = prev || stateRef.current;
+        const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(baseState.surveysResponseState || [])];
+        const slice: SurveyQuestionsLegacyValue = {
+          ...(newSurveysResponseState[surveyIndex] || {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          }),
+        };
+        slice.answers = {
+          ...(slice.answers || {}),
+          [questionId]: plan.nextAnswerState,
+        };
+
+        if (plan.nextAdditionalState) {
+          slice.additionalComments = {
+            ...(slice.additionalComments || {}),
+            [questionId]: plan.nextAdditionalState,
+          };
+        }
+
+        newSurveysResponseState[surveyIndex] = slice;
+        return buildSurveyUserEditResponseStatePatch(
+          newSurveysResponseState,
+          updateSubmittedSinceLastEdit(baseState.submittedSinceLastEdit, 'user_edit'),
+        );
+      },
       () => {
         scheduleJsonPreviewUpdate();
         if (shouldPersistDraft) persistDraftSafely();
@@ -195,20 +204,29 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
-    const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(stateRef.current.surveysResponseState || [])];
-    const slice: SurveyQuestionsLegacyValue = { ...sourceSlice };
-    slice.additionalComments = {
-      ...(slice.additionalComments || {}),
-      [questionId]: plan.nextAdditionalState,
-    };
-
-    newSurveysResponseState[surveyIndex] = slice;
-
     setState(
-      buildSurveyUserEditResponseStatePatch(
-        newSurveysResponseState,
-        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
-      ),
+      (prev: SurveyQuestionsLegacyValue) => {
+        const baseState: SurveyQuestionsLegacyValue = prev || stateRef.current;
+        const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(baseState.surveysResponseState || [])];
+        const slice: SurveyQuestionsLegacyValue = {
+          ...(newSurveysResponseState[surveyIndex] || {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          }),
+        };
+        slice.additionalComments = {
+          ...(slice.additionalComments || {}),
+          [questionId]: plan.nextAdditionalState,
+        };
+
+        newSurveysResponseState[surveyIndex] = slice;
+        return buildSurveyUserEditResponseStatePatch(
+          newSurveysResponseState,
+          updateSubmittedSinceLastEdit(baseState.submittedSinceLastEdit, 'user_edit'),
+        );
+      },
       () => {
         scheduleJsonPreviewUpdate();
         if (shouldPersistDraft) persistDraftSafely();
@@ -238,23 +256,25 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
-    const newSurveysResponseState: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
-    const slice: SurveyQuestionsLegacyValue = {
-      ...(newSurveysResponseState[surveyIndex] || {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      }),
-    };
-    slice.conviction = { ...(slice.conviction || {}), [questionId]: conviction };
-    newSurveysResponseState[surveyIndex] = slice;
-
     setState(
-      buildSurveyUserEditResponseStatePatch(
-        newSurveysResponseState,
-        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
-      ),
+      (prev: SurveyQuestionsLegacyValue) => {
+        const baseState: SurveyQuestionsLegacyValue = prev || stateRef.current;
+        const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(baseState.surveysResponseState || [])];
+        const slice: SurveyQuestionsLegacyValue = {
+          ...(newSurveysResponseState[surveyIndex] || {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          }),
+        };
+        slice.conviction = { ...(slice.conviction || {}), [questionId]: conviction };
+        newSurveysResponseState[surveyIndex] = slice;
+        return buildSurveyUserEditResponseStatePatch(
+          newSurveysResponseState,
+          updateSubmittedSinceLastEdit(baseState.submittedSinceLastEdit, 'user_edit'),
+        );
+      },
       () => {
         scheduleJsonPreviewUpdate();
         if (shouldPersistDraft) persistDraftSafely();
@@ -284,23 +304,25 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
-    const newSurveysResponseState: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
-    const slice: SurveyQuestionsLegacyValue = {
-      ...(newSurveysResponseState[surveyIndex] || {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      }),
-    };
-    slice.importance = { ...(slice.importance || {}), [questionId]: importance };
-    newSurveysResponseState[surveyIndex] = slice;
-
     setState(
-      buildSurveyUserEditResponseStatePatch(
-        newSurveysResponseState,
-        updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'user_edit'),
-      ),
+      (prev: SurveyQuestionsLegacyValue) => {
+        const baseState: SurveyQuestionsLegacyValue = prev || stateRef.current;
+        const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(baseState.surveysResponseState || [])];
+        const slice: SurveyQuestionsLegacyValue = {
+          ...(newSurveysResponseState[surveyIndex] || {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          }),
+        };
+        slice.importance = { ...(slice.importance || {}), [questionId]: importance };
+        newSurveysResponseState[surveyIndex] = slice;
+        return buildSurveyUserEditResponseStatePatch(
+          newSurveysResponseState,
+          updateSubmittedSinceLastEdit(baseState.submittedSinceLastEdit, 'user_edit'),
+        );
+      },
       () => {
         scheduleJsonPreviewUpdate();
         if (shouldPersistDraft) persistDraftSafely();

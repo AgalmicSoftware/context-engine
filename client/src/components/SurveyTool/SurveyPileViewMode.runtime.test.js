@@ -29,6 +29,7 @@ import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../uti
 import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
   const React = require('react');
@@ -295,6 +296,68 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     await waitFor(() => expect(slider).toHaveValue('7'));
     expect(screen.getByText('7')).toBeInTheDocument();
+  });
+
+  it('resets mounted pile responses when the session slug changes', async () => {
+    const question = { id: 'rating-q1', type: 'rating', prompt: 'Rate the active session' };
+    const harness = renderPile({
+      sessionSlug: 'session-a',
+      questionPool: [question],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Rate the active session')).toBeInTheDocument();
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '7' } });
+    await waitFor(() => expect(slider).toHaveValue('7'));
+
+    harness.rerenderSurveyQuestions({ sessionSlug: 'session-b' });
+
+    await waitFor(() => expect(screen.getByRole('slider')).toHaveValue('0'));
+  });
+
+  it('resets mounted pile responses when a same-slug Worker identity changes', async () => {
+    const question = { id: 'rating-q1', type: 'rating', prompt: 'Rate the Worker-backed session' };
+    const buildSessionConfig = (sessionId, corsWorkerUrl) => ({
+      slug: 'demo',
+      sessionId,
+      corsWorkerUrl,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          mode: 'authorized_read',
+        },
+      },
+    });
+    const harness = renderPile({
+      sessionSlug: 'demo',
+      sessionConfig: buildSessionConfig('0x11111111111111111111111111111111', 'https://worker-a.example/'),
+      questionPool: [question],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Rate the Worker-backed session')).toBeInTheDocument();
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '7' } });
+    await waitFor(() => expect(slider).toHaveValue('7'));
+
+    harness.rerenderSurveyQuestions({
+      sessionConfig: buildSessionConfig('0x22222222222222222222222222222222', 'https://worker-b.example/'),
+    });
+
+    await waitFor(() => expect(screen.getByRole('slider')).toHaveValue('0'));
   });
 
   it('advances pile navigation while early questionPool questions are visible', async () => {

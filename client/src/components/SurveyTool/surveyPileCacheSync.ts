@@ -136,6 +136,7 @@ export const isPileCacheConsistentWithBaseline = ({
   if (!baseline || Object.keys(baselineSlice).length === 0) return false;
 
   const normalizedRenderedIds = Array.isArray(renderedIds) ? renderedIds : [];
+  if (normalizedRenderedIds.length === 0) return false;
   const normalizedResponses = questionResponses && typeof questionResponses === 'object' ? questionResponses : {};
   const accountLower = String(account || '').toLowerCase();
 
@@ -187,11 +188,10 @@ export const isPileCacheConsistentWithBaseline = ({
 
     if (baselineSlice.conviction && Object.prototype.hasOwnProperty.call(baselineSlice.conviction, questionId)) {
       const baselineConviction = toNumberOrNull(baselineSlice.conviction[questionId]);
-      const cacheConvictionRaw =
+      const cacheConviction =
         cacheEntry?.conviction !== undefined && cacheEntry?.conviction !== null
-          ? cacheEntry.conviction
-          : cacheEntry?.importance;
-      const cacheConviction = toNumberOrNull(cacheConvictionRaw);
+          ? toNumberOrNull(cacheEntry.conviction)
+          : null;
       if (cacheConviction === null) {
         if (!baselineResponseEncrypted && !cacheRatingEncrypted) return false;
       } else if (baselineConviction !== cacheConviction) {
@@ -201,11 +201,10 @@ export const isPileCacheConsistentWithBaseline = ({
 
     if (baselineSlice.importance && Object.prototype.hasOwnProperty.call(baselineSlice.importance, questionId)) {
       const baselineImportance = toNumberOrNull(baselineSlice.importance[questionId]);
-      const cacheImportanceRaw =
+      const cacheImportance =
         cacheEntry?.importance !== undefined && cacheEntry?.importance !== null
-          ? cacheEntry.importance
-          : cacheEntry?.conviction;
-      const cacheImportance = toNumberOrNull(cacheImportanceRaw);
+          ? toNumberOrNull(cacheEntry.importance)
+          : null;
       if (cacheImportance === null) {
         if (!baselineResponseEncrypted && !cacheRatingEncrypted) return false;
       } else if (baselineImportance !== cacheImportance) {
