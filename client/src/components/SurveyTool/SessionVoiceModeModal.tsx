@@ -8,10 +8,7 @@ import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
 import SessionInterviewMemoryKickoffCard from './SessionInterviewMemoryKickoffCard';
-import SessionInterviewTranscriptDisclosure from './SessionInterviewTranscriptDisclosure';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
-import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
-import { readWorkerGroupAutoJoinId } from '../../domains/worker/workerGroupAutoJoin';
 import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
@@ -21,14 +18,13 @@ import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
+import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import SessionInterviewDraftCard, { type InterviewQuestionControls } from './SessionInterviewDraftCard';
-import SessionListeningPanel, {
-  formatSessionRecordingElapsed,
-  SessionListeningWaveform,
-} from './SessionListeningPanel';
+import SessionListeningPanel from './SessionListeningPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { ImportedResponderContextEditor, SessionInterviewVoiceControls } from './SessionInterviewVoiceControls';
+import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import {
   buildExternalInterviewKickoff,
@@ -107,16 +103,6 @@ type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
 
 type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
-};
-
-const buildInterviewReturnSessionUrl = (): string => {
-  if (typeof window === 'undefined') return '';
-  const url = new URL(`${window.location.origin}${window.location.pathname}`);
-  const source = normalizeRecruitmentSource(new URLSearchParams(window.location.search).get('src'));
-  if (source) url.searchParams.set('src', source);
-  const joinGroup = readWorkerGroupAutoJoinId(window.location.search);
-  if (joinGroup) url.searchParams.set('joinGroup', joinGroup);
-  return url.toString();
 };
 
 function SessionInterviewPanel({
@@ -696,8 +682,8 @@ function SessionInterviewPanel({
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
   const hasImportedExternalPrefill = Boolean(
     prefillPacket &&
-      Array.isArray(prefillPacket.responses) &&
-      ['claude', 'chatgpt'].includes(String(prefillPacket.source?.platform || '').toLowerCase()),
+    Array.isArray(prefillPacket.responses) &&
+    ['claude', 'chatgpt'].includes(String(prefillPacket.source?.platform || '').toLowerCase()),
   );
   const canManuallyRefreshGroupRecommendations = hasRefreshableGroups && drafts.length > 0;
 
@@ -747,6 +733,14 @@ function SessionInterviewPanel({
       : transcript.trim()
         ? 'Continue interview'
         : 'Start voice interview';
+  const canGenerateDrafts = Boolean(
+    !isInterviewBusy &&
+    !drafts.length &&
+    !mapping &&
+    !mappingNotice &&
+    (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
+    (transcript.trim() || prefillPacket || responderContext.trim()),
+  );
 
   return (
     <>
@@ -763,26 +757,16 @@ function SessionInterviewPanel({
       <ModalBody>
         <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
           {hasImportedResponderContext ? (
-            <details
-              className={styles.sessionInterviewContext}
-              open={contextExpanded}
-              onToggle={(event) => setContextExpanded(event.currentTarget.open)}
-            >
-              <summary>Imported responder context</summary>
-              <Label for="ce-interview-context">Imported responder context details</Label>
-              <Input
-                id="ce-interview-context"
-                type="textarea"
-                value={responderContext}
-                onChange={(event) => {
-                  setResponderContext(event.target.value);
-                  setMappingNotice('');
-                }}
-                disabled={isInterviewBusy || mapping}
-                className={styles.sessionInterviewContextInput}
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT}
-              />
-            </details>
+            <ImportedResponderContextEditor
+              expanded={contextExpanded}
+              value={responderContext}
+              disabled={isInterviewBusy || mapping}
+              onExpandedChange={setContextExpanded}
+              onChange={(value) => {
+                setResponderContext(value);
+                setMappingNotice('');
+              }}
+            />
           ) : null}
 
           {updates.notice ? <p role="status">{updates.notice}</p> : null}
@@ -802,96 +786,33 @@ function SessionInterviewPanel({
               {error}
             </div>
           ) : null}
-          <div className={styles.sessionInterviewActions}>
-            {!isRecorderSessionActive ? (
-              <div className={styles.sessionInterviewPrimaryAction}>
-                <Button
-                  color="link"
-                  className={styles.sessionInterviewMicrophone}
-                  aria-label={startLabel}
-                  onClick={() => {
-                    void startInterview();
-                  }}
-                  disabled={mapping || applying || !questions.length || isStarting || interviewOpening.loading}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_START}
-                >
-                  <span className={styles.sessionInterviewActionCircle} aria-hidden="true">
-                    <FontAwesomeIcon icon={isStarting ? faSpinner : faMicrophone} spin={isStarting} />
-                  </span>
-                  <span>{startLabel}</span>
-                </Button>
-                {hasTranscript ? (
-                  <SessionInterviewTranscriptDisclosure
-                    variant="compact"
-                    showTranscript={showTranscript}
-                    transcript={transcript}
-                    onToggleTranscript={() => setShowTranscript((current) => !current)}
-                  />
-                ) : null}
-              </div>
-            ) : (
-              <div className={styles.sessionListeningActiveRecorder}>
-                <div className={styles.sessionListeningWaveformShell}>
-                  <SessionListeningWaveform
-                    streamRef={mediaStreamRef}
-                    isActive={isRecorderSessionActive}
-                    isPaused={isPaused || isStopping}
-                  />
-                  <div className={styles.sessionListeningWaveformTimer}>
-                    <FontAwesomeIcon
-                      icon={isStopping ? faSpinner : faCircle}
-                      spin={isStopping}
-                      className={isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
-                    />
-                    <span>{isStopping ? 'Ending' : isPaused ? 'Paused' : 'Listening'}</span>
-                    <span>{formatSessionRecordingElapsed(recordingElapsedSeconds)}</span>
-                  </div>
-                </div>
-                <div
-                  className={styles.sessionListeningButtonColumn}
-                  role="group"
-                  aria-label="Interview recording controls"
-                >
-                  <button
-                    type="button"
-                    ref={stopControlRef}
-                    className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
-                    onClick={() => {
-                      void endInterview();
-                    }}
-                    disabled={isStopping}
-                    aria-label={isStopping ? 'Stopping interview' : 'Stop interview'}
-                    title={isStopping ? 'Stopping interview' : 'Stop interview and generate drafts'}
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STOP}
-                  >
-                    <FontAwesomeIcon icon={isStopping ? faSpinner : faStop} spin={isStopping} />
-                    <span className={styles.sessionListeningSrOnly}>{isStopping ? 'Stopping' : 'Stop'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.sessionListeningAudioButton}
-                    onClick={isPaused ? recorder.resume : recorder.pause}
-                    disabled={isStopping}
-                    aria-label={isPaused ? 'Resume interview' : 'Pause interview'}
-                    title={isPaused ? 'Resume interview' : 'Pause interview'}
-                  >
-                    <FontAwesomeIcon icon={isPaused ? faPlay : faPause} />
-                    <span className={styles.sessionListeningSrOnly}>{isPaused ? 'Resume' : 'Pause'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-            {!isInterviewBusy &&
-            !drafts.length &&
-            !mapping &&
-            !mappingNotice &&
-            (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
-            (transcript.trim() || prefillPacket || responderContext.trim()) ? (
-              <Button outline onClick={() => runMapping()} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}>
-                Generate response drafts
-              </Button>
-            ) : null}
-          </div>
+          <SessionInterviewVoiceControls
+            isRecorderSessionActive={isRecorderSessionActive}
+            isPaused={isPaused}
+            isStopping={isStopping}
+            isStarting={isStarting}
+            startLabel={startLabel}
+            startDisabled={mapping || applying || !questions.length || isStarting || interviewOpening.loading}
+            hasTranscript={hasTranscript}
+            showTranscript={showTranscript}
+            transcript={transcript}
+            mediaStreamRef={mediaStreamRef}
+            recordingElapsedSeconds={recordingElapsedSeconds}
+            stopControlRef={stopControlRef}
+            canGenerateDrafts={canGenerateDrafts}
+            onStartInterview={() => {
+              void startInterview();
+            }}
+            onEndInterview={() => {
+              void endInterview();
+            }}
+            onPause={recorder.pause}
+            onResume={recorder.resume}
+            onToggleTranscript={() => setShowTranscript((current) => !current)}
+            onGenerateDrafts={() => {
+              void runMapping();
+            }}
+          />
 
           {hasTranscript && showTranscript ? (
             <div className={styles.sessionInterviewTranscriptArea}>
