@@ -2825,9 +2825,7 @@ const renderPileResponseInput = (
             className={styles.ratingSlider}
           />
           <span className={styles.ratingValueDisplay}>
-            <span>{ratingScale.minLabel}</span>
             <span aria-label="Current rating">{ratingValue}</span>
-            <span>{ratingScale.maxLabel}</span>
           </span>
         </div>
       );

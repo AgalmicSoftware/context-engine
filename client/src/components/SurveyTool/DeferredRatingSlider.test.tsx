@@ -24,13 +24,19 @@ describe('DeferredRatingSlider', () => {
   it('uses per-question rating endpoints while buffering commits', () => {
     const onCommit = jest.fn();
     render(
-      <DeferredRatingSlider value={0} scale={{ min: 1, max: 10, minLabel: '1', maxLabel: '10' }} onCommit={onCommit} />,
+      <DeferredRatingSlider
+        value={0}
+        scale={{ min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' }}
+        onCommit={onCommit}
+      />,
     );
 
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('min', '1');
     expect(slider).toHaveAttribute('max', '10');
     expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.queryByText('Almost none of it')).not.toBeInTheDocument();
+    expect(screen.queryByText('All of it')).not.toBeInTheDocument();
 
     fireEvent.mouseDown(slider);
     fireEvent.change(slider, { target: { value: '10' } });

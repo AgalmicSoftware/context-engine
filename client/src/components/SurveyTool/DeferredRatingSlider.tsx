@@ -39,9 +39,7 @@ const DeferredRatingSlider = ({
           <CESlider {...sliderProps} />
         </div>
         <FormText className={styles.ratingLabelText}>
-          <span>{scale.minLabel}</span>
           <span aria-label="Current rating">{liveValue}</span>
-          <span>{scale.maxLabel}</span>
         </FormText>
       </>
     )}
