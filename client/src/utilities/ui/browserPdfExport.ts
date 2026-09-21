@@ -1,3 +1,5 @@
+import { FIXED_MEDIA_LIGHT, formatFixedMediaRgba } from './fixedMediaColors';
+
 export type JsPdfDocument = {
   internal: {
     pageSize: {
@@ -110,7 +112,7 @@ export const saveCanvasAsPagedPdf = ({
       pageCanvas.height = bottom - top;
       const context = pageCanvas.getContext('2d');
       if (!context) throw new Error('PDF page canvas is unavailable.');
-      context.fillStyle = '#fff';
+      context.fillStyle = FIXED_MEDIA_LIGHT;
       context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
       context.drawImage(
         canvas as HTMLCanvasElement,
@@ -204,7 +206,7 @@ export function prepareReportCanvasClone(root: HTMLElement): void {
         context.fillStyle = value;
         context.fillRect(0, 0, 1, 1);
         const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
-        rgb = `rgba(${red}, ${green}, ${blue}, ${alpha / 255})`;
+        rgb = formatFixedMediaRgba(red, green, blue, alpha);
         cache.set(value, rgb);
       }
       element.style.setProperty(property, rgb, 'important');

@@ -1,14 +1,14 @@
 /* @file PolisReport.module.scss */
 
 .polisReportContainer {
-  --report-control-blue: #245fca;
-  --report-control-blue-hover: #184ca8;
-  --report-control-blue-tint: #eaf2ff;
-  --report-control-white: #fff;
-  --report-control-text: #18365f;
-  --report-control-surface: #f1f5f9;
-  --report-scroll-bg: #d6e9ff;
-  --report-scroll-hover: #bddbff;
+  --report-control-blue: color-mix(in srgb, var(--ce-status-info) 76%, var(--ce-document-text));
+  --report-control-blue-hover: color-mix(in srgb, var(--ce-status-info) 64%, var(--ce-document-text));
+  --report-control-blue-tint: color-mix(in srgb, var(--ce-status-info) 14%, var(--ce-document-canvas));
+  --report-control-white: var(--ce-document-canvas);
+  --report-control-text: color-mix(in srgb, var(--ce-status-info) 60%, var(--ce-document-text));
+  --report-control-surface: var(--ce-document-surface);
+  --report-scroll-bg: var(--ce-status-info-soft);
+  --report-scroll-hover: color-mix(in srgb, var(--ce-status-info-soft) 82%, var(--ce-status-info));
 
   margin-top: 20px;
   border: 1px solid var(--ce-border-light);
@@ -186,7 +186,7 @@
   --ce-beeswarm-axis-color: var(--ce-document-text-muted);
   --ce-beeswarm-label-color: var(--ce-document-text);
   --ce-beeswarm-axis-label-size: 14px;
-  --ce-beeswarm-point-color: steelblue;
+  --ce-beeswarm-point-color: var(--ce-data-series-1);
   --ce-beeswarm-point-active-color: var(--ce-status-warning);
   --ce-beeswarm-background: var(--ce-color-white);
   --ce-beeswarm-border: 1px solid var(--ce-border-light);

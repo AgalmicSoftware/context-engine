@@ -6,6 +6,7 @@ import {
   planCanvasPdfPages,
   prepareReportCanvasClone,
 } from './browserPdfExport';
+import { formatFixedMediaRgba } from './fixedMediaColors';
 
 describe('browser PDF export primitives', () => {
   it('retries transient module loading failures', async () => {
@@ -138,4 +139,8 @@ it('normalizes modern theme colors on the capture clone for html2canvas', () => 
   expect(root.querySelector('rect')?.style.fill).toBe('rgb(86, 180, 233)');
   computed.mockRestore();
   context.mockRestore();
+});
+
+it('formats sampled canvas pixels through the fixed-media color owner', () => {
+  expect(formatFixedMediaRgba(26, 51, 77, 128)).toBe('rgba(26, 51, 77, 0.5019607843137255)');
 });

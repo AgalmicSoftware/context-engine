@@ -185,12 +185,12 @@ control states without component selectors in a theme file.
 | Documents              | `--ce-document-*`                                                             | readable light/document-style content                                          |
 | Panel and overlay copy | `--ce-panel-text*`, `--ce-overlay-text*`                                      | foregrounds paired with panel or overlay surfaces                              |
 | Controls               | `--ce-control-*`, `--ce-input-*`, `--ce-titlebar-*`, `--ce-nav-tab-inactive`  | inputs, buttons, disabled states, title bars, and inactive title-bar tab icons |
-| Authoring               | `--ce-authoring-*`                                                           | paired question/survey workspace, section, control, input, and copy colors     |
+| Authoring              | `--ce-authoring-*`                                                            | paired question/survey workspace, section, control, input, and copy colors     |
 | Actions and status     | `--ce-action-*`, `--ce-status-*`, `--ce-link`                                 | interactive, validation, risk, and state semantics                             |
 | Data series            | `--ce-data-series-1` through `--ce-data-series-8`                             | categorical charts and visualizations                                          |
 | Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |
 | Data visualization     | `--ce-data-viz-*`                                                             | plot surfaces, axes, labels, points, active points, and point strokes          |
-| Brand media            | `--ce-brand-logo-*`, `--ce-recognition-logo-*`, `--ce-welcome-artwork-*` | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |
+| Brand media            | `--ce-brand-logo-*`, `--ce-recognition-logo-*`, `--ce-welcome-artwork-*`      | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |
 | Edges and elevation    | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*`, `--ce-tool-card-*`           | flat, raised, inset, pressed, submit, and Tool Explorer card states            |
 | Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
 | Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |
@@ -214,12 +214,12 @@ the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1.
 
 ## Typography
 
-| Token                     | `context-engine`                | `classic-95`                        |
-| ------------------------- | ------------------------------- | ----------------------------------- |
+| Token                     | `context-engine`                | `classic-95`                           |
+| ------------------------- | ------------------------------- | -------------------------------------- |
 | `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks |
 | `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks |
-| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack          |
-| `--ce-font-button-weight` | `600`                           | `400`                               |
+| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack             |
+| `--ce-font-button-weight` | `600`                           | `400`                                  |
 
 Guideline:
 
@@ -311,9 +311,10 @@ Use this shared blue CTA family for actual end-of-flow create and submit actions
 ## Literal Ownership And Usage Rules
 
 - Do not introduce hardcoded theme-semantic colors. The baseline is zero.
-- The exact raw-value owners are the two bundled app-theme maps, the bundled
-  session-scheme map, the deterministic fixed-light standalone export, the
-  fixed-media QR/bitmap constants, and the deterministic blockie generator.
+- The exact raw-value owners are the two bundled app-theme maps, the
+  color-vision palette overlay, the bundled session-scheme map, the
+  deterministic fixed-light standalone export, the fixed-media QR/bitmap
+  constants, and the deterministic blockie generator.
   The checker has no directory-wide or ad hoc exception mechanism.
 - Fixed QR/bitmap colors are intentionally independent of app appearance for
   scanning and copied-image determinism. Standalone HTML/PDF exports remain

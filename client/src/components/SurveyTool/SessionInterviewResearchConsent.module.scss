@@ -84,7 +84,7 @@
 .metadata[open] summary {
   position: sticky;
   top: 0;
-  background: color-mix(in srgb, var(--ce-surface-sunken, #171941) 92%, transparent);
+  background: color-mix(in srgb, var(--ce-surface-sunken) 92%, transparent);
   z-index: 1;
 }
 

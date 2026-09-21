@@ -1,6 +1,6 @@
 .sections {
-  color: #222;
-  background: #fff;
+  color: var(--ce-document-text);
+  background: var(--ce-document-canvas);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 14px;
   line-height: 1.5;
@@ -17,8 +17,8 @@
       Helvetica,
       sans-serif;
     margin: 0 0 12px;
-    color: #222;
-    border-bottom: 1px solid #b9bec5;
+    color: var(--ce-document-text);
+    border-bottom: 1px solid var(--ce-document-border);
     padding-bottom: 8px;
   }
   h4 {
@@ -26,7 +26,7 @@
       600 16px/1.4 Arial,
       Helvetica,
       sans-serif;
-    color: #222;
+    color: var(--ce-document-text);
     margin: 0;
   }
   ul {
@@ -36,13 +36,13 @@
   }
   .sectionContent button.more {
     appearance: none;
-    background: #f0f4f7;
+    background: var(--ce-status-info-soft);
     background-image: none;
-    border: 1px solid #c7d2dc;
+    border: 1px solid var(--ce-document-border);
     border-radius: 999px;
     box-shadow: none;
     text-shadow: none;
-    color: #294b65;
+    color: var(--ce-status-info-text);
     padding: 9px 18px;
     min-height: 40px;
     font: inherit;
@@ -52,8 +52,8 @@
     transform: none;
   }
   .sectionContent button.more:hover {
-    background: #e1eaf1;
-    border-color: #8fa3b5;
+    background: color-mix(in srgb, var(--ce-status-info-soft) 82%, var(--ce-status-info));
+    border-color: var(--ce-status-info);
   }
   .sectionHeading button.sectionToggle {
     appearance: none;
@@ -77,11 +77,11 @@
     transform: none;
   }
   .sectionHeading button.sectionToggle:hover {
-    color: #294b65;
+    color: var(--ce-status-info-text);
   }
   .sectionContent button.more:focus-visible,
   .sectionHeading button.sectionToggle:focus-visible {
-    outline: 2px solid #294b65;
+    outline: 2px solid var(--ce-status-info-text);
     outline-offset: 3px;
   }
 }
@@ -94,7 +94,7 @@
   overflow-wrap: anywhere;
 }
 .question + .question {
-  border-top: 1px solid #c9cdd2;
+  border-top: 1px solid var(--ce-document-border);
   padding-top: 18px;
 }
 .questionHeading {
@@ -105,14 +105,14 @@
   margin-bottom: 16px;
 }
 .questionHeading > span {
-  color: #454c55;
+  color: var(--ce-document-text-muted);
   white-space: nowrap;
   font-size: 13px;
 }
 .written p {
   margin: 10px 0;
   white-space: pre-wrap;
-  color: #333;
+  color: var(--ce-document-text);
 }
 .rating {
   display: grid;
@@ -126,23 +126,30 @@
 }
 .average strong {
   font-size: 26px;
-  color: #222;
+  color: var(--ce-document-text);
 }
 .average span {
   font-size: 13px;
-  color: #454c55;
+  color: var(--ce-document-text-muted);
 }
 .histogram {
   width: 100%;
   max-height: 170px;
-  color: #59616b;
+  color: var(--ce-data-viz-axis);
 }
 .histogram text {
-  fill: #333;
+  fill: var(--ce-document-text);
   font:
     12px Arial,
     Helvetica,
     sans-serif;
+}
+.histogramBar,
+.choiceBar {
+  fill: var(--ce-data-series-1);
+}
+.choiceTrackBg {
+  fill: var(--ce-document-border);
 }
 .choices li {
   display: grid;
@@ -203,7 +210,7 @@
 }
 .leftHalf {
   justify-content: flex-end;
-  border-right: 1px solid #59616b;
+  border-right: 1px solid var(--ce-data-viz-axis);
   padding-left: 32px;
 }
 .rightHalf {

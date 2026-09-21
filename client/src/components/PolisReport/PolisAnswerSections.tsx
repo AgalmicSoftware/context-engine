@@ -40,7 +40,13 @@ function AnswerChart({ question, showAll }: { question: ReportAnswerQuestion; sh
             const height = (bin.count / peak) * 86;
             return (
               <g key={index}>
-                <rect x={12 + index * width + 3} y={114 - height} width={width - 6} height={height} fill="#61778c" />
+                <rect
+                  x={12 + index * width + 3}
+                  y={114 - height}
+                  width={width - 6}
+                  height={height}
+                  className={styles.histogramBar}
+                />
                 {bin.count > 0 && (
                   <text x={12 + (index + 0.5) * width} y={107 - height} textAnchor="middle">
                     {bin.count}
@@ -63,8 +69,8 @@ function AnswerChart({ question, showAll }: { question: ReportAnswerQuestion; sh
           <li key={index}>
             <span>{option.label}</span>
             <svg className={styles.choiceTrack} viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
-              <rect width="100" height="16" fill="#e8ecf0" />
-              <rect width={(option.count / question.count) * 100} height="16" fill="#61778c" />
+              <rect width="100" height="16" className={styles.choiceTrackBg} />
+              <rect width={(option.count / question.count) * 100} height="16" className={styles.choiceBar} />
             </svg>
             <span className={styles.numeric}>
               {Math.round((option.count / question.count) * 100)}% ({option.count})

@@ -7,3 +7,6 @@
  */
 export const FIXED_MEDIA_LIGHT = '#ffffff';
 export const FIXED_MEDIA_DARK = '#000000';
+
+export const formatFixedMediaRgba = (red: number, green: number, blue: number, alphaByte: number): string =>
+  `rgba(${red}, ${green}, ${blue}, ${alphaByte / 255})`;

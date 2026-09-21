@@ -8,6 +8,9 @@ const baselinePath = path.resolve(sourceRoot, 'scss', 'themes', 'color-literal-b
 const approvedLiteralFiles = [
   path.resolve(sourceRoot, 'scss', 'themes', '_context-engine.scss'),
   path.resolve(sourceRoot, 'scss', 'themes', '_classic-95.scss'),
+  // Color-vision mode is a runtime palette overlay: it owns alternate token
+  // values, while components still consume the semantic --ce-* contract.
+  path.resolve(sourceRoot, 'scss', 'themes', '_color-vision.scss'),
   path.resolve(sourceRoot, 'scss', 'session-color-schemes', '_schemes.scss'),
   path.resolve(sourceRoot, 'utilities', 'sessionResultsExport', 'sessionResultsExport.ts'),
   path.resolve(sourceRoot, 'utilities', 'ui', 'fixedMediaColors.ts'),
