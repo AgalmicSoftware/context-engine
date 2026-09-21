@@ -82,7 +82,7 @@ describe('SessionInterviewResearchConsent', () => {
     );
     expect(scss).toMatch(/\.metadata\[open\]\s*\{[\s\S]*?max-height:\s*min\(28vh, 300px\);[\s\S]*?overflow:\s*auto;/);
     expect(scss).toMatch(
-      /\.metadata\[open\] summary\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-surface-sunken, #171941\) 92%, transparent\);/,
+      /\.metadata\[open\] summary\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-surface-sunken\) 92%, transparent\);/,
     );
     expect(scss).toMatch(
       /\.researchHelp\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?cursor:\s*help;/,

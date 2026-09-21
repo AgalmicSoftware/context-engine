@@ -33,11 +33,16 @@ const openPublishSection = async () => {
 };
 
 const deployVerifiedCustomWorker = async ({ sessionName, sessionInfo, openaiKey }) => {
-  const fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
-  if (fastPreset) {
-    const previousConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
+  let fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (!fastPreset) {
+    fireEvent.click(screen.getByRole('button', { name: 'Back', exact: true }));
+    fastPreset = await screen.findByTestId('ce-new-preset-fast_cheap_cloudflare');
+  }
+  const previousConfirm = window.confirm;
+  window.confirm = jest.fn(() => true);
+  try {
     fireEvent.click(fastPreset);
+  } finally {
     window.confirm = previousConfirm;
   }
   const continueButton = screen.queryByTestId('ce-new-preset-continue');
@@ -554,7 +559,6 @@ describe('SessionWizard publish boundary rendering', () => {
 
     try {
       const firstView = renderLoggedInSessionWizard();
-      enableAdvancedMode();
       await deployVerifiedCustomWorker({
         sessionName: 'Single Worker Session',
         sessionInfo: 'One canonical session per worker.',

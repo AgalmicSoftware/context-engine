@@ -52,7 +52,9 @@ describe('SessionWizardIntroStatusRail', () => {
 
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Cloudflare API token' })).toBeInTheDocument();
-    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    const openAiKeyLink = screen.getByRole('link', { name: 'OpenAI key' });
+    expect(openAiKeyLink).toHaveAttribute('href', 'https://platform.openai.com/api-keys');
+    expect(openAiKeyLink.closest('li')).toHaveTextContent('OpenAI key for text and transcription');
     expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'OP Sepolia ETH' })).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent('Sponsored bundle loaded.');
