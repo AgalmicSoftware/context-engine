@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
 import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -1814,6 +1814,27 @@ describe('AppShell route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
     expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#preview=1');
+  });
+
+  it('replaces the bare EDDY entry with the Worker-backed group and interview link', async () => {
+    const subject = createSubject({ path: '/session/eddy26' });
+    const LocationProbe = () => {
+      const location = useLocation();
+      const navigationType = useNavigationType();
+      return <output data-testid="entry-location">{`${navigationType} ${location.pathname}${location.search}`}</output>;
+    };
+    render(
+      <MemoryRouter initialEntries={['/session/eddy26']}>
+        {subject.render()}
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('entry-location')).toHaveTextContent(
+        'REPLACE /session/eddy26?worker=https%3A%2F%2Fce-eddy26-d9702b0d3c41.agalmic.workers.dev%2F&joinGroup=eddy-2026&mode=interview',
+      ),
+    );
+    expect(mockOnePageSession).not.toHaveBeenCalled();
   });
 
   it('renders the sponsor root and forwards session query params to SponsorPage', async () => {

@@ -1071,7 +1071,12 @@ or a restricted invitation.
 
 To separate an event cohort, create an open Group named for the event, choose
 session member visibility, and distribute its auto-join link to participants.
-Visitors using the ordinary session URL are not automatically added. The invitation notice displays the public Group name before sign-in using the
+Visitors using ordinary session URLs are not automatically added. The EDDY event
+entry `/session/eddy26` is an explicit exception: the bare URL redirects to the
+pinned Worker with `joinGroup=eddy-2026&mode=interview`. Existing query parameters,
+hashes (including AI prefill), and subroutes bypass that redirect. Joining still
+requires sign-in; closing the interview or opening results does not relaunch it.
+The invitation notice displays the public Group name before sign-in using the
 exact session-bound discovery endpoint; it falls back to the Group ID when
 public discovery is unavailable. The compact notice reads “Group name: Will be
 joined upon sign-in” with Cancel auto-join; sign-in uses the existing page login
