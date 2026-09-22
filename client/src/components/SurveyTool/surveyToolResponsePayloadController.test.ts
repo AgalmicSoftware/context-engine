@@ -3,6 +3,7 @@ import {
   captureInterviewPredictionComparisonSubmissions,
   type BuildResponsePayloadOptions,
 } from './surveyToolResponsePayloadController';
+import { getConvictionFromSlice, getImportanceFromSlice } from './surveyToolResponseState';
 
 const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): BuildResponsePayloadOptions => ({
   isStandalone: false,
@@ -31,6 +32,49 @@ const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): Buil
 });
 
 describe('surveyToolResponsePayloadController', () => {
+  it.each([
+    { importance: undefined, conviction: 70, expectedImportance: 70, expectedConviction: 70 },
+    { importance: 40, conviction: undefined, expectedImportance: 40, expectedConviction: 40 },
+    { importance: 0, conviction: 70, expectedImportance: 0, expectedConviction: 70 },
+    { importance: 40, conviction: 70, expectedImportance: 40, expectedConviction: 70 },
+    { importance: undefined, conviction: undefined, expectedImportance: null, expectedConviction: null },
+  ])('research final ratings match ordinary submitted ratings: %j', (ratings) => {
+    for (const encrypted of [false, true]) {
+      const state = {
+        answers: { q1: { value: encrypted ? '*' : 'Agree', encrypted } },
+        additionalComments: {},
+        importance: ratings.importance === undefined ? {} : { q1: ratings.importance },
+        conviction: ratings.conviction === undefined ? {} : { q1: ratings.conviction },
+        interviewProvenance: {
+          q1: {
+            includePredictionComparison: true,
+            originalPrediction: { answer: 'Agree', conviction: ratings.conviction, importance: ratings.importance },
+            submissionValueSnapshot: { answer: 'Agree' },
+          },
+        },
+      };
+      const response = buildResponsePayload(defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Proceed?' }],
+        surveyResponseState: state,
+        getConvictionFromSlice,
+        getImportanceFromSlice,
+      })).responses![0];
+      const finalRatings = { importance: ratings.expectedImportance, conviction: ratings.expectedConviction };
+      expect(response).toMatchObject(finalRatings);
+      expect(response.interviewProvenance).toMatchObject({
+        finalSubmitted: finalRatings,
+        predictionComparison: { submitted: finalRatings },
+      });
+      if (encrypted) {
+        expect(response.interviewProvenance).toMatchObject({
+          finalSubmitted: { answer: { redacted: true } },
+        });
+      }
+      if (ratings.importance === undefined && ratings.conviction !== undefined) {
+        expect(response.interviewProvenance).toMatchObject({ changedFields: ['importance'], userEditedFields: [] });
+      }
+    }
+  });
   it('includes unselected research without adding an answer and honors withdrawal of research consent', () => {
     const slice = {
       answers: { q1: { value: 'Final selected answer' }, q2: { value: '', encrypted: true } },
