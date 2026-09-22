@@ -89,3 +89,8 @@ restores the previous interactive expansion state when finished.
 
 Regression coverage lives beside `PolisReport` and `browserPdfExport`. The
 credential-free browser smoke is covered by the repository E2E command notes.
+
+Filtered Raw Results JSON exports retain each question’s normalized rating scale,
+selection limits, quadratic budget, ordering, and public benchmark/source IDs.
+Both Questions and Questions + Responses exports use this whitelist; unrelated
+cache metadata is excluded.
