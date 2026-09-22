@@ -38,7 +38,11 @@ The per-session `interviewMode.realtimeModel` setting also accepts the supported
 legacy aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, and
 `gpt-realtime-1.5`. Those retain the Realtime multipart call contract. Invented
 or retired model IDs normalize to `gpt-live-1` when reading old configurations;
-Worker config writes reject unsupported values. The provider remains OpenAI.
+Worker config writes reject newly supplied unsupported values. Previously
+accepted stored `gpt-realtime` aliases migrate to that same runtime fallback
+during later config, limits, or Lit-descriptor updates, including an unchanged
+model echoed by an older settings form. Other malformed stored fields still
+fail validation. The provider remains OpenAI.
 Session creators can change the model in `/new` under **Optional details**
 (or **More options** in Customize) → **Interview settings** →
 **Interview voice model**.

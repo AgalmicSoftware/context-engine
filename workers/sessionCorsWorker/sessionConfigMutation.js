@@ -1,6 +1,6 @@
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
-import { isRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
+import { isRealtimeInterviewModel, normalizeRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
@@ -268,7 +268,15 @@ const resolveWorkerCanonicalPublicationWrite = ({
 
 export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
-  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+  let existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+  const storedModel = existing?.interviewMode?.realtimeModel;
+  const migrateStoredModel = typeof storedModel === 'string' &&
+    /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(storedModel) && !isRealtimeInterviewModel(storedModel);
+  if (migrateStoredModel) {
+    // Old writes allowed these aliases; their runtime already uses the current
+    // fallback. Migrate that stored value without accepting new invalid models.
+    existing = { ...existing, interviewMode: { ...existing.interviewMode, realtimeModel: normalizeRealtimeInterviewModel(storedModel) } };
+  }
   const kind = toTrimmedString(mutation?.kind);
   let incomingConfig;
   let mergedConfig;
@@ -278,6 +286,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       ? mutation.incomingConfig
       : null;
     if (!incomingConfig) return { ok: false, status: 400, error: 'Missing config.' };
+    if (migrateStoredModel && incomingConfig?.interviewMode?.realtimeModel === storedModel) {
+      incomingConfig = { ...incomingConfig, interviewMode: { ...incomingConfig.interviewMode, realtimeModel: existing.interviewMode.realtimeModel } };
+    }
     if (hasOwn(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
       return { ok: false, status: 400, error: 'Authorization epoch is server-managed.' };
     }
