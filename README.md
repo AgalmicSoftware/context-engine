@@ -58,14 +58,15 @@ For testing, run modes, and deeper setup:
 ## Features
 
 ### Survey and Response Management
-- Multiple question types: freeform, multiple choice, binary, and rating scales
+- Multiple question types: freeform, single- and multi-select, binary, rating scales, and quadratic allocation
 - Optional encryption of responses and results
 - Optional decentralized and permanent response storage in the public Arweave-backed profile
 - Statistical / AI analysis and visualization of results
 - Export results as `.json`, `.csv`, `.pdf`
 
-### SBT-Gated Groups
-- No-code creation of Soulbound tokens ([SBTs](https://www.radicalxchange.org/wiki/social-identity/)) for groups
+### Groups
+- Cloudflare Groups for membership, invitations, and response filtering in Worker-backed sessions
+- Optional no-code creation of Soulbound tokens ([SBTs](https://www.radicalxchange.org/wiki/social-identity/)) for chain-backed groups
 - Public minting, password-protected minting, time-limited minting, limited-number minting, and auto-claim URLs
 - Role-based burn authorization (admin, minter, both, neither)
 - Session and resource gating based on SBT ownership (encrypted titles, information, docURLs, tags)

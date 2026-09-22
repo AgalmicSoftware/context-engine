@@ -12,7 +12,7 @@ The pace of AI development has exceeded the capacity of democratic and civic ins
 
 Context Engine is an open-source toolkit enabling groups to create digital artifacts representing their preferences, beliefs, and points of agreement or disagreement over time. The approach can apply within and between groups, pointing to a future of collective intelligence via automated coordination and productive conflict – stemming from durable context and quantifiable preference data. The toolkit represents an extension on current SOTA large-group discourse software by leveraging cryptography (for private sessions and content), AI (for input UX and result interpretation), and decentralized protocols (for censorship-resistance and data permanence). A corresponding local version for use within organizations is planned.
 
-These tools are meant to be useful wherever groups coordinate and make decisions, from hyper-local to international settings. For companies and organizations, they facilitate the recording and incentivizing of predictions in a privacy-preserving way. For digital groups, a path is visible towards training AI models that represent shared interests to outsiders or other groups, while distilling and (optionally) monetizing preference data in an attributable way, with future access to continuous training data revocable under defined terms. In our cities these tools may help us identify shared priorities and reverse polarization, and it is our hope that they will ultimately help us define (in multimedia formats) AI futures to aim for and avoid.
+These tools are meant to be useful wherever groups coordinate and make decisions, from hyper-local to international settings. For companies and organizations, a proposed extension is to record, resolve, and incentivize predictions with appropriate privacy controls. For digital groups, a path is visible towards training AI models that represent shared interests to outsiders or other groups, while distilling and (optionally) monetizing preference data in an attributable way, with future access to continuous training data revocable under defined terms. In our cities these tools may help us identify shared priorities and reverse polarization, and it is our hope that they will ultimately help us define (in multimedia formats) AI futures to aim for and avoid.
 
 ---
 
@@ -38,27 +38,27 @@ The current SOTA for this type of large-group discourse software is Pol.is, whic
 
 Context Engine extends the pioneering approach of Pol.is in the following ways:
 
-- More question types (binary, freeform, multichoice, rating) + priority / conviction ratings
+- More question types (binary, freeform, single- and multi-select, rating, quadratic allocation) + priority / conviction ratings
 - Optional privacy of responses / votes / results / shared group context
 - AI-native inputs / outputs for better UX: Generate questions / responses from URLs, speech-to-text input, AI analysis of results
-- Permanent and Public Data Storage by default (private and temporary options also possible)
-- Passkey Ethereum Wallet account model (vs email): Natively allows use of cryptography, proof-of-human, digital group membership tokens
+- Cloudflare storage in the default Hosted & Fast profile, with permanent Arweave storage available in the opt-in Trustless & Slower profile
+- Passkey sign-in for session identity, with Ethereum accounts and soulbound tokens available to chain-backed sessions
 - No-Code deployment of new sessions: compatible with other tools / easy .json export
 
-Although Context Engine is an Ethereum application, users do not need to know anything about cryptocurrency to use it
+Hosted & Fast sessions do not require Ethereum, an RPC endpoint, gas, Arweave, or Lit. Chain-backed sessions remain an optional deployment profile.
 
 ## 3. What Context Engine is Today
 
 Context Engine is a web application, a set of smart contracts (EVM), and supporting infrastructure for AI inference, storage, access gating, and encryption. It is meant to be easily redeployable by various groups with no programming experience.
 
 - **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.sh/new)).
-- **Surveys and Questions** supports binary, rating, multiple-choice, and freeform questions (with the ability to add new question types as needed), with optional conviction weighting and comments.
-- **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, EVM tx Costs, Arweave Storage, Lit Encryption).
-- **Storage**: responses and documents stored on Arweave
+- **Surveys and Questions** support binary, rating, single- and multi-select, freeform, and quadratic allocation questions, with optional conviction weighting and comments.
+- **Access control** supports Worker roles and Cloudflare Groups in Hosted & Fast sessions, and soulbound-token gates in chain-backed sessions. Encryption and sponsored resources depend on the selected configuration.
+- **Storage**: Hosted & Fast sessions use Cloudflare storage; Trustless & Slower sessions opt into Arweave and EVM contracts. Storage and encryption choices determine the persistence and access model.
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
 - **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The current public demo can be seen at [/demo-1](https://contextengine.sh/session/demo-1)
 
-The same product can also be deployed more privately and scalably (as circumstances demand), with local storage, POA blockchain, local encryption backends, and self-hosted workers when data cannot leave an organization.
+The static web client can be self-hosted, and creators can deploy their own per-session Cloudflare Worker today. The Company-Operated edition, with adapters for internal identity, key management, storage, AI, networking, and observability, is planned and not yet generally available; it can be entirely off-chain. Hosting the existing client and deploying a Worker does not provide that planned local-only stack. See the [deployment-mode table](../README.md#deployment-modes) and [architecture](../ARCHITECTURE.md), including its [source-versus-deployed contract caveat](../ARCHITECTURE.md#contract-addresses).
 
 ### Session Capacity and Scaling
 
@@ -72,11 +72,11 @@ A session is currently expected to support hundreds to low thousands of concurre
 
 Many organizations could benefit from a more comprehensive record of what people believed before decisions (outcomes, timelines, risks, confidence), which tradeoffs they understood at the time, and who was consistently well-calibrated. This approach would also allow organizations to understand where assumptions diverge before decisions are taken.
 
-Context Engine sessions let teams record predictions, assumptions, and confidence before outcomes are known. Entries are timestamped, immutable, and (optionally) encrypted until a chosen date or condition, reducing social pressure at input time and making later review more objective.
+Context Engine sessions can record assumptions and responses with conviction ratings before outcomes are known. Their persistence and access depend on the storage and encryption configuration; Cloudflare storage does not make every entry immutable. Dedicated prediction resolution, calibration scoring, and time-based release are proposed extensions, not guarantees of the current survey workflow.
 
 Those with strong predictive ability may be incentivized and their predictions (on relevant topics) weighed more heavily in future decisions (potentially in a privacy-preserving way). These ideas point to a future of incentive-compatible job automation, where employees retain control of the data / model representing their tacit knowledge and intuition, and can provide this model to the relevant organization under negotiated terms.
 
-Organizations can run a local version of the decentralized stack described above — using local storage, private POA chains, and self-hosted workers — so that sensitive data does not leave the organization.
+The planned Company-Operated edition would let organizations connect their own storage, identity, key management, and AI services. Keeping data within an organization's chosen boundary depends on those adapters and deployment choices; a private PoA chain is not a prerequisite.
 
 ### Digital Communities
 
@@ -100,7 +100,7 @@ Quantified measures of group membership, attention, and exchange are a related d
 
 Live events generate high-bandwidth discussions which often don't persist or survive in any records – even events which record presentations have no way of capturing resulting discussions, and this valuable data is left to be remembered or forgotten by participants.
 
-Conferences, retreats, and pop-up events could instead produce a map of its opinion space, allowing viewers (public or participants only) to see which ideas had broad support, which were polarizing, how different sub-groups responded (filtered by SBTs).
+Conferences, retreats, and pop-up events could instead produce a map of its opinion space, allowing viewers (public or participants only) to see which ideas had broad support, which were polarizing, how different sub-groups responded (filtered by Cloudflare Groups or SBTs, depending on the session).
 
 Recurring or related communities can add or reference the same map, compare changes over time, and build continuity between gatherings instead of starting over each cycle. Such maps would not only be useful after an event, but also before and during – helping to steer discourse towards the most productive or interesting areas, and creating raw material which can later be rendered as compelling multimedia artifacts. This deliberation data could also be used for AI training and/or generate revenue for the event or group by making this conditionally available to outside viewers.
 
@@ -131,7 +131,7 @@ The roadmap is best understood as several related directions rather than a singl
 ### Deployment and Resilience
 
 - **Walkaway resilience** — host the front end on an ENS (.eth) domain and explore core services as AVSs (EigenLayer, n.d.).
-- **More storage options** — add IPFS for larger or optionally ephemeral files, plus centralized storage options that can be configured per session.
+- **More storage options** — extend the current Cloudflare and Arweave paths with additional backends, including organizational storage adapters and IPFS.
 - **Turnkey deployment** — make it possible to purchase the required bundle of credits and API keys, including Arweave storage, Lit encryption, EVM gas, and AI API access, with stablecoins in a trust-minimized way.
 
 ### Interfaces and Inputs
