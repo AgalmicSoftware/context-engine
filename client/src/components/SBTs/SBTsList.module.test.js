@@ -37,9 +37,7 @@ describe('SBTsList module styles', () => {
     expect(scss).toMatch(
       /\.workerRouteSessionHero,\s*\.header \.createGroupButton\s*{[^}]*border:\s*1px solid color-mix\(in srgb, var\(--ce-color-white\) 50%, transparent\);/,
     );
-    expect(scss).toMatch(
-      /\.workerRouteToolbar\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/,
-    );
+    expect(scss).toMatch(/\.workerRouteToolbar\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(scss).toMatch(/\.workerRouteRefreshButton\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/);
   });
 });
