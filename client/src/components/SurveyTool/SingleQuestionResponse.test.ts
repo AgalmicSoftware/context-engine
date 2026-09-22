@@ -106,6 +106,21 @@ describe('SingleQuestionResponse style contracts', () => {
 });
 
 describe('SingleQuestionResponse render guard', () => {
+  it('renders raw rating aggregates using the question scale', () => {
+    const subject = createSubject({
+      question: {
+        id: 'probability',
+        type: 'rating',
+        ratingScale: { min: 0, max: 100, minLabel: 'Impossible', maxLabel: 'Certain' },
+      },
+    });
+    const html = renderToStaticMarkup(
+      subject.renderRatingAggregator([{ answer: { value: 50 } }, { answer: { value: 100 } }]),
+    );
+    expect(html).toContain('2 total rating responses.');
+    expect(html).toContain('Average: 75.00, Median: 75.00');
+  });
+
   it('skips updates when top-level props and state values are unchanged', () => {
     const question = { id: 'q1', prompt: 'Question?', type: 'freeform' };
     const response = { answer: { value: 'Answer' } };

@@ -94,3 +94,8 @@ Filtered Raw Results JSON exports retain each question’s normalized rating sca
 selection limits, quadratic budget, ordering, and public benchmark/source IDs.
 Both Questions and Questions + Responses exports use this whitelist; unrelated
 cache metadata is excluded.
+
+Raw Results rating averages and medians use the question’s rating bounds,
+including custom scales such as 0–100, with 0–10 as the legacy default. Missing,
+malformed, and out-of-range saved ratings are excluded rather than clamped into
+the analysis. Input controls retain their existing clamping behavior.

@@ -1,5 +1,5 @@
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
-import { normalizeRatingValue } from '../../utilities/survey/ratingValue.js';
+import { DEFAULT_RATING_SCALE, type RatingScale } from '../../utilities/survey/ratingValue.js';
 
 type GateLike = Record<string, unknown> & {
   gateId?: unknown;
@@ -258,15 +258,17 @@ export const buildBinaryAggregatorSummary = (parsedResponses: unknown = []): Bin
   return { counts, total };
 };
 
-export const buildRatingAggregatorSummary = (parsedResponses: unknown = []): RatingAggregatorSummary => {
+export const buildRatingAggregatorSummary = (
+  parsedResponses: unknown = [],
+  scale: RatingScale = DEFAULT_RATING_SCALE,
+): RatingAggregatorSummary => {
   const responses = Array.isArray(parsedResponses) ? parsedResponses : [];
   const values: number[] = [];
   responses.forEach((response) => {
-    const ratingValue = normalizeRatingValue(
-      (response as { answer?: { value?: unknown } } | null | undefined)?.answer?.value,
-      null,
-    );
-    if (ratingValue !== null) values.push(ratingValue);
+    const raw = (response as { answer?: { value?: unknown } } | null | undefined)?.answer?.value;
+    if ((typeof raw !== 'number' && typeof raw !== 'string') || String(raw).trim() === '') return;
+    const ratingValue = Number(raw);
+    if (Number.isFinite(ratingValue) && ratingValue >= scale.min && ratingValue <= scale.max) values.push(ratingValue);
   });
   if (values.length === 0) {
     return {
