@@ -568,6 +568,12 @@ Admin test panel:
   separate provider or model. Inputs are submitted responses only; Circles is
   the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
   from the session subject matter.
+- Canonical generated-analysis input validates readable answers against the full
+  stored question before counting them: rating bounds, exact choice options and
+  selection limits, and signed quadratic allocations within the question budget.
+  Invalid answers are excluded even when accompanied by a comment; genuinely
+  unanswered comment-only rows remain supported. This does not change opaque
+  storage admission or the historical admin-snapshot format.
 - The Worker source snapshot keeps the full submitted-response counts distinct
   from the bounded AI input counts. The AI input keeps rating endpoint metadata
   (`scale.min`/`max` and endpoint labels) and quadratic `voiceCredits`, then

@@ -29,6 +29,7 @@ import {
 } from './aiProviderExecution.js';
 import { json as jsonResponse } from './responseKvHelpers.js';
 import { normalizePayloadAccessControl } from './payloadAccessControl.js';
+import { formatValidAnalysisAnswer } from './resultsAnalysisAnswerValidation.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -199,11 +200,6 @@ const normalizeRatingScale = (question = {}) => {
   };
 };
 
-const normalizeVoiceCredits = (value) => {
-  const numeric = Number(value);
-  return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 99;
-};
-
 const normalizeSubmittedAt = (value) => {
   const text = trim(value);
   if (!text) return '';
@@ -340,13 +336,14 @@ const normalizeQuestionRecord = (question) => {
     prompt: normalizeQuestionPrompt(question.prompt || question.questionPrompt || question.questionText || question.text || question.title),
     type,
     options: Array.isArray(question.options)
-      ? question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => normalizeQuestionPrompt(option).slice(0, 140)).filter(Boolean)
+      ? question.options.filter((option) => typeof option === 'string').map((option) => option.trim()).filter(Boolean)
       : [],
     tags: Array.isArray(question.tags)
       ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean)
       : [],
     ...(scale ? { scale } : {}),
-    ...(type === 'quadratic' ? { voiceCredits: normalizeVoiceCredits(question.voiceCredits) } : {}),
+    ...(type === 'multichoice' ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice), ...(Number.isSafeInteger(question.maxSelections) && question.maxSelections > 0 ? { maxSelections: question.maxSelections } : {}) } : {}),
+    ...(type === 'quadratic' ? { voiceCredits: question.voiceCredits === undefined ? 99 : question.voiceCredits } : {}),
   };
 };
 
@@ -422,14 +419,19 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     const digest = await participantDigest(participantSource);
     const answerValue = hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response);
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
-    const answer = valueFromAnswerLike(answerValue).slice(0, 4000);
+    const knownQuestion = questionMap.get(questionId) || {};
+    const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
+    if (validatedAnswer === null) {
+      excludedCount += 1;
+      continue;
+    }
+    const answer = validatedAnswer.slice(0, 4000);
     const additionalComments = valueFromAnswerLike(additionalValue).slice(0, 2000);
     if (!answer && !additionalComments) {
       excludedCount += 1;
       continue;
     }
     participantDigests.add(digest);
-    const knownQuestion = questionMap.get(questionId) || {};
     const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0;
     const dedupeKey = `${questionId}:${digest}`;
     const candidate = {
@@ -491,9 +493,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     id: question.questionId,
     prompt: question.prompt.slice(0, AI_LIMITS.maxQuestionPromptChars),
     type: question.type,
-    options: question.options,
+    options: question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => option.slice(0, 140)),
     tags: question.tags,
     ...(question.scale ? { scale: question.scale } : {}),
+    ...(question.type === 'multichoice' ? { singleSelect: question.singleSelect, ...(question.maxSelections ? { maxSelections: question.maxSelections } : {}) } : {}),
     ...(question.type === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
   }));
   const aiSnapshot = {
