@@ -618,8 +618,9 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
 .standardBase .workerRouteToolbar {
   --worker-toolbar-control-height: 56px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  // Wrap at the controls' natural widths so the full session name stays visible.
+  display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 8px;
   width: 100%;
@@ -629,7 +630,8 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   .workerRouteSessionHero,
   .header .createGroupButton {
     box-sizing: border-box;
-    height: var(--worker-toolbar-control-height);
+    height: auto;
+    min-height: var(--worker-toolbar-control-height);
     border: 1px solid color-mix(in srgb, var(--ce-color-white) 50%, transparent);
     border-radius: var(--ce-radius-8);
     background: transparent;
@@ -638,18 +640,28 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
     font-family: var(--ce-font-body);
   }
 
+  .workerRouteSessionHero {
+    flex: 1 1 max-content;
+    max-width: 100%;
+  }
+
   .header {
+    flex: 1 1 max-content;
     width: auto;
     min-width: 0;
+    max-width: 100%;
+    align-items: stretch;
     margin: 0;
     gap: 8px;
 
     .createGroupButton {
-      flex: 0 0 auto;
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: none;
       padding: 8px 12px;
       font-size: 0.92rem;
       line-height: 1.1;
-      white-space: nowrap;
+      white-space: normal;
 
       &:hover,
       &:focus-visible {
@@ -697,15 +709,13 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
 .workerRouteSessionEyebrow {
   display: block;
-  overflow: hidden;
   color: var(--ce-panel-text);
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .workerRouteSessionName {
@@ -735,9 +745,7 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
 .workerRouteSessionNameText {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .workerRouteSessionExternalIcon {

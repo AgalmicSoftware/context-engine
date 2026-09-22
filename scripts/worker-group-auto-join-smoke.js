@@ -115,16 +115,31 @@ async function main() {
     const sessionHero = detailPage.getByTestId('ce-worker-groups-session-hero');
     const createGroup = detailPage.getByTestId('ce-sbts-create-toggle');
     const listRefresh = detailPage.getByRole('button', { name: 'Refresh groups', exact: true });
-    for (const width of [390, 646, 1280]) {
+    for (const width of [320, 390, 591, 646, 768, 1280]) {
       await detailPage.setViewportSize({ width, height: 900 });
       for (const creating of [false, true]) {
         if (creating) await createGroup.click();
         const heroBox = await sessionHero.boundingBox();
+        const createBox = await createGroup.boundingBox();
         for (const control of [createGroup, listRefresh]) {
           const box = await control.boundingBox();
-          assert.ok(Math.abs(box.y - heroBox.y) <= 1, `Groups toolbar stays on one row at ${width}px`);
-          assert.ok(Math.abs(box.height - heroBox.height) <= 1, `Groups toolbar controls match height at ${width}px`);
+          if (width <= 390) {
+            assert.ok(box.y >= heroBox.y + heroBox.height, `Groups actions stack below the session at ${width}px`);
+            assert.ok(Math.abs(box.y - createBox.y) <= 1, `Create and refresh stay aligned at ${width}px`);
+          } else {
+            assert.ok(Math.abs(box.y - heroBox.y) <= 1, `Groups toolbar stays on one row at ${width}px`);
+            assert.ok(Math.abs(box.height - heroBox.height) <= 1, `Groups toolbar controls match height at ${width}px`);
+          }
           assert.ok(box.height >= 44, 'Toolbar controls retain a usable touch target');
+        }
+        for (const label of [sessionHero.getByText('Active session', { exact: true }), sessionHero.locator('h1 a span')]) {
+          const dimensions = await label.evaluate(node => ({
+            text: node.textContent, width: node.clientWidth, scrollWidth: node.scrollWidth,
+            height: node.clientHeight, scrollHeight: node.scrollHeight,
+          }));
+          // Fractional line heights can round scrollHeight one pixel above clientHeight.
+          assert.ok(dimensions.scrollWidth <= dimensions.width && dimensions.scrollHeight <= dimensions.height + 1,
+            `Session label is fully visible at ${width}px: ${JSON.stringify(dimensions)}`);
         }
         assert.equal(await listRefresh.evaluate((button) => getComputedStyle(button).borderTopWidth), '0px');
         assert.equal(await detailPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
@@ -132,6 +147,20 @@ async function main() {
       }
       await detailPage.screenshot({ path: path.join(os.tmpdir(), `ce-worker-groups-toolbar-${width}.png`) });
     }
+    // The same viewport must wrap for a longer name, without hiding any text.
+    await detailPage.setViewportSize({ width: 646, height: 900 });
+    const sessionNameText = sessionHero.locator('h1 a span');
+    const originalName = await sessionNameText.textContent();
+    await sessionNameText.evaluate(node => {
+      node.textContent = 'Annual participant discussion and community planning session';
+    });
+    const longNameHeroBox = await sessionHero.boundingBox();
+    assert.ok((await createGroup.boundingBox()).y >= longNameHeroBox.y + longNameHeroBox.height,
+      'Longer session names make the actions wrap at the same viewport width');
+    assert.equal(await sessionNameText.evaluate(node => node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight + 1), false);
+    assert.equal(await detailPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    await detailPage.screenshot({ path: path.join(os.tmpdir(), 'ce-worker-groups-toolbar-long-name.png') });
+    await sessionNameText.evaluate((node, name) => { node.textContent = name; }, originalName);
     await listRefresh.click();
     await detailPage.getByRole('button', { name: 'Open group details for Participants 2026', exact: true }).waitFor();
     await detailPage.close();

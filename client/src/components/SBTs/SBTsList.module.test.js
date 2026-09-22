@@ -31,14 +31,14 @@ describe('SBTsList module styles', () => {
     expect(scss).not.toMatch(/#featuredSBTsContainer/);
   });
 
-  it('keeps the Worker Groups toolbar on one row with borderless refresh', () => {
+  it('keeps the wide Worker Groups toolbar aligned with borderless refresh', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'SBTsList.module.scss'), 'utf8');
 
     expect(scss).toMatch(
       /\.workerRouteSessionHero,\s*\.header \.createGroupButton\s*{[^}]*border:\s*1px solid color-mix\(in srgb, var\(--ce-color-white\) 50%, transparent\);/,
     );
     expect(scss).toMatch(
-      /\.workerRouteToolbar\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
+      /\.workerRouteToolbar\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/,
     );
     expect(scss).toMatch(/\.workerRouteRefreshButton\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/);
   });
