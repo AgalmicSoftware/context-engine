@@ -94,6 +94,26 @@ describe('session interview protocol', () => {
     });
   });
 
+  it('matches the Worker public catalog without treating privacy topics as access restrictions', async () => {
+    const { __test__interviewQuestionCatalog: worker } =
+      await import('../../../../workers/sessionCorsWorker/interviewQuestionCatalog.js');
+    const input = [
+      { id: 'encrypted', prompt: 'Should chats be encrypted?', type: 'binary' },
+      { id: 'locked', prompt: 'Should a decision be locked after voting?', type: 'freeform' },
+      { id: 'blocked', prompt: 'When should blocked users return?', type: 'freeform' },
+      { id: 'mask', prompt: '[encrypted]' },
+      { id: 'private', prompt: 'Private view', promptEncrypted: { ciphertext: 'sealed' } },
+      { id: 'gate', prompt: 'Gated view', gates: ['group'] },
+      { id: 'hidden', prompt: 'Hidden view', visibility: 'private' },
+    ];
+    expect(normalizeInterviewQuestions(input).map((question) => question.id)).toEqual([
+      'encrypted',
+      'locked',
+      'blocked',
+    ]);
+    expect(normalizeInterviewQuestions(input)).toEqual(worker.dedupeQuestions(input));
+  });
+
   it('canonicalizes question hashing order and resolves realtime model provenance', () => {
     expect(resolveRealtimeInterviewSource({ ai: { realtimeModel: 'gpt-realtime-2.1' } }).modelId).toBe(
       'gpt-realtime-2.1',

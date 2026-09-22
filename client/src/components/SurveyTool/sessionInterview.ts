@@ -2,6 +2,7 @@ import {
   validateQuadraticAllocation,
   validateQuadraticQuestion,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
+import { normalizePublicInterviewQuestions } from '../../../../shared/interviewQuestionCatalog.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import {
   buildGeneratedSurveyStatements,
@@ -10,7 +11,7 @@ import {
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
-import { hasRatingScaleMetadata, normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
+import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import {
   buildRealtimeInterviewPrefillContext,
   type RealtimeInterviewReviewedResponse,
@@ -29,7 +30,6 @@ const SUPPORTED_INTERVIEW_PROMPT_VERSIONS = new Set([
   'ce-interview-brief-v4',
   INTERVIEW_PROMPT_VERSION,
 ]);
-const BINARY_RESPONSE_OPTIONS = ['Agree', 'Unsure', 'Disagree'];
 const SUGGESTED_QUESTION_TYPES = ['freeform', 'rating', 'multichoice', 'binary', 'quadratic'] as const;
 const SUGGESTED_QUESTION_TYPE_SET = new Set<string>(SUGGESTED_QUESTION_TYPES);
 const REALTIME_INSTRUCTIONS_LIMIT = 31_500;
@@ -269,40 +269,8 @@ export const resolveRealtimeInterviewSource = (sessionConfig: unknown): Intervie
   };
 };
 
-export const normalizeInterviewQuestions = (questions: unknown): InterviewQuestion[] => {
-  const seen = new Set<string>();
-  return (Array.isArray(questions) ? questions : [])
-    .map((candidate) => {
-      const question = asRecord(candidate);
-      const id = toTrimmedString(question.id || question.questionId).toLowerCase();
-      const prompt = toTrimmedString(question.prompt || question.question || question.title);
-      const type = toTrimmedString(question.type || question.questionType || 'freeform').toLowerCase();
-      const rawOptions = question.options || question.choices;
-      const options =
-        type === 'binary'
-          ? [...BINARY_RESPONSE_OPTIONS]
-          : (Array.isArray(rawOptions) ? rawOptions : [])
-              .map((option) => toTrimmedString(asRecord(option).label || asRecord(option).value || option))
-              .filter(Boolean);
-      return {
-        id,
-        prompt,
-        type,
-        options,
-        ...(type === 'multichoice'
-          ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) }
-          : {}),
-        ...(type === 'rating' && hasRatingScaleMetadata(question) ? { scale: normalizeRatingScale(question) } : {}),
-        ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
-      };
-    })
-    .filter((question) => {
-      if (!question.id || !question.prompt || seen.has(question.id)) return false;
-      if (/encrypted|locked|connect.+decrypt/i.test(question.prompt)) return false;
-      seen.add(question.id);
-      return true;
-    });
-};
+export const normalizeInterviewQuestions = (questions: unknown): InterviewQuestion[] =>
+  normalizePublicInterviewQuestions(questions);
 
 export const canonicalizeInterviewQuestions = (questions: InterviewQuestion[]): InterviewQuestion[] =>
   [...questions].sort(

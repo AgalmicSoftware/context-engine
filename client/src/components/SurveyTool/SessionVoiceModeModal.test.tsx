@@ -1813,6 +1813,59 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
   });
+
+  it('accepts a fresh bounded Worker catalog when the local session contains 101 questions', async () => {
+    const questionPool = Array.from({ length: 101 }, (_, index) => ({
+      id: `q${index}`,
+      prompt: `Question ${index}?`,
+      type: 'freeform',
+    }));
+    const catalogQuestions = questionPool.slice(1).map((question) => ({ ...question, options: [] }));
+    mockedHashInterviewQuestions.mockImplementation(async (questions) =>
+      questions.length === 101 ? 'b'.repeat(64) : 'a'.repeat(64),
+    );
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            type: 'context-engine.interview-question-catalog',
+            version: 1,
+            sessionSlug: 'demo',
+            prefillPromptVersion: 'ce-interview-brief-v5',
+            questionSetHash: 'a'.repeat(64),
+            questions: catalogQuestions,
+          }),
+        ),
+    );
+    try {
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          questionPool={questionPool}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v5',
+            source: { platform: 'claude', modelId: 'example', verification: 'self_reported' },
+            responderContext: {},
+            responses: [
+              { questionId: 'q100', answer: 'A catalog answer', confidence: 0.8 },
+              { questionId: 'q0', answer: 'Outside catalog', confidence: 0.8 },
+            ],
+          }}
+        />,
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Draft answer for Question 100?. Activate to edit.' }),
+      ).toHaveTextContent('A catalog answer');
+      expect(screen.queryByText('Outside catalog')).not.toBeInTheDocument();
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
 });
 
 describe('Interview cancellation and recovery', () => {

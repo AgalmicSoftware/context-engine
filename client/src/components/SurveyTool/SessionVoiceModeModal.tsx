@@ -29,7 +29,6 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import {
   buildExternalInterviewKickoff,
   buildRealtimeInterviewInstructions,
-  hashInterviewQuestions,
   mapInterviewEvidenceToResponses,
   normalizeInterviewQuestions,
   readImportedInterviewDraftResponses,
@@ -38,6 +37,10 @@ import {
   type InterviewQuestion,
   type SessionVoiceMode,
 } from './sessionInterview';
+import {
+  resolveInterviewPrefillQuestions,
+  scopeInterviewPrefillToQuestions,
+} from './sessionInterviewCatalogValidation';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
 import {
   resolveSuggestedQuestionAuthoringState,
@@ -142,6 +145,8 @@ function SessionInterviewPanel({
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
   const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
+  const catalogAbortRef = useRef<AbortController | null>(null);
+  const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
@@ -201,6 +206,7 @@ function SessionInterviewPanel({
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
+      catalogAbortRef.current?.abort();
       if (copyResetRef.current) clearTimeout(copyResetRef.current);
       if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
     };
@@ -363,24 +369,27 @@ function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
-          const currentQuestionSetHash = await hashInterviewQuestions(
+          catalogAbortRef.current = new AbortController();
+          const matchedQuestions = await resolveInterviewPrefillQuestions({
+            packet: prefillPacket,
             questions,
-            prefillPacket.promptVersion || 'ce-interview-brief-v1',
-          );
+            sessionSlug,
+            loadWorkerUrl: resolveWorkerUrl,
+            sessionUrl: buildInterviewReturnSessionUrl(),
+            signal: catalogAbortRef.current.signal,
+          });
           if (disposedRef.current) return;
-          if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
-            throw new Error(
-              'This prefill link was created for an older or different question set. Ask the AI for a fresh link.',
-            );
-          }
           // Validate imported evidence once; later additions must not block continued interviews.
           validatedPrefillRef.current = prefillPacket;
+          validatedPrefillQuestionsRef.current = matchedQuestions;
         }
         const importedDrafts = nextTranscript.trim()
           ? null
-          : readImportedInterviewDraftResponses(prefillPacket, questions);
+          : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions);
         const contextPacket: InterviewPrefillPacket | null =
-          prefillPacket ||
+          (prefillPacket
+            ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
+            : null) ||
           (responderContext.trim()
             ? {
                 version: 1,
@@ -395,7 +404,8 @@ function SessionInterviewPanel({
           const url = await resolveWorkerUrl();
           if (disposedRef.current) return;
           mapped = await mapInterviewEvidenceToResponses({
-            questions,
+            questions:
+              !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions,
             transcript: nextTranscript,
             prefillPacket: contextPacket,
             sessionSlug,
@@ -527,10 +537,10 @@ function SessionInterviewPanel({
     setShowTranscript(false);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
-        ? prefillPacket
+        ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
         : null;
     const importedDrafts = validatedPrefillPacket
-      ? readImportedInterviewDraftResponses(validatedPrefillPacket, questions)
+      ? readImportedInterviewDraftResponses(validatedPrefillPacket, validatedPrefillQuestionsRef.current || questions)
       : null;
     void recorder.start(
       buildRealtimeInterviewInstructions({
