@@ -29,7 +29,9 @@ Binary includes Agree, Unsure, and Disagree. The binary average uses participant
 with binary answers; the overall average uses all participants with readable
 answers. The summary follows the same filters as the answer sections, updates when
 new responses reach the report, and remains visible for nonbinary-only results.
-Polis clustering and participant graphs continue to use binary answers only.
+The session cache adapter passes all supported readable answer types into the report,
+including nonbinary-only sessions. Polis clustering and participant graphs continue
+to use binary answers only.
 
 A section appears only when at least one of its questions has a valid readable
 answer after filtering. All Questions starts open with each type’s preview visible.

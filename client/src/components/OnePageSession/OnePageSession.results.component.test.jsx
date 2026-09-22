@@ -23,12 +23,24 @@ import {
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
+let mockRenderRealPolisReport = false;
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
+const originalResizeObserver = global.ResizeObserver;
+beforeAll(() => {
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
+afterAll(() => {
+  global.ResizeObserver = originalResizeObserver;
+});
 const fullCrossCorpusPayload = JSON.parse(
   fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
 );
@@ -86,6 +98,10 @@ jest.mock('../SBTs/SBTsPage', () => (props) => {
 });
 jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
+  if (mockRenderRealPolisReport) {
+    const Report = jest.requireActual('../PolisReport/PolisReport').default;
+    return <Report {...props} />;
+  }
   return <div data-testid="polis-report">Polis</div>;
 });
 jest.mock('../DebateMap/DebateMap', () => ({
@@ -219,6 +235,7 @@ jest.mock('../DemoViews/CorpusViewer', () => {
 });
 describe('OnePageSession results routing', () => {
   afterEach(() => {
+    mockRenderRealPolisReport = false;
     jest.useRealTimers();
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -1571,6 +1588,110 @@ describe('OnePageSession results routing', () => {
     jest.advanceTimersByTime(150);
     expect(getQuestionsPeekCalls()).toBe(2);
   });
+
+  it.each([true, false])(
+    'renders actual Worker cache answers in the report (include binary: %s)',
+    async (includeBinary) => {
+      mockRenderRealPolisReport = true;
+      const config = {
+        ...buildProps().sessionConfig,
+        sessionId: `0x${'4'.repeat(32)}`,
+        corsWorkerUrl: 'https://synthetic-results.example.test',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        storageProfile: {
+          backend: 'cloudflare',
+          resources: { questions: 'active', responses: 'active', surveys: 'active' },
+        },
+      };
+      const questionList = [
+        ...(includeBinary ? [{ id: 'binary', type: 'binary', prompt: 'Binary prompt', value: 'Agree' }] : []),
+        { id: 'written', type: 'freeform', prompt: 'Written prompt', value: 'Synthetic written response' },
+        { id: 'rating', type: 'rating', prompt: 'Rating prompt', scale: { min: 0, max: 100 }, value: 75 },
+        {
+          id: 'single',
+          type: 'multichoice',
+          prompt: 'Single prompt',
+          options: ['First', 'Second'],
+          singleSelect: true,
+          value: ['First'],
+        },
+        {
+          id: 'multi',
+          type: 'multichoice',
+          prompt: 'Multiple prompt',
+          options: ['First', 'Second'],
+          value: ['First', 'Second'],
+        },
+        {
+          id: 'quadratic',
+          type: 'quadratic',
+          prompt: 'Allocation prompt',
+          options: ['Garden', 'Bus'],
+          voiceCredits: 25,
+          value: [3, -4],
+        },
+      ];
+      // A full mixed bank matches the released 42-question / 27-binary shape,
+      // using synthetic prompts and answers rather than production submissions.
+      if (includeBinary) {
+        const extraCounts = { binary: 26, written: 4, rating: 3, single: 1, multi: 1, quadratic: 1 };
+        questionList.push(
+          ...questionList.flatMap((question) =>
+            Array.from({ length: extraCounts[question.id] }, (_, index) => ({
+              ...question,
+              id: `${question.id}-extra-${index}`,
+              prompt: `${question.prompt} ${index + 2}`,
+            })),
+          ),
+        );
+      }
+      const binaryCount = includeBinary ? 27 : 0;
+      const questions = Object.fromEntries(
+        questionList.map(({ value, ...question }) => [question.id, { ...question, sessionSlug: 'edge' }]),
+      );
+      const questionResponses = Object.fromEntries(
+        questionList.map((question) => [
+          question.id,
+          {
+            participant: {
+              type: question.type,
+              sessionSlug: 'edge',
+              answer: { value: question.value, encrypted: false },
+            },
+          },
+        ]),
+      );
+      const cache = {
+        worker: withWorkerCanonicalCacheIdentity(
+          { questions, questionResponses },
+          resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: 'edge' }),
+        ),
+      };
+      jest
+        .spyOn(cacheScripts, 'peekCacheSync')
+        .mockImplementation((namespace) => (namespace === 'questionsCache' ? cache : {}));
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
+      render(
+        <OnePageSession
+          {...buildProps()}
+          sessionConfig={config}
+          slug="edge"
+          isQuestionCacheReady={true}
+          isResponsesCacheReady={true}
+        />,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      expect(await screen.findByText('Synthetic written response')).toBeInTheDocument();
+      expect(screen.getByText('Rating prompt')).toBeInTheDocument();
+      expect(screen.getByText('Allocation prompt')).toBeInTheDocument();
+      expect(screen.getAllByText('−4').length).toBeGreaterThan(0);
+      expect(screen.getByRole('region', { name: 'Ratings' })).toHaveTextContent('75');
+      expect(screen.getByRole('region', { name: 'Multiple choice' })).toHaveTextContent('First');
+      expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+      expect(screen.getAllByText(`${questionList.length} (${binaryCount} Binary)`)).toHaveLength(2);
+      expect(screen.getByText(`1 (${includeBinary ? 1 : 0} Binary)`)).toBeInTheDocument();
+    },
+  );
 
   it('rejects results cached for a different Worker identity under the same slug', () => {
     const buildWorkerConfig = (sessionId, corsWorkerUrl) => ({
