@@ -611,18 +611,34 @@ Authenticated clients can use the worker as the session storage boundary:
     refs are returned, the client completes without an on-chain transaction.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
-    In Worker-canonical sessions whose results visibility is not
-    `public_full_if_storage_public`, individual response reads also require
-    that recorded author, a current session admin, or an authenticated
-    delegated storage grant. A participant's ordinary `storage` route scope
-    permits submission and own-response reload, not other participants' raw
-    answers. Lists apply the same restriction to each row, and older rows
-    lacking trusted author metadata remain unavailable to ordinary participants.
-    Existing per-item access conditions still apply to every permitted reader.
-    This is a read-time protection for existing and new rows; it does not
-    rewrite stored data or revoke plaintext already downloaded. Aggregate-only
-    visibility does not authorize raw reads to compute a client-side summary;
-    a combined summary needs an authorized server-generated aggregate.
+  - JSON and multipart uploads share per-upload policy validation. Group IDs
+    accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
+    of precedence, using the first nonempty list. Multipart `groupIds` and
+    `groups` may be repeated fields or JSON-encoded arrays; for example,
+    `groupIds=["reviewers","organizers"]` has the same meaning as the JSON
+    array. IDs are normalized and deduplicated. Malformed JSON, objects,
+    nested arrays, and non-string IDs return `400`; every supplied alias is
+    validated even when another alias takes precedence. Only `groupIds` and
+    `groups` may repeat in multipart policy fields; singular group aliases,
+    access-condition documents, and upload-policy fields must occur at most
+    once, so a second restriction cannot be silently discarded.
+  - Per-upload `accessConditions` (or legacy `conditions`) must be an object
+    or JSON-encoded object with a nonempty `conditions` array. `match` accepts
+    `any` or `all` and defaults to `any` when omitted. Supported rule kinds
+    are `worker_role`, `agent_grant_scope`, `worker_group`, and `sbt_onchain`;
+    supplied rule fields must be valid for that kind. Legacy field aliases,
+    the omitted-role admin default, and the session-chain fallback remain
+    supported. An omitted, null, or blank optional condition field selects
+    the existing session fallback. Malformed nonempty JSON, invalid operators,
+    unsupported kinds, and incomplete rules return `400` before payload or
+    index writes, rather than silently dropping a restriction. Existing
+    stored-policy read compatibility is unchanged.
+  - Explicit `uploadPolicy` (or `documentUploadPolicy` / `policy`) must name
+    `group_allowlist` or `sbt_allowlist`, either as a legacy mode string or an
+    object using `mode`, `kind`, or `type`. A malformed nonempty value or an
+    object without a mode returns `400`, including invalid aliases hidden
+    behind another supplied policy. Omitted, null, or blank optional policies
+    retain the existing fallback behavior.
   - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
@@ -1161,7 +1177,8 @@ R2 / Durable Objects:
   compatible live config during resume. Payload-plus-index uploads intentionally
   retain at-least-once retry semantics: success means both writes completed, while
   a failed or response-lost attempt may leave an invisible orphan or a readable
-  duplicate. There is no upload receipt journal or key-rotation state machine.
+  duplicate. Supplying an upload `requestId` does not deduplicate those writes.
+  There is no upload receipt journal or key-rotation state machine.
 - `CE_WORKER_GROUP_COORDINATOR` optionally binds an independently migrated
   `WorkerGroupWriteCoordinator` namespace. When present, Worker Group routes
   use it while authorization, deployment, and session-key coordination remain

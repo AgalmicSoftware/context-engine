@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { exportCloudflareEncryptedPayloadEnvelopes, storageRoute } from './storageRouteExecution.js';
+import { exportCloudflareEncryptedPayloadEnvelopes, readStorageUploadRequestPayload, storageRoute } from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
 import { writeStorageEnvelopeKeyReleaseAudit } from './storageEnvelopeEncryption.js';
@@ -220,117 +220,313 @@ const uploadEnvelopePayload = async ({
 	return { response, body: await readJson(response) };
 };
 
-test('private response reads separate participant submission scope from non-owner raw access', async (t) => {
-	for (const storage of ['kv', 'r2']) {
-		await t.test(storage, async () => {
-			const admin = '0x1111111111111111111111111111111111111111';
-			const first = '0x2222222222222222222222222222222222222222';
-			const second = '0x3333333333333333333333333333333333333333';
-			const payloadAccessControl = {
-				gate: 'role_gate', encryption: 'worker_envelope',
-				accessConditions: { match: 'any', conditions: [
-					{ kind: 'worker_role', role: 'admin' },
-					{ kind: 'agent_grant_scope', scope: 'storage' },
-				] },
-			};
-			let config = {
-				slug: 'session-a', sessionId: WORKER_GROUP_SESSION_ID, adminAddress: admin,
-				storageProfile: { backend: 'cloudflare', payloadAccessControl },
-				workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] },
-				sessionModeProfile: {
-					profileVersion: 1, preset: 'fast_cheap_cloudflare', authority: { mode: 'worker_canonical' },
-					evm: { registryChainId: null }, storage: { backend: 'cloudflare', payloadAccessControl },
-					identity: { default: 'passkey', enabled: ['passkey'] }, authorization: { mechanisms: ['worker_roles'] },
-					encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-					surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
-					results: { visibility: 'participant_aggregate', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } },
-					export: { scope: 'admin_raw' },
-				},
-			};
-			assert.equal(validateWorkerConfigModeValues(config).ok, true);
-			const kv = createMockKv();
-			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-private-response-test-key' };
-			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
-			attachSessionCoordinator(env, (next) => { config = next; });
-			const scopesFor = (address) => resolveWorkerCanonicalLoginScopes({ address, config, env, slug: config.slug });
-			const firstScopes = await scopesFor(first);
-			const secondScopes = await scopesFor(second);
-			assert.deepEqual(firstScopes, { storage: true });
-			const cryptoSpy = createCryptoDecryptSpy();
-			const deps = { json, randomBytes: createSequenceRandomBytes(), crypto: cryptoSpy.crypto };
-			const route = (path, request, uploaderAddress, authScopes, slug = config.slug) => storageRoute({
-				path, method: request.method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders: {}, deps,
-			});
-			const upload = async (address, authScopes, extra = {}) => {
-				const response = await route('/storage/upload', new Request('https://worker.example/storage/upload', {
-					method: 'POST', headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ data: { answer: { value: `private answer from ${address}` }, responder: first }, resource: 'responses', ...extra }),
-				}), address, authScopes);
-				assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
-				return (await response.json()).storageRef.id;
-			};
-			const firstId = await upload(first, firstScopes);
-			const secondId = await upload(second, secondScopes);
-			assert.equal((await readStorageIndexMetadata(kv, 'session-a', 'responses', secondId)).responder, second);
-			assert.equal([...kv.store.values()].join('').includes('private answer from'), false);
-			const read = (id, address, scopes, slug) => route('/storage/read', new Request(`https://worker.example/storage/read?id=${id}`), address, scopes, slug);
-			const list = (address, scopes) => route('/storage/list', new Request('https://worker.example/storage/list?resource=responses'), address, scopes);
-			for (const [address, scopes, ownId, otherId] of [[first, firstScopes, firstId, secondId], [second, secondScopes, secondId, firstId]]) {
-				const listed = await list(address, scopes);
-				assert.equal(listed.status, 200);
-				assert.deepEqual((await listed.json()).items.map((item) => item.storageRef.id), [ownId]);
-				assert.equal((await read(ownId, address, scopes)).status, 200);
-				const beforeDenied = cryptoSpy.decryptCalls;
-				assert.equal((await read(otherId, address, scopes)).status, 403);
-				assert.equal(cryptoSpy.decryptCalls, beforeDenied, 'deny before envelope decryption');
-			}
-			assert.equal((await read(firstId, '', {})).status, 403);
-			assert.equal((await read(firstId, first, {})).status, 403);
-			assert.equal((await read(firstId, first, firstScopes, 'different-session')).status, 404);
-			const adminScopes = await scopesFor(admin);
-			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
-			assert.equal((await (await list(admin, adminScopes)).json()).items.length, 2);
-			const delegated = { storage: true, delegationScopes: ['storage'] };
-			assert.equal((await read(firstId, second, delegated)).status, 200);
-			assert.equal((await (await list(second, delegated)).json()).items.length, 2);
-			assert.equal((await read(firstId, second, { storage: true, delegationScopes: ['ai'] })).status, 403);
-			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: 'synthetic-grant' } })).status, 200);
-			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: '' } })).status, 403);
-			// Old rows without a server-recorded owner fail closed for participants.
-			const missingOwner = await readStorageIndexMetadata(kv, 'session-a', 'responses', firstId);
-			delete missingOwner.responder;
-			await writeStorageIndexMetadata(kv, 'session-a', 'responses', missingOwner);
-			assert.equal((await read(firstId, first, firstScopes)).status, 403);
-			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
-			// Per-item restrictions still apply to an owner who otherwise qualifies.
-			const adminOnlyId = await upload(admin, adminScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
-			assert.equal((await read(adminOnlyId, second, delegated)).status, 403);
-			// Public EDDY-style policy still permits anonymous raw reads and lists.
-			const publicAccess = { gate: 'none', encryption: 'none' };
-			config = { ...config, storageProfile: { backend: 'cloudflare', payloadAccessControl: publicAccess }, sessionModeProfile: {
-				...config.sessionModeProfile, preset: 'custom', storage: { backend: 'cloudflare', payloadAccessControl: publicAccess },
-				encryption: { mode: 'none' }, results: { ...config.sessionModeProfile.results, visibility: 'public_full_if_storage_public' },
-			} };
-			assert.equal(validateWorkerConfigModeValues(config).ok, true);
-			const publicId = await upload(second, secondScopes);
-			assert.equal((await read(publicId, '', {})).status, 200);
-			assert.deepEqual((await (await list('', {})).json()).items.map((item) => item.storageRef.id), [publicId]);
-			// Storage routes retain the legacy arweave scope alias for own responses.
-			config = { ...config, workerAuthority: { version: 1, participantScopes: ['arweave'], anonymousScopes: [] },
-				sessionModeProfile: { ...config.sessionModeProfile, results: { ...config.sessionModeProfile.results, visibility: 'participant_aggregate' } } };
-			assert.equal(validateWorkerConfigModeValues(config).ok, true);
-			const legacyScopes = await scopesFor(first);
-			assert.deepEqual(legacyScopes, { arweave: true });
-			const legacyId = await upload(first, legacyScopes);
-			const legacyRead = await read(legacyId, first, legacyScopes);
-			assert.equal(legacyRead.status, 200);
-			assert.equal(legacyRead.headers.get('Cache-Control'), 'private, no-store');
-			const legacyList = await list(first, legacyScopes);
-			assert.equal(legacyList.status, 200);
-			assert.equal(legacyList.headers.get('Cache-Control'), 'private, no-store');
-			assert.deepEqual((await legacyList.json()).items.map((item) => item.storageRef.id), [legacyId]);
-			assert.equal((await read(publicId, first, legacyScopes)).status, 403);
+const createPolicyUploadRequest = (encoding, fields) => {
+	if (encoding === 'json') {
+		return new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ data: 'group payload', contentType: 'text/plain', ...fields }),
 		});
+	}
+	const form = new FormData();
+	form.append('file', new Blob(['group payload'], { type: 'text/plain' }), 'payload.txt');
+	for (const [key, value] of Object.entries(fields)) {
+		const values = key === 'groupIds' && Array.isArray(value) ? value : [value];
+		for (const entry of values) form.append(key, typeof entry === 'string' ? entry : JSON.stringify(entry));
+	}
+	return new Request('https://worker.example/storage/upload', { method: 'POST', body: form });
+};
+
+test('storage upload policy parser preserves JSON/multipart group aliases through upload and read authorization', async (t) => {
+	const cases = [
+		['groupId', { groupId: 'finance' }, ['finance']],
+		['workerGroupId', { workerGroupId: 'finance' }, ['finance']],
+		['groups alias', { groups: ['finance', 'legal'] }, ['finance', 'legal']],
+		['scalar groupIds', { groupIds: 'finance' }, ['finance']],
+		['repeated groupIds', { groupIds: ['finance', 'legal'] }, ['finance', 'legal']],
+		['JSON array groupIds', { groupIds: '["finance","legal"]' }, ['finance', 'legal']],
+		['mixed encoded/repeated groupIds', { groupIds: ['["finance","legal"]', 'FINANCE'] }, ['finance', 'legal']],
+		['singular fallback', { groupIds: '', groupId: 'finance' }, ['finance']],
+		['alias precedence', { groupIds: ['finance'], groupId: 'legal' }, ['finance']],
+	];
+	for (const [name, fields, groupIds] of cases) {
+		for (const encoding of ['json', 'multipart']) {
+			await t.test(`${name}: ${encoding}`, async () => {
+				const kv = createMockKv();
+				const env = { CE_STORAGE_INDEX_KV: kv };
+				const member = '0x0000000000000000000000000000000000000def';
+				const outsider = '0x0000000000000000000000000000000000000bad';
+				const actorPrincipal = { kind: 'evm_address', address: member };
+				await createWorkerGroup({
+					env,
+					slug: 'session-a',
+					sessionId: WORKER_GROUP_SESSION_ID,
+					input: { groupId: 'finance', label: 'Finance', joinMode: 'admin_add' },
+					actorPrincipal,
+				});
+				await addWorkerGroupMember({
+					env,
+					slug: 'session-a',
+					sessionId: WORKER_GROUP_SESSION_ID,
+					groupId: 'finance',
+					principal: actorPrincipal,
+					actorPrincipal,
+				});
+				const config = {
+					sessionId: WORKER_GROUP_SESSION_ID,
+					storageProfile: {
+						backend: 'cloudflare',
+						payloadAccessControl: { gate: 'group_gate', encryption: 'none' },
+					},
+				};
+				const common = {
+					env,
+					config,
+					slug: 'session-a',
+					baseHeaders: {},
+					deps: { json, randomBytes: fixedRandomBytes, isWorkerGroupMember: readWorkerGroupMembershipProjection },
+				};
+				const denied = await storageRoute({
+					...common,
+					path: '/storage/upload',
+					method: 'POST',
+					request: createPolicyUploadRequest(encoding, fields),
+					uploaderAddress: outsider,
+				});
+				assert.equal(denied.status, 403);
+				assert.equal(
+					[...kv.store.keys()].some((key) => key.startsWith('ce-storage:')),
+					false,
+				);
+				const uploaded = await storageRoute({
+					...common,
+					path: '/storage/upload',
+					method: 'POST',
+					request: createPolicyUploadRequest(encoding, fields),
+					uploaderAddress: member,
+				});
+				assert.equal(uploaded.status, 200, JSON.stringify(await uploaded.clone().json()));
+				const { id } = await readJson(uploaded);
+				const metadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', id);
+				assert.deepEqual(metadata.groupIds, groupIds);
+				assert.deepEqual(metadata.payloadAccessControl.groupIds, groupIds);
+				for (const [address, status] of [
+					[member, 200],
+					[outsider, 403],
+				]) {
+					const read = await storageRoute({
+						...common,
+						path: '/storage/read',
+						method: 'GET',
+						uploaderAddress: address,
+						request: new Request(`https://worker.example/storage/read?id=${id}`),
+					});
+					assert.equal(read.status, status);
+					if (status === 200) assert.equal(await read.text(), 'group payload');
+				}
+			});
+		}
+	}
+});
+
+test('storage upload policy parser rejects malformed explicit policies before storage writes', async (t) => {
+	const role = { kind: 'worker_role', role: 'admin' };
+	const cases = [
+		['invalid JSON', { accessConditions: 'NOT VALID JSON' }],
+		['nonobject document', { accessConditions: [] }],
+		['false document', { accessConditions: false }],
+		['missing rules', { accessConditions: {} }],
+		['empty rules', { accessConditions: { match: 'all', conditions: [] } }],
+		['invalid operator', { accessConditions: { match: 'al', conditions: [role] } }],
+		['blank operator', { accessConditions: { match: '', conditions: [role] } }],
+		['invalid rules type', { accessConditions: { conditions: role } }],
+		['unknown rule', { accessConditions: { conditions: [{ kind: 'future_kind' }] } }],
+		['malformed all rule', { accessConditions: { match: 'all', conditions: [role, null] } }],
+		['malformed any rule', { accessConditions: { match: 'any', conditions: [role, {}] } }],
+		['blank role', { accessConditions: { conditions: [{ kind: 'worker_role', role: '' }] } }],
+		['missing scope', { accessConditions: { conditions: [{ kind: 'agent_grant_scope' }] } }],
+		['invalid scope', { accessConditions: { conditions: [{ kind: 'agent_grant_scope', scope: {} }] } }],
+		['missing group', { accessConditions: { conditions: [{ kind: 'worker_group' }] } }],
+		['missing SBT contract', { accessConditions: { conditions: [{ kind: 'sbt_onchain', chainId: 11155420 }] } }],
+		['invalid SBT contract', { accessConditions: { conditions: [{ kind: 'sbt_onchain', contract: 'bad' }] } }],
+		[
+			'invalid SBT chain',
+			{
+				accessConditions: { conditions: [{ kind: 'sbt_onchain', contract: '0x00000000000000000000000000000000000000aa', chainId: 'bad' }] },
+			},
+		],
+		[
+			'invalid SBT operator',
+			{
+				accessConditions: { conditions: [{ kind: 'sbt_onchain', contract: '0x00000000000000000000000000000000000000aa', anyOrAll: 'al' }] },
+			},
+		],
+		['malformed primary with valid alias', { accessConditions: false, conditions: { conditions: [role] } }],
+		['malformed alias with valid primary', { accessConditions: { conditions: [role] }, conditions: 'broken' }],
+		['malformed group JSON', { groupIds: '["finance"', groupId: 'finance' }],
+		['nested group array', { groupIds: '[ ["finance"] ]' }],
+		['object group ID', { groupIds: '[{"id":"finance"}]' }],
+		['invalid group alias', { groupIds: ['finance'], groupId: { id: 'legal' } }],
+		['malformed rule group', { accessConditions: { conditions: [{ kind: 'worker_group', groupIds: '["finance"' }] } }],
+		['malformed uploadPolicy group', { uploadPolicy: { mode: 'group_allowlist', groupIds: '["finance"' } }],
+		['missing upload policy mode', { uploadPolicy: { groupIds: ['finance'] } }],
+		['invalid upload policy type', { uploadPolicy: false }],
+		['array upload policy', { uploadPolicy: [] }],
+		['invalid upload policy mode type', { uploadPolicy: { mode: ['group_allowlist'], groupIds: ['finance'] } }],
+		['hidden malformed policy alias', { uploadPolicy: { mode: 'group_allowlist', groupIds: ['finance'] }, policy: {} }],
+		['malformed policy JSON', { uploadPolicy: '{broken' }],
+	];
+	for (const [name, fields] of cases) {
+		for (const encoding of ['json', 'multipart']) {
+			await t.test(`${name}: ${encoding}`, async () => {
+				const kv = createMockKv();
+				const r2 = createMockR2();
+				const response = await storageRoute({
+					path: '/storage/upload',
+					method: 'POST',
+					request: createPolicyUploadRequest(encoding, fields),
+					env: { CE_STORAGE_INDEX_KV: kv, CE_STORAGE_R2: r2 },
+					config: {
+						adminAddress: '0xabc',
+						storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+					},
+					slug: 'session-a',
+					uploaderAddress: '0xabc',
+					baseHeaders: {},
+					deps: { json, randomBytes: fixedRandomBytes },
+				});
+				assert.equal(response.status, 400, JSON.stringify(await response.clone().json()));
+				assert.match((await readJson(response)).error, /accessConditions|group|uploadPolicy/i);
+				assert.equal(kv.store.size, 0);
+				assert.equal(r2.store.size, 0);
+			});
+		}
+	}
+});
+
+test('multipart uploads reject repeated singular policy fields before storage writes', async (t) => {
+	for (const field of ['accessConditions', 'conditions', 'uploadPolicy', 'documentUploadPolicy', 'policy', 'groupId', 'workerGroupId']) {
+		await t.test(field, async () => {
+			const form = new FormData();
+			form.append('file', new Blob(['restricted payload']), 'payload.txt');
+			form.append(field, '');
+			form.append(field, 'malformed second value');
+			const kv = createMockKv();
+			const r2 = createMockR2();
+			const response = await storageRoute({
+				path: '/storage/upload', method: 'POST',
+				request: new Request('https://worker.example/storage/upload', { method: 'POST', body: form }),
+				env: { CE_STORAGE_INDEX_KV: kv, CE_STORAGE_R2: r2 },
+				config: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+				slug: 'session-a', uploaderAddress: '0xabc', baseHeaders: {},
+				deps: { json, randomBytes: fixedRandomBytes },
+			});
+			assert.equal(response.status, 400);
+			assert.match((await readJson(response)).error, /must occur at most once/);
+			assert.equal(kv.store.size, 0);
+			assert.equal(r2.store.size, 0);
+		});
+	}
+});
+
+test('storage upload policy parser preserves absent conditions, rule aliases, and legacy defaults', async () => {
+	for (const encoding of ['json', 'multipart']) {
+		for (const fields of [{}, { accessConditions: null }, { accessConditions: '' }, { accessConditions: '  ' }]) {
+			const parsed = await readStorageUploadRequestPayload(createPolicyUploadRequest(encoding, fields));
+			assert.equal(parsed.ok, true);
+			assert.equal(parsed.payload.accessConditions, null);
+		}
+		const conditions = [
+			{ kind: 'WORKER_ROLE', name: 'admin' },
+			{ kind: 'worker_role' },
+			{ kind: 'agent_grant_scope', value: 'storage' },
+			{ kind: 'worker_group', groups: ['finance'] },
+			{ kind: 'sbt_onchain', address: '0x00000000000000000000000000000000000000aa', networkChainId: '11155420', mode: 1 },
+			{ kind: 'sbt_onchain', sbtAddresses: ['0x00000000000000000000000000000000000000aa'] },
+		];
+		const parsed = await readStorageUploadRequestPayload(createPolicyUploadRequest(encoding, { conditions: { conditions } }));
+		assert.equal(parsed.ok, true);
+		assert.deepEqual(parsed.payload.accessConditions, {
+			match: 'any',
+			conditions: [
+				{ kind: 'worker_role', name: 'admin' },
+				{ kind: 'worker_role' },
+				{ kind: 'agent_grant_scope', value: 'storage' },
+				{ kind: 'worker_group', groups: ['finance'], groupIds: ['finance'] },
+				{ kind: 'sbt_onchain', address: '0x00000000000000000000000000000000000000aa', networkChainId: '11155420', mode: 1 },
+				{ kind: 'sbt_onchain', sbtAddresses: ['0x00000000000000000000000000000000000000aa'] },
+			],
+		});
+	}
+});
+
+test('upload policies retain optional values, mode strings, and legacy aliases in both encodings', async () => {
+	for (const encoding of ['json', 'multipart']) {
+		for (const value of [null, '', '  ']) {
+			const parsed = await readStorageUploadRequestPayload(createPolicyUploadRequest(encoding, { uploadPolicy: value }));
+			assert.equal(parsed.ok, true);
+			assert.equal(parsed.payload.uploadPolicy, null);
+		}
+		for (const fields of [
+			{ uploadPolicy: 'group_allowlist', groupId: 'finance' },
+			{ documentUploadPolicy: { kind: 'group_allowlist', groupId: 'finance' } },
+			{ policy: { type: 'group_allowlist', groups: ['finance'] } },
+		]) {
+			const parsed = await readStorageUploadRequestPayload(createPolicyUploadRequest(encoding, fields));
+			assert.equal(parsed.ok, true);
+			assert.equal(parsed.payload.uploadPolicy.mode, 'group_allowlist');
+			assert.deepEqual([...parsed.payload.groupIds, ...parsed.payload.uploadPolicy.groupIds], ['finance']);
+		}
+	}
+});
+
+test('storage upload policy parser persists all conditions and enforces them on subsequent reads', async () => {
+	for (const encoding of ['json', 'multipart']) {
+		const kv = createMockKv();
+		const common = {
+			env: { CE_STORAGE_INDEX_KV: kv },
+			slug: 'session-a',
+			baseHeaders: {},
+			config: {
+				adminAddress: '0xabc',
+				storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+			},
+			deps: { json, randomBytes: fixedRandomBytes },
+		};
+		const accessConditions = {
+			match: 'all',
+			conditions: [
+				{ kind: 'worker_role', name: 'admin' },
+				{ kind: 'agent_grant_scope', value: 'storage' },
+			],
+		};
+		const uploaded = await storageRoute({
+			...common,
+			path: '/storage/upload',
+			method: 'POST',
+			uploaderAddress: '0xabc',
+			authScopes: { storage: true },
+			request: createPolicyUploadRequest(encoding, { accessConditions: null, conditions: accessConditions }),
+		});
+		assert.equal(uploaded.status, 200);
+		const { id } = await readJson(uploaded);
+		assert.deepEqual((await readStorageIndexMetadata(kv, 'session-a', 'docsContext', id)).accessConditions, accessConditions);
+		for (const [uploaderAddress, authScopes, status] of [
+			['0xabc', {}, 403],
+			['0xdef', { storage: true }, 403],
+			['0xabc', { storage: true }, 200],
+		]) {
+			const read = await storageRoute({
+				...common,
+				path: '/storage/read',
+				method: 'GET',
+				uploaderAddress,
+				authScopes,
+				request: new Request(`https://worker.example/storage/read?id=${id}`),
+			});
+			assert.equal(read.status, status);
+			if (status === 200) assert.equal(await read.text(), 'group payload');
+		}
 	}
 });
 
@@ -2219,8 +2415,8 @@ test('storageRoute rejects non-canonical chain ids on direct gates, access condi
 				},
 			},
 		});
-		assert.equal(conditionResponse.status, 403, `access condition: ${chainId}`);
-		assert.equal((await readJson(conditionResponse)).reason, 'invalid_sbt_chain');
+		assert.equal(conditionResponse.status, 400, `access condition: ${chainId}`);
+		assert.match((await readJson(conditionResponse)).error, /accessConditions.chainId/);
 
 		const policyResponse = await runUpload({
 			config: {

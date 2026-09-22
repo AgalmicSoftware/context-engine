@@ -36840,7 +36840,7 @@ var init_uploadSizeLimits = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, normalizeUploadPolicy, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, authorizeCloudflareStorageAccess, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, authorizeCloudflareStorageAccess, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -36960,6 +36960,104 @@ var init_storageRouteExecution = __esm({
       const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj12).map((condition) => ({ ...condition, kind: trim6(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
       return { match, conditions };
     };
+    invalidUploadPolicy = (field, detail) => {
+      throw new Error(`Invalid ${field}: ${detail}.`);
+    };
+    readUploadGroupIds = (source, fields = ["groupIds", "groups", "groupId", "workerGroupId"]) => {
+      const lists = fields.map((field) => {
+        const raw = source[field];
+        if (raw == null) return [];
+        const entries = Array.isArray(raw) ? raw : [raw];
+        const ids = entries.flatMap((entry) => {
+          if (typeof entry !== "string") return invalidUploadPolicy(field, "expected group ID text");
+          const text = entry.trim();
+          if (!text) return [];
+          let values = [text];
+          if (text.startsWith("[") || text.startsWith("{")) {
+            try {
+              values = JSON.parse(text);
+            } catch {
+              return invalidUploadPolicy(field, "malformed group ID JSON");
+            }
+            if (!Array.isArray(values)) return invalidUploadPolicy(field, "expected a group ID array");
+          }
+          return values.map((value) => {
+            if (typeof value !== "string" || !safeGroupId(value) || value.trim().startsWith("[") || value.trim().startsWith("{")) {
+              return invalidUploadPolicy(field, "expected nonempty group ID text");
+            }
+            return safeGroupId(value);
+          });
+        });
+        return Array.from(new Set(ids));
+      });
+      return lists.find((ids) => ids.length) || [];
+    };
+    readUploadAccessConditions = (input) => {
+      if (input == null || typeof input === "string" && !input.trim()) return null;
+      let raw = input;
+      if (typeof raw === "string") {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          return invalidUploadPolicy("accessConditions", "malformed JSON");
+        }
+      }
+      if (raw === null) return null;
+      if (!isObj12(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
+      if (raw.match !== void 0 && (typeof raw.match !== "string" || !["any", "all"].includes(raw.match.trim().toLowerCase()))) {
+        return invalidUploadPolicy("accessConditions.match", "expected any or all");
+      }
+      if (!Array.isArray(raw.conditions) || !raw.conditions.length) {
+        return invalidUploadPolicy("accessConditions.conditions", "expected at least one rule");
+      }
+      const requireText = (condition, fields) => {
+        fields.forEach((field) => {
+          if (condition[field] !== void 0 && (typeof condition[field] !== "string" || !condition[field].trim())) {
+            invalidUploadPolicy(`accessConditions.${field}`, "expected nonempty text");
+          }
+        });
+        return fields.some((field) => typeof condition[field] === "string" && condition[field].trim());
+      };
+      const conditions = raw.conditions.map((condition) => {
+        if (!isObj12(condition) || typeof condition.kind !== "string") {
+          return invalidUploadPolicy("accessConditions.conditions", "expected a rule with a kind");
+        }
+        const kind = condition.kind.trim().toLowerCase();
+        if (kind === "worker_role") {
+          requireText(condition, ["role", "name"]);
+        } else if (kind === "agent_grant_scope") {
+          if (!requireText(condition, ["scope", "value"])) return invalidUploadPolicy("accessConditions.scope", "required");
+        } else if (kind === "worker_group") {
+          const groupIds = readUploadGroupIds(condition, ["groupIds", "groups", "groupId"]);
+          if (!groupIds.length) return invalidUploadPolicy("accessConditions.groupIds", "required");
+          return { ...condition, kind, groupIds };
+        } else if (kind === "sbt_onchain") {
+          if (condition.sbtAddresses !== void 0 && !Array.isArray(condition.sbtAddresses)) {
+            return invalidUploadPolicy("accessConditions.sbtAddresses", "expected an array");
+          }
+          const contracts = [
+            ...condition.sbtAddresses || [],
+            ...["contract", "address"].filter((field) => condition[field] !== void 0).map((field) => condition[field])
+          ];
+          if (!contracts.length || contracts.some((value) => typeof value !== "string" || !/^0x[0-9a-f]{40}$/i.test(value.trim()) || /^0x0{40}$/i.test(value.trim()))) {
+            return invalidUploadPolicy("accessConditions.contract", "expected an SBT contract address");
+          }
+          for (const field of ["chainId", "networkChainId"]) {
+            if (!resolveChainIdWithLegacyFallback(condition[field], 1))
+              return invalidUploadPolicy(`accessConditions.${field}`, "expected a positive chain ID");
+          }
+          for (const field of ["anyOrAll", "mode", "match"]) {
+            if (condition[field] !== void 0 && !["any", "all", "0", "1"].includes(trim6(condition[field]).toLowerCase())) {
+              return invalidUploadPolicy(`accessConditions.${field}`, "expected any or all");
+            }
+          }
+        } else {
+          return invalidUploadPolicy("accessConditions.kind", "unsupported rule");
+        }
+        return { ...condition, kind };
+      });
+      return { match: raw.match?.trim().toLowerCase() || "any", conditions };
+    };
     normalizeUploadPolicy = (policyInput) => {
       let raw = policyInput;
       if (typeof raw === "string" && raw.trim()) {
@@ -36989,6 +37087,44 @@ var init_storageRouteExecution = __esm({
         anyOrAll: normalizeGateMode(raw.anyOrAll || raw.match || raw.gateMode)
       };
     };
+    readUploadPolicyFields = (source) => {
+      try {
+        const conditions = [source.accessConditions, source.conditions].map(readUploadAccessConditions);
+        const groupIds = readUploadGroupIds(source);
+        const policies = [source.uploadPolicy, source.documentUploadPolicy, source.policy].map((input) => {
+          if (input == null || typeof input === "string" && !input.trim()) return null;
+          let raw = input;
+          if (typeof raw === "string") {
+            if (["group_allowlist", "sbt_allowlist"].includes(raw.trim().toLowerCase())) {
+              raw = { mode: raw };
+            } else {
+              try {
+                raw = JSON.parse(raw);
+              } catch {
+                return invalidUploadPolicy("uploadPolicy", "expected a supported mode or JSON object");
+              }
+            }
+          }
+          if (raw === null) return null;
+          if (!isObj12(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
+          for (const field of ["mode", "kind", "type"]) {
+            if (raw[field] !== void 0 && (typeof raw[field] !== "string" || !["group_allowlist", "sbt_allowlist"].includes(raw[field].trim().toLowerCase()))) {
+              return invalidUploadPolicy(`uploadPolicy.${field}`, "expected group_allowlist or sbt_allowlist");
+            }
+          }
+          const policy = normalizeUploadPolicy(raw);
+          if (!policy) return invalidUploadPolicy("uploadPolicy.mode", "required");
+          policy.groupIds = readUploadGroupIds(raw, ["groupIds", "groups", "groupId"]);
+          return policy;
+        });
+        return {
+          ok: true,
+          fields: { accessConditions: conditions.find(Boolean) || null, groupIds, uploadPolicy: policies.find(Boolean) || null }
+        };
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    };
     readJsonPayload = async (request, { maxUploadBytes } = {}) => {
       let raw = null;
       try {
@@ -37003,6 +37139,8 @@ var init_storageRouteExecution = __esm({
       const bytes2 = encoder2.encode(serialized);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes2, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
+      const policy = readUploadPolicyFields(raw);
+      if (!policy.ok) return policy;
       return {
         ok: true,
         payload: {
@@ -37012,9 +37150,7 @@ var init_storageRouteExecution = __esm({
           resource: trim6(raw.resource) || "docsContext",
           gate: raw.gate || raw.gateResource || raw.resourceGate,
           tags: normalizeTagsForMetadata(raw.tags),
-          accessConditions: normalizeAccessConditionDocument(raw.accessConditions || raw.conditions),
-          groupIds: normalizeGroupIdList(raw.groupIds || raw.groups || raw.groupId || raw.workerGroupId),
-          uploadPolicy: normalizeUploadPolicy(raw.uploadPolicy || raw.documentUploadPolicy || raw.policy),
+          ...policy.fields,
           payloadEncrypted: raw.payloadEncrypted === true || raw.encrypted === true,
           requestId: trim6(raw.requestId)
         }
@@ -37027,6 +37163,9 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Expected multipart/form-data." };
       }
+      for (const field of ["accessConditions", "conditions", "uploadPolicy", "documentUploadPolicy", "policy", "groupId", "workerGroupId"]) {
+        if (form.getAll(field).length > 1) return { ok: false, error: `Invalid ${field}: must occur at most once.` };
+      }
       const fileOrBlob = form.get("file") || form.get("data");
       if (!fileOrBlob || typeof fileOrBlob.arrayBuffer !== "function") {
         return { ok: false, error: 'Missing "file" or "data" field.' };
@@ -37035,6 +37174,18 @@ var init_storageRouteExecution = __esm({
       const bytes2 = new Uint8Array(buf);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes2, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
+      const policy = readUploadPolicyFields({
+        accessConditions: form.get("accessConditions"),
+        conditions: form.get("conditions"),
+        groupIds: form.getAll("groupIds"),
+        groups: form.getAll("groups"),
+        groupId: form.get("groupId"),
+        workerGroupId: form.get("workerGroupId"),
+        uploadPolicy: form.get("uploadPolicy"),
+        documentUploadPolicy: form.get("documentUploadPolicy"),
+        policy: form.get("policy")
+      });
+      if (!policy.ok) return policy;
       return {
         ok: true,
         payload: {
@@ -37044,9 +37195,7 @@ var init_storageRouteExecution = __esm({
           resource: trim6(form.get("resource")) || "docsContext",
           gate: form.get("gate") || form.get("gateResource") || form.get("resourceGate"),
           tags: normalizeTagsForMetadata(form.get("tags")),
-          accessConditions: normalizeAccessConditionDocument(form.get("accessConditions") || form.get("conditions")),
-          groupIds: normalizeGroupIdList(form.getAll?.("groupIds") || form.get("groupIds") || form.get("groupId") || form.get("workerGroupId")),
-          uploadPolicy: normalizeUploadPolicy(form.get("uploadPolicy") || form.get("documentUploadPolicy") || form.get("policy")),
+          ...policy.fields,
           payloadEncrypted: trim6(form.get("payloadEncrypted") || form.get("encrypted")).toLowerCase() === "true",
           requestId: trim6(form.get("requestId"))
         }
