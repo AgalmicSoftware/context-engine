@@ -552,7 +552,9 @@ Admin test panel:
   registry/Arweave profiles may use `{ "source": { "kind":
   "admin-snapshot", "snapshot": ... } }` only when the browser has a
   same-session, unlocked submitted-response snapshot. The Worker sanitizes the
-  snapshot and rejects encrypted or locked rows. A successful run immediately
+  snapshot and rejects encrypted or locked rows. Browser snapshots retain rating
+  bounds and labels, selection limits, quadratic budgets, and structured answer
+  arrays (including neutral zeros). A successful run immediately
   replaces the latest visible artifact for authorized viewers; Generate and
   Refresh remain admin-only actions.
 - Automatic generated-results work is durable background work only for
