@@ -75105,6 +75105,7 @@ var normalizeQuestion = (value = {}) => {
     prompt,
     type,
     options,
+    ...type === "multichoice" ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) } : {},
     ...ratingScale ? { scale: ratingScale } : {},
     ...type === "quadratic" ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}
   };
@@ -79511,7 +79512,7 @@ var dispatchSessionConfigBootstrapRequest = async ({
 };
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
-var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v4";
+var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v5";
 var trim10 = (value) => String(value == null ? "" : value).trim();
 var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
@@ -79599,7 +79600,7 @@ var buildInterviewBriefDocument = ({
     binary: ["Agree", "Unsure", "Disagree"],
     rating: { min: 0, max: 10, step: 1 },
     ratingScaleOverrides: "Use a question.scale object when present; otherwise use the default rating contract.",
-    multichoice: "Use one exact question option.",
+    multichoice: "When singleSelect is true, use one exact question option. Otherwise use an array of one or more exact question options.",
     quadratic: "Signed integer array in option order; sum(vote\xB2) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed."
   },
   researchCoverageContract: {
