@@ -381,6 +381,7 @@ describe('surveyToolSubmitTransactionController', () => {
         {
           workerCanonicalSubmission: true,
           storageRefs: [storageRef],
+          questionResponseRefs: [{ questionId: 'q1', storageRef }],
         },
         makeSubmitOpts(),
       );
@@ -389,6 +390,7 @@ describe('surveyToolSubmitTransactionController', () => {
         expect.objectContaining({
           workerCanonicalSubmission: true,
           storageRefs: [storageRef],
+          questionResponseRefs: [{ questionId: 'q1', storageRef }],
           __ceSubmissionGroupKey: 'group-1',
         }),
       );

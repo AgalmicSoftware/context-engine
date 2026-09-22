@@ -1,9 +1,9 @@
+import { isWorkerResponseNewer } from './workerResponseRecency';
 import { listSessionStorageRefsPage, readSessionStorageBlob } from '../storage/storageClient.js';
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { resolveWorkerCanonicalStorageTarget } from '../../domains/surveys/workerCanonicalAuthoringPort';
-import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
   type WorkerCanonicalCacheIdentity,
@@ -34,6 +34,7 @@ export type WorkerCanonicalResponseRow = {
 
 const MAX_RESPONSE_LIST_PAGES = 100;
 const RESPONSE_READ_CONCURRENCY = 8;
+const WORKER_RESPONSE_CACHE_VERSION = 1;
 
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -137,7 +138,7 @@ export const loadWorkerResponses = async (
           responder,
           response: payload,
           storageRefId,
-          timestamp: Number.isFinite(createdAtMs) && createdAtMs > 0 ? Math.floor(createdAtMs / 1000) : 1,
+          timestamp: Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs / 1000 : 1,
         };
       }),
     );
@@ -171,9 +172,17 @@ export const mergeWorkerQuestionResponses = (
   const cachedNetwork = isRecord(next[WORKER_CANONICAL_CACHE_SCOPE_KEY])
     ? (next[WORKER_CANONICAL_CACHE_SCOPE_KEY] as UnknownRecord)
     : createWorkerQuestionCacheNode();
-  const network = workerCanonicalCacheIdentityMatches(cachedNetwork, identity)
+  const network: UnknownRecord = workerCanonicalCacheIdentityMatches(cachedNetwork, identity)
     ? { ...cachedNetwork }
     : createWorkerQuestionCacheNode();
+  if (network.workerResponseCacheVersion !== WORKER_RESPONSE_CACHE_VERSION) {
+    // Old caches may already have consumed a newer same-second ref. Clear both
+    // the payloads and seen refs before the runtime decides which blobs to reread.
+    network.questionResponses = {};
+    network.questionResponsesMeta = {};
+    network.workerResponseStorageRefs = {};
+  }
+  network.workerResponseCacheVersion = WORKER_RESPONSE_CACHE_VERSION;
   const questions = isRecord(network.questions) ? { ...network.questions } : {};
   const responses = isRecord(network.questionResponses) ? { ...network.questionResponses } : {};
   const responseMeta = isRecord(network.questionResponsesMeta) ? { ...network.questionResponsesMeta } : {};
@@ -190,8 +199,8 @@ export const mergeWorkerQuestionResponses = (
     const metaByResponder = isRecord(responseMeta[questionId])
       ? { ...(responseMeta[questionId] as UnknownRecord) }
       : {};
-    const incoming = toResponseRecencyPair({ timestamp: row.timestamp }, row.response);
-    if (!isResponseRecencyNewer(incoming, toResponseRecencyPair(metaByResponder[responder]))) return;
+    if (!isWorkerResponseNewer(row.timestamp, storageRefId, metaByResponder[responder])) return;
+    const incoming = { ts: row.timestamp, storageRefId };
     byResponder[responder] = row.response;
     metaByResponder[responder] = incoming;
     responses[questionId] = byResponder;
@@ -255,6 +264,15 @@ export const mergeWorkerUserResponses = (
     ) {
       delete byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY];
     }
+    const worker = byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY];
+    if (isRecord(worker) && worker.workerResponseCacheVersion !== WORKER_RESPONSE_CACHE_VERSION) {
+      byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] = {
+        ...worker,
+        workerResponseCacheVersion: WORKER_RESPONSE_CACHE_VERSION,
+        lastScanTimestamp: 0,
+        data: { ...(isRecord(worker.data) ? worker.data : createWorkerUserData()), questionResponses: [] },
+      };
+    }
     next[key] = byScope;
   });
   rows.forEach((row) => {
@@ -266,7 +284,7 @@ export const mergeWorkerUserResponses = (
     const cachedNetwork = isRecord(byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY])
       ? (byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] as UnknownRecord)
       : {};
-    const network = workerCanonicalCacheIdentityMatches(cachedNetwork, identity)
+    const network: UnknownRecord = workerCanonicalCacheIdentityMatches(cachedNetwork, identity)
       ? { ...cachedNetwork }
       : { lastBlockScanned: 0, lastScanTimestamp: 0, data: createWorkerUserData() };
     const data = isRecord(network.data) ? { ...network.data } : createWorkerUserData();
@@ -276,13 +294,20 @@ export const mergeWorkerUserResponses = (
     data.questionResponses = entries;
     network.lastScanTimestamp = Math.max(Number(network.lastScanTimestamp || 0), Number(row.timestamp || 0));
     const existingIndex = entries.findIndex((entry) => readString(entry?.questionId).toLowerCase() === questionId);
-    const incoming = { questionId, responder, response: row.response, timestamp: Number(row.timestamp || 0) };
+    const incoming = {
+      questionId,
+      responder,
+      response: row.response,
+      timestamp: Number(row.timestamp || 0),
+      storageRefId: readString(row.storageRefId),
+    };
     if (existingIndex < 0) {
       entries.push(incoming);
-    } else if (isResponseRecencyNewer(incoming, entries[existingIndex])) {
+    } else if (isWorkerResponseNewer(incoming.timestamp, incoming.storageRefId, entries[existingIndex])) {
       entries[existingIndex] = incoming;
     }
     network.data = data;
+    network.workerResponseCacheVersion = WORKER_RESPONSE_CACHE_VERSION;
     byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] = withWorkerCanonicalCacheIdentity(network, identity);
     next[responder] = byScope;
   });

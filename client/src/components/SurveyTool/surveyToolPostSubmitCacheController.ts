@@ -1,3 +1,4 @@
+import { getSubmittedWorkerResponseRecency, isWorkerResponseNewer } from '../../utilities/survey/workerResponseRecency';
 import { ethers } from 'ethers';
 import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import {
@@ -170,17 +171,27 @@ export async function writeSubmittedResponsesToLocalCaches(
         if (!net.questionResponsesMeta[questionId] || typeof net.questionResponsesMeta[questionId] !== 'object') {
           net.questionResponsesMeta[questionId] = {};
         }
-        if (!isIncomingResponseMetaNewer(recencyMeta, net.questionResponsesMeta[questionId][responderLower])) {
+        const workerRecency =
+          netIdStr === WORKER_CANONICAL_CACHE_SCOPE_KEY ? getSubmittedWorkerResponseRecency(receipt, questionId) : null;
+        const questionRecency = workerRecency
+          ? { bn: 0, txi: 0, li: 0, transactionHash: '', ...workerRecency }
+          : recencyMeta;
+        const existingMeta = net.questionResponsesMeta[questionId][responderLower];
+        const newer = workerRecency?.storageRefId
+          ? isWorkerResponseNewer(workerRecency.ts, workerRecency.storageRefId, existingMeta)
+          : isIncomingResponseMetaNewer(questionRecency, existingMeta);
+        if (!newer) {
           return;
         }
 
-        const nextResponse = stampResponsePayloadWithMeta(deepClone(rawResponse || {}), recencyMeta);
+        const nextResponse = stampResponsePayloadWithMeta(deepClone(rawResponse || {}), questionRecency);
         net.questionResponses[questionId][responderLower] = nextResponse;
         net.questionResponsesMeta[questionId][responderLower] = {
-          bn: recencyMeta.bn,
-          txi: recencyMeta.txi,
-          li: recencyMeta.li,
-          ts: recencyMeta.ts,
+          bn: questionRecency.bn,
+          txi: questionRecency.txi,
+          li: questionRecency.li,
+          ts: questionRecency.ts,
+          ...(workerRecency ? { storageRefId: workerRecency.storageRefId } : {}),
         };
 
         const prevQuestion =

@@ -99,7 +99,7 @@ export const hydrateWorkerCanonicalResponses = async ({
         questionId,
         responder,
         response,
-        storageRefId: '',
+        storageRefId: String(metadata[questionId]?.[responder]?.storageRefId || ''),
         timestamp: Number(metadata[questionId]?.[responder]?.ts || 0),
       })),
     );

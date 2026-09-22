@@ -461,6 +461,34 @@ describe('error paths', () => {
     expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
   });
 
+  it('returns per-question Worker upload timestamps without mixing in the survey reference', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = `0x${'9'.repeat(64)}`;
+    const refs = [CF_SURVEY_ID, CF_RESPONSE_ID, CF_QUESTION_ID].map((id, index) => ({
+      backend: 'cloudflare',
+      id,
+      resource: 'responses',
+      createdAt: `2026-09-20T12:00:00.${index}00Z`,
+    }));
+    refs.forEach((storageRef) => uploadDataToSessionStorage.mockResolvedValueOnce({ storageRef }));
+    const answers = [
+      { questionID: QUESTION_ID, answer: 'yes' },
+      { questionID: question2, answer: 'no' },
+    ];
+    const result = await submitResponses(
+      'wagmi',
+      [QUESTION_ID, question2],
+      answers,
+      SURVEY_ID,
+      { surveyID: SURVEY_ID, responses: answers },
+      WORKER_CANONICAL_GROUP_CFG,
+    );
+    expect(result.questionResponseRefs).toEqual([
+      { questionId: QUESTION_ID, storageRef: expect.objectContaining(refs[1]) },
+      { questionId: question2, storageRef: expect.objectContaining(refs[2]) },
+    ]);
+  });
+
   it('persists worker-canonical responses without broadcasting an on-chain transaction', async () => {
     const rpcProvider = makeRpcProvider();
     window.ethereum = rpcProvider;

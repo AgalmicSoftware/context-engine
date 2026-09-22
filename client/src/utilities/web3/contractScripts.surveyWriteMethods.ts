@@ -606,6 +606,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         }
         return {
           workerCanonicalSubmission: true,
+          questionResponseRefs: questionResponseUploads.map((upload, index) => ({
+            questionId: hashedQuestionIds[index],
+            storageRef: upload.storageRef,
+          })),
           sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
           storageRefs,
         };
