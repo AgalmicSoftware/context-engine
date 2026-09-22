@@ -133,6 +133,9 @@ export {
   shouldAutoEnablePolisDemoData,
 } from './polisReportRuntime';
 
+const formatSummaryStat = (all: number | string, binary: number | string) =>
+  all === binary ? all : `${all} (${binary} Binary)`;
+
 const surveyLog = createLogger('surveys');
 export const POLIS_CLUSTER_COLORS = CHART_SERIES_COLORS;
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
@@ -2641,8 +2644,10 @@ export default function PolisReport({
                             :
                           </span>
                           <span className={styles.statValue}>
-                            {reportData.responseStats.all.participants} ({reportData.responseStats.binary.participants}{' '}
-                            Binary)
+                            {formatSummaryStat(
+                              reportData.responseStats.all.participants,
+                              reportData.responseStats.binary.participants,
+                            )}
                           </span>
                         </div>
                         <div className={styles.statsItem}>
@@ -2654,8 +2659,10 @@ export default function PolisReport({
                             :
                           </span>
                           <span className={styles.statValue}>
-                            {reportData.responseStats.all.questions} ({reportData.responseStats.binary.questions}{' '}
-                            Binary)
+                            {formatSummaryStat(
+                              reportData.responseStats.all.questions,
+                              reportData.responseStats.binary.questions,
+                            )}
                           </span>
                         </div>
                         <div className={styles.statsItem}>
@@ -2667,8 +2674,10 @@ export default function PolisReport({
                             :
                           </span>
                           <span className={styles.statValue}>
-                            {reportData.responseStats.all.responses} ({reportData.responseStats.binary.responses}{' '}
-                            Binary)
+                            {formatSummaryStat(
+                              reportData.responseStats.all.responses,
+                              reportData.responseStats.binary.responses,
+                            )}
                           </span>
                         </div>
                         <div className={styles.statsItem}>
@@ -2680,8 +2689,10 @@ export default function PolisReport({
                             :
                           </span>
                           <span className={styles.statValue}>
-                            {reportData.responseStats.all.responsesPerParticipant.toFixed(2)} (
-                            {reportData.responseStats.binary.responsesPerParticipant.toFixed(2)} Binary)
+                            {formatSummaryStat(
+                              reportData.responseStats.all.responsesPerParticipant.toFixed(2),
+                              reportData.responseStats.binary.responsesPerParticipant.toFixed(2),
+                            )}
                           </span>
                         </div>
                       </div>

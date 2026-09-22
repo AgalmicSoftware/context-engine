@@ -1821,3 +1821,30 @@ it('updates all-type summary counts on response nonce changes without waiting fo
   expect(screen.getByText('1 (0 Binary)')).toBeInTheDocument();
   expect(screen.getByText('1.00 (0.00 Binary)')).toBeInTheDocument();
 });
+
+it.each([
+  [null, ['1', '1', '1', '1.00']],
+  ['person-a', ['1', '2 (1 Binary)', '2 (1 Binary)', '2.00 (1.00 Binary)']],
+  ['person-b', ['2 (1 Binary)', '2 (1 Binary)', '2 (1 Binary)', '1.00']],
+])('shows binary statistics only when each value differs (written responder: %s)', (writtenResponder, expected) => {
+  const responses = {
+    binary: [{ responder: 'person-a', response: { type: 'binary', prompt: 'Agree?', answer: { value: 'Agree' } } }],
+    ...(writtenResponder
+      ? {
+          written: [
+            {
+              responder: writtenResponder,
+              response: { type: 'freeform', prompt: 'Explain', answer: { value: 'Thoughts' } },
+            },
+          ],
+        }
+      : {}),
+  };
+  render(<PolisReport {...baseReportProps} questionResponses={responses} />);
+  ['Participants', 'Questions', 'Responses', 'Responses/Participant Avg'].forEach((label, index) => {
+    const stat = screen.getByText(
+      (_, node) => node?.classList.contains('statLabel') && node.firstChild?.textContent.trim() === label,
+    ).parentElement;
+    expect(stat.querySelector('.statValue').textContent).toBe(expected[index]);
+  });
+});

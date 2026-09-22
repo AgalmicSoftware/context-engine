@@ -22,7 +22,9 @@ missing answers, within the current report filters; overall includes the cluster
 
 **Summary and Statistics** counts participants, answered questions, responses,
 and average responses per participant across all five question types. Each value
-shows its binary subset in parentheses, such as `42 (18 Binary)`. One participant's
+shows its binary subset in parentheses only when the displayed values differ,
+such as `42 (18 Binary)`. Matching values show the overall number alone; averages
+are compared at their displayed two-decimal precision. One participant's
 answer to one question counts once: editing replaces that answer, and selecting
 several options or allocating across several choices still counts as one response.
 Binary includes Agree, Unsure, and Disagree. The binary average uses participants
