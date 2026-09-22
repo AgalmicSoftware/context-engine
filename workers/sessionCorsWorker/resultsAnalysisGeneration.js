@@ -1,5 +1,5 @@
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
-import { normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
+import { applyResultsAnalysisExposurePolicy, normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
 import {
   sha256Hex,
   stableCanonicalSerialize,
@@ -70,7 +70,7 @@ const getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSett
   config?.resultsAnalysis,
 );
 const getCanonicalSessionId = (config = {}) => normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
-const publicDraft = (draft) => {
+const publicDraft = (draft, config) => {
   if (!isObj(draft)) return null;
   const {
     participantWatermark,
@@ -81,8 +81,14 @@ const publicDraft = (draft) => {
     attemptId,
     ...rest
   } = draft;
-  return rest;
+  return config ? { ...rest, artifact: applyCurrentArtifactPolicy(rest.artifact, config) } : rest;
 };
+
+const applyCurrentArtifactPolicy = (artifact, config) => applyResultsAnalysisExposurePolicy({
+  artifact,
+  exposure: normalizedResultsProfile(config)?.exposure,
+  sections: normalizeRequestedSections([], getResultsAnalysisSettings(config)),
+});
 
 const normalizeSessionIdHex = (value) => {
   const raw = lower(value).replace(/^0x/, '').replace(/-/g, '');
@@ -665,7 +671,7 @@ const sectionShapes = `{
   "atlas": { "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }], "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }] }
 }`;
 
-const buildPrompt = ({ sections, source }) => `You are generating Context Engine session analysis artifacts.
+const buildPrompt = ({ sections, source, exposure }) => `You are generating Context Engine session analysis artifacts.
 Return only valid JSON. Do not include markdown fences.
 Generate only these result views: ${sections.join(', ')}.
 
@@ -679,6 +685,7 @@ Privacy and grounding rules:
 - If the visible sample is thin because of input limits, mention uncertainty in summaries.
 - Generate RiskMatrix axes from this session's subject matter. Do not use fixed likelihood/impact axes unless those are the best subject-specific axes for the session.
 - Do not use demo-only dimensions unless those exact dimensions are present in segmentDimensions.
+- Follow the session's group-summary exposure policy: ${JSON.stringify(exposure || {})}. This policy applies only to breakdown.groups. When groups are disabled, return an empty groups list. Otherwise cite every distinct supporting participant on each group and omit groups below minGroupSize; never invent citations to reach the minimum. Keep overall synthesis, claims, atlas nodes, and Risk Matrix entries independent of this group threshold.
 
 Generate this JSON shape, including only requested top-level keys:
 ${sectionShapes}
@@ -817,8 +824,8 @@ const buildReservationKey = async ({ sourceSignature, viewSignature }) => (
   `sha256:${await sha256Hex(stableCanonicalSerialize({ sourceSignature, viewSignature, version: ANALYSIS_ARTIFACT_VERSION }))}`
 );
 
-const filterDraftForStatus = (draft, includeDraft) => {
-  const safe = publicDraft(draft);
+const filterDraftForStatus = (draft, includeDraft, config) => {
+  const safe = publicDraft(draft, config);
   if (includeDraft) return safe;
   if (!isObj(safe)) return null;
   const { artifact, snapshot, ...rest } = safe;
@@ -877,7 +884,7 @@ export const buildResultsAnalysisStatusBody = ({ slug, config, coordinatorState,
       jobState: state.jobState || 'idle',
       active: summarizeActiveState(state.active),
       lastFailure: summarizeFailureState(state.lastFailure),
-      lastGood: filterDraftForStatus(state.lastGood, includeDraft),
+      lastGood: filterDraftForStatus(state.lastGood, includeDraft, config),
     },
   };
 };
@@ -919,7 +926,8 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
   const sections = normalizeRequestedSections(body.sections, settings);
   if (!sections.length) return { ok: false, status: 400, jobState: 'failed', error: 'No supported results-analysis sections requested.', capability };
   const sourceDescriptor = await buildSourceDescriptor({ kind: sourceKind, source });
-  const viewSignature = `sha256:${await sha256Hex(stableCanonicalSerialize({ sections, version: ANALYSIS_ARTIFACT_VERSION }))}`;
+  const exposure = normalizedResultsProfile(config)?.exposure;
+  const viewSignature = `sha256:${await sha256Hex(stableCanonicalSerialize({ sections, exposure, version: ANALYSIS_ARTIFACT_VERSION }))}`;
   const reservationKey = await buildReservationKey({ sourceSignature: sourceDescriptor.signature, viewSignature });
   const requestId = trim(body.requestId || body.id || '');
   const reserve = deps?.reserveCoordinatedResultsAnalysis || reserveCoordinatedResultsAnalysisDefault;
@@ -938,7 +946,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
     },
   });
   if (reservation?.kind === 'terminal') {
-    return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft) };
+    return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft, config) };
   }
   if (reservation?.kind === 'pending') {
     return { ok: true, status: 202, jobState: 'running', reservation: summarizeReservation(reservation, requestId), capability };
@@ -957,7 +965,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
           env,
           slug,
           config,
-          prompt: buildPrompt({ sections, source }),
+          prompt: buildPrompt({ sections, source, exposure }),
           headers,
           deps,
         });
@@ -993,6 +1001,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
       generatedAt,
       model: aiProvenance.model,
     });
+    artifact = applyCurrentArtifactPolicy(artifact, config);
   } catch (error) {
     const failure = { ok: false, error: error?.message || 'AI results analysis output failed validation.', status: 502, failedAt: generatedAt };
     await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure } });
@@ -1032,7 +1041,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
   if (!finalization?.ok) {
     return { ok: false, status: finalization?.status || 503, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability, error: finalization?.error || 'Results analysis finalization failed.' };
   }
-  return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft) };
+  return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft, config) };
 };
 
 export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, committedResponses = [], requestId = '', deps } = {}) => {
@@ -1112,7 +1121,9 @@ export const evaluateResultsAnalysisViewerEligibility = ({ config } = {}) => {
 export const readPublishedResultsAnalysisArtifact = async ({ env, slug, config, includeSnapshot = true, deps } = {}) => {
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
   const coordinatorState = await readStatus({ env, slug });
-  const lastGood = publicDraft(coordinatorState?.state?.lastGood);
+  // Stored artifacts outlive their creation policy. Reapply current privacy and
+  // visibility settings on every read, including artifacts created by older Workers.
+  const lastGood = publicDraft(coordinatorState?.state?.lastGood, config);
   if (!lastGood?.artifact) {
     return {
       ok: false,

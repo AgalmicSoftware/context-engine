@@ -570,6 +570,15 @@ Admin test panel:
   separate provider or model. Inputs are submitted responses only; Circles is
   the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
   from the session subject matter.
+- Generated Breakdown `groups` obey `anonymizedGroupsEnabled` and `minGroupSize`.
+  The Worker counts distinct cited participants from the permitted input, applies
+  the policy before saving, and reapplies current settings to previously stored
+  artifacts on public/admin reads and cached replies. Claims, Circles/atlas,
+  Risk Matrix entries, session-wide summaries, and raw snapshots are unaffected
+  by the group threshold; their existing visibility/access rules still apply.
+  Legacy configurations without a group policy retain their previous behavior.
+  Older artifacts with truncated membership citations may need regeneration to
+  show a group above the former 16-citation limit.
 - Canonical generated-analysis input validates readable answers against the full
   stored question before counting them: rating bounds, exact choice options and
   selection limits, and signed quadratic allocations within the question budget.

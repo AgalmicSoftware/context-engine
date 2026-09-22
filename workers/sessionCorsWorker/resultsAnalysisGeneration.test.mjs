@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
+import { dispatchResultsAnalysisArtifactRequest } from './resultsAnalysisArtifactDispatch.js';
+import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 
 import {
   buildIndexKey,
@@ -14,6 +17,7 @@ import {
   maybeTriggerAutomaticResultsAnalysis,
   normalizeGeneratedArtifact,
   readPublishedResultsAnalysisArtifact,
+  readResultsAnalysisAdminStatus,
   resolveAnalysisAiPayload,
   resolveResultsAnalysisCapability,
 } from './resultsAnalysisGeneration.js';
@@ -70,6 +74,93 @@ const putPayload = async ({ kv, slug = 'session-a', resource, id, metadata = {},
     payloadBase64url: b64url(payload),
   }));
 };
+
+test('generated and stored artifacts enforce current group thresholds and disabled views', async () => {
+  const access = { gate: 'none', encryption: 'none' };
+  const settings = { ...config, storageProfile: { backend: 'cloudflare', payloadAccessControl: access },
+    sessionModeProfile: {
+      profileVersion: 1, preset: 'custom', authority: { mode: 'worker_canonical' }, evm: { registryChainId: null },
+      storage: { backend: 'cloudflare', payloadAccessControl: access }, identity: { default: 'passkey', enabled: ['passkey'] },
+      authorization: { mechanisms: ['worker_roles'] }, encryption: { mode: 'none' },
+      surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+      results: { visibility: 'public_full_if_storage_public', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: true, minGroupSize: 2 } },
+      export: { scope: 'all_session' },
+    } };
+  assert.equal(validateWorkerConfigModeValues(settings).ok, true);
+  const values = new Map();
+  const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage) };
+  const env = {};
+  const coordinator = new SessionWriteCoordinator({ storage }, env);
+  env.CE_SESSION_COORDINATOR = { idFromName: (name) => name, get: () => ({ fetch: (url, init) => coordinator.fetch(new Request(url, init)) }) };
+  const one = ['participant_001'];
+  const pair = ['participant_001', 'participant_002'];
+  const all = [...pair, 'participant_003'];
+  const generatedValue = {
+    breakdown: { summary: { overview: 'Overall synthesis' }, groups: [
+      { id: 'small', label: 'Suppressed singleton', participantIds: [...one, ...one] },
+      { id: 'pair', label: 'Pair', participantIds: pair },
+      { id: 'all', label: 'Whole cohort', participantIds: all },
+      { id: 'uncited', label: 'Unproven cohort' },
+    ] },
+    argumentMap: { debates: [{ id: 'topic', title: 'Topic', claims: [
+      { id: 'small', label: 'Suppressed singleton', participantIds: one }, { id: 'all', label: 'Common claim', participantIds: all },
+    ] }] },
+    atlas: { nodes: [{ id: 'small', label: 'Suppressed singleton', participantIds: one }, { id: 'all', label: 'Common node', participantIds: all }],
+      edges: [{ source: 'small', target: 'all' }] },
+    riskMatrix: { categories: [
+      { id: 'small', label: 'Suppressed singleton', likelihood: 'low', impact: 'high', participantIds: one },
+      { id: 'all', label: 'Common risk', likelihood: 'high', impact: 'high', participantIds: all },
+    ], comments: [{ categoryId: 'small', summary: 'Suppressed orphan', participantIds: all }] },
+  };
+  const body = { requestId: 'privacy-check', source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+    questions: [{ id: 'q1', prompt: 'Question?', type: 'text' }],
+    responses: [1, 2, 3].map((i) => ({ questionId: 'q1', participantId: 'synthetic-' + i, answer: 'View ' + i })) } } };
+  const generated = await generateResultsAnalysisDraft({ env, config: settings, slug: 'session-a', body,
+    deps: { generateAnalysisArtifact: async () => ({ ok: true, value: generatedValue }) } });
+  assert.equal(generated.ok, true, JSON.stringify(generated));
+  const sections = generated.draft.artifact.sections;
+  assert.deepEqual(sections.breakdown.groups.map((group) => group.id), ['pair', 'all']);
+  const originalSections = normalizeGeneratedArtifact({ value: generatedValue,
+    source: { participants: generated.draft.artifact.participants, aiSnapshot: { questions: [{ id: 'q1' }], responses: all.map((participantId) => ({ participantId, questionId: 'q1' })) } },
+    sections: ['argumentMap', 'atlas', 'breakdown', 'riskMatrix'],
+  }).sections;
+  for (const key of ['argumentMap', 'atlas', 'riskMatrix']) assert.deepEqual(sections[key], originalSections[key]);
+  const read = async (current) => {
+    const response = await dispatchResultsAnalysisArtifactRequest({ request: new Request('https://worker.invalid/results-analysis/artifact'),
+      env, slug: 'session-a', config: current, address: '', scopes: {}, headers: {},
+      deps: { json: (value, status, headers) => new Response(JSON.stringify(value), { status, headers }) } });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    return response.json();
+  };
+  const stricter = structuredClone(settings);
+  stricter.sessionModeProfile.results.exposure.minGroupSize = 3;
+  assert.deepEqual((await read(stricter)).artifact.sections.breakdown.groups.map((group) => group.id), ['all']);
+  const replay = await generateResultsAnalysisDraft({ env, config: stricter, slug: 'session-a', body,
+    deps: { generateAnalysisArtifact: async () => ({ ok: true, value: generatedValue }) } });
+  assert.deepEqual(replay.draft.artifact.sections.breakdown.groups.map((group) => group.id), ['all']);
+  stricter.sessionModeProfile.results.exposure.anonymizedGroupsEnabled = false;
+  const disabledGroups = await read(stricter);
+  assert.deepEqual(disabledGroups.artifact.sections.breakdown.groups, []);
+  assert.equal(disabledGroups.artifact.sections.breakdown.summary.overview, 'Overall synthesis');
+  for (const key of ['argumentMap', 'atlas', 'riskMatrix']) assert.deepEqual(disabledGroups.artifact.sections[key], originalSections[key]);
+  assert.deepEqual(disabledGroups.snapshot, generated.draft.snapshot);
+  const adminStatus = await readResultsAnalysisAdminStatus({ env, slug: 'session-a', config: stricter });
+  assert.deepEqual(adminStatus.state.lastGood.artifact.sections.breakdown.groups, []);
+  assert.equal(disabledGroups.snapshot.responses.length, 3); // Raw public results remain independently available.
+  const disabledGeneration = await generateResultsAnalysisDraft({ env, config: stricter, slug: 'session-a', body: { ...body, requestId: 'groups-disabled' },
+    deps: { generateAnalysisArtifact: async () => ({ ok: true, value: generatedValue }) } });
+  assert.deepEqual(disabledGeneration.draft.artifact.sections.breakdown.groups, []);
+  const legacy = structuredClone(settings);
+  delete legacy.sessionModeProfile.results.exposure;
+  const legacyGenerated = await generateResultsAnalysisDraft({ env, config: legacy, slug: 'session-a', body: { ...body, requestId: 'legacy-groups' }, deps: { generateAnalysisArtifact: async () => ({ ok: true, value: generatedValue }) } });
+  assert.equal(legacyGenerated.ok, true);
+  assert.deepEqual(legacyGenerated.draft.artifact.sections.breakdown.groups.map((group) => group.id), ['small', 'pair', 'all', 'uncited']);
+  stricter.resultsAnalysis.views = { circles: false, breakdown: false, riskMatrix: false };
+  const hidden = await read(stricter);
+  assert.equal(Object.values(hidden.artifact.sections).every((section) => section.available === false), true);
+});
 
 test('admin snapshot sanitizes to existing schema, accepts 0/false values, and rejects locked rows', async () => {
   const baseBody = {
