@@ -1,4 +1,4 @@
-import { buildReportAnswerQuestions } from './polisReportAnswers';
+import { buildReportAnswerQuestions, buildReportResponseStats } from './polisReportAnswers';
 
 const row = (type: string, value: unknown, responder = 'person-a', extra = {}) => ({
   responder,
@@ -66,5 +66,44 @@ describe('Polis answer summaries', () => {
     };
     expect(buildReportAnswerQuestions(data).map((q) => q.id)).toEqual(['b', 'a']);
     expect(buildReportAnswerQuestions(data, {}, { allowDemo: true }).map((q) => q.id)).toEqual(['b', 'a', 'c']);
+  });
+});
+
+describe('Polis response statistics', () => {
+  it('counts every answer type once per participant/question and reports the binary subset including Unsure', () => {
+    const responses = {
+      binary: [row('binary', 'Agree'), row('binary', 'Unsure', 'PERSON-A'), row('binary', false, 'person-b')],
+      text: [row('freeform', 'A response', 'person-c')],
+      rating: [row('rating', 0, 'person-c')],
+      choice: [row('multichoice', ['Bus', 'Garden'], 'person-d')],
+      quadratic: [row('quadratic', [0, 0], 'person-d')],
+    };
+    expect(
+      buildReportResponseStats(responses, { quadratic: { type: 'quadratic', options: ['Bus', 'Garden'] } }),
+    ).toEqual({
+      all: { participants: 4, questions: 5, responses: 6, responsesPerParticipant: 1.5 },
+      binary: { participants: 2, questions: 1, responses: 2, responsesPerParticipant: 1 },
+    });
+  });
+
+  it('excludes unreadable, invalid, simulated and other-session rows from both totals', () => {
+    const responses = {
+      binary: [
+        row('binary', 'invalid'),
+        row('binary', '*'),
+        row('binary', 'Agree', 'hidden', { answer: { encrypted: true, value: 'Agree' } }),
+      ],
+      text: [
+        row('freeform', ''),
+        row('freeform', 'Other', 'other', { sessionSlug: 'other', sessionSlugExplicit: true }),
+      ],
+      demo: [row('rating', 0, 'demo', { source: 'demo-polis-data' })],
+      rating: [row('rating', 11), row('rating', 0, 'reader')],
+    };
+    expect(buildReportResponseStats(responses, {}, { sessionSlug: 'current' })).toEqual({
+      all: { participants: 1, questions: 1, responses: 1, responsesPerParticipant: 1 },
+      binary: { participants: 0, questions: 0, responses: 0, responsesPerParticipant: 0 },
+    });
+    expect(buildReportResponseStats(responses, {}, { sessionSlug: 'current', allowDemo: true }).all.responses).toBe(2);
   });
 });

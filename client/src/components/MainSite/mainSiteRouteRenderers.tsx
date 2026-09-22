@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import type { AppShell } from './AppShell';
 import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';
@@ -57,6 +58,7 @@ import {
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
+import { getSessionEntryRedirect } from './sessionEntryRedirect';
 import {
   resolveExplicitWorkerSessionConfig,
   resolveExplicitWorkerSessionNetwork,
@@ -1007,7 +1009,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   },
 
   _renderSessionRoute: (ctx: RouteRenderCtx) => {
-    const { fullPath, defaultSessionNetwork, cacheInitializationError, searchStr } = ctx;
+    const { fullPath, defaultSessionNetwork, cacheInitializationError, searchStr, hashStr } = ctx;
+    const entryRedirect = getSessionEntryRedirect(fullPath, searchStr, hashStr);
+    if (entryRedirect) return <Navigate to={entryRedirect} replace />;
     const workerCanonicalRoutes = getWorkerCanonicalRouteController(host);
     const parts = fullPath.split('/').filter(Boolean);
     const sessionTokenRaw = (parts[1] || '').trim();

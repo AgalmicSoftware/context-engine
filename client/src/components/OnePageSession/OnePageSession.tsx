@@ -294,6 +294,7 @@ class OnePageSession extends Component<any, any> {
 
     // refs
     this.questionsSectionRef = React.createRef();
+    this.resultsSectionRef = React.createRef();
 
     // binds
     this.handleOpenResults = this.handleOpenResults.bind(this);
@@ -307,6 +308,7 @@ class OnePageSession extends Component<any, any> {
     this.toggleEmbeddedCreateGroup = this.toggleEmbeddedCreateGroup.bind(this);
     // Removed toggleGroupsAbout bind
     this.toggleResults = this.toggleResults.bind(this);
+    this.viewSessionResults = this.viewSessionResults.bind(this);
     this.toggleDocuments = this.toggleDocuments.bind(this);
     this.handleCorpusViewerLoadStateChange = this.handleCorpusViewerLoadStateChange.bind(this);
     this.handleLoadFullCorpusClick = this.handleLoadFullCorpusClick.bind(this);
@@ -2157,6 +2159,12 @@ class OnePageSession extends Component<any, any> {
     this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
   }
 
+  viewSessionResults() {
+    this.setState({ showResults: true, autoOpenResults: false }, () => {
+      this.resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   toggleResults() {
     this.setState(
       (prevState: Readonly<OnePageSession['state']>) => ({ showResults: !prevState.showResults }),
@@ -2452,6 +2460,8 @@ class OnePageSession extends Component<any, any> {
         onKickoffAutoMintIfNeeded={this.kickoffAutoMintIfNeeded}
         onLoadFullCorpusClick={this.handleLoadFullCorpusClick}
         onOpenResults={this.handleOpenResults}
+        onViewSessionResults={this.viewSessionResults}
+        resultsSectionRef={this.resultsSectionRef}
         onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
         onResultsModalClose={this.handleResultsModalClose}
         onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}

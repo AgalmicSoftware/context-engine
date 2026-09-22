@@ -60,7 +60,7 @@ const INTERVIEW_GROUP_SUGGESTIONS_ENABLED = false;
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
-  onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
+  onSubmitResponses?: (questionIds?: string[]) => InterviewSubmitResult | Promise<InterviewSubmitResult>;
   onViewResults?: () => void;
   onClose: () => void;
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
@@ -322,6 +322,11 @@ function SessionInterviewPanel({
     setStatus('Review drafts');
   }, [activeSubmitContextToken, baseSubmitContextToken, pendingSubmitAfterLogin]);
   useEffect(() => {
+    if (pendingSubmitAfterLogin && authenticatedForSubmit && loginModalToggled) {
+      toggleLoginModal?.(false);
+    }
+  }, [authenticatedForSubmit, loginModalToggled, pendingSubmitAfterLogin, toggleLoginModal]);
+  useEffect(() => {
     const wasOpen = previousLoginModalToggledRef.current;
     const isOpen = Boolean(loginModalToggled);
     previousLoginModalToggledRef.current = isOpen;
@@ -358,7 +363,10 @@ function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
-          const currentQuestionSetHash = await hashInterviewQuestions(questions);
+          const currentQuestionSetHash = await hashInterviewQuestions(
+            questions,
+            prefillPacket.promptVersion || 'ce-interview-brief-v1',
+          );
           if (disposedRef.current) return;
           if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
             throw new Error(

@@ -49,6 +49,9 @@ export async function probeColorVision(page, reload) {
 export async function probePolisAnswerSections(page) {
   const ratings = page.getByTestId('ce-polis-answers-rating');
   await ratings.waitFor();
+  for (const value of ['8 (4 Binary)', '10 (1 Binary)', '33 (4 Binary)', '4.13 (1.00 Binary)']) {
+    assert.equal(await page.getByText(value, { exact: true }).count(), 1, `Summary must include all answer types: ${value}`);
+  }
   assert.equal(await ratings.locator('article').count(), 1, 'Answer sections must start with previews open');
   const followsGraph = await page.getByTestId('ce-polis-answer-sections').evaluate((sections) => {
     const headings = [...document.querySelectorAll('h5')];
@@ -83,13 +86,27 @@ export async function probePolisAnswerSections(page) {
     });
     assert.ok(button.radius >= 20, `${theme}: expansion buttons must be rounded`);
     assert.equal(button.shadow, 'none', `${theme}: expansion buttons must have no heavy theme shadow`);
-    assert.notEqual(button.color, button.background, `${theme}: expansion text must remain legible`);
+    const luminance = (color) => {
+      const rgb = color.match(/[\d.]+/g).slice(0, 3).map((value) => {
+        const channel = Number(value) / (color.startsWith('color(srgb ') ? 1 : 255);
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    };
+    const text = luminance(button.color);
+    const background = luminance(button.background);
+    const contrast = (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
+    assert.ok(contrast >= 4.5, `${theme}: expansion text must meet 4.5:1 contrast (got ${contrast.toFixed(2)}, ${button.color} on ${button.background})`);
   }
   await page.getByTestId('ce-settings-theme').selectOption('context-engine');
   await page.getByRole('combobox', { name: 'Question tag' }).selectOption('housing');
   assert.equal(await page.getByText('How well does local transport work?').count(), 0);
   assert.equal(await page.getByTestId('ce-polis-answers-multichoice').count(), 0);
   assert.equal(await written.getByRole('button', { name: /View more/ }).count(), 0, 'Filtering must update the remaining count');
+  assert.equal(await page.getByText('Summary and Statistics', { exact: true }).count(), 1, 'Nonbinary-only filters retain the summary');
+  for (const value of ['2 (0 Binary)', '3 (0 Binary)', '4 (0 Binary)', '2.00 (0.00 Binary)']) {
+    assert.equal(await page.getByText(value, { exact: true }).count(), 1, `Summary must follow filters: ${value}`);
+  }
   await page.getByRole('combobox', { name: 'Question tag' }).selectOption('empty');
   assert.equal(await page.getByText('No readable responses match the current filters.').count(), 1);
   await page.getByRole('combobox', { name: 'Question tag' }).selectOption('');
@@ -130,8 +147,8 @@ export async function probeBuiltInPolisDemo(page, slug) {
 }
 
 export async function runSmoke() {
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ headless: true });
+  const browsers = await import('playwright');
+  const browser = await browsers[process.env.BROWSER || 'chromium'].launch({ headless: true });
   try {
     for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport });
@@ -161,7 +178,7 @@ export async function runSmoke() {
       if (process.env.BUILT_IN_DEMOS === '1') {
         for (const slug of ['demo', 'demo-2']) await probeBuiltInPolisDemo(page, slug);
       }
-      console.log(JSON.stringify({ ok: true, viewport, checks: ['previews open by default', 'question types nested under All Questions', 'parent reopen opens all previews', 'top question', 'single view more control', 'rounded buttons in both themes', 'tag filters', 'empty sections', 'mobile overflow', 'shared response colors', 'color-blind mode in both themes', 'reload persistence', ...(process.env.OUTPUT_DIR ? ['color-blind PDF download', 'expansion restored'] : [])] }));
+      console.log(JSON.stringify({ ok: true, viewport, checks: ['all-type statistics with binary subset', 'filtered nonbinary summary', 'previews open by default', 'question types nested under All Questions', 'parent reopen opens all previews', 'top question', 'single view more control', 'rounded buttons in both themes', 'tag filters', 'empty sections', 'mobile overflow', 'shared response colors', 'color-blind mode in both themes', 'reload persistence', ...(process.env.OUTPUT_DIR ? ['color-blind PDF download', 'expansion restored'] : [])] }));
       await page.close();
     }
   } finally { await browser.close(); }

@@ -1,17 +1,35 @@
 # Polis report answer sections
 
+Session pages with Context content place the collapsed Groups, Context, and
+Results sections in one three-column row at desktop widths, including
+Worker-hosted sessions. Sessions without Context keep a two-column row; mobile
+sections stack vertically, and an expanded section spans the available width.
+
 The Polis-style report groups **Binary**, **Freeform**,
 **Ratings**, **Multiple choice**, and **Quadratic allocation** under **All
 Questions**, below the Participants Graph. Each type has a collapsible heading. These sections use a white, print-friendly layout.
 The report settings toolbar uses blue actions, white controls, and one pale
 gray surface across report styles; controls wrap on narrow screens. Graph scroll
-arrows use light-blue buttons with dark-blue icons. The Opinion Clusters heading
+arrows use light-blue buttons with dark-blue icons. The cluster count input,
+stepper buttons, and Auto button use explicit dark text on light surfaces; Auto
+retains readable hover text and a visible keyboard focus outline. The Opinion Clusters heading
 shares a row with Analyze clusters and compact minus/plus controls for collapsing
 and expanding all clusters. These icon controls use 50% opacity and accessible
 labels; all header actions are omitted from PDF exports. Representative statements
 show the percentage agreeing (or disagreeing) in the cluster alongside the overall
 percentage. Both use responses to that question, including Unsure and excluding
 missing answers, within the current report filters; overall includes the cluster.
+
+**Summary and Statistics** counts participants, answered questions, responses,
+and average responses per participant across all five question types. Each value
+shows its binary subset in parentheses, such as `42 (18 Binary)`. One participant's
+answer to one question counts once: editing replaces that answer, and selecting
+several options or allocating across several choices still counts as one response.
+Binary includes Agree, Unsure, and Disagree. The binary average uses participants
+with binary answers; the overall average uses all participants with readable
+answers. The summary follows the same filters as the answer sections, updates when
+new responses reach the report, and remains visible for nonbinary-only results.
+Polis clustering and participant graphs continue to use binary answers only.
 
 A section appears only when at least one of its questions has a valid readable
 answer after filtering. All Questions starts open with each type’s preview visible.

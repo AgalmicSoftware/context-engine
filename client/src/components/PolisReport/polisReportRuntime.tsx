@@ -1,5 +1,10 @@
 import React from 'react';
-import { parseReportResponse, readReportAnswer, reportQuestionMetadata } from './polisReportAnswers';
+import {
+  normalizePolisBinaryVote,
+  parseReportResponse,
+  readReportAnswer,
+  reportQuestionMetadata,
+} from './polisReportAnswers';
 import * as d3 from 'd3';
 
 import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
@@ -25,6 +30,8 @@ import {
 } from 'utilities/ui/historicalFigureAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import styles from './PolisReport.module.scss';
+
+export { normalizePolisBinaryVote } from './polisReportAnswers';
 
 export { resolveJsPdfConstructor } from '../../utilities/ui/browserPdfExport';
 
@@ -282,47 +289,6 @@ function safeJsonParse(str: unknown): UnknownRecord | null {
 
 const isPolisDemoFixturePayload = (value: UnknownRecord | null | undefined): boolean =>
   !!value && value.source === 'demo-polis-data';
-
-export function normalizePolisBinaryVote(value: unknown): ConcretePolisVote | null {
-  if (value === 1) return 1;
-  if (value === -1) return -1;
-  if (value === 0) return 0;
-  if (value === true) return 1;
-  if (value === false) return -1;
-
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase();
-  if (!normalized) return null;
-  if (
-    normalized === 'agree' ||
-    normalized === 'yes' ||
-    normalized === 'y' ||
-    normalized === 'true' ||
-    normalized === '1'
-  ) {
-    return 1;
-  }
-  if (
-    normalized === 'disagree' ||
-    normalized === 'no' ||
-    normalized === 'n' ||
-    normalized === 'false' ||
-    normalized === '-1'
-  ) {
-    return -1;
-  }
-  if (
-    normalized === 'unsure' ||
-    normalized === 'unknown' ||
-    normalized === 'maybe' ||
-    normalized === 'neutral' ||
-    normalized === '0'
-  ) {
-    return 0;
-  }
-  return null;
-}
 
 export const DEFAULT_POLIS_DEMO_DATA = withPolisReportDemoAnswers(demoData);
 export const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;

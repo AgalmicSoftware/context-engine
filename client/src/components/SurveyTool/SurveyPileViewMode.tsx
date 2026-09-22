@@ -1801,6 +1801,10 @@ const appendCurrentWorkerHintToPath = (pathIn = ''): string => {
 
 const viewResultsFromSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.closeSessionVoiceModeModal();
+  if (engine.props.onViewSessionResults) {
+    engine.props.onViewSessionResults();
+    return;
+  }
   if (typeof window === 'undefined') return;
   const slug = resolveEffectiveSlug(engine.props);
   const path = applyExistingGroupPrefix(
@@ -2573,6 +2577,33 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
     return { status: 'failed' as const, message: 'No new or changed responses to submit.' };
   }
   return engine.encryptAndUpload();
+};
+
+export const submitSessionInterviewResponses = async (engine: PileViewModeEngine, questionIds: string[] = []) => {
+  // A zero edit count alone cannot prove that drafts were saved. Check the
+  // persisted responses for every selected question before accepting a no-op.
+  if (engine.props.loginComplete && !engine.state.isSubmitting && engine.getSubmitCount() === 0 && questionIds.length) {
+    const saved = engine.buildSliceFromUserAnswers(engine.state.userAnswers);
+    const current = engine.state.surveysResponseState?.[0];
+    const fieldValue = (entry: unknown) => {
+      return entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
+    };
+    if (
+      questionIds.every(
+        (id) =>
+          Object.hasOwn(saved?.answers || {}, id) &&
+          (['answers', 'additionalComments', 'importance', 'conviction'] as const).every((field) =>
+            engine.valuesEqual(fieldValue(saved?.[field]?.[id]), fieldValue(current?.[field]?.[id])),
+          ),
+      )
+    ) {
+      return { status: 'already-saved' as const };
+    }
+  }
+  const result = await engine.handlePileSubmitClick();
+  if (result && typeof result === 'object' && 'status' in result) return result;
+  if (!engine.props.loginComplete) return { status: 'login-required' as const };
+  return { status: 'failed' as const, message: 'Submission did not complete.' };
 };
 
 const getPileFilterQuestionResponses = (engine: PileViewModeEngine) => {
@@ -3413,12 +3444,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   })
                 }
                 onRecordProvenance={engine.recordInterviewProvenance}
-                onSubmitResponses={async () => {
-                  const result = await engine.handlePileSubmitClick();
-                  if (result && typeof result === 'object' && 'status' in result) return result;
-                  if (!engine.props.loginComplete) return { status: 'login-required' as const };
-                  return { status: 'failed' as const, message: 'Submission did not complete.' };
-                }}
+                onSubmitResponses={(questionIds) => submitSessionInterviewResponses(engine, questionIds)}
                 onViewResults={engine.viewResultsFromSessionVoiceModeModal}
                 renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion) =>
                   engine.renderPileResponseInput({

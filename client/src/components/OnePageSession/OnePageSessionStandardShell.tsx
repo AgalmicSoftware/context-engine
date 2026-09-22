@@ -157,6 +157,8 @@ type OnePageSessionStandardShellProps = {
   onKickoffAutoMintIfNeeded: () => void;
   onLoadFullCorpusClick: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenResults: () => void;
+  onViewSessionResults?: () => void;
+  resultsSectionRef?: React.Ref<HTMLDivElement>;
   onPileSubmitRailVisibilityChange: (visible: unknown) => void;
   onResultsModalClose: () => void;
   onResultsModeChange: (resultsViewMode: string) => void;
@@ -349,6 +351,8 @@ export default function OnePageSessionStandardShell({
   onKickoffAutoMintIfNeeded,
   onLoadFullCorpusClick,
   onOpenResults,
+  onViewSessionResults,
+  resultsSectionRef,
   onPileSubmitRailVisibilityChange,
   onResultsModalClose,
   onResultsModeChange,
@@ -412,7 +416,9 @@ export default function OnePageSessionStandardShell({
       : generatedHasArtifact
         ? 'Refresh AI Views'
         : 'Generate AI Views';
-  const sectionsGridClassName = [styles.sectionsGrid, !isDemoSlug ? styles.sectionsGridTwoUp : '']
+  const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
+  const showContextSection = isDemoSlug || !!sessionContext;
+  const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
   const pileSubmitRailActive = !showQuestions && pileSubmitRailVisible;
@@ -436,8 +442,6 @@ export default function OnePageSessionStandardShell({
   const loadFullCorpusButtonLabel =
     corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
   const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
-  const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showContextSection = isDemoSlug || !!sessionContext;
 
   return (
     <div className={styles.onePageDemoContainer}>
@@ -502,6 +506,7 @@ export default function OnePageSessionStandardShell({
         ) : (
           <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
             <MemoSurveyPage
+              onViewSessionResults={onViewSessionResults}
               minifiedMode="pile"
               account={account}
               provider={provider}
@@ -701,7 +706,10 @@ export default function OnePageSessionStandardShell({
           </div>
         )}
 
-        <div className={`${styles.sectionContainer} ${showResults ? styles.sectionExpanded : ''}`}>
+        <div
+          ref={resultsSectionRef}
+          className={`${styles.sectionContainer} ${showResults ? styles.sectionExpanded : ''}`}
+        >
           <div className={styles.sectionHeaderRow}>
             <h2
               onClick={onToggleResults}

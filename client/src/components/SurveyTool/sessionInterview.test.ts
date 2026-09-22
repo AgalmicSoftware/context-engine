@@ -7,6 +7,7 @@ import {
   buildRealtimeInterviewInstructions,
   buildSessionVoiceModeSearch,
   canonicalizeInterviewQuestions,
+  hashInterviewQuestions,
   clearInterviewPrefillHash,
   decodeInterviewPrefillPacket,
   encodeInterviewPrefillPacket,
@@ -150,7 +151,7 @@ describe('session interview protocol', () => {
           promptVersion: INTERVIEW_PROMPT_VERSION,
         }),
       )?.promptVersion,
-    ).toBe('ce-interview-brief-v4');
+    ).toBe('ce-interview-brief-v5');
   });
 
   it('builds a user-authored no-install kickoff and confidence-aware mapper prompt', () => {
@@ -163,13 +164,15 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain(
       'https://worker.example/agent/interview-catalog?slug=demo%20one&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%20one',
     );
-    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v4"');
+    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v5"');
     expect(kickoff).toContain('stop and report a stale catalog');
     expect(kickoff).toContain('conversation history, memory, and connected sources already available to you');
     expect(kickoff).toContain('reasonable inferences');
     expect(kickoff).toContain('question-relevant background, views, experience, uncertainties, and caveats');
     expect(kickoff).toContain('Distinguish stated facts from inferred context');
-    expect(kickoff).toContain('binary and multichoice answers must match one listed option');
+    expect(kickoff).toContain(
+      'multichoice answers use one exact option when singleSelect is true, otherwise an array of exact options',
+    );
     expect(kickoff).toContain(
       'quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
     );
@@ -434,7 +437,7 @@ describe('session interview protocol', () => {
     ).toEqual([
       {
         questionId: 'q1',
-        answer: 'Option A',
+        answer: ['Option A'],
         confidence: 0.22,
         evidence: 'A tentative related remark.',
       },
@@ -662,4 +665,81 @@ it('recommends quadratic questions with options, tags, valid budgets, and budget
   expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain(
     'Use quadratic when the responder raises competing priorities',
   );
+});
+
+describe('interview choice selection contract', () => {
+  const questions = normalizeInterviewQuestions([
+    { id: 'multi', prompt: 'Choose topics', type: 'multichoice', options: ['Parks', 'Transit'] },
+    {
+      id: 'single',
+      prompt: 'Choose a priority',
+      type: 'multichoice',
+      options: ['Parks', 'Transit'],
+      singleSelect: true,
+    },
+    {
+      id: 'legacy-one',
+      prompt: 'Choose one',
+      type: 'multichoice',
+      options: ['Parks', 'Transit'],
+      oneSelectionOnly: true,
+    },
+    {
+      id: 'legacy-choice',
+      prompt: 'Choose one',
+      type: 'multichoice',
+      options: ['Parks', 'Transit'],
+      singleChoice: true,
+    },
+  ]);
+
+  it('retains the underlying selection mode in catalogs and voice/mapping prompts', () => {
+    expect(questions.map(({ singleSelect }) => singleSelect)).toEqual([false, true, true, true]);
+    const instructions = buildRealtimeInterviewInstructions({ questions });
+    expect(instructions).toContain('(multichoice; choose one or more options) Choose topics');
+    expect(instructions).toContain('(multichoice; choose one option) Choose a priority');
+    expect(buildInterviewResponseMappingPrompt({ questions })).toContain(
+      'Never collapse a multiple-selection answer to one choice',
+    );
+  });
+
+  it.each<[string, unknown, unknown]>([
+    ['multi', ['parks', 'Transit', 'Parks'], ['Parks', 'Transit']],
+    ['multi', 'parks', ['Parks']],
+    ['single', 'transit', 'Transit'],
+    ['single', ['parks'], 'Parks'],
+    ['single', ['Parks', 'Transit'], null],
+    ['multi', ['Parks', 'invented'], null],
+    ['multi', [], null],
+    ['multi', [1], null],
+    ['legacy-one', ['Parks', 'Transit'], null],
+    ['legacy-choice', ['Parks', 'Transit'], null],
+  ])('validates imported and mapped selections for %s: %j', (questionId, answer, expected) => {
+    const responses = [{ questionId, answer, confidence: 0.7 }];
+    const expectedDrafts = expected === null ? [] : [{ questionId, answer: expected, confidence: 0.7 }];
+    expect(parseInterviewDraftResponses(JSON.stringify({ responses }), questions)).toEqual(expectedDrafts);
+    expect(readImportedInterviewDraftResponses({ ...packet, responses }, questions)).toEqual(expectedDrafts);
+  });
+
+  it('binds new hashes to selection mode while validating v4 links against the original catalog shape', async () => {
+    const { webcrypto, createHash } = await import('crypto');
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
+    try {
+      const multi = [questions[0]];
+      const single = [{ ...questions[0], singleSelect: true }];
+      expect(await hashInterviewQuestions(multi)).not.toBe(await hashInterviewQuestions(single));
+      const legacy = [{ id: 'multi', prompt: 'Choose topics', type: 'multichoice', options: ['Parks', 'Transit'] }];
+      const legacyHash = createHash('sha256').update(JSON.stringify(legacy)).digest('hex');
+      expect(await hashInterviewQuestions(multi, 'ce-interview-brief-v4')).toBe(legacyHash);
+      expect(await hashInterviewQuestions(single, 'ce-interview-brief-v4')).toBe(legacyHash);
+      expect(
+        decodeInterviewPrefillPacket(
+          encodeInterviewPrefillPacket({ ...packet, promptVersion: 'ce-interview-brief-v4' }),
+        ),
+      ).not.toBeNull();
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'crypto', descriptor);
+    }
+  });
 });

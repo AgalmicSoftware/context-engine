@@ -142,3 +142,10 @@ test('quadratic catalog questions retain ordered options and the configured or d
   assert.equal(questions[0].voiceCredits, 25);
   assert.equal(questions[1].voiceCredits, 99);
 });
+
+
+test('choice catalogs retain canonical and legacy single-select settings and default to multi-select', () => {
+  const questions = [{}, { singleSelect: false }, { singleSelect: true }, { oneSelectionOnly: true }, { singleChoice: true }]
+    .map((settings, index) => ({ id: `q${index}`, prompt: 'Pick topics', type: 'multichoice', options: ['Parks', 'Transit'], ...settings }));
+  assert.deepEqual(helpers.dedupeQuestions(questions).map((question) => question.singleSelect), [false, false, true, true, true]);
+});

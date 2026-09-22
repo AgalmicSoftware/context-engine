@@ -122,7 +122,11 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
 
   it('honors per-question rating scale metadata in full-question descriptors and sliders', () => {
     const descriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-      question: { id: 'q-rating', type: 'rating', scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } },
+      question: {
+        id: 'q-rating',
+        type: 'rating',
+        scale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' },
+      },
       answer: { value: 0 },
     });
 
@@ -130,14 +134,18 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       kind: 'rating',
       questionId: 'q-rating',
       ratingValue: 1,
-      ratingScale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' },
+      ratingScale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' },
       disabled: false,
       useDeferredRating: true,
     });
 
     render(
       <SurveyQuestionsFullQuestionResponseInput
-        question={{ id: 'q-rating', type: 'rating', scale: { min: 1, max: 10, minLabel: '1', maxLabel: '10' } }}
+        question={{
+          id: 'q-rating',
+          type: 'rating',
+          scale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' },
+        }}
         answer={{ value: 0 }}
         onDeferredRatingCommit={jest.fn()}
       />,
@@ -146,8 +154,11 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('min', '1');
     expect(slider).toHaveAttribute('max', '10');
-    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
-    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(slider).toHaveValue('1');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent(/^1$/);
+    expect(screen.queryByText('Almost none of it')).not.toBeInTheDocument();
+    expect(screen.queryByText('All of it')).not.toBeInTheDocument();
+    expect(screen.queryByText('10')).not.toBeInTheDocument();
   });
 
   it('describes response input actions with question identity and dispatch readiness', () => {

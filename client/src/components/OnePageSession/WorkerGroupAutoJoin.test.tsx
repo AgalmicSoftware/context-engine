@@ -112,6 +112,20 @@ describe('WorkerGroupAutoJoin', () => {
     window.removeEventListener('ce:worker-groups-changed', changed);
   });
 
+  it('dismisses a new join after ten seconds and stays silent on reload', async () => {
+    const { unmount } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    await tick(9999);
+    expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+    await tick(1);
+    expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+    unmount();
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+    expect(joins()).toHaveLength(1);
+  });
+
   it('preserves source, mode, worker bootstrap, and prefill context after joining', async () => {
     window.history.replaceState(
       { keep: true },
@@ -181,6 +195,9 @@ describe('WorkerGroupAutoJoin', () => {
   it('allows cancellation before sign-in without leaving a retry on refresh', async () => {
     const { unmount } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    expect(screen.getByText('Auto-join cancelled.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss group notice' }));
+    expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
     unmount();
     render(<WorkerGroupAutoJoin {...props} />);
     await tick();
@@ -217,7 +234,8 @@ describe('WorkerGroupAutoJoin', () => {
     );
     render(<WorkerGroupAutoJoin {...props} />);
     await flush();
-    expect(screen.getByText('You’re already in Participants 2026.')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+    expect(readPendingAutoJoin()).toBeNull();
     expect(joins()).toHaveLength(0);
     expect(window.location.search).toBe('?view=questions');
   });

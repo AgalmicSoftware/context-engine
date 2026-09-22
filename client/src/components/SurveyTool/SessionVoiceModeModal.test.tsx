@@ -507,6 +507,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
+        loginModalToggled
         loginComplete={false}
         account=""
         prefillPacket={prefillPacket}
@@ -531,6 +532,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
+        loginModalToggled
         loginComplete
         account="0x0000000000000000000000000000000000000001"
         isResponsesCacheReady={false}
@@ -541,11 +543,13 @@ describe('SessionVoiceModeModal', () => {
 
     await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.toggleLoginModal).toHaveBeenCalledWith(false);
 
     view.rerender(
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
+        loginModalToggled
         loginComplete
         account="0x0000000000000000000000000000000000000001"
         isResponsesCacheReady
@@ -1162,6 +1166,58 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
+  it.each(['ce-interview-brief-v4', 'ce-interview-brief-v5'])(
+    'submits unedited multi-select and single-select drafts using their catalog settings (%s)',
+    async (promptVersion) => {
+      const questionPool = [
+        { id: 'multi', prompt: 'Pick topics', type: 'multichoice', options: ['Parks', 'Transit'], singleSelect: false },
+        {
+          id: 'single',
+          prompt: 'Pick a priority',
+          type: 'multichoice',
+          options: ['Parks', 'Transit'],
+          singleSelect: true,
+        },
+      ];
+      const prefillPacket = {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion,
+        source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
+        responderContext: {},
+        responses: [
+          { questionId: 'multi', answer: ['Parks', 'Transit'], confidence: 0.8 },
+          { questionId: 'single', answer: 'Transit', confidence: 0.8 },
+        ],
+      };
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          questionPool={questionPool}
+          prefillPacket={prefillPacket}
+        />,
+      );
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      expect(screen.getAllByRole('checkbox', { name: 'Transit' })).toHaveLength(2);
+      expect(
+        screen
+          .getAllByRole('checkbox', { name: 'Transit' })
+          .every((checkbox) => (checkbox as HTMLInputElement).checked),
+      ).toBe(true);
+      expect(mockedHashInterviewQuestions).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'multi', singleSelect: false })]),
+        promptVersion,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('multi', ['Parks', 'Transit']));
+      expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('single', 'Transit');
+      await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledWith(['multi', 'single']));
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+    },
+  );
+
   it('maps imported context into reviewable drafts and never selects replacement of an existing draft silently', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
@@ -1214,52 +1270,60 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
-  it('shows confirmed submit success before offering results navigation and clears it on edit', async () => {
-    jest.useFakeTimers();
-    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
-      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
-    ]);
-    const onViewResults = jest.fn();
-    render(
-      <SessionVoiceModeModal
-        {...baseProps}
-        mode="interview"
-        onViewResults={onViewResults}
-        prefillPacket={{
-          version: 1,
-          sessionSlug: 'demo',
-          questionSetHash: 'a'.repeat(64),
-          promptVersion: 'ce-interview-brief-v1',
-          source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
-          responderContext: { summary: 'Relevant context' },
-        }}
-      />,
-    );
+  it.each(['submitted', 'already-saved'])(
+    'shows confirmed %s success before offering results navigation and clears it on edit',
+    async (submitStatus) => {
+      baseProps.onSubmitResponses.mockResolvedValue({ status: submitStatus });
+      jest.useFakeTimers();
+      mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+        { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+      ]);
+      const onViewResults = jest.fn();
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          onViewResults={onViewResults}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v1',
+            source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
+            responderContext: { summary: 'Relevant context' },
+          }}
+        />,
+      );
 
-    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
 
-    const submitButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
-    expect(submitButton).toHaveTextContent('Responses submitted');
-    expect(submitButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
-    expect(submitButton).toBeDisabled();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+      const submitButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
+      expect(baseProps.onSubmitResponses).toHaveBeenCalledWith(['q1']);
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
+        submitStatus === 'already-saved' ? 'Responses already saved' : 'Responses submitted',
+      );
+      expect(submitButton).toHaveTextContent('Responses submitted');
+      expect(submitButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
+      expect(submitButton).toBeDisabled();
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
 
-    await act(async () => {
-      jest.advanceTimersByTime(4999);
-    });
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
-    await act(async () => {
-      jest.advanceTimersByTime(1);
-    });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS));
-    expect(onViewResults).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        jest.advanceTimersByTime(4999);
+      });
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS));
+      expect(onViewResults).toHaveBeenCalledTimes(1);
 
-    await editReadableDraftText('Draft answer for What matters?', 'Edited after submit');
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Submit responses');
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
-  });
+      await editReadableDraftText('Draft answer for What matters?', 'Edited after submit');
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Submit responses');
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
+    },
+  );
 
   it('keeps the confirmed success button disabled when no results navigation handler exists', async () => {
     jest.useFakeTimers();

@@ -1,3 +1,4 @@
+import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -268,6 +269,15 @@ export default function SessionInterviewDraftCard({
             options={question.options}
             voiceCredits={question.voiceCredits}
             value={answerValue}
+            onChange={onAnswerChange}
+            disabled={disabled}
+          />
+        ) : question?.type === 'multichoice' ? (
+          <MultichoiceQuestionInput
+            questionId={`interview-${draft.questionId}`}
+            options={question.options}
+            selectedValues={Array.isArray(answerValue) ? answerValue : answerValue ? [answerValue] : []}
+            isSingleSelect={question.singleSelect}
             onChange={onAnswerChange}
             disabled={disabled}
           />

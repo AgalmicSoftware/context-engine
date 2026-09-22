@@ -383,3 +383,9 @@ that discards partial work.
 Continued interviews retain user-edited fields even when an intermediate AI
 prediction agrees with the edit. A valid imported prefill is checked against the
 question bank once; later question additions can be included in the ongoing interview.
+
+### Returning from interview submission
+
+Signing in from the interview closes the account dialog after successful login; reviewed drafts remain in the interview while session response data loads. Submitting selected drafts that are already saved and unchanged shows “Responses already saved” without uploading duplicates. On a session page, **View results** closes the interview and opens and scrolls to the inline Results section. Standalone question views keep their raw-results navigation.
+
+Interview choice mapping currently accepts one listed option per question. Multi-select answer arrays are not supported by the interview mapper.

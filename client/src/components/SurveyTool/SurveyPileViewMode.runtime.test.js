@@ -8,6 +8,7 @@ import {
   buildSessionInterviewSubmitContextToken,
   createPileViewRuntimeStrategy,
   recordInterviewProvenance,
+  submitSessionInterviewResponses,
 } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
@@ -531,6 +532,23 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
   });
 
+  it('returns embedded interviews to the session Results section without opening raw results', async () => {
+    const onViewSessionResults = jest.fn();
+    renderPile(
+      { activeSessionSlug: 'demo', onViewSessionResults },
+      {
+        route: '/session/demo?mode=interview&worker=https%3A%2F%2Fworker.example',
+      },
+    );
+    await screen.findByTestId('mock-voice-mode-modal');
+    await act(async () => mockVoiceModeProps.onViewResults());
+    expect(onViewSessionResults).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe('/session/demo');
+    expect(new URLSearchParams(window.location.search).get('worker')).toBe('https://worker.example');
+    expect(new URLSearchParams(window.location.search).has('mode')).toBe(false);
+  });
+
   it('lets the interview modal close and navigate to session results after submit success', async () => {
     const onPopState = jest.fn();
     window.addEventListener('popstate', onPopState);
@@ -904,6 +922,33 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(slice.interviewProvenance.q2.predictionRevisions).toEqual(revisions);
     await recordInterviewProvenance(engine, selected, null, null, false, false, '', [rejected]);
     expect(engine.state.surveysResponseState[0].interviewProvenance).toEqual({});
+  });
+
+  it('accepts unchanged interview answers only when every selected question is already saved', async () => {
+    const engine = {
+      props: { loginComplete: true },
+      state: {
+        userAnswers: { responses: [{ questionId: 'q1' }] },
+        surveysResponseState: [{ answers: { q1: { value: 'Agree' } } }],
+        isSubmitting: false,
+      },
+      valuesEqual: (a, b) => a === b,
+      getSubmitCount: jest.fn(() => 0),
+      buildSliceFromUserAnswers: jest.fn(() => ({ answers: { q1: { value: 'Agree' } } })),
+      handlePileSubmitClick: jest
+        .fn()
+        .mockResolvedValue({ status: 'failed', message: 'No new or changed responses to submit.' }),
+    };
+    expect(await submitSessionInterviewResponses(engine, ['q1'])).toEqual({ status: 'already-saved' });
+    expect(engine.buildSliceFromUserAnswers).toHaveBeenCalledWith(engine.state.userAnswers);
+    expect(engine.handlePileSubmitClick).not.toHaveBeenCalled();
+    expect(await submitSessionInterviewResponses(engine, ['q1', 'q2'])).toMatchObject({ status: 'failed' });
+    engine.state.surveysResponseState[0].answers.q1.value = 'Disagree';
+    expect(await submitSessionInterviewResponses(engine, ['q1'])).toMatchObject({ status: 'failed' });
+    engine.getSubmitCount.mockReturnValue(1);
+    engine.handlePileSubmitClick.mockResolvedValue({ status: 'submitted' });
+    expect(await submitSessionInterviewResponses(engine, ['q1'])).toEqual({ status: 'submitted' });
+    expect(engine.handlePileSubmitClick).toHaveBeenCalledTimes(3);
   });
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {

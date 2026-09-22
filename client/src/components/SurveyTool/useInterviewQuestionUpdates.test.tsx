@@ -99,3 +99,33 @@ it('keeps live quadratic additions and their option order and budget available t
     expect.stringContaining('25 voice credits; options in order: ["Parks","Transit"]'),
   );
 });
+
+it.each([false, true])(
+  'describes the selection mode of new choice questions (singleSelect: %s)',
+  async (singleSelect) => {
+    const append = jest.fn<boolean, [string]>(() => true);
+    const choice = {
+      id: 'new',
+      type: 'multichoice',
+      prompt: 'Pick topics',
+      options: ['Parks', 'Transit'],
+      singleSelect,
+    };
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ questions: [...questions, choice] }) });
+    const { result } = renderHook(() =>
+      useInterviewQuestionUpdates({
+        initialQuestions: questions,
+        config: { interviewMode: { followNewQuestions: true } },
+        workerUrl: 'https://worker.example',
+        sessionSlug: 'demo',
+        active: true,
+        append,
+      }),
+    );
+    await act(async () => jest.advanceTimersByTimeAsync(30000));
+    expect(result.current.questions.at(-1)).toEqual(choice);
+    expect(append).toHaveBeenCalledWith(
+      expect.stringContaining(`Choose ${singleSelect ? 'one option' : 'one or more options'}: ["Parks","Transit"]`),
+    );
+  },
+);

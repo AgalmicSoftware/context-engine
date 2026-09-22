@@ -2,7 +2,9 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
 
 export type InterviewSubmitResult =
-  { status: 'submitted' } | { status: 'login-required' } | { status: 'failed' | 'pending' | 'stale'; message?: string };
+  | { status: 'submitted' | 'already-saved' }
+  | { status: 'login-required' }
+  | { status: 'failed' | 'pending' | 'stale'; message?: string };
 
 type SubmitStatusSetter = (status: string) => void;
 
@@ -42,7 +44,7 @@ type RunInterviewDraftSubmitInput = {
     responderName: string,
     review?: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }>,
   ) => void | Promise<void>;
-  onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
+  onSubmitResponses?: (questionIds?: string[]) => InterviewSubmitResult | Promise<InterviewSubmitResult>;
   onSubmitted?: () => void;
   onRequestLogin?: () => void;
   setApplying: Dispatch<SetStateAction<boolean>>;
@@ -184,7 +186,7 @@ export const runInterviewDraftSubmit = async ({
     );
 
     if (!isSubmitContextCurrent(attemptToken)) return;
-    const submitResult = await onSubmitResponses?.();
+    const submitResult = await onSubmitResponses?.(applied.map((draft) => draft.questionId));
     if (!isSubmitContextCurrent(attemptToken)) return;
     if (submitResult && typeof submitResult === 'object' && submitResult.status === 'login-required') {
       pendingSubmitBaseContextRef.current = baseSubmitContextToken;
@@ -193,7 +195,11 @@ export const runInterviewDraftSubmit = async ({
       setStatus('Log in to submit…');
       return;
     }
-    if (!submitResult || typeof submitResult !== 'object' || submitResult.status !== 'submitted') {
+    if (
+      !submitResult ||
+      typeof submitResult !== 'object' ||
+      !['submitted', 'already-saved'].includes(submitResult.status)
+    ) {
       const message =
         submitResult && typeof submitResult === 'object' && 'message' in submitResult
           ? String(submitResult.message || '')
@@ -205,7 +211,7 @@ export const runInterviewDraftSubmit = async ({
       pendingSubmitBaseContextRef,
       setPendingSubmitAfterLogin,
     });
-    setStatus('Responses submitted');
+    setStatus(submitResult.status === 'already-saved' ? 'Responses already saved' : 'Responses submitted');
     onSubmitted?.();
   } catch (applyError) {
     if (disposedRef.current) return;

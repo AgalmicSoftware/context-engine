@@ -274,6 +274,19 @@ describe('OnePageSession results routing', () => {
     return subject;
   };
 
+  it('opens and scrolls to the inline report after an interview without opening raw results', () => {
+    const subject = createSubject();
+    const scrollIntoView = jest.fn();
+    subject.resultsSectionRef.current = { scrollIntoView };
+    subject.state.showResults = false;
+    subject.viewSessionResults();
+    expect(subject.state.showResults).toBe(true);
+    expect(subject.state.autoOpenResults).toBe(false);
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    subject.viewSessionResults();
+    expect(subject.state.showResults).toBe(true);
+  });
+
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 
@@ -864,6 +877,9 @@ describe('OnePageSession results routing', () => {
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
+    const sectionsGrid = screen.getByTestId('ce-demo-documents-section').parentElement;
+    expect(sectionsGrid).toHaveClass(styles.sectionsGrid);
+    expect(sectionsGrid).not.toHaveClass(styles.sectionsGridTwoUp);
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
     const context = screen.getByTestId('ce-session-context');
     expect(within(context).queryByRole('heading', { name: 'Context' })).not.toBeInTheDocument();

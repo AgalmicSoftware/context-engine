@@ -1071,7 +1071,12 @@ or a restricted invitation.
 
 To separate an event cohort, create an open Group named for the event, choose
 session member visibility, and distribute its auto-join link to participants.
-Visitors using the ordinary session URL are not automatically added. The invitation notice displays the public Group name before sign-in using the
+Visitors using ordinary session URLs are not automatically added. The EDDY event
+entry `/session/eddy26` is an explicit exception: the bare URL redirects to the
+pinned Worker with `joinGroup=eddy-2026&mode=interview`. Existing query parameters,
+hashes (including AI prefill), and subroutes bypass that redirect. Joining still
+requires sign-in; closing the interview or opening results does not relaunch it.
+The invitation notice displays the public Group name before sign-in using the
 exact session-bound discovery endpoint; it falls back to the Group ID when
 public discovery is unavailable. The compact notice reads “Group name: Will be
 joined upon sign-in” with Cancel auto-join; sign-in uses the existing page login
@@ -1083,7 +1088,9 @@ and refresh before sign-in. It retains the original session and Worker identity,
 so signing in elsewhere joins the intended group. This works even with the
 Groups section collapsed and records native Worker
 membership rather than minting an on-chain SBT. Existing members are recognized
-without another join request. Worker capacity, deadlines, and authorization
+without another join request or a success banner. A new join confirmation disappears
+after ten seconds and does not return on reload. Completed join and cancellation
+notices also have a Dismiss button to hide them immediately. Worker capacity, deadlines, and authorization
 remain authoritative; failures expose an explicit Retry action. Success or
 cancellation clears the saved invitation and removes its matching `joinGroup`
 parameter without disturbing other URL parameters. Account changes invalidate
@@ -2139,6 +2146,17 @@ Signed login/bootstrap requests:
     the 0-10 rating range, and the additive self-reported research-coverage count
     fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.
+  - Choice questions expose `singleSelect`: true allows one option; false (the
+    default for multichoice) allows multiple options. Legacy `oneSelectionOnly`
+    and `singleChoice` flags normalize to the same setting. The v5 prefill
+    contract uses a single option string for single-select and an array of exact
+    option labels for multi-select. Voice instructions, mapping, review controls,
+    and submission preserve this setting. Unknown options and multiple distinct
+    choices for a single-select question are rejected, never silently truncated.
+  - `ce-interview-brief-v5` hashes include selection mode. Previously generated
+    v1–v4 links remain readable using their original catalog hash format, while
+    their draft answers are validated against the current question settings.
+    Deploy both client and Worker changes before generating v5 prefills.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     on-chain discovery requires configured block limits and is capped at a
