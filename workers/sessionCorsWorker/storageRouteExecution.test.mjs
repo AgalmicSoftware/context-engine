@@ -11,6 +11,8 @@ import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethers
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup, readWorkerGroupMembershipProjection } from './workerGroups.js';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
+import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js';
+import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
@@ -217,6 +219,120 @@ const uploadEnvelopePayload = async ({
 	});
 	return { response, body: await readJson(response) };
 };
+
+test('private response reads separate participant submission scope from non-owner raw access', async (t) => {
+	for (const storage of ['kv', 'r2']) {
+		await t.test(storage, async () => {
+			const admin = '0x1111111111111111111111111111111111111111';
+			const first = '0x2222222222222222222222222222222222222222';
+			const second = '0x3333333333333333333333333333333333333333';
+			const payloadAccessControl = {
+				gate: 'role_gate', encryption: 'worker_envelope',
+				accessConditions: { match: 'any', conditions: [
+					{ kind: 'worker_role', role: 'admin' },
+					{ kind: 'agent_grant_scope', scope: 'storage' },
+				] },
+			};
+			let config = {
+				slug: 'session-a', sessionId: WORKER_GROUP_SESSION_ID, adminAddress: admin,
+				storageProfile: { backend: 'cloudflare', payloadAccessControl },
+				workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] },
+				sessionModeProfile: {
+					profileVersion: 1, preset: 'fast_cheap_cloudflare', authority: { mode: 'worker_canonical' },
+					evm: { registryChainId: null }, storage: { backend: 'cloudflare', payloadAccessControl },
+					identity: { default: 'passkey', enabled: ['passkey'] }, authorization: { mechanisms: ['worker_roles'] },
+					encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+					surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+					results: { visibility: 'participant_aggregate', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } },
+					export: { scope: 'admin_raw' },
+				},
+			};
+			assert.equal(validateWorkerConfigModeValues(config).ok, true);
+			const kv = createMockKv();
+			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-private-response-test-key' };
+			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
+			attachSessionCoordinator(env, (next) => { config = next; });
+			const scopesFor = (address) => resolveWorkerCanonicalLoginScopes({ address, config, env, slug: config.slug });
+			const firstScopes = await scopesFor(first);
+			const secondScopes = await scopesFor(second);
+			assert.deepEqual(firstScopes, { storage: true });
+			const cryptoSpy = createCryptoDecryptSpy();
+			const deps = { json, randomBytes: createSequenceRandomBytes(), crypto: cryptoSpy.crypto };
+			const route = (path, request, uploaderAddress, authScopes, slug = config.slug) => storageRoute({
+				path, method: request.method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders: {}, deps,
+			});
+			const upload = async (address, authScopes, extra = {}) => {
+				const response = await route('/storage/upload', new Request('https://worker.example/storage/upload', {
+					method: 'POST', headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ data: { answer: { value: `private answer from ${address}` }, responder: first }, resource: 'responses', ...extra }),
+				}), address, authScopes);
+				assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+				return (await response.json()).storageRef.id;
+			};
+			const firstId = await upload(first, firstScopes);
+			const secondId = await upload(second, secondScopes);
+			assert.equal((await readStorageIndexMetadata(kv, 'session-a', 'responses', secondId)).responder, second);
+			assert.equal([...kv.store.values()].join('').includes('private answer from'), false);
+			const read = (id, address, scopes, slug) => route('/storage/read', new Request(`https://worker.example/storage/read?id=${id}`), address, scopes, slug);
+			const list = (address, scopes) => route('/storage/list', new Request('https://worker.example/storage/list?resource=responses'), address, scopes);
+			for (const [address, scopes, ownId, otherId] of [[first, firstScopes, firstId, secondId], [second, secondScopes, secondId, firstId]]) {
+				const listed = await list(address, scopes);
+				assert.equal(listed.status, 200);
+				assert.deepEqual((await listed.json()).items.map((item) => item.storageRef.id), [ownId]);
+				assert.equal((await read(ownId, address, scopes)).status, 200);
+				const beforeDenied = cryptoSpy.decryptCalls;
+				assert.equal((await read(otherId, address, scopes)).status, 403);
+				assert.equal(cryptoSpy.decryptCalls, beforeDenied, 'deny before envelope decryption');
+			}
+			assert.equal((await read(firstId, '', {})).status, 403);
+			assert.equal((await read(firstId, first, {})).status, 403);
+			assert.equal((await read(firstId, first, firstScopes, 'different-session')).status, 404);
+			const adminScopes = await scopesFor(admin);
+			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
+			assert.equal((await (await list(admin, adminScopes)).json()).items.length, 2);
+			const delegated = { storage: true, delegationScopes: ['storage'] };
+			assert.equal((await read(firstId, second, delegated)).status, 200);
+			assert.equal((await (await list(second, delegated)).json()).items.length, 2);
+			assert.equal((await read(firstId, second, { storage: true, delegationScopes: ['ai'] })).status, 403);
+			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: 'synthetic-grant' } })).status, 200);
+			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: '' } })).status, 403);
+			// Old rows without a server-recorded owner fail closed for participants.
+			const missingOwner = await readStorageIndexMetadata(kv, 'session-a', 'responses', firstId);
+			delete missingOwner.responder;
+			await writeStorageIndexMetadata(kv, 'session-a', 'responses', missingOwner);
+			assert.equal((await read(firstId, first, firstScopes)).status, 403);
+			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
+			// Per-item restrictions still apply to an owner who otherwise qualifies.
+			const adminOnlyId = await upload(admin, adminScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
+			assert.equal((await read(adminOnlyId, second, delegated)).status, 403);
+			// Public EDDY-style policy still permits anonymous raw reads and lists.
+			const publicAccess = { gate: 'none', encryption: 'none' };
+			config = { ...config, storageProfile: { backend: 'cloudflare', payloadAccessControl: publicAccess }, sessionModeProfile: {
+				...config.sessionModeProfile, preset: 'custom', storage: { backend: 'cloudflare', payloadAccessControl: publicAccess },
+				encryption: { mode: 'none' }, results: { ...config.sessionModeProfile.results, visibility: 'public_full_if_storage_public' },
+			} };
+			assert.equal(validateWorkerConfigModeValues(config).ok, true);
+			const publicId = await upload(second, secondScopes);
+			assert.equal((await read(publicId, '', {})).status, 200);
+			assert.deepEqual((await (await list('', {})).json()).items.map((item) => item.storageRef.id), [publicId]);
+			// Storage routes retain the legacy arweave scope alias for own responses.
+			config = { ...config, workerAuthority: { version: 1, participantScopes: ['arweave'], anonymousScopes: [] },
+				sessionModeProfile: { ...config.sessionModeProfile, results: { ...config.sessionModeProfile.results, visibility: 'participant_aggregate' } } };
+			assert.equal(validateWorkerConfigModeValues(config).ok, true);
+			const legacyScopes = await scopesFor(first);
+			assert.deepEqual(legacyScopes, { arweave: true });
+			const legacyId = await upload(first, legacyScopes);
+			const legacyRead = await read(legacyId, first, legacyScopes);
+			assert.equal(legacyRead.status, 200);
+			assert.equal(legacyRead.headers.get('Cache-Control'), 'private, no-store');
+			const legacyList = await list(first, legacyScopes);
+			assert.equal(legacyList.status, 200);
+			assert.equal(legacyList.headers.get('Cache-Control'), 'private, no-store');
+			assert.deepEqual((await legacyList.json()).items.map((item) => item.storageRef.id), [legacyId]);
+			assert.equal((await read(publicId, first, legacyScopes)).status, 403);
+		});
+	}
+});
 
 test('storageRoute delegates Arweave uploads and returns storageRef compatibility fields', async () => {
 	const env = { marker: 'worker-env' };

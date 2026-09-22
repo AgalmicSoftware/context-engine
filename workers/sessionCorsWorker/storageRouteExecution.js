@@ -22,6 +22,7 @@ import {
 } from './storageEnvelopeEncryption.js';
 import {
   isWorkerGroupMember,
+  resolveWorkerGroupPrincipal,
 } from './workerGroups.js';
 import {
   rejectBytesOverLimit,
@@ -750,6 +751,32 @@ const authorizeWorkerRoleAccess = ({ config, requesterAddress, baseHeaders, deps
   };
 };
 
+const hasPrivateResponsePolicy = ({ config, resource }) => {
+  const profile = config?.sessionModeProfile;
+  return trim(resource) === 'responses' && profile?.authority?.mode === 'worker_canonical' &&
+    !!profile?.results?.visibility && profile.results.visibility !== 'public_full_if_storage_public';
+};
+
+const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
+  if (operation === 'upload' || !hasPrivateResponsePolicy({ config, resource })) return true;
+
+  const scopes = isObj(authScopes) ? authScopes : {};
+  const address = normalizeAddress(requesterAddress);
+  if (address && resolveRoleAddressSet({ config, role: 'admin' }).has(address)) return true;
+  const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
+  const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
+  if (
+    delegatedScopes.some((items) => items.map(trim).includes('storage')) ||
+    (scopes.storage === true && agent.ok && agent.principal.kind === 'agent')
+  ) return true;
+
+  // A participant's route scope permits submission, not reading everyone else's
+  // answers. List preflight permits scanning; each row still requires its owner.
+  if (!address || (scopes.storage !== true && scopes.arweave !== true)) return false;
+  if (operation === 'list') return true;
+  return !!trim(metadata?.responder) && normalizeAddress(metadata.responder) === address;
+};
+
 const authorizeCloudflareStorageAccess = async ({
   env,
   config,
@@ -758,9 +785,19 @@ const authorizeCloudflareStorageAccess = async ({
   requesterAddress,
   authScopes,
   metadata,
+  operation = 'read',
   baseHeaders,
   deps,
 }) => {
+  if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Access denied: individual response access requires its author, a session admin, or a delegated storage grant.',
+        reason: 'private_response_owner_required',
+      }, 403, baseHeaders),
+    };
+  }
   const access = resolvePayloadAccessControl(config);
   const payloadConditions = resolvePayloadAccessConditions({ metadata, access });
   if (payloadConditions.document) {
@@ -1129,6 +1166,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     config,
     slug,
     resource: payload.resource,
+    operation: 'upload',
     requesterAddress: uploaderAddress,
     authScopes,
     metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
@@ -1484,7 +1522,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   responseHeaders.set('X-CE-Storage-Backend', STORAGE_BACKENDS.CLOUDFLARE);
   responseHeaders.set('X-CE-Storage-Ref', id);
   responseHeaders.set('X-CE-Payload-Access-Mode', deriveLegacyPayloadAccessMode(resolvedAccess));
-  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
     responseHeaders.set('Cache-Control', 'private, no-store');
   }
   return new Response(responseBody, {
@@ -1503,6 +1541,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     config,
     slug,
     resource,
+    operation: 'list',
     requesterAddress: uploaderAddress,
     authScopes,
     baseHeaders,
@@ -1592,7 +1631,9 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     items,
     cursor: nextCursor || null,
     listComplete: !nextCursor,
-  }, 200, baseHeaders);
+  }, 200, hasPrivateResponsePolicy({ config, resource })
+    ? { ...Object.fromEntries(new Headers(baseHeaders || {})), 'Cache-Control': 'private, no-store' }
+    : baseHeaders);
 };
 
 export const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {

@@ -611,6 +611,18 @@ Authenticated clients can use the worker as the session storage boundary:
     refs are returned, the client completes without an on-chain transaction.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
+    In Worker-canonical sessions whose results visibility is not
+    `public_full_if_storage_public`, individual response reads also require
+    that recorded author, a current session admin, or an authenticated
+    delegated storage grant. A participant's ordinary `storage` route scope
+    permits submission and own-response reload, not other participants' raw
+    answers. Lists apply the same restriction to each row, and older rows
+    lacking trusted author metadata remain unavailable to ordinary participants.
+    Existing per-item access conditions still apply to every permitted reader.
+    This is a read-time protection for existing and new rows; it does not
+    rewrite stored data or revoke plaintext already downloaded. Aggregate-only
+    visibility does not authorize raw reads to compute a client-side summary;
+    a combined summary needs an authorized server-generated aggregate.
   - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
