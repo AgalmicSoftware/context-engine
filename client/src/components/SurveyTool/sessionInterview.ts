@@ -143,9 +143,15 @@ const describeRatingScale = (question: InterviewQuestion): string => {
   return `; scale ${scale.min}-${scale.max}; ${scale.min}=${scale.minLabel}; ${scale.max}=${scale.maxLabel}`;
 };
 
-const clampRating = (value: unknown): number | undefined => {
+const readNumericRating = (value: unknown): number | undefined => {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim())) return undefined;
   const number = Number(value);
-  return Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : undefined;
+  return Number.isFinite(number) ? number : undefined;
+};
+
+const clampRating = (value: unknown): number | undefined => {
+  const number = readNumericRating(value);
+  return number === undefined ? undefined : Math.max(0, Math.min(100, number));
 };
 
 const normalizeCoverageCount = (value: unknown): number | null => {
@@ -198,8 +204,8 @@ const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQues
         if (!multiple && selected.length !== 1) return normalized;
         answer = multiple ? selected : selected[0];
       } else if (question?.type === 'rating') {
-        const numericAnswer = Number(answer);
-        if (!Number.isFinite(numericAnswer)) return normalized;
+        const numericAnswer = readNumericRating(answer);
+        if (numericAnswer === undefined) return normalized;
         const scale = normalizeRatingScale(question);
         answer = Math.max(scale.min, Math.min(scale.max, numericAnswer));
       }

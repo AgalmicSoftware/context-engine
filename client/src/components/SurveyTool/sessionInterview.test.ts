@@ -493,6 +493,26 @@ describe('session interview protocol', () => {
     ]);
   });
 
+  it.each([null, undefined, '', '   ', false, true, [], [4], {}, 'not numeric'])(
+    'omits invalid rating answers instead of inventing a scale value: %p',
+    (answer) => {
+      const questions = normalizeInterviewQuestions([
+        { id: 'rating', prompt: 'How much?', type: 'rating', scale: { min: 1, max: 10 } },
+      ]);
+      const responses = [{ questionId: 'rating', answer, confidence: 0.8 }];
+      expect(parseInterviewDraftResponses(JSON.stringify({ responses }), questions)).toEqual([]);
+      expect(readImportedInterviewDraftResponses({ ...packet, responses }, questions)).toEqual([]);
+    },
+  );
+
+  it.each([0, '0', 4, ' 4.5 '])('preserves explicit numeric rating values: %p', (answer) => {
+    const questions = normalizeInterviewQuestions([{ id: 'rating', prompt: 'How much?', type: 'rating' }]);
+    const responses = [{ questionId: 'rating', answer, importance: null, conviction: '', confidence: 0.8 }];
+    expect(parseInterviewDraftResponses(JSON.stringify({ responses }), questions)).toEqual([
+      { questionId: 'rating', answer: Number(answer), confidence: 0.8 },
+    ]);
+  });
+
   it('drops mapper responses that omit the required confidence measure', () => {
     expect(
       parseInterviewDraftResponses('{"responses":[{"questionId":"q1","answer":"Unsupported"}]}', [
