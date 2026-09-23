@@ -2305,6 +2305,46 @@ test('Mini App onboarding endpoint rejects disallowed origins and invalid initDa
   assert.equal((await jsonBody(invalidResponse)).reason, 'miniapp_initdata_invalid');
 });
 
+for (const proof of ['missing', 'invalid', 'expired', 'different-user']) {
+  test(`Invite onboarding cannot claim a body Telegram identity (${proof})`, async () => {
+    const env = telegramOnlyEnv({
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
+        { tokenHash: sha256Hex('untrusted-identity-invite'), sessionSlug: 'alpha' },
+      ]),
+    });
+    const previous = await createTelegramAgentDelegationToken({
+      env, telegramUserId: '42', sessionSlug: 'alpha',
+      accountAddress: `0x${'12'.repeat(20)}`,
+    });
+    await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
+      sessionSlug: 'alpha', source: 'telegram_webhook', sourceChatId: '-10042',
+    }));
+    const bindingBefore = await env.AGENT_ACTION_KV.get('telegram:private-session:42');
+    const initData = proof === 'missing' ? '' : proof === 'invalid' ? 'invalid-proof' : signInitData({
+      auth_date: String(Math.floor(Date.now() / 1000) - (proof === 'expired' ? 7200 : 0)),
+      user: JSON.stringify({ id: 43 }),
+    }, env.TELEGRAM_BOT_TOKEN);
+    const response = await handleTelegramAgentHandoffRequest({
+      request: new Request('https://bridge.example/api/agent/invite/onboard', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ inviteToken: 'untrusted-identity-invite', telegramUserId: '42', initData }),
+      }), env,
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+    assert.equal(loaded.ok, true);
+    if (proof === 'different-user') {
+      assert.equal(loaded.record.principal.adapterUserId, '43');
+    } else {
+      assert.equal(loaded.record.principal.adapter, 'invite');
+      assert.match(loaded.record.principal.principalId, /^cep_/);
+    }
+    assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, true);
+    assert.equal(await env.AGENT_ACTION_KV.get('telegram:private-session:42'), bindingBefore);
+  });
+}
+
 test('Invite onboarding mints a user token from a configured Geo invite', async () => {
   const env = multiTelegramOnlyEnv({
     defaultSessionSlug: 'alpha',
@@ -2338,6 +2378,10 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
       body: JSON.stringify({
         contextEngine: { inviteToken: 'geo-invite-secret' },
         telegramUserId: '42',
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000)),
+          user: JSON.stringify({ id: 42 }),
+        }, env.TELEGRAM_BOT_TOKEN),
         username: 'participant',
       }),
     }),
@@ -2779,6 +2823,10 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
       body: JSON.stringify({
         inviteToken: 'agent-only-invite',
         telegramUserId: '42',
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000)),
+          user: JSON.stringify({ id: 42 }),
+        }, env.TELEGRAM_BOT_TOKEN),
         mode: 'agent_only',
       }),
     }),
@@ -2836,6 +2884,10 @@ test('Session Wrapped invite onboarding mints wrapped agent-only credential meta
       body: JSON.stringify({
         inviteToken: 'wrapped-demo-invite',
         telegramUserId: '4242',
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000)),
+          user: JSON.stringify({ id: 4242 }),
+        }, env.TELEGRAM_BOT_TOKEN),
         mode: 'agent_only',
         skill: 'ce-session-wrapped',
         source: 'session-wrapped-forwarded-prompt',

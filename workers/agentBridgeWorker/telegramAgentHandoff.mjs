@@ -6299,6 +6299,20 @@ async function handleChildSessionRequest({ env = {}, context = {}, input = {} } 
   return json(saved, { status: saved.ok ? 200 : 400 });
 }
 
+async function validateOnboardingTelegramIdentity(initData, env) {
+  const ttlSeconds = Number(env.AGENT_BRIDGE_MINIAPP_INITDATA_TTL_SECONDS || 3600);
+  const validationEnv = {
+    ...env,
+    AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS:
+      Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? String(Math.floor(ttlSeconds)) : '3600',
+  };
+  // Credential issuance always requires a real Telegram identity, including in operator previews.
+  const validated = await validateTelegramMiniAppInitData(initData, {
+    ...validationEnv, AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
+  });
+  return validated;
+}
+
 async function handleMiniAppOnboardRequest({ request, env = {}, createdAt = null } = {}) {
   const cors = miniAppOnboardCorsHeaders(request, env);
   if (cors === null) {
@@ -6321,16 +6335,7 @@ async function handleMiniAppOnboardRequest({ request, env = {}, createdAt = null
   }
 
   const input = await readMiniAppOnboardInput(request);
-  const ttlSeconds = Number(env.AGENT_BRIDGE_MINIAPP_INITDATA_TTL_SECONDS || 3600);
-  const validationEnv = {
-    ...env,
-    AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS:
-      Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? String(Math.floor(ttlSeconds)) : '3600',
-  };
-  // Credential issuance always requires a real Telegram identity, including in operator previews.
-  const validated = await validateTelegramMiniAppInitData(input.initData, {
-    ...validationEnv, AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
-  });
+  const validated = await validateOnboardingTelegramIdentity(input.initData, env);
   if (!validated.ok || validated.authMode !== 'telegram') {
     const reason =
       validated.reason === 'telegram_init_data_expired' ? 'miniapp_initdata_expired' : 'miniapp_initdata_invalid';
@@ -6478,9 +6483,14 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
   if (legacyRedemption.redeemed) {
     return json({ ok: false, reason: 'invite_token_redeemed' }, { status: 409 });
   }
-  const telegramUserId = safeString(
-    body.telegramUserId || body.userId || body.telegram?.telegramUserId || body.telegram?.userId,
+  const identity = await validateOnboardingTelegramIdentity(
+    safeString(body.initData || body.telegramInitData || request.headers.get('X-Telegram-Init-Data')),
+    env,
   );
+  // An invite proves eligibility, not ownership of a caller-supplied Telegram account.
+  const telegramUserId = identity.ok && identity.authMode === 'telegram'
+    ? safeString(identity.user?.telegramUserId)
+    : '';
   const policy = await loadSessionPolicy(env);
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || body.defaultSessionSlug || body.slug);
   const invitedSessionSlug = sanitizeSessionSlug(invite.invite.sessionSlug);
