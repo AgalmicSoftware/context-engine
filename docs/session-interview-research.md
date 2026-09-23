@@ -102,6 +102,9 @@ Access depends on the session's storage and results policy. Public-result sessio
 
 The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Questions + Responses`, `JSON: Questions`, and `JSON: Questions + Responses`. The CSV response export intentionally flattens response rows to question id, prompt, type, options, responder address, importance, answer value/hash, additional value/hash, encryption flags, timestamp, and voice credits; it does not include `interviewProvenance`. The JSON questions-and-responses export includes the filtered response rows as held by the results view. Depending on the view and hydration path, each row's raw `response` can be an object or a JSON string; inspect and parse that nested `response` value, then check either `response.interviewProvenance` or `response.responses[].interviewProvenance`. For full-fidelity research review, use the raw storage read path above.
 
+In browser CSV exports, `options` cells contain JSON arrays, and array-valued `answer` cells contain JSON arrays too (multi-select labels or quadratic vote numbers). Parse the CSV first, then JSON-parse these cells; do not split them on semicolons or commas. For example, the decoded cell `["Transit; buses","Parks"]` represents two exact option names. CSV quoting escapes the JSON quotes, while JSON preserves punctuation and newlines inside labels. Scalar answers remain scalar text; tags retain their existing semicolon-separated representation.
+
+
 ```json
 {
   "responses": [

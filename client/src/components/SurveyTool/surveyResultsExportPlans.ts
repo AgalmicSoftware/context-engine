@@ -308,7 +308,7 @@ const quoteCsvCell = (value: unknown): string =>
   `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`;
 
 const quoteResponseCsvCell = (value: unknown): string => {
-  const cellValue = Array.isArray(value) ? value.join(', ') : value;
+  const cellValue = Array.isArray(value) ? JSON.stringify(value) : value;
   return quoteCsvCell(cellValue);
 };
 
@@ -365,7 +365,7 @@ const readQuestionDataForCsv = (networkQuestions: unknown, questionId: string): 
 
 const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string =>
   ['multichoice', 'quadratic'].includes(String(questionData.type)) && Array.isArray(questionData.options)
-    ? questionData.options.join(';')
+    ? JSON.stringify(questionData.options)
     : '';
 
 export const buildSurveyResultsQuestionsCsvExport = (
@@ -374,7 +374,7 @@ export const buildSurveyResultsQuestionsCsvExport = (
   const header = '"questionID","prompt","type","tags","options","voiceCredits"\n';
   const csvRows = filteredQuestions.map((question) => {
     const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
-    const options = Array.isArray(question?.options) ? question.options.join(';') : '';
+    const options = Array.isArray(question?.options) ? JSON.stringify(question.options) : '';
     return [
       quoteCsvCell(question?.id),
       quoteCsvCell(question?.prompt),
