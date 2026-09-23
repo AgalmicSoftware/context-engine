@@ -16,9 +16,11 @@ per-axis changes are recorded as `Custom`.
 
 | Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
 | --- | --- | --- | --- | --- |
-| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, `worker_canonical` authority, and `worker_envelope` encryption by default | Cloudflare API token and one AI-provider key | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
+| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, `worker_canonical` authority, and `worker_envelope` encryption by default | Cloudflare account sign-in through the native deploy flow; an AI-provider key for enabled AI features | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
 | Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Wallet transaction, gas, RPC access, Arweave JWK, and one AI-provider key | Required; Lit credentials are required only when Lit encryption is selected |
 | Company-Operated | Planned; not generally available | Intended organizational IAM, key-release/KMS, storage, AI gateway, networking, and observability adapters | To be defined by the operator's environment | Not required by the architecture; an entirely off-chain deployment is a target, while a private EVM could only be an optional future adapter |
+
+The advanced deploy helper or CLI path uses a Cloudflare API token; the native Hosted deployment flow uses Cloudflare account sign-in.
 
 Creators need deployment credentials only while provisioning infrastructure.
 Participants joining or using an existing session never need the creator's
