@@ -119,7 +119,12 @@ it('keeps loaded members visible while a focus refresh is pending', async () => 
   const { result } = renderHook(() => useWorkerGroupResultsFilter(input));
   await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
   let finish: (value: WorkerGroupMemberPage) => void = () => {};
-  members.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  members.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
   act(() => window.dispatchEvent(new Event('focus')));
   await waitFor(() => expect(members).toHaveBeenCalledTimes(2));
   expect(result.current.cohort.status).toBe('ready');

@@ -1020,9 +1020,15 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it('refuses to copy or show a kickoff for an unsupported Worker catalog', async () => {
-    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({
-      type: 'context-engine.interview-question-catalog', version: 1, sessionSlug: 'demo', prefillPromptVersion: 'ce-interview-brief-v9',
-    }) } as Response);
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'context-engine.interview-question-catalog',
+        version: 1,
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v9',
+      }),
+    } as Response);
     try {
       render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
@@ -1030,13 +1036,21 @@ describe('SessionVoiceModeModal', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('ask the organizer');
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE)));
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
-    } finally { fetchMock.mockRestore(); }
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 
   it('keeps the copied memory prompt collapsed and confirms clipboard success with a checkmark', async () => {
-    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({
-      type: 'context-engine.interview-question-catalog', version: 1, sessionSlug: 'demo', prefillPromptVersion: 'ce-interview-brief-v4',
-    }) } as Response);
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'context-engine.interview-question-catalog',
+        version: 1,
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v4',
+      }),
+    } as Response);
     render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
 
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
@@ -1124,9 +1138,15 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it('keeps only bounded source and auto-join query state in the copied kickoff return URL', async () => {
-    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({
-      type: 'context-engine.interview-question-catalog', version: 1, sessionSlug: 'demo', prefillPromptVersion: 'ce-interview-brief-v5',
-    }) } as Response);
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'context-engine.interview-question-catalog',
+        version: 1,
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v5',
+      }),
+    } as Response);
     const priorUrl = window.location.href;
     try {
       window.history.replaceState(

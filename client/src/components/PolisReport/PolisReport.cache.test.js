@@ -183,13 +183,25 @@ describe('PolisReport cache read options', () => {
   });
 
   it('plots two participants without calling UMAP with an impossible neighbor count', () => {
-    const points = [{ x: -1, y: 0, index: 0 }, { x: 1, y: 0, index: 1 }];
+    const points = [
+      { x: -1, y: 0, index: 0 },
+      { x: 1, y: 0, index: 1 },
+    ];
     computePolisConversationMath.mockReturnValue({
-      stats: { nParticipants: 2, nComments: 1, totalVotes: 2 }, participantCoords: points,
-      statementCoords: [], commentStats: [], clusterAssignments: [0, 0], clusterCount: 1, repQuestions: { 0: [] },
+      stats: { nParticipants: 2, nComments: 1, totalVotes: 2 },
+      participantCoords: points,
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0, 0],
+      clusterCount: 1,
+      repQuestions: { 0: [] },
     });
-    const questionResponses = { seedQuestion: [seededQuestionResponses.seedQuestion[0],
-      { ...seededQuestionResponses.seedQuestion[0], responder: '0xsecond' }] };
+    const questionResponses = {
+      seedQuestion: [
+        seededQuestionResponses.seedQuestion[0],
+        { ...seededQuestionResponses.seedQuestion[0], responder: '0xsecond' },
+      ],
+    };
     render(<PolisReport {...baseReportProps} slug="small-cohort" questionResponses={questionResponses} />);
     expect(doUMAP).not.toHaveBeenCalled();
     expect(screen.queryByText('(Not enough participant data to plot.)')).not.toBeInTheDocument();
@@ -198,8 +210,12 @@ describe('PolisReport cache read options', () => {
   it('keeps an opened cluster expanded when response data refreshes', () => {
     const math = {
       stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },
-      participantCoords: [{ x: 0, y: 0, index: 0 }], statementCoords: [], commentStats: [],
-      clusterAssignments: [0], clusterCount: 1, repQuestions: { 0: [] },
+      participantCoords: [{ x: 0, y: 0, index: 0 }],
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0],
+      clusterCount: 1,
+      repQuestions: { 0: [] },
     };
     computePolisConversationMath.mockReturnValue(math);
     const props = { ...baseReportProps, slug: 'refresh-cohort', questionResponses: seededQuestionResponses };

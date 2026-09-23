@@ -34,24 +34,33 @@ export default function SessionInterviewMemoryKickoffCard({
     validatedKickoff.current = '';
     setValidationError('');
     setChecking(false);
-    return () => { activeKickoff.current = ''; };
+    return () => {
+      activeKickoff.current = '';
+    };
   }, [kickoff]);
   const runWhenCompatible = (action: () => void) => {
-    if (validatedKickoff.current === kickoff) { action(); return; }
+    if (validatedKickoff.current === kickoff) {
+      action();
+      return;
+    }
     if (inFlight.current) return;
     inFlight.current = true;
     setChecking(true);
     setValidationError('');
-    void validateKickoff().then(() => {
-      if (activeKickoff.current !== kickoff) return;
-      validatedKickoff.current = kickoff;
-      action();
-    }).catch((error: unknown) => {
-      if (activeKickoff.current === kickoff) setValidationError(error instanceof Error ? error.message : 'Could not check the session. Try again.');
-    }).finally(() => {
-      inFlight.current = false;
-      if (activeKickoff.current === kickoff) setChecking(false);
-    });
+    void validateKickoff()
+      .then(() => {
+        if (activeKickoff.current !== kickoff) return;
+        validatedKickoff.current = kickoff;
+        action();
+      })
+      .catch((error: unknown) => {
+        if (activeKickoff.current === kickoff)
+          setValidationError(error instanceof Error ? error.message : 'Could not check the session. Try again.');
+      })
+      .finally(() => {
+        inFlight.current = false;
+        if (activeKickoff.current === kickoff) setChecking(false);
+      });
   };
   return (
     <div
@@ -96,7 +105,7 @@ export default function SessionInterviewMemoryKickoffCard({
           <button
             type="button"
             className={styles.sessionAgentKickoffToggle}
-            onClick={() => showAgentPrompt ? onTogglePrompt() : runWhenCompatible(onTogglePrompt)}
+            onClick={() => (showAgentPrompt ? onTogglePrompt() : runWhenCompatible(onTogglePrompt))}
             aria-expanded={showAgentPrompt}
             aria-controls="ce-session-interview-agent-prompt"
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}

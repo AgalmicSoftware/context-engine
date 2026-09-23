@@ -34,15 +34,28 @@ describe('workerCanonicalResponseHydration', () => {
     const listPage = jest.fn(async ({ cursor }: any) => {
       const start = Number(cursor || 0);
       return {
-        items: Array.from({ length: 100 }, (_, i) => ({ storageRef: { id: `ref-${start + i}` }, metadata: { responder: 'participant' } })),
-        cursor: String(start + 100), listComplete: start + 100 >= 12000,
+        items: Array.from({ length: 100 }, (_, i) => ({
+          storageRef: { id: `ref-${start + i}` },
+          metadata: { responder: 'participant' },
+        })),
+        cursor: String(start + 100),
+        listComplete: start + 100 >= 12000,
       };
     });
     const rows = await loadWorkerResponses(
       { sessionSlug: 'demo-sh', sessionConfig: workerConfig, onPartial },
-      { listSessionStorageRefsPage: listPage, readSessionStorageBlob: async () => new Response(JSON.stringify({
-        sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionId: 'q1', answer: { value: 'answer' },
-      })) },
+      {
+        listSessionStorageRefsPage: listPage,
+        readSessionStorageBlob: async () =>
+          new Response(
+            JSON.stringify({
+              sessionSlug: 'demo-sh',
+              sessionId: SESSION_ID,
+              questionId: 'q1',
+              answer: { value: 'answer' },
+            }),
+          ),
+      },
     );
     expect(rows).toHaveLength(10000);
     expect(onPartial).toHaveBeenCalledTimes(1);

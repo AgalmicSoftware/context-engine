@@ -889,7 +889,9 @@ function SessionInterviewPanel({
           {kickoff && !hasImportedExternalPrefill ? (
             <SessionInterviewMemoryKickoffCard
               kickoff={kickoff}
-              validateKickoff={() => verifyInterviewKickoffCatalog({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })}
+              validateKickoff={() =>
+                verifyInterviewKickoffCatalog({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })
+              }
               promptCopied={promptCopied}
               showAgentPrompt={showAgentPrompt}
               onCopyPrompt={() => {

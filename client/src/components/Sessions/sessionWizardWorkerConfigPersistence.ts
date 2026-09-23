@@ -452,11 +452,12 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
         if (finalizePublication || attempt === delays.length) throw error;
         configMatches = false;
       }
-      if (configMatches) return {
-        workerOrigin,
-        configRevision: finalizePublication ? revision : '',
-        publicConfig: verifiedPublicConfig,
-      };
+      if (configMatches)
+        return {
+          workerOrigin,
+          configRevision: finalizePublication ? revision : '',
+          publicConfig: verifiedPublicConfig,
+        };
     }
 
     if (attempt < delays.length) {

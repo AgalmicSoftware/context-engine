@@ -12,28 +12,47 @@ const response = (status, body) => ({ status, ok: status === 200, json: async ()
 afterEach(() => jest.restoreAllMocks());
 
 it('verifies, edits, verifies again, then publishes through real Worker mutation and public projection', async () => {
-  jest.spyOn(globalThis, 'setTimeout').mockImplementation((callback) => { queueMicrotask(callback); return 0; });
+  jest.spyOn(globalThis, 'setTimeout').mockImplementation((callback) => {
+    queueMicrotask(callback);
+    return 0;
+  });
   let stored = {};
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   const config = {
-    sessionName: 'Round trip', sessionInfo: 'First description',
-    appearance: { colorSchemeId: 'amber' }, allowOrigins: ['https://client.example.test'],
-    sessionModeProfile: profile, storageProfile: profile.storage, limits: {}, scopes: {},
+    sessionName: 'Round trip',
+    sessionInfo: 'First description',
+    appearance: { colorSchemeId: 'amber' },
+    allowOrigins: ['https://client.example.test'],
+    sessionModeProfile: profile,
+    storageProfile: profile.storage,
+    limits: {},
+    scopes: {},
   };
   const fetchImpl = async (_url, init) => {
     if (init?.method === 'POST') {
       const body = JSON.parse(init.body);
-      const result = applySessionConfigMutation({ existingConfig: stored,
-        mutation: { kind: 'set-config', incomingConfig: body.config }, slug: 'round-trip' });
+      const result = applySessionConfigMutation({
+        existingConfig: stored,
+        mutation: { kind: 'set-config', incomingConfig: body.config },
+        slug: 'round-trip',
+      });
       if (!result.ok) return response(result.status, { error: result.error });
       stored = result.config;
       return response(200, { ok: true });
     }
     return response(200, { config: projectPublicWorkerSessionConfig(stored) });
   };
-  const input = { workerUrl, adminAddress, sessionId, slug: 'round-trip', config, fetchImpl,
+  const input = {
+    workerUrl,
+    adminAddress,
+    sessionId,
+    slug: 'round-trip',
+    config,
+    fetchImpl,
     signAdminAction: async () => ({ address: adminAddress }),
-    browserOrigin: 'https://client.example.test', isWorkerCanonical: true };
+    browserOrigin: 'https://client.example.test',
+    isWorkerCanonical: true,
+  };
   const first = await verifySessionWizardWorkerPublicDeployment(input);
   expect(first.publicConfig.appearance).toEqual(config.appearance);
   expect(stored.authzEpoch).toBe(1);

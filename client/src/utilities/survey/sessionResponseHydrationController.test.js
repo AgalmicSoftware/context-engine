@@ -310,15 +310,27 @@ describe('createSessionResponseHydrationController', () => {
 
   it('publishes partial data with a scoped warning and without complete readiness', async () => {
     const sessionConfig = createWorkerCanonicalSessionConfig({ slug: 'demo-sh' });
-    const host = createMockHost({ chainId: null, getSessionCfg: () => sessionConfig,
+    const host = createMockHost({
+      chainId: null,
+      getSessionCfg: () => sessionConfig,
       loadWorkerResponses: async ({ onPartial }) => {
         onPartial();
-        return [{ questionId: QUESTION_ID_A, responder: RESPONDER_LOWER, response: { answer: { value: true } }, storageRefId: 'partial-ref', timestamp: 1 }];
+        return [
+          {
+            questionId: QUESTION_ID_A,
+            responder: RESPONDER_LOWER,
+            response: { answer: { value: true } },
+            storageRefId: 'partial-ref',
+            timestamp: 1,
+          },
+        ];
       },
     });
     const controller = createSessionResponseHydrationController(host);
     await controller.fetchQuestionResponsesChunkedForGroup('demo-sh');
-    expect(host.getStored('questionsCache', 'demo-sh').worker.questionResponses[QUESTION_ID_A][RESPONDER_LOWER].answer.value).toBe(true);
+    expect(
+      host.getStored('questionsCache', 'demo-sh').worker.questionResponses[QUESTION_ID_A][RESPONDER_LOWER].answer.value,
+    ).toBe(true);
     expect(host.getStateSnapshot()).toMatchObject({ isResponsesCacheReady: false, questionResponsesNonce: 1 });
     expect(Object.values(host.getStateSnapshot().partialWorkerResponseRuns)).toEqual([true]);
     host.loadWorkerResponses = async () => [];

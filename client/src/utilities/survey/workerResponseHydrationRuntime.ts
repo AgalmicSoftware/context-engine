@@ -126,7 +126,9 @@ export const hydrateWorkerCanonicalResponses = async ({
     sessionSlug,
     sessionConfig,
     cachedStorageRefIds,
-    onPartial: () => { partial = true; },
+    onPartial: () => {
+      partial = true;
+    },
   });
   if (shouldStop()) return;
 

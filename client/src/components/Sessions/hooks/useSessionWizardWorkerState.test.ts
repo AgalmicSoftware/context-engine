@@ -119,11 +119,14 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.workerSecrets.litApiBase).toBe('https://lit.example');
   });
 
-  it.each(['https://custom.example\nhttps://second.example', ''])('restores cached origins %j after remount', (origins) => {
-    const cachedWizard = buildSessionWizardCacheWritePayload({ workerAllowOrigins: origins });
-    const { result } = renderWorkerState({ cachedWizard });
-    expect(result.current.workerAllowOrigins).toBe(origins);
-  });
+  it.each(['https://custom.example\nhttps://second.example', ''])(
+    'restores cached origins %j after remount',
+    (origins) => {
+      const cachedWizard = buildSessionWizardCacheWritePayload({ workerAllowOrigins: origins });
+      const { result } = renderWorkerState({ cachedWizard });
+      expect(result.current.workerAllowOrigins).toBe(origins);
+    },
+  );
 
   it('uses upload bundle mode when no hosted worker bundle default exists', () => {
     const { result } = renderWorkerState({

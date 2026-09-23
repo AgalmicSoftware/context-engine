@@ -115,7 +115,12 @@ export const scopeInterviewPrefillToQuestions = (
   };
 };
 
-export const verifyInterviewKickoffCatalog = async ({ workerUrl, sessionSlug, sessionUrl, fetchImpl = globalThis.fetch }: {
+export const verifyInterviewKickoffCatalog = async ({
+  workerUrl,
+  sessionSlug,
+  sessionUrl,
+  fetchImpl = globalThis.fetch,
+}: {
   workerUrl: string;
   sessionSlug: string;
   sessionUrl: string;
@@ -128,7 +133,11 @@ export const verifyInterviewKickoffCatalog = async ({ workerUrl, sessionSlug, se
   const timer = setTimeout(() => controller.abort(), 10_000);
   let catalog: Record<string, unknown>;
   try {
-    const response = await fetchImpl(url.toString(), { cache: 'no-store', credentials: 'omit', signal: controller.signal });
+    const response = await fetchImpl(url.toString(), {
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: controller.signal,
+    });
     if (!response.ok) throw new Error('Catalog unavailable');
     catalog = await response.json();
   } catch {
@@ -136,8 +145,15 @@ export const verifyInterviewKickoffCatalog = async ({ workerUrl, sessionSlug, se
   } finally {
     clearTimeout(timer);
   }
-  if (!catalog || catalog.type !== 'context-engine.interview-question-catalog' || catalog.version !== 1 ||
-      catalog.sessionSlug !== sessionSlug || !['ce-interview-brief-v4', 'ce-interview-brief-v5'].includes(String(catalog.prefillPromptVersion))) {
-    throw new Error('This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.');
+  if (
+    !catalog ||
+    catalog.type !== 'context-engine.interview-question-catalog' ||
+    catalog.version !== 1 ||
+    catalog.sessionSlug !== sessionSlug ||
+    !['ce-interview-brief-v4', 'ce-interview-brief-v5'].includes(String(catalog.prefillPromptVersion))
+  ) {
+    throw new Error(
+      'This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.',
+    );
   }
 };

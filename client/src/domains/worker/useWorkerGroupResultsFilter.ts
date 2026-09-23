@@ -107,8 +107,12 @@ export function useWorkerGroupResultsFilter({
         groups: [] as WorkerGroup[],
       };
     // Match during render as well as effects: a new account/filter must never see the old cohort.
-    if (snapshot?.key === key && snapshot.provider === provider &&
-        (snapshot.revision === revision || snapshot.cohort.status === 'ready')) return snapshot;
+    if (
+      snapshot?.key === key &&
+      snapshot.provider === provider &&
+      (snapshot.revision === revision || snapshot.cohort.status === 'ready')
+    )
+      return snapshot;
     return {
       cohort: {
         active,

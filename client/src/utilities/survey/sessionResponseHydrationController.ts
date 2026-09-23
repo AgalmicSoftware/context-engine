@@ -658,7 +658,10 @@ export const createSessionResponseHydrationController = (
         markLoading: () => setResponseState({ isResponsesCacheReady: false }),
         markReady: (partial = false) => {
           setState((prev) => ({
-            partialWorkerResponseRuns: { ...(prev.partialWorkerResponseRuns as Record<string, boolean> || {}), [workerRun.key]: partial },
+            partialWorkerResponseRuns: {
+              ...((prev.partialWorkerResponseRuns as Record<string, boolean>) || {}),
+              [workerRun.key]: partial,
+            },
           }));
           setResponseState((prev) => ({
             isResponsesCacheReady: !partial,

@@ -208,18 +208,21 @@ describe('surveyResultsExportPlans', () => {
 
   it('round-trips punctuation inside option names and selected answers', () => {
     const options = ['Alpha; Beta', 'Comma, option', 'A "quote"', 'Line\nbreak'];
-    const readCells = (csv: string) => Array.from(csv.matchAll(/"((?:[^"]|"")*)"(?:,|\n|$)/g),
-      (match) => match[1].replace(/""/g, '"'));
+    const readCells = (csv: string) =>
+      Array.from(csv.matchAll(/"((?:[^"]|"")*)"(?:,|\n|$)/g), (match) => match[1].replace(/""/g, '"'));
     const questionsCsv = buildSurveyResultsQuestionsCsvExport([{ id: 'q1', type: 'multichoice', options }]);
     expect(JSON.parse(readCells(questionsCsv)[10])).toEqual(options);
     for (const individuals of [false, true]) {
       const response = { questionID: 'q1', answer: { value: options } };
       const csv = buildSurveyResultsResponsesCsvExport({
         networkQuestions: { q1: { type: 'multichoice', options } },
-        ...(individuals ? {
-          viewMode: 'survey', surveyViewMode: 'individuals',
-          filteredResponses: [{ responder: '0x111', response: { responses: [response] } }],
-        } : { aggregatorQuestionResponses: { q1: [{ responder: '0x111', response }] } }),
+        ...(individuals
+          ? {
+              viewMode: 'survey',
+              surveyViewMode: 'individuals',
+              filteredResponses: [{ responder: '0x111', response: { responses: [response] } }],
+            }
+          : { aggregatorQuestionResponses: { q1: [{ responder: '0x111', response }] } }),
       });
       const cells = readCells(csv);
       expect(JSON.parse(cells[individuals ? 4 : 3])).toEqual(options);
