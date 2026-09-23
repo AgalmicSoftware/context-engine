@@ -12,7 +12,7 @@ type SessionInterviewMemoryKickoffCardProps = {
   validateKickoff: () => Promise<void>;
   promptCopied: boolean;
   showAgentPrompt: boolean;
-  onCopyPrompt: () => void;
+  onCopyPrompt: () => Promise<void>;
   onTogglePrompt: () => void;
 };
 
@@ -24,49 +24,52 @@ export default function SessionInterviewMemoryKickoffCard({
   onCopyPrompt,
   onTogglePrompt,
 }: SessionInterviewMemoryKickoffCardProps) {
-  const [validationError, setValidationError] = useState('');
-  const [checking, setChecking] = useState(false);
-  const validatedKickoff = useRef('');
+  const [attempt, setAttempt] = useState(0);
+  const [validation, setValidation] = useState({ kickoff: '', pending: true, error: '' });
+  const [copyError, setCopyError] = useState('');
+  const validateRef = useRef(validateKickoff);
+  validateRef.current = validateKickoff;
   const activeKickoff = useRef(kickoff);
-  const inFlight = useRef(false);
+  activeKickoff.current = kickoff;
   useEffect(() => {
-    activeKickoff.current = kickoff;
-    validatedKickoff.current = '';
-    setValidationError('');
-    setChecking(false);
-    return () => {
-      activeKickoff.current = '';
-    };
-  }, [kickoff]);
-  const runWhenCompatible = (action: () => void) => {
-    if (validatedKickoff.current === kickoff) {
-      action();
-      return;
-    }
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setChecking(true);
-    setValidationError('');
-    void validateKickoff()
+    let active = true;
+    setValidation({ kickoff, pending: true, error: '' });
+    setCopyError('');
+    void validateRef
+      .current()
       .then(() => {
-        if (activeKickoff.current !== kickoff) return;
-        validatedKickoff.current = kickoff;
-        action();
+        if (active) setValidation({ kickoff, pending: false, error: '' });
       })
       .catch((error: unknown) => {
-        if (activeKickoff.current === kickoff)
-          setValidationError(error instanceof Error ? error.message : 'Could not check the session. Try again.');
-      })
-      .finally(() => {
-        inFlight.current = false;
-        if (activeKickoff.current === kickoff) setChecking(false);
+        if (active)
+          setValidation({
+            kickoff,
+            pending: false,
+            error: error instanceof Error ? error.message : 'Could not check the session. Try again.',
+          });
       });
+    return () => {
+      active = false;
+    };
+  }, [kickoff, attempt]);
+  const checking = validation.kickoff !== kickoff || validation.pending;
+  const validationError = validation.kickoff === kickoff ? validation.error : '';
+  const compatible = !checking && !validationError;
+  const copyPrompt = () => {
+    if (!compatible) return;
+    setCopyError('');
+    // Safari requires writeText to begin in the tap stack; never await a catalog fetch here.
+    void onCopyPrompt().catch(() => {
+      if (activeKickoff.current !== kickoff) return;
+      setCopyError('Could not copy to the clipboard. Copy the prompt below by hand.');
+      if (!showAgentPrompt) onTogglePrompt();
+    });
   };
   return (
     <div
       className={styles.sessionAgentKickoff}
       onClick={(event) => {
-        if (!shouldIgnorePromptCopyEvent(event.target)) runWhenCompatible(onCopyPrompt);
+        if (!shouldIgnorePromptCopyEvent(event.target)) copyPrompt();
       }}
     >
       <div className={styles.sessionAgentKickoffRow}>
@@ -76,14 +79,15 @@ export default function SessionInterviewMemoryKickoffCard({
           className={`${styles.sessionAgentKickoffCopyTarget} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
           onClick={(event) => {
             event.stopPropagation();
-            runWhenCompatible(onCopyPrompt);
+            copyPrompt();
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              runWhenCompatible(onCopyPrompt);
+              copyPrompt();
             }
           }}
+          aria-disabled={!compatible}
           aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
           title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
           data-ce-control-appearance="frameless"
@@ -105,8 +109,10 @@ export default function SessionInterviewMemoryKickoffCard({
           <button
             type="button"
             className={styles.sessionAgentKickoffToggle}
-            onClick={() => (showAgentPrompt ? onTogglePrompt() : runWhenCompatible(onTogglePrompt))}
-            aria-expanded={showAgentPrompt}
+            onClick={() => {
+              if (showAgentPrompt || compatible) onTogglePrompt();
+            }}
+            aria-expanded={showAgentPrompt && compatible}
             aria-controls="ce-session-interview-agent-prompt"
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
           >
@@ -121,8 +127,16 @@ export default function SessionInterviewMemoryKickoffCard({
         </div>
       </div>
       {checking ? <div role="status">Checking session compatibility…</div> : null}
-      {validationError ? <div role="alert">{validationError}</div> : null}
-      {showAgentPrompt ? (
+      {validationError ? (
+        <div role="alert">
+          {validationError}{' '}
+          <button type="button" onClick={() => setAttempt((value) => value + 1)}>
+            Retry
+          </button>
+        </div>
+      ) : null}
+      {copyError ? <div role="alert">{copyError}</div> : null}
+      {showAgentPrompt && compatible ? (
         <div
           id="ce-session-interview-agent-prompt"
           className={styles.sessionAgentKickoffPrompt}

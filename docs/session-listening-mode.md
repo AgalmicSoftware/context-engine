@@ -223,6 +223,12 @@ platform/model provenance choice.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
+The external prompt checks the session's interview catalog when it appears and
+when the session changes. Wait for the compatibility check before copying; a
+failed check offers Retry. Copy starts directly from the tap, including on
+Safari. If clipboard access fails or is unavailable, the page shows an error
+and reveals the prompt for manual copying.
+
 Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
 to augment interview** footer card beneath the microphone when the interview has
 not already been opened from a ChatGPT or Claude prefill packet. Clicking its

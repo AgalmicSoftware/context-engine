@@ -714,15 +714,12 @@ function SessionInterviewPanel({
   ]);
 
   const copyAgentPrompt = async () => {
-    if (!kickoff || !navigator.clipboard?.writeText) return;
-    try {
-      await navigator.clipboard.writeText(kickoff);
-      setPromptCopied(true);
-      if (copyResetRef.current) clearTimeout(copyResetRef.current);
-      copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
-    } catch {
-      setPromptCopied(false);
-    }
+    setPromptCopied(false);
+    if (!kickoff || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(kickoff);
+    setPromptCopied(true);
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
   };
 
   const sessionUrl = buildInterviewReturnSessionUrl();
@@ -918,9 +915,7 @@ function SessionInterviewPanel({
               }
               promptCopied={promptCopied}
               showAgentPrompt={showAgentPrompt}
-              onCopyPrompt={() => {
-                void copyAgentPrompt();
-              }}
+              onCopyPrompt={copyAgentPrompt}
               onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
             />
           ) : null}

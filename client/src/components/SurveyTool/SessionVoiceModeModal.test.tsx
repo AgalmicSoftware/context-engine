@@ -123,7 +123,18 @@ const editReadableDraftText = async (label: string, value: string) => {
 
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      ),
+    );
     jest
       .mocked(useInterviewReadiness)
       .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
@@ -1150,6 +1161,75 @@ describe('SessionVoiceModeModal', () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
+  it('validates on mount and writes in the first click stack after validation', async () => {
+    let resolveCatalog: (response: Response) => void = () => {};
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCatalog = resolve;
+        }),
+    );
+    try {
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      expect(fetchMock).toHaveBeenCalled();
+      expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+      const copy = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+      fireEvent.click(copy);
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      await act(async () =>
+        resolveCatalog(
+          new Response(
+            JSON.stringify({
+              type: 'context-engine.interview-question-catalog',
+              version: 1,
+              sessionSlug: 'demo',
+              prefillPromptVersion: 'ce-interview-brief-v4',
+            }),
+          ),
+        ),
+      );
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      let inClick = false;
+      jest.mocked(navigator.clipboard.writeText).mockImplementation(() => {
+        expect(inClick).toBe(true);
+        return Promise.resolve();
+      });
+      inClick = true;
+      fireEvent.click(copy);
+      expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+      inClick = false;
+      await screen.findByRole('button', { name: 'Memory augmentation prompt copied' });
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it.each(['rejected', 'unavailable'])('reveals a manual prompt when clipboard is %s', async (failure) => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      ),
+    );
+    if (failure === 'rejected')
+      jest.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('NotAllowedError'));
+    else Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    try {
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      await act(async () => {});
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Copy the prompt below by hand');
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Memory augmentation prompt copied' })).not.toBeInTheDocument();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it('refuses to copy or show a kickoff for an unsupported Worker catalog', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
@@ -1162,6 +1242,7 @@ describe('SessionVoiceModeModal', () => {
     } as Response);
     try {
       render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
       expect(screen.getByRole('alert')).toHaveTextContent('ask the organizer');
@@ -1170,6 +1251,52 @@ describe('SessionVoiceModeModal', () => {
     } finally {
       fetchMock.mockRestore();
     }
+  });
+
+  it('retries a failed compatibility check and rechecks when the session changes', async () => {
+    const catalog = (slug: string) =>
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: slug,
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      );
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(catalog('demo'));
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).toHaveAttribute(
+        'aria-disabled',
+        'false',
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toBeVisible();
+    let resolveCatalog: (response: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCatalog = resolve;
+        }),
+    );
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" sessionSlug="next" />);
+    expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    await act(async () => resolveCatalog(catalog('next')));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    await act(async () => {});
   });
 
   it('keeps the copied memory prompt collapsed and confirms clipboard success with a checkmark', async () => {
@@ -1202,6 +1329,7 @@ describe('SessionVoiceModeModal', () => {
     expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
+    await waitFor(() => expect(screen.queryByText('Checking session compatibility…')).not.toBeInTheDocument());
     await act(async () => fireEvent.click(copyButton));
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
@@ -1287,6 +1415,7 @@ describe('SessionVoiceModeModal', () => {
       );
       render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
 
+      await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
 
       await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
