@@ -179,9 +179,12 @@ async function main() {
     await page.reload();
     assert.equal(await banner.count(), 0);
     assert.equal(joins, 1);
-    // A pending invitation survives client navigation and a refresh away from
-    // the session, and still joins its original group after login.
+    // A fresh copy of the link remembers cancellation until explicit Join.
     await page.goto(link);
+    await banner.getByRole('button', { name: /^Join / }).waitFor();
+    assert.equal(joins, 1);
+    await banner.getByRole('button', { name: /^Join / }).click();
+    // The re-enabled invitation survives navigation and refresh before login.
     await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     await page.getByRole('link', { name: 'Navigate away before signing in' }).click();
     await page.reload();

@@ -53,6 +53,7 @@ describe('WorkerGroupAutoJoin', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     sessionStorage.clear();
+    localStorage.clear();
     bootstrap.mockReset().mockResolvedValue({
       config,
       sessionId,
@@ -222,6 +223,50 @@ describe('WorkerGroupAutoJoin', () => {
     await tick();
     expect(joins()).toHaveLength(0);
     expect(readPendingAutoJoin()).toBeNull();
+  });
+
+  it('remembers cancellation across a new visit until an explicit Join', async () => {
+    getToken.mockImplementationOnce(() => new Promise(() => {}));
+    const { unmount } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    unmount();
+    window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026&mode=interview');
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(getToken).toHaveBeenCalledTimes(1);
+    expect(joins()).toHaveLength(0);
+    expect(window.location.search).toBe('?mode=interview');
+    fireEvent.click(screen.getByRole('button', { name: /Join participants-2026/ }));
+    await flush();
+    expect(joins()).toHaveLength(1);
+    expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+  });
+
+  it('keeps cancellation scoped to the account on a fresh visit', async () => {
+    getToken.mockImplementationOnce(() => new Promise(() => {}));
+    const { unmount } = render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    unmount();
+    window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026');
+    render(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
+    await flush();
+    expect(joins()).toHaveLength(1);
+  });
+
+  it('keeps a pre-login cancellation through sign-in and a later signed-in visit', async () => {
+    const { rerender, unmount } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    rerender(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    unmount();
+    window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026');
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(joins()).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /Join participants-2026/ })).toBeInTheDocument();
   });
 
   it('recognizes existing members without posting another join', async () => {

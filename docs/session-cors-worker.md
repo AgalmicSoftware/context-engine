@@ -1146,6 +1146,14 @@ remain authoritative; failures expose an explicit Retry action. Success or
 cancellation clears the saved invitation and removes its matching `joinGroup`
 parameter without disturbing other URL parameters. Account changes invalidate
 pending authentication; failures retain the invitation for explicit retry.
+Cancel is remembered in this browser for the account, Worker/session, and Group,
+with no expiry. Following the same link again (including the bare EDDY entry)
+shows an explicit **Join** action instead of joining automatically; the interview
+redirect still works. An explicit Join in the notice, Group page, or interview
+recommendations clears that preference. Cancellation never leaves an existing
+membership. Before sign-in the cancellation is stored for the signed-out visitor;
+when that invitation’s visitor signs in, it is assigned to that account.
+A changed canonical session identity does not inherit another session's choice.
 No credentials are saved with an invitation. Browser storage restrictions can
 limit persistence to the current page.
 
