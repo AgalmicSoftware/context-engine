@@ -253,3 +253,7 @@ JSON value equality, while the form accepts equivalent numeric strings.
 Closing an unsubmitted interview review through its close button, backdrop, or
 Escape asks before discarding the transcript, prefill, and review edits. Choosing
 “Keep reviewing” retains them in memory; no transcript is persisted for reload.
+
+Quadratic comment-only responses do not count as invalid allocations. An explicit
+all-zero allocation counts as an allocation; encrypted or invalid vote vectors
+remain excluded from the allocation summary.
