@@ -1,3 +1,4 @@
+import { normalizeRatingScale } from './ratingValue.js';
 import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 /**
  * @file compareUsers.js
@@ -103,6 +104,8 @@ interface EncodedStances {
 
 interface CompassAxis {
   id: 'x' | 'y';
+  negativeLabel?: string;
+  positiveLabel?: string;
   label: string;
   description: string;
 }
@@ -630,11 +633,23 @@ export function sanitizeCompass(bundle: unknown, addressesInOrder: unknown[] = [
     {
       id: 'x',
       label: String(axX?.label || 'Axis 1'),
+      ...(typeof axX.negativeLabel === 'string' && axX.negativeLabel.trim()
+        ? { negativeLabel: axX.negativeLabel.trim().slice(0, 80) }
+        : {}),
+      ...(typeof axX.positiveLabel === 'string' && axX.positiveLabel.trim()
+        ? { positiveLabel: axX.positiveLabel.trim().slice(0, 80) }
+        : {}),
       description: String(axX?.description || 'First principal direction of encoded opinions.'),
     },
     {
       id: 'y',
       label: String(axY?.label || 'Axis 2'),
+      ...(typeof axY.negativeLabel === 'string' && axY.negativeLabel.trim()
+        ? { negativeLabel: axY.negativeLabel.trim().slice(0, 80) }
+        : {}),
+      ...(typeof axY.positiveLabel === 'string' && axY.positiveLabel.trim()
+        ? { positiveLabel: axY.positiveLabel.trim().slice(0, 80) }
+        : {}),
       description: String(axY?.description || 'Second principal direction of encoded opinions.'),
     },
   ];
@@ -984,7 +999,9 @@ export function buildUsersFromCaches(
         type: String(qData.type || objRecord.type || 'unknown'),
         prompt: String(qData.prompt || objRecord.prompt || 'Unknown Question'),
         answer: ans,
-        ...(qData.type === 'quadratic' ? { options: qData.options, voiceCredits: getVoiceCredits(qData) } : {}),
+        ...(Array.isArray(qData.options) ? { options: qData.options } : {}),
+        ...(qData.type === 'rating' ? { scale: normalizeRatingScale(qData) } : {}),
+        ...(qData.type === 'quadratic' ? { voiceCredits: getVoiceCredits(qData) } : {}),
         importance: extractImportance(obj),
         additionalComment: extractAdditionalComment(obj) || undefined,
       });
@@ -1023,7 +1040,9 @@ export function buildUsersFromCaches(
           type: String(qData.type || r.type || 'unknown'),
           prompt: String(qData.prompt || r.prompt || 'Unknown Question'),
           answer: val,
-          ...(qData.type === 'quadratic' ? { options: qData.options, voiceCredits: getVoiceCredits(qData) } : {}),
+          ...(Array.isArray(qData.options) ? { options: qData.options } : {}),
+          ...(qData.type === 'rating' ? { scale: normalizeRatingScale(qData) } : {}),
+          ...(qData.type === 'quadratic' ? { voiceCredits: getVoiceCredits(qData) } : {}),
           importance: extractImportance(r),
           additionalComment: extractAdditionalComment(r) || undefined,
         });

@@ -549,6 +549,7 @@ describe('aiClient worker auth options', () => {
         completion: JSON.stringify({
           agreements: ['A'],
           disagreements: ['D'],
+          generation: { model: 'invented', source: 'reported' },
         }),
       }),
     });
@@ -558,6 +559,7 @@ describe('aiClient worker auth options', () => {
       sessionSlug: 'general3',
     });
 
+    expect(out.generation).toEqual({ model: 'gpt-4o-mini', provider: 'openai', source: 'requested' });
     expect(out).toEqual(
       expect.objectContaining({
         agreements: expect.any(Array),

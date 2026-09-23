@@ -638,3 +638,17 @@ it('retains quadratic option labels and budgets when preparing comparison analys
   );
   expect(users[0].questions[0]).toMatchObject({ options: ['Parks', 'Transit'], voiceCredits: 25, answer: [3, -4] });
 });
+
+test('preserves generated axis endpoints without inventing missing labels', () => {
+  const result = sanitizeCompass({
+    axes: [
+      { id: 'x', label: 'AI role', negativeLabel: ' Assist people ', positiveLabel: 'Delegate decisions' },
+      { id: 'y', label: 'Participation' },
+    ],
+    points: [],
+  });
+  expect(result.axes[0]).toEqual(
+    expect.objectContaining({ negativeLabel: 'Assist people', positiveLabel: 'Delegate decisions' }),
+  );
+  expect(result.axes[1].negativeLabel).toBeUndefined();
+});

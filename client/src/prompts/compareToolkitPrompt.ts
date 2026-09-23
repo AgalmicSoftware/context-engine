@@ -19,30 +19,34 @@ OUTPUT CONTRACTS — return STRICT JSON ONLY depending on "task":
 
 1) task="compare"
 {
-  "agreements": ["<=140 chars each, neutral, drill-down-ready"],
-  "disagreements": ["<=140 chars each, neutral, drill-down-ready"]
+  "agreements": ["short natural-language paragraph"],
+  "disagreements": ["short natural-language paragraph"]
 }
 Rules for "compare":
 - Use **overlaps in SBTs** and **similar answer patterns** for agreements.
 - Use **divergent answers**, tags, or **distinct SBTs** for disagreements.
 - Consider **created content** signals ("questionsCreated", "surveysCreated", "createdCounts") as proxies for topical focus.
 - Use **neutral**, non-identifying language (no identity/PII speculation).
-- Keep bullets **≤ 140 chars** and **drill-down-ready** with a clear semantic anchor (topic/prompt/tag/SBT).
+- Write concise natural-language paragraphs explaining similarities and differences. Refer to participants as A, B, C in input order, not wallet addresses.
+- Explain direction and relative emphasis intuitively. Do not list vote counts, positive/negative/net totals, question IDs, or statistical jargon in the summary.
+- Ground every statement in visible evidence. Missing or encrypted answers are not disagreement. Do not overstate limited evidence.
 - Optimized for **2–10** participants; degrade gracefully outside that range.
-- Return up to **12** items per side; omit low-signal or redundant points.
+- Return 1–3 short paragraphs per side; omit low-signal or redundant points.
 
 2) task="axes" (Compass 2D)
 {
   "axes": [
-    {"id":"x","label":"<2–4 words>","description":"<1 sentence>"},
-    {"id":"y","label":"<2–4 words>","description":"<1 sentence>"}
+    {"id":"x","label":"<2–4 words>","description":"<1 sentence>","negativeLabel":"<negative end: 2–4 words>","positiveLabel":"<positive end: 2–4 words>"},
+    {"id":"y","label":"<2–4 words>","description":"<1 sentence>","negativeLabel":"<negative end: 2–4 words>","positiveLabel":"<positive end: 2–4 words>"}
   ],
   "points": [{"address":"0x..","x":-1.0,"y":0.41}, ...],
   "evidence": { "x": ["<=5 short bullets"], "y": ["<=5 short bullets"] }
 }
 Rules for "axes":
 - Axes must be derived ONLY from USERS (answer patterns, optional importance/comments, SBT topical proxies, created content).
-- Labels are neutral (2–4 words); descriptions are one sentence.
+- Labels are neutral (2–4 words); descriptions explain the evidence and what each direction means.
+- negativeLabel describes -1; positiveLabel describes +1. Use meaningful endpoints, never Axis 1/2 or generic Low/High. Do not force unrelated preferences into an artificial opposition.
+- Locations must match the stated directions. These are interpretations, not measured agreement scores.
 - Points: include every input user by "address"; clamp x,y to [-1,1].
 
 3) task="venn" (3 participants; explain numbers + hover/ARIA evidence)

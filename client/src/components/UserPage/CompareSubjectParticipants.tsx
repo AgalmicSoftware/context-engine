@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import styles from './UserPage.module.scss';
+import { ParticipantMarker, participantLetter } from './ComparePresentation';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -45,17 +46,17 @@ const CompareSubjectParticipants = ({
             ? `${user.subjectKind || 'subject'} · ${provenanceSession}`
             : `${user.subjectKind || 'subject'} · active session cache`;
       const profileHref = String(user?.profileHref || '').trim();
-      const avatar = String(user?.avatar || '').trim();
       return (
         <div
           key={subjectToken || index}
           className={styles.resultBadge}
           role="listitem"
           aria-label={`${label}, ${provenanceLabel}`}
-          style={{ alignItems: 'center', display: 'inline-flex', gap: 6 }}
+          style={{ alignItems: 'center', display: 'inline-flex', gap: 6, maxWidth: '100%', whiteSpace: 'normal' }}
         >
-          {avatar ? <img src={avatar} alt="" aria-hidden="true" width={20} height={20} /> : null}
-          <span>
+          <ParticipantMarker index={index} />
+          <strong>{participantLetter(index)}</strong>
+          <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             {label} <span className={styles.pillAddress}>({provenanceLabel})</span>
           </span>
           {profileHref && (

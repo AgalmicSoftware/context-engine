@@ -1,0 +1,298 @@
+.presentation {
+  color: var(--ce-panel-text);
+  font-size: 1rem;
+  line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  h3 {
+    font-size: 1.25rem;
+    margin: 0 0 0.75rem;
+    color: inherit;
+  }
+  h4 {
+    font-size: 1.05rem;
+    margin: 0.25rem 0 1rem;
+    color: inherit;
+  }
+  p {
+    margin: 0 0 1rem;
+  }
+  button,
+  summary {
+    cursor: pointer;
+  }
+  button:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+}
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2rem;
+  padding: 1.5rem 0;
+}
+.narrative,
+.graphSection {
+  min-width: 0;
+}
+.narrative section + section {
+  margin-top: 1.75rem;
+}
+.provenance,
+.exploreHint {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.875rem;
+}
+.graphHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.axisBadge {
+  font-size: 0.75rem;
+  border: 1px solid var(--ce-panel-text-muted);
+  border-radius: var(--ce-radius-pill);
+  padding: 0.1rem 0.5rem;
+}
+.map {
+  width: 100%;
+  min-width: 0;
+}
+.mapTop,
+.mapBottom {
+  text-align: center;
+  font-size: 0.875rem;
+  padding-left: 1.5rem;
+}
+.mapMiddle {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  align-items: center;
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+}
+.yAxis {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  font-size: 0.875rem;
+}
+.xAxis {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4rem;
+  align-items: start;
+  font-size: 0.875rem;
+  margin: 0.65rem 0 1rem 1.5rem;
+  text-align: center;
+  span:first-child {
+    text-align: left;
+  }
+  span:last-child {
+    text-align: right;
+  }
+}
+.gridLine {
+  stroke: var(--ce-panel-text);
+  stroke-opacity: 0.18;
+  stroke-width: 1;
+}
+.axisLine {
+  stroke: var(--ce-panel-text);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+}
+.pointLabel {
+  fill: var(--ce-panel-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+.axisDetails {
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  summary {
+    text-align: right;
+    min-height: 44px;
+    color: var(--ce-panel-text);
+    text-decoration: underline;
+  }
+}
+.marker {
+  font-size: 1.25rem;
+}
+:global(:root) .presentation .explore {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  padding: 1rem;
+  min-height: 64px;
+  border: var(--ce-border-control-width) solid;
+  border-color: var(--ce-border-raised);
+  border-radius: var(--ce-radius-10);
+  background: var(--ce-control-face);
+  color: var(--ce-panel-text);
+  box-shadow: var(--ce-shadow-raised);
+  font-size: 1rem;
+  margin: 0;
+  .exploreHint {
+    display: block;
+    font-weight: 400;
+  }
+  > span:last-child {
+    font-size: 1.5rem;
+  }
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+:global(:root) .presentation .filters button {
+  border-radius: var(--ce-radius-pill);
+  min-height: 44px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.95rem;
+  background: var(--ce-control-face);
+  color: var(--ce-panel-text);
+  border: var(--ce-border-control-width) solid;
+  border-color: var(--ce-border-raised);
+  margin: 0;
+  &[aria-pressed='true'] {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 1px;
+    font-weight: 700;
+  }
+}
+.question {
+  border-top: 1px solid var(--ce-panel-text-muted);
+  padding: 1.25rem 0;
+}
+.questionType {
+  font-size: 0.8rem;
+  color: var(--ce-panel-text-muted);
+}
+.answerPair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+.answerCell {
+  display: flex;
+  gap: 0.65rem;
+  align-items: baseline;
+  min-width: 0;
+  blockquote {
+    font-size: 1rem;
+    white-space: pre-wrap;
+    margin: 0;
+  }
+}
+.answerIdentity {
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+.answerPill {
+  border: 1px solid var(--ce-panel-text-muted);
+  border-radius: var(--ce-radius-pill);
+  padding: 0.15rem 0.7rem;
+}
+.tableScroll {
+  overflow-x: auto;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--ce-panel-text-muted);
+    font-weight: 400;
+  }
+}
+.voteOption {
+  margin-bottom: 1rem;
+}
+.voteRow {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 3rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+.voteTrack {
+  height: 1rem;
+  position: relative;
+}
+.voteZero {
+  position: absolute;
+  left: 50%;
+  height: 100%;
+  border-left: 1px solid var(--ce-panel-text);
+}
+.voteBar {
+  position: absolute;
+  top: 15%;
+  height: 70%;
+}
+.comment {
+  margin-top: 0.75rem !important;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+@media (max-width: 800px) {
+  .overview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .graphSection {
+    border-top: 1px solid var(--ce-panel-text-muted);
+    padding-top: 1.25rem;
+  }
+}
+
+.ratingEndpoints {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+.ratingTrack {
+  position: relative;
+  border-top: 1px solid var(--ce-panel-text-muted);
+  margin: 0 0.6rem;
+}
+.ratingPoint {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.resultShell {
+  margin-top: 1rem;
+  border-top: 1px solid var(--ce-panel-text-muted);
+  padding-top: 1rem;
+}
+.participantControls {
+  margin-bottom: 1rem;
+  summary {
+    min-height: 44px;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    color: var(--ce-panel-text);
+  }
+}

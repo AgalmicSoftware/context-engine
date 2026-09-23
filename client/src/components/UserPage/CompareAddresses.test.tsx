@@ -313,6 +313,19 @@ describe('CompareAddresses subject routes', () => {
         : [],
     );
 
+  it('labels malformed AI results as local fallbacks, not model output', async () => {
+    seedWorkerAnswers();
+    mockRunCompareToolkit.mockImplementation(async () => ({ generation: { model: 'example', source: 'reported' } }));
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug="alpha" sessionCachesReady />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Local comparison · AI summary unavailable')).toBeVisible();
+    expect(await screen.findByText('Statistical axes')).toBeVisible();
+    expect(screen.queryByText('Model: example')).not.toBeInTheDocument();
+  });
+
   it('compares Hosted answers and reruns the same participants when the session changes', async () => {
     seedWorkerAnswers();
     const view = (session: string) => (
@@ -386,6 +399,7 @@ describe('CompareAddresses subject routes', () => {
     await waitFor(() =>
       expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'alpha' })),
     );
+    fireEvent.click(screen.getByText('Change participants'));
     expect(screen.getAllByRole('button', { name: 'Clear this subject' })).toHaveLength(2);
     fireEvent.click(screen.getAllByRole('button', { name: 'Clear this subject' })[0]);
     expect(screen.getByRole('textbox', { name: 'Comparison subject 1' })).toHaveValue('');
@@ -424,14 +438,13 @@ describe('CompareAddresses subject routes', () => {
       });
       expect(screen.getByTestId('ce-compare-run')).toHaveTextContent('2s');
       expect(screen.getByText(/Loading chart/)).toHaveTextContent('2s');
-      expect(screen.getAllByText(/Loading\.\.\./)).toHaveLength(2);
-      screen.getAllByText(/Loading\.\.\./).forEach((node) => expect(node).toHaveTextContent('2s'));
+      expect(screen.getByText(/Loading summary/)).toHaveTextContent('2s');
       await act(async () => {
         jest.advanceTimersByTime(28000);
       });
       rerender(view(true));
       expect(screen.getByRole('button', { name: 'Retry loading session data' })).toBeEnabled();
-      expect(screen.getByText(/No agreements found/)).not.toBeVisible();
+      expect(screen.getByText(/No clear similarities/)).not.toBeVisible();
       expect(screen.getByText(/no shared canonical question IDs/)).not.toBeVisible();
       expect(mockRunCompareToolkit).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'Retry loading session data' }));

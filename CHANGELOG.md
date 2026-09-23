@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client fixes — available when the site deploys
 
+- Show comparison summaries and clearly labelled perspective maps together, with
+  model attribution and expandable comparisons for each answer type.
+
 - Keep session-scoped profile groups on the selected session, distinguish private memberships from empty results, and place theme and color-blind controls together when space allows.
 
 - Keep profile comparisons in the selected session, load Hosted answers without waiting for chain membership, verify the session configuration on a fresh visit, and show elapsed seconds and Retry when session data cannot load. Restore compact participant pills and comparison styling in both themes.

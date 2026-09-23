@@ -151,20 +151,3 @@ const COMPARE_COMPASS_SERIES_COLORS = Object.freeze([
 
 export const resolveCompareCompassSeriesColor = (index: number): string =>
   COMPARE_COMPASS_SERIES_COLORS[index % COMPARE_COMPASS_SERIES_COLORS.length];
-
-export const buildCompareCompassQuadrants = ({
-  cx,
-  cy,
-  height,
-  width,
-}: {
-  cx: number;
-  cy: number;
-  height: number;
-  width: number;
-}) => [
-  { x: cx, y: cy, width: width - cx, height: height - cy, intensity: 4 },
-  { x: 0, y: cy, width: cx, height: height - cy, intensity: 4 },
-  { x: 0, y: 0, width: cx, height: cy, intensity: 5 },
-  { x: cx, y: 0, width: width - cx, height: cy, intensity: 5 },
-];

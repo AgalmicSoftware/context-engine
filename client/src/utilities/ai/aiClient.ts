@@ -647,7 +647,37 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
   };
 
   if (isE2eAiMockEnabled()) {
-    if (t === 'compare') return buildE2eMockCompareBullets(safeUsers);
+    const generation = { model: 'Preview', provider: 'mock', source: 'mock' };
+    if (t === 'compare')
+      return {
+        ...buildE2eMockCompareBullets(),
+        generation,
+      };
+    if (t === 'axes')
+      return {
+        axes: [
+          {
+            id: 'x',
+            label: 'AI role',
+            negativeLabel: 'Assist people',
+            positiveLabel: 'Delegate decisions',
+            description: 'Illustrative preview axis, not an analysis of these participants.',
+          },
+          {
+            id: 'y',
+            label: 'Participation',
+            negativeLabel: 'Privacy first',
+            positiveLabel: 'Transparency first',
+            description: 'Illustrative preview axis, not an analysis of these participants.',
+          },
+        ],
+        points: safeUsers.map((user, index) => ({
+          address: asRecord(user).address,
+          x: -0.6 + index * 0.04,
+          y: index % 2 ? 0.5 : -0.5,
+        })),
+        generation,
+      };
     return null;
   }
 
@@ -658,11 +688,12 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
 
   try {
     const prompt = buildCompareToolkitPrompt(envelope);
-    const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
-    const parsed = parseJsonFlexible(raw);
-
-    // Return parsed raw output; callers own deterministic fallbacks.
-    return parsed || null;
+    const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
+      callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
+    );
+    const parsed = asParsedJsonRecord(parseJsonFlexible(raw));
+    // Provenance comes from transport metadata, never from generated JSON.
+    return parsed ? { ...parsed, generation } : null;
   } catch (err) {
     aiLog.error('runCompareToolkit error:', err);
     return null;
