@@ -258,8 +258,9 @@ Escape asks before discarding the transcript, prefill, and review edits. Choosin
 “Keep reviewing” retains them in memory; no transcript is persisted for reload.
 
 Quadratic comment-only responses do not count as invalid allocations. An explicit
-all-zero allocation counts as an allocation; encrypted or invalid vote vectors
-remain excluded from the allocation summary.
+all-zero allocation counts as an allocation; undecrypted or invalid vote vectors
+remain excluded. Decrypted vectors count even when their stored encryption flag
+remains set.
 
 Cluster-summary caches include the filtered participant roster in assignment order, so summaries from a different subset are not reused merely because cluster counts match.
 
