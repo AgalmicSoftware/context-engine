@@ -36868,7 +36868,7 @@ var init_uploadSizeLimits = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, normalizeUploadPolicy, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -36904,6 +36904,7 @@ var init_storageRouteExecution = __esm({
       media: "docUploads",
       images: "docUploads"
     });
+    isStorageResource = (resource) => Object.hasOwn(DEFAULT_RESOURCE_GATES, trim6(resource) || "docsContext");
     bytesToBase64url3 = (bytes2) => {
       if (typeof Buffer !== "undefined") {
         return Buffer.from(bytes2).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -37690,6 +37691,9 @@ var init_storageRouteExecution = __esm({
       baseHeaders,
       deps
     }) => {
+      if (!isStorageResource(resource)) {
+        return { ok: false, response: responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders) };
+      }
       if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
         return {
           ok: false,
@@ -37699,6 +37703,29 @@ var init_storageRouteExecution = __esm({
           }, 403, baseHeaders)
         };
       }
+      const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
+      const sessionAccess = await authorizeCloudflareStorageGate(args);
+      if (!sessionAccess.ok || !metadata) return sessionAccess;
+      const groups = resolveGroupGateIds({ metadata, access: {} });
+      if (groups.length) {
+        const groupAccess = await authorizeWorkerGroupAccess({ ...args, groupIds: groups });
+        if (!groupAccess.ok) return groupAccess;
+      }
+      const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
+      if (!payloadConditions?.conditions?.length || JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
+      return authorizeCloudflareStorageGate({ ...args, metadata });
+    };
+    authorizeCloudflareStorageGate = async ({
+      env,
+      config,
+      slug,
+      resource,
+      requesterAddress,
+      authScopes,
+      metadata,
+      baseHeaders,
+      deps
+    }) => {
       const access = resolvePayloadAccessControl(config);
       const payloadConditions = resolvePayloadAccessConditions({ metadata, access });
       if (payloadConditions.document) {
@@ -38045,10 +38072,6 @@ var init_storageRouteExecution = __esm({
       if (canWriteR2 && !canUseR2Index) {
         return responseJson(deps, { error: "Cloudflare R2 storage requires an index KV binding." }, 501, baseHeaders);
       }
-      const uploadAccessMetadata = {
-        ...payload.accessConditions ? { accessConditions: payload.accessConditions } : {},
-        ...payload.groupIds?.length ? { groupIds: payload.groupIds } : {}
-      };
       const access = await authorizeCloudflareStorageAccess({
         env,
         config,
@@ -38057,7 +38080,7 @@ var init_storageRouteExecution = __esm({
         operation: "upload",
         requesterAddress: uploaderAddress,
         authScopes,
-        metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
+        metadata: null,
         baseHeaders,
         deps
       });
@@ -38403,6 +38426,7 @@ var init_storageRouteExecution = __esm({
       const listOptions = await readStorageListOptions({ request, url });
       if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
       const { cursor, limit, resource } = listOptions;
+      if (!isStorageResource(resource)) return responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders);
       const access = await authorizeCloudflareStorageAccess({
         env,
         config,
@@ -38456,7 +38480,7 @@ var init_storageRouteExecution = __esm({
           continue;
         }
         const storageRef = normalizeStorageRef(metadata || {});
-        if (!storageRef) continue;
+        if (!storageRef || storageRef.resource !== resource || name !== buildIndexKey({ slug, resource, id: storageRef.id })) continue;
         const itemAccess = await authorizeCloudflareStorageAccess({
           env,
           config,
@@ -38671,6 +38695,7 @@ var init_storageRouteExecution = __esm({
         const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
         if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || "Invalid storage upload payload." }, uploadPayload?.status || 400, baseHeaders);
         const payload = uploadPayload.payload || {};
+        if (!isStorageResource(payload.resource)) return responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders);
         const backend = resolveConfiguredStorageBackend({
           config,
           requestedBackend: payload.backend,

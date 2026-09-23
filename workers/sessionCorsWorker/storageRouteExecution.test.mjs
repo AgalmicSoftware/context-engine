@@ -276,7 +276,7 @@ test('storage upload policy parser preserves JSON/multipart group aliases throug
 					sessionId: WORKER_GROUP_SESSION_ID,
 					storageProfile: {
 						backend: 'cloudflare',
-						payloadAccessControl: { gate: 'group_gate', encryption: 'none' },
+						payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupIds: ['finance'] },
 					},
 				};
 				const common = {
@@ -2546,7 +2546,7 @@ test('storageRoute enforces worker group gates and group upload allowlists', asy
 		sessionId: WORKER_GROUP_SESSION_ID,
 		storageProfile: {
 			backend: 'cloudflare',
-			payloadAccessControl: { gate: 'group_gate', encryption: 'none' },
+			payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupIds: ['reviewers'] },
 		},
 	};
 	const deniedUpload = await storageRoute({
@@ -3970,4 +3970,53 @@ test('storageRoute enqueues automatic results analysis after response upload wit
 	assert.equal(enqueueArgs.job.committedResponses.length, 1);
 	assert.equal(enqueueArgs.job.committedResponses[0].metadata.responder, '0x0000000000000000000000000000000000000abc');
 	assert.equal(enqueueArgs.job.requestId.startsWith('auto-upload:'), true);
+});
+
+for (const gate of ['role_gate', 'group_gate']) {
+  test(`uploads cannot replace the session ${gate} with payload conditions`, async () => {
+    const env = { CE_STORAGE_INDEX_KV: createMockKv() };
+    const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: {
+      gate, encryption: 'none', role: 'reviewer', groupIds: ['restricted'],
+    } }, workerRoles: { reviewer: ['0x' + '22'.repeat(20)] } };
+    for (const extra of [{}, { accessConditions: { match: 'all', conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }] } }, { groupIds: ['other'] }]) {
+      const response = await storageRoute({
+        env, config, slug: 'session-a', path: '/storage/upload', method: 'POST',
+        uploaderAddress: '0x' + '11'.repeat(20), authScopes: { storage: true },
+        baseHeaders: {}, deps: { json, randomBytes: fixedRandomBytes },
+        request: new Request('https://worker.example/storage/upload', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: 'synthetic', resource: 'questions', ...extra }),
+        }),
+      });
+      assert.equal(response.status, 403);
+    }
+    assert.equal(env.CE_STORAGE_INDEX_KV.store.size, 0);
+  });
+}
+
+test('resource names cannot alias list prefixes or bypass response policy', async () => {
+  const kv = createMockKv();
+  const common = { env: { CE_STORAGE_INDEX_KV: kv }, slug: 'session-a',
+    config: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+    deps: { json, randomBytes: fixedRandomBytes }, baseHeaders: {},
+  };
+  for (const resource of ['questions:x', 'responses:x', '__proto__', 'unknown']) {
+    for (const encoding of ['json', 'multipart']) {
+      const response = await storageRoute({ ...common, path: '/storage/upload', method: 'POST',
+        request: createPolicyUploadRequest(encoding, { resource }),
+      });
+      assert.equal(response.status, 400);
+    }
+    const response = await storageRoute({ ...common, path: '/storage/list', method: 'GET',
+      request: new Request(`https://worker.example/storage/list?resource=${resource}`),
+    });
+    assert.equal(response.status, 400);
+  }
+  await kv.put(`ce-storage:session-a:questions:x:${CF_ID}`, JSON.stringify({
+    id: CF_ID, backend: 'cloudflare', resource: 'questions:x',
+  }));
+  const listed = await storageRoute({ ...common, path: '/storage/list', method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=questions'),
+  });
+  assert.deepEqual((await listed.json()).items, []);
 });

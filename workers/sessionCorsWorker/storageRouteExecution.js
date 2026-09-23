@@ -69,6 +69,8 @@ const DEFAULT_RESOURCE_GATES = Object.freeze({
   images: 'docUploads',
 });
 
+const isStorageResource = (resource) => Object.hasOwn(DEFAULT_RESOURCE_GATES, trim(resource) || 'docsContext');
+
 const bytesToBase64url = (bytes) => {
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -950,6 +952,9 @@ const authorizeCloudflareStorageAccess = async ({
   baseHeaders,
   deps,
 }) => {
+  if (!isStorageResource(resource)) {
+    return { ok: false, response: responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders) };
+  }
   if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
     return {
       ok: false,
@@ -959,6 +964,32 @@ const authorizeCloudflareStorageAccess = async ({
       }, 403, baseHeaders),
     };
   }
+  // Payload restrictions are additional to the session gate, never a replacement.
+  const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
+  const sessionAccess = await authorizeCloudflareStorageGate(args);
+  if (!sessionAccess.ok || !metadata) return sessionAccess;
+  const groups = resolveGroupGateIds({ metadata, access: {} });
+  if (groups.length) {
+    const groupAccess = await authorizeWorkerGroupAccess({ ...args, groupIds: groups });
+    if (!groupAccess.ok) return groupAccess;
+  }
+  const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
+  if (!payloadConditions?.conditions?.length ||
+      JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
+  return authorizeCloudflareStorageGate({ ...args, metadata });
+};
+
+const authorizeCloudflareStorageGate = async ({
+  env,
+  config,
+  slug,
+  resource,
+  requesterAddress,
+  authScopes,
+  metadata,
+  baseHeaders,
+  deps,
+}) => {
   const access = resolvePayloadAccessControl(config);
   const payloadConditions = resolvePayloadAccessConditions({ metadata, access });
   if (payloadConditions.document) {
@@ -1318,10 +1349,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
   }
-  const uploadAccessMetadata = {
-    ...(payload.accessConditions ? { accessConditions: payload.accessConditions } : {}),
-    ...(payload.groupIds?.length ? { groupIds: payload.groupIds } : {}),
-  };
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
@@ -1330,7 +1357,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     operation: 'upload',
     requesterAddress: uploaderAddress,
     authScopes,
-    metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
+    metadata: null,
     baseHeaders,
     deps,
   });
@@ -1697,6 +1724,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   const listOptions = await readStorageListOptions({ request, url });
   if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
   const { cursor, limit, resource } = listOptions;
+  if (!isStorageResource(resource)) return responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders);
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
@@ -1750,7 +1778,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       continue;
     }
     const storageRef = normalizeStorageRef(metadata || {});
-    if (!storageRef) continue;
+    if (!storageRef || storageRef.resource !== resource ||
+        name !== buildIndexKey({ slug, resource, id: storageRef.id })) continue;
     const itemAccess = await authorizeCloudflareStorageAccess({
       env,
       config,
@@ -1986,6 +2015,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
     if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || 'Invalid storage upload payload.' }, uploadPayload?.status || 400, baseHeaders);
     const payload = uploadPayload.payload || {};
+    if (!isStorageResource(payload.resource)) return responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders);
     const backend = resolveConfiguredStorageBackend({
       config,
       requestedBackend: payload.backend,

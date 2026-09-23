@@ -715,6 +715,12 @@ revalidated before KV persistence.
 
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
+Cloudflare uploads must pass the session's configured storage gate before any
+payload policy is considered. Payload conditions and groups can further restrict
+readers, but cannot replace or broaden that gate. Resource names are restricted
+to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
+`media`, and `images`; list rows must match the exact resource namespace.
+
 - Current pure Worker profiles use `gate: "role_gate"` with
   `encryption: "worker_envelope"` by default, or `encryption: "none"` when the
   creator explicitly disables encryption. They remain passkey/Worker-owned and
