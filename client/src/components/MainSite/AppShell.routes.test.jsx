@@ -1987,6 +1987,15 @@ describe('AppShell route render smoke', () => {
       sessionConfig: workerConfig,
     });
 
+    subject.state = {
+      ...subject.state,
+      isAllCachesReady: false,
+      isSBTCacheReady: false,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      isResponsesCacheReady: true,
+    };
+
     render(subject.render());
 
     expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
@@ -1994,6 +2003,7 @@ describe('AppShell route render smoke', () => {
       'worker-session',
     );
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'false');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-cache-ready', 'true');
   });
 
   it('retains on-chain profile enrichment for Worker sessions with an explicit SBT gate', async () => {

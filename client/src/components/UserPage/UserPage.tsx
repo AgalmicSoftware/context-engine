@@ -165,6 +165,7 @@ import {
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageComparePanel from './UserPageComparePanel';
+import { resolveCompareCachesReady } from './compareSessionRuntime';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
@@ -3735,10 +3736,12 @@ class UserPage extends Component<any, any> {
 
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
-            activeSessionSlug={this.props.activeSessionSlug ?? this.props.sessionSlug ?? ''}
+            activeSessionSlug={this.props.sessionConfig?.slug || this.getActiveSessionSlug()}
             firstAddress={propViewAddress}
             account={account}
-            sessionCachesReady={this.props.isAllCachesReady}
+            sessionCachesReady={resolveCompareCachesReady(this.props)}
+            sessionCacheError={this.props.comparisonSessionError}
+            loadSessionData={this.props.loadComparisonSessionData}
             scanSpecificUserProfile={this.props.scanSpecificUserProfile}
           />
         </UserPageComparePanel>

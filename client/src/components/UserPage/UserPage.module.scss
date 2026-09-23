@@ -1798,3 +1798,106 @@ $icon-size-standard: 1.25rem;
   font-size: 0.85rem;
   margin-bottom: 12px;
 }
+
+// Preserve the comparison's pill treatment across the shared control recipes.
+:global(:root) .compareSection.compareSection {
+  color: var(--ce-panel-text);
+
+  > button {
+    background: var(--ce-comparison-action-bg);
+    color: var(--ce-comparison-action-text);
+    border: var(--ce-border-control-width) solid;
+    border-color: var(--ce-border-raised);
+    border-radius: var(--ce-radius-10);
+    box-shadow: var(--ce-shadow-raised);
+    min-height: 44px;
+    &:disabled {
+      opacity: 1;
+      filter: saturate(0.55);
+      cursor: progress;
+      transform: none;
+    }
+  }
+
+  .addressInput {
+    width: 100%;
+    max-width: 520px;
+  }
+  .addressInput input {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+    margin-right: 0;
+    color: var(--ce-panel-text);
+    background: var(--ce-input-bg);
+    border: var(--ce-border-control-width) solid;
+    border-color: var(--ce-border-inset);
+    border-radius: var(--ce-radius-10);
+    &::placeholder {
+      color: var(--ce-panel-text-muted);
+      opacity: 1;
+    }
+  }
+  .youPill,
+  .bookmarkPill,
+  .resultBadge {
+    border-radius: var(--ce-radius-pill);
+    color: var(--ce-panel-text);
+    border-color: var(--ce-border-raised);
+    background: color-mix(in srgb, var(--ce-panel-text) 12%, var(--ce-control-face));
+  }
+  .youPill {
+    min-height: 44px;
+    max-width: 100%;
+  }
+  .pillAddress {
+    opacity: 0.75;
+  }
+  .bookmarkPill {
+    padding: 6px 12px;
+    box-shadow: var(--ce-shadow-raised);
+  }
+  .bookmarkPill:hover {
+    background: color-mix(in srgb, var(--ce-panel-text) 20%, var(--ce-control-face));
+  }
+  .youPillClear {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    color: inherit;
+    width: 32px;
+    height: 32px;
+  }
+  .addAddressBtn {
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+    border: var(--ce-border-control-width) solid;
+    border-color: var(--ce-border-raised);
+    border-radius: var(--ce-radius-pill);
+    box-shadow: var(--ce-shadow-raised);
+    min-height: 36px;
+  }
+  .resultItem,
+  h5 {
+    color: var(--ce-panel-text);
+  }
+  .placeholderNote,
+  .resultEmpty {
+    color: var(--ce-panel-text-muted);
+  }
+  .comparisonError {
+    color: var(--ce-panel-text);
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+}
+
+@media (max-width: 600px) {
+  :global(:root) .compareSection.compareSection .comparisonResults {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -51,6 +51,11 @@ export const resolveCompareSessionSlug = ({
   pathname = '',
   search = '',
 }: ResolveCompareSessionSlugOptions = {}): string => {
+  // Comparison URLs carry the profile's session even if the global picker lags behind navigation.
+  if (/^\/compare(?:\/|$)/.test(String(pathname))) {
+    const query = new URLSearchParams(String(search || ''));
+    if (query.has('session')) return normalizeSessionSlug(query.get('session') || '');
+  }
   const explicit = normalizeSessionSlug(activeSessionSlug ?? '');
   if (explicit) return explicit;
 
@@ -63,6 +68,23 @@ export const resolveCompareSessionSlug = ({
 
   return normalizeSessionSlug(resolveSessionSlugFromPathname(pathname) || '');
 };
+
+export const resolveCompareCachesReady = ({
+  onChainProfileEnabled,
+  isAllCachesReady,
+  isQuestionCacheReady,
+  isSurveyCacheReady,
+  isResponsesCacheReady,
+}: {
+  onChainProfileEnabled?: boolean;
+  isAllCachesReady?: boolean;
+  isQuestionCacheReady?: boolean;
+  isSurveyCacheReady?: boolean;
+  isResponsesCacheReady?: boolean;
+}): boolean | undefined =>
+  onChainProfileEnabled === false
+    ? !!(isQuestionCacheReady && isSurveyCacheReady && isResponsesCacheReady)
+    : isAllCachesReady;
 
 export const selectCompareCacheValues = (
   entries: CompareCacheEntry[] = [],

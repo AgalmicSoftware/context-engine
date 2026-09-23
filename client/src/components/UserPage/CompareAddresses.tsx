@@ -75,6 +75,7 @@ import {
   type CompareBookmark,
 } from './compareMembershipPresentation';
 import CompareVenn from './CompareVenn';
+import { useCompareSessionData } from './useCompareSessionData';
 import CompareSubjectInputList from './CompareSubjectInputList';
 import CompareSubjectParticipants from './CompareSubjectParticipants';
 import {
@@ -281,6 +282,8 @@ interface CompareAddressProps {
   firstAddress?: string;
   account?: string;
   sessionCachesReady?: boolean;
+  sessionCacheError?: string;
+  loadSessionData?: () => Promise<unknown>;
   scanSpecificUserProfile?: (address: string) => Promise<unknown> | unknown;
 }
 
@@ -503,6 +506,8 @@ const CompareAddress = ({
   firstAddress,
   account,
   sessionCachesReady,
+  sessionCacheError,
+  loadSessionData,
   scanSpecificUserProfile,
 }: CompareAddressProps) => {
   const [compareAddresses, setCompareAddresses] = useState<string[]>([]);
@@ -541,6 +546,19 @@ const CompareAddress = ({
   const deepScanSeenRef = useRef<Set<string>>(new Set());
   const compareRunIdRef = useRef(0);
   const pendingComparisonRef = useRef<{ subjects: string[]; skipNavigate: boolean } | null>(null);
+  const waitForSessionData = useCompareSessionData({
+    sessionSlug: activeSessionSlug,
+    ready: sessionCachesReady,
+    error: sessionCacheError,
+    load: loadSessionData,
+  });
+  useEffect(
+    () => () => {
+      compareRunIdRef.current += 1;
+      pendingComparisonRef.current = null;
+    },
+    [activeSessionSlug],
+  );
 
   // Viz mode (Compass-first; Matrix is behind “More visuals”)
   const [vizMode, setVizMode] = useState<'summary' | 'compass' | 'venn' | 'matrix'>('compass');
@@ -575,7 +593,7 @@ const CompareAddress = ({
 
       // Auto-run when URL already has at least two canonical subjects.
       if (hasTwo) {
-        const key = routeSubjects.map((subject) => subject.key).join('&');
+        const key = `${activeSessionSlug}:${routeSubjects.map((subject) => subject.key).join('&')}`;
         if (key && key !== lastAutoKeyRef.current) {
           lastAutoKeyRef.current = key;
           runComparisonRef.current?.(pathSubjects, { skipNavigate: true });
@@ -585,7 +603,7 @@ const CompareAddress = ({
       setCompareAddresses([firstAddress || '', '']);
       setShowComparison(false);
     }
-  }, [firstAddress, location.pathname, location.search]);
+  }, [firstAddress, location.pathname, location.search, activeSessionSlug]);
 
   const isE2eAutofillDisabled = React.useCallback(() => {
     try {
@@ -752,6 +770,7 @@ const CompareAddress = ({
       return;
     }
 
+    lastAutoKeyRef.current = `${activeSessionSlug}:${subjects.map((subject) => subject.key).join('&')}`;
     if (!skipNavigate)
       navigate(
         buildCompareSubjectsRoutePath({
@@ -778,10 +797,21 @@ const CompareAddress = ({
     setDrillState({});
     setVizMode('compass');
 
-    if (sessionCachesReady === false && compareSubjectsNeedSessionCaches(subjects)) {
-      pendingComparisonRef.current = { subjects: subjectTokens, skipNavigate };
-      setComparisonError('');
-      return;
+    if (compareSubjectsNeedSessionCaches(subjects)) {
+      pendingComparisonRef.current = sessionCachesReady === false ? { subjects: subjectTokens, skipNavigate } : null;
+      try {
+        await waitForSessionData();
+      } catch (error) {
+        if (isStale()) return;
+        pendingComparisonRef.current = null;
+        setComparisonError(error instanceof Error ? error.message : 'Could not load session data. Please retry.');
+        setLoading(false);
+        setBulletsLoading(false);
+        setCompassLoading(false);
+        setVennLoading(false);
+        return;
+      }
+      if (isStale()) return;
     }
     pendingComparisonRef.current = null;
 
@@ -926,14 +956,6 @@ const CompareAddress = ({
   };
   runComparisonRef.current = runComparison;
 
-  useEffect(() => {
-    if (sessionCachesReady === false) return;
-    const pending = pendingComparisonRef.current;
-    if (!pending) return;
-    pendingComparisonRef.current = null;
-    void runComparisonRef.current?.(pending.subjects, { skipNavigate: pending.skipNavigate });
-  }, [sessionCachesReady]);
-
   // If user toggles “More visuals” after initial run and we don't have a matrix yet,
   // ask just for the matrix using the same users (avoid recomputing others).
   useEffect(() => {
@@ -1008,9 +1030,9 @@ const CompareAddress = ({
           .toLowerCase(),
       ) || '';
 
-    if (nickname) {
+    if (walletId) {
       const shortened = String(getShortenedAddress(walletId, false) || '').replace('...', '…');
-      const title = `${nickname} (${shortened})`;
+      const title = nickname ? `${nickname} (${shortened})` : shortened;
       const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
@@ -1024,7 +1046,7 @@ const CompareAddress = ({
               aria-hidden="true"
             />
             <span>
-              {nickname} <span className={styles.pillAddress}>({shortened})</span>
+              {nickname || shortened} {nickname && <span className={styles.pillAddress}>({shortened})</span>}
             </span>
           </span>
           <button
@@ -1046,6 +1068,7 @@ const CompareAddress = ({
           index === 0 ? E2E_TESTIDS.COMPARE_ADDRESS_A : index === 1 ? E2E_TESTIDS.COMPARE_ADDRESS_B : undefined
         }
         placeholder="wallet:0x…, worker:…, or sim:…"
+        aria-label={`Comparison subject ${index + 1}`}
         value={address}
         onChange={(e) => handleCompareAddressChange(index, e)}
       />
@@ -1695,6 +1718,11 @@ const CompareAddress = ({
       {comparisonError && (
         <div className={styles.comparisonError} role="alert" style={resolveCompareErrorStyle()}>
           {comparisonError}
+          {sessionCachesReady === false && (
+            <button type="button" className={styles.addAddressBtn} onClick={performComparison} disabled={loading}>
+              Retry loading session data
+            </button>
+          )}
         </div>
       )}
 
