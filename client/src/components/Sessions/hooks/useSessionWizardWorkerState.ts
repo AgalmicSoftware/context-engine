@@ -26,6 +26,7 @@ type CachedWorkerState =
       provisionedSponsoredContext?: unknown;
       workerSecrets?: unknown;
       draft?: unknown;
+      workerAllowOrigins?: unknown;
       workerLimitPerWallet?: unknown;
       workerLimitPerAnonymousIp?: unknown;
     }
@@ -129,7 +130,9 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     return sanitizeSessionWizardWorkerSecretsForLitMode(safePublicConfig);
   });
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
-  const [workerAllowOrigins, setWorkerAllowOrigins] = useState(defaultAllowedOrigins);
+  const [workerAllowOrigins, setWorkerAllowOrigins] = useState(() =>
+    typeof cachedWizard?.workerAllowOrigins === 'string' ? cachedWizard.workerAllowOrigins : defaultAllowedOrigins,
+  );
   const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState(() =>
     resolveCachedLimitValue({
       cachedWizard,

@@ -1117,3 +1117,5 @@ epoch from its comparison.
 
 Retrying queued Group creation compares canonical HTTPS image and document URLs,
 so a host-only URL and the same URL with a trailing slash reuse the saved Group.
+
+The wizard restores custom allowed origins from its tab-scoped draft after reload, including an explicitly empty field. Drafts without a saved origins field use the normal defaults.
