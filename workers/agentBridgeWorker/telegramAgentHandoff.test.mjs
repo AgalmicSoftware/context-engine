@@ -3487,6 +3487,8 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(remainingAnswers.accepted, 4);
   assert.equal(remainingAnswers.skipsRecorded, 1);
 
+  env.AGENT_BRIDGE_WRAPPED_POSTER_RENDERER = 'local';
+  env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY = 'synthetic-key';
   const wrappedMissingKeyResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
       method: 'POST',
@@ -3495,10 +3497,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
         mode: 'political_compass',
+        poster_renderer: 'openai',
         createdAt: '2026-06-12T15:08:00.000Z',
       },
     }),
     env,
+    fetchImpl: async () => { throw new Error('Caller cannot select a paid renderer'); },
   });
   const wrappedMissingKey = await jsonBody(wrappedMissingKeyResponse);
   assert.equal(wrappedMissingKeyResponse.status, 200);
@@ -3532,6 +3536,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     env,
   });
   assert.equal(votesResponse.status, 200);
+  env.AGENT_BRIDGE_WRAPPED_POSTER_RENDERER = 'openai';
   env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY = 'sk-bridge-openai';
   env.AGENT_BRIDGE_PUBLIC_URL = 'https://bridge.example';
   let openAiRequestForm = null;
