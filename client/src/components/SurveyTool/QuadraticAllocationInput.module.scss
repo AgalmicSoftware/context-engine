@@ -86,6 +86,10 @@
   flex-shrink: 0;
 }
 .moreOptions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   flex-shrink: 0;
   align-self: center;
   width: 64px;
