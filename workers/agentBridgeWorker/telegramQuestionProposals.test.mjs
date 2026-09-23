@@ -47,7 +47,7 @@ test('proposed question ids use compact ceq prefix for new records', async () =>
   });
 
   assert.equal(saved.ok, true);
-  assert.match(saved.questionId, /^ceq_[a-z0-9]{50}$/);
+  assert.match(saved.questionId, /^ceq_[a-z0-9]{10}$/);
   assert.equal(saved.question.questionId, saved.questionId);
   assert.equal(saved.record.questionId, saved.questionId);
   assert.equal(env.AGENT_ACTION_KV.store.has(`telegram:proposed-question:alpha:${saved.questionId}`), true);

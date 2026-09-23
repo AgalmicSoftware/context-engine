@@ -28,7 +28,6 @@ export function evaluateTelegramQuestionAuthoringPermission({
   groupBinding = null,
   privateBinding = null,
   requestedSessionSlug = '',
-  credentialAuthenticated = false,
 } = {}) {
   const mode = questionAuthoringPermissionMode(env, session);
   if (mode === 'disabled' || mode === 'off') {
@@ -68,10 +67,7 @@ export function evaluateTelegramQuestionAuthoringPermission({
     !privateBoundAuthoringDisabled;
 
   if (!effectiveGroupChatId) {
-    const allowPrivateParticipant = telegramOnlyPrivateParticipant || delegatedPrivateParticipant;
-    // Native private-chat participation remains available; delegated credentials
-    // must prove the configured group through their stored webhook binding.
-    if (allowPrivateParticipant && (!credentialAuthenticated || (!configuredGroups.size && !defaultGroupChatId))) {
+    if (telegramOnlyPrivateParticipant || delegatedPrivateParticipant) {
       return {
         ok: true,
         mode,

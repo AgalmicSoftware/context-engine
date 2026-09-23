@@ -1,20 +1,17 @@
-import { ethers } from 'ethers';
-import { stableJson } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
-const ACTION_ID_RE = /^ceab_[a-z0-9]{10,50}$/;
-const CALLBACK_ID_RE = /^cecb_[a-z0-9]{10,50}$/;
-const START_ID_RE = /^cetg_[a-z0-9]{10,50}$/;
+const ACTION_ID_RE = /^ceab_[a-z0-9]{10,48}$/;
+const CALLBACK_ID_RE = /^cecb_[a-z0-9]{10,48}$/;
+const START_ID_RE = /^cetg_[a-z0-9]{10,48}$/;
 
 function stableHash(seed = '') {
-  const digest = ethers.utils.sha256(ethers.utils.toUtf8Bytes(String(seed || 'agent-bridge-action')));
-  // Base36 preserves all 256 bits while keeping prefixed Telegram payloads under 64 bytes.
-  return BigInt(digest).toString(36).padStart(50, '0');
-}
-
-export function buildSubmitIdempotencyKey({ transport, principal, sessionSlug, questionId, answer }) {
-  const fingerprint = stableHash(stableJson({ questionId, answer }));
-  return `${transport}:${principal}:${sessionSlug}:${fingerprint}`;
+  let hash = 0x811c9dc5;
+  const input = String(seed || 'agent-bridge-action');
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36).padStart(10, '0');
 }
 
 function bytesToHex(bytes) {

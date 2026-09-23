@@ -81,6 +81,7 @@ const manualChunkGroups = [
       '/node_modules/@tanstack/query-persist-client-core/',
       '/node_modules/@tanstack/query-sync-storage-persister/',
       '/node_modules/@tanstack/react-query/',
+      '/node_modules/@tanstack/react-query-persist-client/',
       '/node_modules/hoist-non-react-statics/',
       '/node_modules/prop-types/',
       '/node_modules/react/',
@@ -206,6 +207,7 @@ const manualChunkGroups = [
 
 export const resolveManualChunk = (id) => {
   const normalizedId = String(id || '').split(path.sep).join('/');
+  if (normalizedId === '\0commonjsHelpers.js' || normalizedId === '\0vite/preload-helper') return 'vendor-runtime';
   // Keep synchronous demo question seeds cacheable without folding them back
   // into AppShell; full demo result fixtures remain owned by lazy consumers.
   if (normalizedId.includes('/src/variables/demo/demo_2_question_seed.json')) {

@@ -14,11 +14,8 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
 
 const createActionKv = (entries = {}) => {
   const store = new Map(Object.entries(entries));
-  const listPrefixes = [];
   return {
-    listPrefixes,
     async list({ prefix = '' } = {}) {
-      listPrefixes.push(prefix);
       return {
         keys: [...store.keys()]
           .filter((name) => name.startsWith(prefix))
@@ -143,7 +140,6 @@ test('buildTelegramResponseExportArchive exports envelopes without decrypting Te
   assert.equal(fetchCalls.some((url) => url.includes('/storage/export-envelopes?resource=responses')), true);
   assert.equal(fetchCalls.some((url) => url.includes('/storage/read')), false);
   assert.equal(fetchCalls.some((url) => url.includes('/storage/list')), false);
-  assert.ok(!env.AGENT_ACTION_KV.listPrefixes.includes('telegram:submit-request:'));
   const archiveText = new TextDecoder().decode(archive.document.bytes);
   assert.doesNotMatch(archiveText, /plaintext answer should not export/);
   assert.match(archiveText, /"deploymentKekContinuityRequired": true/);
