@@ -179,7 +179,7 @@ describe('SurveyResults data export controls', () => {
       'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits',
     );
     expect(lines[1]).toBe(
-      `"${RESPONDER_ONE}","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z",""`,
+      `"${RESPONDER_ONE}","q1","Question One","multichoice","[""Alpha"",""Beta"",""Gamma""]","7","[""Alpha"",""Gamma""]","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z",""`,
     );
     expect(lines[2]).toBe(
       `"${RESPONDER_TWO}","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z",""`,
@@ -237,10 +237,10 @@ describe('SurveyResults data export controls', () => {
       'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits',
     );
     expect(lines[1]).toBe(
-      `"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","${RESPONDER_ONE}","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z",""`,
+      `"q1","Aggregate Question","multichoice","[""Alpha"",""Beta"",""Gamma""]","${RESPONDER_ONE}","9","[""Alpha"",""Gamma""]","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z",""`,
     );
     expect(lines[2]).toBe(
-      `"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","${RESPONDER_TWO}","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z",""`,
+      `"q1","Aggregate Question","multichoice","[""Alpha"",""Beta"",""Gamma""]","${RESPONDER_TWO}","5","[""Beta""]","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z",""`,
     );
     expect(lines).toHaveLength(3);
   });
@@ -278,7 +278,7 @@ describe('SurveyResults data export controls', () => {
 
     const lines = csv.split('\n');
     expect(lines[1]).toBe(
-      `"q2","Fallback Question","multichoice","Yes;No","${RESPONDER_TWO}","4","Yes","","","false","","","2025-04-01T00:00:00.000Z",""`,
+      `"q2","Fallback Question","multichoice","[""Yes"",""No""]","${RESPONDER_TWO}","4","Yes","","","false","","","2025-04-01T00:00:00.000Z",""`,
     );
   });
 
@@ -318,9 +318,9 @@ describe('SurveyResults data export controls', () => {
       capture.restore();
 
       const [questionsCsv, responsesCsv] = await Promise.all(capture.blobs.map(readBlobText));
-      expect(questionsCsv.split('\n')[1]).toBe('"q1","Allocate support","quadratic","","Parks;Transit","25"');
+      expect(questionsCsv.split('\n')[1]).toBe('"q1","Allocate support","quadratic","","[""Parks"",""Transit""]","25"');
       expect(responsesCsv.split('\n')[1]).toBe(
-        `"q1","Allocate support","quadratic","Parks;Transit","${RESPONDER_ONE}","","3, -4","","","false","","","2025-04-01T00:00:00.000Z","25"`,
+        `"q1","Allocate support","quadratic","[""Parks"",""Transit""]","${RESPONDER_ONE}","","[3,-4]","","","false","","","2025-04-01T00:00:00.000Z","25"`,
       );
     } finally {
       capture.restore();
@@ -394,6 +394,7 @@ describe('SurveyResults data export controls', () => {
         id: 'Q1',
         prompt: 'Prompt One',
         type: 'multichoice',
+        singleSelect: false,
         tags: ['governance', 'ai'],
         options: ['Alpha', 'Beta'],
       },
