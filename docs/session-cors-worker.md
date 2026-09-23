@@ -2189,8 +2189,8 @@ Signed login/bootstrap requests:
   - Returns only an inert JSON question catalog: `type`, `version`,
     `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
     `answerContract`, `researchCoverageContract`, and `questions`. Binary options,
-    the 0-10 rating range, and the additive self-reported research-coverage count
-    fields are explicit. It deliberately contains no agent instructions; the
+    the default 0–10 rating range, per-question scale overrides, and additive
+    self-reported research-coverage count fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.
   - Choice questions expose `singleSelect`: true allows one option; false (the
     default for multichoice) allows multiple options. Legacy `oneSelectionOnly`
@@ -2202,7 +2202,14 @@ Signed login/bootstrap requests:
   - `ce-interview-brief-v5` hashes include selection mode. Previously generated
     v1–v4 links remain readable using their original catalog hash format, while
     their draft answers are validated against the current question settings.
-    Deploy both client and Worker changes before generating v5 prefills.
+    The client clipboard request negotiates v4 or v5 catalogs, validates type,
+    schema version and session slug, and copies the advertised prompt version
+    and hash unchanged. V4 choice drafts use one exact option string; an answer
+    requiring multiple selections is omitted with a limitation notice. V5 choice
+    drafts require boolean selection metadata. Older v1–v3 packets remain
+    importable but are not requested for new generation. Verify the served
+    client/Worker contracts during rollout; bundle publication alone does not
+    establish which version a deployed Worker serves.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     on-chain discovery requires configured block limits and is capped at a
@@ -2210,7 +2217,7 @@ Signed login/bootstrap requests:
   - Applies the session's anonymous rate-limit bucket before reading questions.
   - The compact client clipboard prompt tells ordinary ChatGPT/Claude to search only
     already-authorized history, memory, and connected sources directly related
-    to those questions. It rejects stale catalog versions, requests reviewable
+    to those questions. It rejects unsupported/mismatched catalogs, requests reviewable
     response drafts with per-answer confidence and basis, shows the exact JSON
     before encoding, asks for distinct searched/used chat, memory, source, and
     user-statement counts (`null` when a platform cannot expose a searched count),

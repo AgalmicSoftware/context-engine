@@ -69,6 +69,19 @@ The reverse can also happen: `changedFields` can list a field while `userEditedF
 
 The nested `predictionComparison` object repeats the top-level comparison snapshot in a versioned shape for downstream consumers. Treat it as the same observation represented in a second schema shape, not as a second independent measurement.
 
+For external imports, `promptVersion` records the catalog version used to make
+that packet, not the current frontend version. New requests negotiate v4 or v5;
+older v1–v5 imports keep their original fingerprints. V5 binds selection mode to
+the question hash; v4 does not and its generation contract allows only one
+choice string. A missing v4 draft may reflect an unrepresentable multiple-choice
+answer, not lack of evidence. Ratings follow each question's scale; importance
+and conviction remain separate 0–100 fields. See [the interview contract](session-listening-mode.md).
+
+Voice context can omit whole question/history/background/review rows to fit the
+realtime request limit. This does not truncate the full local transcript used
+for final mapping or turn the research record into a transcript export. It also
+does not make draft revisions a complete record of what the voice model saw.
+
 ## Redaction, Identifiers, and Visibility
 
 When answer text is encrypted, the research snapshot writes `{ "redacted": true, "reason": "encrypted_field" }` instead of plaintext answer text. When additional comments are encrypted, or when comments follow an encrypted answer rather than an explicit plaintext audience, the comment text is redacted too. Evidence/basis strings are removed whenever answer or comment text is redacted, because evidence can repeat or reveal the protected text.
@@ -85,7 +98,7 @@ The most direct read-only procedure for Cloudflare response storage is:
 2. For each returned `storageRef.id`, read the raw payload with `GET <session-worker>/storage/read?id=<storageRef.id>`. The browser storage client calls this through `readSessionStorageBlob()`.
 3. Parse the returned JSON. If the payload has a `responses` array, inspect `responses[].interviewProvenance` on each response entry. If the payload is a single response object, inspect its top-level `interviewProvenance`.
 
-Access depends on the session's storage and results policy. Some sessions allow anonymous reads for public results; others require the normal Worker bearer token acquired by the app's SIWE/passkey worker-login flow. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
+Access depends on the session's storage and results policy. Public-result sessions may allow anonymous reads. In nonpublic Worker-canonical sessions, authentication alone does not grant access to other participants' raw responses: ownership, current admin authority, or a dedicated delegated grant is required, and per-item conditions still apply. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
 
 The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Questions + Responses`, `JSON: Questions`, and `JSON: Questions + Responses`. The CSV response export intentionally flattens response rows to question id, prompt, type, options, responder address, importance, answer value/hash, additional value/hash, encryption flags, timestamp, and voice credits; it does not include `interviewProvenance`. The JSON questions-and-responses export includes the filtered response rows as held by the results view. Depending on the view and hydration path, each row's raw `response` can be an object or a JSON string; inspect and parse that nested `response` value, then check either `response.interviewProvenance` or `response.responses[].interviewProvenance`. For full-fidelity research review, use the raw storage read path above.
 
@@ -103,7 +116,7 @@ The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Qu
           "modelId": "gpt-example",
           "verification": "self_reported"
         },
-        "promptVersion": "ce-interview-brief-v4",
+        "promptVersion": "ce-interview-brief-v5",
         "questionSetHash": "8b7f...",
         "originalPrediction": {
           "answer": "I expect model evaluations to miss deployment risks.",
