@@ -75364,6 +75364,75 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
   };
 };
 
+// workers/sessionCorsWorker/authenticatedRoutePreflight.js
+var evaluateAuthenticatedRoutePreflight = async ({
+  scopes,
+  scope,
+  route,
+  allowWithoutScope = false,
+  config,
+  env,
+  slug,
+  address,
+  limit,
+  headers,
+  deps
+} = {}) => {
+  let tokenHasScope = scopes?.[scope] === true;
+  if (!tokenHasScope && !allowWithoutScope) {
+    return {
+      ok: false,
+      tokenHasScope,
+      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
+    };
+  }
+  let currentScopes;
+  try {
+    currentScopes = await deps?.computeScopesForLogin?.({
+      env,
+      slug,
+      address,
+      config,
+      requestedScopes: [scope]
+    });
+  } catch {
+    currentScopes = null;
+  }
+  if (!currentScopes || typeof currentScopes !== "object" || Array.isArray(currentScopes)) {
+    return {
+      ok: false,
+      tokenHasScope: false,
+      response: deps?.json?.({ error: "Current authorization check failed." }, 403, headers)
+    };
+  }
+  tokenHasScope = tokenHasScope && currentScopes?.[scope] === true;
+  if (!tokenHasScope && !allowWithoutScope) {
+    return {
+      ok: false,
+      tokenHasScope,
+      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
+    };
+  }
+  const rateAllowed = await deps?.checkRateLimit?.({
+    env,
+    slug,
+    address,
+    limit,
+    route
+  });
+  if (!rateAllowed) {
+    return {
+      ok: false,
+      tokenHasScope,
+      response: deps?.json?.({ error: "Rate limit exceeded." }, 429, headers)
+    };
+  }
+  return {
+    ok: true,
+    tokenHasScope
+  };
+};
+
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
 var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
@@ -80527,8 +80596,31 @@ var createWorkerRouteShellWithWorkerDeps = ({
         if (hasAuth) {
           const auth = await deps?.requireAuth?.({ request: withQuerySlugHeader, env, baseHeaders: corsContext?.headers || routeBaseHeaders, slugHint: targetSlug });
           if (!auth?.ok) return auth?.response;
-          address = deps?.toStr?.(auth.payload?.sub || "")?.trim?.().toLowerCase?.() || "";
-          scopes = auth.scopes || auth.payload?.scopes || {};
+          const context = await resolveAuthenticatedRouteContext2({
+            request: withQuerySlugHeader,
+            env,
+            auth,
+            baseHeaders: corsContext?.headers || routeBaseHeaders,
+            deps: {
+              getSessionConfig: async () => config,
+              getCorsContext: deps?.getCorsContext,
+              json: deps?.json,
+              toStr: deps?.toStr,
+              SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
+            }
+          });
+          if (!context?.ok) return context?.response;
+          const evaluatePreflight = deps?.evaluateAuthenticatedRoutePreflight || evaluateAuthenticatedRoutePreflight;
+          const preflight = await evaluatePreflight({
+            ...context,
+            env,
+            route: "storage",
+            scope: context.scopes?.storage === true ? "storage" : "arweave",
+            deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json }
+          });
+          if (!preflight?.ok) return preflight?.response;
+          address = context.address;
+          scopes = context.scopes;
         }
         return await dispatchResultsAnalysisArtifactRequest2({
           request: withQuerySlugHeader,
@@ -80978,75 +81070,6 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
 // workers/sessionCorsWorker/workerRuntimeDepResolution.js
 init_aiRequestNormalization();
 
-// workers/sessionCorsWorker/authenticatedRoutePreflight.js
-var evaluateAuthenticatedRoutePreflight = async ({
-  scopes,
-  scope,
-  route,
-  allowWithoutScope = false,
-  config,
-  env,
-  slug,
-  address,
-  limit,
-  headers,
-  deps
-} = {}) => {
-  let tokenHasScope = scopes?.[scope] === true;
-  if (!tokenHasScope && !allowWithoutScope) {
-    return {
-      ok: false,
-      tokenHasScope,
-      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
-    };
-  }
-  let currentScopes;
-  try {
-    currentScopes = await deps?.computeScopesForLogin?.({
-      env,
-      slug,
-      address,
-      config,
-      requestedScopes: [scope]
-    });
-  } catch {
-    currentScopes = null;
-  }
-  if (!currentScopes || typeof currentScopes !== "object" || Array.isArray(currentScopes)) {
-    return {
-      ok: false,
-      tokenHasScope: false,
-      response: deps?.json?.({ error: "Current authorization check failed." }, 403, headers)
-    };
-  }
-  tokenHasScope = tokenHasScope && currentScopes?.[scope] === true;
-  if (!tokenHasScope && !allowWithoutScope) {
-    return {
-      ok: false,
-      tokenHasScope,
-      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
-    };
-  }
-  const rateAllowed = await deps?.checkRateLimit?.({
-    env,
-    slug,
-    address,
-    limit,
-    route
-  });
-  if (!rateAllowed) {
-    return {
-      ok: false,
-      tokenHasScope,
-      response: deps?.json?.({ error: "Rate limit exceeded." }, 429, headers)
-    };
-  }
-  return {
-    ok: true,
-    tokenHasScope
-  };
-};
-
 // workers/sessionCorsWorker/authenticatedRouteSecretsResolution.js
 var resolveAuthenticatedRouteSecrets = async ({
   env,
@@ -81089,10 +81112,9 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isAgentQuestionsRoute = path === "/api/agent/questions" && method === "GET";
-  const isResultsAnalysisArtifactRoute = path === "/results-analysis/artifact" && method === "GET";
   const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
   const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute && !isResultsAnalysisArtifactRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
   }
   if (isAgentQuestionsRoute && config?.sessionModeProfile?.surfaces?.agentHttp !== true) {
@@ -81109,7 +81131,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       response: endedResponse
     };
   }
-  const route = isTranscribeRoute ? "transcribe" : isStorageRoute || isAgentQuestionsRoute || isResultsAnalysisArtifactRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
+  const route = isTranscribeRoute ? "transcribe" : isStorageRoute || isAgentQuestionsRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
   const scope = route === "storage" && scopes?.storage !== true ? "arweave" : route;
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
@@ -81159,33 +81181,6 @@ var dispatchAuthenticatedSecretPathRoute = async ({
           options: question.options
         }))
       }, 200, responseHeaders)
-    };
-  }
-  if (isResultsAnalysisArtifactRoute) {
-    const dispatchResultsAnalysisArtifactRequest2 = deps?.dispatchResultsAnalysisArtifactRequest || dispatchResultsAnalysisArtifactRequest;
-    return {
-      handled: true,
-      response: await dispatchResultsAnalysisArtifactRequest2({
-        request,
-        env,
-        config,
-        slug,
-        address,
-        scopes,
-        headers,
-        deps: {
-          json: deps?.json,
-          authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
-          readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
-          readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
-          evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
-          readResourceGateOnChain: deps?.readResourceGateOnChain,
-          resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-          toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-          resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-          checkSbtGate: deps?.checkSbtGate
-        }
-      })
     };
   }
   if (isStorageRoute) {

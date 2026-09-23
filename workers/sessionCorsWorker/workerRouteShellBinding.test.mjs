@@ -821,3 +821,38 @@ test('request boundary preserves exact UTF-8 signature bytes and request metadat
   }), { CE_MAX_UPLOAD_BYTES: new TextEncoder().encode(body).byteLength });
   assert.equal(await response.text(), 'preserved');
 });
+
+test('artifact requests reject stale token epochs and require current storage scope', async () => {
+  let tokenEpoch = 1;
+  let currentStorage = true;
+  let artifactReads = 0;
+  const sessionId = '0x' + '1'.repeat(32);
+  const shell = createWorkerRouteShellWithWorkerDeps({
+    constants: createBaseConstants(),
+    deps: {
+      toStr: (value) => String(value ?? ''), corsHeaders: () => ({}),
+      json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
+      resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
+      getSessionConfig: async () => ({ sessionId, authzEpoch: 2, sessionModeProfile: { authority: { mode: 'worker_canonical' } } }),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      requireAuth: async () => ({ ok: true, slug: 'session-a', payload: {
+        sub: '0x' + '2'.repeat(40), sessionId, authzEpoch: tokenEpoch, scopes: { storage: true },
+      } }),
+      computeScopesForLogin: async () => ({ storage: currentStorage }), checkRateLimit: async () => true,
+      dispatchResultsAnalysisArtifactRequest: async () => { artifactReads += 1; return new Response('{}'); },
+    },
+  });
+  const request = (authenticated = true) => new Request('https://worker.example/results-analysis/artifact?slug=session-a', {
+    headers: authenticated ? { authorization: 'Bearer synthetic' } : {},
+  });
+  assert.equal((await shell.fetch(request(), {})).status, 401);
+  assert.equal(artifactReads, 0);
+  tokenEpoch = 2;
+  currentStorage = false;
+  assert.equal((await shell.fetch(request(), {})).status, 403);
+  assert.equal(artifactReads, 0);
+  currentStorage = true;
+  assert.equal((await shell.fetch(request(), {})).status, 200);
+  assert.equal((await shell.fetch(request(false), {})).status, 200);
+  assert.equal(artifactReads, 2);
+});

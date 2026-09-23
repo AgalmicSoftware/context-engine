@@ -3,7 +3,6 @@ import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
-import { dispatchResultsAnalysisArtifactRequest as dispatchResultsAnalysisArtifactRequestBoundary } from './resultsAnalysisArtifactDispatch.js';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -21,7 +20,6 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === '/transcribe' && method === 'POST';
   const isArweaveUploadRoute = path === '/arweave/upload' && method === 'POST';
   const isAgentQuestionsRoute = path === '/api/agent/questions' && method === 'GET';
-  const isResultsAnalysisArtifactRoute = path === '/results-analysis/artifact' && method === 'GET';
   const isStorageRoute = (
     (path === '/storage/upload' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
@@ -36,7 +34,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     (path === '/groups/join' && method === 'POST') ||
     (path === '/groups/leave' && method === 'POST')
   );
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute && !isResultsAnalysisArtifactRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
   }
   if (isAgentQuestionsRoute && config?.sessionModeProfile?.surfaces?.agentHttp !== true) {
@@ -65,7 +63,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 
   const route = isTranscribeRoute
     ? 'transcribe'
-    : ((isStorageRoute || isAgentQuestionsRoute || isResultsAnalysisArtifactRoute) ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
+    : ((isStorageRoute || isAgentQuestionsRoute) ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
   const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
@@ -121,34 +119,6 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     };
   }
 
-
-  if (isResultsAnalysisArtifactRoute) {
-    const dispatchResultsAnalysisArtifactRequest = deps?.dispatchResultsAnalysisArtifactRequest || dispatchResultsAnalysisArtifactRequestBoundary;
-    return {
-      handled: true,
-      response: await dispatchResultsAnalysisArtifactRequest({
-        request,
-        env,
-        config,
-        slug,
-        address,
-        scopes,
-        headers,
-        deps: {
-          json: deps?.json,
-          authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
-          readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
-          readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
-          evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
-          readResourceGateOnChain: deps?.readResourceGateOnChain,
-          resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-          toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-          resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-          checkSbtGate: deps?.checkSbtGate,
-        },
-      }),
-    };
-  }
 
   if (isStorageRoute) {
     return {

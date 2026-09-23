@@ -2533,3 +2533,7 @@ We may also migrate the proxy to alternate compute hosts to reduce reliance on a
 Group-filtered reports keep their loaded cohort visible during background refreshes.
 Changing the account, Worker, session, or filter clears that cohort before loading
 the new selection. Failed refreshes still expose the existing error state.
+
+Authenticated generated-results artifact reads verify the token’s session identity
+and authorization epoch, then recheck the current storage scope and rate limit.
+Anonymous artifact reads continue through the configured public-view policy.
