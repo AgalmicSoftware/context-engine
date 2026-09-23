@@ -80,7 +80,8 @@
   }
 }
 .scrollControls {
-  display: flex;
+  display: grid;
+  grid-template-columns: 64px 64px;
   justify-content: center;
   gap: 6px;
   flex-shrink: 0;
@@ -304,4 +305,13 @@
     align-self: start;
     min-height: 1.2em;
   }
+}
+
+.scrollPrevious {
+  grid-column: 1;
+  grid-row: 1;
+}
+.scrollNext {
+  grid-column: 2;
+  grid-row: 1;
 }

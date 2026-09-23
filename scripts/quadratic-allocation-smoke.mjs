@@ -70,8 +70,10 @@ export async function probeQuadraticAllocation(page) {
     const list = document.getElementById(button.getAttribute('aria-controls'));
     return button.getBoundingClientRect().top >= list.getBoundingClientRect().bottom - 1;
   }), 'Scroll arrow sits below the options');
+  const downPosition = await more.boundingBox();
   const updatesBefore = await page.getByTestId('ce-quadratic-answer-updates').textContent();
   for (let step = 0; step < 12 && await more.count(); step++) {
+    assert.deepEqual(await more.boundingBox(), downPosition, 'Down arrow stays in place');
     const previousTop = await more.evaluate(button => document.getElementById(button.getAttribute('aria-controls')).scrollTop);
     if (step === 0) await more.press('Enter');
     else await more.click();
@@ -86,8 +88,11 @@ export async function probeQuadraticAllocation(page) {
   assert.equal(await more.count(), 0, 'Down arrow hides at the last option');
   const up = page.getByRole('button', { name: 'Scroll to previous options' });
   assert.equal(await up.count(), 1);
+  const upPosition = await up.boundingBox();
   await up.click();
   await more.waitFor();
+  assert.deepEqual(await up.boundingBox(), upPosition, 'Up arrow stays in place');
+  assert.deepEqual(await more.boundingBox(), downPosition, 'Down arrow returns to its fixed position');
   assert.equal(await up.count(), 1, 'Both directions are available in the middle');
   assert.equal(await page.getByTestId('ce-quadratic-answer-updates').textContent(), updatesBefore, 'Scrolling does not change answers');
   const resetBounds = await page.getByRole('button', { name: 'Reset', exact: true }).boundingBox();

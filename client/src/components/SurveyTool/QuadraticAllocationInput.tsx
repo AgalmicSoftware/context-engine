@@ -284,7 +284,7 @@ export default function QuadraticAllocationInput({
           {scrollState.canScrollUp && (
             <button
               type="button"
-              className={styles.moreOptions}
+              className={`${styles.moreOptions} ${styles.scrollPrevious}`}
               aria-label="Scroll to previous options"
               aria-controls={optionsId}
               onClick={() =>
@@ -300,7 +300,7 @@ export default function QuadraticAllocationInput({
           {scrollState.canScrollDown && (
             <button
               type="button"
-              className={styles.moreOptions}
+              className={`${styles.moreOptions} ${styles.scrollNext}`}
               onClick={scrollToMoreOptions}
               aria-label="Scroll to more options"
               aria-controls={optionsId}
