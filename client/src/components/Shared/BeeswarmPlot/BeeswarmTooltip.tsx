@@ -38,6 +38,7 @@ type TooltipVoteGroup = {
 type BeeswarmTooltipProps<T extends BeeswarmTooltipPoint> = {
   point: T;
   pinned: boolean;
+  portal?: boolean;
   layout: TooltipLayout;
   testIdPrefix: string;
   tooltipRef: React.Ref<HTMLDivElement>;
@@ -153,6 +154,7 @@ export const resolveTooltipResponseSegmentStyle = (value: unknown, total: unknow
 export default function BeeswarmTooltip<T extends BeeswarmTooltipPoint>({
   point,
   pinned,
+  portal = false,
   layout,
   testIdPrefix,
   tooltipRef,
@@ -169,7 +171,9 @@ export default function BeeswarmTooltip<T extends BeeswarmTooltipPoint>({
   return (
     <div
       ref={tooltipRef}
-      className={[styles.hoverTooltip, pinned ? styles.hoverTooltipPinned : ''].filter(Boolean).join(' ')}
+      className={[styles.hoverTooltip, portal ? styles.hoverTooltipPortal : '', pinned ? styles.hoverTooltipPinned : '']
+        .filter(Boolean)
+        .join(' ')}
       data-testid={`${testIdPrefix}-tooltip`}
       data-placement={`${layout.horizontal}-${layout.vertical}`}
       style={resolveTooltipPositionStyle(layout)}

@@ -935,7 +935,7 @@ describe('SessionVoiceModeModal', () => {
   it('offers the two large requested voice-mode choices', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
-      'Let your AI agent draft your answers, then correct it.',
+      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
     );
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
@@ -1008,7 +1008,9 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent('Copy Let your AI agent draft your answers, then correct it.');
+    expect(copyButton).toHaveTextContent(
+      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
+    );
     expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 

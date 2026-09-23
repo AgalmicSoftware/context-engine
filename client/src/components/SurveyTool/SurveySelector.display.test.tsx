@@ -208,6 +208,16 @@ describe('SurveySelector display guards', () => {
     );
     const toolbar = findElement(tree, (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_TOOLBAR);
 
+    const revert = jest.fn();
+    const target = { handleRevertPendingChanges: revert, state: { isSubmitting: false } };
+    subject.surveyQuestionsRef = { current: target };
+    const clear = findElement(tree, (element) => element?.props?.['aria-label'] === 'Clear pending changes');
+    expect(clear).toBeTruthy();
+    clear.props.onClick();
+    expect(revert).toHaveBeenCalledTimes(1);
+    target.state.isSubmitting = true;
+    clear.props.onClick();
+    expect(revert).toHaveBeenCalledTimes(1);
     expect(headerSubmitButton).toBeTruthy();
     expect(nodeHasClassName(headerSubmitButton, styles.headerSubmitButton)).toBe(true);
     expect(nodeHasClassName(headerSubmitButton, styles.submitGlow)).toBe(true);

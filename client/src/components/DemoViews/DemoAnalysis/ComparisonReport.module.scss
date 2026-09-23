@@ -442,7 +442,7 @@
   padding: 12px;
   font-size: 0.9rem;
   line-height: 1.4;
-  color: var(--ce-color-tooltip-text, var(--ce-compat-dark));
+  color: var(--ce-tooltip-text);
 }
 
 .tooltipQuestion {
@@ -452,14 +452,14 @@
 
 .tooltipResponse {
   font-style: italic;
-  color: var(--ce-color-tooltip-muted, var(--ce-text-muted));
+  color: var(--ce-tooltip-muted);
   margin-bottom: 8px;
 }
 
 .tooltipTags {
   font-size: 0.85rem;
   font-weight: 500;
-  color: var(--ce-color-tooltip-muted, var(--ce-text-muted));
+  color: var(--ce-tooltip-muted);
   margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--ce-color-tooltip-border, var(--ce-document-border));
@@ -492,13 +492,13 @@
 
 .tooltipGroupName {
   flex-grow: 1;
-  color: var(--ce-color-tooltip-text, var(--ce-compat-dark));
+  color: var(--ce-tooltip-text);
   margin-right: 12px;
 }
 
 .tooltipGroupRate {
   font-weight: 600;
-  color: var(--ce-color-tooltip-text, var(--ce-compat-dark));
+  color: var(--ce-tooltip-text);
 }
 
 .noData {
@@ -535,4 +535,8 @@
 .reportAnalysisContent {
   display: grid;
   gap: 0.45rem;
+}
+
+.tooltipResponse .responseTextPillLabel {
+  color: var(--ce-tooltip-muted);
 }

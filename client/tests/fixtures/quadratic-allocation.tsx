@@ -9,8 +9,10 @@ import QuadraticAllocationResults from '../../src/components/SurveyTool/Quadrati
 import SingleQuestionResponse from '../../src/components/SurveyTool/SingleQuestionResponse';
 import { validateQuadraticAllocation } from '../../../shared/questions/quadraticAllocation.mjs';
 
-const question = { id: 'quadratic-smoke', type: 'quadratic', options: ['Parks', 'Transit', 'Housing'], voiceCredits: 99 };
+const baseQuestion = { id: 'quadratic-smoke', type: 'quadratic', options: ['Parks', 'Transit', 'Housing'], voiceCredits: 99 };
 function Fixture() {
+  const [manyOptions, setManyOptions] = useState(false);
+  const question = { ...baseQuestion, options: manyOptions ? ['Parks', 'Transit', 'Housing', 'Community spaces and neighbourhood amenities', 'Libraries', 'Schools', 'Waste reduction', 'Energy efficiency'] : baseQuestion.options };
   const [value, setValue] = useState<number[]>([0, 0, 0]);
   const [theme, setTheme] = useState('context-engine');
   const [deferDragUpdates, setDeferDragUpdates] = useState(false);
@@ -23,6 +25,7 @@ function Fixture() {
       <style>{'body { background: var(--ce-color-canvas); }'}</style>
       <label>Theme <select value={theme} onChange={event => setTheme(event.target.value)}><option value="context-engine">Context Engine</option><option value="classic-95">Classic 95</option></select></label>
       <label style={{ display: 'block' }}><input type="checkbox" checked={deferDragUpdates} onChange={event => setDeferDragUpdates(event.target.checked)} /> Standalone question drag behavior</label>
+      <label><input type="checkbox" checked={manyOptions} onChange={event => { setManyOptions(event.target.checked); setValue(Array(event.target.checked ? 8 : 3).fill(0)); }} /> Many options</label>
       <h1 style={{ color: 'inherit' }}>Survey questions pile</h1>
       <p>Question 3 of 12</p>
       <div className={pileStyles.pileCardContainer} data-testid="ce-quadratic-pile-card"><div className={`${pileStyles.pileCard} ${pileStyles.pileCardActive}`}>

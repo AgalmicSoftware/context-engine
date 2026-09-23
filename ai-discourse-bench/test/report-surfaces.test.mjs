@@ -31,6 +31,7 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   const runtimeScript = html.match(/<script>\s*(\(function \(\) \{[\s\S]*?\}\(\)\);)\s*<\/script>/)?.[1];
   assert.ok(runtimeScript, 'expected a self-contained report runtime');
   assert.doesNotThrow(() => new vm.Script(runtimeScript));
+  assert.match(html, /max-height: calc\(100dvh - 28px\); overflow-y: auto; overscroll-behavior: contain;/);
   assert.match(html, /data-testid="ce-session-results-view-nav"/);
   assert.match(html, /Consensus and Difference/);
   assert.match(html, /All Questions/);
@@ -1723,7 +1724,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.aidb-legend-row/);
   assert.doesNotMatch(html, /class="aidb-dot/);
   assert.match(html, /data-ce-beeswarm-tooltip/);
-  assert.match(html, /\.beeTooltip \{ position: absolute; width: 300px; background: var\(--ce-color-tooltip-bg\); border: 1px solid var\(--ce-color-tooltip-border\); padding: 10px; font-size: 0\.85rem; color: var\(--ce-color-tooltip-text\); pointer-events: auto; z-index: 999; box-shadow: 0 2px 6px rgba\(0, 0, 0, 0\.15\); \}/);
+  assert.match(html, /\.beeTooltip \{ position: absolute; width: 300px; box-sizing: border-box; max-width: calc\(100vw - 28px\); max-height: calc\(100dvh - 28px\); overflow-y: auto; overscroll-behavior: contain; background: var\(--ce-color-tooltip-bg\); border: 1px solid var\(--ce-color-tooltip-border\); padding: 10px; font-size: 0\.85rem; color: var\(--ce-color-tooltip-text\); pointer-events: auto; z-index: 999; box-shadow: 0 2px 6px rgba\(0, 0, 0, 0\.15\); \}/);
   assert.match(html, /'<div style="font-weight: bold; margin-bottom: 4px;">' \+ escapeText\(point\.dataset\.questionId\) \+ ': ' \+ escapeText\(point\.dataset\.questionPrompt\) \+ '<\/div>',/);
   assert.match(html, /'<div style="font-size: 0\.85rem; margin-bottom: 6px;"><strong>Agree:<\/strong> ' \+ escapeText\(point\.dataset\.questionAgree\)/);
   assert.match(html, /'<div style="font-size: 0\.85rem; margin-bottom: 6px;"><strong>Mean:<\/strong> ' \+ escapeText\(point\.dataset\.questionMean\)/);

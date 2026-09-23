@@ -4002,7 +4002,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .beeswarmPointNoData:hover .beeswarmCircleNoData,
     .beeswarmPointNoData:focus-visible .beeswarmCircleNoData { opacity: 0.78; }
     .beeswarmCircleHover { fill: #ff9900; }
-    .beeTooltip { position: absolute; width: 300px; background: var(--ce-color-tooltip-bg); border: 1px solid var(--ce-color-tooltip-border); padding: 10px; font-size: 0.85rem; color: var(--ce-color-tooltip-text); pointer-events: auto; z-index: 999; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+    .beeTooltip { position: absolute; width: 300px; box-sizing: border-box; max-width: calc(100vw - 28px); max-height: calc(100dvh - 28px); overflow-y: auto; overscroll-behavior: contain; background: var(--ce-color-tooltip-bg); border: 1px solid var(--ce-color-tooltip-border); padding: 10px; font-size: 0.85rem; color: var(--ce-color-tooltip-text); pointer-events: auto; z-index: 999; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
     .beeTooltip[hidden] { display: none; }
     .beeTooltip .ce-report-muted { color: var(--ce-color-tooltip-muted); }
     .clusterLegendSection { width: 100%; margin-top: 12px; margin-bottom: 20px; }

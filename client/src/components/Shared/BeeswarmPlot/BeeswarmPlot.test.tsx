@@ -61,6 +61,24 @@ describe('BeeswarmPlot', () => {
     expect(screen.queryByTestId('ce-beeswarm-tooltip')).not.toBeInTheDocument();
   });
 
+  it('portals Breakdown details outside clipped ancestors and keeps pinned details open', () => {
+    const { container, unmount } = render(
+      <div style={{ overflow: 'hidden', height: 100 }}>
+        <BeeswarmPlot points={samplePoint} showIdleSummary={false} tooltipPortal />
+      </div>,
+    );
+    fireEvent.click(screen.getByTestId('ce-beeswarm-point-0'));
+    const tooltip = screen.getByTestId('ce-beeswarm-tooltip');
+    expect(document.body).toContainElement(tooltip);
+    expect(container).not.toContainElement(tooltip);
+    expect(tooltip).toHaveClass(styles.hoverTooltipPortal);
+    fireEvent.mouseLeave(screen.getByTestId('ce-beeswarm-plot'));
+    expect(tooltip).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+    expect(screen.queryByTestId('ce-beeswarm-tooltip')).not.toBeInTheDocument();
+    unmount();
+  });
+
   it('normalizes tooltip vote breakdowns so the response bar can render unsure votes', () => {
     expect(
       normalizeTooltipVoteBreakdown({

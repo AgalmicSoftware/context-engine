@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
 import CETooltip from '../Shared/CETooltip';
@@ -30,6 +30,35 @@ export default function QuadraticAllocationInput({
   onChange,
 }: Props) {
   const instanceId = useId().replace(/:/g, '');
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
+  const [optionsHeight, setOptionsHeight] = useState<number>();
+  // Leave half of the next label visible in a bounded pile card. Measure the
+  // available parent, not the fitted list, to avoid resize feedback loops.
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const list = optionsRef.current;
+    if (!viewport || !list || typeof ResizeObserver === 'undefined') return;
+    const fit = () => {
+      const available = viewport.clientHeight;
+      if (!available || list.scrollHeight <= available) {
+        setOptionsHeight(undefined);
+        return;
+      }
+      const top = list.getBoundingClientRect().top;
+      const peeks = Array.from(list.querySelectorAll('label')).map((label) => {
+        const rect = label.getBoundingClientRect();
+        return rect.top - top + list.scrollTop + rect.height / 2;
+      });
+      const height = peeks.filter((peek) => peek <= available && peek > 44).pop();
+      setOptionsHeight(height);
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(viewport);
+    Array.from(list.children).forEach((option) => observer.observe(option));
+    fit();
+    return () => observer.disconnect();
+  }, [options.length]);
   const helpId = `quadratic-help-${instanceId}`;
   const question = { options, voiceCredits };
   const questionError = validateQuadraticQuestion(question);
@@ -135,7 +164,7 @@ export default function QuadraticAllocationInput({
           type="button"
           aria-label="Reset"
           title="Reset all votes to neutral"
-          disabled={disabled}
+          disabled={disabled || (!valueError && votes.every((vote) => vote === 0))}
           onClick={() => {
             dragSourceRef.current = null;
             draggedOptionRef.current = null;
@@ -147,60 +176,64 @@ export default function QuadraticAllocationInput({
           <FontAwesomeIcon icon={faUndo} />
         </button>
       </div>
-      {options.map((option, index) => {
-        const vote = votes[index];
-        const inputId = `quadratic-${instanceId}-${index}`;
-        const position = 50 + (vote / limit) * 50;
-        return (
-          <div
-            className={styles.option}
-            key={index}
-            data-direction={vote > 0 ? 'positive' : vote < 0 ? 'negative' : 'neutral'}
-          >
-            <div className={styles.optionHeading}>
-              <label htmlFor={inputId}>{String(option)}</label>
-              <span className={styles.vote} aria-hidden="true">
-                {vote > 0 ? '+' : ''}
-                {vote}
-              </span>
-              <span className={styles.cost} data-testid={`ce-quadratic-cost-${index}`}>
-                {vote === 0 ? '' : `${vote ** 2} credits`}
-              </span>
-            </div>
-            <input
-              id={inputId}
-              className={styles.slider}
-              type="range"
-              min={-limit}
-              max={limit}
-              step={1}
-              value={vote}
-              disabled={disabled}
-              aria-valuetext={`${vote > 0 ? '+' : ''}${vote} votes, ${vote ** 2} credits${vote === 0 ? ', neutral' : vote > 0 ? ', support' : ', oppose'}`}
-              style={
-                {
-                  '--vote-start': `${Math.min(position, 50)}%`,
-                  '--vote-end': `${Math.max(position, 50)}%`,
-                } as React.CSSProperties
-              }
-              onPointerDown={() => {
-                if (deferDragUpdates && !disabled) {
-                  dragSourceRef.current = sourceKey;
-                  draggedOptionRef.current = index;
-                }
-              }}
-              onBlur={() => {
-                // A new slider's pointerdown precedes the old slider's blur.
-                // Only blur on the dragged option may end the new interaction.
-                if (draggedOptionRef.current === index) finishDrag();
-              }}
-              onKeyDown={finishDrag}
-              onChange={(event) => updateVote(index, Number(event.target.value))}
-              data-testid={`ce-quadratic-vote-${index}`}
-            />
-          </div>
-        );
-      })}
+      <div className={styles.optionsViewport} ref={viewportRef}>
+        <div className={styles.options} ref={optionsRef} style={{ height: optionsHeight }}>
+          {options.map((option, index) => {
+            const vote = votes[index];
+            const inputId = `quadratic-${instanceId}-${index}`;
+            const position = 50 + (vote / limit) * 50;
+            return (
+              <div
+                className={styles.option}
+                key={index}
+                data-direction={vote > 0 ? 'positive' : vote < 0 ? 'negative' : 'neutral'}
+              >
+                <div className={styles.optionHeading}>
+                  <label htmlFor={inputId}>{String(option)}</label>
+                  <span className={styles.vote} aria-hidden="true">
+                    {vote > 0 ? '+' : ''}
+                    {vote}
+                  </span>
+                  <span className={styles.cost} data-testid={`ce-quadratic-cost-${index}`}>
+                    {vote === 0 ? '' : `${vote ** 2} credits`}
+                  </span>
+                </div>
+                <input
+                  id={inputId}
+                  className={styles.slider}
+                  type="range"
+                  min={-limit}
+                  max={limit}
+                  step={1}
+                  value={vote}
+                  disabled={disabled}
+                  aria-valuetext={`${vote > 0 ? '+' : ''}${vote} votes, ${vote ** 2} credits${vote === 0 ? ', neutral' : vote > 0 ? ', support' : ', oppose'}`}
+                  style={
+                    {
+                      '--vote-start': `${Math.min(position, 50)}%`,
+                      '--vote-end': `${Math.max(position, 50)}%`,
+                    } as React.CSSProperties
+                  }
+                  onPointerDown={() => {
+                    if (deferDragUpdates && !disabled) {
+                      dragSourceRef.current = sourceKey;
+                      draggedOptionRef.current = index;
+                    }
+                  }}
+                  onBlur={() => {
+                    // A new slider's pointerdown precedes the old slider's blur.
+                    // Only blur on the dragged option may end the new interaction.
+                    if (draggedOptionRef.current === index) finishDrag();
+                  }}
+                  onKeyDown={finishDrag}
+                  onChange={(event) => updateVote(index, Number(event.target.value))}
+                  data-testid={`ce-quadratic-vote-${index}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <div className={styles.scale} aria-hidden="true">
         <span>− Oppose</span>
         <span>+ Support</span>
