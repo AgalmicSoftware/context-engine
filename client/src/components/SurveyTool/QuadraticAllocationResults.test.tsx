@@ -21,3 +21,9 @@ it('still counts zero allocations and excludes encrypted or malformed allocation
     ),
   ).toMatchObject({ totalResponders: 1, excludedResponses: 2 });
 });
+it('includes decrypted allocations that retain their encrypted flag', () => {
+  expect(summarizeQuadraticAllocations([{ answer: { value: [1, -2], encrypted: true } }], question)).toMatchObject({
+    totalResponders: 1,
+    excludedResponses: 0,
+  });
+});

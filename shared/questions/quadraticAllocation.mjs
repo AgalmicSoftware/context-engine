@@ -64,7 +64,7 @@ export function summarizeQuadraticAllocations(responses, question) {
     const answer = response?.answer;
     if (answer?.encrypted !== true && (answer?.value == null || answer.value === '')) continue;
     if (
-      answer?.encrypted === true || validateQuadraticAllocation(answer?.value, question)
+      validateQuadraticAllocation(answer?.value, question)
     ) {
       excludedResponses += 1;
       continue;
