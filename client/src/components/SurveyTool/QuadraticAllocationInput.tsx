@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -34,7 +34,7 @@ export default function QuadraticAllocationInput({
   const viewportRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
   const [optionsHeight, setOptionsHeight] = useState<number>();
-  const [scrollState, setScrollState] = useState({ overflow: false, canScrollDown: false });
+  const [scrollState, setScrollState] = useState({ overflow: false, canScrollDown: false, canScrollUp: false });
   const optionsId = `quadratic-options-${instanceId}`;
   // Leave half of the next label visible in a bounded pile card. Measure the
   // available parent, not the fitted list, to avoid resize feedback loops.
@@ -46,10 +46,13 @@ export default function QuadraticAllocationInput({
     const updateScrollState = () => {
       const overflow = list.scrollHeight > list.clientHeight + 1;
       const canScrollDown = overflow && list.scrollTop + list.clientHeight < list.scrollHeight - 1;
+      const canScrollUp = overflow && list.scrollTop > 1;
       setScrollState((previous) =>
-        previous.overflow === overflow && previous.canScrollDown === canScrollDown
+        previous.overflow === overflow &&
+        previous.canScrollDown === canScrollDown &&
+        previous.canScrollUp === canScrollUp
           ? previous
-          : { overflow, canScrollDown },
+          : { overflow, canScrollDown, canScrollUp },
       );
     };
     const fit = () => {
@@ -272,18 +275,37 @@ export default function QuadraticAllocationInput({
         </div>
       </div>
       {scrollState.overflow && (
-        <button
-          type="button"
-          className={styles.moreOptions}
-          onClick={scrollToMoreOptions}
-          disabled={!scrollState.canScrollDown}
-          aria-label="Scroll to more options"
-          aria-controls={optionsId}
-          title={scrollState.canScrollDown ? 'More options below' : 'Last option reached'}
-          data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
-        >
-          <FontAwesomeIcon icon={faChevronDown} />
-        </button>
+        <div className={styles.scrollControls}>
+          {scrollState.canScrollUp && (
+            <button
+              type="button"
+              className={styles.moreOptions}
+              aria-label="Scroll to previous options"
+              aria-controls={optionsId}
+              onClick={() =>
+                optionsRef.current?.scrollBy({
+                  top: -optionsRef.current.clientHeight * 0.8,
+                  behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                })
+              }
+            >
+              <FontAwesomeIcon icon={faChevronUp} />
+            </button>
+          )}
+          {scrollState.canScrollDown && (
+            <button
+              type="button"
+              className={styles.moreOptions}
+              onClick={scrollToMoreOptions}
+              aria-label="Scroll to more options"
+              aria-controls={optionsId}
+              title="More options below"
+              data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
+            >
+              <FontAwesomeIcon icon={faChevronDown} />
+            </button>
+          )}
+        </div>
       )}
       {valueError && (
         <p className={styles.error} role="alert">
