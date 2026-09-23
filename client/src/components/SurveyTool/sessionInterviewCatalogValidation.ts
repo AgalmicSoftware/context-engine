@@ -114,3 +114,30 @@ export const scopeInterviewPrefillToQuestions = (
       : {}),
   };
 };
+
+export const verifyInterviewKickoffCatalog = async ({ workerUrl, sessionSlug, sessionUrl, fetchImpl = globalThis.fetch }: {
+  workerUrl: string;
+  sessionSlug: string;
+  sessionUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<void> => {
+  const url = new URL(`${workerUrl.replace(/\/+$/, '')}/agent/interview-catalog`);
+  url.searchParams.set('slug', sessionSlug);
+  url.searchParams.set('sessionUrl', sessionUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  let catalog: Record<string, unknown>;
+  try {
+    const response = await fetchImpl(url.toString(), { cache: 'no-store', credentials: 'omit', signal: controller.signal });
+    if (!response.ok) throw new Error('Catalog unavailable');
+    catalog = await response.json();
+  } catch {
+    throw new Error('Could not check this session’s Worker. Check your connection and try again.');
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!catalog || catalog.type !== 'context-engine.interview-question-catalog' || catalog.version !== 1 ||
+      catalog.sessionSlug !== sessionSlug || !['ce-interview-brief-v4', 'ce-interview-brief-v5'].includes(String(catalog.prefillPromptVersion))) {
+    throw new Error('This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.');
+  }
+};

@@ -1,3 +1,4 @@
+import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
@@ -888,6 +889,7 @@ function SessionInterviewPanel({
           {kickoff && !hasImportedExternalPrefill ? (
             <SessionInterviewMemoryKickoffCard
               kickoff={kickoff}
+              validateKickoff={() => verifyInterviewKickoffCatalog({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })}
               promptCopied={promptCopied}
               showAgentPrompt={showAgentPrompt}
               onCopyPrompt={() => {

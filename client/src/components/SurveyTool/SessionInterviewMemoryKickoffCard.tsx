@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -9,6 +9,7 @@ import { shouldIgnorePromptCopyEvent } from './sessionInterviewModalState';
 
 type SessionInterviewMemoryKickoffCardProps = {
   kickoff: string;
+  validateKickoff: () => Promise<void>;
   promptCopied: boolean;
   showAgentPrompt: boolean;
   onCopyPrompt: () => void;
@@ -17,16 +18,46 @@ type SessionInterviewMemoryKickoffCardProps = {
 
 export default function SessionInterviewMemoryKickoffCard({
   kickoff,
+  validateKickoff,
   promptCopied,
   showAgentPrompt,
   onCopyPrompt,
   onTogglePrompt,
 }: SessionInterviewMemoryKickoffCardProps) {
+  const [validationError, setValidationError] = useState('');
+  const [checking, setChecking] = useState(false);
+  const validatedKickoff = useRef('');
+  const activeKickoff = useRef(kickoff);
+  const inFlight = useRef(false);
+  useEffect(() => {
+    activeKickoff.current = kickoff;
+    validatedKickoff.current = '';
+    setValidationError('');
+    setChecking(false);
+    return () => { activeKickoff.current = ''; };
+  }, [kickoff]);
+  const runWhenCompatible = (action: () => void) => {
+    if (validatedKickoff.current === kickoff) { action(); return; }
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setChecking(true);
+    setValidationError('');
+    void validateKickoff().then(() => {
+      if (activeKickoff.current !== kickoff) return;
+      validatedKickoff.current = kickoff;
+      action();
+    }).catch((error: unknown) => {
+      if (activeKickoff.current === kickoff) setValidationError(error instanceof Error ? error.message : 'Could not check the session. Try again.');
+    }).finally(() => {
+      inFlight.current = false;
+      if (activeKickoff.current === kickoff) setChecking(false);
+    });
+  };
   return (
     <div
       className={styles.sessionAgentKickoff}
       onClick={(event) => {
-        if (!shouldIgnorePromptCopyEvent(event.target)) onCopyPrompt();
+        if (!shouldIgnorePromptCopyEvent(event.target)) runWhenCompatible(onCopyPrompt);
       }}
     >
       <div className={styles.sessionAgentKickoffRow}>
@@ -36,12 +67,12 @@ export default function SessionInterviewMemoryKickoffCard({
           className={`${styles.sessionAgentKickoffCopyTarget} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
           onClick={(event) => {
             event.stopPropagation();
-            onCopyPrompt();
+            runWhenCompatible(onCopyPrompt);
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              onCopyPrompt();
+              runWhenCompatible(onCopyPrompt);
             }
           }}
           aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
@@ -65,7 +96,7 @@ export default function SessionInterviewMemoryKickoffCard({
           <button
             type="button"
             className={styles.sessionAgentKickoffToggle}
-            onClick={onTogglePrompt}
+            onClick={() => showAgentPrompt ? onTogglePrompt() : runWhenCompatible(onTogglePrompt)}
             aria-expanded={showAgentPrompt}
             aria-controls="ce-session-interview-agent-prompt"
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
@@ -80,6 +111,8 @@ export default function SessionInterviewMemoryKickoffCard({
           </button>
         </div>
       </div>
+      {checking ? <div role="status">Checking session compatibility…</div> : null}
+      {validationError ? <div role="alert">{validationError}</div> : null}
       {showAgentPrompt ? (
         <div
           id="ce-session-interview-agent-prompt"

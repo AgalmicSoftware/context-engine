@@ -264,3 +264,5 @@ remain excluded from the allocation summary.
 Cluster-summary caches include the filtered participant roster in assignment order, so summaries from a different subset are not reused merely because cluster counts match.
 
 Report refreshes preserve expanded clusters while those cluster identifiers remain present. A two-participant report uses its existing PCA coordinates for the graph because UMAP cannot fit that cohort size.
+
+Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4 or v5 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change v1–v4 packet import validation or relabel catalog hashes.
