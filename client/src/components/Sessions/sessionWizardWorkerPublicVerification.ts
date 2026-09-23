@@ -71,6 +71,7 @@ export const verifySessionWizardWorkerPublicDeployment = async ({
       sessionId: normalizedSessionId,
       adminAddress: normalizedAdminAddress,
       config: publicConfig,
+      finalizePublication: false,
       signAdminAction,
       fetchImpl,
     });

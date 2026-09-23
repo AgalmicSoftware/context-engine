@@ -1,3 +1,4 @@
+import { PUBLIC_WORKER_CONFIG_FIELDS } from '@ce-shared/workerSessionPublicConfig.mjs';
 import {
   normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
@@ -36,6 +37,7 @@ export type PersistAndVerifySessionWizardWorkerConfigInput = {
   signAdminAction: SessionWizardWorkerConfigSignPort;
   fetchImpl?: SessionWizardWorkerConfigFetchPort;
   configRevision?: unknown;
+  finalizePublication?: boolean;
   sleep?: ((delayMs: number) => Promise<void>) | null;
   retryDelaysMs?: readonly number[];
   environment?: DiscoveryEnvironment;
@@ -57,43 +59,6 @@ const RETRYABLE_CONFIG_READ_STATUSES = new Set([404, 408, 425, 429]);
 const isRetryableConfigReadStatus = (status: number): boolean =>
   RETRYABLE_CONFIG_READ_STATUSES.has(status) || (status >= 500 && status <= 599);
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
-const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
-  'slug',
-  'sessionId',
-  'sessionIdHex',
-  'configRevision',
-  'sessionName',
-  'sessionInfo',
-  'appearance',
-  'sessionHeaderImg',
-  'sessionEndsAt',
-  'interviewModeEnabled',
-  'interviewMode',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'questionsGenPrompt',
-  'defaultFilterState',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'adminAddress',
-  'adminAddresses',
-  'corsWorkerUrl',
-  'allowOrigins',
-  'sessionModeProfile',
-  'workerAuthority',
-  'groupCreationPolicy',
-  'storageProfile',
-  'ai',
-  'limits',
-  'scopes',
-  'blockLimits',
-  'contracts',
-  'registryChainId',
-  'networkChainId',
-  'embeddedDeployHelperEnabled',
-  'resultsAnalysis',
-]);
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;
 const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIELDS);
@@ -201,7 +166,7 @@ const clonePublicConfig = (value: unknown): UnknownRecord => {
 
 const buildExpectedPublicConfig = (config: UnknownRecord): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
-    if (!Object.prototype.hasOwnProperty.call(config, key)) return expected;
+    if (key === 'authzEpoch' || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
     if (key === 'ai') {
       const ai =
         config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
@@ -241,6 +206,7 @@ const verifyExpectedPublicConfigValue = (expected: unknown, actual: unknown, pat
 
 const buildComparableActualPublicConfig = (config: UnknownRecord, revision: string): UnknownRecord => {
   const comparableConfig = { ...config };
+  delete comparableConfig.authzEpoch;
   if (Object.prototype.hasOwnProperty.call(comparableConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
     if (toTrimmedString(comparableConfig[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]) !== revision) {
       throw new Error('Worker config verification failed: publication revision mismatch.');
@@ -350,6 +316,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   signAdminAction,
   fetchImpl = globalThis.fetch.bind(globalThis),
   configRevision,
+  finalizePublication = true,
   sleep = defaultSleep,
   retryDelaysMs = SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS,
   environment,
@@ -375,6 +342,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   const revisionConfig = { ...publicConfig };
   delete revisionConfig.configRevision;
   delete revisionConfig.workerCanonicalPublicationRevision;
+  delete revisionConfig.authzEpoch;
   // Regression guard: transport loss after the worker commits must be
   // retryable across reloads. Hash the canonical public publication payload so
   // independent invocations produce the same server-side revision marker.
@@ -389,12 +357,12 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
     }),
   });
   const configToPersist: UnknownRecord = {
-    ...publicConfig,
+    ...revisionConfig,
     slug: normalizedSlug,
     sessionId: normalizedSessionId,
     adminAddress: normalizedAdminAddress,
     corsWorkerUrl: workerOrigin,
-    configRevision: revision,
+    ...(finalizePublication ? { configRevision: revision } : {}),
   };
   const expectedPublicConfig = buildExpectedPublicConfig(configToPersist);
   const requestBody: SessionWizardWorkerConfigWriteBody = {
@@ -469,18 +437,24 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
       workerOrigin,
       environment,
     });
-    if (toTrimmedString(verifiedPublicConfig.configRevision) === revision) {
+    if (!finalizePublication || toTrimmedString(verifiedPublicConfig.configRevision) === revision) {
       // A revision alone proves only that some write claimed this identity. Verify
       // every public field this publication expected so a partial/foreign merge
       // cannot be reported as a successful canonical publication.
-      verifyExpectedPublicConfigValue(
-        expectedPublicConfig,
-        buildComparableActualPublicConfig(verifiedPublicConfig, revision),
-        'config',
-      );
-      return {
+      let configMatches = true;
+      try {
+        verifyExpectedPublicConfigValue(
+          expectedPublicConfig,
+          buildComparableActualPublicConfig(verifiedPublicConfig, revision),
+          'config',
+        );
+      } catch (error) {
+        if (finalizePublication || attempt === delays.length) throw error;
+        configMatches = false;
+      }
+      if (configMatches) return {
         workerOrigin,
-        configRevision: revision,
+        configRevision: finalizePublication ? revision : '',
         publicConfig: verifiedPublicConfig,
       };
     }

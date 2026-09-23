@@ -1108,3 +1108,9 @@ and Interview response mapping. OpenAI requests use standard processing
 (`service_tier: default`) unless a caller explicitly selects another tier.
 GPT-Live voice and transcription settings are separate. Existing explicit session
 models and local overrides remain available; bundled demo defaults use Terra.
+
+Hosted Worker verification writes and reads back the prepared public configuration
+without finalizing publication. You can edit and verify again; Publish creates
+the final publication revision. The browser compares the shared public fields,
+including session appearance, while excluding the server-managed authorization
+epoch from its comparison.

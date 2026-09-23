@@ -1,51 +1,9 @@
+import { PUBLIC_WORKER_CONFIG_FIELDS } from '../../shared/workerSessionPublicConfig.mjs';
+
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
-const PUBLIC_CONFIG_KEYS = Object.freeze([
-  'slug',
-  'authzEpoch',
-  'sessionId',
-  'sessionIdHex',
-  'configRevision',
-  'sessionName',
-  'sessionInfo',
-  'sessionContext',
-  'sessionHeaderImg',
-  'sessionEndsAt',
-  'interviewModeEnabled',
-  'interviewMode',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'questionsGenPrompt',
-  'defaultFilterState',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'HIGHLIGHTED_QUESTION_IDS',
-  'BLOCKED_QUESTION_IDS',
-  'HIGHLIGHTED_SURVEY_IDS',
-  'BLOCKED_SURVEY_IDS',
-  'ignored_SBTs_LIST',
-  'featured_SBTs_LIST',
-  'adminAddress',
-  'adminAddresses',
-  'corsWorkerUrl',
-  'allowOrigins',
-  'sessionModeProfile',
-  'agentSessionWrapped',
-  'workerAuthority',
-  'groupCreationPolicy',
-  'storageProfile',
-  'ai',
-  'limits',
-  'scopes',
-  'blockLimits',
-  'contracts',
-  'registryChainId',
-  'networkChainId',
-  'embeddedDeployHelperEnabled',
-  'resultsAnalysis',
-]);
+
 
 const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'sessionId',
@@ -334,7 +292,7 @@ export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => 
 };
 
 export const projectPublicWorkerSessionConfig = (config) => (
-  selectFields(isObj(config) ? config : {}, PUBLIC_CONFIG_KEYS)
+  selectFields(isObj(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS)
 );
 
 const profileUsesOnChainSbt = (profile) => {

@@ -1582,13 +1582,11 @@ var init_deployHelperEndpointConfig = __esm({
   }
 });
 
-// workers/shared/workerSessionConfig.mjs
-var isObj2, toStr12, PUBLIC_CONFIG_KEYS, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
-var init_workerSessionConfig = __esm({
-  "workers/shared/workerSessionConfig.mjs"() {
-    isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    toStr12 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    PUBLIC_CONFIG_KEYS = Object.freeze([
+// shared/workerSessionPublicConfig.mjs
+var PUBLIC_WORKER_CONFIG_FIELDS;
+var init_workerSessionPublicConfig = __esm({
+  "shared/workerSessionPublicConfig.mjs"() {
+    PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
       "slug",
       "authzEpoch",
       "sessionId",
@@ -1596,6 +1594,7 @@ var init_workerSessionConfig = __esm({
       "configRevision",
       "sessionName",
       "sessionInfo",
+      "appearance",
       "sessionContext",
       "sessionHeaderImg",
       "sessionEndsAt",
@@ -1633,6 +1632,16 @@ var init_workerSessionConfig = __esm({
       "embeddedDeployHelperEnabled",
       "resultsAnalysis"
     ]);
+  }
+});
+
+// workers/shared/workerSessionConfig.mjs
+var isObj2, toStr12, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
+var init_workerSessionConfig = __esm({
+  "workers/shared/workerSessionConfig.mjs"() {
+    init_workerSessionPublicConfig();
+    isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    toStr12 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
       "sessionId",
       "sessionIdHex",
@@ -1862,7 +1871,7 @@ var init_workerSessionConfig = __esm({
       delete recursiveSource.litCredentials;
       return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
     };
-    projectPublicWorkerSessionConfig = (config) => selectFields(isObj2(config) ? config : {}, PUBLIC_CONFIG_KEYS);
+    projectPublicWorkerSessionConfig = (config) => selectFields(isObj2(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS);
     profileUsesOnChainSbt = (profile) => {
       if (profile?.authorization?.mechanisms?.includes?.("sbt_onchain")) return true;
       return [
