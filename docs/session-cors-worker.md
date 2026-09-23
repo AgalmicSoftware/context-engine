@@ -2529,3 +2529,7 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 
 We plan to explore TEE/attested proxy options for stronger trust guarantees in a future version.
 We may also migrate the proxy to alternate compute hosts to reduce reliance on a single edge provider.
+
+Group-filtered reports keep their loaded cohort visible during background refreshes.
+Changing the account, Worker, session, or filter clears that cohort before loading
+the new selection. Failed refreshes still expose the existing error state.
