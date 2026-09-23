@@ -204,14 +204,29 @@ describe('interview connection lifecycle', () => {
     const h = harness('realtime');
     const session = await h.start();
     const question = {
-      type: 'response.output_audio_transcript.done', item_id: 'assistant-one', content_index: 0,
+      type: 'response.output_audio_transcript.done',
+      item_id: 'assistant-one',
+      content_index: 0,
       transcript: 'How much support, zero to ten?',
     };
     h.channel.emit(question);
     h.channel.emit({ ...question, event_id: 'retry-event' });
-    h.channel.emit({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'user-one', transcript: 'Four.' });
-    h.channel.emit({ type: 'response.audio_transcript.done', item_id: 'assistant-two', content_index: 0, transcript: 'Parks or transit?' });
-    h.channel.emit({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'user-two', transcript: 'The first.' });
+    h.channel.emit({
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'user-one',
+      transcript: 'Four.',
+    });
+    h.channel.emit({
+      type: 'response.audio_transcript.done',
+      item_id: 'assistant-two',
+      content_index: 0,
+      transcript: 'Parks or transit?',
+    });
+    h.channel.emit({
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'user-two',
+      transcript: 'The first.',
+    });
     const captured = await session.stop();
     expect(captured.transcript).toBe(
       'Interviewer: How much support, zero to ten?\nResponder: Four.\nInterviewer: Parks or transit?\nResponder: The first.',

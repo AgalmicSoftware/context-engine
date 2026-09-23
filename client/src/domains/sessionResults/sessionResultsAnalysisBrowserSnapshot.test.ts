@@ -93,6 +93,7 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
       body: { source: { kind: 'admin-snapshot', snapshot: result.snapshot } },
     });
     expect(source.ok).toBe(true);
+    if (!source.ok || !('aiSnapshot' in source)) throw new Error('Worker did not return an AI snapshot.');
     expect(source.aiSnapshot.questions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'single', singleSelect: true }),

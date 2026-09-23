@@ -15,7 +15,9 @@ import {
 import { resolveInterviewPrefillQuestions } from './sessionInterviewCatalogValidation';
 
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-beforeAll(() => Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto }));
+beforeAll(() => {
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
+});
 afterAll(() => {
   if (descriptor) Object.defineProperty(globalThis, 'crypto', descriptor);
 });

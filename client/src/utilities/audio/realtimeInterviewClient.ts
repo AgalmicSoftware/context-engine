@@ -62,7 +62,8 @@ const readRealtimeInterviewerTurn = (event: Record<string, unknown>): RealtimeIn
     const fragment = readRealtimeResponderTurn({ ...event, type: 'session.input_transcript.delta' });
     return fragment ? { ...fragment, role: 'interviewer' } : null;
   }
-  if (!['response.output_audio_transcript.done', 'response.audio_transcript.done'].includes(trim(event.type))) return null;
+  if (!['response.output_audio_transcript.done', 'response.audio_transcript.done'].includes(trim(event.type)))
+    return null;
   const text = trim(event.transcript);
   if (!text) return null;
   // Both legacy event names can describe the same completed output. Use content

@@ -53,12 +53,14 @@ describe('surveyToolResponsePayloadController', () => {
           },
         },
       };
-      const response = buildResponsePayload(defaultOpts({
-        questionPool: [{ id: 'q1', type: 'binary', prompt: 'Proceed?' }],
-        surveyResponseState: state,
-        getConvictionFromSlice,
-        getImportanceFromSlice,
-      })).responses![0];
+      const response = buildResponsePayload(
+        defaultOpts({
+          questionPool: [{ id: 'q1', type: 'binary', prompt: 'Proceed?' }],
+          surveyResponseState: state,
+          getConvictionFromSlice,
+          getImportanceFromSlice,
+        }),
+      ).responses![0];
       const finalRatings = { importance: ratings.expectedImportance, conviction: ratings.expectedConviction };
       expect(response).toMatchObject(finalRatings);
       expect(response.interviewProvenance).toMatchObject({
