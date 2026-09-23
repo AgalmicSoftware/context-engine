@@ -1689,7 +1689,18 @@ describe('OnePageSession results routing', () => {
       expect(screen.getByRole('region', { name: 'Multiple choice' })).toHaveTextContent('First');
       expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
       expect(screen.getAllByText(`${questionList.length} (${binaryCount} Binary)`)).toHaveLength(2);
-      expect(screen.getByText(`1 (${includeBinary ? 1 : 0} Binary)`)).toBeInTheDocument();
+      const expectedStats = {
+        Participants: includeBinary ? '1' : '1 (0 Binary)',
+        Questions: `${questionList.length} (${binaryCount} Binary)`,
+        Responses: `${questionList.length} (${binaryCount} Binary)`,
+        'Responses/Participant Avg': `${questionList.length.toFixed(2)} (${binaryCount.toFixed(2)} Binary)`,
+      };
+      Object.entries(expectedStats).forEach(([label, expected]) => {
+        const stat = screen.getByText(
+          (_, node) => node?.classList.contains('statLabel') && node.firstChild?.textContent.trim() === label,
+        ).parentElement;
+        expect(stat.querySelector('.statValue').textContent).toBe(expected);
+      });
     },
   );
 
