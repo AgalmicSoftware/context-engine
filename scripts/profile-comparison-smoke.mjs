@@ -22,6 +22,12 @@ try {
       );
       const run = page.getByTestId("ce-compare-run");
       await run.waitFor();
+      await page.getByText("Loading chart...").waitFor();
+      await page.waitForFunction(() =>
+        document
+          .querySelector('[data-testid="ce-compare-run"]')
+          ?.textContent?.includes("2s"),
+      );
       await page.waitForFunction(
         () =>
           !document.querySelector('[data-testid="ce-compare-run"]')?.disabled,

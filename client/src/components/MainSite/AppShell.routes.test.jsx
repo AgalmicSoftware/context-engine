@@ -21,7 +21,11 @@ import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbac
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
-import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController';
+import {
+  markWorkerCanonicalSessionBootstrapVerified,
+  upsertWorkerCanonicalSessionBootstrap,
+} from '../../utilities/session/sessionWorkerConfigCache.js';
 import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
@@ -481,6 +485,22 @@ const buildSessionConfig = (overrides = {}) => ({
   },
   ...overrides,
 });
+
+const verifyWorkerRouteFixture = (subject, config) => {
+  config.corsWorkerUrl ||= 'https://worker.example.com';
+  config.sessionId ||= '0x00112233445566778899aabbccddeeff';
+  config.configRevision ||= 'revision-1';
+  const identity = { slug: config.slug, sessionIdHex: config.sessionId, workerOrigin: config.corsWorkerUrl };
+  upsertWorkerCanonicalSessionBootstrap({ ...identity, configRevision: config.configRevision, config });
+  markWorkerCanonicalSessionBootstrapVerified(identity);
+  getWorkerCanonicalRouteController(subject).handleBootstrapResolved({
+    config,
+    configRevision: config.configRevision,
+    sessionId: config.sessionId,
+    sessionSlug: config.slug,
+    workerOrigin: config.corsWorkerUrl,
+  });
+};
 
 const setRoute = (path, search = '') => {
   window.history.pushState({}, '', `${path}${search}`);
@@ -1186,7 +1206,7 @@ describe('AppShell route render smoke', () => {
 
     const view = render(subject.render());
 
-    expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(/^Loading Session$/);
+    expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(/^Loading Session · 0s$/);
     expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
@@ -1974,6 +1994,47 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'true');
   });
 
+  it.each(['/compare', '/u/0x1111111111111111111111111111111111111111'])(
+    'verifies a discovery-only Worker config before loading %s',
+    async (path) => {
+      const workerOrigin = 'https://comparison-worker.example.com';
+      const config = {
+        slug: 'comparison-session',
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        configRevision: 'revision-1',
+        corsWorkerUrl: workerOrigin,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      };
+      const hint = { ...config, sessionModeProfile: { profileVersion: 1, authority: { mode: 'worker_canonical' } } };
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, sessionSlug: config.slug, config }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const subject = createSubject({
+        path,
+        search: '?session=comparison-session',
+        activeSessionSlug: config.slug,
+        sessionConfig: hint,
+      });
+      const view = render(subject.render());
+      expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent('Loading Session');
+      expect(mockCompareAddresses).not.toHaveBeenCalled();
+      expect(mockUserPage).not.toHaveBeenCalled();
+      await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+      view.rerender(subject.render());
+      await waitFor(() => expect(path === '/compare' ? mockCompareAddresses : mockUserPage).toHaveBeenCalled());
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${workerOrigin}/session-config?slug=comparison-session`,
+        expect.objectContaining({ method: 'GET' }),
+      );
+      // Hydration must use the verified full config, not the incomplete discovery hint.
+      expect(subject.getCacheSessionCfg(config.slug)).toEqual(config);
+      expect(subject.getCacheSessionCfg('another-session')).not.toEqual(config);
+    },
+  );
+
   it('keeps pure Worker comparison session-scoped without invoking the on-chain profile scanner', async () => {
     const workerConfig = buildSessionConfig({
       slug: 'worker-session',
@@ -1996,6 +2057,7 @@ describe('AppShell route render smoke', () => {
       isResponsesCacheReady: true,
     };
 
+    verifyWorkerRouteFixture(subject, workerConfig);
     render(subject.render());
 
     expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
@@ -2033,6 +2095,7 @@ describe('AppShell route render smoke', () => {
       sessionConfig: hybridConfig,
     });
 
+    verifyWorkerRouteFixture(subject, hybridConfig);
     render(subject.render());
 
     expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
@@ -3529,6 +3592,7 @@ describe('AppShell route render smoke', () => {
       sessionConfig,
     });
 
+    verifyWorkerRouteFixture(subject, sessionConfig);
     render(subject.render());
 
     expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-network-id', '');
@@ -3566,6 +3630,7 @@ describe('AppShell route render smoke', () => {
       sessionConfig,
     });
 
+    verifyWorkerRouteFixture(subject, sessionConfig);
     render(subject.render());
 
     expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-network-id', '');
@@ -3606,6 +3671,7 @@ describe('AppShell route render smoke', () => {
       sessionConfig,
     });
 
+    verifyWorkerRouteFixture(subject, sessionConfig);
     render(subject.render());
 
     expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-network-id', String(DEFAULT_NETWORK.id));

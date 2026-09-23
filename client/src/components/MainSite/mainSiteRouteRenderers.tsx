@@ -290,7 +290,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       pathname: fullPath,
       search: readRouteLocationSearch().searchStr,
     });
-    const sessionConfig = sessionSlug === defaultSlug ? defaultSessionCfg : host.getDisplaySessionCfg(sessionSlug);
+    let sessionConfig = sessionSlug === defaultSlug ? defaultSessionCfg : host.getDisplaySessionCfg(sessionSlug);
+    const controller = getWorkerCanonicalRouteController(host);
+    const workerRoute = resolveMainSiteGroupWorkerRoute({
+      workerSessionSlug: sessionSlug,
+      sessionConfig,
+      searchStr: readRouteLocationSearch().searchStr,
+      controller,
+    });
+    const interruption =
+      renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
+    if (interruption) return interruption;
+    if (workerRoute.kind === 'verified') sessionConfig = workerRoute.sessionConfig;
     const comparePath = String(fullPath || '').split('?')[0];
     const firstAddress =
       comparePath
@@ -501,7 +512,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
     const profileSearchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const profileSearchParams = new URLSearchParams(profileSearchStr);
-    const profileSessionConfig = defaultSlug ? host.getDisplaySessionCfg(defaultSlug) : null;
+    let profileSessionConfig = defaultSlug ? host.getDisplaySessionCfg(defaultSlug) : null;
+    const controller = getWorkerCanonicalRouteController(host);
+    const workerRoute = resolveMainSiteGroupWorkerRoute({
+      workerSessionSlug: defaultSlug,
+      sessionConfig: profileSessionConfig,
+      searchStr: profileSearchStr,
+      controller,
+    });
+    const interruption =
+      renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
+    if (interruption) return interruption;
+    if (workerRoute.kind === 'verified') profileSessionConfig = workerRoute.sessionConfig;
     const profileCapabilityContext = resolveMainSiteRouteCapabilityContext({
       slug: defaultSlug,
       sessionConfig: profileSessionConfig,

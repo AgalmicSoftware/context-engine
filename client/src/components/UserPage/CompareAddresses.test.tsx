@@ -410,6 +410,37 @@ describe('CompareAddresses subject routes', () => {
     }
   });
 
+  it('counts loading seconds, hides false empty results, and retains retry when caches finish late', async () => {
+    jest.useFakeTimers();
+    try {
+      const view = (ready: boolean) => (
+        <MemoryRouter initialEntries={[comparisonPath]}>
+          <CompareAddress activeSessionSlug="alpha" sessionCachesReady={ready} />
+        </MemoryRouter>
+      );
+      const { rerender } = render(view(false));
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(screen.getByTestId('ce-compare-run')).toHaveTextContent('2s');
+      expect(screen.getByText(/Loading chart/)).toHaveTextContent('2s');
+      expect(screen.getAllByText(/Loading\.\.\./)).toHaveLength(2);
+      screen.getAllByText(/Loading\.\.\./).forEach((node) => expect(node).toHaveTextContent('2s'));
+      await act(async () => {
+        jest.advanceTimersByTime(28000);
+      });
+      rerender(view(true));
+      expect(screen.getByRole('button', { name: 'Retry loading session data' })).toBeEnabled();
+      expect(screen.getByText(/No agreements found/)).not.toBeVisible();
+      expect(screen.getByText(/no shared canonical question IDs/)).not.toBeVisible();
+      expect(mockRunCompareToolkit).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry loading session data' }));
+      expect(screen.getByTestId('ce-compare-run')).toHaveTextContent('0s');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('runs a simulated-only route without waiting for session caches', async () => {
     render(
       <MemoryRouter

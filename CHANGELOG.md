@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client fixes — available when the site deploys
 
-- Keep profile comparisons in the selected session, load Hosted answers without waiting for chain membership, and offer Retry when session data cannot load. Restore compact participant pills and comparison styling in both themes.
+- Keep profile comparisons in the selected session, load Hosted answers without waiting for chain membership, verify the session configuration on a fresh visit, and show elapsed seconds and Retry when session data cannot load. Restore compact participant pills and comparison styling in both themes.
 
 - Show which AI model generated a profile summary and describe preferences in
   plain language rather than listing scores and vote totals.

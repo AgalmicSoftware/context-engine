@@ -75,6 +75,7 @@ import {
   type CompareBookmark,
 } from './compareMembershipPresentation';
 import CompareVenn from './CompareVenn';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { useCompareSessionData } from './useCompareSessionData';
 import CompareSubjectInputList from './CompareSubjectInputList';
 import CompareSubjectParticipants from './CompareSubjectParticipants';
@@ -1708,7 +1709,12 @@ const CompareAddress = ({
           <>
             <FontAwesomeIcon icon={faSpinner} spin />
             &nbsp;
-            {pendingComparisonRef.current ? resolveCompareRunLabel(sessionCachesReady) : 'Comparing subjects...'}
+            <ElapsedLoadingLabel
+              key={compareRunIdRef.current}
+              label={
+                pendingComparisonRef.current ? resolveCompareRunLabel(sessionCachesReady) : 'Comparing subjects...'
+              }
+            />
           </>
         ) : (
           'Compare Views & Activity'
@@ -1718,7 +1724,7 @@ const CompareAddress = ({
       {comparisonError && (
         <div className={styles.comparisonError} role="alert" style={resolveCompareErrorStyle()}>
           {comparisonError}
-          {sessionCachesReady === false && (
+          {!loading && currentUsers.length === 0 && (
             <button type="button" className={styles.addAddressBtn} onClick={performComparison} disabled={loading}>
               Retry loading session data
             </button>
@@ -1727,8 +1733,12 @@ const CompareAddress = ({
       )}
 
       {/* RESULTS */}
-      <Collapse isOpen={showComparison}>
-        <div className={styles.comparisonSummary} data-testid={E2E_TESTIDS.COMPARE_RESULT}>
+      <Collapse isOpen={showComparison && (!comparisonError || currentUsers.length > 0)} mountOnEnter unmountOnExit>
+        <div
+          className={styles.comparisonSummary}
+          data-testid={E2E_TESTIDS.COMPARE_RESULT}
+          hidden={!!comparisonError && currentUsers.length === 0}
+        >
           {subjectCompatibility.notice && (
             <div className={styles.placeholderNote} role="status">
               {subjectCompatibility.notice}
@@ -1753,7 +1763,7 @@ const CompareAddress = ({
                     }}
                   >
                     <FontAwesomeIcon icon={faSpinner} spin />
-                    <span>Loading chart...</span>
+                    <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading chart..." />
                   </div>
                 ) : subjectCompatibility.opinionComparable ? (
                   <OpinionCompass2D
@@ -1774,7 +1784,9 @@ const CompareAddress = ({
                   {vennLoading ? (
                     <div className={styles.placeholderNote}>
                       <FontAwesomeIcon icon={faSpinner} spin />
-                      <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
+                      <span style={resolveCompareLoadingTextStyle()}>
+                        <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading overlap..." />
+                      </span>
                     </div>
                   ) : (
                     <CompareVenn
@@ -1795,7 +1807,9 @@ const CompareAddress = ({
                   {vennLoading ? (
                     <div className={styles.placeholderNote}>
                       <FontAwesomeIcon icon={faSpinner} spin />
-                      <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
+                      <span style={resolveCompareLoadingTextStyle()}>
+                        <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading overlap..." />
+                      </span>
                     </div>
                   ) : (
                     <CompareVenn
@@ -1846,7 +1860,9 @@ const CompareAddress = ({
                     {bulletsLoading ? (
                       <li className={styles.resultItem}>
                         <FontAwesomeIcon icon={faSpinner} spin />
-                        <span style={resolveCompareLoadingTextStyle()}>Loading...</span>
+                        <span style={resolveCompareLoadingTextStyle()}>
+                          <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading..." />
+                        </span>
                       </li>
                     ) : (comparisonResult?.agreements || []).length === 0 ? (
                       <li className={styles.resultEmpty}>No agreements found yet.</li>
@@ -1865,7 +1881,9 @@ const CompareAddress = ({
                           {drillState[`agree-${i}`]?.open && (
                             <div style={resolveCompareDrillBodyStyle()}>
                               {drillState[`agree-${i}`]?.loading && (
-                                <span className={styles.drillSpinner}>Loading…</span>
+                                <span className={styles.drillSpinner}>
+                                  <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading…" />
+                                </span>
                               )}
                               {drillState[`agree-${i}`]?.error && (
                                 <span className={styles.comparisonError}>{drillState[`agree-${i}`].error}</span>
@@ -1890,7 +1908,9 @@ const CompareAddress = ({
                     {bulletsLoading ? (
                       <li className={styles.resultItem}>
                         <FontAwesomeIcon icon={faSpinner} spin />
-                        <span style={resolveCompareLoadingTextStyle()}>Loading...</span>
+                        <span style={resolveCompareLoadingTextStyle()}>
+                          <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading..." />
+                        </span>
                       </li>
                     ) : (comparisonResult?.disagreements || []).length === 0 ? (
                       <li className={styles.resultEmpty}>No disagreements found yet.</li>
@@ -1908,7 +1928,11 @@ const CompareAddress = ({
                           <span className={styles.resultText}>{pt}</span>
                           {drillState[`dis-${i}`]?.open && (
                             <div style={resolveCompareDrillBodyStyle()}>
-                              {drillState[`dis-${i}`]?.loading && <span className={styles.drillSpinner}>Loading…</span>}
+                              {drillState[`dis-${i}`]?.loading && (
+                                <span className={styles.drillSpinner}>
+                                  <ElapsedLoadingLabel key={compareRunIdRef.current} label="Loading…" />
+                                </span>
+                              )}
                               {drillState[`dis-${i}`]?.error && (
                                 <span className={styles.comparisonError}>{drillState[`dis-${i}`].error}</span>
                               )}
