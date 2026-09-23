@@ -520,7 +520,6 @@ function SessionInterviewPanel({
       editedDrafts,
       selected,
       suggestedQuestions,
-      existingResponseSlice,
       prefillPacket,
       questions,
       resolveWorkerUrl,
