@@ -1756,21 +1756,20 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     );
   }
   const keys = Array.isArray(listed?.keys) ? listed.keys : [];
-  const items = [];
-  for (const keyEntry of keys) {
-    const name = trim(keyEntry?.name || keyEntry);
-    if (!name) continue;
-    let raw;
-    try {
-      raw = await index.get(name);
-    } catch {
-      return responseJson(
-        deps,
-        { error: 'Cloudflare storage index metadata is unavailable.' },
-        503,
-        baseHeaders,
-      );
+  const rows = [];
+  try {
+    for (let offset = 0; offset < keys.length; offset += 8) {
+      rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
+        const name = trim(keyEntry?.name || keyEntry);
+        return { name, raw: name ? await index.get(name) : null };
+      })));
     }
+  } catch {
+    return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);
+  }
+  const items = [];
+  for (const { name, raw } of rows) {
+    if (!name) continue;
     let metadata;
     try {
       metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;

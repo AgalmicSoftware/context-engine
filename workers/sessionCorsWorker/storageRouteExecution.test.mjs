@@ -4020,3 +4020,30 @@ test('resource names cannot alias list prefixes or bypass response policy', asyn
   });
   assert.deepEqual((await listed.json()).items, []);
 });
+
+test('storage lists read index rows concurrently with a bounded batch', async () => {
+  let active = 0;
+  let maximum = 0;
+  let listCalls = 0;
+  const keys = Array.from({ length: 24 }, (_, i) => ({ name: `ce-storage:session-a:questions:${i}` }));
+  const env = { CE_STORAGE_INDEX_KV: {
+    list: async () => { listCalls += 1; return { keys, list_complete: true }; },
+    get: async () => {
+      active += 1;
+      maximum = Math.max(active, maximum);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+      return null;
+    },
+  } };
+  const response = await storageRoute({
+    path: '/storage/list', method: 'GET', env, slug: 'session-a',
+    config: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+    request: new Request('https://worker.example/storage/list?resource=questions'), deps: { json },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(listCalls, 1);
+  assert.ok(maximum > 1, 'index reads must overlap');
+  assert.ok(maximum <= 8, 'index reads must remain bounded');
+  assert.equal(active, 0);
+});
