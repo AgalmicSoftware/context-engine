@@ -182,6 +182,23 @@ export default function QuadraticAllocationInput({
           >
             <FontAwesomeIcon icon={faQuestionCircle} />
           </button>
+          <button
+            className={styles.reset}
+            data-ce-control-appearance="frameless"
+            type="button"
+            aria-label="Reset"
+            title="Reset all votes to neutral"
+            disabled={disabled || (!valueError && votes.every((vote) => vote === 0))}
+            onClick={() => {
+              dragSourceRef.current = null;
+              draggedOptionRef.current = null;
+              pendingRef.current = null;
+              setPreview(null);
+              onChange?.(options.map(() => 0));
+            }}
+          >
+            <FontAwesomeIcon icon={faUndo} />
+          </button>
         </div>
         <CETooltip
           target={helpId}
@@ -195,23 +212,6 @@ export default function QuadraticAllocationInput({
           leave credits unused.
         </CETooltip>
         <span className={styles.support}>+ Support</span>
-        <button
-          className={styles.reset}
-          data-ce-control-appearance="frameless"
-          type="button"
-          aria-label="Reset"
-          title="Reset all votes to neutral"
-          disabled={disabled || (!valueError && votes.every((vote) => vote === 0))}
-          onClick={() => {
-            dragSourceRef.current = null;
-            draggedOptionRef.current = null;
-            pendingRef.current = null;
-            setPreview(null);
-            onChange?.(options.map(() => 0));
-          }}
-        >
-          <FontAwesomeIcon icon={faUndo} />
-        </button>
       </div>
       <div className={styles.optionsViewport} ref={viewportRef}>
         <div id={optionsId} className={styles.options} ref={optionsRef} style={{ height: optionsHeight }}>
