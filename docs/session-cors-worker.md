@@ -2545,3 +2545,41 @@ the new selection. Failed refreshes still expose the existing error state.
 Authenticated generated-results artifact reads verify the token’s session identity
 and authorization epoch, then recheck the current storage scope and rate limit.
 Anonymous artifact reads continue through the configured public-view policy.
+
+
+### Interview saved-answer readiness
+
+Interview submission waits for the signed-in participant's saved answers for the
+interview questions, independently of the public results cache. A partial public
+listing remains partial; it is never treated as proof that the participant has
+no saved answers. Account, session, or question-set changes invalidate readiness.
+Loading preserves local edits and updates the saved baseline. If loading finds
+an existing answer while submission is queued, that answer is deselected so the
+participant can explicitly review and choose whether to replace it.
+
+For Worker-canonical Hosted sessions, the client uses authenticated
+`GET /storage/list?resource=responses&mine=true`. Ownership comes from the
+verified requester, not a supplied responder parameter or the answer payload.
+The response includes `responder`, the canonical `sessionId`, and the existing
+`items`, `cursor`, and `listComplete` fields, with `Cache-Control: private, no-store`.
+Every page is checked against the expected account and session before its answer
+payloads are read. Session and per-payload authorization still apply; unavailable
+metadata or denied own payloads fail the lookup rather than imply an empty history.
+The ordinary public listing contract and its UI cap are unchanged.
+
+This reuses the existing metadata index and requires no data migration. The own
+lookup follows all pages, including beyond the public UI's 100-page cap, and
+reads only the participant's payloads, in batches of eight. Metadata scanning
+still scales with total stored response versions; this is not a new per-user
+index. It uses the same Worker timestamp and storage-reference ordering as the
+public cache to select the latest edits. Closing the interview or changing its
+identity cancels the in-flight lookup. Failures show **Retry saved answers** and
+do not enable submission. An older Worker lacking the scope/completeness fields
+cannot silently report an empty saved history; deploy compatible client and
+Worker versions together.
+
+For chain-authoritative sessions, the lookup reuses strict per-account,
+per-question contract pointer reads, also in batches of eight. A zero pointer
+proves there is no saved answer; RPC or payload-read failures do not. This covers
+both decentralized Arweave payloads and chain-authoritative Cloudflare payloads
+without changing a contract interface.

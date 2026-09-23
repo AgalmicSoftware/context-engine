@@ -54,6 +54,8 @@ export const loadWorkerResponses = async (
     sessionConfig,
     cachedStorageRefIds,
     onPartial,
+    ownResponses = false,
+    signal,
   }: {
     account?: unknown;
     providerLike?: unknown;
@@ -61,6 +63,8 @@ export const loadWorkerResponses = async (
     sessionConfig: UnknownRecord;
     cachedStorageRefIds?: ReadonlySet<string>;
     onPartial?: () => void;
+    ownResponses?: boolean;
+    signal?: AbortSignal;
   },
   deps: WorkerCanonicalResponseHydrationDeps = {},
 ): Promise<WorkerCanonicalResponseRow[]> => {
@@ -76,13 +80,17 @@ export const loadWorkerResponses = async (
   const seenCursors = new Set<string>();
   let cursor: string | null = null;
 
-  for (let pageIndex = 0; pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
+  for (let pageIndex = 0; ownResponses || pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
+    signal?.throwIfAborted();
     const page = await listPage({
       sessionSlug: target.sessionSlug,
       sessionConfig: target.sessionConfig,
       context,
       workerUrl: target.workerUrl,
       resource: 'responses',
+      ...(ownResponses
+        ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId }, signal }
+        : {}),
       cursor,
       limit: 100,
     });
@@ -94,19 +102,25 @@ export const loadWorkerResponses = async (
     }
     seenCursors.add(nextCursor);
     cursor = nextCursor;
-    if (pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
+    if (!ownResponses && pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
       onPartial?.();
     }
   }
 
   const rows: WorkerCanonicalResponseRow[] = [];
   for (let offset = 0; offset < items.length; offset += RESPONSE_READ_CONCURRENCY) {
+    signal?.throwIfAborted();
     const batch = items.slice(offset, offset + RESPONSE_READ_CONCURRENCY);
     const batchRows = await Promise.all(
       batch.map(async (item): Promise<WorkerCanonicalResponseRow | null> => {
         const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
         const metadata = isRecord(item.metadata) ? item.metadata : {};
         const storageRefId = readString(storageRef.id);
+        if (
+          ownResponses &&
+          (!storageRefId || readString(metadata.responder).toLowerCase() !== readString(account).toLowerCase())
+        )
+          throw new Error('The Worker returned an invalid own-response reference.');
         if (!storageRefId) return null;
         // Response payloads are immutable; an edit receives a new storage reference.
         if (cachedStorageRefIds?.has(storageRefId)) return null;
@@ -116,9 +130,13 @@ export const loadWorkerResponses = async (
           sessionConfig: target.sessionConfig,
           context,
           workerUrl: target.workerUrl,
+          ...(signal ? { signal } : {}),
         });
         const payload = await response.json().catch(() => null);
-        if (!isRecord(payload)) return null;
+        if (!isRecord(payload)) {
+          if (ownResponses) throw new Error('A saved answer could not be read.');
+          return null;
+        }
         const payloadSlug = readString(payload.sessionSlug);
         const payloadSessionId = normalizeWorkerCanonicalSessionIdHex(payload.sessionId);
         if (
@@ -126,15 +144,21 @@ export const loadWorkerResponses = async (
           canonicalizeSessionSlug(payloadSlug) !== target.sessionSlug ||
           payloadSessionId !== target.sessionId
         ) {
+          if (ownResponses) throw new Error('A saved answer belongs to a different session.');
           return null;
         }
         const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
-        if (!questionId) return null;
+        if (!questionId) {
+          if (ownResponses) throw new Error('A saved answer has no question identity.');
+          return null;
+        }
         // The Worker derives this value from the authenticated uploader. Payload claims
         // are intentionally ignored so one participant cannot impersonate another.
         const responder = readString(metadata.responder).toLowerCase();
         if (!responder) return null;
         const createdAtMs = Date.parse(readString(metadata.createdAt));
+        if (ownResponses && !(Number.isFinite(createdAtMs) && createdAtMs > 0))
+          throw new Error('A saved answer has no valid timestamp.');
         return {
           questionId,
           responder,

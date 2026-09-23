@@ -267,3 +267,11 @@ Cluster-summary caches include the filtered participant roster in assignment ord
 Report refreshes preserve expanded clusters while those cluster identifiers remain present. A two-participant report uses its existing PCA coordinates for the graph because UMAP cannot fit that cohort size.
 
 Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4 or v5 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change v1–v4 packet import validation or relabel catalog hashes.
+
+
+Saved-answer checks are scoped to the signed-in participant and the current
+interview questions, independently of public results loading. The review remains
+blocked on incomplete or failed saved-answer reads and offers a retry. Existing
+answers discovered during a queued submission are deselected for explicit review;
+local draft edits are retained. See [the Worker guide](session-cors-worker.md#interview-saved-answer-readiness)
+for Hosted and chain-authoritative lookup behavior.

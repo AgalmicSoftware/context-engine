@@ -1,3 +1,4 @@
+import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
@@ -89,6 +90,7 @@ type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   context?: unknown;
   workerUrl?: string;
   existingResponseSlice?: UnknownRecord | null;
+  onLoadSavedResponses?: InterviewSavedAnswerLoader;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
   account?: unknown;
@@ -120,7 +122,8 @@ function SessionInterviewPanel({
   sessionConfig = null,
   context,
   workerUrl = '',
-  existingResponseSlice = null,
+  existingResponseSlice: formResponseSlice = null,
+  onLoadSavedResponses,
   prefillPacket = null,
   initialError = '',
   account = '',
@@ -276,9 +279,31 @@ function SessionInterviewPanel({
   ].join('|');
   const hasReadinessContextToken =
     responseReadinessContextToken !== undefined && responseReadinessContextToken !== null;
-  const responseStateReadyForSubmit =
-    isResponsesCacheReady !== false &&
-    (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
+  const ownAnswers = useInterviewSavedAnswers({
+    load: onLoadSavedResponses,
+    contextKey: activeSubmitContextToken,
+    questionIds: [...questions.map((question) => question.id), ...drafts.map((draft) => draft.questionId)],
+    active: authenticatedForSubmit,
+    onLoaded: (slice) => {
+      const conflicts = drafts.filter((draft) => hasDraftValue(responseFieldValue(slice, 'answers', draft.questionId)));
+      if (!conflicts.length) return;
+      setSelected((current) => ({
+        ...current,
+        ...Object.fromEntries(conflicts.map((draft) => [draft.questionId, false])),
+      }));
+      pendingSubmitBaseContextRef.current = '';
+      pendingSubmitActiveContextRef.current = '';
+      setPendingSubmitAfterLogin(false);
+      setStatus('Saved answers loaded. Select any answers you want to replace.');
+    },
+  });
+  const existingResponseSlice = ownAnswers.slice || formResponseSlice;
+  const existingResponsesRef = useRef(existingResponseSlice);
+  existingResponsesRef.current = existingResponseSlice;
+  const responseStateReadyForSubmit = onLoadSavedResponses
+    ? ownAnswers.ready
+    : isResponsesCacheReady !== false &&
+      (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
   const suggestedQuestionAuthoringState = resolveSuggestedQuestionAuthoringState({
     account,
     loginComplete,
@@ -443,7 +468,7 @@ function SessionInterviewPanel({
           editedDrafts,
           selected,
           mapped,
-          (id) => !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', id)),
+          (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
           importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
         );
         for (const draft of review.drafts) {
@@ -451,7 +476,7 @@ function SessionInterviewPanel({
             review.edited[draft.questionId] = {
               ...review.edited[draft.questionId],
               additionalComments: String(
-                responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || '',
+                responseFieldValue(existingResponsesRef.current, 'additionalComments', draft.questionId) || '',
               ),
             };
           }
@@ -901,6 +926,12 @@ function SessionInterviewPanel({
             />
           ) : null}
 
+          {ownAnswers.error ? (
+            <div className={styles.sessionListeningError} role="alert">
+              Could not load your saved answers: {ownAnswers.error}
+              <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
+            </div>
+          ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection
               title="Review proposed responses"

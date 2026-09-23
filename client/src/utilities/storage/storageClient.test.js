@@ -402,3 +402,36 @@ describe('storageClient', () => {
     ]);
   });
 });
+
+describe('complete own-answer listings', () => {
+  const ownResponses = { account: '0xabc', sessionId: '0x1234' };
+  const options = { workerUrl: 'https://worker.example', sessionSlug: 'alpha', resource: 'responses', ownResponses };
+  it('authenticates own listings and verifies the responder/session scope', async () => {
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...ownResponses,
+          responder: ownResponses.account,
+          items: [],
+          cursor: null,
+          listComplete: true,
+        }),
+      ),
+    );
+    await expect(listSessionStorageRefsPage(options)).resolves.toEqual({ items: [], cursor: null, listComplete: true });
+    expect(fetchWorkerWithAuth).toHaveBeenLastCalledWith(
+      expect.stringContaining('mine=true'),
+      expect.anything(),
+      expect.objectContaining({ preferAnonymous: false }),
+    );
+  });
+  it.each([
+    { items: [], listComplete: true },
+    { responder: '0xother', sessionId: '0x1234', items: [], listComplete: true },
+    { responder: '0xabc', sessionId: '0x5678', items: [], listComplete: true },
+    { responder: '0xabc', sessionId: '0x1234', items: [], listComplete: false },
+  ])('rejects old Workers and unproven completion (%j)', async (body) => {
+    fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify(body)));
+    await expect(listSessionStorageRefsPage(options)).rejects.toThrow('complete saved answers');
+  });
+});

@@ -38448,6 +38448,11 @@ var init_storageRouteExecution = __esm({
       const listOptions = await readStorageListOptions({ request, url });
       if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
       const { cursor, limit, resource } = listOptions;
+      const mine = url.searchParams.get("mine") === "true";
+      const responder = mine ? normalizeAddress(uploaderAddress) : "";
+      if (mine && (resource !== "responses" || !responder)) {
+        return responseJson(deps, { error: "Own responses require authentication and the responses resource." }, 403, baseHeaders);
+      }
       if (!isStorageResource(resource)) return responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders);
       const access = await authorizeCloudflareStorageAccess({
         env,
@@ -38498,10 +38503,18 @@ var init_storageRouteExecution = __esm({
         try {
           metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
         } catch {
+          if (mine) return responseJson(deps, { error: "Response metadata is unavailable." }, 503, baseHeaders);
           continue;
         }
         const storageRef = normalizeStorageRef(metadata || {});
-        if (!storageRef || storageRef.resource !== resource || name !== buildIndexKey({ slug, resource, id: storageRef.id })) continue;
+        if (!storageRef || storageRef.resource !== resource || name !== buildIndexKey({ slug, resource, id: storageRef.id })) {
+          if (mine) return responseJson(deps, { error: "Response metadata is unavailable." }, 503, baseHeaders);
+          continue;
+        }
+        if (mine && !trim6(metadata?.responder)) {
+          return responseJson(deps, { error: "Response ownership is unavailable." }, 503, baseHeaders);
+        }
+        if (mine && normalizeAddress(metadata.responder) !== responder) continue;
         const itemAccess = await authorizeCloudflareStorageAccess({
           env,
           config,
@@ -38513,7 +38526,10 @@ var init_storageRouteExecution = __esm({
           baseHeaders,
           deps
         });
-        if (!itemAccess.ok) continue;
+        if (!itemAccess.ok) {
+          if (mine) return itemAccess.response;
+          continue;
+        }
         const metadataAccess = normalizePayloadAccessControl2(
           metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config)
         );
@@ -38538,8 +38554,9 @@ var init_storageRouteExecution = __esm({
       return responseJson(deps, {
         items,
         cursor: nextCursor || null,
-        listComplete: !nextCursor
-      }, 200, hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
+        listComplete: !nextCursor,
+        ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
+      }, 200, mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
     };
     listCloudflareMetadataRows = async ({ index, slug, resource = "" }) => {
       const rows = [];

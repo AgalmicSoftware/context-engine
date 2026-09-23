@@ -28,6 +28,7 @@ export type SurveyQuestionReadsGateway = {
     responderAddress: unknown,
     questionId: unknown,
     groupKeyOrCfg?: unknown,
+    options?: SurveyQuestionReadOptions,
   ) => Promise<unknown>;
   getSurveyResponse: (
     provider: unknown,
@@ -53,8 +54,10 @@ export const surveyQuestionReadsPort: SurveyQuestionReadsPort = {
     options === undefined
       ? chainGateway.getResponse(provider, responderAddress, questionId, groupKeyOrCfg)
       : chainGateway.getResponse(provider, responderAddress, questionId, groupKeyOrCfg, options),
-  getResponseHash: (provider, responderAddress, questionId, groupKeyOrCfg) =>
-    chainGateway.getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg),
+  getResponseHash: (provider, responderAddress, questionId, groupKeyOrCfg, options) =>
+    options === undefined
+      ? chainGateway.getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg)
+      : chainGateway.getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg, options),
   getSurveyResponse: (provider, responderAddress, surveyId, groupKeyOrCfg, options) =>
     options === undefined
       ? chainGateway.getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg)

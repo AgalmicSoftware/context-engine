@@ -1,3 +1,4 @@
+import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
@@ -9,6 +10,7 @@ import {
   createPileViewRuntimeStrategy,
   recordInterviewProvenance,
   submitSessionInterviewResponses,
+  loadSessionInterviewOwnAnswers,
 } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
@@ -1562,4 +1564,72 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     expect(await screen.findByTestId('mock-pile-create')).toHaveAttribute('data-hide-survey-toggle', 'true');
   });
+});
+
+describe('independent interview own-answer hydration', () => {
+  it('installs a complete baseline and ignores an old account’s late load', async () => {
+    let resolve;
+    const load = jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const engine = {
+      props: { account: '0xabc', loginComplete: true, sessionSlug: 'demo', sessionConfig: { slug: 'demo' } },
+      state: {
+        surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        editBaseline: {},
+      },
+      valuesEqual: Object.is,
+      buildSliceFromUserAnswers: jest.fn(() => ({
+        answers: { q1: { value: 'saved' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      })),
+      setState(update, callback) {
+        this.state = { ...this.state, ...update(this.state) };
+        callback();
+      },
+    };
+    try {
+      const pending = loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal);
+      engine.props = { ...engine.props, account: '0xdef' };
+      resolve([{ questionID: 'q1', answer: { value: 'saved' } }]);
+      await expect(pending).rejects.toThrow('account or session changed');
+      expect(engine.state.editBaseline).toEqual({});
+      const current = loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal);
+      resolve([{ questionID: 'q1', answer: { value: 'saved' } }]);
+      await expect(current).resolves.toMatchObject({ answers: { q1: { value: 'saved' } } });
+      expect(engine.state.surveysResponseState[0].answers.q1).toEqual({ value: 'saved' });
+      expect(engine.state.userAnswers.responses).toHaveLength(1);
+    } finally {
+      load.mockRestore();
+    }
+  });
+});
+
+it('invalidates interview readiness when response storage or contract targets change', () => {
+  const base = {
+    sessionSlug: 'alpha',
+    sessionConfig: {
+      slug: 'alpha',
+      contracts: { surveys: { address: '0xabc', chainId: 11155420 } },
+      storageProfile: { resources: { responses: 'arweave' } },
+    },
+  };
+  const token = buildSessionInterviewSubmitContextToken(base);
+  expect(
+    buildSessionInterviewSubmitContextToken({
+      ...base,
+      sessionConfig: { ...base.sessionConfig, storageProfile: { resources: { responses: 'cloudflare' } } },
+    }),
+  ).not.toBe(token);
+  expect(
+    buildSessionInterviewSubmitContextToken({
+      ...base,
+      sessionConfig: { ...base.sessionConfig, contracts: { surveys: { address: '0xdef', chainId: 11155420 } } },
+    }),
+  ).not.toBe(token);
 });

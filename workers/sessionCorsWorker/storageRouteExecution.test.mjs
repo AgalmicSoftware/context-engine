@@ -4047,3 +4047,37 @@ test('storage lists read index rows concurrently with a bounded batch', async ()
   assert.ok(maximum <= 8, 'index reads must remain bounded');
   assert.equal(active, 0);
 });
+
+test('own-response listing uses authenticated ownership, preserves public rows, and fails closed on unreadable metadata', async () => {
+  const kv = createMockKv();
+  const account = '0x' + '11'.repeat(20);
+  const other = '0x' + '22'.repeat(20);
+  const common = { env: { CE_STORAGE_INDEX_KV: kv }, slug: 'session-a',
+    config: { sessionId: WORKER_GROUP_SESSION_ID, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+    deps: { json, randomBytes: createSequenceRandomBytes() }, baseHeaders: {},
+  };
+  for (const uploaderAddress of [account, other]) {
+    const uploaded = await storageRoute({ ...common, uploaderAddress, path: '/storage/upload', method: 'POST',
+      request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resource: 'responses', data: { answer: 'yes', responder: other } }),
+      }),
+    });
+    assert.equal(uploaded.status, 200);
+  }
+  const list = (query, uploaderAddress) => storageRoute({ ...common, uploaderAddress, path: '/storage/list', method: 'GET',
+    request: new Request(`https://worker.example/storage/list?resource=responses${query}`),
+  });
+  const mine = await list('&mine=true&responder=' + other, account);
+  assert.equal(mine.headers.get('Cache-Control'), 'private, no-store');
+  const result = await mine.json();
+  assert.equal(result.sessionId, WORKER_GROUP_SESSION_ID);
+  assert.equal(result.responder, account);
+  assert.equal(result.listComplete, true);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].metadata.responder, account);
+  assert.equal((await (await list('', account)).json()).items.length, 2);
+  assert.equal((await list('&mine=true', '')).status, 403);
+  const key = [...kv.store.keys()].find((key) => key.startsWith('ce-storage:'));
+  await kv.put(key, '{bad');
+  assert.equal((await list('&mine=true', account)).status, 503);
+});

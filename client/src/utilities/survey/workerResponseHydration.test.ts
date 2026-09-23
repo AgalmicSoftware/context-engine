@@ -328,3 +328,58 @@ describe('workerCanonicalResponseHydration', () => {
     expect(userCacheB['0xregistry']['11155420']).toEqual(userCacheA['0xregistry']['11155420']);
   });
 });
+
+it('finishes own-answer pagination beyond the public cap and reads only returned own payloads', async () => {
+  let pageCount = 0;
+  const readBlob = jest.fn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          sessionSlug: 'demo-sh',
+          sessionId: SESSION_ID,
+          questionID: 'q1',
+          answer: { value: 'latest' },
+        }),
+      ),
+  );
+  const rows = await loadWorkerResponses(
+    { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xabc', ownResponses: true },
+    {
+      listSessionStorageRefsPage: async (options) => {
+        expect(options.ownResponses).toEqual({ account: '0xabc', sessionId: SESSION_ID });
+        pageCount += 1;
+        return {
+          items:
+            pageCount === 120
+              ? [{ storageRef: { id: 'ref-own' }, metadata: { responder: '0xabc', createdAt: '2026-01-01T00:00:00Z' } }]
+              : [],
+          cursor: pageCount < 120 ? String(pageCount) : null,
+          listComplete: pageCount === 120,
+        };
+      },
+      readSessionStorageBlob: readBlob,
+    },
+  );
+  expect(pageCount).toBe(120);
+  expect(readBlob).toHaveBeenCalledTimes(1);
+  expect(rows[0].response.answer).toEqual({ value: 'latest' });
+});
+
+it('never considers repeated cursors or malformed own payloads a complete empty history', async () => {
+  const options = { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xabc', ownResponses: true };
+  await expect(
+    loadWorkerResponses(options, {
+      listSessionStorageRefsPage: async () => ({ items: [], cursor: 'repeated', listComplete: false }),
+    }),
+  ).rejects.toThrow('invalid cursor');
+  await expect(
+    loadWorkerResponses(options, {
+      listSessionStorageRefsPage: async () => ({
+        items: [{ storageRef: { id: 'ref-own' }, metadata: { responder: '0xabc' } }],
+        cursor: null,
+        listComplete: true,
+      }),
+      readSessionStorageBlob: async () => new Response('invalid json'),
+    }),
+  ).rejects.toThrow('could not be read');
+});

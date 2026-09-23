@@ -704,6 +704,137 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
   });
 
+  it('submits with complete own answers while the public results cache remains partial', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'New answer', confidence: 0.8, evidence: 'Context' },
+    ]);
+    const onLoadSavedResponses = jest
+      .fn()
+      .mockResolvedValue({ answers: {}, additionalComments: {}, importance: {}, conviction: {} });
+    baseProps.onSubmitResponses.mockResolvedValue({ status: 'submitted' });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        isResponsesCacheReady={false}
+        onLoadSavedResponses={onLoadSavedResponses}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: { summary: 'Context' },
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    await waitFor(() => expect(onLoadSavedResponses).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'New answer'));
+    expect(baseProps.onSubmitResponses).toHaveBeenCalled();
+  });
+
+  it('requires review before replacing an answer discovered during a queued submit', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'New answer', confidence: 0.8, evidence: 'Context' },
+    ]);
+    type Slice = {
+      answers: Record<string, unknown>;
+      importance: Record<string, unknown>;
+      conviction: Record<string, unknown>;
+      additionalComments: Record<string, unknown>;
+    };
+    let resolveSaved: (slice: Slice) => void = () => {};
+    const onLoadSavedResponses = jest.fn(
+      () =>
+        new Promise<Slice>((resolve) => {
+          resolveSaved = resolve;
+        }),
+    );
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        isResponsesCacheReady={false}
+        onLoadSavedResponses={onLoadSavedResponses}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: { summary: 'Context' },
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await act(async () =>
+      resolveSaved({
+        answers: { q1: { value: 'Already saved' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }),
+    );
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Saved answers loaded');
+  });
+
+  it('shows one saved-answer error and a working retry', async () => {
+    const onLoadSavedResponses = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Page unavailable'))
+      .mockResolvedValueOnce({ answers: {}, additionalComments: {}, importance: {}, conviction: {} });
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" onLoadSavedResponses={onLoadSavedResponses} />);
+    const retry = await screen.findByRole('button', { name: 'Retry saved answers' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Page unavailable');
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry saved answers' })).not.toBeInTheDocument());
+    expect(onLoadSavedResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not preselect an existing answer when its saved lookup completes before draft mapping', async () => {
+    type Draft = { questionId: string; answer: string; evidence: string; confidence: number };
+    let resolveMapping: (drafts: Draft[]) => void = () => {};
+    mockedMapInterviewEvidenceToResponses.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveMapping = resolve;
+        }),
+    );
+    const onLoadSavedResponses = jest
+      .fn()
+      .mockResolvedValue({
+        answers: { q1: { value: 'Saved' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        onLoadSavedResponses={onLoadSavedResponses}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: { summary: 'Context' },
+        }}
+      />,
+    );
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    await act(async () => resolveMapping([{ questionId: 'q1', answer: 'New', evidence: 'Context', confidence: 0.8 }]));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
   it('does not apply signed-in drafts after the hydrated account changes', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
