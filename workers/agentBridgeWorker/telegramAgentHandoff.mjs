@@ -1797,6 +1797,7 @@ async function resolveHandoffContext({
   if (requireQuestionAuthoring && policy.registryReadOnly !== true) {
     permission = evaluateTelegramQuestionAuthoringPermission({
       env,
+      credentialAuthenticated: !!delegation,
       normalized: storageContext,
       session: resolved.session,
       groupBinding: effectiveGroupBinding,
