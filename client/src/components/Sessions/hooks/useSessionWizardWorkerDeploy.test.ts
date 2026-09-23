@@ -234,7 +234,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(1);
-    expect(bootstrap?.configRevision).toBe('');
+    expect(bootstrap).toEqual(expect.objectContaining({ configRevision: '' }));
     expect(persistedConfig).not.toHaveProperty('configRevision');
     const secretsCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
     expect(JSON.parse(String(secretsCall?.[1]?.body || '{}'))).toEqual(
