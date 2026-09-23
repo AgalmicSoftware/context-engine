@@ -378,6 +378,13 @@ export const resolveMainSiteRenderActiveSessionSlug = ({
     allowSessionIdLookup: true,
     resolveSessionConfigById,
   });
+  // Profile and comparison links can target Workers absent from registry caches.
+  // Keep their explicit scope until the Worker bootstrap verifies its identity.
+  const profileOrCompareRoute = /^\/(?:u\/0x[0-9a-fA-F]{40}\/?|0x[0-9a-fA-F]{40}\/?|compare(?:\/.*)?)$/.test(
+    String(path).split(/[?#]/, 1)[0],
+  );
+  if (querySlug !== null && profileOrCompareRoute) return querySlug;
+
   const querySlugKnown =
     querySlug !== null &&
     (isKnownOrGeneralSessionSlug(querySlug, getSessionConfigBySlug) ||

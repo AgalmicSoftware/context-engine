@@ -3576,6 +3576,36 @@ describe('AppShell route render smoke', () => {
     expect(mockUserPage.mock.calls.at(-1)?.[0].viewAddress).toBe(target);
   });
 
+  it('keeps a verified profile session when registry caches only know the global session', async () => {
+    const target = '0x00000000000000000000000000000000000000ab';
+    const sessionConfig = buildSessionConfig({
+      slug: 'profile-session',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      corsWorkerUrl: 'https://profile-session.example.workers.dev',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      search: '?session=profile-session',
+      activeSessionSlug: 'other-session',
+      sessionConfig,
+    });
+    subject.props = { ...subject.props, account: target, provider: 'passkey_eoa' };
+    verifyWorkerRouteFixture(subject, sessionConfig);
+    getSessionConfigBySlug.mockReturnValue(null);
+    render(subject.render());
+    await screen.findByTestId('mock-user-page');
+    expect(mockUserPage.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        activeSessionSlug: 'profile-session',
+        sessionConfig,
+        account: target,
+        onChainProfileEnabled: false,
+      }),
+    );
+  });
+
   it('keeps an active pure Worker user profile free of SBT scans and wallet-chain context', async () => {
     const target = '0x00000000000000000000000000000000000000ab';
     const sessionConfig = buildSessionConfig({

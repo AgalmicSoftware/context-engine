@@ -600,7 +600,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const instance = makeInstance({
       account: viewAddress,
-      activeSessionSlug: 'demo-sh',
+      activeSessionSlug: 'stale-global-session',
       onChainProfileEnabled: false,
       sessionConfig: {
         slug: 'demo-sh',
@@ -620,6 +620,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       expect.objectContaining({
         account: viewAddress,
         sessionSlug: 'demo-sh',
+        showMemberships: true,
         sessionConfig: expect.objectContaining({ slug: 'demo-sh', sessionModeProfile }),
       }),
     );

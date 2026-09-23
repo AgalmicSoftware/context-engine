@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import UserPageWorkerGroupSection from './UserPageWorkerGroupSection';
 import { renderUserPageMembershipSections } from './UserPageMembershipSections';
 
@@ -34,9 +35,47 @@ describe('UserPageWorkerGroupSection', () => {
       </>,
     );
     expect(screen.getByRole('heading', { name: 'Groups Joined:' })).toBeInTheDocument();
-    expect(screen.getByText('No groups to display.')).toBeInTheDocument();
+    expect(screen.getByText('Choose a session to view group memberships.')).toBeInTheDocument();
     expect(mockWorkerSessionGroupsPanel).not.toHaveBeenCalled();
   });
+
+  it.each(['', '0x00000000000000000000000000000000000000bb'])(
+    'explains private memberships without fetching when the viewer is %s',
+    (account) => {
+      render(
+        <>
+          {renderUserPageMembershipSections({
+            account,
+            activeSessionSlug: 'profile-session',
+            isOwner: false,
+            isSimulated: false,
+            onChainProfileEnabled: false,
+            provider: null,
+            sessionConfig: {
+              slug: 'profile-session',
+              sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+            },
+            sbtSectionProps: {
+              heading: 'SBTs',
+              onRefreshSbtData: jest.fn(),
+              sbtDisplayState: {},
+              sbtEmptyText: '',
+              sbtEntries: [],
+            },
+          })}
+        </>,
+      );
+      expect(
+        screen.getByText(
+          account
+            ? 'Group memberships are only shown on your own profile.'
+            : 'Sign in with this profile’s account to view its groups.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('No groups to display.')).not.toBeInTheDocument();
+      expect(mockWorkerSessionGroupsPanel).not.toHaveBeenCalled();
+    },
+  );
 
   afterEach(() => {
     jest.clearAllMocks();

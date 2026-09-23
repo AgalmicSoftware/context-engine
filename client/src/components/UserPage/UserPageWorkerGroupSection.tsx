@@ -9,6 +9,7 @@ type UserPageWorkerGroupSectionProps = {
   sessionConfig: unknown;
   sessionSlug: string;
   showMemberships?: boolean;
+  unavailableMessage?: string;
 };
 
 const UserPageWorkerGroupSection = ({
@@ -17,6 +18,7 @@ const UserPageWorkerGroupSection = ({
   sessionConfig,
   sessionSlug,
   showMemberships = true,
+  unavailableMessage = 'Group memberships are unavailable for this session.',
 }: UserPageWorkerGroupSectionProps): React.ReactElement => (
   <section className={styles.sbtSection} aria-labelledby="user-profile-worker-groups-heading">
     <h2 id="user-profile-worker-groups-heading">Groups Joined:</h2>
@@ -33,7 +35,7 @@ const UserPageWorkerGroupSection = ({
         membershipsOnly={true}
       />
     ) : (
-      <p>No groups to display.</p>
+      <p>{unavailableMessage}</p>
     )}
   </section>
 );

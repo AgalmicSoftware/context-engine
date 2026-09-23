@@ -3829,7 +3829,7 @@ class UserPage extends Component<any, any> {
 
             {renderUserPageMembershipSections({
               account,
-              activeSessionSlug: this.getActiveSessionSlug(),
+              activeSessionSlug: this.props.sessionConfig?.slug || this.getActiveSessionSlug(),
               isOwner,
               isSimulated,
               onChainProfileEnabled: this.props.onChainProfileEnabled,

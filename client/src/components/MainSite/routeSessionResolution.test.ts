@@ -299,6 +299,22 @@ describe('routeSessionResolution', () => {
     ).toBe('demo');
   });
 
+  it.each(['/u/0x1111111111111111111111111111111111111111', '/compare'])(
+    'keeps an uncached explicit session on %s after global caches are ready',
+    (path) => {
+      expect(
+        resolveMainSiteRenderActiveSessionSlug({
+          path,
+          search: '?session=profile-session',
+          activeSessionSlug: 'other-session',
+          isCacheManagerReady: true,
+          getSessionConfigBySlug: () => null,
+          resolveDisplaySessionConfigBySlug: () => null,
+        }),
+      ).toBe('profile-session');
+    },
+  );
+
   it('falls back to the active session when display lookup misses an explicit non-general query slug', () => {
     const resolveDisplaySessionConfigBySlug = jest.fn((slug) =>
       slug === 'rxc' ? { slug: 'rxc', sessionName: 'Weyl v. Yarvin Debate' } : null,
