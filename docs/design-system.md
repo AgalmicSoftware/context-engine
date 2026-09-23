@@ -48,6 +48,11 @@ colors are resolved on the PDF capture clone so exports retain the preference.
 The palette overlay lives in `scss/themes/_color-vision.scss`; categorical SVG
 charts use `chartColors.ts` token references instead of fixed JavaScript colors.
 
+Quadratic option scrolling uses `--ce-option-scroll-*` tokens for its yellow
+navigation cues, including hover and disabled states. These controls retain the
+same colors in both bundled themes and are independent of response stance colors.
+Their foreground/background pairs are contrast-tested at 4.5:1.
+
 ## Adding A Bundled Theme
 
 1. Add a values-only SCSS definition beside the existing theme files.

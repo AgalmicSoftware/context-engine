@@ -97,15 +97,15 @@
   height: 24px;
   margin-top: 2px;
   border-radius: 6px;
-  background: #ffe34d;
-  color: #202020;
+  background: var(--ce-option-scroll-bg);
+  color: var(--ce-option-scroll-text);
   font-size: 1.1rem;
   &:hover:not(:disabled) {
-    background: #ffed85;
+    background: var(--ce-option-scroll-hover-bg);
   }
   &:disabled {
-    background: #d6cc92;
-    color: #494632;
+    background: var(--ce-option-scroll-disabled-bg);
+    color: var(--ce-option-scroll-disabled-text);
   }
 }
 @container (max-width: 360px) {
