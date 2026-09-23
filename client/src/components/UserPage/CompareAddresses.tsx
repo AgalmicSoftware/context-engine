@@ -801,7 +801,12 @@ const CompareAddress = ({
           subjectValues={compareAddresses}
         />
 
-        <button onClick={performComparison} disabled={loading} data-testid={E2E_TESTIDS.COMPARE_RUN}>
+        <button
+          className={styles.compareAction}
+          onClick={performComparison}
+          disabled={loading}
+          data-testid={E2E_TESTIDS.COMPARE_RUN}
+        >
           {loading ? (
             <>
               <FontAwesomeIcon icon={faSpinner} spin />

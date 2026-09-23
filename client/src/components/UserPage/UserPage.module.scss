@@ -594,7 +594,7 @@ $icon-size-standard: 1.25rem;
   }
 }
 
-.compareSection > button {
+.compareSection .compareAction {
   padding: 10px 16px;
   background: linear-gradient(180deg, var(--ce-status-success) 0%, var(--ce-status-success) 100%);
   border: 1px solid color-mix(in srgb, var(--ce-compat-dark) 8%, transparent);
@@ -1803,7 +1803,10 @@ $icon-size-standard: 1.25rem;
 :global(:root) .compareSection.compareSection {
   color: var(--ce-panel-text);
 
-  > button {
+  .compareAction {
+    width: 100%;
+    margin: 0.75rem 0 0;
+    font-size: 1rem;
     background: var(--ce-comparison-action-bg);
     color: var(--ce-comparison-action-text);
     border: var(--ce-border-control-width) solid;
@@ -1821,6 +1824,7 @@ $icon-size-standard: 1.25rem;
 
   .addressInput {
     width: 100%;
+    min-width: 0;
     max-width: 520px;
   }
   .addressInput input {

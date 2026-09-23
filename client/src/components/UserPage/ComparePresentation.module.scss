@@ -6,6 +6,7 @@
   overflow-wrap: anywhere;
   h3 {
     font-size: 1.25rem;
+    font-weight: 800;
     margin: 0 0 0.75rem;
     color: inherit;
   }
@@ -30,12 +31,17 @@
 .overview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 2rem;
-  padding: 1.5rem 0;
+  gap: 1rem;
+  padding: 1rem 0;
 }
 .narrative,
 .graphSection {
   min-width: 0;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  background: var(--ce-card-bg);
+  border: var(--ce-border-control-width) solid var(--ce-card-border);
+  border-radius: var(--ce-radius-12);
+  box-shadow: var(--ce-card-shadow);
 }
 .narrative section + section {
   margin-top: 1.75rem;
@@ -261,8 +267,7 @@
     gap: 1.5rem;
   }
   .graphSection {
-    border-top: 1px solid var(--ce-panel-text-muted);
-    padding-top: 1.25rem;
+    min-width: 0;
   }
 }
 
@@ -284,8 +289,10 @@
 }
 .resultShell {
   margin-top: 1rem;
-  border-top: 1px solid var(--ce-panel-text-muted);
-  padding-top: 1rem;
+  border: 1px dashed var(--ce-card-border);
+  border-radius: var(--ce-radius-12);
+  background: var(--ce-card-bg);
+  padding: clamp(0.5rem, 2vw, 1rem);
 }
 .participantControls {
   margin-bottom: 1rem;
@@ -293,6 +300,7 @@
     min-height: 44px;
     cursor: pointer;
     padding: 0.5rem 0;
+    font-weight: 700;
     color: var(--ce-panel-text);
   }
 }
