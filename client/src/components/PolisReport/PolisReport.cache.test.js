@@ -24,6 +24,7 @@ import PolisReport, {
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
+import { doUMAP } from '../../utilities/survey/consensusMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -179,6 +180,36 @@ describe('PolisReport cache read options', () => {
       clusterCount: 0,
       repQuestions: {},
     });
+  });
+
+  it('plots two participants without calling UMAP with an impossible neighbor count', () => {
+    const points = [{ x: -1, y: 0, index: 0 }, { x: 1, y: 0, index: 1 }];
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 2, nComments: 1, totalVotes: 2 }, participantCoords: points,
+      statementCoords: [], commentStats: [], clusterAssignments: [0, 0], clusterCount: 1, repQuestions: { 0: [] },
+    });
+    const questionResponses = { seedQuestion: [seededQuestionResponses.seedQuestion[0],
+      { ...seededQuestionResponses.seedQuestion[0], responder: '0xsecond' }] };
+    render(<PolisReport {...baseReportProps} slug="small-cohort" questionResponses={questionResponses} />);
+    expect(doUMAP).not.toHaveBeenCalled();
+    expect(screen.queryByText('(Not enough participant data to plot.)')).not.toBeInTheDocument();
+  });
+
+  it('keeps an opened cluster expanded when response data refreshes', () => {
+    const math = {
+      stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },
+      participantCoords: [{ x: 0, y: 0, index: 0 }], statementCoords: [], commentStats: [],
+      clusterAssignments: [0], clusterCount: 1, repQuestions: { 0: [] },
+    };
+    computePolisConversationMath.mockReturnValue(math);
+    const props = { ...baseReportProps, slug: 'refresh-cohort', questionResponses: seededQuestionResponses };
+    const { rerender } = render(<PolisReport {...props} questionResponsesNonce={1} />);
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+    fireEvent.click(screen.getByText('Cluster 0'));
+    expect(screen.getByText('No representative questions found for cluster 0')).toBeInTheDocument();
+    computePolisConversationMath.mockReturnValue({ ...math });
+    rerender(<PolisReport {...props} questionResponses={{ ...seededQuestionResponses }} questionResponsesNonce={2} />);
+    expect(screen.getByText('No representative questions found for cluster 0')).toBeInTheDocument();
   });
 
   it('normalizes legacy binary vote encodings for real report data', async () => {

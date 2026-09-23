@@ -910,11 +910,13 @@ export default function PolisReport({
       setClusterCount(polisMathResult.clusterCount);
       setClusterAssignments(polisMathResult.clusterAssignments);
       setRepQuestions(polisMathResult.repQuestions);
-      const nextCollapseState: BooleanMap = {};
-      Object.keys(polisMathResult.repQuestions || {}).forEach((clusterKey) => {
-        nextCollapseState[clusterKey] = false;
+      setClusterCollapseState((previous) => {
+        const next: BooleanMap = {};
+        Object.keys(polisMathResult.repQuestions || {}).forEach((clusterKey) => {
+          next[clusterKey] = previous[clusterKey] ?? false;
+        });
+        return next;
       });
-      setClusterCollapseState(nextCollapseState);
     }
   }, [polisMathError, polisMathResult, ratingMatrix, shouldUsePrecomputedDemoClusters]);
 
@@ -929,6 +931,13 @@ export default function PolisReport({
       const nParticipants = ratingMatrix[0]?.length || 0;
       if (nParticipants < 2) {
         setUmapParticipantCoords([]);
+        return;
+      }
+
+      if (nParticipants === 2) {
+        // UMAP needs at least two neighbors, fewer than the number of samples.
+        // Use the existing PCA projection for a pair instead of an empty graph.
+        setUmapParticipantCoords(polisMathResult?.participantCoords || []);
         return;
       }
 
@@ -957,7 +966,7 @@ export default function PolisReport({
       }
       setUmapParticipantCoords([]);
     }
-  }, [DETERMINISTIC_SEED, ratingMatrix]);
+  }, [DETERMINISTIC_SEED, ratingMatrix, polisMathResult]);
 
   useEffect(() => {
     if (!ratingMatrix || !ratingMatrix.length) {
