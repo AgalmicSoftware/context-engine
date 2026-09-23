@@ -133,3 +133,5 @@ The main client, Telegram mini-app, and companion browser use this interaction. 
 and smart-contract storage modes use the same ordered numeric arrays, definition validation,
 per-question budget, encryption encoding, and signed vote analysis. No Solidity interface change
 is required: question metadata and response payloads carry the new type through existing storage.
+
+The overflow scroll arrow sits below the options viewport in a yellow button, keeping it visible while the options scroll.

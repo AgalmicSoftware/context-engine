@@ -81,9 +81,21 @@
 }
 .moreOptions {
   flex-shrink: 0;
-  width: 32px;
-  height: 44px;
+  align-self: center;
+  width: 64px;
+  height: 36px;
+  margin-top: 4px;
+  border-radius: 6px;
+  background: #ffe34d;
+  color: #202020;
   font-size: 1.1rem;
+  &:hover:not(:disabled) {
+    background: #ffed85;
+  }
+  &:disabled {
+    background: #d6cc92;
+    color: #494632;
+  }
 }
 @container (max-width: 360px) {
   .header {

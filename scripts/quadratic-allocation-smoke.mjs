@@ -66,6 +66,10 @@ export async function probeQuadraticAllocation(page) {
   const budgetBefore = await budget.boundingBox();
   const more = page.getByTestId('ce-quadratic-scroll-more');
   assert.equal(await more.isEnabled(), true);
+  assert.ok(await more.evaluate(button => {
+    const list = document.getElementById(button.getAttribute('aria-controls'));
+    return button.getBoundingClientRect().top >= list.getBoundingClientRect().bottom - 1;
+  }), 'Scroll arrow sits below the options');
   const updatesBefore = await page.getByTestId('ce-quadratic-answer-updates').textContent();
   for (let step = 0; step < 12 && await more.isEnabled(); step++) {
     const previousTop = await more.evaluate(button => document.getElementById(button.getAttribute('aria-controls')).scrollTop);

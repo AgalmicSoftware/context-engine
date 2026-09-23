@@ -212,21 +212,6 @@ export default function QuadraticAllocationInput({
         >
           <FontAwesomeIcon icon={faUndo} />
         </button>
-        {scrollState.overflow && (
-          <button
-            type="button"
-            className={styles.moreOptions}
-            onClick={scrollToMoreOptions}
-            disabled={!scrollState.canScrollDown}
-            aria-label="Scroll to more options"
-            aria-controls={optionsId}
-            title={scrollState.canScrollDown ? 'More options below' : 'Last option reached'}
-            data-ce-control-appearance="frameless"
-            data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
-          >
-            <FontAwesomeIcon icon={faChevronDown} />
-          </button>
-        )}
       </div>
       <div className={styles.optionsViewport} ref={viewportRef}>
         <div id={optionsId} className={styles.options} ref={optionsRef} style={{ height: optionsHeight }}>
@@ -286,6 +271,20 @@ export default function QuadraticAllocationInput({
           })}
         </div>
       </div>
+      {scrollState.overflow && (
+        <button
+          type="button"
+          className={styles.moreOptions}
+          onClick={scrollToMoreOptions}
+          disabled={!scrollState.canScrollDown}
+          aria-label="Scroll to more options"
+          aria-controls={optionsId}
+          title={scrollState.canScrollDown ? 'More options below' : 'Last option reached'}
+          data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
+        >
+          <FontAwesomeIcon icon={faChevronDown} />
+        </button>
+      )}
       {valueError && (
         <p className={styles.error} role="alert">
           {valueError}
