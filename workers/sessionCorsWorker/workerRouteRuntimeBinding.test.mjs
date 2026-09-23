@@ -559,7 +559,8 @@ const createResultsAnalysisRuntime = ({ authorizeOk = true, deniedResources = []
   const calls = { auth: 0, authorize: [] };
   const config = {
     slug: 'session-a',
-    sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    sessionIdHex: `0x${'a'.repeat(32)}`,
+    authzEpoch: 1,
     sessionModeProfile: {
       authority: { mode: 'worker_canonical' },
       storage: { backend: 'cloudflare' },
@@ -591,19 +592,15 @@ const createResultsAnalysisRuntime = ({ authorizeOk = true, deniedResources = []
       artifact: { kind: 'ce_session_results_analysis_artifact' },
       snapshot: { sessionSlug: 'session-a', sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', responses: [] },
     }),
-    createRegistryLoginBootstrapAdaptersWithWorkerDeps: () => ({
-      computeScopesForLogin: async () => ({}),
-      readSessionExistsOnChain: async () => true,
-      readSessionBySlugOnChain: async () => null,
-      validateBootstrapAdmin: async () => false,
-      readResourceGateOnChain: async () => null,
-      readRegistryCodeOnChain: async () => null,
-    }),
-    createRateLimitFaucetSupportWithWorkerDeps: () => ({
-      checkRateLimit: async () => true,
-      findSessionGateForSbt: async () => null,
-      readSbtFaucetValidationState: async () => null,
-      validateSbtPasswordForFaucet: async () => false,
+    createWorkerRouteRuntimeWithWorkerDeps: (options) => createWorkerRouteRuntimeWithWorkerDeps({
+      ...options,
+      deps: {
+        ...options.deps,
+        createRegistryLoginBootstrapAdaptersWithWorkerDeps: () => ({
+          computeScopesForLogin: async () => ({ storage: true }),
+        }),
+        createRateLimitFaucetSupportWithWorkerDeps: () => ({ checkRateLimit: async () => true }),
+      },
     }),
     createAnonymousRegistrySupportAdaptersWithWorkerDeps: () => ({
       resolveRequestSlugWithoutToken: ({ request }) => {
@@ -618,7 +615,7 @@ const createResultsAnalysisRuntime = ({ authorizeOk = true, deniedResources = []
       resolveExistingSessionCors: async () => ({ ok: true, headers: {} }),
       requireAuth: async () => {
         calls.auth += 1;
-        const payload = { sub: '0x1234567890123456789012345678901234567890' };
+        const payload = { sub: '0x1234567890123456789012345678901234567890', sessionId: config.sessionIdHex, authzEpoch: 1, scopes: { storage: true } };
         if (authScopesOnPayload) payload.scopes = { storage: true, viewer: true };
         return requireAuthOk
           ? { ok: true, slug: 'session-a', payload, ...(authScopesOnPayload ? {} : { scopes: { storage: true } }) }
@@ -676,7 +673,7 @@ test('createWorkerRuntime accepts authenticated non-admin viewers through storag
   const response = await runtime.fetch(new Request('https://worker.example/results-analysis/artifact?sessionSlug=session-a', {
     headers: { Origin: 'https://viewer.example', Authorization: 'Bearer viewer-token' },
   }), {});
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 200, await response.clone().text());
   assert.equal(calls.auth, 1);
   assert.deepEqual(calls.authorize.map((call) => call.resource), ['generatedArtifacts', 'questions', 'responses']);
   assert.equal(calls.authorize[0].requesterAddress, '0x1234567890123456789012345678901234567890');
@@ -687,7 +684,7 @@ test('createWorkerRuntime forwards optional JWT payload scopes to results-analys
   const response = await runtime.fetch(new Request('https://worker.example/results-analysis/artifact?sessionSlug=session-a', {
     headers: { Origin: 'https://viewer.example', Authorization: 'Bearer viewer-token' },
   }), {});
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 200, await response.clone().text());
   assert.equal(calls.auth, 1);
   assert.deepEqual(calls.authorize[0].authScopes, { storage: true, viewer: true });
 });
