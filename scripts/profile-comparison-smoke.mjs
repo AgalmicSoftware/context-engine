@@ -20,6 +20,15 @@ try {
           document.documentElement.setAttribute("data-ce-theme", theme),
         theme,
       );
+      const appearance = await page.getByRole("combobox", { name: "App theme" }).evaluate((el) => {
+        const [select, checkbox] = el.parentElement.parentElement.children;
+        return { selectTop: select.getBoundingClientRect().top,
+          checkboxTop: checkbox.getBoundingClientRect().top,
+          overflow: document.documentElement.scrollWidth > window.innerWidth };
+      });
+      assert.equal(appearance.overflow, false);
+      if (width >= 1280) assert.ok(Math.abs(appearance.selectTop - appearance.checkboxTop) < 3);
+      else assert.ok(appearance.checkboxTop > appearance.selectTop);
       const run = page.getByTestId("ce-compare-run");
       await run.waitFor();
       await page.getByText("Loading chart...").waitFor();

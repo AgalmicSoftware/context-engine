@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import '../../src/assets/css/contextEngine.scss';
+import LoginThemeQuickControl from '../../src/components/Account/LoginThemeQuickControl';
 import CompareAddress from '../../src/components/UserPage/CompareAddresses';
 import UserPageAnalysisModal from '../../src/components/UserPage/UserPageAnalysisModal';
 import WorkerCanonicalSessionBootstrapBoundary from '../../src/components/Sessions/WorkerCanonicalSessionBootstrapBoundary';
@@ -69,6 +70,7 @@ function Fixture() {
   }, [verified]);
   return (
     <main style={{ maxWidth: 1100, margin: '20px auto', padding: 12 }}>
+      <LoginThemeQuickControl />
       <MemoryRouter
         initialEntries={[`/compare?session=comparison-fixture&subject=wallet:${walletA}&subject=wallet:${walletB}`]}
       >
