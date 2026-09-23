@@ -656,9 +656,12 @@ export const createSessionResponseHydrationController = (
         getProviderLike,
         shouldAbort: () => _destroyed || !isMounted(),
         markLoading: () => setResponseState({ isResponsesCacheReady: false }),
-        markReady: () => {
+        markReady: (partial = false) => {
+          setState((prev) => ({
+            partialWorkerResponseRuns: { ...(prev.partialWorkerResponseRuns as Record<string, boolean> || {}), [workerRun.key]: partial },
+          }));
           setResponseState((prev) => ({
-            isResponsesCacheReady: true,
+            isResponsesCacheReady: !partial,
             questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1,
           }));
           maybeCheckAllCachesReady();

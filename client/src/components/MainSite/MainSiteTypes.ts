@@ -48,6 +48,7 @@ export type MainSiteState = {
   isSurveyCacheReady: boolean;
   isQuestionCacheReady: boolean;
   isResponsesCacheReady: boolean;
+  partialWorkerResponseRuns?: Record<string, boolean>;
   isAllCachesReady: boolean;
   surveyCacheInitializationError: boolean;
   questionCacheInitializationError: boolean;

@@ -53,12 +53,14 @@ export const loadWorkerResponses = async (
     sessionSlug,
     sessionConfig,
     cachedStorageRefIds,
+    onPartial,
   }: {
     account?: unknown;
     providerLike?: unknown;
     sessionSlug: string;
     sessionConfig: UnknownRecord;
     cachedStorageRefIds?: ReadonlySet<string>;
+    onPartial?: () => void;
   },
   deps: WorkerCanonicalResponseHydrationDeps = {},
 ): Promise<WorkerCanonicalResponseRow[]> => {
@@ -93,7 +95,7 @@ export const loadWorkerResponses = async (
     seenCursors.add(nextCursor);
     cursor = nextCursor;
     if (pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
-      throw new Error('Worker response storage pagination exceeded the safety limit.');
+      onPartial?.();
     }
   }
 

@@ -16,6 +16,7 @@ export type WorkerResponseHydrationLoader = (options: {
   sessionSlug: string;
   sessionConfig: CacheRecord;
   cachedStorageRefIds?: ReadonlySet<string>;
+  onPartial?: () => void;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
 export type WorkerResponseHydrationRun = {
@@ -33,7 +34,7 @@ type WorkerResponseHydrationOptions = {
   getCurrentSessionConfig: () => CacheRecord | null;
   shouldAbort: () => boolean;
   markLoading: () => void;
-  markReady: () => void;
+  markReady: (partial?: boolean) => void;
   updateQuestionsCacheAtomic: (updater: CacheUpdater) => Promise<boolean>;
   updateUserCacheAtomic: (updater: CacheUpdater) => Promise<boolean>;
   createPersistenceError: (message: string) => Error;
@@ -118,12 +119,14 @@ export const hydrateWorkerCanonicalResponses = async ({
   }
   if (shouldStop()) return;
 
+  let partial = false;
   const rows = await loadRows({
     account: getAccount(),
     providerLike: getProviderLike(),
     sessionSlug,
     sessionConfig,
     cachedStorageRefIds,
+    onPartial: () => { partial = true; },
   });
   if (shouldStop()) return;
 
@@ -145,5 +148,5 @@ export const hydrateWorkerCanonicalResponses = async ({
   }
   if (shouldStop()) return;
 
-  markReady();
+  markReady(partial);
 };

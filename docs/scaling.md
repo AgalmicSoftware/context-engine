@@ -127,3 +127,5 @@ private-compute services. They do not require a public or private EVM.
 - [Cloudflare worker reference](session-cors-worker.md)
 - [Top-level architecture](../ARCHITECTURE.md)
 - [Public roadmap](../ROADMAP.md)
+
+Worker response hydration reads at most 100 pages per refresh (10,000 stored response revisions). At that limit it keeps the loaded rows and displays a partial-results warning; results and exports may omit answers or later edits. The cache is not marked fully ready, so interview submission continues to wait rather than treating potentially missing saved answers as empty. Ordinary complete loads clear the warning.
