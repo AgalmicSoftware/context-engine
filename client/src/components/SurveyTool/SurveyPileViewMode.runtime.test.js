@@ -292,6 +292,11 @@ describe('SurveyPileViewMode runtime surface', () => {
     fireEvent.change(parks, { target: { value: '4' } });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(parks).toHaveValue('3');
+    expect(screen.getByRole('button', { name: /Submit.*1/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset', exact: true }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Submit.*1/i })).not.toBeInTheDocument());
+    expect(parks).toHaveValue('0');
+    expect(screen.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
   });
 
   it('updates a pile rating through the shared slider persistence helper', async () => {

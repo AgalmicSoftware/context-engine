@@ -19,6 +19,8 @@ type Props = {
   disabled?: boolean;
   deferDragUpdates?: boolean;
   onChange?: (value: number[]) => void;
+  onReset?: () => void;
+  canReset?: boolean;
 };
 
 export default function QuadraticAllocationInput({
@@ -29,6 +31,8 @@ export default function QuadraticAllocationInput({
   disabled = false,
   deferDragUpdates = false,
   onChange,
+  onReset,
+  canReset,
 }: Props) {
   const instanceId = useId().replace(/:/g, '');
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -190,14 +194,15 @@ export default function QuadraticAllocationInput({
             data-ce-control-appearance="frameless"
             type="button"
             aria-label="Reset"
-            title="Reset all votes to neutral"
-            disabled={disabled || (!valueError && votes.every((vote) => vote === 0))}
+            title={onReset ? 'Undo answer changes' : 'Reset all votes to neutral'}
+            disabled={disabled || !(canReset ?? (Boolean(valueError) || votes.some((vote) => vote !== 0)))}
             onClick={() => {
               dragSourceRef.current = null;
               draggedOptionRef.current = null;
               pendingRef.current = null;
               setPreview(null);
-              onChange?.(options.map(() => 0));
+              if (onReset) onReset();
+              else onChange?.(options.map(() => 0));
             }}
           >
             <FontAwesomeIcon icon={faUndo} />

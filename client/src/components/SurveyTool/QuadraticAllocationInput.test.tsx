@@ -132,3 +132,24 @@ it.each([undefined, null, '', [0, 0]])('does not create a pending answer when re
   fireEvent.change(screen.getByRole('slider', { name: 'Parks' }), { target: { value: '2' } });
   expect(onChange).toHaveBeenCalledWith([2, 0]);
 });
+
+it('can undo a neutral draft back to saved votes without writing another answer', () => {
+  function Form() {
+    const [value, setValue] = useState([0, 0]);
+    return (
+      <QuadraticAllocationInput
+        questionId="q"
+        {...question}
+        value={value}
+        onChange={setValue}
+        onReset={() => setValue([3, -4])}
+        canReset={value[0] !== 3 || value[1] !== -4}
+      />
+    );
+  }
+  render(<Form />);
+  fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+  expect(screen.getByLabelText('Parks')).toHaveValue('3');
+  expect(screen.getByLabelText('Transit')).toHaveValue('-4');
+  expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+});

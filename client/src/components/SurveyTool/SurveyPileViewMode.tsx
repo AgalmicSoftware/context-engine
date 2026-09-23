@@ -2809,7 +2809,16 @@ const renderPileResponseInput = (
         />
       );
 
-    case 'quadratic':
+    case 'quadratic': {
+      const baseline = resolveRevertPendingBaselineSlice({
+        editBaseline: engine.state.editBaseline,
+        isLoggedIn: Boolean(engine.props.loginComplete && engine.props.account),
+        userAnswers: engine.state.userAnswers,
+        buildSliceFromUserAnswers: (answers) => engine.buildSliceFromUserAnswers(answers),
+        buildSliceFromLocalCache: () => engine.buildSliceFromLocalCache(),
+      });
+      const savedValue = baseline.answers?.[question.id]?.value ?? '';
+
       return (
         <QuadraticAllocationInput
           questionId={question.id}
@@ -2818,8 +2827,11 @@ const renderPileResponseInput = (
           value={answer.value}
           disabled={engine.state.isSubmitting}
           onChange={updateAnswer}
+          onReset={() => updateAnswer(savedValue)}
+          canReset={JSON.stringify(answer.value ?? '') !== JSON.stringify(savedValue)}
         />
       );
+    }
     case 'multichoice': {
       const options = engine.getQuestionOptionsForInput(question);
       const isSingleSelect = isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question);

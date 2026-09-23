@@ -123,7 +123,7 @@ control gives one squared-cost example, the shared budget, and the option to lea
 On standalone question pages, votes and remaining credits update locally during a drag;
 the completed allocation reaches the page's normal edit and draft-save handler on release
 or loss of focus. Keyboard changes update the answer immediately.
-The Reset undo-arrow icon returns every slider to zero and records a neutral allocation. It uses 50% opacity,
+In pile cards, the Reset undo-arrow restores the saved answer, or clears the pending answer when none was saved. In draft editors it returns sliders to zero as a neutral allocation. It uses 50% opacity,
 with full opacity on hover or keyboard focus. Pile cards grow to fit their sliders; progress
 and submission remain in the pile's shared controls outside the question card.
 If signing or saving fails, the pile shows the error beneath the question
