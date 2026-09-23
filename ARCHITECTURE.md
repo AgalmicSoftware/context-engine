@@ -322,7 +322,7 @@ match current config and re-evaluates the current default plus route-specific
 gate. Registry gate changes therefore take effect on the next request; config
 changes invalidate previously issued tokens. The mandatory Session coordinator
 Durable Object serializes nonce issue/consume and per-route counters across
-isolates; KV nonce markers are diagnostic mirrors only.
+isolates; nonce state is stored only in the coordinator, without redundant KV mirrors.
 
 ## Session Config Data Shape
 

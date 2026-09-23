@@ -65,11 +65,6 @@ export const issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {
       error: result?.error || 'Authorization state coordination is unavailable.',
     };
   }
-  await env?.GROUP_KV?.put?.(
-    `nonce:${slug}:${String(address || '').toLowerCase()}`,
-    nonce,
-    { expirationTtl: ttlSeconds },
-  );
   return { ok: true };
 };
 
@@ -101,12 +96,6 @@ export const consumeNonce = async (env, slug, address, nonce, deps = {}) => {
     };
   }
 
-  await env?.GROUP_KV?.put?.(
-    `usedNonce:${slug}:${nonce}`,
-    '1',
-    { expirationTtl: usedNonceTtlSeconds },
-  );
-  await env?.GROUP_KV?.delete?.(`nonce:${slug}:${address}`);
   return { ok: true };
 };
 

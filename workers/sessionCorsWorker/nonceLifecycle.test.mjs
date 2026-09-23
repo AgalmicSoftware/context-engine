@@ -50,14 +50,10 @@ test('issueNonce requires durable coordination before writing the KV compatibili
   assert.equal(issued.ok, true);
   assert.equal(calls[0].slug, 'session-a');
   assert.equal(calls[0].usedNonceTtlSeconds, 600);
-  assert.deepEqual(calls[1], [
-    'nonce:session-a:0xabc',
-    'nonce-1',
-    { expirationTtl: 300 },
-  ]);
+  assert.equal(calls.length, 1);
 });
 
-test('consumeNonce trusts the durable verdict and mirrors successful consumption to KV', async () => {
+test('consumeNonce trusts the durable verdict without redundant KV writes', async () => {
   const calls = [];
   const env = {
     GROUP_KV: {
@@ -74,10 +70,7 @@ test('consumeNonce trusts the durable verdict and mirrors successful consumption
   });
   assert.deepEqual(result, { ok: true });
   assert.equal(calls[0][1].nonce, 'nonce-1');
-  assert.deepEqual(calls.slice(1), [
-    ['put', 'usedNonce:session-a:nonce-1', '1', { expirationTtl: 321 }],
-    ['delete', 'nonce:session-a:0xabc'],
-  ]);
+  assert.deepEqual(calls.slice(1), []);
 });
 
 test('consumeNonce records durable replay verdicts without mutating KV mirrors', async () => {

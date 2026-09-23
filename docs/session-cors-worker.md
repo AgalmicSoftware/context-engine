@@ -1654,8 +1654,6 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   worker-specific authenticated route-context deps, missing-config constant,
   and env-bound secret-path, non-secret action, and secret-action helper
   bundles before calling the authenticated route-entry and route dispatchers.
-- `nonce:{slug}:{address}` → diagnostic nonce mirror (TTL 5m; the Durable Object is authoritative)
-- `usedNonce:{slug}:{nonce}` → diagnostic used mirror (TTL 10m; the Durable Object is authoritative)
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
 - route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
