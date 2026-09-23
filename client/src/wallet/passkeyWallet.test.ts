@@ -99,6 +99,32 @@ const makeSessionClient = () => {
 };
 
 describe('PasskeyEoaWalletClient', () => {
+  describe.each([config, derivedConfig])('persistent disconnect ($walletKeyMode)', (walletConfig) => {
+    it('preserves wallet recovery but suppresses automatic restore until explicit login', async () => {
+      const storage = createMemoryWalletStorage();
+      const credentials = makeCredentials();
+      const createClient = () =>
+        new PasskeyEoaWalletClient({
+          config: walletConfig,
+          storage,
+          credentials,
+          sessionClient: makeSessionClient(),
+          sessionClientFactory: makeSessionClient,
+          privateKeyFactory: () => PRIVATE_KEY,
+        });
+      const first = createClient();
+      const address = await first.createWallet();
+      await first.disconnect();
+      const returning = createClient();
+      await expect(returning.restoreSession({ requireSigner: false })).resolves.toBeNull();
+      expect(returning.getAddress()).toBeNull();
+      expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: address }));
+      await expect(returning.unlockWallet()).resolves.toBe(address);
+      await returning.lock();
+      await expect(createClient().restoreSession({ requireSigner: false })).resolves.toBe(address);
+    });
+  });
+
   beforeEach(() => {
     (globalThis as any).PublicKeyCredential = function PublicKeyCredential() {};
   });
@@ -697,31 +723,5 @@ describe('soft session policy', () => {
         now: 1500,
       }),
     ).toThrow(/value-bearing/i);
-  });
-});
-
-describe.each([config, derivedConfig])('persistent disconnect ($walletKeyMode)', (walletConfig) => {
-  it('preserves wallet recovery but suppresses automatic restore until explicit login', async () => {
-    const storage = createMemoryWalletStorage();
-    const credentials = makeCredentials();
-    const createClient = () =>
-      new PasskeyEoaWalletClient({
-        config: walletConfig,
-        storage,
-        credentials,
-        sessionClient: makeSessionClient(),
-        sessionClientFactory: makeSessionClient,
-        privateKeyFactory: () => PRIVATE_KEY,
-      });
-    const first = createClient();
-    const address = await first.createWallet();
-    await first.disconnect();
-    const returning = createClient();
-    await expect(returning.restoreSession({ requireSigner: false })).resolves.toBeNull();
-    expect(returning.getAddress()).toBeNull();
-    expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: address }));
-    await expect(returning.unlockWallet()).resolves.toBe(address);
-    await returning.lock();
-    await expect(createClient().restoreSession({ requireSigner: false })).resolves.toBe(address);
   });
 });
