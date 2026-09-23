@@ -504,7 +504,12 @@ export class PasskeyEoaWalletClient {
     await this.sessionClient.init({ privateKey, rpcUrl, chainId, policy });
     if (record.disconnected) {
       record = { ...record, disconnected: false };
-      await this.storage.write(record);
+      try {
+        await this.storage.write(record);
+      } catch (error) {
+        await this.sessionClient.lock();
+        throw error;
+      }
     }
     this.activeRecord = record;
     this.activeAddress = record.evmAddress;

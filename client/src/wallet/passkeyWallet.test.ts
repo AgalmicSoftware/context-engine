@@ -515,6 +515,27 @@ describe('PasskeyEoaWalletClient', () => {
     await expect(client.createWallet()).rejects.toThrow(/PRF/i);
   });
 
+  it('locks the signer if restoring an explicit connection cannot be persisted', async () => {
+    const storage = createMemoryWalletStorage();
+    const sessionClient = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials: makeCredentials(),
+      sessionClient,
+      sessionClientFactory: () => sessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    await client.createWallet();
+    await client.disconnect();
+    jest.spyOn(storage, 'write').mockRejectedValueOnce(new Error('Storage unavailable'));
+    await expect(client.unlockWallet()).rejects.toThrow('Storage unavailable');
+    expect(sessionClient.calls).toHaveLength(2);
+    expect(sessionClient.locked).toBe(true);
+    expect(client.isUnlocked()).toBe(false);
+    expect((await storage.read())?.disconnected).toBe(true);
+  });
+
   it('locks the in-memory signer without deleting the encrypted wallet record', async () => {
     const storage = createMemoryWalletStorage();
     const sessionClient = makeSessionClient();
