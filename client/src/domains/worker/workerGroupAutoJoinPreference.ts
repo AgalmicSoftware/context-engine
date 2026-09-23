@@ -40,6 +40,7 @@ export const rememberWorkerGroupAutoJoinCancellation = (scope: Scope): boolean =
 export const clearWorkerGroupAutoJoinCancellation = (scope: Scope): void => {
   try {
     localStorage.removeItem(key(scope));
+    if (scope.account) localStorage.removeItem(key({ ...scope, account: '' }));
   } catch {
     // Joining is still possible when browser storage is disabled.
   }

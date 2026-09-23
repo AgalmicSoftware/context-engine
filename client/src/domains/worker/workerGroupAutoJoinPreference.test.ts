@@ -35,3 +35,11 @@ it('reports unavailable storage so the notice can explain that cancellation last
   expect(rememberWorkerGroupAutoJoinCancellation(scope)).toBe(false);
   set.mockRestore();
 });
+
+it('an explicit signed-in Join also clears the earlier signed-out choice, without clearing another account', () => {
+  rememberWorkerGroupAutoJoinCancellation({ ...scope, account: '' });
+  rememberWorkerGroupAutoJoinCancellation({ ...scope, account: '0xother' });
+  clearWorkerGroupAutoJoinCancellation(scope);
+  expect(isWorkerGroupAutoJoinCancelled({ ...scope, account: '' })).toBe(false);
+  expect(isWorkerGroupAutoJoinCancelled({ ...scope, account: '0xother' })).toBe(true);
+});
