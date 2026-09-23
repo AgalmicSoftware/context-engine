@@ -22,7 +22,9 @@ For example, `[7, -7]` costs 98 credits and is valid under the default budget.
 The pile editor keeps the same fixed card height as other question types. Labels
 and sliders share a row where space permits; narrow cards stack them. Options
 scroll vertically while the remaining-credit budget stays visible, with part of
-the next label showing when there are more options. Reset is inactive for an
+the next label showing when there are more options. A down-arrow button advances
+to the next options and becomes inactive at the end. Oppose, remaining credits,
+Support, and reset share one row above the options. Reset is inactive for an
 untouched or already neutral allocation, so it cannot create an accidental draft.
 The Questions toolbar's **Clear pending changes** button restores the saved
 response baseline, just like the pile's X control.

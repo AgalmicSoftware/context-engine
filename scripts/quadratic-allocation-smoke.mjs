@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 
-// Compatible with Playwright and the in-app browser's Playwright locator surface.
+// Browser probe for the shared respondent control and its compact pile layout.
 export async function probeQuadraticAllocation(page) {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const parks = page.getByTestId('ce-quadratic-vote-0');
   const transit = page.getByTestId('ce-quadratic-vote-1');
   const budget = page.getByTestId('ce-quadratic-budget');
@@ -32,7 +33,6 @@ export async function probeQuadraticAllocation(page) {
     const container = document.querySelector('[data-testid="ce-quadratic-pile-card"]');
     const sliders = container.querySelectorAll('input[type="range"]');
     return {
-
       inline: (() => {
         const input = sliders[0].getBoundingClientRect();
         const label = container.querySelector('label').getBoundingClientRect();
@@ -64,6 +64,29 @@ export async function probeQuadraticAllocation(page) {
   const after = await page.getByTestId('ce-quadratic-pile-card').boundingBox();
   assert.equal(after.height, before.height, 'Adding options must not grow the card');
   const budgetBefore = await budget.boundingBox();
+  const more = page.getByTestId('ce-quadratic-scroll-more');
+  assert.equal(await more.isEnabled(), true);
+  const updatesBefore = await page.getByTestId('ce-quadratic-answer-updates').textContent();
+  for (let step = 0; step < 12 && await more.isEnabled(); step++) {
+    const previousTop = await more.evaluate(button => document.getElementById(button.getAttribute('aria-controls')).scrollTop);
+    if (step === 0) await more.press('Enter');
+    else await more.click();
+    await page.waitForFunction(previous => {
+      const button = document.querySelector('[data-testid="ce-quadratic-scroll-more"]');
+      const list = document.getElementById(button.getAttribute('aria-controls'));
+      const atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+      return list.scrollTop > previous && button.disabled === atEnd;
+    }, previousTop);
+  }
+  assert.equal(await more.isEnabled(), false, 'Arrow stops at the last option');
+  assert.equal(await page.getByTestId('ce-quadratic-answer-updates').textContent(), updatesBefore, 'Scrolling does not change answers');
+  const resetBounds = await page.getByRole('button', { name: 'Reset', exact: true }).boundingBox();
+  const opposeBounds = await page.getByText('− Oppose', { exact: true }).boundingBox();
+  const supportBounds = await page.getByText('+ Support', { exact: true }).boundingBox();
+  const center = (bounds) => bounds.y + bounds.height / 2;
+  for (const bounds of [resetBounds, opposeBounds, supportBounds]) {
+    assert.ok(Math.abs(center(bounds) - center(budgetBefore)) < 2, 'Oppose, credits, support, and reset share a row');
+  }
   const last = page.getByTestId('ce-quadratic-vote-7');
   await last.focus();
   await last.press('ArrowRight');
@@ -72,14 +95,14 @@ export async function probeQuadraticAllocation(page) {
   assert.equal(budgetAfter.y, budgetBefore.y, 'Budget stays visible as options scroll');
   const lastBounds = await last.boundingBox();
   assert.ok(lastBounds.y + lastBounds.height <= after.y + after.height, 'Last slider is reachable');
-  return { ok: true, checks: ['keyboard sliders', 'per-option costs', 'descriptive tooltip', 'signed votes', 'budget enforcement', 'neutrality', 'draft restore', 'net and positive/negative totals', 'compact rows', 'fixed card height', 'half-label overflow cue', 'scroll to final option'] };
+  return { ok: true, checks: ['keyboard sliders', 'per-option costs', 'descriptive tooltip', 'signed votes', 'budget enforcement', 'neutrality', 'draft restore', 'net and positive/negative totals', 'compact rows', 'fixed card height', 'half-label overflow cue', 'scroll to final option', 'scroll arrow', 'one control row'] };
 }
 
 export async function runSmoke() {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 551, height: 803 }, { width: 390, height: 844 }]) {
       const page = await browser.newPage({ viewport });
       for (const theme of ['context-engine', 'classic-95']) {
         await page.goto(`${process.env.BASE_URL || 'http://127.0.0.1:3000'}/tests/fixtures/quadratic-allocation.html`);

@@ -27,45 +27,71 @@
 .header {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 0.25rem;
   margin-bottom: 0.25rem;
-  flex-wrap: wrap;
+  white-space: nowrap;
+  font-size: 0.9rem;
   p {
     margin: 0;
   }
   strong {
-    font-size: 1.2rem;
-  }
-  button {
-    font: inherit;
-    color: inherit;
-    background: transparent;
-    border: 0;
-    min-height: 44px;
-    cursor: pointer;
-    &:focus-visible {
-      outline: 2px solid currentColor;
-      outline-offset: 2px;
-    }
-    &:disabled {
-      cursor: default;
-      color: var(--ce-panel-text-muted);
-    }
-  }
-  .help {
-    width: 44px;
-  }
-  .reset {
-    margin-left: auto;
-    width: 44px;
     font-size: 1rem;
-    text-decoration: none;
-    padding: 0;
-    opacity: 0.5;
-    &:hover:not(:disabled),
-    &:focus-visible {
-      opacity: 1;
-    }
+  }
+  .help,
+  .reset {
+    width: 32px;
+    min-width: 32px;
+    min-height: 44px;
+  }
+}
+.budget {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+.oppose,
+.support {
+  font-weight: 700;
+}
+.oppose {
+  color: var(--ce-response-disagree-text);
+}
+.support {
+  color: var(--ce-response-agree-text);
+}
+.help,
+.reset,
+.moreOptions {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+  &:disabled {
+    cursor: default;
+    color: var(--ce-panel-text-muted);
+  }
+}
+.moreOptions {
+  flex-shrink: 0;
+  width: 32px;
+  height: 44px;
+  font-size: 1.1rem;
+}
+@container (max-width: 360px) {
+  .header {
+    gap: 0.125rem;
+    font-size: 0.75rem;
+  }
+  .header strong {
+    font-size: 0.9rem;
   }
 }
 
@@ -175,24 +201,6 @@
   }
 }
 
-.scale {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  gap: 0.5rem;
-  span:first-child,
-  span:last-child {
-    font-size: 1rem;
-    font-weight: 700;
-  }
-  span:first-child {
-    color: var(--ce-response-disagree-text);
-  }
-  span:last-child {
-    color: var(--ce-response-agree-text);
-  }
-}
 .error {
   margin: 0.75rem 0 0;
   font-size: 0.85rem;

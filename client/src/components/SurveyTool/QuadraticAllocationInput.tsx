@@ -1,7 +1,8 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
 import CETooltip from '../Shared/CETooltip';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   getVoiceCredits,
   quadraticCreditsSpent,
@@ -33,12 +34,24 @@ export default function QuadraticAllocationInput({
   const viewportRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
   const [optionsHeight, setOptionsHeight] = useState<number>();
+  const [scrollState, setScrollState] = useState({ overflow: false, canScrollDown: false });
+  const optionsId = `quadratic-options-${instanceId}`;
   // Leave half of the next label visible in a bounded pile card. Measure the
   // available parent, not the fitted list, to avoid resize feedback loops.
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     const list = optionsRef.current;
     if (!viewport || !list || typeof ResizeObserver === 'undefined') return;
+    list.scrollTop = 0;
+    const updateScrollState = () => {
+      const overflow = list.scrollHeight > list.clientHeight + 1;
+      const canScrollDown = overflow && list.scrollTop + list.clientHeight < list.scrollHeight - 1;
+      setScrollState((previous) =>
+        previous.overflow === overflow && previous.canScrollDown === canScrollDown
+          ? previous
+          : { overflow, canScrollDown },
+      );
+    };
     const fit = () => {
       const available = viewport.clientHeight;
       if (!available || list.scrollHeight <= available) {
@@ -53,12 +66,32 @@ export default function QuadraticAllocationInput({
       const height = peeks.filter((peek) => peek <= available && peek > 44).pop();
       setOptionsHeight(height);
     };
-    const observer = new ResizeObserver(fit);
+    const observer = new ResizeObserver(() => {
+      fit();
+      updateScrollState();
+    });
     observer.observe(viewport);
+    observer.observe(list);
     Array.from(list.children).forEach((option) => observer.observe(option));
     fit();
-    return () => observer.disconnect();
-  }, [options.length]);
+    updateScrollState();
+    list.addEventListener('scroll', updateScrollState, { passive: true });
+    return () => {
+      observer.disconnect();
+      list.removeEventListener('scroll', updateScrollState);
+    };
+  }, [options.length, questionId]);
+  const scrollToMoreOptions = () => {
+    const list = optionsRef.current;
+    if (!list) return;
+    const bounds = list.getBoundingClientRect();
+    const next = Array.from(list.children).find((option) => option.getBoundingClientRect().bottom > bounds.bottom + 1);
+    const nextTop = next ? next.getBoundingClientRect().top - bounds.top + list.scrollTop : list.scrollHeight;
+    // If one long option fills the viewport, advance through it instead of
+    // repeatedly aligning its already-visible top.
+    const top = nextTop > list.scrollTop + 1 ? nextTop : list.scrollTop + list.clientHeight * 0.8;
+    list.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  };
   const helpId = `quadratic-help-${instanceId}`;
   const question = { options, voiceCredits };
   const questionError = validateQuadraticQuestion(question);
@@ -135,18 +168,21 @@ export default function QuadraticAllocationInput({
     <fieldset className={styles.allocation} data-testid="ce-quadratic-allocation" data-question-id={questionId}>
       <legend className={styles.srOnly}>Quadratic allocation</legend>
       <div className={styles.header}>
-        <p role="status" data-testid="ce-quadratic-budget">
-          <strong>{budget - spent}</strong> credits left
-        </p>
-        <button
-          type="button"
-          id={helpId}
-          className={styles.help}
-          data-ce-control-appearance="frameless"
-          aria-label="How voice credits work"
-        >
-          <FontAwesomeIcon icon={faQuestionCircle} />
-        </button>
+        <span className={styles.oppose}>− Oppose</span>
+        <div className={styles.budget}>
+          <p role="status" data-testid="ce-quadratic-budget">
+            <strong>{budget - spent}</strong> credits left
+          </p>
+          <button
+            type="button"
+            id={helpId}
+            className={styles.help}
+            data-ce-control-appearance="frameless"
+            aria-label="How voice credits work"
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+        </div>
         <CETooltip
           target={helpId}
           trigger="hover focus"
@@ -158,6 +194,7 @@ export default function QuadraticAllocationInput({
           Votes cost their square: +7 or −7 uses 49 credits. Share your {budget} credits across the options. You may
           leave credits unused.
         </CETooltip>
+        <span className={styles.support}>+ Support</span>
         <button
           className={styles.reset}
           data-ce-control-appearance="frameless"
@@ -175,9 +212,24 @@ export default function QuadraticAllocationInput({
         >
           <FontAwesomeIcon icon={faUndo} />
         </button>
+        {scrollState.overflow && (
+          <button
+            type="button"
+            className={styles.moreOptions}
+            onClick={scrollToMoreOptions}
+            disabled={!scrollState.canScrollDown}
+            aria-label="Scroll to more options"
+            aria-controls={optionsId}
+            title={scrollState.canScrollDown ? 'More options below' : 'Last option reached'}
+            data-ce-control-appearance="frameless"
+            data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
+          >
+            <FontAwesomeIcon icon={faChevronDown} />
+          </button>
+        )}
       </div>
       <div className={styles.optionsViewport} ref={viewportRef}>
-        <div className={styles.options} ref={optionsRef} style={{ height: optionsHeight }}>
+        <div id={optionsId} className={styles.options} ref={optionsRef} style={{ height: optionsHeight }}>
           {options.map((option, index) => {
             const vote = votes[index];
             const inputId = `quadratic-${instanceId}-${index}`;
@@ -233,10 +285,6 @@ export default function QuadraticAllocationInput({
             );
           })}
         </div>
-      </div>
-      <div className={styles.scale} aria-hidden="true">
-        <span>− Oppose</span>
-        <span>+ Support</span>
       </div>
       {valueError && (
         <p className={styles.error} role="alert">
