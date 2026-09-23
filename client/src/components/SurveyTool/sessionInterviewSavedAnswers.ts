@@ -1,3 +1,4 @@
+import { LegacyOwnResponseListingError } from '../../utilities/storage/storageClient';
 import { isWorkerCanonicalSessionConfig, loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { isWorkerResponseNewer } from '../../utilities/survey/workerResponseRecency';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort';
@@ -21,7 +22,7 @@ export const loadSessionInterviewSavedAnswers = async ({
   sessionSlug: string;
   sessionConfig: RecordValue;
   signal: AbortSignal;
-}): Promise<RecordValue[]> => {
+}): Promise<RecordValue[] | null> => {
   if (!account) throw new Error('Sign in to load your saved answers.');
   const ids = [...new Set(questionIds.map((id) => id.toLowerCase()))];
   signal.throwIfAborted();
@@ -33,8 +34,12 @@ export const loadSessionInterviewSavedAnswers = async ({
       sessionConfig,
       ownResponses: true,
       signal,
+    }).catch((error: unknown) => {
+      if (error instanceof LegacyOwnResponseListingError) return null;
+      throw error;
     });
     signal.throwIfAborted();
+    if (rows === null) return null;
     const latest = new Map<string, (typeof rows)[number]>();
     for (const row of rows) {
       const previous = latest.get(row.questionId);

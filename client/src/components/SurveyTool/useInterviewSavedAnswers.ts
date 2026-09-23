@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { InterviewSavedSlice } from './sessionInterviewSavedAnswers';
 
-export type InterviewSavedAnswerLoader = (questionIds: string[], signal: AbortSignal) => Promise<InterviewSavedSlice>;
+export type InterviewSavedAnswerLoader = (
+  questionIds: string[],
+  signal: AbortSignal,
+) => Promise<InterviewSavedSlice | null>;
 
 export const useInterviewSavedAnswers = ({
   load,
@@ -24,7 +27,7 @@ export const useInterviewSavedAnswers = ({
   const key = JSON.stringify([contextKey, idsKey, active]);
   const enabled = !!load;
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<{ key: string; slice?: InterviewSavedSlice; error?: string }>({ key: '' });
+  const [state, setState] = useState<{ key: string; slice?: InterviewSavedSlice | null; error?: string }>({ key: '' });
   useEffect(() => {
     if (!enabled || !active) return;
     const controller = new AbortController();
@@ -33,7 +36,7 @@ export const useInterviewSavedAnswers = ({
       .then((slice) => {
         if (controller.signal.aborted) return;
         // Resolve selection conflicts before readiness can trigger a queued submit.
-        loadedRef.current(slice);
+        if (slice !== null) loadedRef.current(slice);
         setState({ key, slice });
       })
       .catch((error: unknown) => {
@@ -44,6 +47,7 @@ export const useInterviewSavedAnswers = ({
   }, [enabled, active, key, idsKey, attempt]);
   const current = state.key === key && active ? state : null;
   return {
+    legacy: current?.slice === null,
     ready: !!current?.slice,
     slice: current?.slice,
     error: current?.error || '',

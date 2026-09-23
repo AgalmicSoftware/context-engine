@@ -794,6 +794,40 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Saved answers loaded');
   });
 
+  it('uses complete public-cache readiness for a verified legacy Worker', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'New answer' }]);
+    const onLoadSavedResponses = jest.fn().mockResolvedValue(null);
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      onLoadSavedResponses,
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion: 'ce-interview-brief-v1',
+        source: { platform: 'chatgpt' as const, modelId: 'synthetic', verification: 'self_reported' as const },
+        responderContext: { summary: 'Context' },
+      },
+      responseReadinessContextToken: '',
+    };
+    const view = render(<SessionVoiceModeModal {...props} isResponsesCacheReady={false} />);
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    view.rerender(<SessionVoiceModeModal {...props} isResponsesCacheReady responseReadinessContextToken="stale" />);
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    view.rerender(
+      <SessionVoiceModeModal
+        {...props}
+        isResponsesCacheReady
+        responseReadinessContextToken={`demo|${baseProps.account}|true`}
+      />,
+    );
+    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalled());
+    expect(screen.queryByText(/Could not load your saved answers/)).not.toBeInTheDocument();
+  });
+
   it('shows one saved-answer error and a working retry', async () => {
     const onLoadSavedResponses = jest
       .fn()

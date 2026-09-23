@@ -1,3 +1,4 @@
+import { LegacyOwnResponseListingError } from '../../utilities/storage/storageClient';
 import { loadSessionInterviewSavedAnswers, mergeInterviewSavedAnswerBaseline } from './sessionInterviewSavedAnswers';
 import { loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort';
@@ -71,4 +72,17 @@ it('merges the saved baseline without discarding in-flight local edits or unrela
   expect(merged.slice.answers).toEqual({ q1: 'local edit', q2: 'latest', q3: 'unrelated' });
   expect(merged.baseline.answers).toEqual({ q1: 'saved', q2: 'latest' });
   expect(merged.slice.importance.q1).toBe(4);
+});
+
+it('requests the public-cache fallback only for the verified legacy listing', async () => {
+  const options = {
+    ...base,
+    sessionConfig: { sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE) },
+  };
+  jest.mocked(loadWorkerResponses).mockRejectedValueOnce(new LegacyOwnResponseListingError());
+  await expect(loadSessionInterviewSavedAnswers(options)).resolves.toBeNull();
+  jest
+    .mocked(loadWorkerResponses)
+    .mockRejectedValueOnce(new Error('This Worker could not verify your complete saved answers.'));
+  await expect(loadSessionInterviewSavedAnswers(options)).rejects.toThrow('complete saved answers');
 });

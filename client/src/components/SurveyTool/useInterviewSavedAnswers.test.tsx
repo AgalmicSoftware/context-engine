@@ -37,3 +37,17 @@ it('keeps errors unready and retries the same scope without using a partial answ
   act(() => result.current.retry());
   await waitFor(() => expect(result.current.ready).toBe(true));
 });
+
+it('keeps the legacy fallback separate from an empty saved slice and invalidates it on identity changes', async () => {
+  const load = jest.fn().mockResolvedValue(null);
+  const onLoaded = jest.fn();
+  const { result, rerender } = renderHook(
+    ({ contextKey, active }) => useInterviewSavedAnswers({ load, active, contextKey, questionIds: ['q1'], onLoaded }),
+    { initialProps: { contextKey: 'a', active: true } },
+  );
+  await waitFor(() => expect(result.current.legacy).toBe(true));
+  expect(result.current.ready).toBe(false);
+  expect(onLoaded).not.toHaveBeenCalled();
+  rerender({ contextKey: 'b', active: false });
+  expect(result.current.legacy).toBe(false);
+});

@@ -51,6 +51,13 @@ interface SessionStorageRefsPage {
   listComplete: boolean;
 }
 
+export class LegacyOwnResponseListingError extends Error {
+  constructor() {
+    super('This Worker uses the public response listing. Wait for complete session data.');
+    this.name = 'LegacyOwnResponseListingError';
+  }
+}
+
 const normalizeWorkerBaseUrl = (rawUrl: unknown): string => toStr(rawUrl).trim().replace(/\/+$/, '');
 const normalizeTags = (tags: unknown): Array<{ name: string; value: string }> =>
   (Array.isArray(tags) ? tags : [])
@@ -270,6 +277,20 @@ export const listSessionStorageRefsPage = async ({
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) throw new Error((body?.error as string) || `Storage list failed (${response.status}).`);
+  // 0.6.2 ignores mine=true but already supplies pagination. Only its exact
+  // unscoped shape may use public-cache readiness; partial identity proofs fail closed.
+  if (
+    ownResponses &&
+    !normalizedCursor &&
+    response.status === 200 &&
+    body &&
+    !Object.hasOwn(body, 'responder') &&
+    !Object.hasOwn(body, 'sessionId') &&
+    Array.isArray(body.items) &&
+    typeof body.listComplete === 'boolean' &&
+    (body.listComplete ? body.cursor === null : typeof body.cursor === 'string' && !!body.cursor.trim())
+  )
+    throw new LegacyOwnResponseListingError();
   if (
     ownResponses &&
     (toStr(body.responder).toLowerCase() !== ownResponses.account.toLowerCase() ||

@@ -300,10 +300,11 @@ function SessionInterviewPanel({
   const existingResponseSlice = ownAnswers.slice || formResponseSlice;
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
-  const responseStateReadyForSubmit = onLoadSavedResponses
-    ? ownAnswers.ready
-    : isResponsesCacheReady !== false &&
-      (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
+  const responseStateReadyForSubmit =
+    onLoadSavedResponses && !ownAnswers.legacy
+      ? ownAnswers.ready
+      : isResponsesCacheReady !== false &&
+        (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
   const suggestedQuestionAuthoringState = resolveSuggestedQuestionAuthoringState({
     account,
     loginComplete,

@@ -1,4 +1,9 @@
-import { listSessionStorageRefsPage, readSessionStorageBlob, uploadDataToSessionStorage } from './storageClient.js';
+import {
+  LegacyOwnResponseListingError,
+  listSessionStorageRefsPage,
+  readSessionStorageBlob,
+  uploadDataToSessionStorage,
+} from './storageClient.js';
 import { normalizeSessionStorageConfig } from './sessionStorageConfig.js';
 import { buildResponsePayload } from '../../components/SurveyTool/surveyToolResponsePayloadController';
 
@@ -406,6 +411,35 @@ describe('storageClient', () => {
 describe('complete own-answer listings', () => {
   const ownResponses = { account: '0xabc', sessionId: '0x1234' };
   const options = { workerUrl: 'https://worker.example', sessionSlug: 'alpha', resource: 'responses', ownResponses };
+  // Recorded response shape from public 0.6.2, bfe30d54ab3ef653e7973bd29c941bc9409b628f:
+  // storageRouteExecution.js handleCloudflareList ignores mine and returns only these top-level fields.
+  it.each([
+    { items: [], cursor: null, listComplete: true },
+    { items: [{ metadata: { responder: '0xother' } }], cursor: 'page-two', listComplete: false },
+  ])('recognizes the 0.6.2 listing without accepting it as scoped saved answers (%j)', async (body) => {
+    fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+    await expect(listSessionStorageRefsPage(options)).rejects.toBeInstanceOf(LegacyOwnResponseListingError);
+  });
+  it.each([
+    [{ items: [], cursor: null, listComplete: true }, 201],
+    [{ items: [], cursor: null, listComplete: true }, 403],
+    [{ items: [], cursor: null, listComplete: false }, 200],
+    [{ items: [], cursor: 'stale', listComplete: true }, 200],
+    [{ items: [], cursor: null, listComplete: true, responder: null }, 200],
+    [{ items: [], cursor: null, listComplete: true, sessionId: '0x1234' }, 200],
+    [{ items: [], cursor: null, listComplete: true, responder: '0xabc' }, 200],
+  ])('never downgrades errors, malformed pagination, or partial scope proofs (%j)', async (body, status) => {
+    fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify(body), { status }));
+    await expect(listSessionStorageRefsPage(options)).rejects.not.toBeInstanceOf(LegacyOwnResponseListingError);
+  });
+  it('never downgrades a current Worker on a later page', async () => {
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(JSON.stringify({ items: [], cursor: null, listComplete: true })),
+    );
+    await expect(listSessionStorageRefsPage({ ...options, cursor: 'page-two' })).rejects.not.toBeInstanceOf(
+      LegacyOwnResponseListingError,
+    );
+  });
   it('authenticates own listings and verifies the responder/session scope', async () => {
     fetchWorkerWithAuth.mockResolvedValue(
       new Response(
@@ -430,7 +464,7 @@ describe('complete own-answer listings', () => {
     { responder: '0xother', sessionId: '0x1234', items: [], listComplete: true },
     { responder: '0xabc', sessionId: '0x5678', items: [], listComplete: true },
     { responder: '0xabc', sessionId: '0x1234', items: [], listComplete: false },
-  ])('rejects old Workers and unproven completion (%j)', async (body) => {
+  ])('rejects malformed or mismatched completion (%j)', async (body) => {
     fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify(body)));
     await expect(listSessionStorageRefsPage(options)).rejects.toThrow('complete saved answers');
   });

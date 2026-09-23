@@ -2593,7 +2593,7 @@ export const loadSessionInterviewOwnAnswers = async (
   engine: PileViewModeEngine,
   questionIds: string[],
   signal: AbortSignal,
-): Promise<InterviewSavedSlice> => {
+): Promise<InterviewSavedSlice | null> => {
   const props = engine.props;
   const token = buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(props));
   const isCurrent = () =>
@@ -2611,6 +2611,7 @@ export const loadSessionInterviewOwnAnswers = async (
     signal,
   });
   if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  if (responses === null) return null;
   const userAnswers = { responses };
   const saved = engine.buildSliceFromUserAnswers(userAnswers);
   await new Promise<void>((resolve) =>
