@@ -1691,8 +1691,8 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
             telegram: {
               userId: principalUserId,
               username: safeString(input.username || principal.label),
-              groupChatId: safeString(input.groupChatId),
-              chatId: safeString(input.chatId),
+              groupChatId: '',
+              chatId: '',
             },
           }
         : {},
@@ -1727,11 +1727,13 @@ async function resolveHandoffContext({
     principalAdapter === 'telegram'
       ? safeString(legacyTelegramUserId || delegatedPrincipal?.adapterUserId || principalId)
       : principalId;
+  // Request chat IDs may name an admin action target, but cannot prove membership.
   const storageContext = normalizeAgentTelegramContext({
     ...input,
+    ...(delegation ? { telegram: {} } : {}),
     telegramUserId: storageSubjectId,
-    groupChatId: principalAdapter === 'telegram' ? safeString(input.groupChatId) : '',
-    chatId: principalAdapter === 'telegram' ? safeString(input.chatId) : '',
+    groupChatId: !delegation && principalAdapter === 'telegram' ? safeString(input.groupChatId) : '',
+    chatId: !delegation && principalAdapter === 'telegram' ? safeString(input.chatId) : '',
   });
   const adapterMetadata =
     principalAdapter === 'telegram'
@@ -1739,8 +1741,8 @@ async function resolveHandoffContext({
           telegram: {
             userId: legacyTelegramUserId || safeString(input.adapterMetadata?.telegram?.userId),
             username: safeString(input.username || input.adapterMetadata?.telegram?.username),
-            groupChatId: safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
-            chatId: safeString(input.chatId || input.adapterMetadata?.telegram?.chatId),
+            groupChatId: delegation ? '' : safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
+            chatId: delegation ? '' : safeString(input.chatId || input.adapterMetadata?.telegram?.chatId),
           },
         }
       : {};

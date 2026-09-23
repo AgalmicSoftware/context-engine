@@ -67,7 +67,7 @@ export function evaluateTelegramQuestionAuthoringPermission({
     !privateBoundAuthoringDisabled;
 
   if (!effectiveGroupChatId) {
-    if (telegramOnlyPrivateParticipant || delegatedPrivateParticipant) {
+    if (!configuredGroups.size && !defaultGroupChatId && (telegramOnlyPrivateParticipant || delegatedPrivateParticipant)) {
       return {
         ok: true,
         mode,

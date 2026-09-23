@@ -1401,6 +1401,25 @@ test('Telegram agent handoff requires the configured token', async () => {
   assert.equal(body.reason, 'agent_api_token_invalid');
 });
 
+test('Delegated authoring requires a stored allowed group binding, not a claimed chat', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '', AGENT_BRIDGE_AUTHORING_GROUP_CHAT_IDS: '-10042' });
+  const issued = await createTelegramAgentDelegationToken({
+    env, telegramUserId: '42', sessionSlug: 'alpha', accountAddress: `0x${'12'.repeat(20)}`,
+  });
+  const request = () => agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&groupChatId=-10042&chatId=-10042', { token: issued.token });
+  const denied = await handleTelegramAgentHandoffRequest({ request: request(), env });
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).reason, 'telegram_group_binding_required');
+  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
+    sessionSlug: 'alpha', sourceChatId: '-10099', source: 'telegram_group',
+  }));
+  assert.equal((await handleTelegramAgentHandoffRequest({ request: request(), env })).status, 403);
+  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
+    sessionSlug: 'alpha', sourceChatId: '-10042', source: 'telegram_group',
+  }));
+  assert.equal((await handleTelegramAgentHandoffRequest({ request: request(), env })).status, 200);
+});
+
 test('Telegram agent handoff accepts scoped user delegation tokens without a shared service token', async () => {
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const issued = await createTelegramAgentDelegationToken({
