@@ -137,6 +137,32 @@ describe('SessionVoiceModeModal', () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'idle', recommendations: [] });
   });
 
+  it('keeps imported review edits until discard is explicitly confirmed', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: { summary: 'Synthetic context' },
+        }}
+      />,
+    );
+    await editReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep reviewing' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Keep reviewing' })).not.toBeInTheDocument());
+    await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard interview' }));
+    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
   it('reports unusable voice context before starting the recorder', async () => {
     render(
       <SessionVoiceModeModal

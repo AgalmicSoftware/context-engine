@@ -249,3 +249,7 @@ The current implementation path is:
 An unanswered rating displays “–”. Selecting zero is a real answer and is saved
 as a change from an empty response. Interview comparison metadata retains exact
 JSON value equality, while the form accepts equivalent numeric strings.
+
+Closing an unsubmitted interview review through its close button, backdrop, or
+Escape asks before discarding the transcript, prefill, and review edits. Choosing
+“Keep reviewing” retains them in memory; no transcript is persisted for reload.

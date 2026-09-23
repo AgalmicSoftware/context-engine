@@ -1,3 +1,4 @@
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
@@ -109,6 +110,7 @@ type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
 
 type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
+  onReviewStateChange: (dirty: boolean) => void;
 };
 
 function SessionInterviewPanel({
@@ -141,6 +143,7 @@ function SessionInterviewPanel({
   renderAdditionalInput,
   renderFieldLock,
   onClose,
+  onReviewStateChange,
 }: SessionInterviewPanelProps) {
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
@@ -751,6 +754,24 @@ function SessionInterviewPanel({
           (idle && (readiness.state !== 'ready' || interviewOpening.loading))
         ? 'pending'
         : 'ready';
+  useEffect(() => {
+    onReviewStateChange(
+      !submitSucceeded &&
+        !isInterviewBusy &&
+        Boolean(
+          transcript.trim() || drafts.length || prefillPacket || responderContext.trim() || suggestedQuestions.length,
+        ),
+    );
+  }, [
+    submitSucceeded,
+    isInterviewBusy,
+    transcript,
+    drafts.length,
+    prefillPacket,
+    responderContext,
+    suggestedQuestions.length,
+    onReviewStateChange,
+  ]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
@@ -1038,37 +1059,70 @@ function SessionInterviewPanel({
 
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [] } = props;
+  const [hasUnsavedReview, setHasUnsavedReview] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  useEffect(() => {
+    if (!isOpen || mode !== 'interview') {
+      setHasUnsavedReview(false);
+      setConfirmDiscard(false);
+    }
+  }, [isOpen, mode]);
+  const requestClose = () => {
+    if (hasUnsavedReview) setConfirmDiscard(true);
+    else onClose();
+  };
   const questions = useMemo(() => normalizeInterviewQuestions(questionPool), [questionPool]);
   const title = mode === 'interview' ? 'Interview' : mode === 'recordGroup' ? 'Group Conversation' : 'Voice mode';
   return (
-    <Modal
-      isOpen={isOpen}
-      toggle={onClose}
-      size="lg"
-      centered
-      labelledBy="ce-session-voice-mode-title"
-      returnFocusAfterClose
-      contentClassName={styles.sessionVoiceModeModal}
-      data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
-    >
-      {mode === 'interview' ? (
-        isOpen ? (
-          <SessionInterviewPanel {...props} questions={questions} />
-        ) : null
-      ) : (
-        <>
-          <ModalHeader id="ce-session-voice-mode-title" toggle={onClose}>
-            {title}
-          </ModalHeader>
-          <ModalBody>
-            {!mode ? (
-              <SessionVoiceModeChooser onSelectMode={onSelectMode} />
-            ) : (
-              <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
-            )}
-          </ModalBody>
-        </>
-      )}
-    </Modal>
+    <>
+      <Modal
+        isOpen={isOpen}
+        toggle={requestClose}
+        size="lg"
+        centered
+        labelledBy="ce-session-voice-mode-title"
+        returnFocusAfterClose
+        contentClassName={styles.sessionVoiceModeModal}
+        data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
+      >
+        {mode === 'interview' ? (
+          isOpen ? (
+            <SessionInterviewPanel
+              {...props}
+              onClose={requestClose}
+              questions={questions}
+              onReviewStateChange={setHasUnsavedReview}
+            />
+          ) : null
+        ) : (
+          <>
+            <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
+              {title}
+            </ModalHeader>
+            <ModalBody>
+              {!mode ? (
+                <SessionVoiceModeChooser onSelectMode={onSelectMode} />
+              ) : (
+                <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
+              )}
+            </ModalBody>
+          </>
+        )}
+      </Modal>
+      <CEConfirmDialog
+        isOpen={isOpen && confirmDiscard}
+        title="Discard this interview?"
+        body="Your transcript, imported prefill, and unsaved review edits will be lost."
+        confirmLabel="Discard interview"
+        cancelLabel="Keep reviewing"
+        danger
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          onClose();
+        }}
+        testId="ce-interview-discard"
+      />
+    </>
   );
 }
