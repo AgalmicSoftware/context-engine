@@ -184,17 +184,17 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain(
       'https://worker.example/agent/interview-catalog?slug=demo%20one&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%20one',
     );
-    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v5"');
+    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v4" or "ce-interview-brief-v5"');
     expect(kickoff).toContain('stop and report a stale catalog');
     expect(kickoff).toContain('conversation history, memory, and connected sources already available to you');
     expect(kickoff).toContain('reasonable inferences');
     expect(kickoff).toContain('question-relevant background, views, experience, uncertainties, and caveats');
     expect(kickoff).toContain('Distinguish stated facts from inferred context');
     expect(kickoff).toContain(
-      'multichoice answers use one exact option when singleSelect is true, otherwise an array of exact options',
+      'v5: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop',
     );
     expect(kickoff).toContain(
-      'quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
+      'Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
     );
     expect(kickoff).toContain('Every response needs confidence from 0 to 1');
     expect(kickoff).toContain('additionalComments is text');
@@ -205,7 +205,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('Use null when the platform does not reveal a searched count');
     expect(kickoff).not.toContain('responderContext.name');
     expect(kickoff).not.toContain('preferred name');
-    expect(kickoff).toContain('"responderContext":{"summary":"concise relevant background/views/uncertainties"');
+    expect(kickoff).toContain('"responderContext":{"summary":"relevant background/views/uncertainties"');
     expect(kickoff).toContain('"facts":[{"fact":"stated or inferred context"');
     expect(kickoff).toContain('the exact single-line JSON packet');
     expect(kickoff).toContain('Nothing is submitted;');
