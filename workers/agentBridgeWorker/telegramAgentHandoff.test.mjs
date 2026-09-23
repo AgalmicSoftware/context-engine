@@ -1024,6 +1024,12 @@ async function jsonBody(response) {
   return response.json();
 }
 
+async function seedSubmittedResult(env, key, serialized) {
+  const record = { requestId: key.slice('telegram:submit-request:'.length), ...JSON.parse(serialized) };
+  const persisted = await persistTelegramSubmitRecord({ env, kvKey: key, record });
+  assert.equal(persisted.ok, true);
+}
+
 async function putSubmittedResult(
   env,
   {
@@ -1037,7 +1043,7 @@ async function putSubmittedResult(
     createdAt = '2026-06-01T12:00:00.000Z',
   } = {},
 ) {
-  await env.AGENT_ACTION_KV.put(
+  await seedSubmittedResult(env,
     key || `telegram:submit-request:${sessionSlug}:${telegramUserId}:${questionId}:${createdAt}`,
     JSON.stringify({
       status: 'direct_submitted',
@@ -6309,7 +6315,7 @@ test('Telegram agent can read and render topic-map results without raw response 
     ['q-privacy', '43', 'Agree'],
   ]) {
     counter += 1;
-    await env.AGENT_ACTION_KV.put(
+    await seedSubmittedResult(env,
       `telegram:submit-request:${counter}`,
       JSON.stringify({
         status: 'direct_submitted',
