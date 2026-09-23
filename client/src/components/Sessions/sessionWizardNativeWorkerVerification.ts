@@ -1,8 +1,5 @@
 import type { MutableRefObject } from 'react';
-import {
-  fetchWorkerCanonicalSessionBootstrap,
-  normalizeWorkerCanonicalSessionIdHex,
-} from '../../utilities/session/sessionWorkerDiscovery';
+import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 import { buildWorkerSecretsPayload, syncWorkerSecretsAfterDeploy } from './sessionWizardSecrets.js';
@@ -196,18 +193,15 @@ export const verifyNativeSessionWorker = async ({
       throw new Error(secretsSyncStatus.warning || 'Worker secrets could not be verified.');
     }
 
-    const bootstrap: SessionWizardVerifiedWorkerConnection = modeRequirements.isWorkerCanonical
-      ? await fetchWorkerCanonicalSessionBootstrap({
-          sessionSlug: slug,
-          workerQueryValue: workerUrl,
-        })
-      : {
-          config: verifiedConfig.publicConfig,
-          configRevision: '',
-          sessionId: normalizeWorkerCanonicalSessionIdHex(runtime.sessionId || runtime.sessionIdHex),
-          sessionSlug: slug,
-          workerOrigin: verifiedConfig.workerOrigin,
-        };
+    // Verify has already checked the public readback and identity. Publication
+    // creates the revision later; the participant bootstrap requires that revision.
+    const bootstrap: SessionWizardVerifiedWorkerConnection = {
+      config: verifiedConfig.publicConfig,
+      configRevision: verifiedConfig.configRevision,
+      sessionId: normalizeWorkerCanonicalSessionIdHex(runtime.sessionId || runtime.sessionIdHex),
+      sessionSlug: slug,
+      workerOrigin: verifiedConfig.workerOrigin,
+    };
     const proof = buildSessionWizardWorkerRequirementProof({
       workerUrl: bootstrap.workerOrigin,
       sessionSlug: slug,

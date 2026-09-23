@@ -15,7 +15,7 @@ import {
 } from './telegramCommands.mjs';
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
-import { submitRequestUserKvKey } from './telegramSubmitQueue.mjs';
+import { submitRequestUserKvKey, submitRequestSessionKvKey } from './telegramSubmitQueue.mjs';
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
 import {
   materializeAgentOnlyWindow,
@@ -78,9 +78,18 @@ const __test__telegramMiniApp = Object.freeze({
   }),
 });
 
+async function seedSubmitRecord(kv, key, serialized) {
+  const record = { requestId: key.slice('telegram:submit-request:'.length), ...JSON.parse(serialized) };
+  const value = JSON.stringify(record);
+  for (const target of [key, submitRequestSessionKvKey(record), submitRequestUserKvKey(record)].filter(Boolean)) {
+    await kv.put(target, value);
+  }
+}
+
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.listPrefixes = [];
     this.options = new Map();
   }
 
@@ -98,6 +107,7 @@ class MemoryKv {
   }
 
   async list({ prefix = '', limit = 1000 } = {}) {
+    this.listPrefixes.push(prefix);
     const keys = Array.from(this.store.keys())
       .filter((key) => key.startsWith(prefix))
       .sort()
@@ -3253,7 +3263,7 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
     submitLane: 'telegram_mini_app',
     createdAt: '2026-05-08T12:00:00.000Z',
   });
-  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}submitted-history`, JSON.stringify({
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}submitted-history`, JSON.stringify({
     version: 1,
     requestId: 'submitted-history',
     status: 'direct_submitted',
@@ -3314,7 +3324,7 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
 test('Mini App state exposes submitted rating answers for hydration', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-rating-history';
-  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}rating-history`, JSON.stringify({
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}rating-history`, JSON.stringify({
     version: 1,
     requestId: 'rating-history',
     status: 'direct_submitted',
@@ -3364,7 +3374,7 @@ test('Mini App restores quadratic drafts and history as ordered numeric votes', 
       const questionId = 'q-quadratic-history';
       const answer = { questionType: 'quadratic', value, comments: 'Saved context' };
       if (submitted) {
-        await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}quadratic-history`, JSON.stringify({
+        await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}quadratic-history`, JSON.stringify({
           version: 1, requestId: 'quadratic-history', status: 'direct_submitted',
           lane: 'telegram_mini_app', telegramUserId: 'preview-user', sessionSlug: 'alpha', questionId,
           answer, createdAt: '2026-05-08T12:00:02.000Z',
@@ -3404,7 +3414,7 @@ test('Mini App restores quadratic drafts and history as ordered numeric votes', 
 test('Mini App state hydrates submitted rating answers from serialized values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-rating-serialized-history';
-  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}rating-serialized-history`, JSON.stringify({
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}rating-serialized-history`, JSON.stringify({
     version: 1,
     requestId: 'rating-serialized-history',
     status: 'direct_submitted',
@@ -3456,7 +3466,7 @@ test('Mini App state hydrates submitted rating answers from serialized values', 
 test('Mini App state hydrates submitted multichoice answers from serialized values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-multichoice-history';
-  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}multichoice-history`, JSON.stringify({
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}multichoice-history`, JSON.stringify({
     version: 1,
     requestId: 'multichoice-history',
     status: 'direct_submitted',
@@ -3509,7 +3519,7 @@ test('Mini App state hydrates submitted multichoice answers from serialized valu
 test('Mini App state hydrates submitted multichoice object values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-multichoice-object-history';
-  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}multichoice-object-history`, JSON.stringify({
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}multichoice-object-history`, JSON.stringify({
     version: 1,
     requestId: 'multichoice-object-history',
     status: 'direct_submitted',
@@ -3606,6 +3616,7 @@ test('Mini App submitted answer hydration reads per-user indexes when global sub
   assert.equal(state.ok, true);
   assert.equal(state.submittedAnswers.length, 1);
   assert.equal(state.submittedAnswers[0].answerLabel, 'Indexed response');
+  assert.ok(!kv.listPrefixes.includes('telegram:submit-request:'));
 });
 
 test('Mini App question voting stores one current up/down vote per Telegram user', async () => {
@@ -3733,7 +3744,7 @@ test('Mini App state exposes per-question response counts for popularity scoring
     ['r3', 'user-c', 'q-few', 'Disagree'],
   ];
   for (const [requestId, telegramUserId, questionId, label] of records) {
-    await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}${requestId}`, JSON.stringify({
+    await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}${requestId}`, JSON.stringify({
       version: 1,
       requestId,
       status: 'direct_submitted',
@@ -3822,7 +3833,7 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
     ['r5', 'user-c', 'q-divisive', { value: 'unsure', label: 'Unsure' }],
   ];
   for (const [id, telegramUserId, questionId, answer] of submitRecords) {
-    await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
+    await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
       version: 1,
       requestId: id,
       status: 'direct_submitted',
@@ -3977,7 +3988,7 @@ test('Mini App results hides level 4 group views unless an admin enables anonymi
     ['r4', 'user-b', 'q-divisive', { value: 'disagree', label: 'Disagree' }],
   ];
   for (const [id, telegramUserId, questionId, answer] of submitRecords) {
-    await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
+    await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
       version: 1,
       requestId: id,
       status: 'direct_submitted',
@@ -5312,7 +5323,7 @@ test('Mini App live results can filter by saved lightweight group details', asyn
       prompt: 'Should filtered results include this?',
     }]),
   };
-  await kv.put('telegram:submit-request:one', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:one', JSON.stringify({
     status: 'submit_request_created',
     sessionSlug: 'alpha',
     telegramUserId: 'user-a',
@@ -5320,7 +5331,7 @@ test('Mini App live results can filter by saved lightweight group details', asyn
     answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
     createdAt: '2026-05-25T00:00:00.000Z',
   }));
-  await kv.put('telegram:submit-request:two', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:two', JSON.stringify({
     status: 'submit_request_created',
     sessionSlug: 'alpha',
     telegramUserId: 'user-b',
@@ -5328,7 +5339,7 @@ test('Mini App live results can filter by saved lightweight group details', asyn
     answer: { questionType: 'agree_unsure_disagree', value: 'disagree', label: 'Disagree' },
     createdAt: '2026-05-25T00:01:00.000Z',
   }));
-  await kv.put('telegram:submit-request:three', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:three', JSON.stringify({
     status: 'submit_request_created',
     sessionSlug: 'alpha',
     telegramUserId: 'user-c',
