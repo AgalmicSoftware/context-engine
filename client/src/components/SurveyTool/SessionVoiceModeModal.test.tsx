@@ -137,6 +137,54 @@ describe('SessionVoiceModeModal', () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'idle', recommendations: [] });
   });
 
+  it('reports unusable voice context before starting the recorder', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[{ id: 'q1', type: 'freeform', prompt: 'x'.repeat(40_000) }]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No complete question fits');
+    expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
+  });
+
+  it('shows limited voice context on Continue while final mapping receives the full transcript', async () => {
+    const longTranscript =
+      'Interviewer: Earlier question?\nResponder: Earlier answer.\n\n'.repeat(700) +
+      'Interviewer: How ready now?\nResponder: Four.';
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      options.onTranscript?.(longTranscript, []);
+      return {
+        mediaStream: {} as MediaStream,
+        pause: jest.fn(),
+        resume: jest.fn(),
+        stop: jest.fn(async () => ({ transcript: longTranscript, turns: [] })),
+        getTranscript: () => longTranscript,
+      };
+    });
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() =>
+      expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
+        expect.objectContaining({ transcript: longTranscript }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled());
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    expect(screen.getByText(/Voice context was limited/)).toHaveTextContent('full transcript and drafts');
+    const instructions = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
+    expect(instructions.length).toBeLessThanOrEqual(31_500);
+    expect(instructions).toContain('Interviewer: How ready now?');
+    expect(instructions).toContain('Responder: Four.');
+    expect(instructions).not.toContain(longTranscript);
+  });
+
   it.each([
     ['checking', 'Checking setup', 'pending'],
     ['unavailable', 'Setup needed', 'error'],

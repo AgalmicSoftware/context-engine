@@ -542,8 +542,8 @@ function SessionInterviewPanel({
     const importedDrafts = validatedPrefillPacket
       ? readImportedInterviewDraftResponses(validatedPrefillPacket, validatedPrefillQuestionsRef.current || questions)
       : null;
-    void recorder.start(
-      buildRealtimeInterviewInstructions({
+    try {
+      const instructions = buildRealtimeInterviewInstructions({
         questions,
         responderContext,
         openingPrompt: interviewOpening.opening,
@@ -551,12 +551,17 @@ function SessionInterviewPanel({
         previousTranscript: transcriptRef.current,
         prefillPacket: validatedPrefillPacket,
         importedDrafts,
+        onContextLimited: setMappingNotice,
         reviewedResponses: drafts.map((draft) => ({
           prediction: draft,
           reviewed: editedDrafts[draft.questionId],
         })),
-      }),
-    );
+      });
+      void recorder.start(instructions);
+    } catch (instructionError) {
+      setError(instructionError instanceof Error ? instructionError.message : 'Could not prepare voice context.');
+      setStatus('Error');
+    }
   };
 
   const endInterview = async () => {
