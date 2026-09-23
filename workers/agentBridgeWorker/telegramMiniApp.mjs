@@ -1333,8 +1333,7 @@ async function loadSubmittedMiniAppAnswers({
     const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
     return prefix ? listKvRecordsByPrefix(env, prefix, { limit: Infinity }) : [];
   }));
-  const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
-  const records = dedupeRecordsByRequestId([...indexedRecordGroups.flat(), ...legacyRecords]);
+  const records = dedupeRecordsByRequestId(indexedRecordGroups.flat());
   const byQuestionKey = new Map();
   records.forEach((record) => {
     if (safeString(record.telegramUserId) !== telegramUserId) return;

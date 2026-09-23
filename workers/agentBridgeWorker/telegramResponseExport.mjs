@@ -9,7 +9,7 @@ import {
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 import {
   canonicalAnswerSessionKvPrefix,
-  SUBMIT_REQUEST_KV_PREFIX,
+  submitRequestUserKvPrefix,
   submitRequestSessionKvPrefix,
 } from './telegramSubmitQueue.mjs';
 import { buildZipArchive } from './zipArchive.mjs';
@@ -383,8 +383,7 @@ async function listTelegramSubmitRecordsForSession(env = {}, sessionSlug = '') {
   const indexedRecords = indexedPrefix
     ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity })
     : [];
-  const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
-  const records = dedupeSubmitRecords([...canonicalRecords, ...indexedRecords, ...legacyRecords]);
+  const records = dedupeSubmitRecords([...canonicalRecords, ...indexedRecords]);
   return records
     .filter((record) => lower(record.sessionSlug) === slug)
     .map(normalizeTelegramSubmitRecord)
@@ -395,11 +394,17 @@ export async function findLatestResponseExportSessionSlugForTelegramUser({
   env = {},
   normalized = {},
   createdAt = null,
+  sessionSlugs = [],
 } = {}) {
   const account = await deriveTelegramResponseExportAccount({ env, normalized, createdAt });
   const accountAddress = normalizeAddress(account.accountAddress);
   if (!accountAddress) return '';
-  const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const recordGroups = await Promise.all([...new Set(sessionSlugs)].map((sessionSlug) => {
+    const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
+    return prefix ? listKvRecordsByPrefix(env, prefix, { limit: Infinity }) : [];
+  }));
+  const records = dedupeSubmitRecords(recordGroups.flat());
   const matched = records
     .map(normalizeTelegramSubmitRecord)
     .filter((record) => (

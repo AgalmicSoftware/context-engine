@@ -30,11 +30,21 @@ import { __test__sessionQuestions } from './sessionQuestions.mjs';
 import {
   canonicalAnswerSessionKvKey,
   submitRequestSessionKvKey,
+  submitRequestUserKvKey,
 } from './telegramSubmitQueue.mjs';
+
+async function seedSubmitRecord(kv, key, serialized) {
+  const record = { requestId: key.slice('telegram:submit-request:'.length), ...JSON.parse(serialized) };
+  const value = JSON.stringify(record);
+  for (const target of [key, submitRequestSessionKvKey(record), submitRequestUserKvKey(record)].filter(Boolean)) {
+    await kv.put(target, value);
+  }
+}
 
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.listPrefixes = [];
     this.putCalls = [];
   }
 
@@ -52,6 +62,7 @@ class MemoryKv {
   }
 
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
+    this.listPrefixes.push(prefix);
     const keys = Array.from(this.store.keys())
       .filter((key) => String(key).startsWith(prefix))
       .sort();
@@ -1868,7 +1879,7 @@ test('/results consensus shows top difference questions from submitted records',
   let counter = 0;
   async function putResponse(questionId, telegramUserId, label) {
     counter += 1;
-    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+    await seedSubmitRecord(env.AGENT_ACTION_KV, `telegram:submit-request:${counter}`, JSON.stringify({
       status: 'direct_submitted',
       sessionSlug: 'alpha',
       telegramUserId,
@@ -1968,6 +1979,7 @@ test('submitted result reads use per-session indexes instead of capped global sc
   const records = await loadSubmittedResultRecords(env, 'alpha');
 
   assert.deepEqual(records.map((record) => record.requestId), ['alpha-0', 'alpha-1', 'alpha-2']);
+  assert.ok(!env.AGENT_ACTION_KV.listPrefixes.includes('telegram:submit-request:'));
 });
 
 test('submitted result reads include durable canonical answer records', async () => {
@@ -2007,7 +2019,7 @@ test('/results group shows participant graph with question legend', async () => 
       { questionId: 'q-2', questionType: 'freeform', prompt: 'Second prompt?' },
     ]),
   });
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:one', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2016,7 +2028,7 @@ test('/results group shows participant graph with question legend', async () => 
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:00.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:two', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2025,7 +2037,7 @@ test('/results group shows participant graph with question legend', async () => 
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:three', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2034,7 +2046,7 @@ test('/results group shows participant graph with question legend', async () => 
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:02.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:four', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:four', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2129,7 +2141,7 @@ test('/results group analysis callback uses session worker AI for the selected p
       headers: { 'content-type': 'application/json' },
     });
   };
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:one', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2138,7 +2150,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:00.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:two', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2147,7 +2159,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:freeform', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:freeform', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2156,7 +2168,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.500Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:three', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2165,7 +2177,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:02.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:four', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:four', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2240,7 +2252,7 @@ test('/results topic returns a topic-map image when enough answered questions ex
   let counter = 0;
   async function putResponse(questionId, telegramUserId, label) {
     counter += 1;
-    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+    await seedSubmitRecord(env.AGENT_ACTION_KV, `telegram:submit-request:${counter}`, JSON.stringify({
       status: 'direct_submitted',
       sessionSlug: 'alpha',
       telegramUserId,
@@ -2363,7 +2375,7 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
   const storageId = arweaveId(33);
   const calls = [];
   const kv = new MemoryKv();
-  await kv.put('telegram:submit-request:export-one', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:export-one', JSON.stringify({
     version: 1,
     requestId: 'export-one',
     status: 'direct_submitted',
@@ -2472,7 +2484,7 @@ test('/export_all falls back to Telegram submit records when storage payload lis
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
-  await kv.put('telegram:submit-request:storage-list-fallback', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:storage-list-fallback', JSON.stringify({
     requestId: 'storage-list-fallback',
     action: 'submit_response',
     status: 'direct_submitted',
@@ -2741,7 +2753,7 @@ test('/start admin actions target the latest submitted session before the regist
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
-  await kv.put('telegram:submit-request:latest-export-session', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:latest-export-session', JSON.stringify({
     requestId: 'latest-export-session',
     status: 'direct_submitted',
     sessionSlug: 'telegram-demo-2',

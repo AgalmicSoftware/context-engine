@@ -3300,6 +3300,7 @@ async function resolveResponseExportSessionSlug({
     env,
     normalized,
     createdAt,
+    sessionSlugs: (policy.linkedSessions || []).map((session) => session.sessionSlug),
   }));
   if (latestSubmittedSession) return latestSubmittedSession;
   const binding = await readGroupSessionBinding(env, normalized);
@@ -6198,15 +6199,11 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
   const indexedRecords = indexedPrefix
     ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity, parseJson: safeJsonParse })
     : [];
-  const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, {
-    limit: Infinity,
-    parseJson: safeJsonParse,
-  });
   const canonicalPrefix = canonicalAnswerSessionKvPrefix(slug);
   const canonicalRecords = canonicalPrefix
     ? await listKvRecordsByPrefix(env, canonicalPrefix, { limit: Infinity, parseJson: safeJsonParse })
     : [];
-  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords, ...canonicalRecords]);
+  const records = dedupeSubmitRecords([...indexedRecords, ...canonicalRecords]);
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   return records
     .filter((record) => (
