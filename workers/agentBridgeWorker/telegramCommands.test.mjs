@@ -419,8 +419,8 @@ test('agent action menu is group-safe and persists only opaque launch records', 
   assert.equal(result.catalog.canonicalBoundary, '/api/agent/*');
   assert.equal(result.catalog.capabilities.some((capability) => capability.id === 'agent.settings.update'), false);
   assert.equal(buttons.some((button) => button.text === 'Create Agent'), false);
-  assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
-  assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
+  assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
   assert.equal(settings.url.includes('alpha'), false);
   assert.equal(storedActionKeys.length >= 2, true);
@@ -463,7 +463,7 @@ test('agent create and settings commands route group inputs private and model ca
   assert.equal(groupCreate.privateChatRequired, true);
   assert.match(groupCreate.response.text, /No account state is shown in group chat/);
   assert.equal(groupCreate.response.text.includes('Address:'), false);
-  assert.match(flattenButtons(groupCreate.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(flattenButtons(groupCreate.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
 
   assert.equal(privateCreate.screen, 'agent_account_create');
   assert.match(privateCreate.response.text, /Agent account/);
@@ -478,7 +478,7 @@ test('agent create and settings commands route group inputs private and model ca
   assert.equal(groupSettings.screen, 'agent_settings_overview');
   assert.equal(groupSettings.privateChatRequired, true);
   assert.equal(groupSettings.response.text.includes('Draft style:'), false);
-  assert.match(flattenButtons(groupSettings.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(flattenButtons(groupSettings.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
 
   assert.equal(privateSettings.screen, 'agent_settings_overview');
   assert.match(privateSettings.response.text, /Draft style: balanced/);
@@ -543,11 +543,11 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   const buttons = flattenButtons(result.response.replyMarkup);
   const startButton = buttons.find((button) => button.text === 'Join Session');
   const callbackButtons = buttons.filter((button) => button.callback_data);
-  assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   assert.equal(startButton.url.includes('alpha'), false);
   assert.equal(callbackButtons.length, 3);
   for (const button of callbackButtons) {
-    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,50}$/);
     assert.equal(button.callback_data.includes('alpha'), false);
     assert.equal(button.callback_data.includes('q-readiness'), false);
   }
@@ -1576,7 +1576,7 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
   ]);
   assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
   for (const button of buttons) {
-    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,50}$/);
     assert.equal(button.callback_data.includes(publicQuestionId), false);
     assert.equal(button.callback_data.includes(lockedQuestionId), false);
   }
@@ -1693,7 +1693,7 @@ test('/questions caps Telegram rows at five and keeps the chat page minimal', as
     'Pose 5',
   ]);
   const loadNext = buttons.find((button) => button.text === 'Load Next');
-  assert.match(loadNext.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(loadNext.callback_data, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
 
   const nextPage = await buildTelegramCommandResponse({
@@ -4537,7 +4537,7 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
 
   const binaryButtons = flattenButtons(binary.response.replyMarkup);
   const onboardAgent = binaryButtons.find((button) => button.text === 'Onboard Agent');
-  assert.match(onboardAgent?.url || '', /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(onboardAgent?.url || '', /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   const agree = binaryButtons.find((button) => button.text === 'Agree');
   const disagree = binaryButtons.find((button) => button.text === 'Disagree');
   const submitDraft = binaryButtons.find((button) => button.text === 'Submit Draft');
@@ -4833,7 +4833,7 @@ test('/attachments lists public metadata and hides private storage refs', async 
     'Show 3 as image',
     'View Questions',
   ]);
-  assert.match(buttons[0].callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(buttons[0].callback_data, /^cecb_[a-z0-9]{10,50}$/);
   const imageCallback = await buildTelegramCommandResponse({
     update: {
       update_id: 7110,
@@ -4898,7 +4898,7 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(buttons.some((button) => button.text === 'Onboard Agent'), true);
   assert.equal(buttons.some((button) => button.text === 'Activity'), true);
   const backToStart = buttons.find((button) => button.text === 'Back to Start');
-  assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,50}$/);
   const start = await buildTelegramCommandResponse({
     update: {
       update_id: 9203,
@@ -5195,7 +5195,7 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
   assert.ok(copyNew?.copy_text?.text);
   assert.equal(copyNew.callback_data, undefined);
   assert.match(secondToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   assert.equal(linkedAgain.response.text.includes(secondToken), false);
   assert.notEqual(secondPointer.tokenHash, firstPointer.tokenHash);
   assert.equal(oldLoaded.ok, false);
@@ -5246,7 +5246,7 @@ test('private Onboard Agent callback opens Mini App when already onboarded', asy
   assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
   assert.ok(copyNew?.copy_text?.text);
   assert.equal(copyNew.callback_data, undefined);
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   const token = copyNew.copy_text.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
@@ -5396,7 +5396,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(record.miniAppLaunch, true);
@@ -5552,7 +5552,7 @@ test('group /start includes a Mini App deep link to the session picker', async (
   assert.equal(result.response.text.includes('/attachments'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
-  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,50}$/);
   const launch = new URL(miniApp.url).searchParams.get('start');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(record.miniAppLaunch, true);

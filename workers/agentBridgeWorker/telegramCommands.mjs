@@ -27,6 +27,7 @@ import {
 } from './onChainResponses.mjs';
 import {
   buildOpaqueActionId,
+  buildSubmitIdempotencyKey,
   createTelegramCallbackAction,
   createRandomTelegramCallbackAction,
   createTelegramStartAction,
@@ -3030,7 +3031,10 @@ async function persistTelegramSubmitRequest({
     return { ok: false, reason: 'submit_request_incomplete' };
   }
   const answerFingerprint = answerDraftFingerprint(draft);
-  const idempotencyKey = `telegram_bot_submit:${telegramUserId}:${slug}:${questionIdSeedPart(qid)}:${answerFingerprint}`;
+  const idempotencyKey = buildSubmitIdempotencyKey({
+    transport: 'telegram_bot_submit', principal: telegramUserId, sessionSlug: slug, questionId: qid,
+    answer: { answerLabel: safeString(draft.answerLabel), answerValue: safeString(draft.answerValue), controlType: safeString(draft.controlType) },
+  });
   const requestId = buildOpaqueActionId(idempotencyKey);
   const kvKey = submitRequestKvKey(requestId);
   const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
