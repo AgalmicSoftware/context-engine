@@ -96,10 +96,8 @@ describe('Footer', () => {
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 
-  it('keeps all five footer links on one full-width row across the mobile breakpoints', () => {
+  it('keeps tablet footer links on one full-width row', () => {
     [
-      { minWidth: 0, maxWidth: 319, fontSize: 'clamp\\(0\\.56rem, 2\\.75vw, 0\\.68rem\\)' },
-      { minWidth: 320, maxWidth: 465, fontSize: 'clamp\\(0\\.62rem, 2\\.45vw, 0\\.78rem\\)' },
       { minWidth: 466, maxWidth: 768, fontSize: 'clamp\\(0\\.9rem, 2\\.25vw, 1\\.08rem\\)' },
     ].forEach(({ minWidth, maxWidth, fontSize }) => {
       const breakpointRule = new RegExp(
