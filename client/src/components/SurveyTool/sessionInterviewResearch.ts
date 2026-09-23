@@ -1,3 +1,4 @@
+import { responseValuesEqual as valuesEqual } from './responseValueEquality';
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : {};
@@ -5,14 +6,6 @@ const redacted = () => ({ redacted: true, reason: 'encrypted_field' });
 const hasOwn = (value: RecordValue, key: string) => Object.prototype.hasOwnProperty.call(value, key);
 const FIELD_KEYS = ['answer', 'additionalComments', 'importance', 'conviction'] as const;
 type ResearchField = (typeof FIELD_KEYS)[number];
-
-const valuesEqual = (left: unknown, right: unknown): boolean => {
-  try {
-    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
-  } catch (_) {
-    return left === right;
-  }
-};
 
 const resolveFieldProtection = (
   questionId: string,

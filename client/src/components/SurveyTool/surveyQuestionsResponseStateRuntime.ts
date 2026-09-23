@@ -1,3 +1,4 @@
+import { responseValuesEqual } from './responseValueEquality';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
 export type SurveyQuestionsResponseStateRuntime = SurveyQuestionsLegacyRecord;
@@ -79,28 +80,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
     }
   };
 
-  const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => {
-    // Normalize empties
-    const norm: SurveyQuestionsLegacyValue = (v: SurveyQuestionsLegacyValue) =>
-      v === undefined || v === '' ? null : v;
-
-    // Arrays: compare order-sensitive (checkbox order is stable)
-    if (Array.isArray(a) || Array.isArray(b)) {
-      const aa: SurveyQuestionsLegacyValue = Array.isArray(a) ? a : [];
-      const bb: SurveyQuestionsLegacyValue = Array.isArray(b) ? b : [];
-      if (aa.length !== bb.length) return false;
-      return JSON.stringify(aa) === JSON.stringify(bb);
-    }
-
-    // Numbers vs strings: compare numerically if either is a number-like
-    const an: SurveyQuestionsLegacyValue = Number(a);
-    const bn: SurveyQuestionsLegacyValue = Number(b);
-    const aNumLike: SurveyQuestionsLegacyValue = !Number.isNaN(an) && a !== null && a !== '' && typeof a !== 'object';
-    const bNumLike: SurveyQuestionsLegacyValue = !Number.isNaN(bn) && b !== null && b !== '' && typeof b !== 'object';
-    if (aNumLike || bNumLike) return Number(a) === Number(b);
-
-    return String(norm(a)) === String(norm(b));
-  };
+  const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => responseValuesEqual(a, b, true);
 
   const computeModifiedQuestionsCount = (
     baselineSlice: SurveyQuestionsLegacyValue,

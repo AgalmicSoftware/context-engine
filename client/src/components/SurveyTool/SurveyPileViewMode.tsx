@@ -2870,7 +2870,7 @@ const renderPileResponseInput = (
             className={styles.ratingSlider}
           />
           <span className={styles.ratingValueDisplay}>
-            <span aria-label="Current rating">{ratingValue}</span>
+            <span aria-label="Current rating">{answer.value == null || answer.value === '' ? '–' : ratingValue}</span>
           </span>
         </div>
       );

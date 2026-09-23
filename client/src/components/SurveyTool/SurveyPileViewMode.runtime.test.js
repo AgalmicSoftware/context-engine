@@ -1550,7 +1550,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('min', '1');
     expect(slider).toHaveAttribute('max', '10');
-    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('–');
     expect(screen.queryByText('Almost none of it')).not.toBeInTheDocument();
     expect(screen.queryByText('All of it')).not.toBeInTheDocument();
   });

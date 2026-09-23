@@ -245,3 +245,7 @@ The current implementation path is:
 - `client/src/components/SurveyTool/sessionInterviewResearch.ts` redacts encrypted text and formats selected/unselected draft comparison records.
 - `client/src/utilities/web3/contractScripts.impl.ts` uploads the final JSON payload to the configured response storage resource.
 - `client/src/utilities/storage/storageClient.ts` and `workers/sessionCorsWorker/storageRouteExecution.js` implement Cloudflare `/storage/upload`, `/storage/list`, and `/storage/read` for sessions using Cloudflare response storage.
+
+An unanswered rating displays “–”. Selecting zero is a real answer and is saved
+as a change from an empty response. Interview comparison metadata retains exact
+JSON value equality, while the form accepts equivalent numeric strings.
