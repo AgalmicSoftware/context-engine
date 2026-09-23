@@ -2067,8 +2067,14 @@ function resolveWrappedPosterOpenAiKey(env = {}) {
   return safeString(env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY);
 }
 
-function resolveWrappedPosterRenderer(env = {}) {
-  return lower(env.AGENT_BRIDGE_WRAPPED_POSTER_RENDERER) === 'openai' ? 'openai' : 'local';
+function resolveWrappedPosterRenderer(body = {}, env = {}) {
+  const renderer = lower(
+    body.poster_renderer ||
+    body.posterRenderer ||
+    body.renderer ||
+    env.AGENT_BRIDGE_WRAPPED_POSTER_RENDERER,
+  );
+  return renderer === 'openai' ? 'openai' : 'local';
 }
 
 function wrappedPredictionRows(snapshot = {}, state = {}, { includeUnavailableGuesses = false, runId = '' } = {}) {
@@ -3324,7 +3330,7 @@ export async function generateAgentOnlyWrappedImage({
     };
   }
   const openAiKey = resolveWrappedPosterOpenAiKey(env);
-  const posterRenderer = resolveWrappedPosterRenderer(env);
+  const posterRenderer = resolveWrappedPosterRenderer(body, env);
   if (imageMode !== 'wrapped_story' && (posterRenderer !== 'openai' || !openAiKey)) {
     return saveDeterministicWrappedPoster({
       env,
