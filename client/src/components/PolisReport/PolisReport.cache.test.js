@@ -1019,6 +1019,14 @@ describe('PolisReport demo data defaults', () => {
     });
   });
 
+  it('separates summaries for different filtered participants with identical cluster assignments', () => {
+    const common = { activeClusterAssignments: [0, 1], allQuestions: ['q1'] };
+    const first = buildClusterAnalysisDataKey({ ...common, allResponders: ['0x111', '0x222'] });
+    expect(first).not.toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x333', '0x444'] }));
+    expect(first).not.toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x222', '0x111'] }));
+    expect(first).toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x111', '0x222'] }));
+  });
+
   it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
     const sharedArgs = {
       activeClusterAssignments: [0, 1, 1, 0],

@@ -260,3 +260,5 @@ Escape asks before discarding the transcript, prefill, and review edits. Choosin
 Quadratic comment-only responses do not count as invalid allocations. An explicit
 all-zero allocation counts as an allocation; encrypted or invalid vote vectors
 remain excluded from the allocation summary.
+
+Cluster-summary caches include the filtered participant roster in assignment order, so summaries from a different subset are not reused merely because cluster counts match.

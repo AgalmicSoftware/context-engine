@@ -633,6 +633,7 @@ export default function PolisReport({
         questionResponsesNonce,
         questionPrompts,
         allQuestions,
+        allResponders,
       }),
     [
       activeClusterAssignments,
@@ -643,6 +644,7 @@ export default function PolisReport({
       questionResponsesNonce,
       questionPrompts,
       allQuestions,
+      allResponders,
     ],
   );
   const currentAnalysisKey = groupResolution.cohort.active
