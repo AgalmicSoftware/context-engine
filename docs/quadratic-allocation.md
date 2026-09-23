@@ -24,8 +24,10 @@ and sliders share a row where space permits; narrow cards stack them. Options
 scroll vertically while the remaining-credit budget stays visible, with part of
 the next label showing when there are more options. A down-arrow button advances
 to the next options. An up arrow appears below the top; only up remains at the bottom. Oppose, remaining credits,
-Support, and reset share one row above the options. Reset is inactive for an
-untouched or already neutral allocation, so it cannot create an accidental draft.
+Support, and reset share one row above the options. Reset is inactive when the
+answer matches the saved baseline, including when both are unanswered, so it cannot
+create an accidental draft. An edited neutral allocation can still be reset to a
+previously saved nonzero answer.
 The Questions toolbar's **Clear pending changes** button restores the saved
 response baseline, just like the pile's X control.
 
@@ -124,7 +126,7 @@ On standalone question pages, votes and remaining credits update locally during 
 the completed allocation reaches the page's normal edit and draft-save handler on release
 or loss of focus. Keyboard changes update the answer immediately.
 In pile cards, the Reset undo-arrow restores the saved answer, or clears the pending answer when none was saved. In draft editors it returns sliders to zero as a neutral allocation. It uses 50% opacity,
-with full opacity on hover or keyboard focus. Pile cards grow to fit their sliders; progress
+with full opacity on hover or keyboard focus. Pile cards keep a fixed height and scroll their options; progress
 and submission remain in the pile's shared controls outside the question card.
 If signing or saving fails, the pile shows the error beneath the question
 and keeps the pending allocation available for retry.

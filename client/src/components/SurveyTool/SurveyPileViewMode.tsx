@@ -2817,7 +2817,9 @@ const renderPileResponseInput = (
         buildSliceFromUserAnswers: (answers) => engine.buildSliceFromUserAnswers(answers),
         buildSliceFromLocalCache: () => engine.buildSliceFromLocalCache(),
       });
-      const savedValue = baseline.answers?.[question.id]?.value ?? '';
+      const savedAnswer = baseline.answers?.[question.id];
+      const savedValue =
+        savedAnswer && typeof savedAnswer === 'object' && 'value' in savedAnswer ? (savedAnswer.value ?? '') : '';
 
       return (
         <QuadraticAllocationInput

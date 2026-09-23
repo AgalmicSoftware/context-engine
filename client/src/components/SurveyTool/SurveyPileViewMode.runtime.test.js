@@ -299,6 +299,61 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
   });
 
+  it.each([
+    { saved: [3, -4], draft: [0, 0] },
+    { saved: [0, 0], draft: [1, -1] },
+  ])(
+    'undoes an edited saved quadratic answer without leaving a pending submission ($saved)',
+    async ({ saved, draft }) => {
+      const runtimeStrategy = createPileViewRuntimeStrategy();
+      let engine;
+      renderPile({
+        runtimeStrategy: {
+          ...runtimeStrategy,
+          render: (current) => {
+            engine = current;
+            return runtimeStrategy.render(current);
+          },
+        },
+        questionPool: [
+          {
+            id: 'quadratic-q',
+            type: 'quadratic',
+            prompt: 'Allocate support',
+            options: ['Parks', 'Transit'],
+            voiceCredits: 25,
+          },
+        ],
+        cacheHasLoaded: false,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: false,
+        isSBTCacheReady: false,
+        isSurveyCacheReady: false,
+      });
+      const parks = await screen.findByLabelText('Parks');
+      const savedSlice = {
+        answers: { 'quadratic-q': { value: saved, encrypted: false } },
+        importance: {},
+        conviction: {},
+        additionalComments: { 'quadratic-q': { value: 'Keep this saved comment', encrypted: false } },
+      };
+      // Seed the same hydrated edit baseline used after retrieving a saved response.
+      // Subsequent edits, reset and pending-submit calculation use the real runtime.
+      act(() => engine.setState({ editBaseline: savedSlice, surveysResponseState: [savedSlice] }));
+      expect(parks).toHaveValue(String(saved[0]));
+      fireEvent.change(parks, { target: { value: String(draft[0]) } });
+      fireEvent.change(screen.getByLabelText('Transit'), { target: { value: String(draft[1]) } });
+      expect(screen.getByRole('button', { name: /Submit.*1/i })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Reset', exact: true }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: /Submit.*1/i })).not.toBeInTheDocument());
+      expect(parks).toHaveValue(String(saved[0]));
+      expect(screen.getByLabelText('Transit')).toHaveValue(String(saved[1]));
+      expect(engine.state.surveysResponseState[0].answers['quadratic-q'].value).toEqual(saved);
+      expect(engine.state.surveysResponseState[0].additionalComments).toEqual(savedSlice.additionalComments);
+      expect(screen.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
+    },
+  );
+
   it('updates a pile rating through the shared slider persistence helper', async () => {
     renderPile({
       questionPool: [{ id: 'rating-q1', type: 'rating', prompt: 'Rate this from zero to ten' }],
