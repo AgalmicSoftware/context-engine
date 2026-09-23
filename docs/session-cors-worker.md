@@ -628,6 +628,18 @@ Authenticated clients can use the worker as the session storage boundary:
     refs are returned, the client completes without an on-chain transaction.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
+    In Worker-canonical sessions whose results visibility is not
+    `public_full_if_storage_public`, individual response reads also require
+    that recorded author, a current session admin, or an authenticated
+    delegated storage grant. A participant's ordinary `storage` route scope
+    permits submission and own-response reload, not other participants' raw
+    answers. Lists apply the same restriction to each row, and older rows
+    lacking trusted author metadata remain unavailable to ordinary participants.
+    Existing per-item access conditions still apply to every permitted reader.
+    This is a read-time protection for existing and new rows; it does not
+    rewrite stored data or revoke plaintext already downloaded. Aggregate-only
+    visibility does not authorize raw reads to compute a client-side summary;
+    a combined summary needs an authorized server-generated aggregate.
   - JSON and multipart uploads share per-upload policy validation. Group IDs
     accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
     of precedence, using the first nonempty list. Multipart `groupIds` and

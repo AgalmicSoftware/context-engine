@@ -850,14 +850,12 @@ describe('SessionVoiceModeModal', () => {
           resolveMapping = resolve;
         }),
     );
-    const onLoadSavedResponses = jest
-      .fn()
-      .mockResolvedValue({
-        answers: { q1: { value: 'Saved' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      });
+    const onLoadSavedResponses = jest.fn().mockResolvedValue({
+      answers: { q1: { value: 'Saved' } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    });
     render(
       <SessionVoiceModeModal
         {...baseProps}

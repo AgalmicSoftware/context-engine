@@ -130,4 +130,6 @@ private-compute services. They do not require a public or private EVM.
 - [Top-level architecture](../ARCHITECTURE.md)
 - [Public roadmap](../ROADMAP.md)
 
+Public Worker response hydration reads at most 100 pages per refresh (10,000 stored response revisions). At that limit it keeps the loaded rows and displays a partial-results warning; results and exports may omit answers or later edits. The public cache is not marked fully ready. Interviews load the signed-in participant's saved answers independently and follow every own-answer page before allowing submission, so a partial public cache does not block a completed own-answer load. A failed own-answer read keeps submission waiting and offers a retry. Ordinary complete public loads clear the warning.
+
 Build runtime helpers are assigned to a separate `vendor-runtime` chunk so the HTML bootstrap does not pull chain vendors through shared helper imports. Application routes still load their own dependencies; this configuration change alone does not eliminate the chain stack from Hosted pages.
