@@ -495,6 +495,23 @@ var init_stringCoercion = __esm({
   }
 });
 
+// shared/workerGroupUrl.mjs
+var normalizeWorkerGroupUrl;
+var init_workerGroupUrl = __esm({
+  "shared/workerGroupUrl.mjs"() {
+    normalizeWorkerGroupUrl = (value) => {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      try {
+        const parsed = new URL(raw);
+        return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.href : null;
+      } catch {
+        return null;
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/sessionSlugResolution.js
 var toStr8, INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
 var init_sessionSlugResolution = __esm({
@@ -5882,6 +5899,7 @@ var init_sessionConfigMutation = __esm({
 var toStr15, trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
+    init_workerGroupUrl();
     init_sessionSlugResolution();
     init_sessionConfigMutation();
     init_workerConfigModeValidation();
@@ -6032,13 +6050,8 @@ var init_workerGroups = __esm({
       const raw = trim2(value);
       if (!raw) return { ok: true, value: "" };
       if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
-      try {
-        const parsed = new URL(raw);
-        if (parsed.protocol !== "https:" || parsed.username || parsed.password) return { ok: false };
-        return { ok: true, value: parsed.href };
-      } catch {
-        return { ok: false };
-      }
+      const normalized = normalizeWorkerGroupUrl(raw);
+      return normalized === null ? { ok: false } : { ok: true, value: normalized };
     };
     normalizeGroupTags = (value) => {
       if (value == null) return { ok: true, value: [] };

@@ -1,3 +1,4 @@
+import { normalizeWorkerGroupUrl } from '@ce-shared/workerGroupUrl.mjs';
 import {
   createWorkerGroup,
   listWorkerGroupsAdmin,
@@ -44,9 +45,9 @@ const comparableGroup = (group: Partial<WorkerGroup>) => ({
   groupId: String(group.groupId || '').trim(),
   label: String(group.label || '').trim(),
   description: String(group.description || '').trim(),
-  imageUrl: String(group.imageUrl || '').trim(),
+  imageUrl: normalizeWorkerGroupUrl(group.imageUrl),
   tags: Array.isArray(group.tags) ? group.tags : [],
-  documentURLs: Array.isArray(group.documentURLs) ? group.documentURLs : [],
+  documentURLs: Array.isArray(group.documentURLs) ? [...new Set(group.documentURLs.map(normalizeWorkerGroupUrl))] : [],
   memberLimit: Number(group.memberLimit || 0),
   joinEndsAt: String(group.joinEndsAt || '').trim(),
   adminAddress: String(group.adminAddress || '')

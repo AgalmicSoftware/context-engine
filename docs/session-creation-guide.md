@@ -1114,3 +1114,6 @@ without finalizing publication. You can edit and verify again; Publish creates
 the final publication revision. The browser compares the shared public fields,
 including session appearance, while excluding the server-managed authorization
 epoch from its comparison.
+
+Retrying queued Group creation compares canonical HTTPS image and document URLs,
+so a host-only URL and the same URL with a trailing slash reuse the saved Group.

@@ -121,6 +121,33 @@ describe('publishPendingWorkerGroupDrafts', () => {
     ]);
   });
 
+  it('reuses a group when the Worker canonicalizes host-only URLs', async () => {
+    const postSignedRequestImpl: jest.MockedFunction<typeof postSignedAdminWorkerRequest> = jest
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('already exists'), { reason: 'worker_group_exists', status: 409 }))
+      .mockResolvedValueOnce(
+        workerRequestResult({
+          sessionSlug: 'test-session',
+          sessionId: SESSION_ID,
+          groups: [
+            { ...payloadGroup, imageUrl: 'https://images.example.test/', documentURLs: ['https://docs.example.test/'] },
+          ],
+        }),
+      );
+    await expect(
+      publishPendingWorkerGroupDrafts({
+        drafts: [{ ...draft, imageUrl: 'https://images.example.test', documentURLs: ['https://docs.example.test'] }],
+        sessionConfig: { defaultGroupTags: ['research'] },
+        sessionId: SESSION_ID,
+        sessionSlug: 'test-session',
+        signerAccount: ADMIN_ADDRESS,
+        workerUrl: 'https://worker.example',
+        signTypedAdminAction: jest.fn(),
+        postSignedRequestImpl,
+      }),
+    ).resolves.toEqual({ created: 0, reused: 1 });
+  });
+
   it('uploads a selected draft image after Worker verification and persists its retry URL', async () => {
     const imageFile = new File(['image'], 'research.png', { type: 'image/png' });
     const uploadImageImpl = jest.fn(async (_input: unknown) => 'https://worker.example/storage/read?id=image-1');
