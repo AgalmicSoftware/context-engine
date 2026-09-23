@@ -56,6 +56,27 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageAnal
 });
 
 describe('UserPageAnalysisModal', () => {
+  it('labels the model that produced a cached summary and distinguishes older requested-only metadata', () => {
+    const { rerender } = render(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisGeneration: { provider: 'openrouter', model: 'provider/resolved-model', source: 'reported' },
+        })}
+      />,
+    );
+    expect(screen.getByText('AI model: provider/resolved-model (openrouter)')).toBeInTheDocument();
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisGeneration: { provider: 'openrouter', model: 'openrouter/auto', source: 'requested' },
+        })}
+      />,
+    );
+    expect(screen.getByText('Requested AI model: openrouter/auto (openrouter)')).toBeInTheDocument();
+    rerender(<UserPageAnalysisModal {...createProps()} />);
+    expect(screen.getByText('AI model: not recorded')).toBeInTheDocument();
+  });
+
   it('renders cached analysis body and forwards close and refresh handlers', () => {
     const onRefreshAnalysis = jest.fn();
     const onToggle = jest.fn();

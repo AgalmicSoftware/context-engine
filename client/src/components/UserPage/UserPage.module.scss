@@ -1792,3 +1792,9 @@ $icon-size-standard: 1.25rem;
   outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 64%, transparent);
   outline-offset: 2px;
 }
+
+.analysisModel {
+  color: var(--ce-document-text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}

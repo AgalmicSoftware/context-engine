@@ -221,7 +221,7 @@ const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
 const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
 const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
-const USER_ANALYSIS_CACHE_VERSION = 1;
+const USER_ANALYSIS_CACHE_VERSION = 2;
 const USER_ANALYSIS_TTL_MS = 24 * 60 * 60 * 1000;
 
 type UnknownRecord = Record<string, unknown>;
@@ -3862,6 +3862,7 @@ class UserPage extends Component<any, any> {
           analysisElapsedMs={analysisElapsedMs}
           analysisError={analysisError}
           analysisErrorAction={analysisErrorAction}
+          analysisGeneration={this.state.analysisGeneration}
           analysisHistoricalFigure={analysisHistoricalFigure}
           analysisHistoricalReasoning={analysisHistoricalReasoning}
           analysisModalDisplayState={analysisModalDisplayState}

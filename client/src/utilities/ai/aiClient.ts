@@ -185,7 +185,7 @@ export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, o
  *   POST { action:'ai', provider, model, temperature?, max_tokens?, messages:[{role, content}] }
  * And respond with: { completion: "<text>" }
  */
-export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<string> => {
+const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
   try {
     const thinkingRequested = readAiOptionThinking(opts);
     const aiRequestOpts = normalizeAiClientOptions(opts);
@@ -259,12 +259,24 @@ export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<strin
       throw new Error(data?.error || 'AI request failed');
     }
 
-    return parseAiWorkerCompletion(data);
+    const reportedModel = asRecord(asRecord(data).raw).model ?? asRecord(data).model;
+    const model = typeof reportedModel === 'string' ? reportedModel.trim() : '';
+    return {
+      text: parseAiWorkerCompletion(data),
+      generation: {
+        provider: ai.provider,
+        model: model || ai.model,
+        source: model ? ('reported' as const) : ('requested' as const),
+      },
+    };
   } catch (error) {
     aiLog.error('Error calling AI via Worker:', error);
     throw error;
   }
 };
+
+export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<string> =>
+  (await callAICompletion(prompt, opts)).text;
 
 /**
  * In-process queue wrapper for AI calls (concurrency = 1) with small
@@ -575,7 +587,9 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
     const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
     const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
-    const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
+    const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
+      callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
+    );
 
     const parsed = asParsedJsonRecord(parseJsonFlexible(raw)) || {};
 
@@ -593,7 +607,7 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
       reasoning: readParsedLegacyString(ha, 'reasoning').trim() || '',
     };
 
-    return { name, summary, details, historicalAlignment };
+    return { name, summary, details, historicalAlignment, generation };
   } catch (err) {
     // User-triggered analysis requests need the real Worker failure so the UI can
     // explain why analysis did not run instead of presenting a synthetic result.

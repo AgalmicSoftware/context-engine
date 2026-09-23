@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client fixes — available when the site deploys
 
+- Show which AI model generated a profile summary and describe preferences in
+  plain language rather than listing scores and vote totals.
+
 - Make interview prompt copying work on the first ready tap in Safari and iOS.
   Check session compatibility in advance, offer Retry when that check fails,
   and reveal the prompt for manual copying if clipboard access fails.
@@ -39,7 +42,6 @@ Sessions created before 0.6.3 keep their existing Worker and remain supported
 by the client. Creators may redeploy to pick up Worker-side fixes.
 
 ## Previously published changes
-
 
 - Align report response bars with pile colors and add persistent Color-blind mode
   under Theme settings, applying shared response and chart palettes across the
@@ -413,11 +415,11 @@ by the client. Creators may redeploy to pick up Worker-side fixes.
   separately as Advanced access, Worker-native creation stays scoped to the
   active session, and registry-backed sessions retain the SBT flow. Native
   Group card bodies now open the full SBT-style detail layout in a new tab;
-      canonical list links use `/groups?sessionName=<slug>` and non-address
-      Worker detail links use `/group/<groupId>?sessionName=<slug>`. Legacy
-      `/groups/:slug` links normalize to those routes, while address-shaped
-      Worker IDs remain at `/groups?sessionName=<slug>#group-<groupId>` so
-      `/group/<address>` stays reserved for SBT detail.
+  canonical list links use `/groups?sessionName=<slug>` and non-address
+  Worker detail links use `/group/<groupId>?sessionName=<slug>`. Legacy
+  `/groups/:slug` links normalize to those routes, while address-shaped
+  Worker IDs remain at `/groups?sessionName=<slug>#group-<groupId>` so
+  `/group/<address>` stays reserved for SBT detail.
   Full detail translates SBT stats into member capacity and a live join
   deadline, exposes member counts and identities only through authenticated
   visibility-aware responses, and renders the Group's public document
