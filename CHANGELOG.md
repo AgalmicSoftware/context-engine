@@ -2,7 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.6.3] - 2026-09-23
+
+### Client fixes — available when the site deploys
+
+- Make interview prompt copying work on the first ready tap in Safari and iOS.
+  Check session compatibility in advance, offer Retry when that check fails,
+  and reveal the prompt for manual copying if clipboard access fails.
+- Keep interview submission working with older session Workers by waiting for
+  complete public response hydration when the older saved-answer lookup is
+  detected. Current Workers retain strict saved-answer identity and completion
+  checks. Existing v4 and v5 interview catalogs remain supported.
+- Preserve interview review edits and complete voice instructions, handle
+  legacy transcript events, and improve rating and quadratic-answer validation.
+- Correct report totals, response ordering and exports; keep partial results
+  visible with a warning when a large response history exceeds the loading cap.
+- Improve keyboard access, report contrast, group filtering and cancellation,
+  and passkey locking. Reduce the initial application bootstrap download.
+
+### Worker fixes — sessions created after this release
+
+New sessions receive the Worker package from this release. The package:
+
+- Enforces private response-read permissions and the configured upload gate.
+- Validates storage resource names and checks current authentication on the
+  results-analysis artifact route, including stale tokens.
+- Improves nonce handling and batches response-index reads.
+- Supports authenticated `mine=true` saved-answer listings with responder,
+  session and pagination proofs.
+- Verifies the public configuration used by setup and publication, and keeps
+  Verify usable before the first Publish.
+- Strengthens Telegram invite, group and administrator authorization and
+  validates all supported answer types in generated results.
+
+Sessions created before 0.6.3 keep their existing Worker and remain supported
+by the client. Creators may redeploy to pick up Worker-side fixes.
+
+## Previously published changes
+
 
 - Align report response bars with pile colors and add persistent Color-blind mode
   under Theme settings, applying shared response and chart palettes across the
