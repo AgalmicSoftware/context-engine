@@ -21,6 +21,12 @@ describe('sessionCorsWorker auth routes', () => {
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
   const loginOrigin = 'https://contextengine.sh';
   const loginDomain = 'contextengine.sh';
+  const readActiveNonce = (env) => {
+    const identity = `auth-nonce:${sessionSlug}:${wallet.address.toLowerCase()}`;
+    const digest = ethers.utils.sha256(ethers.utils.toUtf8Bytes(identity)).slice(2);
+    return env.__coordinatorInstances.get(`coordinator:${digest}`)?.store.get('auth-nonce-active')?.nonce;
+  };
+
 
   const makeAuthJsonRequest = (path, body, origin = loginOrigin) => makeJsonRequest(path, body, {
     headers: { Origin: origin },
@@ -81,7 +87,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.headers.get('Vary')).toBe('Origin');
   });
 
-  it('issues auth nonces and stores them under slug + address', async () => {
+  it('issues auth nonces in the coordinator without KV mirrors', async () => {
     const kv = createMemoryKv();
     const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
@@ -98,11 +104,8 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(200);
     expect(typeof payload?.nonce).toBe('string');
     expect(payload.nonce.length).toBeGreaterThan(10);
-    expect(kv.put).toHaveBeenCalledWith(
-      `nonce:${sessionSlug}:${wallet.address.toLowerCase()}`,
-      payload.nonce,
-      { expirationTtl: 60 * 5 }
-    );
+    expect(readActiveNonce(env)).toBe(payload.nonce);
+    expect(kv.put).not.toHaveBeenCalled();
   });
 
   it('allows 100 distinct wallets behind one trusted Cloudflare IP to request login nonces concurrently', async () => {
@@ -384,7 +387,8 @@ describe('sessionCorsWorker auth routes', () => {
       lit: true,
       groups: true,
     });
-    expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
+    expect(readActiveNonce(env)).toBeUndefined();
+    expect(kv.delete).not.toHaveBeenCalled();
   });
 
   it('issues passkey-wallet login tokens for unregistered worker-canonical sessions', async () => {
@@ -533,7 +537,8 @@ describe('sessionCorsWorker auth routes', () => {
       lit: false,
       groups: true,
     });
-    expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
+    expect(readActiveNonce(env)).toBeUndefined();
+    expect(kv.delete).not.toHaveBeenCalled();
   });
 
   it('rejects login when the nonce is reused after a successful login', async () => {
@@ -694,7 +699,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('SIWE domain does not match URI host.');
     expect(kv.delete).not.toHaveBeenCalled();
-    expect(kv._dump().get(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`)).toBe(nonce);
+    expect(readActiveNonce(env)).toBe(nonce);
   });
 
   it('rejects login when the SIWE message address does not match the request address and preserves the nonce', async () => {
@@ -741,7 +746,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('SIWE address mismatch.');
     expect(kv.delete).not.toHaveBeenCalled();
-    expect(kv._dump().get(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`)).toBe(nonce);
+    expect(readActiveNonce(env)).toBe(nonce);
   });
 
   it('rejects login when the siwe message is expired and preserves the nonce', async () => {
@@ -782,7 +787,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('SIWE message expired.');
     expect(kv.delete).not.toHaveBeenCalled();
-    expect(kv._dump().get(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`)).toBe(nonce);
+    expect(readActiveNonce(env)).toBe(nonce);
   });
 
   it('rejects login when session config is missing without consuming the nonce', async () => {
@@ -822,7 +827,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(loginResponse.status).toBe(404);
     expect(payload?.error).toBe('Session config not found.');
     expect(kv.delete).not.toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
-    expect(kv._dump().get(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`)).toBe(nonce);
+    expect(readActiveNonce(env)).toBe(nonce);
   });
 
   it('returns a stable 403 error when the default on-chain gate denies login access', async () => {
@@ -881,7 +886,8 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(403);
     expect(payload?.error).toBe('Access denied: default gate failed.');
     expect(payload?.token).toBeUndefined();
-    expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
+    expect(readActiveNonce(env)).toBeUndefined();
+    expect(kv.delete).not.toHaveBeenCalled();
   });
 
   it('rejects login before consuming the nonce when the existing session allowlist blocks the request origin', async () => {
@@ -932,6 +938,6 @@ describe('sessionCorsWorker auth routes', () => {
     expect(payload?.error).toBe('Origin not allowed.');
     expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
     expect(kv.delete).not.toHaveBeenCalledWith(nonceKey);
-    expect(kv._dump().get(nonceKey)).toBe(nonce);
+    expect(readActiveNonce(env)).toBe(nonce);
   });
 });
