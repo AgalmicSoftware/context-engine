@@ -47,6 +47,15 @@ const mockUploadDataToArweave = jest.fn();
 const mockBuildArweaveGatewayUrl = jest.fn();
 const mockNormalizeSessionMediaUrl = jest.fn((value) => String(value || '').trim());
 
+// These UI tests do not exercise chain transport. Mock background metadata reads
+// so teardown cannot leave live RPC requests running in the test process.
+jest.mock('../../domains/chain/rpcProvidersChainReadsPort', () => ({
+  rpcProvidersChainReadsPort: {
+    getLatestBlockNumberForChain: jest.fn(async () => 100),
+    getNativeBalanceWeiForChain: jest.fn(async () => '0'),
+  },
+}));
+
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
     resolveCorsProxyUrl: (...args) => mockResolveCorsProxyUrl(...args),

@@ -666,11 +666,44 @@ const validateProfileStoragePolicyCoherence = ({ profile, storageSide }) => {
   return validateCanonicalStorageAccessConditions({ profile, storageSide });
 };
 
+// Optional field recipients do not change the public/private storage policy.
+const validateSupplementalSessionPolicies = (config) => {
+  if (hasOwn(config, 'responseFieldEncryption')) {
+    const policy = config.responseFieldEncryption;
+    if (!isObj(policy) || Object.keys(policy).some(key => !['mode', 'version'].includes(key)) ||
+        (hasOwn(policy, 'mode') && !['none', 'optional'].includes(policy.mode)) ||
+        (hasOwn(policy, 'version') && ![0, 1].includes(policy.version))) return invalid('responseFieldEncryption');
+    if (policy.mode === 'optional' && (config.sessionModeProfile?.authority?.mode !== 'worker_canonical' ||
+        config.sessionModeProfile?.storage?.backend !== 'cloudflare' ||
+        config.storageProfile?.backend !== 'cloudflare')) return invalid('responseFieldEncryption.mode');
+  }
+  if (hasOwn(config, 'linkedWorkerGroups')) {
+    if (!Array.isArray(config.linkedWorkerGroups) || config.linkedWorkerGroups.length > 20) return invalid('linkedWorkerGroups');
+    const seen = new Set();
+    for (const group of config.linkedWorkerGroups) {
+      if (!isObj(group) || Object.keys(group).some(key => !['sessionSlug', 'sessionId', 'workerUrl', 'groupId'].includes(key)) ||
+          !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.sessionSlug || '') ||
+          !/^0x[0-9a-f]{32}$/i.test(group.sessionId || '') ||
+          !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.groupId || '')) return invalid('linkedWorkerGroups');
+      try {
+        const url = new URL(group.workerUrl);
+        if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') return invalid('linkedWorkerGroups.workerUrl');
+      } catch { return invalid('linkedWorkerGroups.workerUrl'); }
+      const key = `${group.sessionId}:${group.groupId}`;
+      if (seen.has(key)) return invalid('linkedWorkerGroups');
+      seen.add(key);
+    }
+  }
+  return valid();
+};
+
 export const validateWorkerConfigModeValues = (
   config,
   { allowPartialProfileStorage = false } = {},
 ) => {
   if (!isObj(config)) return invalid('config');
+  const supplemental = validateSupplementalSessionPolicies(config);
+  if (!supplemental.ok) return supplemental;
   if (hasOwn(config, 'sessionEndsAt') && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
     return invalid('sessionEndsAt');
   }
@@ -733,6 +766,8 @@ export const workerConfigAllowsAnonymousGroupDiscovery = (config) => {
 
 export const validateDeploymentModeValues = (body) => {
   if (!isObj(body)) return invalid('request');
+  const supplemental = validateSupplementalSessionPolicies(body);
+  if (!supplemental.ok) return supplemental;
 
   let profile = null;
   if (hasOwn(body, 'sessionModeProfile')) {

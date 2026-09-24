@@ -88,3 +88,31 @@ describe('surveyQuestionsLockAudienceRuntime', () => {
     expect(buildLockAudienceMenuState).toHaveBeenCalledWith({ lockAudienceMenuByQuestion: {} }, 'q1:additional', true);
   });
 });
+
+it('hides new pile locks when encryption is explicitly disabled, while preserving the old locked indicator', () => {
+  const runtime = createSurveyQuestionsLockAudienceRuntime({
+    propsRef: { current: { sessionConfig: { sessionModeProfile: { encryption: { mode: 'none' } } } } },
+    stateRef: { current: {} },
+    SurveyQuestionsLockAudienceControl: () => null,
+    isQuestionLockedForResponse: () => false,
+    resolveQuestionGateOption: () => null,
+    resolveFieldEncryptionAudience: () => 'self',
+    resolveFieldEncryptionGateId: () => '',
+    normalizeFieldAudienceMode: () => 'explicit',
+    normalizeGateLabelText: (s: string) => s || '',
+    buildLockAudienceDisplayState: (input: Record<string, unknown>) => ({
+      ...input,
+      effectiveFieldKey: 'answer',
+      isLockDisabled: input.lockDisabled,
+    }),
+  });
+  expect(
+    runtime.renderAnswerLockControl({ questionId: 'q1', answer: { encrypted: false }, visualContext: 'pile' }),
+  ).toBeNull();
+  const locked = runtime.renderAnswerLockControl({
+    questionId: 'q1',
+    answer: { encrypted: true },
+    visualContext: 'pile',
+  });
+  expect(locked.props.isLockDisabled).toBe(true);
+});

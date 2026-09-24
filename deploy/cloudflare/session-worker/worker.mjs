@@ -336,11 +336,11 @@ var init_outboundUrlSafetyBinding = __esm({
         let target = url;
         const maxRedirects = outboundUrlPolicy === PUBLIC_HTTPS_ARTIFACT_POLICY ? 5 : 1;
         for (let redirects = 0; ; redirects += 1) {
-          const response2 = await fetchImpl(target, requestOptions);
-          if (response2.status < 300 || response2.status >= 400) return response2;
-          await response2.body?.cancel?.();
+          const response3 = await fetchImpl(target, requestOptions);
+          if (response3.status < 300 || response3.status >= 400) return response3;
+          await response3.body?.cancel?.();
           if (redirects >= maxRedirects) return { ok: false, error: "Too many redirects", status: 403 };
-          const location2 = toStr5(response2.headers.get("location"), deps).trim();
+          const location2 = toStr5(response3.headers.get("location"), deps).trim();
           let redirectUrl = "";
           if (location2) {
             try {
@@ -786,19 +786,19 @@ var init_artifactFetch = __esm({
       accept = "application/javascript"
     } = {}) => {
       const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
-      const response2 = await safeFetch(url, {
+      const response3 = await safeFetch(url, {
         method: "GET",
         headers: { Accept: accept },
         cache: "no-store",
         outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY
       });
-      if (!response2.ok) {
-        await response2.body?.cancel?.();
-        const error = new Error(response2.error || `Artifact fetch failed (${response2.status}).`);
-        error.status = response2.status;
+      if (!response3.ok) {
+        await response3.body?.cancel?.();
+        const error = new Error(response3.error || `Artifact fetch failed (${response3.status}).`);
+        error.status = response3.status;
         throw error;
       }
-      return readBodyText(response2, maxBytes);
+      return readBodyText(response3, maxBytes);
     };
   }
 });
@@ -1635,9 +1635,11 @@ var init_workerSessionPublicConfig = __esm({
       "corsWorkerUrl",
       "allowOrigins",
       "sessionModeProfile",
+      "responseFieldEncryption",
       "agentSessionWrapped",
       "workerAuthority",
       "groupCreationPolicy",
+      "linkedWorkerGroups",
       "storageProfile",
       "ai",
       "limits",
@@ -1678,8 +1680,10 @@ var init_workerSessionConfig = __esm({
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
       "sessionModeProfile",
+      "responseFieldEncryption",
       "workerAuthority",
       "groupCreationPolicy",
+      "linkedWorkerGroups",
       "storageProfile",
       "ai",
       "networkChainId",
@@ -1963,7 +1967,7 @@ var init_sessionLifecycle = __esm({
 });
 
 // workers/shared/workerConfigModeValidation.mjs
-var isObj3, hasOwn, AUTHORITY_MODES, SESSION_PRESETS, SESSION_STORAGE_BACKENDS, DEPLOY_STORAGE_BACKENDS, PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES, PAYLOAD_ENCRYPTION_MODES, SESSION_KEY_PROVIDERS, IDENTITY_DEFAULTS, IDENTITY_METHODS, AUTHORIZATION_MECHANISMS, SURFACES, RESULTS_VISIBILITIES, EXPORT_SCOPES, ACCESS_MATCHES, ACCESS_KINDS, RESOURCE_KEYS, EVM_ADDRESS_PATTERN, MAX_ACCESS_CONDITION_TEXT_LENGTH, CANONICAL_NAMED_SESSION_MODE_PROFILES, valid, invalid, stableSessionModeValue, sessionModeValuesEqual, validateEnumField, validateRequiredEnumField, validateObjectField, validateExactKeys, validateRequiredObjectField, validateEnumArray, positiveChainId, validateAccessConditions, validatePayloadAccessControl, validateStorageProfile, validateVersionedSessionModeProfile, validateSessionModeProfile, resolveProfileStorageSide, profileStorageBackendMatches, validateCanonicalStorageAccessConditions, validateProfileStoragePolicyCoherence, validateWorkerConfigModeValues, workerConfigAllowsAnonymousGroupDiscovery, validateDeploymentModeValues;
+var isObj3, hasOwn, AUTHORITY_MODES, SESSION_PRESETS, SESSION_STORAGE_BACKENDS, DEPLOY_STORAGE_BACKENDS, PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES, PAYLOAD_ENCRYPTION_MODES, SESSION_KEY_PROVIDERS, IDENTITY_DEFAULTS, IDENTITY_METHODS, AUTHORIZATION_MECHANISMS, SURFACES, RESULTS_VISIBILITIES, EXPORT_SCOPES, ACCESS_MATCHES, ACCESS_KINDS, RESOURCE_KEYS, EVM_ADDRESS_PATTERN, MAX_ACCESS_CONDITION_TEXT_LENGTH, CANONICAL_NAMED_SESSION_MODE_PROFILES, valid, invalid, stableSessionModeValue, sessionModeValuesEqual, validateEnumField, validateRequiredEnumField, validateObjectField, validateExactKeys, validateRequiredObjectField, validateEnumArray, positiveChainId, validateAccessConditions, validatePayloadAccessControl, validateStorageProfile, validateVersionedSessionModeProfile, validateSessionModeProfile, resolveProfileStorageSide, profileStorageBackendMatches, validateCanonicalStorageAccessConditions, validateProfileStoragePolicyCoherence, validateSupplementalSessionPolicies, validateWorkerConfigModeValues, workerConfigAllowsAnonymousGroupDiscovery, validateDeploymentModeValues;
 var init_workerConfigModeValidation = __esm({
   "workers/shared/workerConfigModeValidation.mjs"() {
     init_sessionLifecycle();
@@ -2509,8 +2513,34 @@ var init_workerConfigModeValidation = __esm({
       }
       return validateCanonicalStorageAccessConditions({ profile, storageSide });
     };
+    validateSupplementalSessionPolicies = (config) => {
+      if (hasOwn(config, "responseFieldEncryption")) {
+        const policy = config.responseFieldEncryption;
+        if (!isObj3(policy) || Object.keys(policy).some((key) => !["mode", "version"].includes(key)) || hasOwn(policy, "mode") && !["none", "optional"].includes(policy.mode) || hasOwn(policy, "version") && ![0, 1].includes(policy.version)) return invalid("responseFieldEncryption");
+        if (policy.mode === "optional" && (config.sessionModeProfile?.authority?.mode !== "worker_canonical" || config.sessionModeProfile?.storage?.backend !== "cloudflare" || config.storageProfile?.backend !== "cloudflare")) return invalid("responseFieldEncryption.mode");
+      }
+      if (hasOwn(config, "linkedWorkerGroups")) {
+        if (!Array.isArray(config.linkedWorkerGroups) || config.linkedWorkerGroups.length > 20) return invalid("linkedWorkerGroups");
+        const seen = /* @__PURE__ */ new Set();
+        for (const group of config.linkedWorkerGroups) {
+          if (!isObj3(group) || Object.keys(group).some((key2) => !["sessionSlug", "sessionId", "workerUrl", "groupId"].includes(key2)) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.sessionSlug || "") || !/^0x[0-9a-f]{32}$/i.test(group.sessionId || "") || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(group.groupId || "")) return invalid("linkedWorkerGroups");
+          try {
+            const url = new URL(group.workerUrl);
+            if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/") return invalid("linkedWorkerGroups.workerUrl");
+          } catch {
+            return invalid("linkedWorkerGroups.workerUrl");
+          }
+          const key = `${group.sessionId}:${group.groupId}`;
+          if (seen.has(key)) return invalid("linkedWorkerGroups");
+          seen.add(key);
+        }
+      }
+      return valid();
+    };
     validateWorkerConfigModeValues = (config, { allowPartialProfileStorage = false } = {}) => {
       if (!isObj3(config)) return invalid("config");
+      const supplemental = validateSupplementalSessionPolicies(config);
+      if (!supplemental.ok) return supplemental;
       if (hasOwn(config, "sessionEndsAt") && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
         return invalid("sessionEndsAt");
       }
@@ -2557,6 +2587,8 @@ var init_workerConfigModeValidation = __esm({
     };
     validateDeploymentModeValues = (body) => {
       if (!isObj3(body)) return invalid("request");
+      const supplemental = validateSupplementalSessionPolicies(body);
+      if (!supplemental.ok) return supplemental;
       let profile = null;
       if (hasOwn(body, "sessionModeProfile")) {
         const result = validateSessionModeProfile(body.sessionModeProfile, "sessionModeProfile");
@@ -4859,9 +4891,9 @@ var init_deployHelperCore = __esm({
         }
         const coordinatorName = await sha256Hex2(`direct-deploy:${context.deploymentId}`);
         const stub = coordinator2.get(coordinator2.idFromName(coordinatorName));
-        let response2;
+        let response3;
         try {
-          response2 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
+          response3 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -4878,7 +4910,7 @@ var init_deployHelperCore = __esm({
             deploymentRequestPending: true
           }, { fallbackEligible: true });
         }
-        const result2 = await response2.json().catch(() => ({}));
+        const result2 = await response3.json().catch(() => ({}));
         if (isObj4(result2?.body) && Number(result2?.status || 0)) {
           return {
             ok: result2.ok === true,
@@ -4887,7 +4919,7 @@ var init_deployHelperCore = __esm({
             fallbackEligible: result2.fallbackEligible === true
           };
         }
-        return buildFailure(Number(response2.status || 0) || 502, isObj4(result2) ? result2 : {
+        return buildFailure(Number(response3.status || 0) || 502, isObj4(result2) ? result2 : {
           error: "Deployment coordinator returned an invalid response."
         });
       }
@@ -6101,18 +6133,18 @@ var init_workerGroups = __esm({
       return { ok: true, value: new Date(timestamp).toISOString() };
     };
     normalizeEvmAddress = (value, deps = {}) => {
-      const address = trim2(value);
-      if (typeof deps.isAddress === "function" && !deps.isAddress(address)) return "";
-      if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return "";
+      const address2 = trim2(value);
+      if (typeof deps.isAddress === "function" && !deps.isAddress(address2)) return "";
+      if (!/^0x[0-9a-fA-F]{40}$/.test(address2)) return "";
       if (typeof deps.getAddress === "function") {
         try {
-          const normalized = trim2(deps.getAddress(address));
+          const normalized = trim2(deps.getAddress(address2));
           if (/^0x[0-9a-fA-F]{40}$/.test(normalized)) return normalized;
         } catch {
           return "";
         }
       }
-      return address.toLowerCase();
+      return address2.toLowerCase();
     };
     normalizePrincipalId = (value) => {
       const id2 = trim2(value);
@@ -6127,23 +6159,23 @@ var init_workerGroups = __esm({
     };
     normalizeWorkerGroupPrincipal = (input, deps = {}) => {
       if (typeof input === "string") {
-        const address = normalizeEvmAddress(input, deps);
-        if (!address) return { ok: false, reason: "invalid_principal" };
+        const address2 = normalizeEvmAddress(input, deps);
+        if (!address2) return { ok: false, reason: "invalid_principal" };
         return {
           ok: true,
-          principal: { kind: "evm_address", address },
-          key: principalKeyFor("evm_address", address)
+          principal: { kind: "evm_address", address: address2 },
+          key: principalKeyFor("evm_address", address2)
         };
       }
       if (!isObj7(input)) return { ok: false, reason: "invalid_principal" };
       const kind = trim2(input.kind || input.type).toLowerCase();
       if (kind === "passkey_account" || kind === "evm_address") {
-        const address = normalizeEvmAddress(input.address || input.account || input.id, deps);
-        if (!address) return { ok: false, reason: "invalid_principal_address" };
+        const address2 = normalizeEvmAddress(input.address || input.account || input.id, deps);
+        if (!address2) return { ok: false, reason: "invalid_principal_address" };
         return {
           ok: true,
-          principal: { kind, address },
-          key: principalKeyFor(kind, address)
+          principal: { kind, address: address2 },
+          key: principalKeyFor(kind, address2)
         };
       }
       if (kind === "telegram") {
@@ -7391,16 +7423,16 @@ ${row.principalKey}`, row);
       }
       if (!stub?.fetch) return workerGroupCoordinationUnavailable();
       try {
-        const response2 = await stub.fetch(`https://session-coordinator.internal${path}`, {
+        const response3 = await stub.fetch(`https://session-coordinator.internal${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, slug: sessionSlug, sessionId: canonicalSessionId })
         });
-        const result = await response2.json().catch(() => null);
+        const result = await response3.json().catch(() => null);
         if (!result || typeof result !== "object") return workerGroupCoordinationUnavailable();
         return {
           ...result,
-          status: Number(result.status || 0) || response2.status
+          status: Number(result.status || 0) || response3.status
         };
       } catch {
         return workerGroupCoordinationUnavailable();
@@ -9986,18 +10018,18 @@ var require_fetch = __commonJS({
       if (scheme in Gateways2) {
         const result = await Gateways2[scheme](req.url, checkSignal2(__privateGet(_request4, _signal2)));
         if (result instanceof FetchResponse2) {
-          let response3 = result;
+          let response4 = result;
           if (this.processFunc) {
             checkSignal2(__privateGet(_request4, _signal2));
             try {
-              response3 = await this.processFunc(req, response3);
+              response4 = await this.processFunc(req, response4);
             } catch (error) {
               if (error.throttle == null || typeof error.stall !== "number") {
-                response3.makeServerError("error in post-processing function", error).assertOk();
+                response4.makeServerError("error in post-processing function", error).assertOk();
               }
             }
           }
-          return response3;
+          return response4;
         }
         req = result;
       }
@@ -10005,41 +10037,41 @@ var require_fetch = __commonJS({
         req = await this.preflightFunc(req);
       }
       const resp = await this.getUrlFunc(req, checkSignal2(__privateGet(_request4, _signal2)));
-      let response2 = new FetchResponse2(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request4);
-      if (response2.statusCode === 301 || response2.statusCode === 302) {
+      let response3 = new FetchResponse2(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request4);
+      if (response3.statusCode === 301 || response3.statusCode === 302) {
         try {
-          const location2 = response2.headers.location || "";
-          return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances2, send_fn2).call(_a2, attempt + 1, expires, 0, _request4, response2);
+          const location2 = response3.headers.location || "";
+          return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances2, send_fn2).call(_a2, attempt + 1, expires, 0, _request4, response3);
         } catch (error) {
         }
-        return response2;
-      } else if (response2.statusCode === 429) {
-        if (this.retryFunc == null || await this.retryFunc(req, response2, attempt)) {
-          const retryAfter = response2.headers["retry-after"];
+        return response3;
+      } else if (response3.statusCode === 429) {
+        if (this.retryFunc == null || await this.retryFunc(req, response3, attempt)) {
+          const retryAfter = response3.headers["retry-after"];
           let delay2 = __privateGet(this, _throttle2).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
           if (typeof retryAfter === "string" && retryAfter.match(/^[1-9][0-9]*$/)) {
             delay2 = parseInt(retryAfter);
           }
-          return __privateMethod(_b = req.clone(), _FetchRequest_instances2, send_fn2).call(_b, attempt + 1, expires, delay2, _request4, response2);
+          return __privateMethod(_b = req.clone(), _FetchRequest_instances2, send_fn2).call(_b, attempt + 1, expires, delay2, _request4, response3);
         }
       }
       if (this.processFunc) {
         checkSignal2(__privateGet(_request4, _signal2));
         try {
-          response2 = await this.processFunc(req, response2);
+          response3 = await this.processFunc(req, response3);
         } catch (error) {
           if (error.throttle == null || typeof error.stall !== "number") {
-            response2.makeServerError("error in post-processing function", error).assertOk();
+            response3.makeServerError("error in post-processing function", error).assertOk();
           }
           let delay2 = __privateGet(this, _throttle2).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
           ;
           if (error.stall >= 0) {
             delay2 = error.stall;
           }
-          return __privateMethod(_c = req.clone(), _FetchRequest_instances2, send_fn2).call(_c, attempt + 1, expires, delay2, _request4, response2);
+          return __privateMethod(_c = req.clone(), _FetchRequest_instances2, send_fn2).call(_c, attempt + 1, expires, delay2, _request4, response3);
         }
       }
-      return response2;
+      return response3;
     };
     var FetchRequest2 = _FetchRequest2;
     exports.FetchRequest = FetchRequest2;
@@ -10151,9 +10183,9 @@ var require_fetch = __commonJS({
         } else {
           statusMessage = `CLIENT ESCALATED SERVER ERROR (${this.statusCode} ${this.statusMessage}; ${message})`;
         }
-        const response2 = new _FetchResponse2(599, statusMessage, this.headers, this.body, __privateGet(this, _request3) || void 0);
-        __privateSet(response2, _error2, { message, error });
-        return response2;
+        const response3 = new _FetchResponse2(599, statusMessage, this.headers, this.body, __privateGet(this, _request3) || void 0);
+        __privateSet(response3, _error2, { message, error });
+        return response3;
       }
       /**
        *  If called within a [request.processFunc](FetchRequest-processFunc)
@@ -16086,9 +16118,9 @@ var require_address = __commonJS({
     var index_js_2 = require_utils();
     var BN_012 = BigInt(0);
     var BN_362 = BigInt(36);
-    function getChecksumAddress2(address) {
-      address = address.toLowerCase();
-      const chars = address.substring(2).split("");
+    function getChecksumAddress2(address2) {
+      address2 = address2.toLowerCase();
+      const chars = address2.substring(2).split("");
       const expanded = new Uint8Array(40);
       for (let i = 0; i < 40; i++) {
         expanded[i] = chars[i].charCodeAt(0);
@@ -16112,10 +16144,10 @@ var require_address = __commonJS({
       ibanLookup2[String.fromCharCode(65 + i)] = String(10 + i);
     }
     var safeDigits2 = 15;
-    function ibanChecksum2(address) {
-      address = address.toUpperCase();
-      address = address.substring(4) + address.substring(0, 2) + "00";
-      let expanded = address.split("").map((c) => {
+    function ibanChecksum2(address2) {
+      address2 = address2.toUpperCase();
+      address2 = address2.substring(4) + address2.substring(0, 2) + "00";
+      let expanded = address2.split("").map((c) => {
         return ibanLookup2[c];
       }).join("");
       while (expanded.length >= safeDigits2) {
@@ -16145,29 +16177,29 @@ var require_address = __commonJS({
       }
       return result;
     }
-    function getAddress2(address) {
-      (0, index_js_2.assertArgument)(typeof address === "string", "invalid address", "address", address);
-      if (address.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
-        if (!address.startsWith("0x")) {
-          address = "0x" + address;
+    function getAddress2(address2) {
+      (0, index_js_2.assertArgument)(typeof address2 === "string", "invalid address", "address", address2);
+      if (address2.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
+        if (!address2.startsWith("0x")) {
+          address2 = "0x" + address2;
         }
-        const result = getChecksumAddress2(address);
-        (0, index_js_2.assertArgument)(!address.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address, "bad address checksum", "address", address);
+        const result = getChecksumAddress2(address2);
+        (0, index_js_2.assertArgument)(!address2.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address2, "bad address checksum", "address", address2);
         return result;
       }
-      if (address.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
-        (0, index_js_2.assertArgument)(address.substring(2, 4) === ibanChecksum2(address), "bad icap checksum", "address", address);
-        let result = fromBase362(address.substring(4)).toString(16);
+      if (address2.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
+        (0, index_js_2.assertArgument)(address2.substring(2, 4) === ibanChecksum2(address2), "bad icap checksum", "address", address2);
+        let result = fromBase362(address2.substring(4)).toString(16);
         while (result.length < 40) {
           result = "0" + result;
         }
         return getChecksumAddress2("0x" + result);
       }
-      (0, index_js_2.assertArgument)(false, "invalid address", "address", address);
+      (0, index_js_2.assertArgument)(false, "invalid address", "address", address2);
     }
     exports.getAddress = getAddress2;
-    function getIcapAddress2(address) {
-      let base36 = BigInt(getAddress2(address)).toString(36).toUpperCase();
+    function getIcapAddress2(address2) {
+      let base36 = BigInt(getAddress2(address2)).toString(36).toUpperCase();
       while (base36.length < 30) {
         base36 = "0" + base36;
       }
@@ -23655,10 +23687,10 @@ var require_provider = __commonJS({
        *  Returns a JSON-compatible object.
        */
       toJSON() {
-        const { address, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
+        const { address: address2, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
         return {
           _type: "log",
-          address,
+          address: address2,
           blockHash,
           blockNumber,
           data,
@@ -25014,8 +25046,8 @@ var require_contract = __commonJS({
       const { addr, subs } = getInternal2(contract);
       let sub = subs.get(tag);
       if (!sub) {
-        const address = addr ? addr : contract;
-        const filter = { address, topics };
+        const address2 = addr ? addr : contract;
+        const filter = { address: address2, topics };
         const listener = (log2) => {
           let foundFragment = fragment;
           if (foundFragment == null) {
@@ -25355,9 +25387,9 @@ var require_contract = __commonJS({
           toBlock = "latest";
         }
         const { addr, addrPromise } = getInternal2(this);
-        const address = addr ? addr : await addrPromise;
+        const address2 = addr ? addr : await addrPromise;
         const { fragment, topics } = await getSubInfo2(this, event);
-        const filter = { address, topics, fromBlock, toBlock };
+        const filter = { address: address2, topics, fromBlock, toBlock };
         const provider = getProvider2(this.runner);
         (0, index_js_3.assert)(provider, "contract runner does not have a provider", "UNSUPPORTED_OPERATION", { operation: "queryFilter" });
         return (await provider.getLogs(filter)).map((log2) => {
@@ -25502,8 +25534,8 @@ var require_contract = __commonJS({
        */
       static buildClass(abi) {
         class CustomContract extends _BaseContract2 {
-          constructor(address, runner = null) {
-            super(address, abi, runner);
+          constructor(address2, runner = null) {
+            super(address2, abi, runner);
           }
         }
         return CustomContract;
@@ -25613,8 +25645,8 @@ var require_factory = __commonJS({
           operation: "sendTransaction"
         });
         const sentTx = await this.runner.sendTransaction(tx);
-        const address = (0, index_js_2.getCreateAddress)(sentTx);
-        return new contract_js_1.BaseContract(address, this.interface, this.runner, sentTx);
+        const address2 = (0, index_js_2.getCreateAddress)(sentTx);
+        return new contract_js_1.BaseContract(address2, this.interface, this.runner, sentTx);
       }
       /**
        *  Return a new **ContractFactory** with the same ABI and bytecode,
@@ -25728,7 +25760,7 @@ var require_ens_resolver = __commonJS({
       /**
        *  Resolves to the encoded %%address%% for %%coinType%%.
        */
-      async encodeAddress(coinType, address) {
+      async encodeAddress(coinType, address2) {
         throw new Error("unsupported coin");
       }
       /**
@@ -25758,7 +25790,7 @@ var require_ens_resolver = __commonJS({
     ];
     var _supports25442, _resolver2, _EnsResolver_instances2, fetch_fn2, _EnsResolver_static2, getResolver_fn2;
     var _EnsResolver2 = class _EnsResolver2 {
-      constructor(provider, address, name) {
+      constructor(provider, address2, name) {
         __privateAdd(this, _EnsResolver_instances2);
         /**
          *  The connected provider.
@@ -25775,9 +25807,9 @@ var require_ens_resolver = __commonJS({
         // For EIP-2544 names, the ancestor that provided the resolver
         __privateAdd(this, _supports25442);
         __privateAdd(this, _resolver2);
-        (0, index_js_5.defineProperties)(this, { provider, address, name });
+        (0, index_js_5.defineProperties)(this, { provider, address: address2, name });
         __privateSet(this, _supports25442, null);
-        __privateSet(this, _resolver2, new index_js_3.Contract(address, [
+        __privateSet(this, _resolver2, new index_js_3.Contract(address2, [
           "function supportsInterface(bytes4) view returns (bool)",
           "function resolve(bytes, bytes) view returns (bytes)",
           "function addr(bytes32) view returns (address)",
@@ -25851,9 +25883,9 @@ var require_ens_resolver = __commonJS({
         if (data == null || data === "0x") {
           return null;
         }
-        const address = await coinPlugin.decodeAddress(coinType, data);
-        if (address != null) {
-          return address;
+        const address2 = await coinPlugin.decodeAddress(coinType, data);
+        if (address2 != null) {
+          return address2;
         }
         (0, index_js_5.assert)(false, `invalid coin data`, "UNSUPPORTED_OPERATION", {
           operation: `getAddress(${coinType})`,
@@ -25995,15 +26027,15 @@ var require_ens_resolver = __commonJS({
                 }
                 linkage.push({ type: "metadata-url", value: metadataUrl });
                 let metadata = {};
-                const response2 = await new index_js_5.FetchRequest(metadataUrl).send();
-                response2.assertOk();
+                const response3 = await new index_js_5.FetchRequest(metadataUrl).send();
+                response3.assertOk();
                 try {
-                  metadata = response2.bodyJson;
+                  metadata = response3.bodyJson;
                 } catch (error) {
                   try {
-                    linkage.push({ type: "!metadata", value: response2.bodyText });
+                    linkage.push({ type: "!metadata", value: response3.bodyText });
                   } catch (error2) {
-                    const bytes2 = response2.body;
+                    const bytes2 = response3.body;
                     if (bytes2) {
                       linkage.push({ type: "!metadata", value: (0, index_js_5.hexlify)(bytes2) });
                     }
@@ -26501,7 +26533,7 @@ var require_plugins_network = __commonJS({
        *  %%targetNetwork%%. The default ENS address and mainnet is used
        *  if unspecified.
        */
-      constructor(address, targetNetwork) {
+      constructor(address2, targetNetwork) {
         super("org.ethers.plugins.network.Ens");
         /**
          *  The ENS Registrty Contract address.
@@ -26512,7 +26544,7 @@ var require_plugins_network = __commonJS({
          */
         __publicField(this, "targetNetwork");
         (0, properties_js_1.defineProperties)(this, {
-          address: address || EnsAddress2,
+          address: address2 || EnsAddress2,
           targetNetwork: targetNetwork == null ? 1 : targetNetwork
         });
       }
@@ -26829,14 +26861,14 @@ var require_network = __commonJS({
     function getGasStationPlugin2(url) {
       return new plugins_network_js_1.FetchUrlFeeDataNetworkPlugin(url, async (fetchFeeData, provider, request) => {
         request.setHeader("User-Agent", "ethers");
-        let response2;
+        let response3;
         try {
           const [_response, _feeData] = await Promise.all([
             request.send(),
             fetchFeeData()
           ]);
-          response2 = _response;
-          const payload = response2.bodyJson.standard;
+          response3 = _response;
+          const payload = response3.bodyJson.standard;
           const feeData = {
             gasPrice: _feeData.gasPrice,
             maxFeePerGas: parseUnits3(payload.maxFee, 9),
@@ -26844,7 +26876,7 @@ var require_network = __commonJS({
           };
           return feeData;
         } catch (error) {
-          (0, index_js_2.assert)(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response2, error });
+          (0, index_js_2.assert)(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response3, error });
         }
       });
     }
@@ -27567,8 +27599,8 @@ var require_abstract_provider = __commonJS({
        *  names and [[Addressable]] objects and returning if already an
        *  address.
        */
-      _getAddress(address) {
-        return (0, index_js_1.resolveAddress)(address, this);
+      _getAddress(address2) {
+        return (0, index_js_1.resolveAddress)(address2, this);
       }
       /**
        *  Returns or resolves to a valid block tag for %%blockTag%%, resolving
@@ -27624,16 +27656,16 @@ var require_abstract_provider = __commonJS({
         });
         const blockHash = "blockHash" in filter ? filter.blockHash : void 0;
         const resolve = (_address, fromBlock2, toBlock2) => {
-          let address2 = void 0;
+          let address3 = void 0;
           switch (_address.length) {
             case 0:
               break;
             case 1:
-              address2 = _address[0];
+              address3 = _address[0];
               break;
             default:
               _address.sort();
-              address2 = _address;
+              address3 = _address;
           }
           if (blockHash) {
             if (fromBlock2 != null || toBlock2 != null) {
@@ -27641,8 +27673,8 @@ var require_abstract_provider = __commonJS({
             }
           }
           const filter2 = {};
-          if (address2) {
-            filter2.address = address2;
+          if (address3) {
+            filter2.address = address3;
           }
           if (topics.length) {
             filter2.topics = topics;
@@ -27658,14 +27690,14 @@ var require_abstract_provider = __commonJS({
           }
           return filter2;
         };
-        let address = [];
+        let address2 = [];
         if (filter.address) {
           if (Array.isArray(filter.address)) {
             for (const addr of filter.address) {
-              address.push(this._getAddress(addr));
+              address2.push(this._getAddress(addr));
             }
           } else {
-            address.push(this._getAddress(filter.address));
+            address2.push(this._getAddress(filter.address));
           }
         }
         let fromBlock = void 0;
@@ -27676,12 +27708,12 @@ var require_abstract_provider = __commonJS({
         if ("toBlock" in filter) {
           toBlock = this._getBlockTag(filter.toBlock);
         }
-        if (address.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
-          return Promise.all([Promise.all(address), fromBlock, toBlock]).then((result) => {
+        if (address2.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
+          return Promise.all([Promise.all(address2), fromBlock, toBlock]).then((result) => {
             return resolve(result[0], result[1], result[2]);
           });
         }
-        return resolve(address, fromBlock, toBlock);
+        return resolve(address2, fromBlock, toBlock);
       }
       /**
        *  Returns or resolves to a transaction for %%request%%, resolving
@@ -27815,18 +27847,18 @@ var require_abstract_provider = __commonJS({
         });
         return await __privateMethod(this, _AbstractProvider_instances2, checkNetwork_fn2).call(this, __privateMethod(this, _AbstractProvider_instances2, call_fn2).call(this, tx, blockTag, _tx.enableCcipRead ? 0 : -1));
       }
-      async getBalance(address, blockTag) {
-        return (0, index_js_6.getBigInt)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getBalance" }, address, blockTag), "%response");
+      async getBalance(address2, blockTag) {
+        return (0, index_js_6.getBigInt)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getBalance" }, address2, blockTag), "%response");
       }
-      async getTransactionCount(address, blockTag) {
-        return (0, index_js_6.getNumber)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getTransactionCount" }, address, blockTag), "%response");
+      async getTransactionCount(address2, blockTag) {
+        return (0, index_js_6.getNumber)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getTransactionCount" }, address2, blockTag), "%response");
       }
-      async getCode(address, blockTag) {
-        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getCode" }, address, blockTag));
+      async getCode(address2, blockTag) {
+        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getCode" }, address2, blockTag));
       }
-      async getStorage(address, _position, blockTag) {
+      async getStorage(address2, _position, blockTag) {
         const position = (0, index_js_6.getBigInt)(_position, "position");
-        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getStorage", position }, address, blockTag));
+        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getStorage", position }, address2, blockTag));
       }
       // Write
       async broadcastTransaction(signedTx) {
@@ -27927,9 +27959,9 @@ var require_abstract_provider = __commonJS({
         }
         return null;
       }
-      async lookupAddress(address) {
-        address = (0, index_js_1.getAddress)(address);
-        const node = (0, index_js_4.namehash)(address.substring(2).toLowerCase() + ".addr.reverse");
+      async lookupAddress(address2) {
+        address2 = (0, index_js_1.getAddress)(address2);
+        const node = (0, index_js_4.namehash)(address2.substring(2).toLowerCase() + ".addr.reverse");
         try {
           const ensAddr = await ens_resolver_js_1.EnsResolver.getEnsAddress(this);
           const ensContract = new index_js_3.Contract(ensAddr, [
@@ -27944,7 +27976,7 @@ var require_abstract_provider = __commonJS({
           ], this);
           const name = await resolverContract.name(node);
           const check = await this.resolveName(name);
-          if (check !== address) {
+          if (check !== address2) {
             return null;
           }
           return name;
@@ -28406,12 +28438,12 @@ var require_abstract_provider = __commonJS({
       return value;
     };
     getAccountValue_fn2 = async function(request, _address, _blockTag) {
-      let address = this._getAddress(_address);
+      let address2 = this._getAddress(_address);
       let blockTag = this._getBlockTag(_blockTag);
-      if (typeof address !== "string" || typeof blockTag !== "string") {
-        [address, blockTag] = await Promise.all([address, blockTag]);
+      if (typeof address2 !== "string" || typeof blockTag !== "string") {
+        [address2, blockTag] = await Promise.all([address2, blockTag]);
       }
-      return await __privateMethod(this, _AbstractProvider_instances2, checkNetwork_fn2).call(this, __privateMethod(this, _AbstractProvider_instances2, perform_fn2).call(this, Object.assign(request, { address, blockTag })));
+      return await __privateMethod(this, _AbstractProvider_instances2, checkNetwork_fn2).call(this, __privateMethod(this, _AbstractProvider_instances2, perform_fn2).call(this, Object.assign(request, { address: address2, blockTag })));
     };
     getBlock_fn2 = async function(block, includeTransactions) {
       if ((0, index_js_6.isHexString)(block, 32)) {
@@ -28602,9 +28634,9 @@ var require_abstract_signer = __commonJS({
         pop.from = Promise.all([
           signer.getAddress(),
           (0, index_js_1.resolveAddress)(from, signer)
-        ]).then(([address, from2]) => {
-          (0, index_js_3.assertArgument)(address.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
-          return address;
+        ]).then(([address2, from2]) => {
+          (0, index_js_3.assertArgument)(address2.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
+          return address2;
         });
       } else {
         pop.from = signer.getAddress();
@@ -28746,14 +28778,14 @@ var require_abstract_signer = __commonJS({
        *  Creates a new **VoidSigner** with %%address%% attached to
        *  %%provider%%.
        */
-      constructor(address, provider) {
+      constructor(address2, provider) {
         super(provider);
         __privateAdd(this, _VoidSigner_instances2);
         /**
          *  The signer address.
          */
         __publicField(this, "address");
-        (0, index_js_3.defineProperties)(this, { address });
+        (0, index_js_3.defineProperties)(this, { address: address2 });
       }
       async getAddress() {
         return this.address;
@@ -29040,11 +29072,11 @@ var require_provider_jsonrpc = __commonJS({
       pollingInterval: 4e3
     };
     var JsonRpcSigner2 = class extends abstract_signer_js_1.AbstractSigner {
-      constructor(provider, address) {
+      constructor(provider, address2) {
         super(provider);
         __publicField(this, "address");
-        address = (0, index_js_2.getAddress)(address);
-        (0, index_js_5.defineProperties)(this, { address });
+        address2 = (0, index_js_2.getAddress)(address2);
+        (0, index_js_5.defineProperties)(this, { address: address2 });
       }
       connect(provider) {
         (0, index_js_5.assert)(false, "cannot reconnect JsonRpcSigner", "UNSUPPORTED_OPERATION", {
@@ -29154,9 +29186,9 @@ var require_provider_jsonrpc = __commonJS({
       async signTypedData(domain, types, _value2) {
         const value = deepCopy2(_value2);
         const populated = await index_js_3.TypedDataEncoder.resolveNames(domain, types, value, async (value2) => {
-          const address = await (0, index_js_2.resolveAddress)(value2);
-          (0, index_js_5.assertArgument)(address != null, "TypedData does not support null address", "value", value2);
-          return address;
+          const address2 = await (0, index_js_2.resolveAddress)(value2);
+          (0, index_js_5.assertArgument)(address2 != null, "TypedData does not support null address", "value", value2);
+          return address2;
         });
         return await this.provider.send("eth_signTypedData_v4", [
           this.address.toLowerCase(),
@@ -29640,26 +29672,26 @@ var require_provider_jsonrpc = __commonJS({
        *
        *  Throws if the account doesn't exist.
        */
-      async getSigner(address) {
-        if (address == null) {
-          address = 0;
+      async getSigner(address2) {
+        if (address2 == null) {
+          address2 = 0;
         }
         const accountsPromise = this.send("eth_accounts", []);
-        if (typeof address === "number") {
+        if (typeof address2 === "number") {
           const accounts2 = await accountsPromise;
-          if (address >= accounts2.length) {
+          if (address2 >= accounts2.length) {
             throw new Error("no such account");
           }
-          return new JsonRpcSigner2(this, accounts2[address]);
+          return new JsonRpcSigner2(this, accounts2[address2]);
         }
         const { accounts } = await (0, index_js_5.resolveProperties)({
           network: this.getNetwork(),
           accounts: accountsPromise
         });
-        address = (0, index_js_2.getAddress)(address);
+        address2 = (0, index_js_2.getAddress)(address2);
         for (const account of accounts) {
-          if ((0, index_js_2.getAddress)(account) === address) {
-            return new JsonRpcSigner2(this, address);
+          if ((0, index_js_2.getAddress)(account) === address2) {
+            return new JsonRpcSigner2(this, address2);
           }
         }
         throw new Error("invalid account");
@@ -29811,9 +29843,9 @@ var require_provider_jsonrpc = __commonJS({
         const request = this._getConnection();
         request.body = JSON.stringify(payload);
         request.setHeader("content-type", "application/json");
-        const response2 = await request.send();
-        response2.assertOk();
-        let resp = response2.bodyJson;
+        const response3 = await request.send();
+        response3.assertOk();
+        let resp = response3.bodyJson;
         if (!Array.isArray(resp)) {
           resp = [resp];
         }
@@ -29959,7 +29991,7 @@ var require_provider_ankr = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === defaultApiKey3) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("AnkrProvider");
             return true;
           };
@@ -30091,7 +30123,7 @@ var require_provider_alchemy = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/v2/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === defaultApiKey3) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("alchemy");
             return true;
           };
@@ -30180,7 +30212,7 @@ var require_provider_chainstack = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === getApiKey2(network.name)) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("ChainstackProvider");
             return true;
           };
@@ -30378,46 +30410,46 @@ var require_provider_etherscan = __commonJS({
           }
           return Promise.resolve(true);
         };
-        request.processFunc = async (request2, response3) => {
-          const result2 = response3.hasBody() ? JSON.parse((0, index_js_4.toUtf8String)(response3.body)) : {};
+        request.processFunc = async (request2, response4) => {
+          const result2 = response4.hasBody() ? JSON.parse((0, index_js_4.toUtf8String)(response4.body)) : {};
           const throttle = (typeof result2.result === "string" ? result2.result : "").toLowerCase().indexOf("rate limit") >= 0;
           if (module2 === "proxy") {
             if (result2 && result2.status == 0 && result2.message == "NOTOK" && throttle) {
               this.emit("debug", { action: "receiveError", id: id2, reason: "proxy-NOTOK", error: result2 });
-              response3.throwThrottleError(result2.result, THROTTLE2);
+              response4.throwThrottleError(result2.result, THROTTLE2);
             }
           } else {
             if (throttle) {
               this.emit("debug", { action: "receiveError", id: id2, reason: "null result", error: result2.result });
-              response3.throwThrottleError(result2.result, THROTTLE2);
+              response4.throwThrottleError(result2.result, THROTTLE2);
             }
           }
-          return response3;
+          return response4;
         };
         if (payload) {
           request.setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
           request.body = Object.keys(payload).map((k) => `${k}=${payload[k]}`).join("&");
         }
-        const response2 = await request.send();
+        const response3 = await request.send();
         try {
-          response2.assertOk();
+          response3.assertOk();
         } catch (error) {
           this.emit("debug", { action: "receiveError", id: id2, error, reason: "assertOk" });
-          (0, index_js_4.assert)(false, "response error", "SERVER_ERROR", { request, response: response2 });
+          (0, index_js_4.assert)(false, "response error", "SERVER_ERROR", { request, response: response3 });
         }
-        if (!response2.hasBody()) {
+        if (!response3.hasBody()) {
           this.emit("debug", { action: "receiveError", id: id2, error: "missing body", reason: "null body" });
-          (0, index_js_4.assert)(false, "missing response", "SERVER_ERROR", { request, response: response2 });
+          (0, index_js_4.assert)(false, "missing response", "SERVER_ERROR", { request, response: response3 });
         }
-        const result = JSON.parse((0, index_js_4.toUtf8String)(response2.body));
+        const result = JSON.parse((0, index_js_4.toUtf8String)(response3.body));
         if (module2 === "proxy") {
           if (result.jsonrpc != "2.0") {
             this.emit("debug", { action: "receiveError", id: id2, result, reason: "invalid JSON-RPC" });
-            (0, index_js_4.assert)(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response2, info: { result } });
+            (0, index_js_4.assert)(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           if (result.error) {
             this.emit("debug", { action: "receiveError", id: id2, result, reason: "JSON-RPC error" });
-            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           this.emit("debug", { action: "receiveRequest", id: id2, result });
           return result.result;
@@ -30428,7 +30460,7 @@ var require_provider_etherscan = __commonJS({
           }
           if (result.status != 1 || typeof result.message === "string" && !result.message.match(/^OK/)) {
             this.emit("debug", { action: "receiveError", id: id2, result });
-            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           this.emit("debug", { action: "receiveRequest", id: id2, result });
           return result.result;
@@ -30731,17 +30763,17 @@ var require_provider_etherscan = __commonJS({
        *  Etherscan API to retreive the Contract ABI.
        */
       async getContract(_address) {
-        let address = this._getAddress(_address);
-        if (isPromise3(address)) {
-          address = await address;
+        let address2 = this._getAddress(_address);
+        if (isPromise3(address2)) {
+          address2 = await address2;
         }
         try {
           const resp = await this.fetch("contract", {
             action: "getabi",
-            address
+            address: address2
           });
           const abi = JSON.parse(resp);
-          return new index_js_2.Contract(address, abi, this);
+          return new index_js_2.Contract(address2, abi, this);
         } catch (error) {
           return null;
         }
@@ -31274,7 +31306,7 @@ var require_provider_infura = __commonJS({
           request.setCredentials("", projectSecret);
         }
         if (projectId === defaultProjectId2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("InfuraProvider");
             return true;
           };
@@ -31379,7 +31411,7 @@ var require_provider_quicknode = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/${token}`);
         request.allowGzip = true;
         if (token === defaultToken2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("QuickNodeProvider");
             return true;
           };
@@ -32240,22 +32272,22 @@ var require_provider_browser = __commonJS({
       /**
        *  Resolves to ``true`` if the provider manages the %%address%%.
        */
-      async hasSigner(address) {
-        if (address == null) {
-          address = 0;
+      async hasSigner(address2) {
+        if (address2 == null) {
+          address2 = 0;
         }
         const accounts = await this.send("eth_accounts", []);
-        if (typeof address === "number") {
-          return accounts.length > address;
+        if (typeof address2 === "number") {
+          return accounts.length > address2;
         }
-        address = address.toLowerCase();
-        return accounts.filter((a) => a.toLowerCase() === address).length !== 0;
+        address2 = address2.toLowerCase();
+        return accounts.filter((a) => a.toLowerCase() === address2).length !== 0;
       }
-      async getSigner(address) {
-        if (address == null) {
-          address = 0;
+      async getSigner(address2) {
+        if (address2 == null) {
+          address2 = 0;
         }
-        if (!await this.hasSigner(address)) {
+        if (!await this.hasSigner(address2)) {
           try {
             await __privateGet(this, _request3).call(this, "eth_requestAccounts", []);
           } catch (error) {
@@ -32263,7 +32295,7 @@ var require_provider_browser = __commonJS({
             throw this.getRpcError(payload, { id: payload.id, error });
           }
         }
-        return await super.getSigner(address);
+        return await super.getSigner(address2);
       }
       /**
        *  Discover and connect to a Provider in the Browser using the
@@ -32544,7 +32576,7 @@ var require_provider_pocket = __commonJS({
           request.setCredentials("", applicationSecret);
         }
         if (applicationId === defaultApplicationId2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("PocketProvider");
             return true;
           };
@@ -32765,8 +32797,8 @@ var require_base_wallet = __commonJS({
         __privateAdd(this, _signingKey2);
         (0, index_js_5.assertArgument)(privateKey && typeof privateKey.sign === "function", "invalid private key", "privateKey", "[ REDACTED ]");
         __privateSet(this, _signingKey2, privateKey);
-        const address = (0, index_js_4.computeAddress)(this.signingKey.publicKey);
-        (0, index_js_5.defineProperties)(this, { address });
+        const address2 = (0, index_js_4.computeAddress)(this.signingKey.publicKey);
+        (0, index_js_5.defineProperties)(this, { address: address2 });
       }
       // Store private values behind getters to reduce visibility
       // in console.log
@@ -32846,11 +32878,11 @@ var require_base_wallet = __commonJS({
             operation: "resolveName",
             info: { name }
           });
-          const address = await this.provider.resolveName(name);
-          (0, index_js_5.assert)(address != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
+          const address2 = await this.provider.resolveName(name);
+          (0, index_js_5.assert)(address2 != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
             value: name
           });
-          return address;
+          return address2;
         });
         return this.signingKey.sign(index_js_2.TypedDataEncoder.hash(populated.domain, types, populated.value)).serialized;
       }
@@ -33982,15 +34014,15 @@ var require_json_keystore = __commonJS({
       const computedMAC = (0, index_js_4.hexlify)((0, index_js_2.keccak256)((0, index_js_4.concat)([key.slice(16, 32), ciphertext]))).substring(2);
       (0, index_js_4.assertArgument)(computedMAC === (0, utils_js_1.spelunk)(data, "crypto.mac:string!").toLowerCase(), "incorrect password", "password", "[ REDACTED ]");
       const privateKey = decrypt2(data, key.slice(0, 16), ciphertext);
-      const address = (0, index_js_3.computeAddress)(privateKey);
+      const address2 = (0, index_js_3.computeAddress)(privateKey);
       if (data.address) {
         let check = data.address.toLowerCase();
         if (!check.startsWith("0x")) {
           check = "0x" + check;
         }
-        (0, index_js_4.assertArgument)((0, index_js_1.getAddress)(check) === address, "keystore address/privateKey mismatch", "address", data.address);
+        (0, index_js_4.assertArgument)((0, index_js_1.getAddress)(check) === address2, "keystore address/privateKey mismatch", "address", data.address);
       }
-      const account = { address, privateKey };
+      const account = { address: address2, privateKey };
       const version2 = (0, utils_js_1.spelunk)(data, "x-ethers.version:string");
       if (version2 === "0.1") {
         const mnemonicKey = key.slice(32, 64);
@@ -34514,8 +34546,8 @@ var require_hdwallet = __commonJS({
       /**
        *  @private
        */
-      constructor(guard, address, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
-        super(address, provider);
+      constructor(guard, address2, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
+        super(address2, provider);
         /**
          *  The compressed public key.
          */
@@ -34610,8 +34642,8 @@ var require_hdwallet = __commonJS({
         }
         const { IR, IL } = ser_I2(index, this.chainCode, this.publicKey, null);
         const Ki = index_js_1.SigningKey.addPoints(IL, this.publicKey, true);
-        const address = (0, index_js_3.computeAddress)(Ki);
-        return new _HDNodeVoidWallet(_guard7, address, Ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path, index, this.depth + 1, this.provider);
+        const address2 = (0, index_js_3.computeAddress)(Ki);
+        return new _HDNodeVoidWallet(_guard7, address2, Ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path, index, this.depth + 1, this.provider);
       }
       /**
        *  Return the signer for %%path%% from this node.
@@ -34662,7 +34694,7 @@ var require_json_crowdsale = __commonJS({
     function decryptCrowdsaleJson2(json2, _password) {
       const data = JSON.parse(json2);
       const password = (0, utils_js_1.getPassword)(_password);
-      const address = (0, index_js_1.getAddress)((0, utils_js_1.spelunk)(data, "ethaddr:string!"));
+      const address2 = (0, index_js_1.getAddress)((0, utils_js_1.spelunk)(data, "ethaddr:string!"));
       const encseed = (0, utils_js_1.looseArrayify)((0, utils_js_1.spelunk)(data, "encseed:string!"));
       (0, index_js_4.assertArgument)(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json2);
       const key = (0, index_js_4.getBytes)((0, index_js_2.pbkdf2)(password, password, 2e3, 32, "sha256")).slice(0, 16);
@@ -34674,7 +34706,7 @@ var require_json_crowdsale = __commonJS({
       for (let i = 0; i < seed.length; i++) {
         seedHex += String.fromCharCode(seed[i]);
       }
-      return { address, privateKey: (0, index_js_3.id)(seedHex) };
+      return { address: address2, privateKey: (0, index_js_3.id)(seedHex) };
     }
     exports.decryptCrowdsaleJson = decryptCrowdsaleJson2;
   }
@@ -35828,7 +35860,7 @@ var init_sponsoredBootstrapGrantStore = __esm({
       token,
       grantRecord,
       requestDigest,
-      response: response2,
+      response: response3,
       sensitiveValues = [],
       nowMs = Date.now()
     } = {}) => {
@@ -35841,8 +35873,8 @@ var init_sponsoredBootstrapGrantStore = __esm({
           state: "redeemed"
         }),
         receipt: {
-          status: Number(response2?.status || 0) || 200,
-          body: buildSafeSponsoredReceiptBody(response2?.body, sensitiveValues)
+          status: Number(response3?.status || 0) || 200,
+          body: buildSafeSponsoredReceiptBody(response3?.body, sensitiveValues)
         }
       };
       await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
@@ -36521,7 +36553,7 @@ var init_payloadAccessControl = __esm({
 });
 
 // workers/sessionCorsWorker/storageEnvelopeEncryption.js
-var textEncoder2, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, toStr18, trim5, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso2, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit;
+var textEncoder2, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, toStr18, trim5, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso2, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit;
 var init_storageEnvelopeEncryption = __esm({
   "workers/sessionCorsWorker/storageEnvelopeEncryption.js"() {
     init_sessionWriteCoordinator();
@@ -36641,6 +36673,21 @@ var init_storageEnvelopeEncryption = __esm({
       if (aad) params.additionalData = textEncoder2.encode(aad);
       const plaintext = await getCryptoImpl2(deps).subtle.decrypt(params, wrappingKey, base64urlToBytes2(wrapped.wrappedKey));
       return new Uint8Array(plaintext);
+    };
+    wrapResponseFieldKey = async ({ env, keyBytes, policy, deps = {} }) => wrapBytesWithKey({
+      wrappingKey: await importDeploymentKek({ env, deps }),
+      plaintextBytes: keyBytes,
+      aad: `ce-response-field-key-v1:${JSON.stringify(policy)}`,
+      deps
+    });
+    unwrapResponseFieldKey = async ({ env, wrapped, policy, deps = {} }) => {
+      const args = { wrapped, aad: `ce-response-field-key-v1:${JSON.stringify(policy)}`, deps };
+      try {
+        return await unwrapBytesWithKey({ ...args, wrappingKey: await importDeploymentKek({ env, deps }) });
+      } catch (error) {
+        if (!readDeploymentSecret({ env, previous: true, deps })) throw error;
+        return unwrapBytesWithKey({ ...args, wrappingKey: await importDeploymentKek({ env, previous: true, deps }) });
+      }
     };
     readSessionKeyRecord = (config = {}) => {
       const envelope = isObj11(config.storageEnvelope) ? config.storageEnvelope : {};
@@ -36889,6 +36936,112 @@ var init_uploadSizeLimits = __esm({
   }
 });
 
+// shared/encryption/responseFieldPolicy.mjs
+var resolveResponseFieldPolicy, assertResponseFieldAudience;
+var init_responseFieldPolicy = __esm({
+  "shared/encryption/responseFieldPolicy.mjs"() {
+    resolveResponseFieldPolicy = (config, { workerAvailable = false } = {}) => {
+      const profile = config?.sessionModeProfile;
+      if (!profile) return { enabled: true, self: true, admin: false, session: false, centralized: false, privateSession: false };
+      const mode = profile.encryption?.mode;
+      const centralized = profile.authority?.mode === "worker_canonical" && profile.storage?.backend === "cloudflare" && config?.storageProfile?.backend === "cloudflare";
+      const access = config?.storageProfile?.payloadAccessControl;
+      const conditions = access?.accessConditions || access?.conditions || config?.storageProfile?.cloudflare?.accessConditions || config?.storageProfile?.accessConditions;
+      const privateSession = ["role_gate", "group_gate", "sbt_gate"].includes(access?.gate) || Array.isArray(conditions?.conditions) && conditions.conditions.length > 0;
+      const optionalFields = centralized && config?.responseFieldEncryption?.mode === "optional";
+      const enabled = mode === "worker_envelope" || mode === "lit" || optionalFields;
+      const worker = centralized && (optionalFields || mode === "worker_envelope" && access?.encryption === "worker_envelope") && (workerAvailable || config?.responseFieldEncryption?.version === 1);
+      return { enabled, self: enabled, admin: worker, session: worker && privateSession, centralized, privateSession };
+    };
+    assertResponseFieldAudience = (config, audience, options) => {
+      const policy = resolveResponseFieldPolicy(config, options);
+      if (!policy.enabled) throw new Error("Response encryption is disabled for this session.");
+      if (audience === "self_admin" && !policy.admin) throw new Error("Me + admin encryption is unavailable for this session.");
+      if (audience === "session" && !policy.session) throw new Error("Session audience requires a private session with Worker encryption.");
+      if (!["self", "self_admin", "session", "gate"].includes(audience)) throw new Error("Unknown response encryption audience.");
+      return policy;
+    };
+  }
+});
+
+// workers/sessionCorsWorker/responseFieldKeyRoute.js
+var address, response2, responseFieldKeyRoute;
+var init_responseFieldKeyRoute = __esm({
+  "workers/sessionCorsWorker/responseFieldKeyRoute.js"() {
+    init_responseFieldPolicy();
+    init_storageEnvelopeEncryption();
+    address = (value) => /^0x[0-9a-f]{40}$/i.test(String(value || "")) ? String(value).toLowerCase() : "";
+    response2 = (body, status, headers) => new Response(JSON.stringify(body), {
+      status,
+      headers: { ...Object.fromEntries(new Headers(headers || {})), "Content-Type": "application/json", "Cache-Control": "private, no-store" }
+    });
+    responseFieldKeyRoute = async ({ path, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, authorizeSession, isAdmin }) => {
+      const principal = address(uploaderAddress);
+      if (!principal || authScopes?.storage !== true && authScopes?.arweave !== true) return response2({ error: "Authentication required." }, 401, baseHeaders);
+      if (Number(request.headers.get("content-length") || 0) > 8192) return response2({ error: "Key request too large." }, 413, baseHeaders);
+      let body;
+      try {
+        const text = await request.text();
+        if (text.length > 8192) return response2({ error: "Key request too large." }, 413, baseHeaders);
+        body = JSON.parse(text);
+      } catch {
+        return response2({ error: "Invalid key request." }, 400, baseHeaders);
+      }
+      if (!body || typeof body !== "object" || Array.isArray(body)) return response2({ error: "Invalid key request." }, 400, baseHeaders);
+      const wrapping = path === "/storage/response-field-key/wrap";
+      const policy = wrapping ? {
+        sessionSlug: slug,
+        sessionId: config.sessionId || config.sessionIdHex,
+        owner: principal,
+        audience: body.audience,
+        context: body.context
+      } : body.recipient?.policy;
+      if (!policy || !["self_admin", "session"].includes(policy.audience) || !policy.sessionId || policy.sessionSlug !== slug || policy.sessionId !== (config.sessionId || config.sessionIdHex) || !address(policy.owner) || !/^0x[0-9a-f]{64}$/i.test(policy.context) || !wrapping && (body.context !== policy.context || body.recipient?.type !== "worker-response-field-v1")) {
+        return response2({ error: "Invalid response field policy." }, 400, baseHeaders);
+      }
+      try {
+        if (wrapping) assertResponseFieldAudience(config, policy.audience, { workerAvailable: true });
+        else {
+          const capability = resolveResponseFieldPolicy(config, { workerAvailable: true });
+          if (!capability.centralized || policy.audience === "session" && !capability.privateSession) throw new Error("Response field audience is no longer available.");
+        }
+      } catch (error) {
+        return response2({ error: error.message }, 403, baseHeaders);
+      }
+      if (policy.audience === "session") {
+        const access = await authorizeSession();
+        if (!access?.ok) return access?.response || response2({ error: "Session membership required." }, 403, baseHeaders);
+        if (!access.conditionMatched || access.conditionMatched.emptyGate) return response2({ error: "Private session membership required." }, 403, baseHeaders);
+      } else if (!wrapping && principal !== policy.owner && !isAdmin(principal)) {
+        return response2({ error: "This field is restricted to its submitter and session admins." }, 403, baseHeaders);
+      }
+      try {
+        if (wrapping) {
+          if (typeof body.key !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(body.key)) return response2({ error: "Invalid field key." }, 400, baseHeaders);
+          const keyBytes2 = base64urlToBytes2(body.key);
+          if (keyBytes2.length !== 32) return response2({ error: "Invalid field key." }, 400, baseHeaders);
+          try {
+            const wrapped = await wrapResponseFieldKey({ env, keyBytes: keyBytes2, policy, deps });
+            return response2({ recipient: { type: "worker-response-field-v1", policy, wrapped } }, 200, baseHeaders);
+          } finally {
+            keyBytes2.fill(0);
+          }
+        }
+        const keyBytes = await unwrapResponseFieldKey({ env, wrapped: body.recipient.wrapped, policy, deps });
+        try {
+          if (keyBytes.length !== 32) throw new Error("Invalid field key.");
+          await writeStorageEnvelopeKeyReleaseAudit({ env, slug, payloadId: policy.context, principal, conditionMatched: { audience: policy.audience, owner: policy.owner }, deps });
+          return response2({ key: bytesToBase64url2(keyBytes) }, 200, baseHeaders);
+        } finally {
+          keyBytes.fill(0);
+        }
+      } catch {
+        return response2({ error: "Unable to release response field key." }, 503, baseHeaders);
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/storageRouteExecution.js
 var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
@@ -36902,6 +37055,7 @@ var init_storageRouteExecution = __esm({
     init_chainIdNormalization();
     init_sessionConfigMutation();
     init_sessionSlugResolution();
+    init_responseFieldKeyRoute();
     encoder2 = new TextEncoder();
     decoder2 = new TextDecoder();
     RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol("resolve-storage-gate-runtime-config");
@@ -37341,20 +37495,20 @@ var init_storageRouteExecution = __esm({
         if (Array.isArray(value.addresses)) return value.addresses.map(normalizeAddress).filter(Boolean);
         if (Array.isArray(value.members)) return value.members.map(normalizeAddress).filter(Boolean);
       }
-      const address = normalizeAddress(value);
-      return address ? [address] : [];
+      const address2 = normalizeAddress(value);
+      return address2 ? [address2] : [];
     };
     resolveRoleAddressSet2 = ({ config = {}, role }) => {
       const normalizedRole = trim6(role || "admin").toLowerCase();
       const addresses = /* @__PURE__ */ new Set();
       if (normalizedRole === "admin") {
-        listRoleAddresses(config.adminAddress).forEach((address) => addresses.add(address));
-        listRoleAddresses(config.adminAddresses).forEach((address) => addresses.add(address));
-        listRoleAddresses(config.admin?.addresses).forEach((address) => addresses.add(address));
+        listRoleAddresses(config.adminAddress).forEach((address2) => addresses.add(address2));
+        listRoleAddresses(config.adminAddresses).forEach((address2) => addresses.add(address2));
+        listRoleAddresses(config.admin?.addresses).forEach((address2) => addresses.add(address2));
       }
       const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj12);
       roleMaps.forEach((roles) => {
-        listRoleAddresses(roles[normalizedRole]).forEach((address) => addresses.add(address));
+        listRoleAddresses(roles[normalizedRole]).forEach((address2) => addresses.add(address2));
       });
       return addresses;
     };
@@ -37366,10 +37520,10 @@ var init_storageRouteExecution = __esm({
     };
     resolveEnvelopeExportAddressSet = (config = {}) => {
       const addresses = new Set(resolveRoleAddressSet2({ config, role: "admin" }));
-      listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address) => addresses.add(address));
-      listDelimitedAddresses(config.telegramResponseExportAllowedAddresses).forEach((address) => addresses.add(address));
-      listDelimitedAddresses(config.export?.allowedAddresses).forEach((address) => addresses.add(address));
-      listDelimitedAddresses(config.export?.adminAddresses).forEach((address) => addresses.add(address));
+      listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address2) => addresses.add(address2));
+      listDelimitedAddresses(config.telegramResponseExportAllowedAddresses).forEach((address2) => addresses.add(address2));
+      listDelimitedAddresses(config.export?.allowedAddresses).forEach((address2) => addresses.add(address2));
+      listDelimitedAddresses(config.export?.adminAddresses).forEach((address2) => addresses.add(address2));
       return addresses;
     };
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
@@ -37377,16 +37531,16 @@ var init_storageRouteExecution = __esm({
       if (scopes.admin === true || scopes.responseExport === true || scopes.response_export === true || scopes.encryptedEnvelopeExport === true) {
         return true;
       }
-      const address = normalizeAddress(requesterAddress);
-      if (!address) return false;
-      return resolveEnvelopeExportAddressSet(config).has(address);
+      const address2 = normalizeAddress(requesterAddress);
+      if (!address2) return false;
+      return resolveEnvelopeExportAddressSet(config).has(address2);
     };
     evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
       const role = trim6(condition.role || condition.name || "admin").toLowerCase();
-      const address = normalizeAddress(requesterAddress);
-      if (!address) return { ok: false, reason: "missing_principal" };
+      const address2 = normalizeAddress(requesterAddress);
+      if (!address2) return { ok: false, reason: "missing_principal" };
       const roleAddresses = resolveRoleAddressSet2({ config, role });
-      if (roleAddresses.has(address)) {
+      if (roleAddresses.has(address2)) {
         return { ok: true, matchedCondition: { kind: "worker_role", role } };
       }
       return { ok: false, reason: "worker_role_denied", condition: { kind: "worker_role", role } };
@@ -37404,8 +37558,8 @@ var init_storageRouteExecution = __esm({
       return ok ? { ok: true, matchedCondition: { kind: "agent_grant_scope", scope } } : { ok: false, reason: "agent_grant_scope_denied", condition: { kind: "agent_grant_scope", scope } };
     };
     evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
-      const address = normalizeAddress(requesterAddress);
-      if (!address) return { ok: false, reason: "missing_principal" };
+      const address2 = normalizeAddress(requesterAddress);
+      if (!address2) return { ok: false, reason: "missing_principal" };
       const sbtAddresses = [
         ...Array.isArray(condition.sbtAddresses) ? condition.sbtAddresses : [],
         condition.contract,
@@ -37437,7 +37591,7 @@ var init_storageRouteExecution = __esm({
       for (const rpcUrl of rpcUrls) {
         const ok = await deps.checkSbtGate({
           sbtAddresses,
-          address,
+          address: address2,
           rpcUrl,
           mode,
           chainId,
@@ -37692,14 +37846,14 @@ var init_storageRouteExecution = __esm({
     canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
       if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
       const scopes = isObj12(authScopes) ? authScopes : {};
-      const address = normalizeAddress(requesterAddress);
-      if (address && resolveRoleAddressSet2({ config, role: "admin" }).has(address)) return true;
+      const address2 = normalizeAddress(requesterAddress);
+      if (address2 && resolveRoleAddressSet2({ config, role: "admin" }).has(address2)) return true;
       const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
       const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
       if (delegatedScopes.some((items) => items.map(trim6).includes("storage")) || scopes.storage === true && agent.ok && agent.principal.kind === "agent") return true;
-      if (!address || scopes.storage !== true && scopes.arweave !== true) return false;
+      if (!address2 || scopes.storage !== true && scopes.arweave !== true) return false;
       if (operation === "list") return true;
-      return !!trim6(metadata?.responder) && normalizeAddress(metadata.responder) === address;
+      return !!trim6(metadata?.responder) && normalizeAddress(metadata.responder) === address2;
     };
     authorizeCloudflareStorageAccess = async ({
       env,
@@ -37823,8 +37977,8 @@ var init_storageRouteExecution = __esm({
           response: responseJson(deps, { error: "Access denied: unsupported Cloudflare storage gate." }, 403, baseHeaders)
         };
       }
-      const address = trim6(requesterAddress);
-      if (!address) {
+      const address2 = trim6(requesterAddress);
+      if (!address2) {
         return {
           ok: false,
           response: responseJson(deps, { error: "Missing requester address for worker SBT gate." }, 401, baseHeaders)
@@ -37878,7 +38032,7 @@ var init_storageRouteExecution = __esm({
       for (const rpcUrl of rpcUrls) {
         const ok = await deps.checkSbtGate({
           sbtAddresses: gate.sbtAddresses,
-          address,
+          address: address2,
           rpcUrl,
           mode: gate.mode,
           chainId: gate.chainId,
@@ -37943,8 +38097,8 @@ var init_storageRouteExecution = __esm({
         return { ok: true, conditionMatched: groupAccess.conditionMatched, groupIds };
       }
       if (policy.mode === "sbt_allowlist") {
-        const address = normalizeAddress(requesterAddress);
-        if (!address) {
+        const address2 = normalizeAddress(requesterAddress);
+        if (!address2) {
           return {
             ok: false,
             response: responseJson(deps, { error: "Missing requester address for SBT upload policy." }, 401, baseHeaders)
@@ -37988,7 +38142,7 @@ var init_storageRouteExecution = __esm({
         for (const rpcUrl of rpcUrls) {
           const ok = await deps.checkSbtGate({
             sbtAddresses: policy.sbtAddresses,
-            address,
+            address: address2,
             rpcUrl,
             mode: policy.anyOrAll,
             chainId,
@@ -38045,10 +38199,10 @@ var init_storageRouteExecution = __esm({
       });
       return routeDeps;
     };
-    parseArweaveUploadResponse = async (response2) => {
+    parseArweaveUploadResponse = async (response3) => {
       let body = {};
       try {
-        body = await response2.clone().json();
+        body = await response3.clone().json();
       } catch {
         body = {};
       }
@@ -38057,7 +38211,7 @@ var init_storageRouteExecution = __esm({
     };
     handleArweaveStorageUpload = async ({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps }) => {
       const secrets = await deps?.getSessionSecrets?.(env, slug) || {};
-      const response2 = await deps?.arweaveUpload?.({
+      const response3 = await deps?.arweaveUpload?.({
         request,
         env,
         secrets,
@@ -38066,8 +38220,8 @@ var init_storageRouteExecution = __esm({
         slug,
         uploaderAddress
       });
-      if (!response2?.ok) return response2;
-      const parsed = await parseArweaveUploadResponse(response2);
+      if (!response3?.ok) return response3;
+      const parsed = await parseArweaveUploadResponse(response3);
       if (!parsed.id) return responseJson(deps, { error: "Storage upload succeeded but no id was returned." }, 502, baseHeaders);
       const compatible = attachStorageRefCompatibilityFields({
         backend,
@@ -38728,6 +38882,30 @@ var init_storageRouteExecution = __esm({
       };
     };
     storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps } = {}) => {
+      if (method === "POST" && ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path)) {
+        return responseFieldKeyRoute({
+          path,
+          request,
+          env,
+          config,
+          slug,
+          uploaderAddress,
+          authScopes,
+          baseHeaders,
+          deps,
+          isAdmin: (principal) => resolveRoleAddressSet2({ config, role: "admin" }).has(principal),
+          authorizeSession: () => authorizeCloudflareStorageGate({
+            env,
+            config,
+            slug,
+            resource: "responses",
+            requesterAddress: uploaderAddress,
+            authScopes,
+            baseHeaders,
+            deps
+          })
+        });
+      }
       if (path === "/storage/upload" && method === "POST") {
         const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
         const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
@@ -39033,7 +39211,7 @@ var init_aiProviderExecution = __esm({
         max_tokens: max_tokens ?? max_tokens_to_sample ?? 4096,
         messages: [{ role: "user", content: String(prompt || "") }]
       };
-      const response2 = await fetchImpl(constants?.anthropicUrl || ANTHROPIC_URL, {
+      const response3 = await fetchImpl(constants?.anthropicUrl || ANTHROPIC_URL, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -39042,9 +39220,9 @@ var init_aiProviderExecution = __esm({
         },
         body: JSON.stringify(body)
       });
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        return json2({ error: data?.error?.message || "Anthropic error", details: data }, response2.status, baseHeaders);
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        return json2({ error: data?.error?.message || "Anthropic error", details: data }, response3.status, baseHeaders);
       }
       const completion = data?.content?.[0]?.text || "";
       return json2({ completion, raw: data }, 200, baseHeaders);
@@ -39118,7 +39296,7 @@ var init_aiProviderExecution = __esm({
           temperature
         });
       }
-      const response2 = await fetchImpl(
+      const response3 = await fetchImpl(
         useResponses ? constants?.openAiResponsesUrl || OPENAI_RESPONSES_URL : constants?.openAiChatUrl || OPENAI_CHAT_URL,
         {
           method: "POST",
@@ -39126,9 +39304,9 @@ var init_aiProviderExecution = __esm({
           body: JSON.stringify(body)
         }
       );
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        return json2({ error: data?.error?.message || "OpenAI error", details: data }, response2.status, baseHeaders);
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        return json2({ error: data?.error?.message || "OpenAI error", details: data }, response3.status, baseHeaders);
       }
       const completion = extractOpenAiCompletion(data, useResponses);
       return json2({ completion, raw: data }, 200, baseHeaders);
@@ -39182,14 +39360,14 @@ var init_aiProviderExecution = __esm({
       const title = payload?.appName || payload?.title;
       if (ref) headers["HTTP-Referer"] = ref;
       if (title) headers["X-Title"] = title;
-      const response2 = await fetchImpl(constants?.openRouterChatUrl || OPENROUTER_CHAT_URL, {
+      const response3 = await fetchImpl(constants?.openRouterChatUrl || OPENROUTER_CHAT_URL, {
         method: "POST",
         headers,
         body: JSON.stringify(body)
       });
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        return json2({ error: data?.error?.message || "OpenRouter error", details: data }, response2.status, baseHeaders);
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        return json2({ error: data?.error?.message || "OpenRouter error", details: data }, response3.status, baseHeaders);
       }
       const completion = data?.choices?.[0]?.message?.content || "";
       return json2({ completion, raw: data }, 200, baseHeaders);
@@ -39272,17 +39450,17 @@ var init_aiProviderExecution = __esm({
       const key = payloadKey || secretKey;
       const headers = { "content-type": "application/json" };
       if (key) headers.authorization = `Bearer ${key}`;
-      const response2 = await safeFetch(rpcUrl, {
+      const response3 = await safeFetch(rpcUrl, {
         method: "POST",
         headers,
         body: JSON.stringify(body)
       });
-      if (!(response2 instanceof Response)) {
-        return json2({ error: response2?.error }, response2?.status, baseHeaders);
+      if (!(response3 instanceof Response)) {
+        return json2({ error: response3?.error }, response3?.status, baseHeaders);
       }
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        return json2({ error: data?.error?.message || "Custom RPC error", details: data }, response2.status, baseHeaders);
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        return json2({ error: data?.error?.message || "Custom RPC error", details: data }, response3.status, baseHeaders);
       }
       const completion = data?.choices?.[0]?.message?.content || data?.completion || data?.content?.[0]?.text || "";
       return json2({ completion, raw: data }, 200, baseHeaders);
@@ -40000,9 +40178,9 @@ ${sectionShapes}
 
 Session input:
 ${JSON.stringify(source.aiSnapshot, null, 2)}`;
-    normalizeProviderResponse = async (response2) => {
-      const data = await response2?.json?.().catch?.(() => ({}));
-      if (!response2?.ok) return { ok: false, status: response2?.status || 502, error: data?.error || "AI provider request failed." };
+    normalizeProviderResponse = async (response3) => {
+      const data = await response3?.json?.().catch?.(() => ({}));
+      if (!response3?.ok) return { ok: false, status: response3?.status || 502, error: data?.error || "AI provider request failed." };
       const raw = trim7(data?.completion || data?.text || data?.content || "");
       try {
         return { ok: true, value: JSON.parse(raw) };
@@ -40066,7 +40244,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       }
       const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getSessionSecrets(env, slug)) || {};
       const proxyArgs = { payload, secrets, baseHeaders: headers };
-      let response2;
+      let response3;
       const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || json };
       const runProvider = async () => {
         if (provider === "anthropic") return (deps?.proxyAnthropic || ((args) => proxyAnthropic({ ...args, deps: proxyDeps })))(proxyArgs);
@@ -40074,8 +40252,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         if (provider === "custom") return (deps?.proxyCustomRPC || ((args) => proxyCustomRPC({ ...args, deps: proxyDeps })))({ ...proxyArgs, auth: { scopes: { ai: true, custom_rpc: true } } });
         return (deps?.proxyOpenAI || ((args) => proxyOpenAI({ ...args, deps: proxyDeps })))(proxyArgs);
       };
-      response2 = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, "AI results analysis generation timed out.");
-      return normalizeProviderResponse(response2);
+      response3 = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, "AI results analysis generation timed out.");
+      return normalizeProviderResponse(response3);
     };
     normalizeGeneratedArtifact = ({ value, source, sections, generatedAt, model = "" }) => {
       const validationSource = {
@@ -41992,7 +42170,7 @@ var init_sessionWriteCoordinator = __esm({
       async executeAuthNonceIssue(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const address = toTrimmedString9(payload?.address).toLowerCase();
+        const address2 = toTrimmedString9(payload?.address).toLowerCase();
         const nonce = toTrimmedString9(payload?.nonce);
         const expiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.expiresAtMs,
@@ -42004,7 +42182,7 @@ var init_sessionWriteCoordinator = __esm({
           nowMs,
           MAX_AUTH_NONCE_LIFETIME_MS
         );
-        if (!slug || !address || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
+        if (!slug || !address2 || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce issuance request." }, 400);
         }
         await this.state.storage.transaction(async (transaction) => {
@@ -42022,14 +42200,14 @@ var init_sessionWriteCoordinator = __esm({
       async executeAuthNonceConsume(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const address = toTrimmedString9(payload?.address).toLowerCase();
+        const address2 = toTrimmedString9(payload?.address).toLowerCase();
         const nonce = toTrimmedString9(payload?.nonce);
         const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.usedExpiresAtMs,
           nowMs,
           MAX_AUTH_NONCE_LIFETIME_MS
         );
-        if (!slug || !address || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
+        if (!slug || !address2 || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce consumption request." }, 400);
         }
         const result = await this.state.storage.transaction(async (transaction) => {
@@ -42496,12 +42674,12 @@ var init_sessionWriteCoordinator = __esm({
       }
       const coordinatorName = await sha256Hex2(`sponsored-grant:${normalizedGrantToken}`);
       const stub = coordinator.get(coordinator.idFromName(coordinatorName));
-      const response2 = await stub.fetch("https://session-coordinator.internal/sponsored-deploy", {
+      const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-deploy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestDigest, deployBody, requestOrigin, sensitiveValues })
       });
-      const result = await response2.json().catch(() => ({}));
+      const result = await response3.json().catch(() => ({}));
       if (result && typeof result === "object" && result.body && Number(result.status || 0)) {
         return {
           ok: result.ok === true,
@@ -42509,7 +42687,7 @@ var init_sessionWriteCoordinator = __esm({
           body: result.body
         };
       }
-      return { ok: false, status: response2.status || 502, body: result };
+      return { ok: false, status: response3.status || 502, body: result };
     };
     resolveCoordinatorStub = async (env, identity) => {
       const coordinator = env?.CE_SESSION_COORDINATOR;
@@ -42536,16 +42714,16 @@ var init_sessionWriteCoordinator = __esm({
       }
       if (!stub?.fetch) return { ...AUTH_STATE_UNAVAILABLE };
       try {
-        const response2 = await stub.fetch(`https://session-coordinator.internal${path}`, {
+        const response3 = await stub.fetch(`https://session-coordinator.internal${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const body = await response2.json().catch(() => null);
+        const body = await response3.json().catch(() => null);
         if (!body || typeof body !== "object") return { ...AUTH_STATE_UNAVAILABLE };
         return {
           ...body,
-          status: response2.status
+          status: response3.status
         };
       } catch {
         return { ...AUTH_STATE_UNAVAILABLE };
@@ -42554,7 +42732,7 @@ var init_sessionWriteCoordinator = __esm({
     issueCoordinatedAuthNonce = async ({
       env,
       slug,
-      address,
+      address: address2,
       nonce,
       ttlSeconds,
       usedNonceTtlSeconds = 600,
@@ -42563,11 +42741,11 @@ var init_sessionWriteCoordinator = __esm({
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address).toLowerCase()}`,
+        identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
         path: "/auth-state/nonce/issue",
         payload: {
           slug,
-          address,
+          address: address2,
           nonce,
           expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1e3,
           usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1e3
@@ -42577,7 +42755,7 @@ var init_sessionWriteCoordinator = __esm({
     consumeCoordinatedAuthNonce = async ({
       env,
       slug,
-      address,
+      address: address2,
       nonce,
       usedNonceTtlSeconds,
       now = Date.now
@@ -42585,11 +42763,11 @@ var init_sessionWriteCoordinator = __esm({
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address).toLowerCase()}`,
+        identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
         path: "/auth-state/nonce/consume",
         payload: {
           slug,
-          address,
+          address: address2,
           nonce,
           usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1e3
         }
@@ -42629,9 +42807,9 @@ var init_sessionWriteCoordinator = __esm({
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) throw new Error("Session config coordination is unavailable.");
-      let response2;
+      let response3;
       try {
-        response2 = await stub.fetch(
+        response3 = await stub.fetch(
           "https://session-coordinator.internal/session-config/storage-envelope-key/get-or-create",
           {
             method: "POST",
@@ -42646,9 +42824,9 @@ var init_sessionWriteCoordinator = __esm({
       } catch {
         throw new Error("Session config coordination failed; retry.");
       }
-      const result = await response2.json().catch(() => ({}));
-      if (!response2.ok || result?.ok !== true) {
-        throw new Error(response2.status === 503 ? "Session config projection is pending; retry." : "Session config coordination failed.");
+      const result = await response3.json().catch(() => ({}));
+      if (!response3.ok || result?.ok !== true) {
+        throw new Error(response3.status === 503 ? "Session config projection is pending; retry." : "Session config coordination failed.");
       }
       return result;
     };
@@ -42667,9 +42845,9 @@ var init_sessionWriteCoordinator = __esm({
           body: { error: "Session config coordination is unavailable; config was not changed." }
         };
       }
-      let response2;
+      let response3;
       try {
-        response2 = await stub.fetch("https://session-coordinator.internal/session-config/mutate", {
+        response3 = await stub.fetch("https://session-coordinator.internal/session-config/mutate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -42685,10 +42863,10 @@ var init_sessionWriteCoordinator = __esm({
           body: { error: "Session config coordination failed; retry." }
         };
       }
-      const result = await response2.json().catch(() => ({}));
-      return response2.ok && result?.ok === true ? { ok: true, status: 200, body: { ok: true } } : {
+      const result = await response3.json().catch(() => ({}));
+      return response3.ok && result?.ok === true ? { ok: true, status: 200, body: { ok: true } } : {
         ok: false,
-        status: response2.status || 503,
+        status: response3.status || 503,
         body: { error: result?.error || "Session config mutation failed." }
       };
     };
@@ -42698,12 +42876,12 @@ var init_sessionWriteCoordinator = __esm({
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return { kind: "unavailable" };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/reserve", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/reserve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ requestDigest: digest })
         });
-        return response2.json().catch(() => ({ kind: "unavailable" }));
+        return response3.json().catch(() => ({ kind: "unavailable" }));
       } catch {
         return { kind: "unavailable" };
       }
@@ -42718,13 +42896,13 @@ var init_sessionWriteCoordinator = __esm({
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return null;
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/finalize", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ requestDigest, receipt })
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result?.receipt : null;
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result?.receipt : null;
       } catch {
         return null;
       }
@@ -42734,13 +42912,13 @@ var init_sessionWriteCoordinator = __esm({
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/status", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({})
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result : { ok: false, status: response2.status || 503, error: result?.error || "Results analysis status unavailable." };
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result : { ok: false, status: response3.status || 503, error: result?.error || "Results analysis status unavailable." };
       } catch {
         return { ok: false, status: 503, error: "Results analysis coordination failed; retry." };
       }
@@ -42750,12 +42928,12 @@ var init_sessionWriteCoordinator = __esm({
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { kind: "failed", status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/reserve", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/reserve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reservation || {})
         });
-        return response2.json().catch(() => ({ kind: "failed", status: response2.status || 503 }));
+        return response3.json().catch(() => ({ kind: "failed", status: response3.status || 503 }));
       } catch {
         return { kind: "failed", status: 503, error: "Results analysis coordination failed; retry." };
       }
@@ -42765,13 +42943,13 @@ var init_sessionWriteCoordinator = __esm({
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/finalize", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(finalization || {})
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result : { ok: false, status: response2.status || 503, error: result?.error || "Results analysis finalization failed." };
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result : { ok: false, status: response3.status || 503, error: result?.error || "Results analysis finalization failed." };
       } catch {
         return { ok: false, status: 503, error: "Results analysis coordination failed; retry." };
       }
@@ -42781,13 +42959,13 @@ var init_sessionWriteCoordinator = __esm({
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/auto/enqueue", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/auto/enqueue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...job || {}, slug: normalizedSlug })
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result : { ok: false, status: response2.status || 503, error: result?.error || "Results analysis auto enqueue failed." };
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result : { ok: false, status: response3.status || 503, error: result?.error || "Results analysis auto enqueue failed." };
       } catch {
         return { ok: false, status: 503, error: "Results analysis auto enqueue failed; retry." };
       }
@@ -44281,38 +44459,38 @@ var require_api = __commonJS({
         }
         const contentType = res.headers.get("content-type");
         const charset = contentType?.match(/charset=([^()<>@,;:\"/[\]?.=\s]*)/i)?.[1];
-        const response2 = res;
+        const response3 = res;
         const decodeText = async () => {
           if (charset) {
             try {
-              response2.data = new TextDecoder(charset).decode(await res.arrayBuffer());
+              response3.data = new TextDecoder(charset).decode(await res.arrayBuffer());
             } catch (e) {
-              response2.data = await res.text();
+              response3.data = await res.text();
             }
           } else {
-            response2.data = await res.text();
+            response3.data = await res.text();
           }
         };
         if (responseType === "arraybuffer") {
-          response2.data = await res.arrayBuffer();
+          response3.data = await res.arrayBuffer();
         } else if (responseType === "text") {
           await decodeText();
         } else if (responseType === "webstream") {
-          response2.data = addAsyncIterator(res.body);
+          response3.data = addAsyncIterator(res.body);
         } else {
           try {
             let test = await res.clone().json();
             if (typeof test !== "object") {
               await decodeText();
             } else {
-              response2.data = await res.json();
+              response3.data = await res.json();
             }
             test = null;
           } catch {
             await decodeText();
           }
         }
-        return response2;
+        return response3;
       }
     };
     exports.default = Api;
@@ -44691,13 +44869,13 @@ var require_network2 = __commonJS({
         this.api = api;
       }
       getInfo() {
-        return this.api.get(`info`).then((response2) => {
-          return response2.data;
+        return this.api.get(`info`).then((response3) => {
+          return response3.data;
         });
       }
       getPeers() {
-        return this.api.get(`peers`).then((response2) => {
-          return response2.data;
+        return this.api.get(`peers`).then((response3) => {
+          return response3.data;
         });
       }
     };
@@ -45471,28 +45649,28 @@ var require_transactions = __commonJS({
         return res.data;
       }
       async get(id2) {
-        const response2 = await this.api.get(`tx/${id2}`);
-        if (response2.status == 200) {
-          const data_size = parseInt(response2.data.data_size);
-          if (response2.data.format >= 2 && data_size > 0 && data_size <= 1024 * 1024 * 12) {
+        const response3 = await this.api.get(`tx/${id2}`);
+        if (response3.status == 200) {
+          const data_size = parseInt(response3.data.data_size);
+          if (response3.data.format >= 2 && data_size > 0 && data_size <= 1024 * 1024 * 12) {
             const data = await this.getData(id2);
             return new transaction_1.default({
-              ...response2.data,
+              ...response3.data,
               data
             });
           }
           return new transaction_1.default({
-            ...response2.data,
-            format: response2.data.format || 1
+            ...response3.data,
+            format: response3.data.format || 1
           });
         }
-        if (response2.status == 404) {
+        if (response3.status == 404) {
           throw new error_1.default(
             "TX_NOT_FOUND"
             /* ArweaveErrorType.TX_NOT_FOUND */
           );
         }
-        if (response2.status == 410) {
+        if (response3.status == 410) {
           throw new error_1.default(
             "TX_FAILED"
             /* ArweaveErrorType.TX_FAILED */
@@ -45512,23 +45690,23 @@ var require_transactions = __commonJS({
           op: "equals",
           expr1: tagName,
           expr2: tagValue
-        }).then((response2) => {
-          if (!response2.data) {
+        }).then((response3) => {
+          if (!response3.data) {
             return [];
           }
-          return response2.data;
+          return response3.data;
         });
       }
       getStatus(id2) {
-        return this.api.get(`tx/${id2}/status`).then((response2) => {
-          if (response2.status == 200) {
+        return this.api.get(`tx/${id2}/status`).then((response3) => {
+          if (response3.status == 200) {
             return {
               status: 200,
-              confirmed: response2.data
+              confirmed: response3.data
             };
           }
           return {
-            status: response2.status,
+            status: response3.status,
             confirmed: null
           };
         });
@@ -45750,9 +45928,9 @@ var require_wallets = __commonJS({
        *
        * @returns {Promise<string>} - Promise which resolves with a winston string balance.
        */
-      getBalance(address) {
-        return this.api.get(`wallet/${address}/balance`).then((response2) => {
-          return response2.data;
+      getBalance(address2) {
+        return this.api.get(`wallet/${address2}/balance`).then((response3) => {
+          return response3.data;
         });
       }
       /**
@@ -45762,9 +45940,9 @@ var require_wallets = __commonJS({
        *
        * @returns {Promise<string>} - Promise which resolves with a transaction ID.
        */
-      getLastTransactionID(address) {
-        return this.api.get(`wallet/${address}/last_tx`).then((response2) => {
-          return response2.data;
+      getLastTransactionID(address2) {
+        return this.api.get(`wallet/${address2}/last_tx`).then((response3) => {
+          return response3.data;
         });
       }
       generate() {
@@ -45964,17 +46142,17 @@ var require_blocks = __commonJS({
        * Gets a block by its "indep_hash"
        */
       async get(indepHash) {
-        const response2 = await this.api.get(`${_Blocks.HASH_ENDPOINT}${indepHash}`);
-        if (response2.status === 200) {
-          return response2.data;
+        const response3 = await this.api.get(`${_Blocks.HASH_ENDPOINT}${indepHash}`);
+        if (response3.status === 200) {
+          return response3.data;
         } else {
-          if (response2.status === 404) {
+          if (response3.status === 404) {
             throw new error_1.default(
               "BLOCK_NOT_FOUND"
               /* ArweaveErrorType.BLOCK_NOT_FOUND */
             );
           } else {
-            throw new Error(`Error while loading block data: ${response2}`);
+            throw new Error(`Error while loading block data: ${response3}`);
           }
         }
       }
@@ -45982,17 +46160,17 @@ var require_blocks = __commonJS({
        * Gets a block by its "height"
        */
       async getByHeight(height) {
-        const response2 = await this.api.get(`${_Blocks.HEIGHT_ENDPOINT}${height}`);
-        if (response2.status === 200) {
-          return response2.data;
+        const response3 = await this.api.get(`${_Blocks.HEIGHT_ENDPOINT}${height}`);
+        if (response3.status === 200) {
+          return response3.data;
         } else {
-          if (response2.status === 404) {
+          if (response3.status === 404) {
             throw new error_1.default(
               "BLOCK_NOT_FOUND"
               /* ArweaveErrorType.BLOCK_NOT_FOUND */
             );
           } else {
-            throw new Error(`Error while loading block data: ${response2}`);
+            throw new Error(`Error while loading block data: ${response3}`);
           }
         }
       }
@@ -46132,7 +46310,7 @@ var require_common = __commonJS({
         return siloTransaction;
       }
       arql(query) {
-        return this.api.post("/arql", query).then((response2) => response2.data || []);
+        return this.api.post("/arql", query).then((response3) => response3.data || []);
       }
     };
     __publicField(_Arweave, "init");
@@ -47966,18 +48144,18 @@ send_fn = async function(attempt, expires, delay, _request3, _response) {
   if (scheme in Gateways) {
     const result = await Gateways[scheme](req.url, checkSignal(__privateGet(_request3, _signal)));
     if (result instanceof FetchResponse) {
-      let response3 = result;
+      let response4 = result;
       if (this.processFunc) {
         checkSignal(__privateGet(_request3, _signal));
         try {
-          response3 = await this.processFunc(req, response3);
+          response4 = await this.processFunc(req, response4);
         } catch (error) {
           if (error.throttle == null || typeof error.stall !== "number") {
-            response3.makeServerError("error in post-processing function", error).assertOk();
+            response4.makeServerError("error in post-processing function", error).assertOk();
           }
         }
       }
-      return response3;
+      return response4;
     }
     req = result;
   }
@@ -47985,41 +48163,41 @@ send_fn = async function(attempt, expires, delay, _request3, _response) {
     req = await this.preflightFunc(req);
   }
   const resp = await this.getUrlFunc(req, checkSignal(__privateGet(_request3, _signal)));
-  let response2 = new FetchResponse(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request3);
-  if (response2.statusCode === 301 || response2.statusCode === 302) {
+  let response3 = new FetchResponse(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request3);
+  if (response3.statusCode === 301 || response3.statusCode === 302) {
     try {
-      const location2 = response2.headers.location || "";
-      return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances, send_fn).call(_a2, attempt + 1, expires, 0, _request3, response2);
+      const location2 = response3.headers.location || "";
+      return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances, send_fn).call(_a2, attempt + 1, expires, 0, _request3, response3);
     } catch (error) {
     }
-    return response2;
-  } else if (response2.statusCode === 429) {
-    if (this.retryFunc == null || await this.retryFunc(req, response2, attempt)) {
-      const retryAfter = response2.headers["retry-after"];
+    return response3;
+  } else if (response3.statusCode === 429) {
+    if (this.retryFunc == null || await this.retryFunc(req, response3, attempt)) {
+      const retryAfter = response3.headers["retry-after"];
       let delay2 = __privateGet(this, _throttle).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
       if (typeof retryAfter === "string" && retryAfter.match(/^[1-9][0-9]*$/)) {
         delay2 = parseInt(retryAfter);
       }
-      return __privateMethod(_b = req.clone(), _FetchRequest_instances, send_fn).call(_b, attempt + 1, expires, delay2, _request3, response2);
+      return __privateMethod(_b = req.clone(), _FetchRequest_instances, send_fn).call(_b, attempt + 1, expires, delay2, _request3, response3);
     }
   }
   if (this.processFunc) {
     checkSignal(__privateGet(_request3, _signal));
     try {
-      response2 = await this.processFunc(req, response2);
+      response3 = await this.processFunc(req, response3);
     } catch (error) {
       if (error.throttle == null || typeof error.stall !== "number") {
-        response2.makeServerError("error in post-processing function", error).assertOk();
+        response3.makeServerError("error in post-processing function", error).assertOk();
       }
       let delay2 = __privateGet(this, _throttle).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
       ;
       if (error.stall >= 0) {
         delay2 = error.stall;
       }
-      return __privateMethod(_c = req.clone(), _FetchRequest_instances, send_fn).call(_c, attempt + 1, expires, delay2, _request3, response2);
+      return __privateMethod(_c = req.clone(), _FetchRequest_instances, send_fn).call(_c, attempt + 1, expires, delay2, _request3, response3);
     }
   }
-  return response2;
+  return response3;
 };
 var FetchRequest = _FetchRequest;
 var _statusCode, _statusMessage, _headers2, _body2, _request, _error;
@@ -48130,9 +48308,9 @@ var _FetchResponse = class _FetchResponse {
     } else {
       statusMessage = `CLIENT ESCALATED SERVER ERROR (${this.statusCode} ${this.statusMessage}; ${message})`;
     }
-    const response2 = new _FetchResponse(599, statusMessage, this.headers, this.body, __privateGet(this, _request) || void 0);
-    __privateSet(response2, _error, { message, error });
-    return response2;
+    const response3 = new _FetchResponse(599, statusMessage, this.headers, this.body, __privateGet(this, _request) || void 0);
+    __privateSet(response3, _error, { message, error });
+    return response3;
   }
   /**
    *  If called within a [request.processFunc](FetchRequest-processFunc)
@@ -52760,9 +52938,9 @@ function lock() {
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/address/address.js
 var BN_05 = BigInt(0);
 var BN_36 = BigInt(36);
-function getChecksumAddress(address) {
-  address = address.toLowerCase();
-  const chars = address.substring(2).split("");
+function getChecksumAddress(address2) {
+  address2 = address2.toLowerCase();
+  const chars = address2.substring(2).split("");
   const expanded = new Uint8Array(40);
   for (let i = 0; i < 40; i++) {
     expanded[i] = chars[i].charCodeAt(0);
@@ -52786,10 +52964,10 @@ for (let i = 0; i < 26; i++) {
   ibanLookup[String.fromCharCode(65 + i)] = String(10 + i);
 }
 var safeDigits = 15;
-function ibanChecksum(address) {
-  address = address.toUpperCase();
-  address = address.substring(4) + address.substring(0, 2) + "00";
-  let expanded = address.split("").map((c) => {
+function ibanChecksum(address2) {
+  address2 = address2.toUpperCase();
+  address2 = address2.substring(4) + address2.substring(0, 2) + "00";
+  let expanded = address2.split("").map((c) => {
     return ibanLookup[c];
   }).join("");
   while (expanded.length >= safeDigits) {
@@ -52819,28 +52997,28 @@ function fromBase36(value) {
   }
   return result;
 }
-function getAddress(address) {
-  assertArgument(typeof address === "string", "invalid address", "address", address);
-  if (address.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
-    if (!address.startsWith("0x")) {
-      address = "0x" + address;
+function getAddress(address2) {
+  assertArgument(typeof address2 === "string", "invalid address", "address", address2);
+  if (address2.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
+    if (!address2.startsWith("0x")) {
+      address2 = "0x" + address2;
     }
-    const result = getChecksumAddress(address);
-    assertArgument(!address.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address, "bad address checksum", "address", address);
+    const result = getChecksumAddress(address2);
+    assertArgument(!address2.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address2, "bad address checksum", "address", address2);
     return result;
   }
-  if (address.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
-    assertArgument(address.substring(2, 4) === ibanChecksum(address), "bad icap checksum", "address", address);
-    let result = fromBase36(address.substring(4)).toString(16);
+  if (address2.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
+    assertArgument(address2.substring(2, 4) === ibanChecksum(address2), "bad icap checksum", "address", address2);
+    let result = fromBase36(address2.substring(4)).toString(16);
     while (result.length < 40) {
       result = "0" + result;
     }
     return getChecksumAddress("0x" + result);
   }
-  assertArgument(false, "invalid address", "address", address);
+  assertArgument(false, "invalid address", "address", address2);
 }
-function getIcapAddress(address) {
-  let base36 = BigInt(getAddress(address)).toString(36).toUpperCase();
+function getIcapAddress(address2) {
+  let base36 = BigInt(getAddress(address2)).toString(36).toUpperCase();
   while (base36.length < 30) {
     base36 = "0" + base36;
   }
@@ -59632,10 +59810,10 @@ var Log = class {
    *  Returns a JSON-compatible object.
    */
   toJSON() {
-    const { address, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
+    const { address: address2, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
     return {
       _type: "log",
-      address,
+      address: address2,
       blockHash,
       blockNumber,
       data,
@@ -60959,8 +61137,8 @@ async function getSub(contract, operation, event) {
   const { addr, subs } = getInternal(contract);
   let sub = subs.get(tag);
   if (!sub) {
-    const address = addr ? addr : contract;
-    const filter = { address, topics };
+    const address2 = addr ? addr : contract;
+    const filter = { address: address2, topics };
     const listener = (log2) => {
       let foundFragment = fragment;
       if (foundFragment == null) {
@@ -61300,9 +61478,9 @@ var _BaseContract = class _BaseContract {
       toBlock = "latest";
     }
     const { addr, addrPromise } = getInternal(this);
-    const address = addr ? addr : await addrPromise;
+    const address2 = addr ? addr : await addrPromise;
     const { fragment, topics } = await getSubInfo(this, event);
-    const filter = { address, topics, fromBlock, toBlock };
+    const filter = { address: address2, topics, fromBlock, toBlock };
     const provider = getProvider(this.runner);
     assert(provider, "contract runner does not have a provider", "UNSUPPORTED_OPERATION", { operation: "queryFilter" });
     return (await provider.getLogs(filter)).map((log2) => {
@@ -61447,8 +61625,8 @@ var _BaseContract = class _BaseContract {
    */
   static buildClass(abi) {
     class CustomContract extends _BaseContract {
-      constructor(address, runner = null) {
-        super(address, abi, runner);
+      constructor(address2, runner = null) {
+        super(address2, abi, runner);
       }
     }
     return CustomContract;
@@ -61545,8 +61723,8 @@ var ContractFactory = class _ContractFactory {
       operation: "sendTransaction"
     });
     const sentTx = await this.runner.sendTransaction(tx);
-    const address = getCreateAddress(sentTx);
-    return new BaseContract(address, this.interface, this.runner, sentTx);
+    const address2 = getCreateAddress(sentTx);
+    return new BaseContract(address2, this.interface, this.runner, sentTx);
   }
   /**
    *  Return a new **ContractFactory** with the same ABI and bytecode,
@@ -61608,7 +61786,7 @@ var MulticoinProviderPlugin = class {
   /**
    *  Resolves to the encoded %%address%% for %%coinType%%.
    */
-  async encodeAddress(coinType, address) {
+  async encodeAddress(coinType, address2) {
     throw new Error("unsupported coin");
   }
   /**
@@ -61627,7 +61805,7 @@ var matchers = [
 ];
 var _supports2544, _resolver, _EnsResolver_instances, fetch_fn, _EnsResolver_static, getResolver_fn;
 var _EnsResolver = class _EnsResolver {
-  constructor(provider, address, name) {
+  constructor(provider, address2, name) {
     __privateAdd(this, _EnsResolver_instances);
     /**
      *  The connected provider.
@@ -61644,9 +61822,9 @@ var _EnsResolver = class _EnsResolver {
     // For EIP-2544 names, the ancestor that provided the resolver
     __privateAdd(this, _supports2544);
     __privateAdd(this, _resolver);
-    defineProperties(this, { provider, address, name });
+    defineProperties(this, { provider, address: address2, name });
     __privateSet(this, _supports2544, null);
-    __privateSet(this, _resolver, new Contract(address, [
+    __privateSet(this, _resolver, new Contract(address2, [
       "function supportsInterface(bytes4) view returns (bool)",
       "function resolve(bytes, bytes) view returns (bytes)",
       "function addr(bytes32) view returns (address)",
@@ -61720,9 +61898,9 @@ var _EnsResolver = class _EnsResolver {
     if (data == null || data === "0x") {
       return null;
     }
-    const address = await coinPlugin.decodeAddress(coinType, data);
-    if (address != null) {
-      return address;
+    const address2 = await coinPlugin.decodeAddress(coinType, data);
+    if (address2 != null) {
+      return address2;
     }
     assert(false, `invalid coin data`, "UNSUPPORTED_OPERATION", {
       operation: `getAddress(${coinType})`,
@@ -61864,15 +62042,15 @@ var _EnsResolver = class _EnsResolver {
             }
             linkage.push({ type: "metadata-url", value: metadataUrl });
             let metadata = {};
-            const response2 = await new FetchRequest(metadataUrl).send();
-            response2.assertOk();
+            const response3 = await new FetchRequest(metadataUrl).send();
+            response3.assertOk();
             try {
-              metadata = response2.bodyJson;
+              metadata = response3.bodyJson;
             } catch (error) {
               try {
-                linkage.push({ type: "!metadata", value: response2.bodyText });
+                linkage.push({ type: "!metadata", value: response3.bodyText });
               } catch (error2) {
-                const bytes2 = response2.body;
+                const bytes2 = response3.body;
                 if (bytes2) {
                   linkage.push({ type: "!metadata", value: hexlify(bytes2) });
                 }
@@ -62329,7 +62507,7 @@ var EnsPlugin = class _EnsPlugin extends NetworkPlugin {
    *  %%targetNetwork%%. The default ENS address and mainnet is used
    *  if unspecified.
    */
-  constructor(address, targetNetwork) {
+  constructor(address2, targetNetwork) {
     super("org.ethers.plugins.network.Ens");
     /**
      *  The ENS Registrty Contract address.
@@ -62340,7 +62518,7 @@ var EnsPlugin = class _EnsPlugin extends NetworkPlugin {
      */
     __publicField(this, "targetNetwork");
     defineProperties(this, {
-      address: address || EnsAddress,
+      address: address2 || EnsAddress,
       targetNetwork: targetNetwork == null ? 1 : targetNetwork
     });
   }
@@ -62643,14 +62821,14 @@ function parseUnits2(_value2, decimals) {
 function getGasStationPlugin(url) {
   return new FetchUrlFeeDataNetworkPlugin(url, async (fetchFeeData, provider, request) => {
     request.setHeader("User-Agent", "ethers");
-    let response2;
+    let response3;
     try {
       const [_response, _feeData] = await Promise.all([
         request.send(),
         fetchFeeData()
       ]);
-      response2 = _response;
-      const payload = response2.bodyJson.standard;
+      response3 = _response;
+      const payload = response3.bodyJson.standard;
       const feeData = {
         gasPrice: _feeData.gasPrice,
         maxFeePerGas: parseUnits2(payload.maxFee, 9),
@@ -62658,7 +62836,7 @@ function getGasStationPlugin(url) {
       };
       return feeData;
     } catch (error) {
-      assert(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response2, error });
+      assert(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response3, error });
     }
   });
 }
@@ -63335,8 +63513,8 @@ var AbstractProvider = class {
    *  names and [[Addressable]] objects and returning if already an
    *  address.
    */
-  _getAddress(address) {
-    return resolveAddress(address, this);
+  _getAddress(address2) {
+    return resolveAddress(address2, this);
   }
   /**
    *  Returns or resolves to a valid block tag for %%blockTag%%, resolving
@@ -63392,16 +63570,16 @@ var AbstractProvider = class {
     });
     const blockHash = "blockHash" in filter ? filter.blockHash : void 0;
     const resolve = (_address, fromBlock2, toBlock2) => {
-      let address2 = void 0;
+      let address3 = void 0;
       switch (_address.length) {
         case 0:
           break;
         case 1:
-          address2 = _address[0];
+          address3 = _address[0];
           break;
         default:
           _address.sort();
-          address2 = _address;
+          address3 = _address;
       }
       if (blockHash) {
         if (fromBlock2 != null || toBlock2 != null) {
@@ -63409,8 +63587,8 @@ var AbstractProvider = class {
         }
       }
       const filter2 = {};
-      if (address2) {
-        filter2.address = address2;
+      if (address3) {
+        filter2.address = address3;
       }
       if (topics.length) {
         filter2.topics = topics;
@@ -63426,14 +63604,14 @@ var AbstractProvider = class {
       }
       return filter2;
     };
-    let address = [];
+    let address2 = [];
     if (filter.address) {
       if (Array.isArray(filter.address)) {
         for (const addr of filter.address) {
-          address.push(this._getAddress(addr));
+          address2.push(this._getAddress(addr));
         }
       } else {
-        address.push(this._getAddress(filter.address));
+        address2.push(this._getAddress(filter.address));
       }
     }
     let fromBlock = void 0;
@@ -63444,12 +63622,12 @@ var AbstractProvider = class {
     if ("toBlock" in filter) {
       toBlock = this._getBlockTag(filter.toBlock);
     }
-    if (address.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
-      return Promise.all([Promise.all(address), fromBlock, toBlock]).then((result) => {
+    if (address2.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
+      return Promise.all([Promise.all(address2), fromBlock, toBlock]).then((result) => {
         return resolve(result[0], result[1], result[2]);
       });
     }
-    return resolve(address, fromBlock, toBlock);
+    return resolve(address2, fromBlock, toBlock);
   }
   /**
    *  Returns or resolves to a transaction for %%request%%, resolving
@@ -63583,18 +63761,18 @@ var AbstractProvider = class {
     });
     return await __privateMethod(this, _AbstractProvider_instances, checkNetwork_fn).call(this, __privateMethod(this, _AbstractProvider_instances, call_fn).call(this, tx, blockTag, _tx.enableCcipRead ? 0 : -1));
   }
-  async getBalance(address, blockTag) {
-    return getBigInt(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getBalance" }, address, blockTag), "%response");
+  async getBalance(address2, blockTag) {
+    return getBigInt(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getBalance" }, address2, blockTag), "%response");
   }
-  async getTransactionCount(address, blockTag) {
-    return getNumber(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getTransactionCount" }, address, blockTag), "%response");
+  async getTransactionCount(address2, blockTag) {
+    return getNumber(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getTransactionCount" }, address2, blockTag), "%response");
   }
-  async getCode(address, blockTag) {
-    return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getCode" }, address, blockTag));
+  async getCode(address2, blockTag) {
+    return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getCode" }, address2, blockTag));
   }
-  async getStorage(address, _position, blockTag) {
+  async getStorage(address2, _position, blockTag) {
     const position = getBigInt(_position, "position");
-    return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getStorage", position }, address, blockTag));
+    return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getStorage", position }, address2, blockTag));
   }
   // Write
   async broadcastTransaction(signedTx) {
@@ -63695,9 +63873,9 @@ var AbstractProvider = class {
     }
     return null;
   }
-  async lookupAddress(address) {
-    address = getAddress(address);
-    const node = namehash(address.substring(2).toLowerCase() + ".addr.reverse");
+  async lookupAddress(address2) {
+    address2 = getAddress(address2);
+    const node = namehash(address2.substring(2).toLowerCase() + ".addr.reverse");
     try {
       const ensAddr = await EnsResolver.getEnsAddress(this);
       const ensContract = new Contract(ensAddr, [
@@ -63712,7 +63890,7 @@ var AbstractProvider = class {
       ], this);
       const name = await resolverContract.name(node);
       const check = await this.resolveName(name);
-      if (check !== address) {
+      if (check !== address2) {
         return null;
       }
       return name;
@@ -64174,12 +64352,12 @@ checkNetwork_fn = async function(promise) {
   return value;
 };
 getAccountValue_fn = async function(request, _address, _blockTag) {
-  let address = this._getAddress(_address);
+  let address2 = this._getAddress(_address);
   let blockTag = this._getBlockTag(_blockTag);
-  if (typeof address !== "string" || typeof blockTag !== "string") {
-    [address, blockTag] = await Promise.all([address, blockTag]);
+  if (typeof address2 !== "string" || typeof blockTag !== "string") {
+    [address2, blockTag] = await Promise.all([address2, blockTag]);
   }
-  return await __privateMethod(this, _AbstractProvider_instances, checkNetwork_fn).call(this, __privateMethod(this, _AbstractProvider_instances, perform_fn).call(this, Object.assign(request, { address, blockTag })));
+  return await __privateMethod(this, _AbstractProvider_instances, checkNetwork_fn).call(this, __privateMethod(this, _AbstractProvider_instances, perform_fn).call(this, Object.assign(request, { address: address2, blockTag })));
 };
 getBlock_fn = async function(block, includeTransactions) {
   if (isHexString(block, 32)) {
@@ -64358,9 +64536,9 @@ async function populate(signer, tx) {
     pop.from = Promise.all([
       signer.getAddress(),
       resolveAddress(from, signer)
-    ]).then(([address, from2]) => {
-      assertArgument(address.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
-      return address;
+    ]).then(([address2, from2]) => {
+      assertArgument(address2.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
+      return address2;
     });
   } else {
     pop.from = signer.getAddress();
@@ -64501,14 +64679,14 @@ var _VoidSigner = class _VoidSigner extends AbstractSigner {
    *  Creates a new **VoidSigner** with %%address%% attached to
    *  %%provider%%.
    */
-  constructor(address, provider) {
+  constructor(address2, provider) {
     super(provider);
     __privateAdd(this, _VoidSigner_instances);
     /**
      *  The signer address.
      */
     __publicField(this, "address");
-    defineProperties(this, { address });
+    defineProperties(this, { address: address2 });
   }
   async getAddress() {
     return this.address;
@@ -64757,11 +64935,11 @@ var defaultOptions2 = {
   pollingInterval: 4e3
 };
 var JsonRpcSigner = class extends AbstractSigner {
-  constructor(provider, address) {
+  constructor(provider, address2) {
     super(provider);
     __publicField(this, "address");
-    address = getAddress(address);
-    defineProperties(this, { address });
+    address2 = getAddress(address2);
+    defineProperties(this, { address: address2 });
   }
   connect(provider) {
     assert(false, "cannot reconnect JsonRpcSigner", "UNSUPPORTED_OPERATION", {
@@ -64871,9 +65049,9 @@ var JsonRpcSigner = class extends AbstractSigner {
   async signTypedData(domain, types, _value2) {
     const value = deepCopy(_value2);
     const populated = await TypedDataEncoder.resolveNames(domain, types, value, async (value2) => {
-      const address = await resolveAddress(value2);
-      assertArgument(address != null, "TypedData does not support null address", "value", value2);
-      return address;
+      const address2 = await resolveAddress(value2);
+      assertArgument(address2 != null, "TypedData does not support null address", "value", value2);
+      return address2;
     });
     return await this.provider.send("eth_signTypedData_v4", [
       this.address.toLowerCase(),
@@ -65356,26 +65534,26 @@ var JsonRpcApiProvider = class extends AbstractProvider {
    *
    *  Throws if the account doesn't exist.
    */
-  async getSigner(address) {
-    if (address == null) {
-      address = 0;
+  async getSigner(address2) {
+    if (address2 == null) {
+      address2 = 0;
     }
     const accountsPromise = this.send("eth_accounts", []);
-    if (typeof address === "number") {
+    if (typeof address2 === "number") {
       const accounts2 = await accountsPromise;
-      if (address >= accounts2.length) {
+      if (address2 >= accounts2.length) {
         throw new Error("no such account");
       }
-      return new JsonRpcSigner(this, accounts2[address]);
+      return new JsonRpcSigner(this, accounts2[address2]);
     }
     const { accounts } = await resolveProperties({
       network: this.getNetwork(),
       accounts: accountsPromise
     });
-    address = getAddress(address);
+    address2 = getAddress(address2);
     for (const account of accounts) {
-      if (getAddress(account) === address) {
-        return new JsonRpcSigner(this, address);
+      if (getAddress(account) === address2) {
+        return new JsonRpcSigner(this, address2);
       }
     }
     throw new Error("invalid account");
@@ -65525,9 +65703,9 @@ var JsonRpcProvider = class extends JsonRpcApiPollingProvider {
     const request = this._getConnection();
     request.body = JSON.stringify(payload);
     request.setHeader("content-type", "application/json");
-    const response2 = await request.send();
-    response2.assertOk();
-    let resp = response2.bodyJson;
+    const response3 = await request.send();
+    response3.assertOk();
+    let resp = response3.bodyJson;
     if (!Array.isArray(resp)) {
       resp = [resp];
     }
@@ -65661,7 +65839,7 @@ var AnkrProvider = class _AnkrProvider extends JsonRpcProvider {
     const request = new FetchRequest(`https://${getHost(network.name)}/${apiKey}`);
     request.allowGzip = true;
     if (apiKey === defaultApiKey) {
-      request.retryFunc = async (request2, response2, attempt) => {
+      request.retryFunc = async (request2, response3, attempt) => {
         showThrottleMessage("AnkrProvider");
         return true;
       };
@@ -65781,7 +65959,7 @@ var AlchemyProvider = class _AlchemyProvider extends JsonRpcProvider {
     const request = new FetchRequest(`https://${getHost2(network.name)}/v2/${apiKey}`);
     request.allowGzip = true;
     if (apiKey === defaultApiKey2) {
-      request.retryFunc = async (request2, response2, attempt) => {
+      request.retryFunc = async (request2, response3, attempt) => {
         showThrottleMessage("alchemy");
         return true;
       };
@@ -65858,7 +66036,7 @@ var ChainstackProvider = class _ChainstackProvider extends JsonRpcProvider {
     const request = new FetchRequest(`https://${getHost3(network.name)}/${apiKey}`);
     request.allowGzip = true;
     if (apiKey === getApiKey(network.name)) {
-      request.retryFunc = async (request2, response2, attempt) => {
+      request.retryFunc = async (request2, response3, attempt) => {
         showThrottleMessage("ChainstackProvider");
         return true;
       };
@@ -66028,46 +66206,46 @@ var EtherscanProvider = class extends AbstractProvider {
       }
       return Promise.resolve(true);
     };
-    request.processFunc = async (request2, response3) => {
-      const result2 = response3.hasBody() ? JSON.parse(toUtf8String(response3.body)) : {};
+    request.processFunc = async (request2, response4) => {
+      const result2 = response4.hasBody() ? JSON.parse(toUtf8String(response4.body)) : {};
       const throttle = (typeof result2.result === "string" ? result2.result : "").toLowerCase().indexOf("rate limit") >= 0;
       if (module === "proxy") {
         if (result2 && result2.status == 0 && result2.message == "NOTOK" && throttle) {
           this.emit("debug", { action: "receiveError", id: id2, reason: "proxy-NOTOK", error: result2 });
-          response3.throwThrottleError(result2.result, THROTTLE);
+          response4.throwThrottleError(result2.result, THROTTLE);
         }
       } else {
         if (throttle) {
           this.emit("debug", { action: "receiveError", id: id2, reason: "null result", error: result2.result });
-          response3.throwThrottleError(result2.result, THROTTLE);
+          response4.throwThrottleError(result2.result, THROTTLE);
         }
       }
-      return response3;
+      return response4;
     };
     if (payload) {
       request.setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
       request.body = Object.keys(payload).map((k) => `${k}=${payload[k]}`).join("&");
     }
-    const response2 = await request.send();
+    const response3 = await request.send();
     try {
-      response2.assertOk();
+      response3.assertOk();
     } catch (error) {
       this.emit("debug", { action: "receiveError", id: id2, error, reason: "assertOk" });
-      assert(false, "response error", "SERVER_ERROR", { request, response: response2 });
+      assert(false, "response error", "SERVER_ERROR", { request, response: response3 });
     }
-    if (!response2.hasBody()) {
+    if (!response3.hasBody()) {
       this.emit("debug", { action: "receiveError", id: id2, error: "missing body", reason: "null body" });
-      assert(false, "missing response", "SERVER_ERROR", { request, response: response2 });
+      assert(false, "missing response", "SERVER_ERROR", { request, response: response3 });
     }
-    const result = JSON.parse(toUtf8String(response2.body));
+    const result = JSON.parse(toUtf8String(response3.body));
     if (module === "proxy") {
       if (result.jsonrpc != "2.0") {
         this.emit("debug", { action: "receiveError", id: id2, result, reason: "invalid JSON-RPC" });
-        assert(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response2, info: { result } });
+        assert(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response3, info: { result } });
       }
       if (result.error) {
         this.emit("debug", { action: "receiveError", id: id2, result, reason: "JSON-RPC error" });
-        assert(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+        assert(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
       }
       this.emit("debug", { action: "receiveRequest", id: id2, result });
       return result.result;
@@ -66078,7 +66256,7 @@ var EtherscanProvider = class extends AbstractProvider {
       }
       if (result.status != 1 || typeof result.message === "string" && !result.message.match(/^OK/)) {
         this.emit("debug", { action: "receiveError", id: id2, result });
-        assert(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+        assert(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
       }
       this.emit("debug", { action: "receiveRequest", id: id2, result });
       return result.result;
@@ -66381,17 +66559,17 @@ var EtherscanProvider = class extends AbstractProvider {
    *  Etherscan API to retreive the Contract ABI.
    */
   async getContract(_address) {
-    let address = this._getAddress(_address);
-    if (isPromise2(address)) {
-      address = await address;
+    let address2 = this._getAddress(_address);
+    if (isPromise2(address2)) {
+      address2 = await address2;
     }
     try {
       const resp = await this.fetch("contract", {
         action: "getabi",
-        address
+        address: address2
       });
       const abi = JSON.parse(resp);
-      return new Contract(address, abi, this);
+      return new Contract(address2, abi, this);
     } catch (error) {
       return null;
     }
@@ -66877,7 +67055,7 @@ var InfuraProvider = class _InfuraProvider extends JsonRpcProvider {
       request.setCredentials("", projectSecret);
     }
     if (projectId === defaultProjectId) {
-      request.retryFunc = async (request2, response2, attempt) => {
+      request.retryFunc = async (request2, response3, attempt) => {
         showThrottleMessage("InfuraProvider");
         return true;
       };
@@ -66970,7 +67148,7 @@ var QuickNodeProvider = class _QuickNodeProvider extends JsonRpcProvider {
     const request = new FetchRequest(`https://${getHost5(network.name)}/${token}`);
     request.allowGzip = true;
     if (token === defaultToken) {
-      request.retryFunc = async (request2, response2, attempt) => {
+      request.retryFunc = async (request2, response3, attempt) => {
         showThrottleMessage("QuickNodeProvider");
         return true;
       };
@@ -67780,22 +67958,22 @@ var _BrowserProvider = class _BrowserProvider extends JsonRpcApiPollingProvider 
   /**
    *  Resolves to ``true`` if the provider manages the %%address%%.
    */
-  async hasSigner(address) {
-    if (address == null) {
-      address = 0;
+  async hasSigner(address2) {
+    if (address2 == null) {
+      address2 = 0;
     }
     const accounts = await this.send("eth_accounts", []);
-    if (typeof address === "number") {
-      return accounts.length > address;
+    if (typeof address2 === "number") {
+      return accounts.length > address2;
     }
-    address = address.toLowerCase();
-    return accounts.filter((a) => a.toLowerCase() === address).length !== 0;
+    address2 = address2.toLowerCase();
+    return accounts.filter((a) => a.toLowerCase() === address2).length !== 0;
   }
-  async getSigner(address) {
-    if (address == null) {
-      address = 0;
+  async getSigner(address2) {
+    if (address2 == null) {
+      address2 = 0;
     }
-    if (!await this.hasSigner(address)) {
+    if (!await this.hasSigner(address2)) {
       try {
         await __privateGet(this, _request2).call(this, "eth_requestAccounts", []);
       } catch (error) {
@@ -67803,7 +67981,7 @@ var _BrowserProvider = class _BrowserProvider extends JsonRpcApiPollingProvider 
         throw this.getRpcError(payload, { id: payload.id, error });
       }
     }
-    return await super.getSigner(address);
+    return await super.getSigner(address2);
   }
   /**
    *  Discover and connect to a Provider in the Browser using the
@@ -68061,7 +68239,7 @@ var PocketProvider = class _PocketProvider extends JsonRpcProvider {
       request.setCredentials("", applicationSecret);
     }
     if (applicationId === defaultApplicationId) {
-      request.retryFunc = async (request2, response2, attempt) => {
+      request.retryFunc = async (request2, response3, attempt) => {
         showThrottleMessage("PocketProvider");
         return true;
       };
@@ -68095,8 +68273,8 @@ var _BaseWallet = class _BaseWallet extends AbstractSigner {
     __privateAdd(this, _signingKey);
     assertArgument(privateKey && typeof privateKey.sign === "function", "invalid private key", "privateKey", "[ REDACTED ]");
     __privateSet(this, _signingKey, privateKey);
-    const address = computeAddress(this.signingKey.publicKey);
-    defineProperties(this, { address });
+    const address2 = computeAddress(this.signingKey.publicKey);
+    defineProperties(this, { address: address2 });
   }
   // Store private values behind getters to reduce visibility
   // in console.log
@@ -68176,11 +68354,11 @@ var _BaseWallet = class _BaseWallet extends AbstractSigner {
         operation: "resolveName",
         info: { name }
       });
-      const address = await this.provider.resolveName(name);
-      assert(address != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
+      const address2 = await this.provider.resolveName(name);
+      assert(address2 != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
         value: name
       });
-      return address;
+      return address2;
     });
     return this.signingKey.sign(TypedDataEncoder.hash(populated.domain, types, populated.value)).serialized;
   }
@@ -68967,15 +69145,15 @@ function getAccount(data, _key) {
   const computedMAC = hexlify(keccak256(concat([key.slice(16, 32), ciphertext]))).substring(2);
   assertArgument(computedMAC === spelunk(data, "crypto.mac:string!").toLowerCase(), "incorrect password", "password", "[ REDACTED ]");
   const privateKey = decrypt(data, key.slice(0, 16), ciphertext);
-  const address = computeAddress(privateKey);
+  const address2 = computeAddress(privateKey);
   if (data.address) {
     let check = data.address.toLowerCase();
     if (!check.startsWith("0x")) {
       check = "0x" + check;
     }
-    assertArgument(getAddress(check) === address, "keystore address/privateKey mismatch", "address", data.address);
+    assertArgument(getAddress(check) === address2, "keystore address/privateKey mismatch", "address", data.address);
   }
-  const account = { address, privateKey };
+  const account = { address: address2, privateKey };
   const version2 = spelunk(data, "x-ethers.version:string");
   if (version2 === "0.1") {
     const mnemonicKey = key.slice(32, 64);
@@ -69479,8 +69657,8 @@ var HDNodeVoidWallet = class _HDNodeVoidWallet extends VoidSigner {
   /**
    *  @private
    */
-  constructor(guard, address, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
-    super(address, provider);
+  constructor(guard, address2, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
+    super(address2, provider);
     /**
      *  The compressed public key.
      */
@@ -69575,8 +69753,8 @@ var HDNodeVoidWallet = class _HDNodeVoidWallet extends VoidSigner {
     }
     const { IR, IL } = ser_I(index, this.chainCode, this.publicKey, null);
     const Ki = SigningKey.addPoints(IL, this.publicKey, true);
-    const address = computeAddress(Ki);
-    return new _HDNodeVoidWallet(_guard6, address, Ki, this.fingerprint, hexlify(IR), path, index, this.depth + 1, this.provider);
+    const address2 = computeAddress(Ki);
+    return new _HDNodeVoidWallet(_guard6, address2, Ki, this.fingerprint, hexlify(IR), path, index, this.depth + 1, this.provider);
   }
   /**
    *  Return the signer for %%path%% from this node.
@@ -69610,7 +69788,7 @@ function isCrowdsaleJson(json2) {
 function decryptCrowdsaleJson(json2, _password) {
   const data = JSON.parse(json2);
   const password = getPassword(_password);
-  const address = getAddress(spelunk(data, "ethaddr:string!"));
+  const address2 = getAddress(spelunk(data, "ethaddr:string!"));
   const encseed = looseArrayify(spelunk(data, "encseed:string!"));
   assertArgument(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json2);
   const key = getBytes(pbkdf22(password, password, 2e3, 32, "sha256")).slice(0, 16);
@@ -69622,7 +69800,7 @@ function decryptCrowdsaleJson(json2, _password) {
   for (let i = 0; i < seed.length; i++) {
     seedHex += String.fromCharCode(seed[i]);
   }
-  return { address, privateKey: id(seedHex) };
+  return { address: address2, privateKey: id(seedHex) };
 }
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/wallet/wallet.js
@@ -70062,7 +70240,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
   };
   const checkSbtGate = async ({
     sbtAddresses,
-    address,
+    address: address2,
     rpcUrl,
     mode,
     chainId,
@@ -70083,7 +70261,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     });
     if (!attestation.ok) {
       log2("[gating] sbt rpc chain attestation failed", {
-        address,
+        address: address2,
         rpcUrl: rpcUrlDiagnostic,
         expectedChainId: attestation.expectedChainId,
         actualChainId: attestation.actualChainId,
@@ -70104,7 +70282,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
             contractAddress: sbt,
             iface,
             method: "balanceOf",
-            args: [address]
+            args: [address2]
           });
           const bal = Array.isArray(decoded) ? decoded[0] : decoded;
           return isPositiveBalance(bal);
@@ -70128,7 +70306,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     );
     if (!checks.some(Boolean) && errors.length) {
       log2("[gating] sbt balanceOf failed", {
-        address,
+        address: address2,
         rpcUrl: rpcUrlDiagnostic,
         errors
       });
@@ -70787,18 +70965,18 @@ var normalizeScopeList = (value) => Array.isArray(value) ? [...new Set(value.map
 var listAddresses = (value) => {
   if (Array.isArray(value)) return value.flatMap(listAddresses);
   if (isObj8(value)) return listAddresses(value.addresses || value.members || []);
-  const address = lower(value);
-  return /^0x[0-9a-f]{40}$/.test(address) ? [address] : [];
+  const address2 = lower(value);
+  return /^0x[0-9a-f]{40}$/.test(address2) ? [address2] : [];
 };
 var resolveRoleAddressSet = ({ config, role }) => {
   const normalizedRole = lower(role || "admin") || "admin";
   const addresses = /* @__PURE__ */ new Set();
   if (normalizedRole === "admin") {
-    listAddresses(config?.adminAddress).forEach((address) => addresses.add(address));
-    listAddresses(config?.adminAddresses).forEach((address) => addresses.add(address));
-    listAddresses(config?.admin?.addresses).forEach((address) => addresses.add(address));
+    listAddresses(config?.adminAddress).forEach((address2) => addresses.add(address2));
+    listAddresses(config?.adminAddresses).forEach((address2) => addresses.add(address2));
+    listAddresses(config?.admin?.addresses).forEach((address2) => addresses.add(address2));
   }
-  [config?.workerRoles, config?.roles, config?.authorization?.roles].filter(isObj8).forEach((roles) => listAddresses(roles[normalizedRole]).forEach((address) => addresses.add(address)));
+  [config?.workerRoles, config?.roles, config?.authorization?.roles].filter(isObj8).forEach((roles) => listAddresses(roles[normalizedRole]).forEach((address2) => addresses.add(address2)));
   return addresses;
 };
 var resolveAuthorityPolicy = (config) => {
@@ -70813,11 +70991,11 @@ var resolveLoginConditions = (policy) => {
     conditions: Array.isArray(gate.conditions) ? gate.conditions.filter(isObj8) : []
   };
 };
-var evaluateLoginCondition = async ({ condition, address, config, env, slug, deps }) => {
+var evaluateLoginCondition = async ({ condition, address: address2, config, env, slug, deps }) => {
   const kind = lower(condition?.kind);
   if (kind === "worker_role") {
     const role = lower(condition?.role || "admin") || "admin";
-    return resolveRoleAddressSet({ config, role }).has(lower(address));
+    return resolveRoleAddressSet({ config, role }).has(lower(address2));
   }
   if (kind === "worker_group") {
     const groupId = trim3(condition?.groupId);
@@ -70828,25 +71006,25 @@ var evaluateLoginCondition = async ({ condition, address, config, env, slug, dep
       slug,
       sessionId: resolveCanonicalWorkerSessionIdHex(config),
       groupId,
-      requesterAddress: address,
+      requesterAddress: address2,
       authScopes: {}
     });
     return result?.ok === true;
   }
   return false;
 };
-var passesLoginGate = async ({ address, config, env, slug, policy, deps }) => {
+var passesLoginGate = async ({ address: address2, config, env, slug, policy, deps }) => {
   const gate = resolveLoginConditions(policy);
   if (!gate.conditions.length) return true;
   const results = [];
   for (const condition of gate.conditions) {
-    results.push(await evaluateLoginCondition({ condition, address, config, env, slug, deps }));
+    results.push(await evaluateLoginCondition({ condition, address: address2, config, env, slug, deps }));
   }
   return gate.match === "all" ? results.every(Boolean) : results.some(Boolean);
 };
 var isWorkerCanonicalSessionConfig = (config) => lower(config?.sessionModeProfile?.authority?.mode) === "worker_canonical";
 var resolveWorkerCanonicalLoginScopes = async ({
-  address,
+  address: address2,
   config,
   env,
   slug,
@@ -70859,9 +71037,9 @@ var resolveWorkerCanonicalLoginScopes = async ({
   if (!policy) {
     throw new Error("Access denied: worker-canonical authority policy missing.");
   }
-  const normalizedAddress = lower(address);
+  const normalizedAddress = lower(address2);
   const isAdmin = resolveRoleAddressSet({ config, role: "admin" }).has(normalizedAddress);
-  if (!isAdmin && !await passesLoginGate({ address, config, env, slug, policy, deps })) {
+  if (!isAdmin && !await passesLoginGate({ address: address2, config, env, slug, policy, deps })) {
     throw new Error("Access denied: worker-canonical login gate failed.");
   }
   const configuredScopes = normalizeScopeList(policy.participantScopes);
@@ -71087,7 +71265,7 @@ init_chainIdNormalization();
 var validateAdmin = async ({
   env,
   slug,
-  address,
+  address: address2,
   config,
   body,
   deps
@@ -71108,7 +71286,7 @@ var validateAdmin = async ({
     }
   }
   if (adminAddress && deps?.isAddress?.(adminAddress)) {
-    if (adminAddress.toLowerCase() === address.toLowerCase()) return true;
+    if (adminAddress.toLowerCase() === address2.toLowerCase()) return true;
   }
   if (adminHatId > 0n && deps?.isAddress?.(hatsAddress)) {
     const expectedChainId = resolveRegistryChainId(config);
@@ -71132,7 +71310,7 @@ var validateAdmin = async ({
           contractAddress: hatsAddress,
           iface,
           method: "isWearerOfHat",
-          args: [address, adminHatId]
+          args: [address2, adminHatId]
         });
         const ok = Array.isArray(decoded) ? decoded[0] : decoded;
         if (ok) return true;
@@ -71827,7 +72005,7 @@ var parseSiweMessage = (message) => {
   const firstLine = lines[0] || "";
   const domainMatch = firstLine.match(/^(.*) wants you to sign in with your Ethereum account:/);
   const domain = domainMatch ? trimIfString(domainMatch[1]) || "" : "";
-  const address = lines[1] || "";
+  const address2 = lines[1] || "";
   const fields = {};
   lines.forEach((line) => {
     const uri = getSiweFieldValue(line, "URI:");
@@ -71845,7 +72023,7 @@ var parseSiweMessage = (message) => {
   });
   return {
     domain,
-    address,
+    address: address2,
     uri: fields.uri || "",
     chainId: fields.chainId || "",
     nonce: fields.nonce || "",
@@ -72332,14 +72510,14 @@ var createRateLimitFaucetSupportWithWorkerDeps = ({
   const checkRateLimit = async ({
     env,
     slug,
-    address,
+    address: address2,
     limit,
     route
   } = {}) => {
     const numeric = Number(limit || 0);
     if (!numeric || Number.isNaN(numeric) || numeric <= 0) return true;
     const routeKey = toTrimmedString2(route, deps).toLowerCase() || "default";
-    const identity = toTrimmedString2(address, deps).toLowerCase() || "anonymous";
+    const identity = toTrimmedString2(address2, deps).toLowerCase() || "anonymous";
     const coordinate = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit;
     const result = await coordinate({
       env,
@@ -72396,16 +72574,16 @@ var resolveBootstrapAdminAddress = (body = {}, deps) => {
 var validateBootstrapAdmin = async ({
   env,
   slug,
-  address,
+  address: address2,
   body,
   deps
 } = {}) => {
   const requestedAdmin = resolveBootstrapAdminAddress(body, deps);
-  const requestedAdminMatches = !!requestedAdmin && requestedAdmin.toLowerCase() === address.toLowerCase();
+  const requestedAdminMatches = !!requestedAdmin && requestedAdmin.toLowerCase() === address2.toLowerCase();
   const boundBootstrapAdmin = deps?.toStr?.(env?.BOOTSTRAP_ADMIN_ADDRESS || "").trim();
   if (boundBootstrapAdmin) {
     if (!deps?.isAddress?.(boundBootstrapAdmin)) return false;
-    return requestedAdminMatches && boundBootstrapAdmin.toLowerCase() === address.toLowerCase();
+    return requestedAdminMatches && boundBootstrapAdmin.toLowerCase() === address2.toLowerCase();
   }
   const registryAddress = deps?.toStr?.(env?.REGISTRY_ADDRESS || "").trim();
   const registryRpcUrls = deps?.normalizeRpcUrlList?.(env?.RPC_URL) || [];
@@ -72456,7 +72634,7 @@ var validateBootstrapAdmin = async ({
     }
     const onChainAdmin = deps?.toStr?.(tupleRead?.tuple?.[4] || "").trim();
     if (!onChainAdmin || !deps?.isAddress?.(onChainAdmin)) return false;
-    return requestedAdminMatches && onChainAdmin.toLowerCase() === address.toLowerCase();
+    return requestedAdminMatches && onChainAdmin.toLowerCase() === address2.toLowerCase();
   } catch {
     return false;
   }
@@ -72716,7 +72894,7 @@ var maskGateRpcUrlList = ({ config, gateChainId, rpcUrls, deps }) => (Array.isAr
   deps
 }));
 var resolveLoginGateAuthority = async ({
-  address,
+  address: address2,
   config,
   registryAddress,
   registryRpcUrls,
@@ -72770,7 +72948,7 @@ var resolveLoginGateAuthority = async ({
       if (key === "default") {
         warn("[gating] default gate lookup failed", {
           slug: registrySlug,
-          address,
+          address: address2,
           registryAddress,
           registryRpcUrls: maskRpcUrlList2(registryRpcUrls, deps),
           registryRpcErrors,
@@ -72813,7 +72991,7 @@ var resolveLoginGateAuthority = async ({
       if (key === "default") {
         log2(`[gating] default gate empty (allow) [${gateSource}]`, {
           slug: registrySlug,
-          address,
+          address: address2,
           gateChainId: gate.chainId || null,
           registryAddress,
           registryRpcUrl: registryRpcUrlUsed ? maskRpcUrl(registryRpcUrlUsed) : ""
@@ -72825,7 +73003,7 @@ var resolveLoginGateAuthority = async ({
     if (!rpcUrls.length && key === "default") {
       warn("[gating] default gate missing rpc url", {
         slug: registrySlug,
-        address,
+        address: address2,
         gateChainId: gate.chainId || null,
         registryChainId,
         registryAddress,
@@ -72838,7 +73016,7 @@ var resolveLoginGateAuthority = async ({
     for (const rpcUrl of rpcUrls) {
       const candidate = await checkSbtGate({
         sbtAddresses: gate.sbtAddresses,
-        address,
+        address: address2,
         rpcUrl,
         mode: gate.mode,
         chainId: gate.chainId,
@@ -72859,7 +73037,7 @@ var resolveLoginGateAuthority = async ({
     if (key === "default") {
       (ok ? log2 : warn)(`[gating] default gate check ${ok ? "ok" : "failed"} [${gateSource}]`, {
         slug: registrySlug,
-        address,
+        address: address2,
         gateChainId: gate.chainId || null,
         mode: gate.mode,
         sbtCount: gate.sbtAddresses.length,
@@ -72885,7 +73063,7 @@ var resolveLoginGateAuthority = async ({
 
 // workers/sessionCorsWorker/loginScopeEvaluation.js
 var computeLoginScopes = async ({
-  address,
+  address: address2,
   authorityMode,
   config,
   env,
@@ -72898,7 +73076,7 @@ var computeLoginScopes = async ({
 } = {}) => {
   if (authorityMode === "worker_canonical") {
     return (deps?.resolveWorkerCanonicalLoginScopes || resolveWorkerCanonicalLoginScopes)({
-      address,
+      address: address2,
       config,
       env,
       slug: registrySlug,
@@ -72909,7 +73087,7 @@ var computeLoginScopes = async ({
   }
   const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
   const gateResults = await (deps?.resolveLoginGateAuthority || resolveLoginGateAuthority)({
-    address,
+    address: address2,
     config,
     registryAddress,
     registryRpcUrls,
@@ -72957,7 +73135,7 @@ init_stringCoercion();
 init_chainIdNormalization();
 var resolveLoginAuthorityContext = async ({
   slug,
-  address,
+  address: address2,
   config,
   deps
 } = {}) => {
@@ -73000,7 +73178,7 @@ var resolveLoginAuthorityContext = async ({
     const reason = sessionCheck?.exists === false ? "session-not-registered" : "session-check-unavailable";
     warn("[gating] on-chain gate authority unavailable; denying login", {
       slug: registrySlug,
-      address,
+      address: address2,
       reason,
       registryAddress,
       rpcUrl: sessionCheck?.rpcUrl ? maskRpcUrl(sessionCheck.rpcUrl) : "",
@@ -73065,7 +73243,7 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
   const computeScopesForLogin = async ({
     env,
     slug,
-    address,
+    address: address2,
     config,
     requestedScopes
   } = {}) => {
@@ -73078,7 +73256,7 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       sessionCheck
     } = await (deps?.resolveLoginAuthorityContext || resolveLoginAuthorityContext)({
       slug,
-      address,
+      address: address2,
       config,
       deps: {
         toStr: deps?.toStr,
@@ -73092,7 +73270,7 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       }
     });
     return (deps?.computeLoginScopes || computeLoginScopes)({
-      address,
+      address: address2,
       authorityMode,
       config,
       env,
@@ -74679,25 +74857,25 @@ var fetchNormalizedTarget = async ({
       response: json2({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
     };
   }
-  const response2 = await deps?.safeFetch?.(normalized.targetUrl, {
+  const response3 = await deps?.safeFetch?.(normalized.targetUrl, {
     headers: { "user-agent": FETCH_USER_AGENT },
     cf: { cacheTtl: FETCH_CACHE_TTL_SECONDS }
   });
-  if (!(response2 instanceof Response)) {
+  if (!(response3 instanceof Response)) {
     return {
       ok: false,
-      response: json2({ error: response2?.error }, response2?.status, baseHeaders)
+      response: json2({ error: response3?.error }, response3?.status, baseHeaders)
     };
   }
   return {
     ok: true,
-    response: response2,
+    response: response3,
     json: json2
   };
 };
-var readFetchBytes = async (response2) => {
+var readFetchBytes = async (response3) => {
   try {
-    return await readBodyBytes(response2, MAX_RESPONSE_BYTES);
+    return await readBodyBytes(response3, MAX_RESPONSE_BYTES);
   } catch (error) {
     if (error instanceof BodyByteLimitError) return null;
     throw error;
@@ -74711,15 +74889,15 @@ var fetchImage = async ({
 } = {}) => {
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
-  const { response: response2, json: json2 } = fetchResult;
-  if (!response2.ok) {
-    return json2({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
+  const { response: response3, json: json2 } = fetchResult;
+  if (!response3.ok) {
+    return json2({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
   }
-  const type = response2.headers.get("content-type") || "";
+  const type = response3.headers.get("content-type") || "";
   if (!type.startsWith("image/")) {
     return json2({ error: "URL must return an image" }, 400, baseHeaders);
   }
-  const bytes2 = await readFetchBytes(response2);
+  const bytes2 = await readFetchBytes(response3);
   if (!bytes2) return json2({ error: "Response too large" }, 413, baseHeaders);
   const headers = new Headers(baseHeaders);
   headers.set("Content-Type", type);
@@ -74732,15 +74910,15 @@ var fetchUrl = async ({
 } = {}) => {
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
-  const { response: response2, json: json2 } = fetchResult;
-  if (!response2.ok) {
-    return json2({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
+  const { response: response3, json: json2 } = fetchResult;
+  if (!response3.ok) {
+    return json2({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
   }
-  const type = response2.headers.get("content-type") || "";
+  const type = response3.headers.get("content-type") || "";
   if (!/text\/html|application\/json/i.test(type)) {
     return json2({ error: "URL must return HTML or JSON" }, 400, baseHeaders);
   }
-  const bytes2 = await readFetchBytes(response2);
+  const bytes2 = await readFetchBytes(response3);
   if (!bytes2) return json2({ error: "Response too large" }, 413, baseHeaders);
   const text = new TextDecoder().decode(bytes2);
   if (type.includes("application/json")) {
@@ -74760,7 +74938,7 @@ var resolveAdminSignatureAuthority = async ({
   body,
   config,
   allowBootstrapWithoutConfig = false,
-  address = "",
+  address: address2 = "",
   message = "",
   signature = "",
   targetSlug = "",
@@ -74778,7 +74956,7 @@ var resolveAdminSignatureAuthority = async ({
   const validateSiweAddressMatchesRequest2 = typeof deps?.validateSiweAddressMatchesRequest === "function" ? deps.validateSiweAddressMatchesRequest : () => ({ ok: false, error: "SIWE address does not match request." });
   const consumeNonce2 = typeof deps?.consumeNonce === "function" ? deps.consumeNonce : async () => ({ ok: false, error: "Invalid or expired nonce." });
   const validateAdmin2 = typeof deps?.validateAdmin === "function" ? deps.validateAdmin : async () => false;
-  if (!address || !isAddress2(address)) {
+  if (!address2 || !isAddress2(address2)) {
     return {
       ok: false,
       status: 400,
@@ -74813,7 +74991,7 @@ var resolveAdminSignatureAuthority = async ({
       reason: "invalid_signature"
     };
   }
-  const recoveredCheck = validateRecoveredAddressMatchesRequest2({ recovered, address }) || {};
+  const recoveredCheck = validateRecoveredAddressMatchesRequest2({ recovered, address: address2 }) || {};
   if (!recoveredCheck?.ok) {
     return {
       ok: false,
@@ -74834,7 +75012,7 @@ var resolveAdminSignatureAuthority = async ({
       logExtra: { error: siweCheck?.error }
     };
   }
-  const siweAddressCheck = validateSiweAddressMatchesRequest2({ siwe, address }) || {};
+  const siweAddressCheck = validateSiweAddressMatchesRequest2({ siwe, address: address2 }) || {};
   if (!siweAddressCheck?.ok) {
     return {
       ok: false,
@@ -74843,7 +75021,7 @@ var resolveAdminSignatureAuthority = async ({
       reason: "siwe_address_mismatch"
     };
   }
-  const nonceResult = await consumeNonce2(env, targetSlug, address.toLowerCase(), siwe?.nonce);
+  const nonceResult = await consumeNonce2(env, targetSlug, address2.toLowerCase(), siwe?.nonce);
   if (!nonceResult?.ok) {
     return {
       ok: false,
@@ -74857,11 +75035,11 @@ var resolveAdminSignatureAuthority = async ({
     return {
       ok: true,
       slug: targetSlug,
-      address,
+      address: address2,
       reason: "bootstrap-no-config"
     };
   }
-  const adminOk = await validateAdmin2({ env, slug: targetSlug, address, config, body });
+  const adminOk = await validateAdmin2({ env, slug: targetSlug, address: address2, config, body });
   if (!adminOk) {
     return {
       ok: false,
@@ -74874,7 +75052,7 @@ var resolveAdminSignatureAuthority = async ({
   return {
     ok: true,
     slug: targetSlug,
-    address,
+    address: address2,
     reason: "authorized"
   };
 };
@@ -74890,7 +75068,7 @@ var verifyAdminSignature = async ({
   deps
 } = {}) => {
   const {
-    address,
+    address: address2,
     message,
     signature,
     requestId
@@ -74910,7 +75088,7 @@ var verifyAdminSignature = async ({
     deps?.log?.("[arweave] admin verify reject", {
       requestId: requestId || null,
       reason,
-      address: address || null,
+      address: address2 || null,
       targetSlug: targetSlug || null,
       ...extra
     });
@@ -74943,7 +75121,7 @@ var verifyAdminSignature = async ({
   }
   deps?.log?.("[arweave] admin verify start", {
     requestId: requestId || null,
-    address: address || null,
+    address: address2 || null,
     targetSlug: targetSlug || null,
     hasMessage: !!message,
     hasSignature: !!signature,
@@ -74957,7 +75135,7 @@ var verifyAdminSignature = async ({
     body,
     config,
     allowBootstrapWithoutConfig,
-    address,
+    address: address2,
     message,
     signature,
     targetSlug,
@@ -74993,7 +75171,7 @@ var verifyAdminSignature = async ({
   if (authorityResult?.reason === "bootstrap-no-config") {
     deps?.log?.("[arweave] admin verify ok (bootstrap no config)", {
       requestId: requestId || null,
-      address,
+      address: address2,
       targetSlug: targetSlug || null
     });
     return {
@@ -75004,7 +75182,7 @@ var verifyAdminSignature = async ({
   }
   deps?.log?.("[arweave] admin verify ok", {
     requestId: requestId || null,
-    address,
+    address: address2,
     targetSlug: targetSlug || null
   });
   return {
@@ -75156,19 +75334,19 @@ var transcribe = async ({
     body: upstreamFormData
   };
   if (outboundUrlPolicy) fetchOptions.outboundUrlPolicy = outboundUrlPolicy;
-  const response2 = await deps?.safeFetch?.(targetUrl, fetchOptions);
-  if (!(response2 instanceof Response)) {
-    return json2?.({ error: response2?.error }, response2?.status, baseHeaders);
+  const response3 = await deps?.safeFetch?.(targetUrl, fetchOptions);
+  if (!(response3 instanceof Response)) {
+    return json2?.({ error: response3?.error }, response3?.status, baseHeaders);
   }
   let data = {};
   try {
-    data = await response2.json();
+    data = await response3.json();
   } catch {
     data = {};
   }
-  if (!response2.ok) {
-    const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response2.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
-    return json2?.({ error: String(message), details: data }, response2.status, baseHeaders);
+  if (!response3.ok) {
+    const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response3.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
+    return json2?.({ error: String(message), details: data }, response3.status, baseHeaders);
   }
   return json2?.({ text: data?.text || "" }, 200, baseHeaders);
 };
@@ -75390,7 +75568,7 @@ var evaluateAuthenticatedRoutePreflight = async ({
   config,
   env,
   slug,
-  address,
+  address: address2,
   limit,
   headers,
   deps
@@ -75408,7 +75586,7 @@ var evaluateAuthenticatedRoutePreflight = async ({
     currentScopes = await deps?.computeScopesForLogin?.({
       env,
       slug,
-      address,
+      address: address2,
       config,
       requestedScopes: [scope]
     });
@@ -75433,7 +75611,7 @@ var evaluateAuthenticatedRoutePreflight = async ({
   const rateAllowed = await deps?.checkRateLimit?.({
     env,
     slug,
-    address,
+    address: address2,
     limit,
     route
   });
@@ -75572,13 +75750,13 @@ var trim9 = (value) => String(value == null ? "" : value).trim();
 var lower5 = (value) => trim9(value).toLowerCase();
 var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
-var readJsonResponse = async (response2) => {
-  if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
+var readJsonResponse = async (response3) => {
+  if (!response3 || Number(response3.status || 0) < 200 || Number(response3.status || 0) >= 300) return null;
   try {
-    return await response2.clone().json();
+    return await response3.clone().json();
   } catch {
     try {
-      return JSON.parse(await response2.text());
+      return JSON.parse(await response3.text());
     } catch {
       return null;
     }
@@ -75640,13 +75818,13 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
   for (const rpcUrl of rpcUrls) {
     try {
-      const response2 = await fetchImpl(rpcUrl, {
+      const response3 = await fetchImpl(rpcUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
       });
-      const data = await response2.json();
-      if (!response2.ok || data?.error) throw new Error(data?.error?.message || `RPC ${method} failed.`);
+      const data = await response3.json();
+      if (!response3.ok || data?.error) throw new Error(data?.error?.message || `RPC ${method} failed.`);
       return data.result;
     } catch (error) {
       lastError = error;
@@ -75698,9 +75876,9 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
   if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return null;
   for (const gateway of ["https://ar-io.dev", "https://arweave.net"]) {
     try {
-      const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
-      if (!response2.ok) continue;
-      const payload = await response2.json();
+      const response3 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
+      if (!response3.ok) continue;
+      const payload = await response3.json();
       if (isObj16(payload)) return payload;
     } catch {
     }
@@ -76036,7 +76214,7 @@ var proxyOpenAiRealtimeCall = async ({
   };
   const multipart = buildRealtimeMultipartBody({ sdp: payload.sdp, session });
   const url = live ? constants?.openAiLiveSessionsUrl || OPENAI_LIVE_SESSIONS_URL : constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL;
-  const response2 = await fetchImpl(url, {
+  const response3 = await fetchImpl(url, {
     method: "POST",
     headers: {
       authorization: `Bearer ${key}`,
@@ -76044,10 +76222,10 @@ var proxyOpenAiRealtimeCall = async ({
     },
     body: live ? JSON.stringify({ session, transport: { type: "webrtc", sdp: payload.sdp } }) : multipart.body
   });
-  const text = await response2.text();
-  if (!response2.ok) {
-    const message = response2.status === 401 || response2.status === 403 ? "OpenAI denied the interview. Ask the session owner to check the Worker key and model access." : response2.status === 429 ? "OpenAI is at its usage limit. Try again later or contact the session owner." : "OpenAI could not connect the interview. Try again or contact the session owner.";
-    return deps?.json?.({ error: message }, response2.status, baseHeaders);
+  const text = await response3.text();
+  if (!response3.ok) {
+    const message = response3.status === 401 || response3.status === 403 ? "OpenAI denied the interview. Ask the session owner to check the Worker key and model access." : response3.status === 429 ? "OpenAI is at its usage limit. Try again later or contact the session owner." : "OpenAI could not connect the interview. Try again or contact the session owner.";
+    return deps?.json?.({ error: message }, response3.status, baseHeaders);
   }
   let answerSdp = text;
   if (live) {
@@ -76297,7 +76475,7 @@ var dispatchAuthenticatedRoute = async ({
     config,
     headers,
     scopes,
-    address,
+    address: address2,
     limit
   } = authenticatedContext || {};
   const secretPathRoute = await deps?.dispatchAuthenticatedSecretPathRoute?.({
@@ -76306,7 +76484,7 @@ var dispatchAuthenticatedRoute = async ({
     request,
     config,
     slug,
-    address,
+    address: address2,
     limit,
     headers,
     scopes
@@ -76331,7 +76509,7 @@ var dispatchAuthenticatedRoute = async ({
     body,
     config,
     slug,
-    address,
+    address: address2,
     limit,
     headers,
     scopes
@@ -76343,7 +76521,7 @@ var dispatchAuthenticatedRoute = async ({
     body,
     config,
     slug,
-    address,
+    address: address2,
     limit,
     headers,
     scopes
@@ -76403,14 +76581,14 @@ var resolveAuthenticatedRouteContext = async ({
       response: deps?.json?.({ error: "Token authorization is stale." }, 401, corsContext.headers)
     };
   }
-  const address = deps?.toStr?.(payload.sub || "").toLowerCase();
+  const address2 = deps?.toStr?.(payload.sub || "").toLowerCase();
   return {
     ok: true,
     slug,
     config,
     headers: corsContext.headers,
     scopes: payload.scopes || {},
-    address,
+    address: address2,
     limit: config?.limits?.perWalletPerDay || 0
   };
 };
@@ -76536,7 +76714,7 @@ var resolveAdminRequestAuthority = async ({
   deps
 } = {}) => {
   const {
-    address,
+    address: address2,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
   const signedAction = toTrimmedString14(body?.action);
@@ -76558,7 +76736,7 @@ var resolveAdminRequestAuthority = async ({
   }
   const { envSlug, slugPayload, targetSlug } = slugContext;
   const explicitSlugProvided = slugContext?.explicitSlugProvided === true || !!envSlug || !!slugPayload?.hasAnySlug;
-  if (!address || !deps?.isAddress?.(address)) {
+  if (!address2 || !deps?.isAddress?.(address2)) {
     return {
       ok: false,
       response: deps?.json?.({ error: "Invalid address." }, 400, baseHeaders)
@@ -76633,7 +76811,7 @@ var resolveAdminRequestAuthority = async ({
     nonce,
     audience: audienceCheck?.audience || audience,
     expiration,
-    expectedAddress: address,
+    expectedAddress: address2,
     deps: {
       verifyTypedData: deps?.verifyTypedData,
       now: deps?.now
@@ -76645,7 +76823,7 @@ var resolveAdminRequestAuthority = async ({
       response: deps?.json?.({ error: signatureCheck?.error }, 400, headers)
     };
   }
-  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address.toLowerCase(), nonce);
+  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address2.toLowerCase(), nonce);
   if (!nonceResult?.ok) {
     return {
       ok: false,
@@ -76659,13 +76837,13 @@ var resolveAdminRequestAuthority = async ({
   const existingConfig = corsState.config;
   let adminOk = false;
   if (!existingConfig && action === "set-config") {
-    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address, body });
+    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address: address2, body });
   }
   if (!adminOk) {
     adminOk = await deps?.validateAdmin?.({
       env,
       slug: targetSlug,
-      address,
+      address: address2,
       config: existingConfig,
       body
     });
@@ -76678,7 +76856,7 @@ var resolveAdminRequestAuthority = async ({
   }
   return {
     ok: true,
-    address,
+    address: address2,
     existingConfig,
     headers,
     targetSlug
@@ -76980,9 +77158,9 @@ var fetchChipotleJson = async ({
     headers["X-Api-Key"] = normalizedApiKey;
     headers.Authorization = `Bearer ${normalizedApiKey}`;
   }
-  let response2;
+  let response3;
   try {
-    response2 = await fetchImpl(requestUrl, {
+    response3 = await fetchImpl(requestUrl, {
       method,
       headers,
       redirect: "error",
@@ -76991,13 +77169,13 @@ var fetchChipotleJson = async ({
   } catch (error) {
     throw new Error(toTrimmedString15(error?.message || error) || "Chipotle request failed.");
   }
-  const text = await response2.text().catch(() => "");
+  const text = await response3.text().catch(() => "");
   const parsed = parseJsonIfPossible(text);
-  if (!response2.ok) {
-    throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
+  if (!response3.ok) {
+    throw new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed"));
   }
   if (isObj18(parsed) && toTrimmedString15(parsed.error || "").trim()) {
-    throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
+    throw new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed"));
   }
   return parsed;
 };
@@ -77087,7 +77265,7 @@ var buildPagedPath = (path, params = {}) => {
 var runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
 var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
   if (!toTrimmedString15(runtime?.litGroupId)) return [];
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77098,13 +77276,13 @@ var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
     }),
     fetchImpl
   });
-  return Array.isArray(response2) ? response2 : [];
+  return Array.isArray(response3) ? response3 : [];
 };
 var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
   const rawGroupId = groupId === null ? "" : groupId === void 0 ? runtime?.litGroupId : groupId;
   const resolvedGroupId = toTrimmedString15(rawGroupId);
   if (groupId !== void 0 && groupId !== null && !resolvedGroupId && groupId !== "") return [];
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey || runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77115,14 +77293,14 @@ var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
     }),
     fetchImpl
   });
-  return Array.isArray(response2) ? response2 : [];
+  return Array.isArray(response3) ? response3 : [];
 };
 var listGroupActions = async ({ runtime, fetchImpl } = {}) => {
   if (!toTrimmedString15(runtime?.litGroupId)) return [];
   return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
 };
 var listGroups = async ({ runtime, fetchImpl } = {}) => {
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77132,10 +77310,10 @@ var listGroups = async ({ runtime, fetchImpl } = {}) => {
     }),
     fetchImpl
   });
-  return Array.isArray(response2) ? response2 : [];
+  return Array.isArray(response3) ? response3 : [];
 };
 var listWallets = async ({ runtime, fetchImpl } = {}) => {
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77145,7 +77323,7 @@ var listWallets = async ({ runtime, fetchImpl } = {}) => {
     }),
     fetchImpl
   });
-  return Array.isArray(response2) ? response2 : [];
+  return Array.isArray(response3) ? response3 : [];
 };
 var resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
   const configuredCid = toTrimmedString15(runtime?.litActionCid);
@@ -77367,7 +77545,7 @@ var createLitChipotleAccount = async ({
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
   const requestBody = isObj18(request) ? request : {};
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
     path: "/new_account",
@@ -77380,8 +77558,8 @@ var createLitChipotleAccount = async ({
     fetchImpl
   });
   return {
-    accountApiKey: toTrimmedString15(response2?.api_key),
-    accountWalletAddress: toTrimmedString15(response2?.wallet_address),
+    accountApiKey: toTrimmedString15(response3?.api_key),
+    accountWalletAddress: toTrimmedString15(response3?.wallet_address),
     metadata
   };
 };
@@ -77392,7 +77570,7 @@ var createLitChipotleGroup = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77407,7 +77585,7 @@ var createLitChipotleGroup = async ({
     fetchImpl
   });
   return {
-    groupId: toTrimmedString15(response2?.group_id),
+    groupId: toTrimmedString15(response3?.group_id),
     metadata
   };
 };
@@ -77415,14 +77593,14 @@ var createLitChipotleWallet = async ({
   runtime = {},
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: "/create_wallet",
     fetchImpl
   });
-  const walletAddress = toTrimmedString15(response2?.wallet_address);
+  const walletAddress = toTrimmedString15(response3?.wallet_address);
   const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
   const matchedWallet = wallets.find((entry) => {
     const entryWalletAddress = toTrimmedString15(entry?.wallet_address).toLowerCase();
@@ -77445,7 +77623,7 @@ var createLitChipotleUsageKey = async ({
   if (!Number.isFinite(numericGroupId) || numericGroupId <= 0) {
     throw new Error("Lit group ID not configured.");
   }
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77465,7 +77643,7 @@ var createLitChipotleUsageKey = async ({
     fetchImpl
   });
   return {
-    usageApiKey: toTrimmedString15(response2?.usage_api_key),
+    usageApiKey: toTrimmedString15(response3?.usage_api_key),
     metadata
   };
 };
@@ -77505,7 +77683,7 @@ var ensureActionMetadata = async ({ runtime = {}, litActionCid = "", actionName 
   if (hasAction) {
     return { created: false };
   }
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77520,7 +77698,7 @@ var ensureActionMetadata = async ({ runtime = {}, litActionCid = "", actionName 
   });
   return {
     created: true,
-    response: response2
+    response: response3
   };
 };
 var ensureActionInGroup = async ({ runtime = {}, groupId = "", litActionCid = "", fetchImpl = globalThis.fetch } = {}) => {
@@ -77537,7 +77715,7 @@ var ensureActionInGroup = async ({ runtime = {}, groupId = "", litActionCid = ""
   if (hasAction) {
     return { added: false };
   }
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77551,7 +77729,7 @@ var ensureActionInGroup = async ({ runtime = {}, groupId = "", litActionCid = ""
   });
   return {
     added: true,
-    response: response2
+    response: response3
   };
 };
 var ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalThis.fetch } = {}) => {
@@ -77571,7 +77749,7 @@ var ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalTh
   if (hasPkp) {
     return { added: false };
   }
-  const response2 = await fetchChipotleJson({
+  const response3 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77585,7 +77763,7 @@ var ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalTh
   });
   return {
     added: true,
-    response: response2
+    response: response3
   };
 };
 var provisionLitChipotleAction = async ({
@@ -77941,9 +78119,9 @@ var executeLitChipotleAction = async ({
   } else if (Object.prototype.hasOwnProperty.call(actionRequest, "js_params")) {
     payload.js_params = actionRequest.js_params;
   }
-  let response2;
+  let response3;
   try {
-    response2 = await fetchChipotleJson({
+    response3 = await fetchChipotleJson({
       apiBase: runtime.litApiBase,
       apiKey: runtime.litUsageApiKey,
       allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -77964,7 +78142,7 @@ var executeLitChipotleAction = async ({
     apiBase: runtime.litApiBase,
     apiKeySource: runtime.apiKeySource,
     request: payload,
-    response: response2
+    response: response3
   };
 };
 var executeSessionLitChipotleAction = async ({
@@ -78239,7 +78417,7 @@ var dispatchAdminRequest = async ({
     targetSlug
   } = authorityResult;
   if (action?.startsWith?.("groups/")) {
-    const response2 = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
+    const response3 = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
       action,
       body,
       config: existingConfig,
@@ -78258,7 +78436,7 @@ var dispatchAdminRequest = async ({
         reconcileCoordinatedWorkerGroupCapacity: deps?.reconcileCoordinatedWorkerGroupCapacity
       }
     });
-    if (response2) return response2;
+    if (response3) return response3;
   }
   if (action === "results-analysis/generate") {
     const privateHeaders = withPrivateNoStoreHeaders(headers);
@@ -78623,11 +78801,11 @@ var dispatchAdminAbuseSummaryRequest = async ({
   });
   if (corsContext && !corsContext.ok) return corsContext.response;
   const headers = corsContext?.headers || baseHeaders;
-  const address = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
+  const address2 = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
     slug: targetSlug,
-    address,
+    address: address2,
     config,
     body: {}
   });
@@ -78712,11 +78890,11 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
   const corsContext = await deps?.getCorsContext?.({ request, config, baseHeaders });
   if (corsContext && !corsContext.ok) return corsContext.response;
   const headers = withPrivateNoStoreHeaders2(corsContext?.headers || baseHeaders);
-  const address = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
+  const address2 = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
     slug: targetSlug,
-    address,
+    address: address2,
     config,
     body: {}
   });
@@ -78755,7 +78933,7 @@ var dispatchResultsAnalysisArtifactRequest = async ({
   env,
   config,
   slug,
-  address,
+  address: address2,
   scopes,
   headers,
   deps
@@ -78772,7 +78950,7 @@ var dispatchResultsAnalysisArtifactRequest = async ({
       config,
       slug,
       resource,
-      requesterAddress: address,
+      requesterAddress: address2,
       authScopes: scopes,
       baseHeaders: responseHeaders,
       deps
@@ -78815,8 +78993,8 @@ var dispatchAuthNonceRequest = async ({
   } catch {
     return deps?.json?.({ error: "Invalid JSON." }, 400, baseHeaders);
   }
-  const address = (deps?.toStr?.(body?.address) ?? "").trim();
-  if (!address || !deps?.isAddress?.(address)) {
+  const address2 = (deps?.toStr?.(body?.address) ?? "").trim();
+  if (!address2 || !deps?.isAddress?.(address2)) {
     return deps?.json?.({ error: "Invalid address." }, 400, baseHeaders);
   }
   const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint: slug }) || {
@@ -78879,7 +79057,7 @@ var dispatchAuthNonceRequest = async ({
     env,
     slug: targetSlug,
     identity: rateLimitIdentity,
-    address,
+    address: address2,
     limit: deps?.NONCE_RATE_LIMIT_MAX,
     sharedNetworkLimit: deps?.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     now: deps?.now,
@@ -78894,7 +79072,7 @@ var dispatchAuthNonceRequest = async ({
   const issueResult = await deps?.issueNonce?.(
     env,
     targetSlug,
-    address.toLowerCase(),
+    address2.toLowerCase(),
     nonce,
     deps?.NONCE_TTL_SECONDS
   );
@@ -78924,7 +79102,7 @@ var resolveAuthLoginRequestAuthority = async ({
   deps
 } = {}) => {
   const {
-    address,
+    address: address2,
     message,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
@@ -78940,7 +79118,7 @@ var resolveAuthLoginRequestAuthority = async ({
   }
   const { envSlug, slugPayload, targetSlug } = slugContext;
   const explicitSlugProvided = slugContext?.explicitSlugProvided === true || !!envSlug || !!slugPayload?.hasAnySlug;
-  if (!address || !deps?.isAddress?.(address)) {
+  if (!address2 || !deps?.isAddress?.(address2)) {
     return {
       ok: false,
       response: deps?.json?.({ error: "Invalid address." }, 400, baseHeaders)
@@ -78980,7 +79158,7 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: "Invalid signature." }, 400, headers)
     };
   }
-  const recoveredCheck = deps?.validateRecoveredAddressMatchesRequest?.({ recovered, address }) || {};
+  const recoveredCheck = deps?.validateRecoveredAddressMatchesRequest?.({ recovered, address: address2 }) || {};
   if (!recoveredCheck?.ok) {
     return {
       ok: false,
@@ -79038,14 +79216,14 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: loginOriginCheck?.error }, 403, headers)
     };
   }
-  const siweAddressCheck = deps?.validateSiweAddressMatchesRequest?.({ siwe, address }) || {};
+  const siweAddressCheck = deps?.validateSiweAddressMatchesRequest?.({ siwe, address: address2 }) || {};
   if (!siweAddressCheck?.ok) {
     return {
       ok: false,
       response: deps?.json?.({ error: siweAddressCheck?.error }, 400, headers)
     };
   }
-  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address.toLowerCase(), siwe?.nonce);
+  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address2.toLowerCase(), siwe?.nonce);
   if (!nonceResult?.ok) {
     return {
       ok: false,
@@ -79061,7 +79239,7 @@ var resolveAuthLoginRequestAuthority = async ({
     scopes = await deps?.computeScopesForLogin?.({
       env,
       slug: targetSlug,
-      address,
+      address: address2,
       config
     });
   } catch (err) {
@@ -79072,7 +79250,7 @@ var resolveAuthLoginRequestAuthority = async ({
   }
   return {
     ok: true,
-    address,
+    address: address2,
     config,
     headers,
     scopes,
@@ -79139,14 +79317,14 @@ var dispatchAuthLoginRequest = async ({
     return authorityResult?.response;
   }
   const {
-    address,
+    address: address2,
     config,
     headers,
     scopes,
     targetSlug
   } = authorityResult;
   const exp = Math.floor((deps?.now?.() ?? Date.now()) / 1e3) + deps?.TOKEN_TTL_SECONDS;
-  const sub = deps?.getAddress?.(address);
+  const sub = deps?.getAddress?.(address2);
   const authzEpoch = readAuthorizationEpoch(config);
   if (authzEpoch === null) {
     return deps?.json?.({ error: "Session authorization epoch is invalid." }, 500, headers);
@@ -79234,12 +79412,12 @@ var buildNonce = (deps) => {
   };
   return encode2(bytes2);
 };
-var issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {}) => {
+var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
   const coordinate = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
   const result = await coordinate({
     env,
     slug,
-    address,
+    address: address2,
     nonce,
     ttlSeconds,
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
@@ -79254,13 +79432,13 @@ var issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {}) => {
   }
   return { ok: true };
 };
-var consumeNonce = async (env, slug, address, nonce, deps = {}) => {
+var consumeNonce = async (env, slug, address2, nonce, deps = {}) => {
   const usedNonceTtlSeconds = Number.isFinite(deps?.usedNonceTtlSeconds) ? deps.usedNonceTtlSeconds : DEFAULT_USED_NONCE_TTL_SECONDS;
   const coordinate = deps?.consumeCoordinatedAuthNonce || consumeCoordinatedAuthNonce;
   const result = await coordinate({
     env,
     slug,
-    address,
+    address: address2,
     nonce,
     usedNonceTtlSeconds,
     now: deps?.now
@@ -79285,7 +79463,7 @@ var checkNonceRateLimit = async ({
   env,
   slug,
   identity,
-  address,
+  address: address2,
   limit = DEFAULT_NONCE_RATE_LIMIT_MAX,
   sharedNetworkLimit = DEFAULT_NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
   now,
@@ -79301,7 +79479,7 @@ var checkNonceRateLimit = async ({
   }
   const numericWindowMs = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0 ? Number(windowMs) : DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS;
   const normalizedIdentity = String(identity || "").trim().toLowerCase();
-  const fallbackIdentity = String(address || "").trim().toLowerCase();
+  const fallbackIdentity = String(address2 || "").trim().toLowerCase();
   const walletIdentity = fallbackIdentity || "unknown-wallet";
   const networkIdentity = normalizedIdentity || "unknown-network";
   const sessionSlug = String(slug || "").trim();
@@ -79482,18 +79660,18 @@ var readJsonRequestBody = async (request) => {
     return null;
   }
 };
-var readReceiptResponse = async (response2) => {
-  if (response2?.body && typeof response2.body === "object" && typeof response2?.clone !== "function") {
-    return response2;
+var readReceiptResponse = async (response3) => {
+  if (response3?.body && typeof response3.body === "object" && typeof response3?.clone !== "function") {
+    return response3;
   }
-  if (typeof response2?.clone === "function") {
-    const body = await response2.clone().json().catch(() => ({}));
+  if (typeof response3?.clone === "function") {
+    const body = await response3.clone().json().catch(() => ({}));
     return {
-      status: Number(response2.status || 0) || 200,
+      status: Number(response3.status || 0) || 200,
       body: body && typeof body === "object" ? body : {}
     };
   }
-  return { status: Number(response2?.status || 0) || 200, body: {} };
+  return { status: Number(response3?.status || 0) || 200, body: {} };
 };
 var buildGrantErrorResponse = (deps, headers, status, error) => deps?.json?.({ error }, status, headers);
 var buildDeployExecutionFailure = (error) => ({
@@ -79880,6 +80058,7 @@ var dispatchResourcePresenceRequest = async ({
 init_workerSessionConfig();
 init_workerConfigModeValidation();
 init_sessionSlugResolution();
+init_responseFieldPolicy();
 var buildBootstrapHeaders = (headers) => {
   const next = new Headers(headers || {});
   const vary = new Set(
@@ -79891,17 +80070,17 @@ var buildBootstrapHeaders = (headers) => {
   next.set("Cache-Control", "no-store");
   return next;
 };
-var protectBootstrapResponse = (response2, baseHeaders) => {
-  if (!response2) return response2;
-  const headers = buildBootstrapHeaders(response2.headers || baseHeaders);
-  if (response2 instanceof Response) {
-    return new Response(response2.body, {
-      status: response2.status,
-      statusText: response2.statusText,
+var protectBootstrapResponse = (response3, baseHeaders) => {
+  if (!response3) return response3;
+  const headers = buildBootstrapHeaders(response3.headers || baseHeaders);
+  if (response3 instanceof Response) {
+    return new Response(response3.body, {
+      status: response3.status,
+      statusText: response3.statusText,
       headers
     });
   }
-  return { ...response2, headers };
+  return { ...response3, headers };
 };
 var dispatchSessionConfigBootstrapRequest = async ({
   request,
@@ -79950,7 +80129,14 @@ var dispatchSessionConfigBootstrapRequest = async ({
   return deps?.json?.({
     ok: true,
     sessionSlug: slug,
-    config: projectPublicWorkerSessionConfig(config)
+    config: {
+      ...projectPublicWorkerSessionConfig(config),
+      // Runtime advertisement, never trust a persisted capability on an older Worker.
+      responseFieldEncryption: {
+        ...config.responseFieldEncryption?.mode ? { mode: config.responseFieldEncryption.mode } : {},
+        version: resolveResponseFieldPolicy(config, { workerAvailable: true }).admin && !!env?.CE_STORAGE_ENVELOPE_KEK && typeof (env?.CE_STORAGE_AUDIT_KV || env?.CE_STORAGE_INDEX_KV || env?.STORAGE_INDEX_KV || env?.STORAGE_KV)?.put === "function" ? 1 : 0
+      }
+    }
   }, 200, buildBootstrapHeaders(corsContext.headers));
 };
 
@@ -80608,7 +80794,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         const corsContext = await deps?.getCorsContext?.({ request: withQuerySlugHeader, config, baseHeaders: routeBaseHeaders });
         if (corsContext && !corsContext.ok) return corsContext.response;
         const hasAuth = !!deps?.toStr?.(withQuerySlugHeader.headers.get("authorization") || "").trim();
-        let address = "";
+        let address2 = "";
         let scopes = {};
         if (hasAuth) {
           const auth = await deps?.requireAuth?.({ request: withQuerySlugHeader, env, baseHeaders: corsContext?.headers || routeBaseHeaders, slugHint: targetSlug });
@@ -80636,7 +80822,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json }
           });
           if (!preflight?.ok) return preflight?.response;
-          address = context.address;
+          address2 = context.address;
           scopes = context.scopes;
         }
         return await dispatchResultsAnalysisArtifactRequest2({
@@ -80644,7 +80830,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           env,
           config,
           slug: targetSlug,
-          address,
+          address: address2,
           scopes,
           headers: corsContext?.headers || routeBaseHeaders,
           deps: {
@@ -81119,7 +81305,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   request,
   config,
   slug,
-  address,
+  address: address2,
   env,
   limit,
   headers,
@@ -81129,7 +81315,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isAgentQuestionsRoute = path === "/api/agent/questions" && method === "GET";
-  const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
+  const isStorageRoute = ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path) && method === "POST" || path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
   const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
@@ -81140,7 +81326,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       response: deps?.json?.({ error: "Agent HTTP is disabled for this session." }, 404, headers)
     };
   }
-  const isParticipantWrite = isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
+  const isParticipantWrite = path === "/storage/response-field-key/wrap" && method === "POST" || isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   const endedResponse = isParticipantWrite ? buildSessionEndedResponse({ config, headers, json: deps?.json, now: deps?.now }) : null;
   if (endedResponse) {
     return {
@@ -81157,7 +81343,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
     config,
     env,
     slug,
-    address,
+    address: address2,
     limit,
     headers,
     deps: {
@@ -81210,7 +81396,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         env,
         config,
         slug,
-        uploaderAddress: address,
+        uploaderAddress: address2,
         authScopes: scopes,
         baseHeaders: headers
       })
@@ -81227,7 +81413,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         env,
         config,
         slug,
-        requesterAddress: address,
+        requesterAddress: address2,
         authScopes: scopes,
         baseHeaders: headers,
         deps: {
@@ -81298,7 +81484,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       baseHeaders: headers,
       config,
       slug,
-      uploaderAddress: address
+      uploaderAddress: address2
     })
   };
 };
@@ -81324,7 +81510,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
   body,
   config,
   slug,
-  address,
+  address: address2,
   env,
   limit,
   headers,
@@ -81355,7 +81541,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     const toStr22 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     const hasProofBackedFaucetRequest = !!toStr22(body?.sbtAddress).trim();
     const requestedRecipient = toStr22(body?.to || body?.recipient || body?.address).trim().toLowerCase();
-    const normalizedAddress = toStr22(address).trim().toLowerCase();
+    const normalizedAddress = toStr22(address2).trim().toLowerCase();
     const isSelfFundingRequest = !!requestedRecipient && requestedRecipient === normalizedAddress;
     const preflight2 = await deps?.evaluateAuthenticatedRoutePreflight?.({
       scopes,
@@ -81365,7 +81551,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       allowWithoutScope: hasProofBackedFaucetRequest || isSelfFundingRequest,
       env,
       slug,
-      address,
+      address: address2,
       limit,
       headers,
       deps: {
@@ -81403,7 +81589,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         config,
         baseHeaders: headers,
         slug,
-        requesterAddress: address,
+        requesterAddress: address2,
         tokenHasFaucetScope: preflight2.tokenHasScope
       })
     };
@@ -81416,7 +81602,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       config,
       env,
       slug,
-      address,
+      address: address2,
       limit,
       headers,
       deps: {
@@ -81493,7 +81679,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
           secrets: secretContext2.secrets,
           baseHeaders: headers,
           auth: {
-            address,
+            address: address2,
             scopes
           }
         })
@@ -81511,7 +81697,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     config,
     env,
     slug,
-    address,
+    address: address2,
     limit,
     headers,
     deps: {
@@ -81547,7 +81733,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       config,
       secrets: secretContext.secrets,
       request: body,
-      requesterAddress: address,
+      requesterAddress: address2,
       fetchImpl: deps?.fetchImpl
     });
     return {
@@ -81572,7 +81758,7 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
   body,
   config,
   slug,
-  address,
+  address: address2,
   env,
   limit,
   headers,
@@ -81603,7 +81789,7 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
     config,
     env,
     slug,
-    address,
+    address: address2,
     limit,
     headers,
     deps: {
@@ -81724,10 +81910,10 @@ var normalizeSignedWorkerRequest = (body = {}) => ({
 });
 var validateRecoveredAddressMatchesRequest = ({
   recovered,
-  address
+  address: address2
 } = {}) => {
   const normalizedRecovered = normalizeAddressLower3(recovered);
-  const normalizedAddress = normalizeAddressLower3(address);
+  const normalizedAddress = normalizeAddressLower3(address2);
   if (!normalizedRecovered || !normalizedAddress || normalizedRecovered !== normalizedAddress) {
     return { ok: false, error: "Signature does not match address." };
   }
@@ -81735,9 +81921,9 @@ var validateRecoveredAddressMatchesRequest = ({
 };
 var validateSiweAddressMatchesRequest = ({
   siwe,
-  address
+  address: address2
 } = {}) => {
-  const normalizedAddress = normalizeAddressLower3(address);
+  const normalizedAddress = normalizeAddressLower3(address2);
   const normalizedSiweAddress = normalizeAddressLower3(siwe?.address);
   if (!normalizedSiweAddress) return { ok: true, error: "" };
   if (!normalizedAddress || normalizedSiweAddress !== normalizedAddress) {

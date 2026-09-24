@@ -1,3 +1,4 @@
+import { resolveResponseFieldPolicy } from '@ce-shared/encryption/responseFieldPolicy.mjs';
 type UnknownRecord = Record<string, unknown>;
 
 type ResponseAccessPolicy = {
@@ -41,6 +42,7 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
   const normalizedAccount = String(account || '').trim();
   const loggedIn = !!(loginComplete && normalizedAccount);
   const recipients = Array.isArray(policy?.recipients) ? policy.recipients : [];
+  const workerMediated = resolveResponseFieldPolicy(cfg).centralized;
   const primaryResource =
     String(
       policy?.primaryResource || (singleQuestionMode || isStandalone ? 'questionResponses' : 'surveyResponses'),
@@ -54,10 +56,12 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
     String(cfg?.__registry?.updatedAt || ''),
     String(cfg?.__registry?.gateAuthority || ''),
     String(recipients.length),
+    ...(workerMediated ? ['worker-field-access'] : []),
   ];
 
   return {
     loggedIn,
+    ...(workerMediated ? { workerMediated: true } : {}),
     account: normalizedAccount,
     recipients,
     resourceKeysToCheck,

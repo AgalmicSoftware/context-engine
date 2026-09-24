@@ -4206,6 +4206,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   h4 {
     flex: 1;
     min-width: 0;
+    font-weight: 800;
   }
 
   .sessionInterviewReviewCount {
@@ -4437,11 +4438,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 8px;
   margin: 0 -18px -18px;
   padding: 12px 18px;
-  border-top: 1px solid var(--ce-card-border);
-  background: var(--ce-surface-sunken);
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--ce-surface-sunken) 85%, var(--ce-status-info-text));
   box-shadow: 0 -10px 24px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
 }
 
@@ -4462,12 +4464,48 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionInterviewConsentOptions {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 6px;
-  min-width: min(100%, 280px);
-  max-width: min(100%, 620px);
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 620px;
+  color: var(--ce-panel-text);
+
+  > summary {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--ce-action-accent) 55%, var(--ce-surface-sunken));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ce-surface-sunken) 78%, var(--ce-action-accent));
+    color: var(--ce-panel-text);
+    font-size: 0.84rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  > summary:hover {
+    background: color-mix(in srgb, var(--ce-surface-sunken) 70%, var(--ce-action-accent));
+  }
+
+  > summary:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.sessionInterviewChoicesPanel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: min(620px, calc(100vw - 72px));
+  max-height: min(45vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: 10px;
+  background: var(--ce-surface-sunken);
+  box-shadow: 0 -6px 22px color-mix(in srgb, var(--ce-overlay-base) 25%, transparent);
 }
 
 .sessionInterviewReviewActions .sessionInterviewSubmitButton {
@@ -4497,6 +4535,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .sessionInterviewConsentOptions {
+    flex-basis: auto;
+    width: 100%;
     max-width: 100%;
   }
 

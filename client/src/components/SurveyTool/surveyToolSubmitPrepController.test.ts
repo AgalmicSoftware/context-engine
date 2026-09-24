@@ -415,3 +415,24 @@ describe('surveyToolSubmitPrepController', () => {
     });
   });
 });
+
+it('rejects audience metadata changes which reuse ciphertext for a different policy', () => {
+  const encryptedPortion = JSON.stringify({
+    recipients: [{ type: 'self-eip712-v1' }, { type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }],
+  });
+  expect(
+    verifyEncryptionIntegrity({
+      answers: { q1: { encrypted: true, value: '*', encryptedPortion, encryptionAudience: 'self' } },
+    }).passed,
+  ).toBe(false);
+  expect(
+    verifyEncryptionIntegrity({
+      answers: { q1: { encrypted: true, value: '*', encryptedPortion, encryptionAudience: 'self_admin' } },
+    }).passed,
+  ).toBe(true);
+  expect(
+    verifyEncryptionIntegrity({
+      answers: { q1: { encrypted: true, value: '*', encryptedPortion, encryptionAudience: 'session' } },
+    }).passed,
+  ).toBe(false);
+});

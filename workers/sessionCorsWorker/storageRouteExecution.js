@@ -42,6 +42,7 @@ import {
 } from './chainIdNormalization.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
+import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -2027,6 +2028,15 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
 };
 
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps } = {}) => {
+  if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
+    return responseFieldKeyRoute({
+      path, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps,
+      isAdmin: principal => resolveRoleAddressSet({ config, role: 'admin' }).has(principal),
+      authorizeSession: () => authorizeCloudflareStorageGate({
+        env, config, slug, resource: 'responses', requesterAddress: uploaderAddress, authScopes, baseHeaders, deps,
+      }),
+    });
+  }
   if (path === '/storage/upload' && method === 'POST') {
     const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
     const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });

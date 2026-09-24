@@ -21,6 +21,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isArweaveUploadRoute = path === '/arweave/upload' && method === 'POST';
   const isAgentQuestionsRoute = path === '/api/agent/questions' && method === 'GET';
   const isStorageRoute = (
+    (['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path) && method === 'POST') ||
     (path === '/storage/upload' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
@@ -44,6 +45,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     };
   }
   const isParticipantWrite = (
+    (path === '/storage/response-field-key/wrap' && method === 'POST') ||
     isTranscribeRoute ||
     isArweaveUploadRoute ||
     (path === '/storage/upload' && method === 'POST') ||

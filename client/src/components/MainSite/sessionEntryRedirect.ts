@@ -2,6 +2,9 @@ import demoSessions from '../../variables/demo/demo_sessions.json';
 import { buildPublicUrl } from './urlUtils';
 
 export const getSessionEntryRedirect = (pathname: string, search = '', hash = ''): string | null => {
+  if (/^\/rxc-(?:ra-)?test\/?$/.test(pathname)) {
+    return buildPublicUrl(`/session${pathname.replace(/\/$/, '')}`, search, hash);
+  }
   // Only the bare event link implies interview/join intent. Preserve explicit
   // links and the Worker parameter left behind after those intents are consumed.
   if (!/^\/session\/eddy26\/?$/.test(pathname) || search || hash) return null;

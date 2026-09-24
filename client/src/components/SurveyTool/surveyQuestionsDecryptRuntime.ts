@@ -87,6 +87,10 @@ export const createSurveyQuestionsDecryptRuntime = (
     syncDecryptedQuestionIntoBaselineHelper,
   } = context;
   const decryptHost = inst as QuestionDecryptBusyTokenHost & SurveyDecryptAttemptHost;
+  const workerFieldContext = () => ({
+    sessionSlug: resolveEffectiveSlug(propsRef.current),
+    sessionConfig: propsRef.current.sessionConfig,
+  });
   const shouldUseAnimationFrameForAutoDecryptSweep = () => {
     if (typeof window === 'undefined') return false;
     if (typeof window.requestAnimationFrame !== 'function') return false;
@@ -332,7 +336,11 @@ export const createSurveyQuestionsDecryptRuntime = (
       ratingEnvelopes,
       { chainId, lit, account, providerLike },
       {
-        decryptEnvelopeValue: (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue,
+        decryptEnvelopeValue: (value: unknown, options: SurveyQuestionsLegacyValue) =>
+          (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue(value, {
+            ...options,
+            ...workerFieldContext(),
+          }),
         logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
       },
     );
@@ -345,7 +353,11 @@ export const createSurveyQuestionsDecryptRuntime = (
       ratingEnvelopesByQid,
       { chainId, lit, account, providerLike },
       {
-        decryptEnvelopeValue: (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue,
+        decryptEnvelopeValue: (value: unknown, options: SurveyQuestionsLegacyValue) =>
+          (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue(value, {
+            ...options,
+            ...workerFieldContext(),
+          }),
         logWarn: (error: SurveyQuestionsLegacyValue) => surveyLog.warn('SurveyTool: fallback', error),
       },
     );
@@ -512,14 +524,25 @@ export const createSurveyQuestionsDecryptRuntime = (
 
   const finalizeQuestionDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
     (finalizeQuestionDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
-      decryptSingleField: (cryptoUtils as { decryptSingleField: DecryptSingleFieldPort }).decryptSingleField,
+      decryptSingleField: (slice: unknown, qid: string, field: string, opts: SurveyQuestionsLegacyValue) =>
+        (cryptoUtils as { decryptSingleField: DecryptSingleFieldPort }).decryptSingleField(slice, qid, field, {
+          ...opts,
+          ...workerFieldContext(),
+        }),
       decryptQuestionRatingEnvelopes: decryptQuestionRatingEnvelopes,
     });
 
   const finalizeSurveyDecryptAttempt = async (options: SurveyQuestionsLegacyValue = {}) =>
     (finalizeSurveyDecryptAttemptHelper as SurveyQuestionsLegacyValue)(options, {
-      decryptMultipleAnswers: (cryptoUtils as { decryptMultipleAnswers: DecryptMultipleAnswersPort })
-        .decryptMultipleAnswers,
+      decryptMultipleAnswers: (
+        slice: Parameters<DecryptMultipleAnswersPort>[0],
+        pool: unknown[],
+        opts: SurveyQuestionsLegacyValue,
+      ) =>
+        (cryptoUtils as { decryptMultipleAnswers: DecryptMultipleAnswersPort }).decryptMultipleAnswers(slice, pool, {
+          ...opts,
+          ...workerFieldContext(),
+        }),
       decryptQuestionRatingEnvelopeMap: decryptQuestionRatingEnvelopeMap,
       normalizeBulkDecryptedSliceForSurveyState: normalizeBulkDecryptedSliceForSurveyState,
     });

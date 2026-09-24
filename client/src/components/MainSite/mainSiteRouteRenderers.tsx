@@ -1294,6 +1294,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const routeLocation = readRouteLocationSearch();
     const { searchStr, searchParams } = routeLocation;
     let { hashStr } = routeLocation;
+    if (/^\/rxc-(?:ra-)?test\/?$/.test(fullPath)) {
+      return <Navigate replace to={getSessionEntryRedirect(fullPath, searchStr, hashStr)!} />;
+    }
     const routeDemoMode = host.props.demoSurfaceMode !== false || searchParams.get('demo') === '1';
     const requestedSessionId = searchParams.get('sessionId') || searchParams.get('sessionID') || '';
     const requestedChainIdRaw = searchParams.get('chainId') || searchParams.get('chainID') || '';

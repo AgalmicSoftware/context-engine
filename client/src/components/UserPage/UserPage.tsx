@@ -1819,6 +1819,22 @@ class UserPage extends Component<any, any> {
       return false;
     }
     const qid = decryptRequestPlan.questionId;
+    // A profile can aggregate responses across sessions. Resolve the field key
+    // against its source session's verified config, never the profile's active
+    // session or a URL supplied inside the encrypted response.
+    const surveyId = String(decryptRequestPlan.cryptoOptions.surveyId || '');
+    const sourceInfo =
+      this.state.questionResponseInfo.find((entry: UnknownRecord) => String(entry.id || '').toLowerCase() === qid) ||
+      this.state.surveyResponseInfo.find((entry: UnknownRecord) => String(entry.id || '') === surveyId);
+    const sourceSlug = normalizeSessionSlug(
+      sourceInfo?.sessionSlug ??
+        sourceInfo?.slug ??
+        this.props.activeSessionSlug ??
+        this.props.sessionSlug ??
+        resolveActiveSessionSlug(this.props.sessionConfig || {}) ??
+        '',
+    );
+    const sourceConfig = this._getSessionConfigForSlugExact(sourceSlug);
 
     let decryptedResult: unknown = null;
     try {
@@ -1826,7 +1842,11 @@ class UserPage extends Component<any, any> {
         decryptRequestPlan.responseSlice,
         qid,
         fieldToDecrypt,
-        decryptRequestPlan.cryptoOptions,
+        {
+          ...decryptRequestPlan.cryptoOptions,
+          sessionSlug: sourceSlug,
+          sessionConfig: sourceConfig,
+        },
       );
     } catch (error) {
       accountLog.warn('[UserPage] Failed to decrypt viewed response:', error);

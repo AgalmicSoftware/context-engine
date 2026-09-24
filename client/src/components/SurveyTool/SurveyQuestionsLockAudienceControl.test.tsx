@@ -113,3 +113,25 @@ describe('SurveyQuestionsLockAudienceControl', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW)).toHaveTextContent('Match Answer');
   });
 });
+
+it('offers only the enabled Worker audiences and preserves selections', () => {
+  const onSelectAudience = jest.fn();
+  const props = {
+    qid: 'q1',
+    effectiveFieldKey: 'answer',
+    hasAudienceMenu: true,
+    menuOpen: true,
+    normalizedSelfAudienceLabel: 'Only me',
+    onSelectAudience,
+  };
+  const { rerender } = render(<SurveyQuestionsLockAudienceControl {...props} allowAdminAudience />);
+  fireEvent.click(screen.getByRole('button', { name: 'Only me' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Me + admin' }));
+  expect(onSelectAudience.mock.calls).toEqual([['self'], ['self_admin']]);
+  expect(screen.queryByRole('button', { name: 'Session members' })).not.toBeInTheDocument();
+  rerender(<SurveyQuestionsLockAudienceControl {...props} allowAdminAudience allowSessionAudience />);
+  fireEvent.click(screen.getByRole('button', { name: 'Session members' }));
+  expect(onSelectAudience).toHaveBeenLastCalledWith('session');
+  rerender(<SurveyQuestionsLockAudienceControl {...props} />);
+  expect(screen.queryByRole('button', { name: 'Me + admin' })).not.toBeInTheDocument();
+});

@@ -653,3 +653,45 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
   assert.equal(blockedCorsResponse.headers.get('Cache-Control'), 'no-store');
   assert.equal(blockedCorsResponse.headers.get('Vary'), 'Origin, X-Session-Slug');
 });
+
+test('field-key capability requires the deployed KEK and audit binding, not a persisted advertisement', async () => {
+  const config = { ...buildWorkerCanonicalConfig(), responseFieldEncryption: { version: 1 } };
+  for (const [env, version] of [
+    [{}, 0], [{ CE_STORAGE_ENVELOPE_KEK: 'test-key' }, 0],
+    [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', CE_STORAGE_INDEX_KV: { put: async () => {} } }, 1],
+  ]) {
+    const response = await dispatchSessionConfigBootstrapRequest({
+      request: new Request('https://worker.example/session-config?slug=session-a'), env,
+      deps: {
+        resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
+        getSessionConfig: async () => config,
+        getCorsContext: async () => ({ ok: true, headers: {} }),
+        json: (body, status, headers) => ({ body, status, headers }),
+      },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.config.responseFieldEncryption.version, version);
+  }
+});
+
+test('public Results can advertise optional field encryption only with runtime bindings', async () => {
+  const config = buildWorkerCanonicalConfig();
+  config.sessionModeProfile.encryption = { mode: 'none' };
+  config.sessionModeProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+  config.storageProfile.payloadAccessControl = { gate: 'none', encryption: 'none' };
+  config.sessionModeProfile.results.visibility = 'public_full_if_storage_public';
+  config.responseFieldEncryption = { mode: 'optional', version: 1 };
+  for (const [env, version] of [[{}, 0], [{ CE_STORAGE_ENVELOPE_KEK: 'test', CE_STORAGE_INDEX_KV: { put: async () => {} } }, 1]]) {
+    const result = await dispatchSessionConfigBootstrapRequest({
+      request: new Request('https://worker.example/session-config?slug=session-a'), env,
+      deps: {
+        resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
+        getSessionConfig: async () => config, getCorsContext: async () => ({ ok: true, headers: {} }),
+        json: (body, status) => ({ body, status }),
+      },
+    });
+    assert.equal(result.status, 200, JSON.stringify(result));
+    assert.deepEqual(result.body.config.responseFieldEncryption, { mode: 'optional', version });
+    assert.equal(result.body.config.sessionModeProfile.results.visibility, 'public_full_if_storage_public');
+  }
+});

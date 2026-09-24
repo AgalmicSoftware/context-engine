@@ -39,6 +39,15 @@ const mockUploadSessionMetadata = jest.fn();
 const mockUpdateSessionMetadataOnChain = jest.fn();
 const mockUpsertSessionRegistryCache = jest.fn();
 
+// These UI tests do not exercise chain transport. Mock background metadata reads
+// so teardown cannot leave live RPC requests running in the test process.
+jest.mock('../../domains/chain/rpcProvidersChainReadsPort', () => ({
+  rpcProvidersChainReadsPort: {
+    getLatestBlockNumberForChain: jest.fn(async () => 100),
+    getNativeBalanceWeiForChain: jest.fn(async () => '0'),
+  },
+}));
+
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
     resolveCorsProxyUrl: (...args) => mockResolveCorsProxyUrl(...args),

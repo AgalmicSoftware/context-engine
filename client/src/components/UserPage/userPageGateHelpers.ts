@@ -54,7 +54,7 @@ export type UserPageEncryptedVisibilityStatusRequestPlan =
       action: 'terminal';
       displayState: UserPageEncryptedVisibilityDisplayState;
       resourceKeysToCheck: [];
-      terminalReason: 'own-profile' | 'self-audience' | 'missing-viewer-account';
+      terminalReason: 'own-profile' | 'self-audience' | 'missing-viewer-account' | 'worker-audience';
     }
   | {
       action: 'read-statuses';
@@ -522,6 +522,19 @@ export const buildUserPageEncryptedVisibilityStatusRequestPlan = ({
     };
   }
 
+  if (normalizedAudience === 'self_admin' || normalizedAudience === 'session') {
+    return {
+      action: 'terminal',
+      displayState: buildUserPageEncryptedVisibilityDisplayState({
+        encryptionAudience,
+        viewerAccount,
+        viewAddressLower,
+      }),
+      resourceKeysToCheck: [],
+      terminalReason: 'worker-audience',
+    };
+  }
+
   return {
     action: 'read-statuses',
     displayState: null,
@@ -559,6 +572,18 @@ export const buildUserPageEncryptedVisibilityDisplayState = ({
     return {
       visible: false,
       canDecryptOtherResponses: false,
+      uncertain: false,
+      pendingResourceKeys: [],
+      uncertainResourceKey: '',
+    };
+  }
+
+  // Offer a decrypt attempt for Worker recipients; no Lit gate can establish
+  // this permission. Actual access is checked by the authenticated key route.
+  if (viewerAccountLower && (normalizedAudience === 'self_admin' || normalizedAudience === 'session')) {
+    return {
+      visible: true,
+      canDecryptOtherResponses: true,
       uncertain: false,
       pendingResourceKeys: [],
       uncertainResourceKey: '',
@@ -775,7 +800,7 @@ export const inferUserPageResponseFieldEncryptionAudience = (
   const rawAudience = String(fieldRecord.encryptionAudience || '')
     .trim()
     .toLowerCase();
-  if (rawAudience === 'gate' || rawAudience === 'self') return rawAudience;
+  if (['gate', 'self', 'self_admin', 'session'].includes(rawAudience)) return rawAudience;
   return (
     String(fallback || 'gate')
       .trim()
@@ -791,6 +816,8 @@ export const inferUserPageResponseEncryptionAudience = (
   const additionalAudience = inferUserPageResponseFieldEncryptionAudience(responseObj, 'additional', fallback);
   if (answerAudience === 'self' && additionalAudience === 'self') return 'self';
   if (answerAudience === 'gate' || additionalAudience === 'gate') return 'gate';
+  if (answerAudience === 'self_admin' || additionalAudience === 'self_admin') return 'self_admin';
+  if (answerAudience === 'session' || additionalAudience === 'session') return 'session';
   if (answerAudience === 'self' || additionalAudience === 'self') return 'self';
   return (
     String(fallback || 'gate')

@@ -340,6 +340,7 @@ describe('SessionVoiceModeModal', () => {
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'AI research metadata' })).not.toBeInTheDocument();
+    expect(screen.queryByText('AI submission info')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Agent: A reviewed answer'));
     await waitFor(() =>
@@ -399,6 +400,15 @@ describe('SessionVoiceModeModal', () => {
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(screen.getByRole('button', { name: 'Privacy q1 answer' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Privacy q1 additional' })).toBeInTheDocument();
+    const choices = screen.getByText('AI submission info').closest('details')!;
+    const submission = screen.getByRole('group', { name: 'Response submission' });
+    expect(submission).toContainElement(choices);
+    expect(submission).toContainElement(screen.getByRole('button', { name: 'Submit responses' }));
+    expect(choices).not.toHaveAttribute('open');
+    expect(screen.getByLabelText('Include platform/model provenance')).toBeChecked();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
+    fireEvent.click(choices.querySelector('summary')!);
+    expect(choices).toHaveAttribute('open');
     expect(screen.getByRole('button', { name: 'About research metadata' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
@@ -417,6 +427,9 @@ describe('SessionVoiceModeModal', () => {
     );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
     expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
+    fireEvent.click(choices.querySelector('summary')!);
+    expect(choices).not.toHaveAttribute('open');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
     await editReadableDraftText('Draft answer for What matters?', 'Edited one');
     await editReadableDraftText('Additional comments for What matters?', 'Edited explanation');
     await editReadableDraftText('Draft answer for Second question?', 'Edited two');
