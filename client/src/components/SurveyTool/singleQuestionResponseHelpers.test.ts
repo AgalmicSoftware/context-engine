@@ -218,6 +218,32 @@ describe('singleQuestionResponseHelpers aggregator responses', () => {
     });
   });
 
+  it('preserves custom-scale zeros and excludes missing ratings', () => {
+    const scale = { min: 0, max: 100, minLabel: 'Low', maxLabel: 'High' };
+    expect(
+      buildRatingAggregatorSummary(
+        [
+          { answer: { value: 0 } },
+          { answer: { value: '100' } },
+          { answer: { value: null } },
+          { answer: { value: '' } },
+        ],
+        scale,
+      ),
+    ).toEqual({ average: 50, median: 50, total: 2, values: [0, 100] });
+  });
+
+  it('excludes malformed and out-of-range saved values instead of clamping analysis', () => {
+    const scale = { min: -10, max: 10, minLabel: 'Oppose', maxLabel: 'Support' };
+    const values = [-10, 0, 10, -11, 11, false, true, [], {}, ' ', null, Infinity];
+    expect(
+      buildRatingAggregatorSummary(
+        values.map((value) => ({ answer: { value } })),
+        scale,
+      ),
+    ).toEqual({ average: 0, median: 0, total: 3, values: [-10, 0, 10] });
+  });
+
   it('extracts normalized option labels from candidate option shapes', () => {
     expect(
       extractSingleQuestionOptionsFromCandidate({

@@ -185,7 +185,7 @@ export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, o
  *   POST { action:'ai', provider, model, temperature?, max_tokens?, messages:[{role, content}] }
  * And respond with: { completion: "<text>" }
  */
-export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<string> => {
+const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
   try {
     const thinkingRequested = readAiOptionThinking(opts);
     const aiRequestOpts = normalizeAiClientOptions(opts);
@@ -259,12 +259,24 @@ export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<strin
       throw new Error(data?.error || 'AI request failed');
     }
 
-    return parseAiWorkerCompletion(data);
+    const reportedModel = asRecord(asRecord(data).raw).model ?? asRecord(data).model;
+    const model = typeof reportedModel === 'string' ? reportedModel.trim() : '';
+    return {
+      text: parseAiWorkerCompletion(data),
+      generation: {
+        provider: ai.provider,
+        model: model || ai.model,
+        source: model ? ('reported' as const) : ('requested' as const),
+      },
+    };
   } catch (error) {
     aiLog.error('Error calling AI via Worker:', error);
     throw error;
   }
 };
+
+export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<string> =>
+  (await callAICompletion(prompt, opts)).text;
 
 /**
  * In-process queue wrapper for AI calls (concurrency = 1) with small
@@ -575,7 +587,9 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
     const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
     const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
-    const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
+    const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
+      callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
+    );
 
     const parsed = asParsedJsonRecord(parseJsonFlexible(raw)) || {};
 
@@ -593,7 +607,7 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
       reasoning: readParsedLegacyString(ha, 'reasoning').trim() || '',
     };
 
-    return { name, summary, details, historicalAlignment };
+    return { name, summary, details, historicalAlignment, generation };
   } catch (err) {
     // User-triggered analysis requests need the real Worker failure so the UI can
     // explain why analysis did not run instead of presenting a synthetic result.
@@ -633,7 +647,37 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
   };
 
   if (isE2eAiMockEnabled()) {
-    if (t === 'compare') return buildE2eMockCompareBullets(safeUsers);
+    const generation = { model: 'Preview', provider: 'mock', source: 'mock' };
+    if (t === 'compare')
+      return {
+        ...buildE2eMockCompareBullets(),
+        generation,
+      };
+    if (t === 'axes')
+      return {
+        axes: [
+          {
+            id: 'x',
+            label: 'AI role',
+            negativeLabel: 'Assist people',
+            positiveLabel: 'Delegate decisions',
+            description: 'Illustrative preview axis, not an analysis of these participants.',
+          },
+          {
+            id: 'y',
+            label: 'Participation',
+            negativeLabel: 'Privacy first',
+            positiveLabel: 'Transparency first',
+            description: 'Illustrative preview axis, not an analysis of these participants.',
+          },
+        ],
+        points: safeUsers.map((user, index) => ({
+          address: asRecord(user).address,
+          x: -0.6 + index * 0.04,
+          y: index % 2 ? 0.5 : -0.5,
+        })),
+        generation,
+      };
     return null;
   }
 
@@ -644,11 +688,12 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
 
   try {
     const prompt = buildCompareToolkitPrompt(envelope);
-    const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
-    const parsed = parseJsonFlexible(raw);
-
-    // Return parsed raw output; callers own deterministic fallbacks.
-    return parsed || null;
+    const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
+      callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
+    );
+    const parsed = asParsedJsonRecord(parseJsonFlexible(raw));
+    // Provenance comes from transport metadata, never from generated JSON.
+    return parsed ? { ...parsed, generation } : null;
   } catch (err) {
     aiLog.error('runCompareToolkit error:', err);
     return null;

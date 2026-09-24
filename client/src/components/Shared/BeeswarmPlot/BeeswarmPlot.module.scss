@@ -28,6 +28,14 @@ $card-bg: var(--ce-card-bg);
   backdrop-filter: blur(12px);
 }
 
+.hoverTooltipPortal {
+  position: fixed;
+  z-index: 1100;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .hoverTooltipPinned {
   pointer-events: auto;
 }

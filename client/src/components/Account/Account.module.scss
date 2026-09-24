@@ -2308,7 +2308,21 @@ h1 {
 }
 
 .settingsThemeQuickSelect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
   min-width: 0;
+
+  > div {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+
+  > label {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
 }
 
 .faucetContainer {

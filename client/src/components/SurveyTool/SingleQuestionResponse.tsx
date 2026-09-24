@@ -537,7 +537,10 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
   // For aggregator rating
   renderRatingAggregator = (parsedResponses: unknown[]): React.ReactNode => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
-    const ratingSummary = buildRatingAggregatorSummary(parsedResponses);
+    const ratingSummary = buildRatingAggregatorSummary(
+      parsedResponses,
+      normalizeRatingScale(this.props.question || {}),
+    );
     if (ratingSummary.total === 0) {
       return (
         <div className={aggregatorContainerClassName}>

@@ -1,3 +1,4 @@
+import WorkerResponseHydrationNotice from './WorkerResponseHydrationNotice';
 /** @file AppShell.tsx */
 
 import React, { Component, Suspense } from 'react';
@@ -4229,6 +4230,11 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
         <DevE2eNav />
 
+        <WorkerResponseHydrationNotice
+          sessionConfig={activeRouteSessionConfig}
+          sessionSlug={this.getSessionSlugFromProps()}
+          partialRuns={this.state.partialWorkerResponseRuns}
+        />
         {mainViewDisplay}
 
         <Footer toggleLoginModal={this.props.toggleLoginModal} flowAtDocumentEnd={hasActiveSessionRoute} />

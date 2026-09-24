@@ -454,6 +454,7 @@ const ComparisonReport = ({
         testIdPrefix="demo-analysis-beeswarm"
         responsesAvailable={analysisResults.beeswarmData.length > 0}
         showIdleSummary={false}
+        tooltipPortal
         renderTooltip={(point) => tooltipForPoint(point as ComparisonBeeswarmPoint)}
         getPointStyle={(point) => {
           const comparisonPoint = point as ComparisonBeeswarmPoint;

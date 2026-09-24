@@ -22,6 +22,7 @@ import {
 } from './storageEnvelopeEncryption.js';
 import {
   isWorkerGroupMember,
+  resolveWorkerGroupPrincipal,
 } from './workerGroups.js';
 import {
   rejectBytesOverLimit,
@@ -67,6 +68,8 @@ const DEFAULT_RESOURCE_GATES = Object.freeze({
   media: 'docUploads',
   images: 'docUploads',
 });
+
+const isStorageResource = (resource) => Object.hasOwn(DEFAULT_RESOURCE_GATES, trim(resource) || 'docsContext');
 
 const bytesToBase64url = (bytes) => {
   if (typeof Buffer !== 'undefined') {
@@ -154,6 +157,113 @@ const normalizeAccessConditionDocument = (conditionsInput) => {
   return { match, conditions };
 };
 
+const invalidUploadPolicy = (field, detail) => {
+  throw new Error(`Invalid ${field}: ${detail}.`);
+};
+
+const readUploadGroupIds = (source, fields = ['groupIds', 'groups', 'groupId', 'workerGroupId']) => {
+  const lists = fields.map((field) => {
+    const raw = source[field];
+    if (raw == null) return [];
+    const entries = Array.isArray(raw) ? raw : [raw];
+    const ids = entries.flatMap((entry) => {
+      if (typeof entry !== 'string') return invalidUploadPolicy(field, 'expected group ID text');
+      const text = entry.trim();
+      if (!text) return [];
+      let values = [text];
+      if (text.startsWith('[') || text.startsWith('{')) {
+        try {
+          values = JSON.parse(text);
+        } catch {
+          return invalidUploadPolicy(field, 'malformed group ID JSON');
+        }
+        if (!Array.isArray(values)) return invalidUploadPolicy(field, 'expected a group ID array');
+      }
+      return values.map((value) => {
+        if (typeof value !== 'string' || !safeGroupId(value) || value.trim().startsWith('[') || value.trim().startsWith('{')) {
+          return invalidUploadPolicy(field, 'expected nonempty group ID text');
+        }
+        return safeGroupId(value);
+      });
+    });
+    return Array.from(new Set(ids));
+  });
+  // Validate every supplied alias before choosing one: malformed restrictions
+  // must not disappear behind a valid alias or the session fallback policy.
+  return lists.find((ids) => ids.length) || [];
+};
+
+const readUploadAccessConditions = (input) => {
+  if (input == null || (typeof input === 'string' && !input.trim())) return null;
+  let raw = input;
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return invalidUploadPolicy('accessConditions', 'malformed JSON');
+    }
+  }
+  if (raw === null) return null;
+  if (!isObj(raw)) return invalidUploadPolicy('accessConditions', 'expected an object');
+  if (raw.match !== undefined && (typeof raw.match !== 'string' || !['any', 'all'].includes(raw.match.trim().toLowerCase()))) {
+    return invalidUploadPolicy('accessConditions.match', 'expected any or all');
+  }
+  if (!Array.isArray(raw.conditions) || !raw.conditions.length) {
+    return invalidUploadPolicy('accessConditions.conditions', 'expected at least one rule');
+  }
+  const requireText = (condition, fields) => {
+    fields.forEach((field) => {
+      if (condition[field] !== undefined && (typeof condition[field] !== 'string' || !condition[field].trim())) {
+        invalidUploadPolicy(`accessConditions.${field}`, 'expected nonempty text');
+      }
+    });
+    return fields.some((field) => typeof condition[field] === 'string' && condition[field].trim());
+  };
+  const conditions = raw.conditions.map((condition) => {
+    if (!isObj(condition) || typeof condition.kind !== 'string') {
+      return invalidUploadPolicy('accessConditions.conditions', 'expected a rule with a kind');
+    }
+    const kind = condition.kind.trim().toLowerCase();
+    if (kind === 'worker_role') {
+      requireText(condition, ['role', 'name']); // Omitted roles retain the legacy admin default.
+    } else if (kind === 'agent_grant_scope') {
+      if (!requireText(condition, ['scope', 'value'])) return invalidUploadPolicy('accessConditions.scope', 'required');
+    } else if (kind === 'worker_group') {
+      const groupIds = readUploadGroupIds(condition, ['groupIds', 'groups', 'groupId']);
+      if (!groupIds.length) return invalidUploadPolicy('accessConditions.groupIds', 'required');
+      return { ...condition, kind, groupIds };
+    } else if (kind === 'sbt_onchain') {
+      if (condition.sbtAddresses !== undefined && !Array.isArray(condition.sbtAddresses)) {
+        return invalidUploadPolicy('accessConditions.sbtAddresses', 'expected an array');
+      }
+      const contracts = [
+        ...(condition.sbtAddresses || []),
+        ...['contract', 'address'].filter((field) => condition[field] !== undefined).map((field) => condition[field]),
+      ];
+      if (
+        !contracts.length ||
+        contracts.some((value) => typeof value !== 'string' || !/^0x[0-9a-f]{40}$/i.test(value.trim()) || /^0x0{40}$/i.test(value.trim()))
+      ) {
+        return invalidUploadPolicy('accessConditions.contract', 'expected an SBT contract address');
+      }
+      for (const field of ['chainId', 'networkChainId']) {
+        // Absent/zero chain IDs have historically selected the session chain.
+        if (!resolveChainIdWithLegacyFallback(condition[field], 1))
+          return invalidUploadPolicy(`accessConditions.${field}`, 'expected a positive chain ID');
+      }
+      for (const field of ['anyOrAll', 'mode', 'match']) {
+        if (condition[field] !== undefined && !['any', 'all', '0', '1'].includes(trim(condition[field]).toLowerCase())) {
+          return invalidUploadPolicy(`accessConditions.${field}`, 'expected any or all');
+        }
+      }
+    } else {
+      return invalidUploadPolicy('accessConditions.kind', 'unsupported rule');
+    }
+    return { ...condition, kind };
+  });
+  return { match: raw.match?.trim().toLowerCase() || 'any', conditions };
+};
+
 const normalizeUploadPolicy = (policyInput) => {
   let raw = policyInput;
   if (typeof raw === 'string' && raw.trim()) {
@@ -180,6 +290,45 @@ const normalizeUploadPolicy = (policyInput) => {
   };
 };
 
+const readUploadPolicyFields = (source) => {
+  try {
+    const conditions = [source.accessConditions, source.conditions].map(readUploadAccessConditions);
+    const groupIds = readUploadGroupIds(source);
+    const policies = [source.uploadPolicy, source.documentUploadPolicy, source.policy].map((input) => {
+      if (input == null || (typeof input === 'string' && !input.trim())) return null;
+      let raw = input;
+      if (typeof raw === 'string') {
+        if (['group_allowlist', 'sbt_allowlist'].includes(raw.trim().toLowerCase())) {
+          raw = { mode: raw };
+        } else {
+          try {
+            raw = JSON.parse(raw);
+          } catch {
+            return invalidUploadPolicy('uploadPolicy', 'expected a supported mode or JSON object');
+          }
+        }
+      }
+      if (raw === null) return null;
+      if (!isObj(raw)) return invalidUploadPolicy('uploadPolicy', 'expected an object');
+      for (const field of ['mode', 'kind', 'type']) {
+        if (raw[field] !== undefined && (typeof raw[field] !== 'string' || !['group_allowlist', 'sbt_allowlist'].includes(raw[field].trim().toLowerCase()))) {
+          return invalidUploadPolicy(`uploadPolicy.${field}`, 'expected group_allowlist or sbt_allowlist');
+        }
+      }
+      const policy = normalizeUploadPolicy(raw);
+      if (!policy) return invalidUploadPolicy('uploadPolicy.mode', 'required');
+      policy.groupIds = readUploadGroupIds(raw, ['groupIds', 'groups', 'groupId']);
+      return policy;
+    });
+    return {
+      ok: true,
+      fields: { accessConditions: conditions.find(Boolean) || null, groupIds, uploadPolicy: policies.find(Boolean) || null },
+    };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+};
+
 const readJsonPayload = async (request, { maxUploadBytes } = {}) => {
   let raw = null;
   try {
@@ -196,6 +345,8 @@ const readJsonPayload = async (request, { maxUploadBytes } = {}) => {
   const bytes = encoder.encode(serialized);
   const tooLarge = rejectBytesOverLimit({ bytes, maxUploadBytes });
   if (tooLarge) return tooLarge;
+  const policy = readUploadPolicyFields(raw);
+  if (!policy.ok) return policy;
   return {
     ok: true,
     payload: {
@@ -205,9 +356,7 @@ const readJsonPayload = async (request, { maxUploadBytes } = {}) => {
       resource: trim(raw.resource) || 'docsContext',
       gate: raw.gate || raw.gateResource || raw.resourceGate,
       tags: normalizeTagsForMetadata(raw.tags),
-      accessConditions: normalizeAccessConditionDocument(raw.accessConditions || raw.conditions),
-      groupIds: normalizeGroupIdList(raw.groupIds || raw.groups || raw.groupId || raw.workerGroupId),
-      uploadPolicy: normalizeUploadPolicy(raw.uploadPolicy || raw.documentUploadPolicy || raw.policy),
+      ...policy.fields,
       payloadEncrypted: raw.payloadEncrypted === true || raw.encrypted === true,
       requestId: trim(raw.requestId),
     },
@@ -221,6 +370,11 @@ const readMultipartPayload = async (request, { maxUploadBytes } = {}) => {
   } catch {
     return { ok: false, error: 'Expected multipart/form-data.' };
   }
+  // Only list fields may repeat. get() alone would silently discard a second
+  // restriction, including malformed values that must fail validation.
+  for (const field of ['accessConditions', 'conditions', 'uploadPolicy', 'documentUploadPolicy', 'policy', 'groupId', 'workerGroupId']) {
+    if (form.getAll(field).length > 1) return { ok: false, error: `Invalid ${field}: must occur at most once.` };
+  }
   const fileOrBlob = form.get('file') || form.get('data');
   if (!fileOrBlob || typeof fileOrBlob.arrayBuffer !== 'function') {
     return { ok: false, error: 'Missing "file" or "data" field.' };
@@ -229,6 +383,18 @@ const readMultipartPayload = async (request, { maxUploadBytes } = {}) => {
   const bytes = new Uint8Array(buf);
   const tooLarge = rejectBytesOverLimit({ bytes, maxUploadBytes });
   if (tooLarge) return tooLarge;
+  const policy = readUploadPolicyFields({
+    accessConditions: form.get('accessConditions'),
+    conditions: form.get('conditions'),
+    groupIds: form.getAll('groupIds'),
+    groups: form.getAll('groups'),
+    groupId: form.get('groupId'),
+    workerGroupId: form.get('workerGroupId'),
+    uploadPolicy: form.get('uploadPolicy'),
+    documentUploadPolicy: form.get('documentUploadPolicy'),
+    policy: form.get('policy'),
+  });
+  if (!policy.ok) return policy;
   return {
     ok: true,
     payload: {
@@ -238,9 +404,7 @@ const readMultipartPayload = async (request, { maxUploadBytes } = {}) => {
       resource: trim(form.get('resource')) || 'docsContext',
       gate: form.get('gate') || form.get('gateResource') || form.get('resourceGate'),
       tags: normalizeTagsForMetadata(form.get('tags')),
-      accessConditions: normalizeAccessConditionDocument(form.get('accessConditions') || form.get('conditions')),
-      groupIds: normalizeGroupIdList(form.getAll?.('groupIds') || form.get('groupIds') || form.get('groupId') || form.get('workerGroupId')),
-      uploadPolicy: normalizeUploadPolicy(form.get('uploadPolicy') || form.get('documentUploadPolicy') || form.get('policy')),
+      ...policy.fields,
       payloadEncrypted: trim(form.get('payloadEncrypted') || form.get('encrypted')).toLowerCase() === 'true',
       requestId: trim(form.get('requestId')),
     },
@@ -750,7 +914,72 @@ const authorizeWorkerRoleAccess = ({ config, requesterAddress, baseHeaders, deps
   };
 };
 
+const hasPrivateResponsePolicy = ({ config, resource }) => {
+  const profile = config?.sessionModeProfile;
+  return trim(resource) === 'responses' && profile?.authority?.mode === 'worker_canonical' &&
+    !!profile?.results?.visibility && profile.results.visibility !== 'public_full_if_storage_public';
+};
+
+const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
+  if (operation === 'upload' || !hasPrivateResponsePolicy({ config, resource })) return true;
+
+  const scopes = isObj(authScopes) ? authScopes : {};
+  const address = normalizeAddress(requesterAddress);
+  if (address && resolveRoleAddressSet({ config, role: 'admin' }).has(address)) return true;
+  const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
+  const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
+  if (
+    delegatedScopes.some((items) => items.map(trim).includes('storage')) ||
+    (scopes.storage === true && agent.ok && agent.principal.kind === 'agent')
+  ) return true;
+
+  // A participant's route scope permits submission, not reading everyone else's
+  // answers. List preflight permits scanning; each row still requires its owner.
+  if (!address || (scopes.storage !== true && scopes.arweave !== true)) return false;
+  if (operation === 'list') return true;
+  return !!trim(metadata?.responder) && normalizeAddress(metadata.responder) === address;
+};
+
 const authorizeCloudflareStorageAccess = async ({
+  env,
+  config,
+  slug,
+  resource,
+  requesterAddress,
+  authScopes,
+  metadata,
+  operation = 'read',
+  baseHeaders,
+  deps,
+}) => {
+  if (!isStorageResource(resource)) {
+    return { ok: false, response: responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders) };
+  }
+  if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Access denied: individual response access requires its author, a session admin, or a delegated storage grant.',
+        reason: 'private_response_owner_required',
+      }, 403, baseHeaders),
+    };
+  }
+  // Payload restrictions are additional to the session gate, never a replacement.
+  const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
+  const sessionAccess = await authorizeCloudflareStorageGate(args);
+  if (!sessionAccess.ok || !metadata) return sessionAccess;
+  const groups = resolveGroupGateIds({ metadata, access: {} });
+  if (groups.length) {
+    const groupAccess = await authorizeWorkerGroupAccess({ ...args, groupIds: groups });
+    if (!groupAccess.ok) return groupAccess;
+  }
+  const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
+  if (!payloadConditions?.conditions?.length ||
+      JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
+  return authorizeCloudflareStorageGate({ ...args, metadata });
+};
+
+const authorizeCloudflareStorageGate = async ({
   env,
   config,
   slug,
@@ -1120,18 +1349,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
   }
-  const uploadAccessMetadata = {
-    ...(payload.accessConditions ? { accessConditions: payload.accessConditions } : {}),
-    ...(payload.groupIds?.length ? { groupIds: payload.groupIds } : {}),
-  };
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
     slug,
     resource: payload.resource,
+    operation: 'upload',
     requesterAddress: uploaderAddress,
     authScopes,
-    metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
+    metadata: null,
     baseHeaders,
     deps,
   });
@@ -1484,7 +1710,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   responseHeaders.set('X-CE-Storage-Backend', STORAGE_BACKENDS.CLOUDFLARE);
   responseHeaders.set('X-CE-Storage-Ref', id);
   responseHeaders.set('X-CE-Payload-Access-Mode', deriveLegacyPayloadAccessMode(resolvedAccess));
-  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
     responseHeaders.set('Cache-Control', 'private, no-store');
   }
   return new Response(responseBody, {
@@ -1498,11 +1724,18 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   const listOptions = await readStorageListOptions({ request, url });
   if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
   const { cursor, limit, resource } = listOptions;
+  const mine = url.searchParams.get('mine') === 'true';
+  const responder = mine ? normalizeAddress(uploaderAddress) : '';
+  if (mine && (resource !== 'responses' || !responder)) {
+    return responseJson(deps, { error: 'Own responses require authentication and the responses resource.' }, 403, baseHeaders);
+  }
+  if (!isStorageResource(resource)) return responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders);
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
     slug,
     resource,
+    operation: 'list',
     requesterAddress: uploaderAddress,
     authScopes,
     baseHeaders,
@@ -1528,29 +1761,37 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     );
   }
   const keys = Array.isArray(listed?.keys) ? listed.keys : [];
-  const items = [];
-  for (const keyEntry of keys) {
-    const name = trim(keyEntry?.name || keyEntry);
-    if (!name) continue;
-    let raw;
-    try {
-      raw = await index.get(name);
-    } catch {
-      return responseJson(
-        deps,
-        { error: 'Cloudflare storage index metadata is unavailable.' },
-        503,
-        baseHeaders,
-      );
+  const rows = [];
+  try {
+    for (let offset = 0; offset < keys.length; offset += 8) {
+      rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
+        const name = trim(keyEntry?.name || keyEntry);
+        return { name, raw: name ? await index.get(name) : null };
+      })));
     }
+  } catch {
+    return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);
+  }
+  const items = [];
+  for (const { name, raw } of rows) {
+    if (!name) continue;
     let metadata;
     try {
       metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
     } catch {
+      if (mine) return responseJson(deps, { error: 'Response metadata is unavailable.' }, 503, baseHeaders);
       continue;
     }
     const storageRef = normalizeStorageRef(metadata || {});
-    if (!storageRef) continue;
+    if (!storageRef || storageRef.resource !== resource ||
+        name !== buildIndexKey({ slug, resource, id: storageRef.id })) {
+      if (mine) return responseJson(deps, { error: 'Response metadata is unavailable.' }, 503, baseHeaders);
+      continue;
+    }
+    if (mine && !trim(metadata?.responder)) {
+      return responseJson(deps, { error: 'Response ownership is unavailable.' }, 503, baseHeaders);
+    }
+    if (mine && normalizeAddress(metadata.responder) !== responder) continue;
     const itemAccess = await authorizeCloudflareStorageAccess({
       env,
       config,
@@ -1562,7 +1803,11 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       baseHeaders,
       deps,
     });
-    if (!itemAccess.ok) continue;
+    // A denied own answer is not evidence of an empty answer history.
+    if (!itemAccess.ok) {
+      if (mine) return itemAccess.response;
+      continue;
+    }
     const metadataAccess = normalizePayloadAccessControl(
       metadata?.payloadAccessControl ||
       metadata?.payloadAccessMode ||
@@ -1592,7 +1837,10 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     items,
     cursor: nextCursor || null,
     listComplete: !nextCursor,
-  }, 200, baseHeaders);
+    ...(mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}),
+  }, 200, mine || hasPrivateResponsePolicy({ config, resource })
+    ? { ...Object.fromEntries(new Headers(baseHeaders || {})), 'Cache-Control': 'private, no-store' }
+    : baseHeaders);
 };
 
 export const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
@@ -1784,6 +2032,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
     if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || 'Invalid storage upload payload.' }, uploadPayload?.status || 400, baseHeaders);
     const payload = uploadPayload.payload || {};
+    if (!isStorageResource(payload.resource)) return responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders);
     const backend = resolveConfiguredStorageBackend({
       config,
       requestedBackend: payload.backend,

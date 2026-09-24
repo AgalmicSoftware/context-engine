@@ -409,6 +409,7 @@ type SurveySelectorSurveyState = SurveySelectorRecord & {
 };
 type SurveySelectorPrimarySubmitTarget = {
   handlePrimarySubmitClick?: () => void;
+  handleRevertPendingChanges?: () => void;
   state?: {
     isSubmitting?: unknown;
   };
@@ -1131,6 +1132,12 @@ export class SurveySelector extends Component<any, any> {
     target.handlePrimarySubmitClick();
   };
 
+  handleHeaderRevertClick = (): void => {
+    const target = this.surveyQuestionsRef?.current as SurveySelectorPrimarySubmitTarget | null;
+    if (!target || target.state?.isSubmitting) return;
+    target.handleRevertPendingChanges?.();
+  };
+
   handlePendingStatsChange = (stats: unknown): void => {
     if (!stats || typeof stats !== 'object') return;
     const patch = buildSurveySelectorPendingSubmitStatsPatch(stats);
@@ -1550,19 +1557,32 @@ export class SurveySelector extends Component<any, any> {
           </button>
 
           {showHeaderSubmitButton && (
-            <button
-              type="button"
-              className={buildSurveySelectorHeaderSubmitButtonClassName(styles)}
-              onClick={this.handleHeaderSubmitClick}
-              title="Submit responses"
-              data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-              disabled={!!pendingSubmitStats.isSubmitting}
-            >
-              {headerSubmitLabel}
-              {pendingSubmitStats.isSubmitting && (
-                <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
-              )}
-            </button>
+            <div className={styles.headerSubmitActions}>
+              <button
+                type="button"
+                className={buildSurveySelectorHeaderSubmitButtonClassName(styles)}
+                onClick={this.handleHeaderSubmitClick}
+                title="Submit responses"
+                data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
+                disabled={!!pendingSubmitStats.isSubmitting}
+              >
+                {headerSubmitLabel}
+                {pendingSubmitStats.isSubmitting && (
+                  <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
+                )}
+              </button>
+              <button
+                type="button"
+                className={styles.pileIconButton}
+                onClick={this.handleHeaderRevertClick}
+                disabled={!!pendingSubmitStats.isSubmitting}
+                aria-label="Clear pending changes"
+                title="Clear changes"
+                data-ce-control-appearance="frameless"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
           )}
         </div>
 

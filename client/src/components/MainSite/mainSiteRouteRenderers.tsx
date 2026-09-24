@@ -10,6 +10,7 @@ import RightSideRaw from '../RightSidebar/RightSide';
 import LazyFallbackRaw from '../Shared/LazyFallback';
 import InitialRouteBoundaryRaw, { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { resolveCompareCachesReady, resolveCompareSessionSlug } from '../UserPage/compareSessionRuntime';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import {
@@ -284,6 +285,23 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
   _renderCompareRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug, defaultSessionCfg } = ctx;
+    const sessionSlug = resolveCompareSessionSlug({
+      activeSessionSlug: defaultSlug,
+      pathname: fullPath,
+      search: readRouteLocationSearch().searchStr,
+    });
+    let sessionConfig = sessionSlug === defaultSlug ? defaultSessionCfg : host.getDisplaySessionCfg(sessionSlug);
+    const controller = getWorkerCanonicalRouteController(host);
+    const workerRoute = resolveMainSiteGroupWorkerRoute({
+      workerSessionSlug: sessionSlug,
+      sessionConfig,
+      searchStr: readRouteLocationSearch().searchStr,
+      controller,
+    });
+    const interruption =
+      renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
+    if (interruption) return interruption;
+    if (workerRoute.kind === 'verified') sessionConfig = workerRoute.sessionConfig;
     const comparePath = String(fullPath || '').split('?')[0];
     const firstAddress =
       comparePath
@@ -291,8 +309,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         .split('&')
         .filter(Boolean)[0] || '';
     const compareCapabilityContext = resolveMainSiteRouteCapabilityContext({
-      slug: defaultSlug,
-      sessionConfig: defaultSessionCfg,
+      slug: sessionSlug,
+      sessionConfig,
     });
     const onChainProfileEnabled =
       compareCapabilityContext.capabilities.source === 'legacy_registry' ||
@@ -302,10 +320,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_COMPARE_ROOT}>
           <CompareAddresses
-            activeSessionSlug={defaultSlug}
+            activeSessionSlug={sessionSlug}
             firstAddress={firstAddress}
             account={host.props.account}
-            sessionCachesReady={!!host.state.isAllCachesReady}
+            sessionCachesReady={resolveCompareCachesReady({ ...host.state, onChainProfileEnabled })}
+            sessionCacheError={
+              hasRouteCacheInitializationError(host) ? 'Could not load session data. Please retry.' : undefined
+            }
+            loadSessionData={
+              onChainProfileEnabled
+                ? undefined
+                : () => host.initializeWorkerCanonicalCachesForGroup(sessionSlug, { resetReadiness: true })
+            }
             scanSpecificUserProfile={onChainProfileEnabled ? host.scanSpecificUserProfile : undefined}
           />
         </div>
@@ -486,7 +512,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
     const profileSearchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const profileSearchParams = new URLSearchParams(profileSearchStr);
-    const profileSessionConfig = defaultSlug ? host.getDisplaySessionCfg(defaultSlug) : null;
+    let profileSessionConfig = defaultSlug ? host.getDisplaySessionCfg(defaultSlug) : null;
+    const controller = getWorkerCanonicalRouteController(host);
+    const workerRoute = resolveMainSiteGroupWorkerRoute({
+      workerSessionSlug: defaultSlug,
+      sessionConfig: profileSessionConfig,
+      searchStr: profileSearchStr,
+      controller,
+    });
+    const interruption =
+      renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
+    if (interruption) return interruption;
+    if (workerRoute.kind === 'verified') profileSessionConfig = workerRoute.sessionConfig;
     const profileCapabilityContext = resolveMainSiteRouteCapabilityContext({
       slug: defaultSlug,
       sessionConfig: profileSessionConfig,
@@ -508,6 +545,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
           activeSessionSlug={defaultSlug}
           sessionConfig={profileSessionConfig}
           onChainProfileEnabled={onChainProfileEnabled}
+          loadComparisonSessionData={
+            onChainProfileEnabled
+              ? undefined
+              : () => host.initializeWorkerCanonicalCachesForGroup(defaultSlug, { resetReadiness: true })
+          }
+          comparisonSessionError={
+            hasRouteCacheInitializationError(host) ? 'Could not load session data. Please retry.' : undefined
+          }
           sbtCacheRevision={host.state.sbtCacheRevision}
           questionResponsesNonce={host.state.questionResponsesNonce}
           defaultTab={defaultTab}

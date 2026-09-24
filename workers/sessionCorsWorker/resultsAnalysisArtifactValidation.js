@@ -122,16 +122,16 @@ const normalizeParticipants = (participants) => toArray(participants)
   })
   .filter(Boolean);
 
-const normalizeIdRefs = ({ value, allowed, label, errors }) => {
-  const refs = unique(toArray(value).map((entry) => cleanId(entry)).filter(Boolean)).slice(0, LIMITS.sourceRefs);
+const normalizeIdRefs = ({ value, allowed, label, errors, limit = LIMITS.sourceRefs }) => {
+  const refs = unique(toArray(value).map((entry) => cleanId(entry)).filter(Boolean)).slice(0, limit);
   refs.forEach((ref) => {
     if (!allowed.has(ref)) errors.push(`unknown ${label}: ${ref}`);
   });
   return refs;
 };
 
-const normalizeSourceFields = (record, allowed, errors) => {
-  const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: 'participantId', errors });
+const normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+  const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: 'participantId', errors, limit: participantLimit });
   const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: 'questionId', errors });
   return {
     ...(participantIds.length ? { participantIds } : {}),
@@ -293,7 +293,8 @@ const normalizeBreakdown = (rawSection, allowed) => {
       id: slugId(group.id || label || summaryText, `group_${index + 1}`),
       label: label || `Group ${index + 1}`,
       ...(summaryText ? { summary: summaryText } : {}),
-      ...normalizeSourceFields(group, allowed, errors),
+      // Groups need complete membership evidence for thresholds above the citation cap.
+      ...normalizeSourceFields(group, allowed, errors, allowed.participants.size),
     };
   }).filter(Boolean);
   if (errors.length) return defaultSection('breakdown', `AI generation referenced unknown source ids in breakdown: ${errors.slice(0, 4).join(', ')}.`);
@@ -518,6 +519,29 @@ export const normalizeResultsAnalysisArtifact = ({ value, source = {}, sections 
     source: 'ai-generated',
     version: ARTIFACT_VERSION,
   };
+};
+
+export const applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
+  if (!isObj(artifact?.sections)) return artifact;
+  const enabled = new Set(sections);
+  const groupPolicy = isObj(exposure) && (hasOwn(exposure, 'anonymizedGroupsEnabled') || hasOwn(exposure, 'minGroupSize'));
+  const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
+  const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
+  const projected = {};
+  for (const key of SECTION_ORDER) {
+    const section = artifact.sections[key];
+    if (!enabled.has(key)) {
+      projected[key] = defaultSection(key, 'This generated view is disabled for the session.');
+    } else if (key === 'breakdown' && isObj(section) && section.available !== false && groupPolicy) {
+      // Group policy applies to the labeled Groups list, not minority claims or risks.
+      projected[key] = { ...section, groups: toArray(section.groups).filter((group) =>
+        exposure.anonymizedGroupsEnabled !== false &&
+        unique(toArray(group?.participantIds).filter((id) => participants.has(id))).length >= minGroupSize) };
+    } else {
+      projected[key] = section;
+    }
+  }
+  return { ...artifact, sections: projected };
 };
 
 export default normalizeResultsAnalysisArtifact;

@@ -89,6 +89,11 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     const runtime = createSurveyQuestionsResponseStateRuntime(createContext());
 
     expect(runtime.valuesEqual('', null)).toBe(true);
+    for (const empty of ['', null, undefined]) {
+      expect(runtime.valuesEqual(empty, 0)).toBe(false);
+      expect(runtime.valuesEqual(0, empty)).toBe(false);
+    }
+    expect(runtime.valuesEqual('0', 0)).toBe(true);
     expect(runtime.valuesEqual('4', 4)).toBe(true);
     expect(runtime.valuesEqual(['a', 'b'], ['a', 'b'])).toBe(true);
     expect(runtime.valuesEqual(['a', 'b'], ['b', 'a'])).toBe(false);

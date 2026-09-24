@@ -474,6 +474,7 @@ export const buildSessionWizardCacheWritePayload = ({
   manualMaxPriorityFeePerGasGwei = '',
   workerSecretsEnabled = true,
   workerSecrets = {},
+  workerAllowOrigins = undefined,
   workerLimitPerWallet = '',
   workerLimitPerAnonymousIp = undefined,
   deployForm = {},
@@ -522,6 +523,7 @@ export const buildSessionWizardCacheWritePayload = ({
     workerSecretsEnabled,
     persistWorkerSecrets: false,
     workerSecrets: publicWorkerConfig,
+    ...(workerAllowOrigins === undefined ? {} : { workerAllowOrigins: toStr(workerAllowOrigins) }),
     workerLimitPerWallet: toStr(workerLimitPerWallet).trim(),
     ...(workerLimitPerAnonymousIp === undefined
       ? {}

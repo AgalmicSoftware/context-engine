@@ -420,6 +420,7 @@ export function buildClusterAnalysisDataKey({
   questionResponsesNonce = 0,
   questionPrompts = {},
   allQuestions = [],
+  allResponders = [],
 }: {
   activeClusterAssignments?: number[];
   activeClusterCount?: number;
@@ -429,6 +430,7 @@ export function buildClusterAnalysisDataKey({
   questionResponsesNonce?: number;
   questionPrompts?: StringMap;
   allQuestions?: string[];
+  allResponders?: string[];
 } = {}) {
   const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce(
     (acc, val) => {
@@ -450,7 +452,7 @@ export function buildClusterAnalysisDataKey({
   // nonce churn should not invalidate the visible cluster-analysis cache.
   const nonce = useDemoData ? 0 : (questionResponsesNonce ?? 0);
 
-  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}`;
+  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}-${JSON.stringify(allResponders)}`;
 }
 
 /**************************************************************

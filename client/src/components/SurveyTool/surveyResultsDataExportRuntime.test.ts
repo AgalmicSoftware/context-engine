@@ -117,6 +117,59 @@ describe('surveyResultsDataExportRuntime', () => {
     });
   });
 
+  it.each(['generateQuestionsJSON', 'generateResultsJSON'] as const)(
+    'retains public question contracts in %s',
+    (method) => {
+      const scale = { min: 0, max: 100, minLabel: 'Impossible', maxLabel: 'Certain' };
+      const networkQuestions = {
+        rating: {
+          id: 'rating',
+          type: 'rating',
+          ratingScale: scale,
+          order: 0,
+          benchmarkQuestionId: 'benchmark-1',
+          sourceCommentId: 'comment-1',
+          sourceType: 'benchmark',
+          aiFuturesCommentId: 'future-1',
+          privateNotes: 'Do not publish',
+        },
+        choice: { id: 'choice', type: 'multichoice', options: ['A', 'B'], singleSelect: false, maxSelections: 2 },
+        quadratic: { id: 'quadratic', type: 'quadratic', options: ['A', 'B'], voiceCredits: 25 },
+      };
+      const { runtime } = createRuntime({
+        networkQuestions,
+        state: { sbtFilteredAggregatorQuestionResponses: { rating: [], choice: [], quadratic: [] } },
+      });
+      const output = JSON.parse(runtime[method]());
+      expect(output.filteredQuestions).toEqual([
+        {
+          id: 'rating',
+          prompt: '',
+          type: 'rating',
+          options: [],
+          tags: [],
+          scale,
+          order: 0,
+          benchmarkQuestionId: 'benchmark-1',
+          sourceCommentId: 'comment-1',
+          sourceType: 'benchmark',
+          aiFuturesCommentId: 'future-1',
+        },
+        {
+          id: 'choice',
+          prompt: '',
+          type: 'multichoice',
+          options: ['A', 'B'],
+          tags: [],
+          singleSelect: false,
+          maxSelections: 2,
+        },
+        { id: 'quadratic', prompt: '', type: 'quadratic', options: ['A', 'B'], tags: [], voiceCredits: 25 },
+      ]);
+      expect(JSON.stringify(output)).not.toContain('privateNotes');
+    },
+  );
+
   it('builds filtered question JSON from aggregate and row response question ids', () => {
     const { runtime } = createRuntime({
       networkQuestions: {

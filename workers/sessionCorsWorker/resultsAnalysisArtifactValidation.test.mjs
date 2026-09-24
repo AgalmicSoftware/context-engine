@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   normalizeResultsAnalysisArtifact,
+  applyResultsAnalysisExposurePolicy,
 } from './resultsAnalysisArtifactValidation.js';
 
 const source = {
@@ -401,4 +402,20 @@ test('clamps oversized arrays and text and returns only bounded renderer fields'
   assert.equal(artifact.sections.riskMatrix.comments.length, 80);
   assert.equal(artifact.sections.riskMatrix.scenarioLinks.length, 0);
   assert.equal(JSON.stringify(artifact).includes('extraNested'), false);
+});
+
+
+test('labeled groups retain verified participant evidence beyond the ordinary citation cap', () => {
+  const participants = Array.from({ length: 20 }, (_, i) => ({ syntheticId: `participant_${i + 1}` }));
+  const artifact = normalize({ source: { participants, aiSnapshot: { questions: [{ id: 'q1' }], responses: participants.map(({ syntheticId }) => ({ participantId: syntheticId, questionId: 'q1' })) } }, sections: ['breakdown'], value: { breakdown: { groups: [{ id: 'large', label: 'Twenty participants', participantIds: participants.map(({ syntheticId }) => syntheticId) }] } } });
+  assert.equal(artifact.sections.breakdown.groups[0].participantIds.length, 20);
+  artifact.sections.breakdown.groups.push({ id: 'small', label: 'Too few', participantIds: [...participants.slice(0, 16).map(({ syntheticId }) => syntheticId), 'unknown', 'unknown'] });
+  const filtered = applyResultsAnalysisExposurePolicy({ artifact, exposure: { minGroupSize: 17, anonymizedGroupsEnabled: true } });
+  assert.deepEqual(filtered.sections.breakdown.groups.map(({ id }) => id), ['large']);
+  assert.deepEqual(applyResultsAnalysisExposurePolicy({ artifact, exposure: { minGroupSize: 20 } }).sections.breakdown.groups.map(({ id }) => id), ['large']);
+  assert.deepEqual(applyResultsAnalysisExposurePolicy({ artifact, exposure: { minGroupSize: 21 } }).sections.breakdown.groups, []);
+  assert.deepEqual(applyResultsAnalysisExposurePolicy({ artifact, exposure: { anonymizedGroupsEnabled: false } }).sections.breakdown.groups, []);
+  const singleton = { ...artifact, sections: { ...artifact.sections, breakdown: { ...artifact.sections.breakdown, groups: [{ id: 'singleton', participantIds: ['participant_1'] }] } } };
+  assert.deepEqual(applyResultsAnalysisExposurePolicy({ artifact: singleton, exposure: { anonymizedGroupsEnabled: true } }).sections.breakdown.groups, []);
+  assert.deepEqual(applyResultsAnalysisExposurePolicy({ artifact }), artifact);
 });

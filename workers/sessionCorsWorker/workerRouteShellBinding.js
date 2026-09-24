@@ -1,3 +1,4 @@
+import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePreflightBoundary } from './authenticatedRoutePreflight.js';
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
@@ -508,8 +509,24 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         if (hasAuth) {
           const auth = await deps?.requireAuth?.({ request: withQuerySlugHeader, env, baseHeaders: corsContext?.headers || routeBaseHeaders, slugHint: targetSlug });
           if (!auth?.ok) return auth?.response;
-          address = deps?.toStr?.(auth.payload?.sub || '')?.trim?.().toLowerCase?.() || '';
-          scopes = auth.scopes || auth.payload?.scopes || {};
+          const context = await resolveAuthenticatedRouteContext({
+            request: withQuerySlugHeader, env, auth, baseHeaders: corsContext?.headers || routeBaseHeaders,
+            deps: {
+              getSessionConfig: async () => config,
+              getCorsContext: deps?.getCorsContext,
+              json: deps?.json, toStr: deps?.toStr,
+              SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
+            },
+          });
+          if (!context?.ok) return context?.response;
+          const evaluatePreflight = deps?.evaluateAuthenticatedRoutePreflight || evaluateAuthenticatedRoutePreflightBoundary;
+          const preflight = await evaluatePreflight({
+            ...context, env, route: 'storage', scope: context.scopes?.storage === true ? 'storage' : 'arweave',
+            deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json },
+          });
+          if (!preflight?.ok) return preflight?.response;
+          address = context.address;
+          scopes = context.scopes;
         }
         return await dispatchResultsAnalysisArtifactRequest({
           request: withQuerySlugHeader,

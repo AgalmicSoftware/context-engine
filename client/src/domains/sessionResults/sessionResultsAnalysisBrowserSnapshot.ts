@@ -1,3 +1,4 @@
+import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 
 export type ResultsAnalysisBrowserSnapshotResult =
@@ -44,11 +45,7 @@ const responseLooksLocked = (response: RecordLike): boolean =>
 const getAnswerValue = (value: unknown): unknown => {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
-  if (Array.isArray(value))
-    return value
-      .map(getAnswerValue)
-      .filter((entry) => toText(entry))
-      .join('; ');
+  if (Array.isArray(value)) return value.map(getAnswerValue);
   const record = toRecord(value);
   if (Object.prototype.hasOwnProperty.call(record, 'value')) return getAnswerValue(record.value);
   if (Object.prototype.hasOwnProperty.call(record, 'answer')) return getAnswerValue(record.answer);
@@ -89,12 +86,27 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
   Object.entries(questionsById).forEach(([questionId, questionRaw]) => {
     const question = toRecord(questionRaw);
     if (!questionIsHydratedForSession(question, normalizedSlug)) return;
+    const type = toText(question.type || question.questionType);
     questions.push({
       id: toText(question.id || questionId),
       prompt: toText(question.prompt || question.text || question.title || question.question),
-      type: toText(question.type || question.questionType),
+      type,
       options: toArray(question.options).map(toText).filter(Boolean),
       tags: toArray(question.tags).map(toText).filter(Boolean),
+      ...(type === 'rating' ? { scale: normalizeRatingScale(question) } : {}),
+      ...(type === 'multichoice'
+        ? {
+            singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice),
+            ...(typeof question.maxSelections === 'number' &&
+            Number.isSafeInteger(question.maxSelections) &&
+            question.maxSelections > 0
+              ? { maxSelections: question.maxSelections }
+              : {}),
+          }
+        : {}),
+      ...(type === 'quadratic'
+        ? { voiceCredits: question.voiceCredits === undefined ? 99 : question.voiceCredits }
+        : {}),
     });
   });
   const validQuestionIds = new Set(questions.map((question) => toText(question.id)).filter(Boolean));
@@ -119,9 +131,12 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
         return;
       }
       const answer = getAnswerValue(record.answer ?? record.value ?? record.response);
-      const additional = getAnswerValue(
+      const additionalValue = getAnswerValue(
         record.additional ?? record.additionalComments ?? record.comments ?? record.comment,
       );
+      const additional = Array.isArray(additionalValue)
+        ? additionalValue.map(toText).filter(Boolean).join('; ')
+        : additionalValue;
       if (!toText(answer) && !toText(additional)) {
         skippedCount += 1;
         return;

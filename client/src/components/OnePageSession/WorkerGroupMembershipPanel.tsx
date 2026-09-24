@@ -1,3 +1,4 @@
+import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfinity, faLink, faSpinner, faSyncAlt, faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
@@ -464,6 +465,7 @@ const WorkerGroupMembershipPanel = ({
   workerToken: workerTokenProp,
   canReadGroups: canReadGroupsProp,
   refreshNonce = 0,
+  participantAddress,
   fetchImpl = fetch,
   sessionConfig = null,
   sessionId: sessionIdProp = '',
@@ -732,6 +734,13 @@ const WorkerGroupMembershipPanel = ({
         sessionSlug,
         groupId: group.groupId,
         fetchImpl,
+      });
+      clearWorkerGroupAutoJoinCancellation({
+        workerUrl,
+        sessionSlug,
+        sessionId,
+        groupId: group.groupId,
+        account: participantAddress,
       });
       if (!isMembershipMutationCurrent(mutation)) return;
       requestIdRef.current += 1;

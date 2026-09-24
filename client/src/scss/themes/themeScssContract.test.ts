@@ -11,6 +11,7 @@ describe('runtime SCSS theme contract', () => {
     'components/MainSite/AppShell.module.scss',
     'components/Navbar/Navbar.module.scss',
     'components/RightSidebar/RightSide.module.scss',
+    'components/SurveyTool/QuadraticAllocationInput.module.scss',
     'scss/_finalSubmitCta.scss',
   ];
   const colorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/i;

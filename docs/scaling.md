@@ -16,9 +16,11 @@ per-axis changes are recorded as `Custom`.
 
 | Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
 | --- | --- | --- | --- | --- |
-| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, `worker_canonical` authority, and `worker_envelope` encryption by default | Cloudflare API token and one AI-provider key | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
+| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, `worker_canonical` authority, and `worker_envelope` encryption by default | Cloudflare account sign-in through the native deploy flow; an AI-provider key for enabled AI features | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
 | Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Wallet transaction, gas, RPC access, Arweave JWK, and one AI-provider key | Required; Lit credentials are required only when Lit encryption is selected |
 | Company-Operated | Planned; not generally available | Intended organizational IAM, key-release/KMS, storage, AI gateway, networking, and observability adapters | To be defined by the operator's environment | Not required by the architecture; an entirely off-chain deployment is a target, while a private EVM could only be an optional future adapter |
+
+The advanced deploy helper or CLI path uses a Cloudflare API token; the native Hosted deployment flow uses Cloudflare account sign-in.
 
 Creators need deployment credentials only while provisioning infrastructure.
 Participants joining or using an existing session never need the creator's
@@ -127,3 +129,7 @@ private-compute services. They do not require a public or private EVM.
 - [Cloudflare worker reference](session-cors-worker.md)
 - [Top-level architecture](../ARCHITECTURE.md)
 - [Public roadmap](../ROADMAP.md)
+
+Public Worker response hydration reads at most 100 pages per refresh (10,000 stored response revisions). At that limit it keeps the loaded rows and displays a partial-results warning; results and exports may omit answers or later edits. The public cache is not marked fully ready. Interviews load the signed-in participant's saved answers independently and follow every own-answer page before allowing submission, so a partial public cache does not block a completed own-answer load. A failed own-answer read keeps submission waiting and offers a retry. Ordinary complete public loads clear the warning.
+
+Build runtime helpers are assigned to a separate `vendor-runtime` chunk so the HTML bootstrap does not pull chain vendors through shared helper imports. Application routes still load their own dependencies; this configuration change alone does not eliminate the chain stack from Hosted pages.

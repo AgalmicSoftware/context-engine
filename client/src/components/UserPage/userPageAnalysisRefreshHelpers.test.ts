@@ -258,6 +258,7 @@ describe('userPage analysis refresh helpers', () => {
       analysisName: 'Cached',
       analysisHistoricalFigure: 'Ada',
       analysisHistoricalReasoning: 'Reason',
+      analysisGeneration: null,
       analysisElapsedMs: 0,
       analysisError: '',
       analysisErrorAction: '',
@@ -275,6 +276,7 @@ describe('userPage analysis refresh helpers', () => {
       analysisName: 'User Analysis',
       analysisHistoricalFigure: '',
       analysisHistoricalReasoning: '',
+      analysisGeneration: null,
       analyzing: false,
       analysisServedFromCache: false,
       analysisCachedAt: null,
@@ -290,6 +292,7 @@ describe('userPage analysis refresh helpers', () => {
       analysisElapsedMs: 0,
       analysisHistoricalFigure: '',
       analysisHistoricalReasoning: '',
+      analysisGeneration: null,
       analysisServedFromCache: false,
       analysisCachedAt: null,
     });

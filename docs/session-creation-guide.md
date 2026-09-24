@@ -477,7 +477,7 @@ What gets stored where:
   their payload gate is `none` and neither profile policy branch carries access
   conditions.
 - When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
-- Worker-envelope key provider is fixed to `worker_secret` in this release. The default Cloudflare rule permits configured session admins or agents granted the `storage` scope; normal participant responses use their dedicated submission route. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
+- Worker-envelope key provider is fixed to `worker_secret` in this release. In a nonpublic Worker-canonical session, the normal participant storage scope permits submitting and reloading their own responses. Reading another participant's individual response additionally requires a current session admin or an authenticated delegated storage grant; ordinary `storage: true` is not that grant. Existing item access conditions still apply. Aggregate-only visibility does not permit downloading everyone's raw answers to calculate a summary in the browser; combined summaries require an authorized server-generated aggregate. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized
   profiles store a metadata URI pointer plus minimal session identity fields;
   the default worker-canonical profile skips registry writes entirely.
@@ -1108,3 +1108,14 @@ and Interview response mapping. OpenAI requests use standard processing
 (`service_tier: default`) unless a caller explicitly selects another tier.
 GPT-Live voice and transcription settings are separate. Existing explicit session
 models and local overrides remain available; bundled demo defaults use Terra.
+
+Hosted Worker verification writes and reads back the prepared public configuration
+without finalizing publication. You can edit and verify again; Publish creates
+the final publication revision. The browser compares the shared public fields,
+including session appearance, while excluding the server-managed authorization
+epoch from its comparison.
+
+Retrying queued Group creation compares canonical HTTPS image and document URLs,
+so a host-only URL and the same URL with a trailing slash reuse the saved Group.
+
+The wizard restores custom allowed origins from its tab-scoped draft after reload, including an explicitly empty field. Drafts without a saved origins field use the normal defaults.

@@ -284,10 +284,22 @@ export const buildUserPageTooltipTargetIds = (viewAddress: unknown = ''): UserPa
   };
 };
 
+export type UserAnalysisGeneration = { model: string; provider: string; source: 'reported' | 'requested' };
+
 export const normalizeUserAnalysisResult = (result: unknown = {}) => {
   const resultRecord = toAnalysisRecord(result);
   const historicalAlignment = toAnalysisRecord(resultRecord.historicalAlignment);
+  const metadata = toAnalysisRecord(resultRecord.generation);
+  const model = typeof metadata.model === 'string' ? metadata.model.trim() : '';
+  const generation: UserAnalysisGeneration | null = model
+    ? {
+        model,
+        provider: typeof metadata.provider === 'string' ? metadata.provider.trim() : '',
+        source: metadata.source === 'reported' ? 'reported' : 'requested',
+      }
+    : null;
   return {
+    ...(generation ? { generation } : {}),
     name: resultRecord.name || 'User Analysis',
     summary: resultRecord.summary || '',
     details: resultRecord.details || '',
@@ -310,6 +322,7 @@ export const buildUserPageAnalysisResultStatePatch = ({
   return {
     ...(includeModal ? { showAnalysisModal: true } : {}),
     aiAnalysis: normalizedResult.summary,
+    analysisGeneration: normalizedResult.generation || null,
     analysisDetails: normalizedResult.details,
     analysisName: normalizedResult.name,
     analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
@@ -330,6 +343,7 @@ export const buildUserPageAnalysisResetStatePatch = ({
   analysisError: '',
   analysisErrorAction: '',
   aiAnalysis: '',
+  analysisGeneration: null,
   analysisDetails: '',
   analysisName: '',
   analysisElapsedMs: 0,

@@ -4,6 +4,8 @@ Imported and voice-assisted session interviews can optionally attach AI provenan
 
 The ordinary submitted answer remains the normal response fields: `answer`, `additional`, `importance`, `conviction`, question id, responder, and timestamps/storage metadata. Interview research is a sidecar on that submitted response, not a second answer. A final submitted snapshot in `interviewProvenance` should be read as a copy of the ordinary submitted values after review, with answer/comment text redacted when field encryption requires it.
 
+Final research ratings include the ordinary response's legacy fallback from missing importance to conviction. This can mark importance as changed even when the reviewer never touched its control; it does not imply an explicit importance choice. Older exports can contain a null research importance beside a non-null ordinary response importance; use the ordinary submitted field to resolve that historical discrepancy.
+
 When a session URL includes a valid `src` query parameter, the browser keeps the first source token seen for that session in session storage and attaches it to submitted response entries as `recruitment: { "source": "<token>" }`. This recruitment metadata is independent of AI provenance consent and can appear on ordinary manual responses, AI prefill responses, and responses where all interview research checkboxes are off. The client stores only the normalized source token for the current browser session; it does not store the full URL, hash, account, or additional navigation history.
 
 `changedFields` is a net comparison between the original AI draft and the final submitted values. `userEditedFields` is a narrower signal from instrumented review-modal interactions; it can be empty even when a final value differs from the original draft, and it is not a complete event log. Neither field means the participant scientifically agreed or disagreed with the model.
@@ -67,6 +69,19 @@ The reverse can also happen: `changedFields` can list a field while `userEditedF
 
 The nested `predictionComparison` object repeats the top-level comparison snapshot in a versioned shape for downstream consumers. Treat it as the same observation represented in a second schema shape, not as a second independent measurement.
 
+For external imports, `promptVersion` records the catalog version used to make
+that packet, not the current frontend version. New requests negotiate v4 or v5;
+older v1–v5 imports keep their original fingerprints. V5 binds selection mode to
+the question hash; v4 does not and its generation contract allows only one
+choice string. A missing v4 draft may reflect an unrepresentable multiple-choice
+answer, not lack of evidence. Ratings follow each question's scale; importance
+and conviction remain separate 0–100 fields. See [the interview contract](session-listening-mode.md).
+
+Voice context can omit whole question/history/background/review rows to fit the
+realtime request limit. This does not truncate the full local transcript used
+for final mapping or turn the research record into a transcript export. It also
+does not make draft revisions a complete record of what the voice model saw.
+
 ## Redaction, Identifiers, and Visibility
 
 When answer text is encrypted, the research snapshot writes `{ "redacted": true, "reason": "encrypted_field" }` instead of plaintext answer text. When additional comments are encrypted, or when comments follow an encrypted answer rather than an explicit plaintext audience, the comment text is redacted too. Evidence/basis strings are removed whenever answer or comment text is redacted, because evidence can repeat or reveal the protected text.
@@ -83,9 +98,12 @@ The most direct read-only procedure for Cloudflare response storage is:
 2. For each returned `storageRef.id`, read the raw payload with `GET <session-worker>/storage/read?id=<storageRef.id>`. The browser storage client calls this through `readSessionStorageBlob()`.
 3. Parse the returned JSON. If the payload has a `responses` array, inspect `responses[].interviewProvenance` on each response entry. If the payload is a single response object, inspect its top-level `interviewProvenance`.
 
-Access depends on the session's storage and results policy. Some sessions allow anonymous reads for public results; others require the normal Worker bearer token acquired by the app's SIWE/passkey worker-login flow. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
+Access depends on the session's storage and results policy. Public-result sessions may allow anonymous reads. In nonpublic Worker-canonical sessions, authentication alone does not grant access to other participants' raw responses: ownership, current admin authority, or a dedicated delegated grant is required, and per-item conditions still apply. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
 
 The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Questions + Responses`, `JSON: Questions`, and `JSON: Questions + Responses`. The CSV response export intentionally flattens response rows to question id, prompt, type, options, responder address, importance, answer value/hash, additional value/hash, encryption flags, timestamp, and voice credits; it does not include `interviewProvenance`. The JSON questions-and-responses export includes the filtered response rows as held by the results view. Depending on the view and hydration path, each row's raw `response` can be an object or a JSON string; inspect and parse that nested `response` value, then check either `response.interviewProvenance` or `response.responses[].interviewProvenance`. For full-fidelity research review, use the raw storage read path above.
+
+In browser CSV exports, `options` cells contain JSON arrays, and array-valued `answer` cells contain JSON arrays too (multi-select labels or quadratic vote numbers). Parse the CSV first, then JSON-parse these cells; do not split them on semicolons or commas. For example, the decoded cell `["Transit; buses","Parks"]` represents two exact option names. CSV quoting escapes the JSON quotes, while JSON preserves punctuation and newlines inside labels. Scalar answers remain scalar text; tags retain their existing semicolon-separated representation.
+
 
 ```json
 {
@@ -101,7 +119,7 @@ The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Qu
           "modelId": "gpt-example",
           "verification": "self_reported"
         },
-        "promptVersion": "ce-interview-brief-v4",
+        "promptVersion": "ce-interview-brief-v5",
         "questionSetHash": "8b7f...",
         "originalPrediction": {
           "answer": "I expect model evaluations to miss deployment risks.",
@@ -230,3 +248,30 @@ The current implementation path is:
 - `client/src/components/SurveyTool/sessionInterviewResearch.ts` redacts encrypted text and formats selected/unselected draft comparison records.
 - `client/src/utilities/web3/contractScripts.impl.ts` uploads the final JSON payload to the configured response storage resource.
 - `client/src/utilities/storage/storageClient.ts` and `workers/sessionCorsWorker/storageRouteExecution.js` implement Cloudflare `/storage/upload`, `/storage/list`, and `/storage/read` for sessions using Cloudflare response storage.
+
+An unanswered rating displays “–”. Selecting zero is a real answer and is saved
+as a change from an empty response. Interview comparison metadata retains exact
+JSON value equality, while the form accepts equivalent numeric strings.
+
+Closing an unsubmitted interview review through its close button, backdrop, or
+Escape asks before discarding the transcript, prefill, and review edits. Choosing
+“Keep reviewing” retains them in memory; no transcript is persisted for reload.
+
+Quadratic comment-only responses do not count as invalid allocations. An explicit
+all-zero allocation counts as an allocation; undecrypted or invalid vote vectors
+remain excluded. Decrypted vectors count even when their stored encryption flag
+remains set.
+
+Cluster-summary caches include the filtered participant roster in assignment order, so summaries from a different subset are not reused merely because cluster counts match.
+
+Report refreshes preserve expanded clusters while those cluster identifiers remain present. A two-participant report uses its existing PCA coordinates for the graph because UMAP cannot fit that cohort size.
+
+Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4 or v5 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change v1–v4 packet import validation or relabel catalog hashes.
+
+
+Saved-answer checks are scoped to the signed-in participant and the current
+interview questions, independently of public results loading. The review remains
+blocked on incomplete or failed saved-answer reads and offers a retry. Existing
+answers discovered during a queued submission are deselected for explicit review;
+local draft edits are retained. See [the Worker guide](session-cors-worker.md#interview-saved-answer-readiness)
+for Hosted and chain-authoritative lookup behavior.

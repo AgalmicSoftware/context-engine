@@ -364,7 +364,7 @@ export class PasskeyEoaWalletClient {
     if (this.transitionInProgress) return null;
     if (this.isUnlocked() && this.activeAddress) return this.activeAddress;
     const record = await this.storage.read();
-    if (!record) return null;
+    if (!record || (record.disconnected === true && options.requireSigner !== true)) return null;
     if (record.rpId !== this.config.rpId) return null;
     if (this.config.walletKeyMode === 'passkey-derived' && !isPasskeyDerivedWalletRecord(record)) return null;
     if (this.config.walletKeyMode === 'encrypted-private-key' && !isEncryptedWalletRecord(record)) return null;
@@ -470,6 +470,8 @@ export class PasskeyEoaWalletClient {
     await this.lock();
     this.activeRecord = null;
     this.activeAddress = null;
+    const record = await this.storage.read();
+    if (record) await this.storage.write({ ...record, disconnected: true });
   }
 
   async deleteWallet(): Promise<void> {
@@ -500,6 +502,15 @@ export class PasskeyEoaWalletClient {
     // material out of serializable app state and isolate signing code, but any
     // malicious script executing in this origin can still ask the worker to sign.
     await this.sessionClient.init({ privateKey, rpcUrl, chainId, policy });
+    if (record.disconnected) {
+      record = { ...record, disconnected: false };
+      try {
+        await this.storage.write(record);
+      } catch (error) {
+        await this.sessionClient.lock();
+        throw error;
+      }
+    }
     this.activeRecord = record;
     this.activeAddress = record.evmAddress;
     this.unlockExpiresAt = expiresAt;

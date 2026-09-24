@@ -223,6 +223,7 @@
   "SURVEY_LOCKED_DECRYPT": "ce-survey-locked-decrypt",
   "SURVEY_ANSWER_INPUT": "ce-survey-answer-input",
   "SURVEY_TOOLBAR": "ce-survey-toolbar",
+  "QUADRATIC_SCROLL_MORE": "ce-quadratic-scroll-more",
   "SURVEY_SUBMIT": "ce-survey-submit",
   "SURVEY_CREATE_TOGGLE": "ce-survey-create-toggle",
   "SURVEY_CREATE_TOGGLE_PILE": "ce-survey-create-toggle-pile",

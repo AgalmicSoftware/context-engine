@@ -30,11 +30,21 @@ import { __test__sessionQuestions } from './sessionQuestions.mjs';
 import {
   canonicalAnswerSessionKvKey,
   submitRequestSessionKvKey,
+  submitRequestUserKvKey,
 } from './telegramSubmitQueue.mjs';
+
+async function seedSubmitRecord(kv, key, serialized) {
+  const record = { requestId: key.slice('telegram:submit-request:'.length), ...JSON.parse(serialized) };
+  const value = JSON.stringify(record);
+  for (const target of [key, submitRequestSessionKvKey(record), submitRequestUserKvKey(record)].filter(Boolean)) {
+    await kv.put(target, value);
+  }
+}
 
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.listPrefixes = [];
     this.putCalls = [];
   }
 
@@ -52,6 +62,7 @@ class MemoryKv {
   }
 
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
+    this.listPrefixes.push(prefix);
     const keys = Array.from(this.store.keys())
       .filter((key) => String(key).startsWith(prefix))
       .sort();
@@ -408,8 +419,8 @@ test('agent action menu is group-safe and persists only opaque launch records', 
   assert.equal(result.catalog.canonicalBoundary, '/api/agent/*');
   assert.equal(result.catalog.capabilities.some((capability) => capability.id === 'agent.settings.update'), false);
   assert.equal(buttons.some((button) => button.text === 'Create Agent'), false);
-  assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
-  assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
+  assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
   assert.equal(settings.url.includes('alpha'), false);
   assert.equal(storedActionKeys.length >= 2, true);
@@ -452,7 +463,7 @@ test('agent create and settings commands route group inputs private and model ca
   assert.equal(groupCreate.privateChatRequired, true);
   assert.match(groupCreate.response.text, /No account state is shown in group chat/);
   assert.equal(groupCreate.response.text.includes('Address:'), false);
-  assert.match(flattenButtons(groupCreate.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(flattenButtons(groupCreate.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
 
   assert.equal(privateCreate.screen, 'agent_account_create');
   assert.match(privateCreate.response.text, /Agent account/);
@@ -467,7 +478,7 @@ test('agent create and settings commands route group inputs private and model ca
   assert.equal(groupSettings.screen, 'agent_settings_overview');
   assert.equal(groupSettings.privateChatRequired, true);
   assert.equal(groupSettings.response.text.includes('Draft style:'), false);
-  assert.match(flattenButtons(groupSettings.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(flattenButtons(groupSettings.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
 
   assert.equal(privateSettings.screen, 'agent_settings_overview');
   assert.match(privateSettings.response.text, /Draft style: balanced/);
@@ -532,11 +543,11 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   const buttons = flattenButtons(result.response.replyMarkup);
   const startButton = buttons.find((button) => button.text === 'Join Session');
   const callbackButtons = buttons.filter((button) => button.callback_data);
-  assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   assert.equal(startButton.url.includes('alpha'), false);
   assert.equal(callbackButtons.length, 3);
   for (const button of callbackButtons) {
-    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,50}$/);
     assert.equal(button.callback_data.includes('alpha'), false);
     assert.equal(button.callback_data.includes('q-readiness'), false);
   }
@@ -1565,7 +1576,7 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
   ]);
   assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
   for (const button of buttons) {
-    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,50}$/);
     assert.equal(button.callback_data.includes(publicQuestionId), false);
     assert.equal(button.callback_data.includes(lockedQuestionId), false);
   }
@@ -1682,7 +1693,7 @@ test('/questions caps Telegram rows at five and keeps the chat page minimal', as
     'Pose 5',
   ]);
   const loadNext = buttons.find((button) => button.text === 'Load Next');
-  assert.match(loadNext.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(loadNext.callback_data, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
 
   const nextPage = await buildTelegramCommandResponse({
@@ -1868,7 +1879,7 @@ test('/results consensus shows top difference questions from submitted records',
   let counter = 0;
   async function putResponse(questionId, telegramUserId, label) {
     counter += 1;
-    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+    await seedSubmitRecord(env.AGENT_ACTION_KV, `telegram:submit-request:${counter}`, JSON.stringify({
       status: 'direct_submitted',
       sessionSlug: 'alpha',
       telegramUserId,
@@ -1968,6 +1979,7 @@ test('submitted result reads use per-session indexes instead of capped global sc
   const records = await loadSubmittedResultRecords(env, 'alpha');
 
   assert.deepEqual(records.map((record) => record.requestId), ['alpha-0', 'alpha-1', 'alpha-2']);
+  assert.ok(!env.AGENT_ACTION_KV.listPrefixes.includes('telegram:submit-request:'));
 });
 
 test('submitted result reads include durable canonical answer records', async () => {
@@ -2007,7 +2019,7 @@ test('/results group shows participant graph with question legend', async () => 
       { questionId: 'q-2', questionType: 'freeform', prompt: 'Second prompt?' },
     ]),
   });
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:one', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2016,7 +2028,7 @@ test('/results group shows participant graph with question legend', async () => 
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:00.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:two', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2025,7 +2037,7 @@ test('/results group shows participant graph with question legend', async () => 
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:three', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2034,7 +2046,7 @@ test('/results group shows participant graph with question legend', async () => 
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:02.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:four', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:four', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2129,7 +2141,7 @@ test('/results group analysis callback uses session worker AI for the selected p
       headers: { 'content-type': 'application/json' },
     });
   };
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:one', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2138,7 +2150,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:00.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:two', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2147,7 +2159,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:freeform', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:freeform', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '42',
@@ -2156,7 +2168,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.500Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:three', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2165,7 +2177,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:02.000Z',
   }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:four', JSON.stringify({
+  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:four', JSON.stringify({
     status: 'direct_submitted',
     sessionSlug: 'alpha',
     telegramUserId: '43',
@@ -2240,7 +2252,7 @@ test('/results topic returns a topic-map image when enough answered questions ex
   let counter = 0;
   async function putResponse(questionId, telegramUserId, label) {
     counter += 1;
-    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+    await seedSubmitRecord(env.AGENT_ACTION_KV, `telegram:submit-request:${counter}`, JSON.stringify({
       status: 'direct_submitted',
       sessionSlug: 'alpha',
       telegramUserId,
@@ -2363,7 +2375,7 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
   const storageId = arweaveId(33);
   const calls = [];
   const kv = new MemoryKv();
-  await kv.put('telegram:submit-request:export-one', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:export-one', JSON.stringify({
     version: 1,
     requestId: 'export-one',
     status: 'direct_submitted',
@@ -2472,7 +2484,7 @@ test('/export_all falls back to Telegram submit records when storage payload lis
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
-  await kv.put('telegram:submit-request:storage-list-fallback', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:storage-list-fallback', JSON.stringify({
     requestId: 'storage-list-fallback',
     action: 'submit_response',
     status: 'direct_submitted',
@@ -2741,7 +2753,7 @@ test('/start admin actions target the latest submitted session before the regist
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
-  await kv.put('telegram:submit-request:latest-export-session', JSON.stringify({
+  await seedSubmitRecord(kv, 'telegram:submit-request:latest-export-session', JSON.stringify({
     requestId: 'latest-export-session',
     status: 'direct_submitted',
     sessionSlug: 'telegram-demo-2',
@@ -4525,7 +4537,7 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
 
   const binaryButtons = flattenButtons(binary.response.replyMarkup);
   const onboardAgent = binaryButtons.find((button) => button.text === 'Onboard Agent');
-  assert.match(onboardAgent?.url || '', /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(onboardAgent?.url || '', /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   const agree = binaryButtons.find((button) => button.text === 'Agree');
   const disagree = binaryButtons.find((button) => button.text === 'Disagree');
   const submitDraft = binaryButtons.find((button) => button.text === 'Submit Draft');
@@ -4821,7 +4833,7 @@ test('/attachments lists public metadata and hides private storage refs', async 
     'Show 3 as image',
     'View Questions',
   ]);
-  assert.match(buttons[0].callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(buttons[0].callback_data, /^cecb_[a-z0-9]{10,50}$/);
   const imageCallback = await buildTelegramCommandResponse({
     update: {
       update_id: 7110,
@@ -4886,7 +4898,7 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(buttons.some((button) => button.text === 'Onboard Agent'), true);
   assert.equal(buttons.some((button) => button.text === 'Activity'), true);
   const backToStart = buttons.find((button) => button.text === 'Back to Start');
-  assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,50}$/);
   const start = await buildTelegramCommandResponse({
     update: {
       update_id: 9203,
@@ -5183,7 +5195,7 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
   assert.ok(copyNew?.copy_text?.text);
   assert.equal(copyNew.callback_data, undefined);
   assert.match(secondToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   assert.equal(linkedAgain.response.text.includes(secondToken), false);
   assert.notEqual(secondPointer.tokenHash, firstPointer.tokenHash);
   assert.equal(oldLoaded.ok, false);
@@ -5234,7 +5246,7 @@ test('private Onboard Agent callback opens Mini App when already onboarded', asy
   assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
   assert.ok(copyNew?.copy_text?.text);
   assert.equal(copyNew.callback_data, undefined);
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   const token = copyNew.copy_text.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
@@ -5384,7 +5396,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(record.miniAppLaunch, true);
@@ -5540,7 +5552,7 @@ test('group /start includes a Mini App deep link to the session picker', async (
   assert.equal(result.response.text.includes('/attachments'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
-  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,50}$/);
   const launch = new URL(miniApp.url).searchParams.get('start');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(record.miniAppLaunch, true);

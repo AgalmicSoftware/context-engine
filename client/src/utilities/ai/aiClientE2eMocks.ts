@@ -44,72 +44,10 @@ export const isE2eAiMockEnabled = (): boolean => {
   return false;
 };
 
-const shortAddr = (addr: unknown): string => {
-  const s = String(addr || '').trim();
-  if (!s) return '';
-  if (s.length <= 12) return s;
-  return `${s.slice(0, 6)}...${s.slice(-4)}`;
-};
-
-const hashStr32 = (value: unknown): number => {
-  const s = String(value || '');
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i += 1) {
-    h ^= s.charCodeAt(i);
-
-    h = Math.imul(h, 16777619);
-  }
-
-  return h >>> 0;
-};
-
-export const buildE2eMockCompareBullets = (users: unknown[] = []) => {
-  const safe = Array.isArray(users) ? users : [];
-  const addrs = safe.map((u) => String(asRecord(u).address || '').trim()).filter(Boolean);
-  const label = (a: unknown) => shortAddr(a) || 'unknown';
-  const joined = addrs.slice(0, 3).map(label).join(', ');
-  const seed = addrs.join('|') || String(safe.length);
-  const h = hashStr32(seed);
-
-  const totalSbt = safe.reduce<number>((acc, u) => {
-    const user = asRecord(u);
-    return acc + (Array.isArray(user.sbts) ? user.sbts.length : 0);
-  }, 0);
-  const totalQuestions = safe.reduce<number>((acc, u) => {
-    const user = asRecord(u);
-    return acc + (Array.isArray(user.questions) ? user.questions.length : 0);
-  }, 0);
-  const totalSurveys = safe.reduce<number>((acc, u) => {
-    const user = asRecord(u);
-    return acc + (Array.isArray(user.surveys) ? user.surveys.length : 0);
-  }, 0);
-
-  const agreements = [
-    `Compared ${safe.length} participant(s): ${joined || '(none)'}.`,
-    `Observed signals (cache-derived): ${totalQuestions} question response(s), ${totalSurveys} survey response(s), ${totalSbt} SBT(s).`,
-  ];
-
-  const a = addrs[0] || '';
-  const b = addrs[1] || '';
-  const pick = (arr: string[]) => arr[h % arr.length];
-  const disagreements = [
-    pick([
-      `Most distinct themes: ${label(a)} vs ${label(b)} differ on participation footprint (mock).`,
-      `Most distinct themes: ${label(a)} vs ${label(b)} differ on voting certainty (mock).`,
-      `Most distinct themes: ${label(a)} vs ${label(b)} differ on observed topic clusters (mock).`,
-    ]),
-    pick([
-      `Next step: open drilldowns to see which statements drive the gap (mock).`,
-      `Next step: check SBT overlap and stance clusters for a sharper split (mock).`,
-      `Next step: review high-divergence prompts for explainers (mock).`,
-    ]),
-  ];
-
-  return {
-    agreements: agreements.filter(Boolean),
-    disagreements: disagreements.filter(Boolean),
-  };
-};
+export const buildE2eMockCompareBullets = () => ({
+  agreements: ['Both participants welcome assistance while keeping people involved in decisions.'],
+  disagreements: ['A emphasizes private participation; B places more emphasis on transparent decisions.'],
+});
 
 export const buildE2eMockClusterAnalysis = (clusterData: unknown) => {
   const cluster = asRecord(clusterData);

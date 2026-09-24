@@ -495,6 +495,23 @@ var init_stringCoercion = __esm({
   }
 });
 
+// shared/workerGroupUrl.mjs
+var normalizeWorkerGroupUrl;
+var init_workerGroupUrl = __esm({
+  "shared/workerGroupUrl.mjs"() {
+    normalizeWorkerGroupUrl = (value) => {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      try {
+        const parsed = new URL(raw);
+        return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.href : null;
+      } catch {
+        return null;
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/sessionSlugResolution.js
 var toStr8, INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
 var init_sessionSlugResolution = __esm({
@@ -1582,13 +1599,11 @@ var init_deployHelperEndpointConfig = __esm({
   }
 });
 
-// workers/shared/workerSessionConfig.mjs
-var isObj2, toStr12, PUBLIC_CONFIG_KEYS, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
-var init_workerSessionConfig = __esm({
-  "workers/shared/workerSessionConfig.mjs"() {
-    isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    toStr12 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    PUBLIC_CONFIG_KEYS = Object.freeze([
+// shared/workerSessionPublicConfig.mjs
+var PUBLIC_WORKER_CONFIG_FIELDS;
+var init_workerSessionPublicConfig = __esm({
+  "shared/workerSessionPublicConfig.mjs"() {
+    PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
       "slug",
       "authzEpoch",
       "sessionId",
@@ -1596,6 +1611,7 @@ var init_workerSessionConfig = __esm({
       "configRevision",
       "sessionName",
       "sessionInfo",
+      "appearance",
       "sessionContext",
       "sessionHeaderImg",
       "sessionEndsAt",
@@ -1633,6 +1649,16 @@ var init_workerSessionConfig = __esm({
       "embeddedDeployHelperEnabled",
       "resultsAnalysis"
     ]);
+  }
+});
+
+// workers/shared/workerSessionConfig.mjs
+var isObj2, toStr12, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
+var init_workerSessionConfig = __esm({
+  "workers/shared/workerSessionConfig.mjs"() {
+    init_workerSessionPublicConfig();
+    isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    toStr12 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
       "sessionId",
       "sessionIdHex",
@@ -1862,7 +1888,7 @@ var init_workerSessionConfig = __esm({
       delete recursiveSource.litCredentials;
       return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
     };
-    projectPublicWorkerSessionConfig = (config) => selectFields(isObj2(config) ? config : {}, PUBLIC_CONFIG_KEYS);
+    projectPublicWorkerSessionConfig = (config) => selectFields(isObj2(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS);
     profileUsesOnChainSbt = (profile) => {
       if (profile?.authorization?.mechanisms?.includes?.("sbt_onchain")) return true;
       return [
@@ -5717,13 +5743,21 @@ var init_sessionConfigMutation = __esm({
     };
     applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
       const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
-      const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+      let existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+      const storedModel = existing?.interviewMode?.realtimeModel;
+      const migrateStoredModel = typeof storedModel === "string" && /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(storedModel) && !isRealtimeInterviewModel(storedModel);
+      if (migrateStoredModel) {
+        existing = { ...existing, interviewMode: { ...existing.interviewMode, realtimeModel: normalizeRealtimeInterviewModel(storedModel) } };
+      }
       const kind = toTrimmedString6(mutation?.kind);
       let incomingConfig;
       let mergedConfig;
       if (kind === "set-config") {
         incomingConfig = mutation?.incomingConfig && typeof mutation.incomingConfig === "object" ? mutation.incomingConfig : null;
         if (!incomingConfig) return { ok: false, status: 400, error: "Missing config." };
+        if (migrateStoredModel && incomingConfig?.interviewMode?.realtimeModel === storedModel) {
+          incomingConfig = { ...incomingConfig, interviewMode: { ...incomingConfig.interviewMode, realtimeModel: existing.interviewMode.realtimeModel } };
+        }
         if (hasOwn4(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
           return { ok: false, status: 400, error: "Authorization epoch is server-managed." };
         }
@@ -5865,6 +5899,7 @@ var init_sessionConfigMutation = __esm({
 var toStr15, trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
+    init_workerGroupUrl();
     init_sessionSlugResolution();
     init_sessionConfigMutation();
     init_workerConfigModeValidation();
@@ -6015,13 +6050,8 @@ var init_workerGroups = __esm({
       const raw = trim2(value);
       if (!raw) return { ok: true, value: "" };
       if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
-      try {
-        const parsed = new URL(raw);
-        if (parsed.protocol !== "https:" || parsed.username || parsed.password) return { ok: false };
-        return { ok: true, value: parsed.href };
-      } catch {
-        return { ok: false };
-      }
+      const normalized = normalizeWorkerGroupUrl(raw);
+      return normalized === null ? { ok: false } : { ok: true, value: normalized };
     };
     normalizeGroupTags = (value) => {
       if (value == null) return { ok: true, value: [] };
@@ -35822,7 +35852,7 @@ var init_sponsoredBootstrapGrantStore = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js
-var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj9, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact;
+var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj9, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
 var init_resultsAnalysisArtifactValidation = __esm({
   "workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js"() {
     ARTIFACT_KIND = "ce_session_results_analysis_artifact";
@@ -35930,15 +35960,15 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const syntheticId = cleanId(entry?.syntheticId);
       return syntheticId ? { syntheticId } : null;
     }).filter(Boolean);
-    normalizeIdRefs = ({ value, allowed, label, errors }) => {
-      const refs = unique(toArray(value).map((entry) => cleanId(entry)).filter(Boolean)).slice(0, LIMITS.sourceRefs);
+    normalizeIdRefs = ({ value, allowed, label, errors, limit = LIMITS.sourceRefs }) => {
+      const refs = unique(toArray(value).map((entry) => cleanId(entry)).filter(Boolean)).slice(0, limit);
       refs.forEach((ref) => {
         if (!allowed.has(ref)) errors.push(`unknown ${label}: ${ref}`);
       });
       return refs;
     };
-    normalizeSourceFields = (record, allowed, errors) => {
-      const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: "participantId", errors });
+    normalizeSourceFields = (record, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+      const participantIds = normalizeIdRefs({ value: record.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
       const questionIds = normalizeIdRefs({ value: record.questionIds, allowed: allowed.questions, label: "questionId", errors });
       return {
         ...participantIds.length ? { participantIds } : {},
@@ -36092,7 +36122,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
           id: slugId(group.id || label || summaryText, `group_${index + 1}`),
           label: label || `Group ${index + 1}`,
           ...summaryText ? { summary: summaryText } : {},
-          ...normalizeSourceFields(group, allowed, errors)
+          // Groups need complete membership evidence for thresholds above the citation cap.
+          ...normalizeSourceFields(group, allowed, errors, allowed.participants.size)
         };
       }).filter(Boolean);
       if (errors.length) return defaultSection("breakdown", `AI generation referenced unknown source ids in breakdown: ${errors.slice(0, 4).join(", ")}.`);
@@ -36305,6 +36336,25 @@ var init_resultsAnalysisArtifactValidation = __esm({
         source: "ai-generated",
         version: ARTIFACT_VERSION
       };
+    };
+    applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
+      if (!isObj9(artifact?.sections)) return artifact;
+      const enabled = new Set(sections);
+      const groupPolicy = isObj9(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
+      const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
+      const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
+      const projected = {};
+      for (const key of SECTION_ORDER) {
+        const section = artifact.sections[key];
+        if (!enabled.has(key)) {
+          projected[key] = defaultSection(key, "This generated view is disabled for the session.");
+        } else if (key === "breakdown" && isObj9(section) && section.available !== false && groupPolicy) {
+          projected[key] = { ...section, groups: toArray(section.groups).filter((group) => exposure.anonymizedGroupsEnabled !== false && unique(toArray(group?.participantIds).filter((id2) => participants.has(id2))).length >= minGroupSize) };
+        } else {
+          projected[key] = section;
+        }
+      }
+      return { ...artifact, sections: projected };
     };
   }
 });
@@ -36840,7 +36890,7 @@ var init_uploadSizeLimits = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, normalizeUploadPolicy, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, authorizeCloudflareStorageAccess, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr19, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -36876,6 +36926,7 @@ var init_storageRouteExecution = __esm({
       media: "docUploads",
       images: "docUploads"
     });
+    isStorageResource = (resource) => Object.hasOwn(DEFAULT_RESOURCE_GATES, trim6(resource) || "docsContext");
     bytesToBase64url3 = (bytes2) => {
       if (typeof Buffer !== "undefined") {
         return Buffer.from(bytes2).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -36960,6 +37011,104 @@ var init_storageRouteExecution = __esm({
       const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj12).map((condition) => ({ ...condition, kind: trim6(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
       return { match, conditions };
     };
+    invalidUploadPolicy = (field, detail) => {
+      throw new Error(`Invalid ${field}: ${detail}.`);
+    };
+    readUploadGroupIds = (source, fields = ["groupIds", "groups", "groupId", "workerGroupId"]) => {
+      const lists = fields.map((field) => {
+        const raw = source[field];
+        if (raw == null) return [];
+        const entries = Array.isArray(raw) ? raw : [raw];
+        const ids = entries.flatMap((entry) => {
+          if (typeof entry !== "string") return invalidUploadPolicy(field, "expected group ID text");
+          const text = entry.trim();
+          if (!text) return [];
+          let values = [text];
+          if (text.startsWith("[") || text.startsWith("{")) {
+            try {
+              values = JSON.parse(text);
+            } catch {
+              return invalidUploadPolicy(field, "malformed group ID JSON");
+            }
+            if (!Array.isArray(values)) return invalidUploadPolicy(field, "expected a group ID array");
+          }
+          return values.map((value) => {
+            if (typeof value !== "string" || !safeGroupId(value) || value.trim().startsWith("[") || value.trim().startsWith("{")) {
+              return invalidUploadPolicy(field, "expected nonempty group ID text");
+            }
+            return safeGroupId(value);
+          });
+        });
+        return Array.from(new Set(ids));
+      });
+      return lists.find((ids) => ids.length) || [];
+    };
+    readUploadAccessConditions = (input) => {
+      if (input == null || typeof input === "string" && !input.trim()) return null;
+      let raw = input;
+      if (typeof raw === "string") {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          return invalidUploadPolicy("accessConditions", "malformed JSON");
+        }
+      }
+      if (raw === null) return null;
+      if (!isObj12(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
+      if (raw.match !== void 0 && (typeof raw.match !== "string" || !["any", "all"].includes(raw.match.trim().toLowerCase()))) {
+        return invalidUploadPolicy("accessConditions.match", "expected any or all");
+      }
+      if (!Array.isArray(raw.conditions) || !raw.conditions.length) {
+        return invalidUploadPolicy("accessConditions.conditions", "expected at least one rule");
+      }
+      const requireText = (condition, fields) => {
+        fields.forEach((field) => {
+          if (condition[field] !== void 0 && (typeof condition[field] !== "string" || !condition[field].trim())) {
+            invalidUploadPolicy(`accessConditions.${field}`, "expected nonempty text");
+          }
+        });
+        return fields.some((field) => typeof condition[field] === "string" && condition[field].trim());
+      };
+      const conditions = raw.conditions.map((condition) => {
+        if (!isObj12(condition) || typeof condition.kind !== "string") {
+          return invalidUploadPolicy("accessConditions.conditions", "expected a rule with a kind");
+        }
+        const kind = condition.kind.trim().toLowerCase();
+        if (kind === "worker_role") {
+          requireText(condition, ["role", "name"]);
+        } else if (kind === "agent_grant_scope") {
+          if (!requireText(condition, ["scope", "value"])) return invalidUploadPolicy("accessConditions.scope", "required");
+        } else if (kind === "worker_group") {
+          const groupIds = readUploadGroupIds(condition, ["groupIds", "groups", "groupId"]);
+          if (!groupIds.length) return invalidUploadPolicy("accessConditions.groupIds", "required");
+          return { ...condition, kind, groupIds };
+        } else if (kind === "sbt_onchain") {
+          if (condition.sbtAddresses !== void 0 && !Array.isArray(condition.sbtAddresses)) {
+            return invalidUploadPolicy("accessConditions.sbtAddresses", "expected an array");
+          }
+          const contracts = [
+            ...condition.sbtAddresses || [],
+            ...["contract", "address"].filter((field) => condition[field] !== void 0).map((field) => condition[field])
+          ];
+          if (!contracts.length || contracts.some((value) => typeof value !== "string" || !/^0x[0-9a-f]{40}$/i.test(value.trim()) || /^0x0{40}$/i.test(value.trim()))) {
+            return invalidUploadPolicy("accessConditions.contract", "expected an SBT contract address");
+          }
+          for (const field of ["chainId", "networkChainId"]) {
+            if (!resolveChainIdWithLegacyFallback(condition[field], 1))
+              return invalidUploadPolicy(`accessConditions.${field}`, "expected a positive chain ID");
+          }
+          for (const field of ["anyOrAll", "mode", "match"]) {
+            if (condition[field] !== void 0 && !["any", "all", "0", "1"].includes(trim6(condition[field]).toLowerCase())) {
+              return invalidUploadPolicy(`accessConditions.${field}`, "expected any or all");
+            }
+          }
+        } else {
+          return invalidUploadPolicy("accessConditions.kind", "unsupported rule");
+        }
+        return { ...condition, kind };
+      });
+      return { match: raw.match?.trim().toLowerCase() || "any", conditions };
+    };
     normalizeUploadPolicy = (policyInput) => {
       let raw = policyInput;
       if (typeof raw === "string" && raw.trim()) {
@@ -36989,6 +37138,44 @@ var init_storageRouteExecution = __esm({
         anyOrAll: normalizeGateMode(raw.anyOrAll || raw.match || raw.gateMode)
       };
     };
+    readUploadPolicyFields = (source) => {
+      try {
+        const conditions = [source.accessConditions, source.conditions].map(readUploadAccessConditions);
+        const groupIds = readUploadGroupIds(source);
+        const policies = [source.uploadPolicy, source.documentUploadPolicy, source.policy].map((input) => {
+          if (input == null || typeof input === "string" && !input.trim()) return null;
+          let raw = input;
+          if (typeof raw === "string") {
+            if (["group_allowlist", "sbt_allowlist"].includes(raw.trim().toLowerCase())) {
+              raw = { mode: raw };
+            } else {
+              try {
+                raw = JSON.parse(raw);
+              } catch {
+                return invalidUploadPolicy("uploadPolicy", "expected a supported mode or JSON object");
+              }
+            }
+          }
+          if (raw === null) return null;
+          if (!isObj12(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
+          for (const field of ["mode", "kind", "type"]) {
+            if (raw[field] !== void 0 && (typeof raw[field] !== "string" || !["group_allowlist", "sbt_allowlist"].includes(raw[field].trim().toLowerCase()))) {
+              return invalidUploadPolicy(`uploadPolicy.${field}`, "expected group_allowlist or sbt_allowlist");
+            }
+          }
+          const policy = normalizeUploadPolicy(raw);
+          if (!policy) return invalidUploadPolicy("uploadPolicy.mode", "required");
+          policy.groupIds = readUploadGroupIds(raw, ["groupIds", "groups", "groupId"]);
+          return policy;
+        });
+        return {
+          ok: true,
+          fields: { accessConditions: conditions.find(Boolean) || null, groupIds, uploadPolicy: policies.find(Boolean) || null }
+        };
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    };
     readJsonPayload = async (request, { maxUploadBytes } = {}) => {
       let raw = null;
       try {
@@ -37003,6 +37190,8 @@ var init_storageRouteExecution = __esm({
       const bytes2 = encoder2.encode(serialized);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes2, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
+      const policy = readUploadPolicyFields(raw);
+      if (!policy.ok) return policy;
       return {
         ok: true,
         payload: {
@@ -37012,9 +37201,7 @@ var init_storageRouteExecution = __esm({
           resource: trim6(raw.resource) || "docsContext",
           gate: raw.gate || raw.gateResource || raw.resourceGate,
           tags: normalizeTagsForMetadata(raw.tags),
-          accessConditions: normalizeAccessConditionDocument(raw.accessConditions || raw.conditions),
-          groupIds: normalizeGroupIdList(raw.groupIds || raw.groups || raw.groupId || raw.workerGroupId),
-          uploadPolicy: normalizeUploadPolicy(raw.uploadPolicy || raw.documentUploadPolicy || raw.policy),
+          ...policy.fields,
           payloadEncrypted: raw.payloadEncrypted === true || raw.encrypted === true,
           requestId: trim6(raw.requestId)
         }
@@ -37027,6 +37214,9 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Expected multipart/form-data." };
       }
+      for (const field of ["accessConditions", "conditions", "uploadPolicy", "documentUploadPolicy", "policy", "groupId", "workerGroupId"]) {
+        if (form.getAll(field).length > 1) return { ok: false, error: `Invalid ${field}: must occur at most once.` };
+      }
       const fileOrBlob = form.get("file") || form.get("data");
       if (!fileOrBlob || typeof fileOrBlob.arrayBuffer !== "function") {
         return { ok: false, error: 'Missing "file" or "data" field.' };
@@ -37035,6 +37225,18 @@ var init_storageRouteExecution = __esm({
       const bytes2 = new Uint8Array(buf);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes2, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
+      const policy = readUploadPolicyFields({
+        accessConditions: form.get("accessConditions"),
+        conditions: form.get("conditions"),
+        groupIds: form.getAll("groupIds"),
+        groups: form.getAll("groups"),
+        groupId: form.get("groupId"),
+        workerGroupId: form.get("workerGroupId"),
+        uploadPolicy: form.get("uploadPolicy"),
+        documentUploadPolicy: form.get("documentUploadPolicy"),
+        policy: form.get("policy")
+      });
+      if (!policy.ok) return policy;
       return {
         ok: true,
         payload: {
@@ -37044,9 +37246,7 @@ var init_storageRouteExecution = __esm({
           resource: trim6(form.get("resource")) || "docsContext",
           gate: form.get("gate") || form.get("gateResource") || form.get("resourceGate"),
           tags: normalizeTagsForMetadata(form.get("tags")),
-          accessConditions: normalizeAccessConditionDocument(form.get("accessConditions") || form.get("conditions")),
-          groupIds: normalizeGroupIdList(form.getAll?.("groupIds") || form.get("groupIds") || form.get("groupId") || form.get("workerGroupId")),
-          uploadPolicy: normalizeUploadPolicy(form.get("uploadPolicy") || form.get("documentUploadPolicy") || form.get("policy")),
+          ...policy.fields,
           payloadEncrypted: trim6(form.get("payloadEncrypted") || form.get("encrypted")).toLowerCase() === "true",
           requestId: trim6(form.get("requestId"))
         }
@@ -37485,7 +37685,59 @@ var init_storageRouteExecution = __esm({
         }
       };
     };
+    hasPrivateResponsePolicy = ({ config, resource }) => {
+      const profile = config?.sessionModeProfile;
+      return trim6(resource) === "responses" && profile?.authority?.mode === "worker_canonical" && !!profile?.results?.visibility && profile.results.visibility !== "public_full_if_storage_public";
+    };
+    canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
+      if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
+      const scopes = isObj12(authScopes) ? authScopes : {};
+      const address = normalizeAddress(requesterAddress);
+      if (address && resolveRoleAddressSet2({ config, role: "admin" }).has(address)) return true;
+      const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
+      const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
+      if (delegatedScopes.some((items) => items.map(trim6).includes("storage")) || scopes.storage === true && agent.ok && agent.principal.kind === "agent") return true;
+      if (!address || scopes.storage !== true && scopes.arweave !== true) return false;
+      if (operation === "list") return true;
+      return !!trim6(metadata?.responder) && normalizeAddress(metadata.responder) === address;
+    };
     authorizeCloudflareStorageAccess = async ({
+      env,
+      config,
+      slug,
+      resource,
+      requesterAddress,
+      authScopes,
+      metadata,
+      operation = "read",
+      baseHeaders,
+      deps
+    }) => {
+      if (!isStorageResource(resource)) {
+        return { ok: false, response: responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders) };
+      }
+      if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
+        return {
+          ok: false,
+          response: responseJson(deps, {
+            error: "Access denied: individual response access requires its author, a session admin, or a delegated storage grant.",
+            reason: "private_response_owner_required"
+          }, 403, baseHeaders)
+        };
+      }
+      const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
+      const sessionAccess = await authorizeCloudflareStorageGate(args);
+      if (!sessionAccess.ok || !metadata) return sessionAccess;
+      const groups = resolveGroupGateIds({ metadata, access: {} });
+      if (groups.length) {
+        const groupAccess = await authorizeWorkerGroupAccess({ ...args, groupIds: groups });
+        if (!groupAccess.ok) return groupAccess;
+      }
+      const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
+      if (!payloadConditions?.conditions?.length || JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
+      return authorizeCloudflareStorageGate({ ...args, metadata });
+    };
+    authorizeCloudflareStorageGate = async ({
       env,
       config,
       slug,
@@ -37842,18 +38094,15 @@ var init_storageRouteExecution = __esm({
       if (canWriteR2 && !canUseR2Index) {
         return responseJson(deps, { error: "Cloudflare R2 storage requires an index KV binding." }, 501, baseHeaders);
       }
-      const uploadAccessMetadata = {
-        ...payload.accessConditions ? { accessConditions: payload.accessConditions } : {},
-        ...payload.groupIds?.length ? { groupIds: payload.groupIds } : {}
-      };
       const access = await authorizeCloudflareStorageAccess({
         env,
         config,
         slug,
         resource: payload.resource,
+        operation: "upload",
         requesterAddress: uploaderAddress,
         authScopes,
-        metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
+        metadata: null,
         baseHeaders,
         deps
       });
@@ -38186,7 +38435,7 @@ var init_storageRouteExecution = __esm({
       responseHeaders.set("X-CE-Storage-Backend", STORAGE_BACKENDS.CLOUDFLARE);
       responseHeaders.set("X-CE-Storage-Ref", id2);
       responseHeaders.set("X-CE-Payload-Access-Mode", deriveLegacyPayloadAccessMode2(resolvedAccess));
-      if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE) {
+      if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
         responseHeaders.set("Cache-Control", "private, no-store");
       }
       return new Response(responseBody, {
@@ -38199,11 +38448,18 @@ var init_storageRouteExecution = __esm({
       const listOptions = await readStorageListOptions({ request, url });
       if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
       const { cursor, limit, resource } = listOptions;
+      const mine = url.searchParams.get("mine") === "true";
+      const responder = mine ? normalizeAddress(uploaderAddress) : "";
+      if (mine && (resource !== "responses" || !responder)) {
+        return responseJson(deps, { error: "Own responses require authentication and the responses resource." }, 403, baseHeaders);
+      }
+      if (!isStorageResource(resource)) return responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders);
       const access = await authorizeCloudflareStorageAccess({
         env,
         config,
         slug,
         resource,
+        operation: "list",
         requesterAddress: uploaderAddress,
         authScopes,
         baseHeaders,
@@ -38229,29 +38485,36 @@ var init_storageRouteExecution = __esm({
         );
       }
       const keys = Array.isArray(listed?.keys) ? listed.keys : [];
-      const items = [];
-      for (const keyEntry of keys) {
-        const name = trim6(keyEntry?.name || keyEntry);
-        if (!name) continue;
-        let raw;
-        try {
-          raw = await index.get(name);
-        } catch {
-          return responseJson(
-            deps,
-            { error: "Cloudflare storage index metadata is unavailable." },
-            503,
-            baseHeaders
-          );
+      const rows = [];
+      try {
+        for (let offset = 0; offset < keys.length; offset += 8) {
+          rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
+            const name = trim6(keyEntry?.name || keyEntry);
+            return { name, raw: name ? await index.get(name) : null };
+          })));
         }
+      } catch {
+        return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
+      }
+      const items = [];
+      for (const { name, raw } of rows) {
+        if (!name) continue;
         let metadata;
         try {
           metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
         } catch {
+          if (mine) return responseJson(deps, { error: "Response metadata is unavailable." }, 503, baseHeaders);
           continue;
         }
         const storageRef = normalizeStorageRef(metadata || {});
-        if (!storageRef) continue;
+        if (!storageRef || storageRef.resource !== resource || name !== buildIndexKey({ slug, resource, id: storageRef.id })) {
+          if (mine) return responseJson(deps, { error: "Response metadata is unavailable." }, 503, baseHeaders);
+          continue;
+        }
+        if (mine && !trim6(metadata?.responder)) {
+          return responseJson(deps, { error: "Response ownership is unavailable." }, 503, baseHeaders);
+        }
+        if (mine && normalizeAddress(metadata.responder) !== responder) continue;
         const itemAccess = await authorizeCloudflareStorageAccess({
           env,
           config,
@@ -38263,7 +38526,10 @@ var init_storageRouteExecution = __esm({
           baseHeaders,
           deps
         });
-        if (!itemAccess.ok) continue;
+        if (!itemAccess.ok) {
+          if (mine) return itemAccess.response;
+          continue;
+        }
         const metadataAccess = normalizePayloadAccessControl2(
           metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config)
         );
@@ -38288,8 +38554,9 @@ var init_storageRouteExecution = __esm({
       return responseJson(deps, {
         items,
         cursor: nextCursor || null,
-        listComplete: !nextCursor
-      }, 200, baseHeaders);
+        listComplete: !nextCursor,
+        ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
+      }, 200, mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
     };
     listCloudflareMetadataRows = async ({ index, slug, resource = "" }) => {
       const rows = [];
@@ -38466,6 +38733,7 @@ var init_storageRouteExecution = __esm({
         const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
         if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || "Invalid storage upload payload." }, uploadPayload?.status || 400, baseHeaders);
         const payload = uploadPayload.payload || {};
+        if (!isStorageResource(payload.resource)) return responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders);
         const backend = resolveConfiguredStorageBackend({
           config,
           requestedBackend: payload.backend,
@@ -39022,8 +39290,103 @@ var init_aiProviderExecution = __esm({
   }
 });
 
+// shared/questions/quadraticAllocation.mjs
+function getVoiceCredits(question = {}) {
+  return question.voiceCredits === void 0 ? DEFAULT_VOICE_CREDITS : question.voiceCredits;
+}
+function validateQuadraticQuestion(question = {}) {
+  const budget = getVoiceCredits(question);
+  if (!Number.isSafeInteger(budget) || budget < 1)
+    return "Voice credits must be a positive whole number.";
+  const options = question.options;
+  if (!Array.isArray(options) || options.length < 2)
+    return "Quadratic allocation requires at least two options.";
+  const labels = Array.from(
+    options,
+    (option) => typeof option === "string" ? option.trim().toLowerCase() : ""
+  );
+  if (labels.some((label) => !label))
+    return "Every quadratic option must have a nonblank label.";
+  if (new Set(labels).size !== labels.length)
+    return "Quadratic option labels must be unique.";
+  return "";
+}
+function validateQuadraticAllocation(value, question = {}) {
+  const questionError = validateQuadraticQuestion(question);
+  if (questionError) return questionError;
+  if (!Array.isArray(value) || value.length !== question.options.length || Array.from(value).some((vote) => !Number.isSafeInteger(vote))) {
+    return "Assign one signed whole-number vote to every option; use 0 for neutral.";
+  }
+  const spent = quadraticCreditsSpent(value);
+  if (!Number.isSafeInteger(spent) || spent > getVoiceCredits(question))
+    return "This allocation exceeds the voice-credit budget.";
+  return "";
+}
+function quadraticCreditsSpent(value) {
+  return value.reduce((total, vote) => total + vote * vote, 0);
+}
+function formatQuadraticAllocation(value, options = []) {
+  if (!Array.isArray(value)) return "";
+  return value.map(
+    (vote, index) => `${options[index] ?? `Option ${index + 1}`}: ${vote > 0 ? "+" : ""}${vote}`
+  ).join("; ");
+}
+var DEFAULT_VOICE_CREDITS;
+var init_quadraticAllocation = __esm({
+  "shared/questions/quadraticAllocation.mjs"() {
+    DEFAULT_VOICE_CREDITS = 99;
+  }
+});
+
+// workers/sessionCorsWorker/resultsAnalysisAnswerValidation.js
+var unwrap, scalarText, binaryAliases, formatValidAnalysisAnswer;
+var init_resultsAnalysisAnswerValidation = __esm({
+  "workers/sessionCorsWorker/resultsAnalysisAnswerValidation.js"() {
+    init_quadraticAllocation();
+    unwrap = (value, depth = 0) => value && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "value") && depth < 5 ? unwrap(value.value, depth + 1) : value;
+    scalarText = (value) => ["string", "number", "boolean"].includes(typeof value) ? String(value).trim() : "";
+    binaryAliases = new Map([
+      ...["agree", "yes", "y", "true", "1"].map((key) => [key, "Agree"]),
+      ...["disagree", "no", "n", "false", "-1"].map((key) => [key, "Disagree"]),
+      ...["unsure", "unknown", "maybe", "neutral", "0"].map((key) => [key, "Unsure"])
+    ]);
+    formatValidAnalysisAnswer = (raw, question) => {
+      const value = unwrap(raw);
+      if (value == null || typeof value === "string" && !value.trim()) return "";
+      switch (question.type) {
+        case "binary":
+          return binaryAliases.get(scalarText(value).toLowerCase()) ?? null;
+        case "rating": {
+          if (!["number", "string"].includes(typeof value) || String(value).trim() === "") return null;
+          const number2 = Number(value);
+          const { min = 0, max = 10 } = question.scale || {};
+          return Number.isFinite(number2) && number2 >= min && number2 <= max ? String(number2) : null;
+        }
+        case "multichoice": {
+          const values = Array.isArray(value) ? value : [value];
+          if (!values.length) return "";
+          if (values.some((entry) => typeof entry !== "string" || !entry.trim())) return null;
+          const options = question.options || [];
+          const selected = values.map((entry) => options.find((option) => option.toLowerCase() === entry.trim().toLowerCase()));
+          if (selected.some((entry) => !entry)) return null;
+          const unique2 = [...new Set(selected)];
+          const limit = question.singleSelect ? 1 : question.maxSelections || options.length;
+          return unique2.length <= limit ? unique2.join("; ") : null;
+        }
+        case "quadratic":
+          return validateQuadraticAllocation(value, question) ? null : formatQuadraticAllocation(value, question.options);
+        case "freeform":
+        case "text":
+          return scalarText(value) || null;
+        default:
+          return scalarText(value) || null;
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr20, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeVoiceCredits, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr20, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_resultsAnalysisSettings();
@@ -39038,6 +39401,7 @@ var init_resultsAnalysisGeneration = __esm({
     init_aiProviderExecution();
     init_responseKvHelpers();
     init_payloadAccessControl();
+    init_resultsAnalysisAnswerValidation();
     readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).readCoordinatedResultsAnalysisStatus(args);
     reserveCoordinatedResultsAnalysisDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).reserveCoordinatedResultsAnalysis(args);
     finalizeCoordinatedResultsAnalysisDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).finalizeCoordinatedResultsAnalysis(args);
@@ -39068,7 +39432,7 @@ var init_resultsAnalysisGeneration = __esm({
       config?.resultsAnalysis
     );
     getCanonicalSessionId = (config = {}) => normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
-    publicDraft = (draft) => {
+    publicDraft = (draft, config) => {
       if (!isObj13(draft)) return null;
       const {
         participantWatermark,
@@ -39079,8 +39443,13 @@ var init_resultsAnalysisGeneration = __esm({
         attemptId,
         ...rest
       } = draft;
-      return rest;
+      return config ? { ...rest, artifact: applyCurrentArtifactPolicy(rest.artifact, config) } : rest;
     };
+    applyCurrentArtifactPolicy = (artifact, config) => applyResultsAnalysisExposurePolicy({
+      artifact,
+      exposure: normalizedResultsProfile(config)?.exposure,
+      sections: normalizeRequestedSections([], getResultsAnalysisSettings(config))
+    });
     normalizeSessionIdHex = (value) => {
       const raw = lower3(value).replace(/^0x/, "").replace(/-/g, "");
       return /^[0-9a-f]{32}$/.test(raw) ? `0x${raw}` : "";
@@ -39185,10 +39554,6 @@ var init_resultsAnalysisGeneration = __esm({
         minLabel: normalizeRatingLabel(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
         maxLabel: normalizeRatingLabel(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax)
       };
-    };
-    normalizeVoiceCredits = (value) => {
-      const numeric = Number(value);
-      return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 99;
     };
     normalizeSubmittedAt = (value) => {
       const text = trim7(value);
@@ -39302,10 +39667,11 @@ var init_resultsAnalysisGeneration = __esm({
         id: questionId,
         prompt: normalizeQuestionPrompt(question.prompt || question.questionPrompt || question.questionText || question.text || question.title),
         type,
-        options: Array.isArray(question.options) ? question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => normalizeQuestionPrompt(option).slice(0, 140)).filter(Boolean) : [],
+        options: Array.isArray(question.options) ? question.options.filter((option) => typeof option === "string").map((option) => option.trim()).filter(Boolean) : [],
         tags: Array.isArray(question.tags) ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean) : [],
         ...scale ? { scale } : {},
-        ...type === "quadratic" ? { voiceCredits: normalizeVoiceCredits(question.voiceCredits) } : {}
+        ...type === "multichoice" ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice), ...Number.isSafeInteger(question.maxSelections) && question.maxSelections > 0 ? { maxSelections: question.maxSelections } : {} } : {},
+        ...type === "quadratic" ? { voiceCredits: question.voiceCredits === void 0 ? 99 : question.voiceCredits } : {}
       };
     };
     selectRoundRobinResponses = ({ responseRows, questionIds, limit }) => {
@@ -39378,14 +39744,19 @@ var init_resultsAnalysisGeneration = __esm({
         const digest = await participantDigest(participantSource);
         const answerValue = hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response;
         const additionalValue = hasOwn6(row, "additional") ? row.additional : hasOwn6(row, "additionalComments") ? row.additionalComments : hasOwn6(row, "comments") ? row.comments : row.comment;
-        const answer = valueFromAnswerLike(answerValue).slice(0, 4e3);
+        const knownQuestion = questionMap.get(questionId) || {};
+        const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
+        if (validatedAnswer === null) {
+          excludedCount += 1;
+          continue;
+        }
+        const answer = validatedAnswer.slice(0, 4e3);
         const additionalComments = valueFromAnswerLike(additionalValue).slice(0, 2e3);
         if (!answer && !additionalComments) {
           excludedCount += 1;
           continue;
         }
         participantDigests.add(digest);
-        const knownQuestion = questionMap.get(questionId) || {};
         const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || "") || 0;
         const dedupeKey = `${questionId}:${digest}`;
         const candidate = {
@@ -39443,9 +39814,10 @@ var init_resultsAnalysisGeneration = __esm({
         id: question.questionId,
         prompt: question.prompt.slice(0, AI_LIMITS.maxQuestionPromptChars),
         type: question.type,
-        options: question.options,
+        options: question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => option.slice(0, 140)),
         tags: question.tags,
         ...question.scale ? { scale: question.scale } : {},
+        ...question.type === "multichoice" ? { singleSelect: question.singleSelect, ...question.maxSelections ? { maxSelections: question.maxSelections } : {} } : {},
         ...question.type === "quadratic" ? { voiceCredits: question.voiceCredits ?? 99 } : {}
       }));
       const aiSnapshot = {
@@ -39607,7 +39979,7 @@ var init_resultsAnalysisGeneration = __esm({
   "riskMatrix": { "axes": { "x": { "id": "subject_specific_x_axis", "label": "subject-specific horizontal axis", "levels": [{ "id": "x_low", "label": "low/example" }, { "id": "x_high", "label": "high/example" }] }, "y": { "id": "subject_specific_y_axis", "label": "subject-specific vertical axis", "levels": [{ "id": "y_low", "label": "low/example" }, { "id": "y_high", "label": "high/example" }] } }, "assessments": [{ "id": "risk_1", "label": "custom risk or tension", "summary": "paraphrased evidence and why it matters", "xLevelId": "x_high", "yLevelId": "y_low", "participantIds": ["participant_001"], "questionIds": ["q1"] }], "scenarioLinks": [] },
   "atlas": { "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }], "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }] }
 }`;
-    buildPrompt = ({ sections, source }) => `You are generating Context Engine session analysis artifacts.
+    buildPrompt = ({ sections, source, exposure }) => `You are generating Context Engine session analysis artifacts.
 Return only valid JSON. Do not include markdown fences.
 Generate only these result views: ${sections.join(", ")}.
 
@@ -39621,6 +39993,7 @@ Privacy and grounding rules:
 - If the visible sample is thin because of input limits, mention uncertainty in summaries.
 - Generate RiskMatrix axes from this session's subject matter. Do not use fixed likelihood/impact axes unless those are the best subject-specific axes for the session.
 - Do not use demo-only dimensions unless those exact dimensions are present in segmentDimensions.
+- Follow the session's group-summary exposure policy: ${JSON.stringify(exposure || {})}. This policy applies only to breakdown.groups. When groups are disabled, return an empty groups list. Otherwise cite every distinct supporting participant on each group and omit groups below minGroupSize; never invent citations to reach the minimum. Keep overall synthesis, claims, atlas nodes, and Risk Matrix entries independent of this group threshold.
 
 Generate this JSON shape, including only requested top-level keys:
 ${sectionShapes}
@@ -39730,8 +40103,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       };
     };
     buildReservationKey = async ({ sourceSignature, viewSignature }) => `sha256:${await sha256Hex2(stableCanonicalSerialize({ sourceSignature, viewSignature, version: ANALYSIS_ARTIFACT_VERSION }))}`;
-    filterDraftForStatus = (draft, includeDraft) => {
-      const safe = publicDraft(draft);
+    filterDraftForStatus = (draft, includeDraft, config) => {
+      const safe = publicDraft(draft, config);
       if (includeDraft) return safe;
       if (!isObj13(safe)) return null;
       const { artifact, snapshot, ...rest } = safe;
@@ -39785,7 +40158,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
           jobState: state.jobState || "idle",
           active: summarizeActiveState(state.active),
           lastFailure: summarizeFailureState(state.lastFailure),
-          lastGood: filterDraftForStatus(state.lastGood, includeDraft)
+          lastGood: filterDraftForStatus(state.lastGood, includeDraft, config)
         }
       };
     };
@@ -39825,7 +40198,8 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const sections = normalizeRequestedSections(body.sections, settings);
       if (!sections.length) return { ok: false, status: 400, jobState: "failed", error: "No supported results-analysis sections requested.", capability };
       const sourceDescriptor = await buildSourceDescriptor({ kind: sourceKind, source });
-      const viewSignature = `sha256:${await sha256Hex2(stableCanonicalSerialize({ sections, version: ANALYSIS_ARTIFACT_VERSION }))}`;
+      const exposure = normalizedResultsProfile(config)?.exposure;
+      const viewSignature = `sha256:${await sha256Hex2(stableCanonicalSerialize({ sections, exposure, version: ANALYSIS_ARTIFACT_VERSION }))}`;
       const reservationKey = await buildReservationKey({ sourceSignature: sourceDescriptor.signature, viewSignature });
       const requestId = trim7(body.requestId || body.id || "");
       const reserve = deps?.reserveCoordinatedResultsAnalysis || reserveCoordinatedResultsAnalysisDefault;
@@ -39844,7 +40218,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         }
       });
       if (reservation?.kind === "terminal") {
-        return { ok: true, status: 200, jobState: "succeeded", reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft) };
+        return { ok: true, status: 200, jobState: "succeeded", reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft, config) };
       }
       if (reservation?.kind === "pending") {
         return { ok: true, status: 202, jobState: "running", reservation: summarizeReservation(reservation, requestId), capability };
@@ -39860,7 +40234,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
           env,
           slug,
           config,
-          prompt: buildPrompt({ sections, source }),
+          prompt: buildPrompt({ sections, source, exposure }),
           headers,
           deps
         });
@@ -39896,6 +40270,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
           generatedAt,
           model: aiProvenance.model
         });
+        artifact = applyCurrentArtifactPolicy(artifact, config);
       } catch (error) {
         const failure2 = { ok: false, error: error?.message || "AI results analysis output failed validation.", status: 502, failedAt: generatedAt };
         await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure2 } });
@@ -39935,7 +40310,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       if (!finalization?.ok) {
         return { ok: false, status: finalization?.status || 503, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: finalization?.error || "Results analysis finalization failed." };
       }
-      return { ok: true, status: 200, jobState: "succeeded", reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft) };
+      return { ok: true, status: 200, jobState: "succeeded", reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft, config) };
     };
     maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, committedResponses = [], requestId = "", deps } = {}) => {
       const settings = getResultsAnalysisSettings(config);
@@ -40006,7 +40381,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
     readPublishedResultsAnalysisArtifact = async ({ env, slug, config, includeSnapshot = true, deps } = {}) => {
       const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
       const coordinatorState = await readStatus({ env, slug });
-      const lastGood = publicDraft(coordinatorState?.state?.lastGood);
+      const lastGood = publicDraft(coordinatorState?.state?.lastGood, config);
       if (!lastGood?.artifact) {
         return {
           ok: false,
@@ -43792,7 +44167,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim11 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim12 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -75006,6 +75381,75 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
   };
 };
 
+// workers/sessionCorsWorker/authenticatedRoutePreflight.js
+var evaluateAuthenticatedRoutePreflight = async ({
+  scopes,
+  scope,
+  route,
+  allowWithoutScope = false,
+  config,
+  env,
+  slug,
+  address,
+  limit,
+  headers,
+  deps
+} = {}) => {
+  let tokenHasScope = scopes?.[scope] === true;
+  if (!tokenHasScope && !allowWithoutScope) {
+    return {
+      ok: false,
+      tokenHasScope,
+      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
+    };
+  }
+  let currentScopes;
+  try {
+    currentScopes = await deps?.computeScopesForLogin?.({
+      env,
+      slug,
+      address,
+      config,
+      requestedScopes: [scope]
+    });
+  } catch {
+    currentScopes = null;
+  }
+  if (!currentScopes || typeof currentScopes !== "object" || Array.isArray(currentScopes)) {
+    return {
+      ok: false,
+      tokenHasScope: false,
+      response: deps?.json?.({ error: "Current authorization check failed." }, 403, headers)
+    };
+  }
+  tokenHasScope = tokenHasScope && currentScopes?.[scope] === true;
+  if (!tokenHasScope && !allowWithoutScope) {
+    return {
+      ok: false,
+      tokenHasScope,
+      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
+    };
+  }
+  const rateAllowed = await deps?.checkRateLimit?.({
+    env,
+    slug,
+    address,
+    limit,
+    route
+  });
+  if (!rateAllowed) {
+    return {
+      ok: false,
+      tokenHasScope,
+      response: deps?.json?.({ error: "Rate limit exceeded." }, 429, headers)
+    };
+  }
+  return {
+    ok: true,
+    tokenHasScope
+  };
+};
+
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
 var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
@@ -75023,13 +75467,7 @@ init_interviewSettings();
 init_aiDefaults();
 init_responseKvHelpers();
 
-// workers/sessionCorsWorker/interviewQuestionCatalog.js
-var QUESTIONS_ADDED_TOPIC0 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
-var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
-var ZERO_BYTES32 = `0x${"00".repeat(32)}`;
-var MAX_QUESTIONS = 100;
-var MAX_SCAN_BLOCKS = 2e6;
-var RPC_CHUNK_SIZE = 1e5;
+// shared/interviewQuestionCatalog.mjs
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim8 = (value) => String(value == null ? "" : value).trim();
 var lower4 = (value) => trim8(value).toLowerCase();
@@ -75095,7 +75533,10 @@ var normalizeQuestion = (value = {}) => {
   const question = isObj15(value) ? value : {};
   const id2 = lower4(question.id || question.questionId);
   const prompt = trim8(question.prompt || question.question || question.title);
-  if (!id2 || !prompt || hasRestrictedPrompt(question) || /connect.+decrypt|encrypted prompt/i.test(prompt)) return null;
+  if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
+    prompt
+  ))
+    return null;
   const type = lower4(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
   const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj15(entry) ? entry.label || entry.value : entry)).filter(Boolean);
@@ -75110,14 +75551,27 @@ var normalizeQuestion = (value = {}) => {
     ...type === "quadratic" ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}
   };
 };
-var dedupeQuestions = (questions = []) => {
+var normalizePublicInterviewQuestions = (input = [], limit = Infinity) => {
+  const questions = Array.isArray(input) ? input : [];
   const seen = /* @__PURE__ */ new Set();
   return questions.map(normalizeQuestion).filter((question) => {
     if (!question || seen.has(question.id)) return false;
     seen.add(question.id);
     return true;
-  }).slice(0, MAX_QUESTIONS);
+  }).slice(0, limit);
 };
+
+// workers/sessionCorsWorker/interviewQuestionCatalog.js
+var QUESTIONS_ADDED_TOPIC0 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
+var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
+var ZERO_BYTES32 = `0x${"00".repeat(32)}`;
+var MAX_QUESTIONS = 100;
+var MAX_SCAN_BLOCKS = 2e6;
+var RPC_CHUNK_SIZE = 1e5;
+var trim9 = (value) => String(value == null ? "" : value).trim();
+var lower5 = (value) => trim9(value).toLowerCase();
+var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var readJsonResponse = async (response2) => {
   if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
   try {
@@ -75147,7 +75601,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const items = Array.isArray(listing?.items) ? listing.items.slice(0, MAX_QUESTIONS) : [];
   const questions = [];
   for (const item of items) {
-    const id2 = trim8(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    const id2 = trim9(item?.storageRef?.id || item?.metadata?.id || item?.id);
     if (!id2) continue;
     const readResponse = await storageRoute2({
       path: "/storage/read",
@@ -75165,22 +75619,22 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return dedupeQuestions(questions);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj15(config.contracts) ? config.contracts : {};
-  const surveys = isObj15(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
-  return trim8(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+  const contracts = isObj16(config.contracts) ? config.contracts : {};
+  const surveys = isObj16(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  return trim9(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
-  const chainId = trim8(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj15(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj15(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj15(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj15(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj15(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const chainId = trim9(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const rpcConfig = isObj16(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj16(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj16(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj16(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj16(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
     ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
     ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
   ];
-  return [...new Set(source.map(trim8).filter((value) => /^https:\/\//i.test(value)))];
+  return [...new Set(source.map(trim9).filter((value) => /^https:\/\//i.test(value)))];
 };
 var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
@@ -75200,9 +75654,9 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   }
   throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
 };
-var wordAt = (hex, index) => trim8(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var wordAt = (hex, index) => trim9(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
 var decodeQuestionIds = (data = "") => {
-  const clean = trim8(data).replace(/^0x/, "");
+  const clean = trim9(data).replace(/^0x/, "");
   if (clean.length < 128) return [];
   const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || "0"}`));
   const lengthWordIndex = offsetBytes / 32;
@@ -75215,7 +75669,7 @@ var decodeQuestionIds = (data = "") => {
   return ids;
 };
 var base64urlFromHex = (hex = "") => {
-  const clean = trim8(hex).replace(/^0x/, "");
+  const clean = trim9(hex).replace(/^0x/, "");
   if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
   const bytes2 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
   let binary = "";
@@ -75225,7 +75679,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj15(payload.session) ? payload.session : {};
+  const session = isObj16(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -75235,7 +75689,7 @@ var payloadSessionSlug = (payload = {}) => {
     payload.session
   ]) {
     if (typeof candidate !== "string" && typeof candidate !== "number") continue;
-    const normalized = lower4(candidate).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
+    const normalized = lower5(candidate).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
     if (normalized) return normalized;
   }
   return "";
@@ -75247,7 +75701,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response2.ok) continue;
       const payload = await response2.json();
-      if (isObj15(payload)) return payload;
+      if (isObj16(payload)) return payload;
     } catch {
     }
   }
@@ -75296,7 +75750,7 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
     const pointer = base64urlFromHex(result);
     if (!pointer) continue;
     const payload = await fetchArweaveQuestion(pointer, fetchImpl);
-    if (payload && payloadSessionSlug(payload) === lower4(slug)) {
+    if (payload && payloadSessionSlug(payload) === lower5(slug)) {
       questions.push({ ...payload, id: payload.id || id2 });
     }
   }
@@ -75495,8 +75949,8 @@ init_sessionLifecycle();
 init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
-var trim9 = (value) => String(value == null ? "" : value).trim();
-var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim10 = (value) => String(value == null ? "" : value).trim();
+var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
   const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
   const body = [
@@ -75524,9 +75978,9 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj16(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj17(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
-  const instructions = trim9(body.instructions);
+  const instructions = trim10(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
   if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
   if (!instructions || instructions.length > 32e3) {
@@ -75535,8 +75989,8 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj16(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
-  const provider = trim9(interview.provider || "openai").toLowerCase();
+  const interview = isObj17(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const provider = trim10(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
 };
@@ -75553,7 +76007,7 @@ var proxyOpenAiRealtimeCall = async ({
   if (realtime.provider !== "openai") {
     return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
   }
-  const key = trim9(secrets?.openaiKey);
+  const key = trim10(secrets?.openaiKey);
   if (!key) {
     return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
@@ -76359,7 +76813,7 @@ var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
 var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
@@ -76498,7 +76952,7 @@ var parseJsonIfPossible = (value) => {
 };
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj17(body)) {
+  if (isObj18(body)) {
     const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
@@ -76542,7 +76996,7 @@ var fetchChipotleJson = async ({
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj17(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj18(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -76553,8 +77007,8 @@ var resolveLitChipotleRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj17(body) ? body : {};
+  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj18(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -76585,8 +77039,8 @@ var resolveLitChipotleProvisioningRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj17(body) ? body : {};
+  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj18(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -76821,7 +77275,7 @@ var resolveConfigMappedChipotleRpcUrls = ({
 } = {}) => {
   const normalizedChainId = toChainId(chainId);
   if (!normalizedChainId) return [];
-  const map = isObj17(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+  const map = isObj18(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
   const mapped = normalizeChipotleRpcCandidateList(
     map[normalizedChainId] || map[String(normalizedChainId)] || []
   );
@@ -76844,7 +77298,7 @@ var resolveSessionChipotleRpcUrl = ({
   chainId = 0,
   op = ""
 } = {}) => {
-  const requestBody = isObj17(request) ? request : {};
+  const requestBody = isObj18(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
   const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
@@ -76885,7 +77339,7 @@ var buildSessionBootstrapMetadata = ({
   request = {},
   sessionSlug = ""
 } = {}) => {
-  const requestBody = isObj17(request) ? request : {};
+  const requestBody = isObj18(request) ? request : {};
   const slugSegment = normalizeSessionScopedNameSegment(
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
@@ -76912,7 +77366,7 @@ var createLitChipotleAccount = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj17(request) ? request : {};
+  const requestBody = isObj18(request) ? request : {};
   const response2 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
@@ -77143,7 +77597,7 @@ var provisionLitChipotleAction = async ({
   if (!toTrimmedString15(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const actionRequest = isObj17(request) ? request : {};
+  const actionRequest = isObj18(request) ? request : {};
   const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
@@ -77191,9 +77645,9 @@ var bootstrapLitChipotleSession = async ({
   sessionSlug = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
+  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestBody = isObj17(request) ? request : {};
+  const requestBody = isObj18(request) ? request : {};
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
@@ -77471,7 +77925,7 @@ var executeLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleApiKey(runtime);
-  const actionRequest = isObj17(request) ? request : {};
+  const actionRequest = isObj18(request) ? request : {};
   const code = toTrimmedString15(actionRequest.code);
   const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -77521,8 +77975,8 @@ var executeSessionLitChipotleAction = async ({
   requesterAddress = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj17(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj17(request) ? request : {};
+  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj18(request) ? request : {};
   const runtime = resolveLitChipotleRuntime({
     env,
     config,
@@ -78798,11 +79252,6 @@ var issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {}) => {
       error: result?.error || "Authorization state coordination is unavailable."
     };
   }
-  await env?.GROUP_KV?.put?.(
-    `nonce:${slug}:${String(address || "").toLowerCase()}`,
-    nonce,
-    { expirationTtl: ttlSeconds }
-  );
   return { ok: true };
 };
 var consumeNonce = async (env, slug, address, nonce, deps = {}) => {
@@ -78830,12 +79279,6 @@ var consumeNonce = async (env, slug, address, nonce, deps = {}) => {
       status: Number(result?.status || 0) || 503
     };
   }
-  await env?.GROUP_KV?.put?.(
-    `usedNonce:${slug}:${nonce}`,
-    "1",
-    { expirationTtl: usedNonceTtlSeconds }
-  );
-  await env?.GROUP_KV?.delete?.(`nonce:${slug}:${address}`);
   return { ok: true };
 };
 var checkNonceRateLimit = async ({
@@ -79513,26 +79956,26 @@ var dispatchSessionConfigBootstrapRequest = async ({
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v5";
-var trim10 = (value) => String(value == null ? "" : value).trim();
-var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim11 = (value) => String(value == null ? "" : value).trim();
+var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj18(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj19(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
   try {
-    return new URL(trim10(entry)).origin;
+    return new URL(trim11(entry)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
 var normalizeRecruitmentSource = (value) => {
-  const normalized = trim10(value).replace(/\s+/g, "-").slice(0, 128);
+  const normalized = trim11(value).replace(/\s+/g, "-").slice(0, 128);
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
 };
 var normalizeJoinGroup = (value) => {
-  const normalized = trim10(value).toLowerCase();
+  const normalized = trim11(value).toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
 };
 var copySafeReturnParams = (sourceUrl, targetUrl) => {
@@ -79543,7 +79986,7 @@ var copySafeReturnParams = (sourceUrl, targetUrl) => {
 };
 var safeServedWorkerOrigin = (value) => {
   try {
-    const url = new URL(trim10(value));
+    const url = new URL(trim11(value));
     if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
       return url.origin;
     }
@@ -79553,10 +79996,10 @@ var safeServedWorkerOrigin = (value) => {
 };
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim10(value));
+    const url = new URL(trim11(value));
     if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim10(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim11(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -79574,7 +80017,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim10(left?.id).localeCompare(trim10(right?.id)) || trim10(left?.prompt).localeCompare(trim10(right?.prompt)) || trim10(left?.type).localeCompare(trim10(right?.type))
+  (left, right) => trim11(left?.id).localeCompare(trim11(right?.id)) || trim11(left?.prompt).localeCompare(trim11(right?.prompt)) || trim11(left?.type).localeCompare(trim11(right?.type))
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
@@ -80170,8 +80613,31 @@ var createWorkerRouteShellWithWorkerDeps = ({
         if (hasAuth) {
           const auth = await deps?.requireAuth?.({ request: withQuerySlugHeader, env, baseHeaders: corsContext?.headers || routeBaseHeaders, slugHint: targetSlug });
           if (!auth?.ok) return auth?.response;
-          address = deps?.toStr?.(auth.payload?.sub || "")?.trim?.().toLowerCase?.() || "";
-          scopes = auth.scopes || auth.payload?.scopes || {};
+          const context = await resolveAuthenticatedRouteContext2({
+            request: withQuerySlugHeader,
+            env,
+            auth,
+            baseHeaders: corsContext?.headers || routeBaseHeaders,
+            deps: {
+              getSessionConfig: async () => config,
+              getCorsContext: deps?.getCorsContext,
+              json: deps?.json,
+              toStr: deps?.toStr,
+              SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
+            }
+          });
+          if (!context?.ok) return context?.response;
+          const evaluatePreflight = deps?.evaluateAuthenticatedRoutePreflight || evaluateAuthenticatedRoutePreflight;
+          const preflight = await evaluatePreflight({
+            ...context,
+            env,
+            route: "storage",
+            scope: context.scopes?.storage === true ? "storage" : "arweave",
+            deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json }
+          });
+          if (!preflight?.ok) return preflight?.response;
+          address = context.address;
+          scopes = context.scopes;
         }
         return await dispatchResultsAnalysisArtifactRequest2({
           request: withQuerySlugHeader,
@@ -80621,75 +81087,6 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
 // workers/sessionCorsWorker/workerRuntimeDepResolution.js
 init_aiRequestNormalization();
 
-// workers/sessionCorsWorker/authenticatedRoutePreflight.js
-var evaluateAuthenticatedRoutePreflight = async ({
-  scopes,
-  scope,
-  route,
-  allowWithoutScope = false,
-  config,
-  env,
-  slug,
-  address,
-  limit,
-  headers,
-  deps
-} = {}) => {
-  let tokenHasScope = scopes?.[scope] === true;
-  if (!tokenHasScope && !allowWithoutScope) {
-    return {
-      ok: false,
-      tokenHasScope,
-      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
-    };
-  }
-  let currentScopes;
-  try {
-    currentScopes = await deps?.computeScopesForLogin?.({
-      env,
-      slug,
-      address,
-      config,
-      requestedScopes: [scope]
-    });
-  } catch {
-    currentScopes = null;
-  }
-  if (!currentScopes || typeof currentScopes !== "object" || Array.isArray(currentScopes)) {
-    return {
-      ok: false,
-      tokenHasScope: false,
-      response: deps?.json?.({ error: "Current authorization check failed." }, 403, headers)
-    };
-  }
-  tokenHasScope = tokenHasScope && currentScopes?.[scope] === true;
-  if (!tokenHasScope && !allowWithoutScope) {
-    return {
-      ok: false,
-      tokenHasScope,
-      response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers)
-    };
-  }
-  const rateAllowed = await deps?.checkRateLimit?.({
-    env,
-    slug,
-    address,
-    limit,
-    route
-  });
-  if (!rateAllowed) {
-    return {
-      ok: false,
-      tokenHasScope,
-      response: deps?.json?.({ error: "Rate limit exceeded." }, 429, headers)
-    };
-  }
-  return {
-    ok: true,
-    tokenHasScope
-  };
-};
-
 // workers/sessionCorsWorker/authenticatedRouteSecretsResolution.js
 var resolveAuthenticatedRouteSecrets = async ({
   env,
@@ -80732,10 +81129,9 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isAgentQuestionsRoute = path === "/api/agent/questions" && method === "GET";
-  const isResultsAnalysisArtifactRoute = path === "/results-analysis/artifact" && method === "GET";
   const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
   const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute && !isResultsAnalysisArtifactRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
   }
   if (isAgentQuestionsRoute && config?.sessionModeProfile?.surfaces?.agentHttp !== true) {
@@ -80752,7 +81148,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       response: endedResponse
     };
   }
-  const route = isTranscribeRoute ? "transcribe" : isStorageRoute || isAgentQuestionsRoute || isResultsAnalysisArtifactRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
+  const route = isTranscribeRoute ? "transcribe" : isStorageRoute || isAgentQuestionsRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
   const scope = route === "storage" && scopes?.storage !== true ? "arweave" : route;
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
@@ -80802,33 +81198,6 @@ var dispatchAuthenticatedSecretPathRoute = async ({
           options: question.options
         }))
       }, 200, responseHeaders)
-    };
-  }
-  if (isResultsAnalysisArtifactRoute) {
-    const dispatchResultsAnalysisArtifactRequest2 = deps?.dispatchResultsAnalysisArtifactRequest || dispatchResultsAnalysisArtifactRequest;
-    return {
-      handled: true,
-      response: await dispatchResultsAnalysisArtifactRequest2({
-        request,
-        env,
-        config,
-        slug,
-        address,
-        scopes,
-        headers,
-        deps: {
-          json: deps?.json,
-          authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
-          readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
-          readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
-          evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
-          readResourceGateOnChain: deps?.readResourceGateOnChain,
-          resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-          toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-          resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-          checkSbtGate: deps?.checkSbtGate
-        }
-      })
     };
   }
   if (isStorageRoute) {

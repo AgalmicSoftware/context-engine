@@ -4,6 +4,7 @@ import { faSpinner, faSync } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import styles from './UserPage.module.scss';
+import type { UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
 
 type UserPageAnalysisCacheStatusState = {
   analysisCacheAge?: React.ReactNode;
@@ -27,6 +28,7 @@ type UserPageAnalysisModalProps = {
   analysisElapsedMs?: number;
   analysisError?: React.ReactNode;
   analysisErrorAction?: string;
+  analysisGeneration?: UserAnalysisGeneration | null;
   analysisHistoricalFigure?: React.ReactNode;
   analysisHistoricalReasoning?: React.ReactNode;
   analysisModalDisplayState: UserPageAnalysisModalDisplayState;
@@ -45,6 +47,7 @@ const UserPageAnalysisModal = ({
   analysisElapsedMs = 0,
   analysisError,
   analysisErrorAction = '',
+  analysisGeneration,
   analysisHistoricalFigure,
   analysisHistoricalReasoning,
   analysisModalDisplayState,
@@ -110,6 +113,11 @@ const UserPageAnalysisModal = ({
       )}
       {analysisModalDisplayState.shouldRenderAnalysisBody && (
         <>
+          <p className={styles.analysisModel}>
+            {analysisGeneration?.source === 'requested' ? 'Requested AI model: ' : 'AI model: '}
+            {analysisGeneration?.model || 'not recorded'}
+            {analysisGeneration?.provider ? ` (${analysisGeneration.provider})` : ''}
+          </p>
           <p className={styles.placeholderNote}>{aiAnalysis}</p>
           {analysisModalDisplayState.shouldRenderDetails && <p className={styles.analysisDetails}>{analysisDetails}</p>}
           {analysisModalDisplayState.shouldRenderHistoricalAlignment && (

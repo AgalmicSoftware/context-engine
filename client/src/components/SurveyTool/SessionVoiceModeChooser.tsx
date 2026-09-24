@@ -19,7 +19,7 @@ export default function SessionVoiceModeChooser({ onSelectMode }: SessionVoiceMo
       >
         <FontAwesomeIcon icon={faMicrophone} />
         <strong>Interview</strong>
-        <span>Let your AI agent draft your answers, then correct it.</span>
+        <span>Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.</span>
       </button>
       <button
         type="button"

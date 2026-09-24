@@ -44,6 +44,15 @@ export const renderUserPageMembershipSections = ({
         sessionConfig={sessionConfig}
         sessionSlug={activeSessionSlug}
         showMemberships={showWorkerGroups}
+        unavailableMessage={
+          !activeSessionSlug
+            ? 'Choose a session to view group memberships.'
+            : !account
+              ? 'Sign in with this profile’s account to view its groups.'
+              : !isOwner
+                ? 'Group memberships are only shown on your own profile.'
+                : 'Group memberships are unavailable for this session.'
+        }
       />
       {showOnChainSbts ? (
         <UserPageSbtSection {...sbtSectionProps} account={account} provider={provider} wrapColumn={false} />

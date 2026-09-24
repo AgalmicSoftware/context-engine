@@ -1,5 +1,6 @@
 import {
   analyzeClusterOpinions,
+  analyzeUserOpinions,
   analyzePhotoForQuestionGeneration,
   callAI,
   rankQuestionsAI,
@@ -34,6 +35,29 @@ jest.mock('../logging.js', () => ({
 describe('aiClient worker auth options', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it.each([
+    [{ model: 'provider/resolved-model' }, 'provider/resolved-model', 'reported'],
+    [{}, 'openrouter/auto', 'requested'],
+  ])('records transport model provenance independently of generated prose', async (raw, model, source) => {
+    getEffectiveAiConfig.mockResolvedValue({
+      provider: 'openrouter',
+      model: 'openrouter/auto',
+      apiKeySource: 'worker',
+    });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        completion: JSON.stringify({ summary: 'A cautious supporter.', generation: { model: 'invented' } }),
+        raw,
+      }),
+    });
+    const result = await analyzeUserOpinions({}, { sessionSlug: 'session-a', throwOnError: true });
+    expect(result.generation).toEqual({ provider: 'openrouter', model, source });
+    expect(result.summary).toBe('A cautious supporter.');
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });
 
   it('uses anonymous-first worker transport for callAI', async () => {
@@ -525,6 +549,7 @@ describe('aiClient worker auth options', () => {
         completion: JSON.stringify({
           agreements: ['A'],
           disagreements: ['D'],
+          generation: { model: 'invented', source: 'reported' },
         }),
       }),
     });
@@ -534,6 +559,7 @@ describe('aiClient worker auth options', () => {
       sessionSlug: 'general3',
     });
 
+    expect(out.generation).toEqual({ model: 'gpt-4o-mini', provider: 'openai', source: 'requested' });
     expect(out).toEqual(
       expect.objectContaining({
         agreements: expect.any(Array),

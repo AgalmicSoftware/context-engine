@@ -123,7 +123,18 @@ const editReadableDraftText = async (label: string, value: string) => {
 
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      ),
+    );
     jest
       .mocked(useInterviewReadiness)
       .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
@@ -135,6 +146,80 @@ describe('SessionVoiceModeModal', () => {
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'idle', recommendations: [] });
+  });
+
+  it('keeps imported review edits until discard is explicitly confirmed', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: { summary: 'Synthetic context' },
+        }}
+      />,
+    );
+    await editReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep reviewing' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Keep reviewing' })).not.toBeInTheDocument());
+    await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard interview' }));
+    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
+  it('reports unusable voice context before starting the recorder', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[{ id: 'q1', type: 'freeform', prompt: 'x'.repeat(40_000) }]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No complete question fits');
+    expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
+  });
+
+  it('shows limited voice context on Continue while final mapping receives the full transcript', async () => {
+    const longTranscript =
+      'Interviewer: Earlier question?\nResponder: Earlier answer.\n\n'.repeat(700) +
+      'Interviewer: How ready now?\nResponder: Four.';
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      options.onTranscript?.(longTranscript, []);
+      return {
+        mediaStream: {} as MediaStream,
+        pause: jest.fn(),
+        resume: jest.fn(),
+        stop: jest.fn(async () => ({ transcript: longTranscript, turns: [] })),
+        getTranscript: () => longTranscript,
+      };
+    });
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() =>
+      expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
+        expect.objectContaining({ transcript: longTranscript }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled());
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    expect(screen.getByText(/Voice context was limited/)).toHaveTextContent('full transcript and drafts');
+    const instructions = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
+    expect(instructions.length).toBeLessThanOrEqual(31_500);
+    expect(instructions).toContain('Interviewer: How ready now?');
+    expect(instructions).toContain('Responder: Four.');
+    expect(instructions).not.toContain(longTranscript);
   });
 
   it.each([
@@ -630,6 +715,169 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
   });
 
+  it('submits with complete own answers while the public results cache remains partial', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'New answer', confidence: 0.8, evidence: 'Context' },
+    ]);
+    const onLoadSavedResponses = jest
+      .fn()
+      .mockResolvedValue({ answers: {}, additionalComments: {}, importance: {}, conviction: {} });
+    baseProps.onSubmitResponses.mockResolvedValue({ status: 'submitted' });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        isResponsesCacheReady={false}
+        onLoadSavedResponses={onLoadSavedResponses}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: { summary: 'Context' },
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    await waitFor(() => expect(onLoadSavedResponses).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'New answer'));
+    expect(baseProps.onSubmitResponses).toHaveBeenCalled();
+  });
+
+  it('requires review before replacing an answer discovered during a queued submit', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'New answer', confidence: 0.8, evidence: 'Context' },
+    ]);
+    type Slice = {
+      answers: Record<string, unknown>;
+      importance: Record<string, unknown>;
+      conviction: Record<string, unknown>;
+      additionalComments: Record<string, unknown>;
+    };
+    let resolveSaved: (slice: Slice) => void = () => {};
+    const onLoadSavedResponses = jest.fn(
+      () =>
+        new Promise<Slice>((resolve) => {
+          resolveSaved = resolve;
+        }),
+    );
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        isResponsesCacheReady={false}
+        onLoadSavedResponses={onLoadSavedResponses}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: { summary: 'Context' },
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await act(async () =>
+      resolveSaved({
+        answers: { q1: { value: 'Already saved' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }),
+    );
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Saved answers loaded');
+  });
+
+  it('uses complete public-cache readiness for a verified legacy Worker', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'New answer' }]);
+    const onLoadSavedResponses = jest.fn().mockResolvedValue(null);
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      onLoadSavedResponses,
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion: 'ce-interview-brief-v1',
+        source: { platform: 'chatgpt' as const, modelId: 'synthetic', verification: 'self_reported' as const },
+        responderContext: { summary: 'Context' },
+      },
+      responseReadinessContextToken: '',
+    };
+    const view = render(<SessionVoiceModeModal {...props} isResponsesCacheReady={false} />);
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    view.rerender(<SessionVoiceModeModal {...props} isResponsesCacheReady responseReadinessContextToken="stale" />);
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    view.rerender(
+      <SessionVoiceModeModal
+        {...props}
+        isResponsesCacheReady
+        responseReadinessContextToken={`demo|${baseProps.account}|true`}
+      />,
+    );
+    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalled());
+    expect(screen.queryByText(/Could not load your saved answers/)).not.toBeInTheDocument();
+  });
+
+  it('shows one saved-answer error and a working retry', async () => {
+    const onLoadSavedResponses = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Page unavailable'))
+      .mockResolvedValueOnce({ answers: {}, additionalComments: {}, importance: {}, conviction: {} });
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" onLoadSavedResponses={onLoadSavedResponses} />);
+    const retry = await screen.findByRole('button', { name: 'Retry saved answers' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Page unavailable');
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry saved answers' })).not.toBeInTheDocument());
+    expect(onLoadSavedResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not preselect an existing answer when its saved lookup completes before draft mapping', async () => {
+    type Draft = { questionId: string; answer: string; evidence: string; confidence: number };
+    let resolveMapping: (drafts: Draft[]) => void = () => {};
+    mockedMapInterviewEvidenceToResponses.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveMapping = resolve;
+        }),
+    );
+    const onLoadSavedResponses = jest.fn().mockResolvedValue({
+      answers: { q1: { value: 'Saved' } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        onLoadSavedResponses={onLoadSavedResponses}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+          responderContext: { summary: 'Context' },
+        }}
+      />,
+    );
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    await act(async () => resolveMapping([{ questionId: 'q1', answer: 'New', evidence: 'Context', confidence: 0.8 }]));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
   it('does not apply signed-in drafts after the hydrated account changes', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
@@ -887,7 +1135,7 @@ describe('SessionVoiceModeModal', () => {
   it('offers the two large requested voice-mode choices', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
-      'Let your AI agent draft your answers, then correct it.',
+      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
     );
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
@@ -945,7 +1193,154 @@ describe('SessionVoiceModeModal', () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
+  it('validates on mount and writes in the first click stack after validation', async () => {
+    let resolveCatalog: (response: Response) => void = () => {};
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCatalog = resolve;
+        }),
+    );
+    try {
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      expect(fetchMock).toHaveBeenCalled();
+      expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+      const copy = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+      fireEvent.click(copy);
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      await act(async () =>
+        resolveCatalog(
+          new Response(
+            JSON.stringify({
+              type: 'context-engine.interview-question-catalog',
+              version: 1,
+              sessionSlug: 'demo',
+              prefillPromptVersion: 'ce-interview-brief-v4',
+            }),
+          ),
+        ),
+      );
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      let inClick = false;
+      jest.mocked(navigator.clipboard.writeText).mockImplementation(() => {
+        expect(inClick).toBe(true);
+        return Promise.resolve();
+      });
+      inClick = true;
+      fireEvent.click(copy);
+      expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+      inClick = false;
+      await screen.findByRole('button', { name: 'Memory augmentation prompt copied' });
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it.each(['rejected', 'unavailable'])('reveals a manual prompt when clipboard is %s', async (failure) => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      ),
+    );
+    if (failure === 'rejected')
+      jest.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('NotAllowedError'));
+    else Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    try {
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      await act(async () => {});
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Copy the prompt below by hand');
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Memory augmentation prompt copied' })).not.toBeInTheDocument();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('refuses to copy or show a kickoff for an unsupported Worker catalog', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'context-engine.interview-question-catalog',
+        version: 1,
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v9',
+      }),
+    } as Response);
+    try {
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      await act(async () => {});
+      await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent('ask the organizer');
+      await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE)));
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('retries a failed compatibility check and rechecks when the session changes', async () => {
+    const catalog = (slug: string) =>
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: slug,
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      );
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(catalog('demo'));
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).toHaveAttribute(
+        'aria-disabled',
+        'false',
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toBeVisible();
+    let resolveCatalog: (response: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCatalog = resolve;
+        }),
+    );
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" sessionSlug="next" />);
+    expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    await act(async () => resolveCatalog(catalog('next')));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+  });
+
   it('keeps the copied memory prompt collapsed and confirms clipboard success with a checkmark', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'context-engine.interview-question-catalog',
+        version: 1,
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v4',
+      }),
+    } as Response);
     render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
 
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
@@ -960,10 +1355,13 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent('Copy Let your AI agent draft your answers, then correct it.');
+    expect(copyButton).toHaveTextContent(
+      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
+    );
     expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
+    await waitFor(() => expect(screen.queryByText('Checking session compatibility…')).not.toBeInTheDocument());
     await act(async () => fireEvent.click(copyButton));
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
@@ -1027,9 +1425,19 @@ describe('SessionVoiceModeModal', () => {
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'About the interview prompt' })).not.toBeInTheDocument();
+    fetchMock.mockRestore();
   });
 
   it('keeps only bounded source and auto-join query state in the copied kickoff return URL', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'context-engine.interview-question-catalog',
+        version: 1,
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v5',
+      }),
+    } as Response);
     const priorUrl = window.location.href;
     try {
       window.history.replaceState(
@@ -1039,6 +1447,7 @@ describe('SessionVoiceModeModal', () => {
       );
       render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
 
+      await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
 
       await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
@@ -1051,6 +1460,7 @@ describe('SessionVoiceModeModal', () => {
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
+    fetchMock.mockRestore();
   });
 
   it('shows a collapsed responder transcript disclosure after the voice interview ends', async () => {
@@ -1812,6 +2222,59 @@ describe('SessionVoiceModeModal', () => {
     expect(mapInterviewEvidenceToResponses).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
+  });
+
+  it('accepts a fresh bounded Worker catalog when the local session contains 101 questions', async () => {
+    const questionPool = Array.from({ length: 101 }, (_, index) => ({
+      id: `q${index}`,
+      prompt: `Question ${index}?`,
+      type: 'freeform',
+    }));
+    const catalogQuestions = questionPool.slice(1).map((question) => ({ ...question, options: [] }));
+    mockedHashInterviewQuestions.mockImplementation(async (questions) =>
+      questions.length === 101 ? 'b'.repeat(64) : 'a'.repeat(64),
+    );
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            type: 'context-engine.interview-question-catalog',
+            version: 1,
+            sessionSlug: 'demo',
+            prefillPromptVersion: 'ce-interview-brief-v5',
+            questionSetHash: 'a'.repeat(64),
+            questions: catalogQuestions,
+          }),
+        ),
+    );
+    try {
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          questionPool={questionPool}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v5',
+            source: { platform: 'claude', modelId: 'example', verification: 'self_reported' },
+            responderContext: {},
+            responses: [
+              { questionId: 'q100', answer: 'A catalog answer', confidence: 0.8 },
+              { questionId: 'q0', answer: 'Outside catalog', confidence: 0.8 },
+            ],
+          }}
+        />,
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Draft answer for Question 100?. Activate to edit.' }),
+      ).toHaveTextContent('A catalog answer');
+      expect(screen.queryByText('Outside catalog')).not.toBeInTheDocument();
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
   });
 });
 

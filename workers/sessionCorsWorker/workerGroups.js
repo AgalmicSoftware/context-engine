@@ -1,3 +1,4 @@
+import { normalizeWorkerGroupUrl } from '../../shared/workerGroupUrl.mjs';
 import {
 	normalizeWorkerSessionSlug,
 	sessionSlugStorageKey,
@@ -214,13 +215,8 @@ const normalizeImageUrl = (value) => {
 	const raw = trim(value);
 	if (!raw) return { ok: true, value: '' };
 	if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
-	try {
-		const parsed = new URL(raw);
-		if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return { ok: false };
-		return { ok: true, value: parsed.href };
-	} catch {
-		return { ok: false };
-	}
+	const normalized = normalizeWorkerGroupUrl(raw);
+	return normalized === null ? { ok: false } : { ok: true, value: normalized };
 };
 
 const normalizeGroupTags = (value) => {

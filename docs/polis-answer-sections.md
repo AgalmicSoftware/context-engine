@@ -22,14 +22,18 @@ missing answers, within the current report filters; overall includes the cluster
 
 **Summary and Statistics** counts participants, answered questions, responses,
 and average responses per participant across all five question types. Each value
-shows its binary subset in parentheses, such as `42 (18 Binary)`. One participant's
+shows its binary subset in parentheses only when the displayed values differ,
+such as `42 (18 Binary)`. Matching values show the overall number alone; averages
+are compared at their displayed two-decimal precision. One participant's
 answer to one question counts once: editing replaces that answer, and selecting
 several options or allocating across several choices still counts as one response.
 Binary includes Agree, Unsure, and Disagree. The binary average uses participants
 with binary answers; the overall average uses all participants with readable
 answers. The summary follows the same filters as the answer sections, updates when
 new responses reach the report, and remains visible for nonbinary-only results.
-Polis clustering and participant graphs continue to use binary answers only.
+The session cache adapter passes all supported readable answer types into the report,
+including nonbinary-only sessions. Polis clustering and participant graphs continue
+to use binary answers only.
 
 A section appears only when at least one of its questions has a valid readable
 answer after filtering. All Questions starts open with each type’s preview visible.
@@ -87,3 +91,17 @@ restores the previous interactive expansion state when finished.
 
 Regression coverage lives beside `PolisReport` and `browserPdfExport`. The
 credential-free browser smoke is covered by the repository E2E command notes.
+
+Filtered Raw Results JSON exports retain each question’s normalized rating scale,
+selection limits, quadratic budget, ordering, and public benchmark/source IDs.
+Both Questions and Questions + Responses exports use this whitelist; unrelated
+cache metadata is excluded.
+
+Raw Results rating averages and medians use the question’s rating bounds,
+including custom scales such as 0–100, with 0–10 as the legacy default. Missing,
+malformed, and out-of-range saved ratings are excluded rather than clamped into
+the analysis. Input controls retain their existing clamping behavior.
+
+Breakdown's spectrum details open outside the chart panel so they are not clipped
+by its edges. Click a point to pin its details; long popups scroll within the
+viewport and have a close button.

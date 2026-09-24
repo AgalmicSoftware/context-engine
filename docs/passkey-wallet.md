@@ -355,3 +355,11 @@ transfer flow.
 Passkey derivation, encrypted wallet persistence, unlock behavior, and account
 recovery are covered by the client unit and integration suites. Test fixtures
 are non-identifying and must never be used for production funds.
+
+Locking or disconnecting a passkey soft session rejects pending Worker signing
+requests with a locked-wallet error and terminates the signer. A lock during
+lazy Worker startup also cancels that startup.
+
+Disconnect also saves a local disconnected flag with the wallet record. Reloading
+does not restore the account automatically until the user signs in again. Locking
+alone retains account discovery, and disconnect never deletes recovery material.

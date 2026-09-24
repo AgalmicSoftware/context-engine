@@ -1,11 +1,6 @@
-type SurveyResultsQuestionRecord = {
-  id?: unknown;
-  options?: unknown;
-  prompt?: unknown;
-  tags?: unknown;
-  type?: unknown;
-  voiceCredits?: unknown;
-};
+import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue';
+
+type SurveyResultsQuestionRecord = Record<string, unknown>;
 
 type SurveyResultsResponseRecord = {
   questionID?: unknown;
@@ -17,13 +12,26 @@ type SurveyResultsFilteredResponseRow = {
   response?: unknown;
 };
 
-export type SurveyResultsQuestionExportRecord = {
+const PUBLIC_SOURCE_FIELDS = [
+  'order',
+  'benchmarkQuestionId',
+  'sourceCommentId',
+  'sourceType',
+  'aiFuturesCommentId',
+] as const;
+
+export type SurveyResultsQuestionExportRecord = Partial<
+  Record<(typeof PUBLIC_SOURCE_FIELDS)[number], string | number>
+> & {
   id: unknown;
   options: unknown[];
   prompt: unknown;
   tags: unknown[];
   type: unknown;
   voiceCredits?: unknown;
+  scale?: RatingScale;
+  singleSelect?: boolean;
+  maxSelections?: number;
 };
 
 export type BuildSurveyResultsFilteredQuestionIdsForExportArgs = {
@@ -79,6 +87,25 @@ export const buildSurveyResultsFilteredQuestionsForExport = ({
       prompt: questionData.prompt || '',
       type: questionData.type || '',
       ...(questionData.type === 'quadratic' ? { voiceCredits: questionData.voiceCredits ?? 99 } : {}),
+      ...(questionData.type === 'rating' ? { scale: normalizeRatingScale(questionData) } : {}),
+      ...(questionData.type === 'multichoice'
+        ? {
+            singleSelect: Boolean(
+              questionData.singleSelect || questionData.oneSelectionOnly || questionData.singleChoice,
+            ),
+            ...(typeof questionData.maxSelections === 'number' &&
+            Number.isSafeInteger(questionData.maxSelections) &&
+            questionData.maxSelections > 0
+              ? { maxSelections: questionData.maxSelections }
+              : {}),
+          }
+        : {}),
+      ...Object.fromEntries(
+        PUBLIC_SOURCE_FIELDS.filter((key) => ['string', 'number'].includes(typeof questionData[key])).map((key) => [
+          key,
+          questionData[key],
+        ]),
+      ),
       tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
       options: Array.isArray(questionData.options) ? [...questionData.options] : [],
     };

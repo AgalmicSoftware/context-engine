@@ -30,7 +30,17 @@ export const createWorkerCanonicalRouteController = (
   const isSessionSlug = (slug: unknown): boolean => {
     const normalizedSlug = normalizeSessionSlug(slug);
     const search = typeof window !== 'undefined' ? window.location.search || '' : '';
-    const routeSlug = normalizeSessionSlug(host.getSessionTokenFromPath(host.getCurrentPathname()) || '');
+    const path = host.getCurrentPathname();
+    // Profile and comparison deep links carry their session in the query. Only
+    // that exact route may use its live-verified config for cache hydration.
+    const querySlugs = new URLSearchParams(search).getAll('session');
+    const routeSlug = normalizeSessionSlug(
+      /^\/(?:compare(?:\/|$)|u\/)/.test(path)
+        ? querySlugs.length === 1
+          ? querySlugs[0]
+          : ''
+        : host.getSessionTokenFromPath(path) || '',
+    );
     const matchesExplicitRoute = !!routeSlug && routeSlug === normalizedSlug;
     try {
       const workerOrigin = parseSessionWorkerDiscoveryQuery(search);

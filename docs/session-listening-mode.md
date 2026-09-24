@@ -38,7 +38,11 @@ The per-session `interviewMode.realtimeModel` setting also accepts the supported
 legacy aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, and
 `gpt-realtime-1.5`. Those retain the Realtime multipart call contract. Invented
 or retired model IDs normalize to `gpt-live-1` when reading old configurations;
-Worker config writes reject unsupported values. The provider remains OpenAI.
+Worker config writes reject newly supplied unsupported values. Previously
+accepted stored `gpt-realtime` aliases migrate to that same runtime fallback
+during later config, limits, or Lit-descriptor updates, including an unchanged
+model echoed by an older settings form. Other malformed stored fields still
+fail validation. The provider remains OpenAI.
 Session creators can change the model in `/new` under **Optional details**
 (or **More options** in Customize) → **Interview settings** →
 **Interview voice model**.
@@ -128,7 +132,7 @@ Live capacity notes for 100-person tests, checked September 19, 2026:
 - OpenAI's [rate-limit guide](https://developers.openai.com/api/docs/guides/rate-limits) also applies to the backend text/model calls used after Stop. Confirm the organization's actual Limits dashboard before the test because limits vary by model and can include RPM, TPM, and audio-minute ceilings. The current account tier and remaining allocation are not knowable from this repository.
 - Organization and project limits both matter. OpenAI documents org/project rate limits and project-scoped headers, while [spend limits](https://developers.openai.com/api/docs/guides/spend-limits) can be configured at either org or project level; project settings cannot make traffic succeed after an applicable organization limit or approved usage limit is exhausted.
 - Context Engine does not currently enforce app-level voice spend or duration caps. The practical cap is the configured OpenAI allocation plus the session Worker and browser paths.
-- Authenticated submission paths still request Worker nonces. The Worker constants set `NONCE_RATE_LIMIT_MAX = 5` per minute, and nonce issuance uses the trusted Cloudflare/anonymous rate identity in `authNonceRequestDispatch`. A same-venue Wi-Fi test can bottleneck on nonce issuance before it demonstrates 100 independent live voices or submissions.
+- Authenticated submission paths request Worker nonces. The current defaults are five nonce requests per wallet per minute and a separate 300-request shared-network limit per session per minute, coordinated by the Worker. Distinct venue participants do not share a five-request allowance. Shared-network/provider concurrency still needs a venue rehearsal; these constants do not prove a capacity level.
 - A read-only 100-browser GET test is not equivalent to 100 live voice sessions plus response submissions. Headless browser coverage can use virtual WebAuthn PRF for auth flows, but it should be planned as a separate load profile from read-only page fetches.
 
 Suggested questions follow the response drafts in an expandable **Suggested new questions** section, initially open, using pile-style question cards with editable prompts and tags. Interview review hides the survey/questions toggle and manual question-type selector; the normal authoring surface retains them. A help tooltip beside the section heading explains that suggestions remain drafts until uploaded. Both review sections use matching headings and support keyboard collapse/expand without losing edits. Questions can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggested questions are visible before sign-in so the responder can review them, but after sign-in the section stays hidden unless the connected participant is allowed to create questions for that session. Unresolved group, SBT, or custom permissions keep the section hidden in the UI, and the backend still enforces the upload. Suggestions share the response-mapping request, avoiding an extra model round trip. That request also generates short, non-identifying tags, prefers relevant session `defaultTags`, and incorporates `questionsGenPrompt` guidance. Default tags are suggestions rather than a restricted vocabulary; users can add or remove tags before upload.
@@ -139,7 +143,8 @@ Only responder speech becomes
 answer evidence. Interviewer questions are retained as context so short replies
 such as “four” can be matched to the question asked. Live input and output
 transcript fragments are retained exactly, deduplicated by event ID, and ordered
-by session time; legacy Realtime sessions use completed input transcriptions.
+by session time. Supported legacy Realtime sessions retain completed responder
+transcriptions and interviewer output turns, deduplicating repeated completion events.
 **Continue interview** continues the existing conversation. Each round appends to the transcript, and mapping reviews the combined evidence alongside earlier predictions and user-reviewed responses. Changed predictions retain numbered versions with model IDs in local review state; consented research submission includes those versions and applies the same answer/comment encryption redaction to every version. Research controls also appear after a voice-only continuation revises a prediction. Declining research excludes the history from submitted metadata. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. Closing the Interview dialog still ends this in-memory review.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
@@ -218,6 +223,12 @@ platform/model provenance choice.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
+The external prompt checks the session's interview catalog when it appears and
+when the session changes. Wait for the compatibility check before copying; a
+failed check offers Retry. Copy starts directly from the tap, including on
+Safari. If clipboard access fails or is unavailable, the page shows an error
+and reveals the prompt for manual copying.
+
 Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
 to augment interview** footer card beneath the microphone when the interview has
 not already been opened from a ChatGPT or Claude prefill packet. Clicking its
@@ -230,8 +241,8 @@ The tooltip is available on hover and keyboard focus. The copied request begins:
 
 ```text
 Help me prepare a review-only Context Engine interview prefill. Fetch
-<session-worker>/agent/interview-catalog?... and require the current inert
-catalog contract. Search only already-authorized, question-related history,
+<session-worker>/agent/interview-catalog?... and validate the session and supported v4/v5 inert
+catalog contract without changing its version or fingerprint. Search only already-authorized, question-related history,
 memory, and connected sources; show the exact response packet before encoding;
 then return its local review link.
 ```
@@ -271,8 +282,10 @@ searched count is `null` when the platform does not expose it; zero means the AI
 reports that it used none. The review modal shows these counts before drafts are
 applied, and retained model provenance keeps them beside the eventual prediction
 comparison. Low-confidence responses are allowed when the AI
-has a defensible indirect signal and explains its basis; only questions with no
-relevant signal are omitted. Model identity is collected to measure prediction
+has a defensible indirect signal and explains its basis; questions with no
+relevant signal are omitted. When an older v4 catalog cannot represent a
+multiple-selection answer, the prompt also requires omitting that draft and
+disclosing the limitation instead of losing some selections. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
 one. The copied prompt does not request a responder name. Previously generated
 packets may still include one; the client does not submit it unless the responder
@@ -280,15 +293,36 @@ enables the default-off name control. The packet contains no
 credential and is carried in `#prefill=...`, so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
-identifiers are forbidden and the exact JSON is shown first. Prompt version
-`ce-interview-brief-v4` provides this shorter direct-response contract and uses
-the distinct `/agent/interview-catalog` URL to avoid stale external fetches. The
-catalog makes the application answer contract explicit: binary responses use
-`Agree`, `Unsure`, or `Disagree`; ratings use 0-10; and multichoice responses
-must use an exact listed option. Its additive `researchCoverageContract` lists
-the count fields and labels them self-reported without turning the catalog into
-agent instructions. The client continues to accept version 1-3 packets from
-previously copied prompts.
+identifiers are forbidden and the exact JSON is shown first. The current catalog prompt version is
+`ce-interview-brief-v5`. The copied request accepts a catalog with type
+`context-engine.interview-question-catalog`, schema `version: 1`, the expected
+session slug, and prompt version v4 or v5. Unknown or inconsistent contracts
+must stop generation. The packet copies `prefillPromptVersion` to `promptVersion`
+and retains `questionSetHash` exactly; a v4 hash must never be relabeled v5.
+The distinct `/agent/interview-catalog` URL avoids stale external brief fetches.
+
+The answer contract is question-specific:
+
+- Binary answers use one exact option: `Agree`, `Unsure`, or `Disagree`.
+- Ratings use the question's `scale` bounds and labels. Only questions without a
+  scale use `answerContract.rating` (the current catalog default is 0–10).
+- V5 multichoice questions include boolean `singleSelect`. `true` takes one
+  exact option string; `false` takes an array of exact option strings. Missing
+  or invalid selection metadata is not permission to assume multiple selection.
+- V4 multichoice uses one exact option string. Missing `singleSelect` does not
+  indicate multi-select support. If the evidence requires several options,
+  omit that draft and explain the older catalog's limitation.
+- Quadratic answers are signed integer arrays in option order with squared
+  cost within `voiceCredits` (99 when absent); neutral zeros and unused credits
+  are valid.
+
+The additive `researchCoverageContract` describes self-reported count fields,
+not agent instructions. Existing v1–v5 packets remain importable with their
+original fingerprint rules and current question validation. V5 hashes include
+selection mode; v1–v4 hashes do not. Source compatibility does not prove a live
+frontend or Worker has been updated: verify both served contracts during an
+authorized rollout, especially before generating v5 packets.
+
 
 When Context Engine opens that link, it validates the packet, requires the
 session slug and question-set hash to match, removes the fragment from browser
@@ -365,6 +399,8 @@ by default.
 
 - `client/src/components/SurveyTool/SessionVoiceModeModal.tsx`
 - `client/src/components/SurveyTool/sessionInterview.ts`
+- `client/src/components/SurveyTool/sessionInterviewRealtimeInstructions.ts`
+- `client/src/components/SurveyTool/sessionInterviewRealtimePrefill.ts`
 - `client/src/utilities/audio/realtimeInterviewClient.ts`
 - `client/src/components/SurveyTool/SessionListeningPanel.tsx`
 - `workers/sessionCorsWorker/interviewBriefDispatch.js`
@@ -388,4 +424,15 @@ question bank once; later question additions can be included in the ongoing inte
 
 Signing in from the interview closes the account dialog after successful login; reviewed drafts remain in the interview while session response data loads. Submitting selected drafts that are already saved and unchanged shows “Responses already saved” without uploading duplicates. On a session page, **View results** closes the interview and opens and scrolls to the inline Results section. Standalone question views keep their raw-results navigation.
 
-Interview choice mapping currently accepts one listed option per question. Multi-select answer arrays are not supported by the interview mapper.
+Interview choice mapping and review preserve one option for binary/single-select questions and arrays for multiple-selection questions. A legacy scalar choice imported for a current multi-select question becomes a one-element selection; it does not reconstruct selections absent from the original packet. Unknown options and multiple distinct options for a single-select question are rejected.
+
+Prefill validation uses the shared public-question normalization contract. If the
+local bank differs from the Worker’s bounded catalog (up to 100 questions), the
+client fetches that session’s current catalog and verifies its identity, hash,
+and each question against locally available metadata. It never accepts an
+arbitrary prefix. Imported predictions are scoped to the verified catalog;
+network failures remain retryable and closing the modal cancels catalog work.
+
+### Live interview context limits
+
+The complete initial/continued voice instructions fit below the Worker’s 32,000-character limit. The client keeps whole question rows, recent role-labelled conversation turns, and bounded background/review data. Participant edits are either included exactly or omitted with their obsolete prediction; they are never shortened into a different answer. Review state also reaches continued voice when no external prefill was imported. A notice explains omitted voice context. The full local transcript and review drafts remain available to final response mapping. If no complete question fits, the client reports an error before opening the microphone; participants can answer manually or ask the owner to shorten the question content.

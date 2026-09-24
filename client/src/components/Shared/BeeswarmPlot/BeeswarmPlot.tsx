@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './BeeswarmPlot.module.scss';
 import { layoutBeeswarmPoints, type BeeswarmLayoutDomain, type BeeswarmLayoutStrategy } from './beeswarmLayout';
 import BeeswarmTooltip, {
@@ -81,6 +82,7 @@ export type BeeswarmPlotProps = {
   noResponsesText?: string;
   responsesAvailable?: boolean;
   tooltipsEnabled?: boolean;
+  tooltipPortal?: boolean;
   renderTooltip?: (point: BeeswarmPoint) => React.ReactNode;
   renderPointLabel?: (point: BeeswarmPoint, index: number) => React.ReactNode;
   getPointStyle?: (point: BeeswarmPoint, index: number) => React.CSSProperties | undefined;
@@ -181,6 +183,7 @@ export default function BeeswarmPlot({
   noResponsesText = 'No responses yet',
   responsesAvailable,
   tooltipsEnabled = true,
+  tooltipPortal = false,
   renderTooltip,
   renderPointLabel,
   getPointStyle,
@@ -299,25 +302,43 @@ export default function BeeswarmPlot({
     const tooltip = tooltipRef.current;
     if (!wrapper || !tooltip) return;
 
-    const nextLayout = resolveTooltipLayout({
-      anchorX: tooltipAnchor.x,
-      anchorY: tooltipAnchor.y,
-      wrapperWidth: wrapper.clientWidth || width,
-      wrapperHeight: wrapper.clientHeight || height,
-      tooltipWidth: tooltip.offsetWidth || 0,
-      tooltipHeight: tooltip.offsetHeight || 0,
-      offset: tooltipAnchor.offset,
-    });
-
-    setTooltipLayout((prev) =>
-      prev.left === nextLayout.left &&
-      prev.top === nextLayout.top &&
-      prev.horizontal === nextLayout.horizontal &&
-      prev.vertical === nextLayout.vertical
-        ? prev
-        : nextLayout,
-    );
-  }, [activePoint, height, tooltipAnchor.offset, tooltipAnchor.x, tooltipAnchor.y, width]);
+    const position = () => {
+      const rect = wrapper.getBoundingClientRect();
+      const nextLayout = resolveTooltipLayout({
+        anchorX: tooltipAnchor.x + (tooltipPortal ? rect.left : 0),
+        anchorY: tooltipAnchor.y + (tooltipPortal ? rect.top : 0),
+        wrapperWidth: tooltipPortal ? document.documentElement.clientWidth : wrapper.clientWidth || width,
+        wrapperHeight: tooltipPortal ? window.innerHeight : wrapper.clientHeight || height,
+        tooltipWidth: tooltip.offsetWidth || 0,
+        tooltipHeight: tooltip.offsetHeight || 0,
+        offset: tooltipAnchor.offset,
+      });
+      // Plot-local tooltips may extend past the chart; a body portal must stay
+      // inside the viewport, with long content scrolling within the popup.
+      if (tooltipPortal)
+        nextLayout.top = clamp(
+          nextLayout.top,
+          TOOLTIP_MARGIN,
+          Math.max(TOOLTIP_MARGIN, window.innerHeight - tooltip.offsetHeight - TOOLTIP_MARGIN),
+        );
+      setTooltipLayout((prev) =>
+        prev.left === nextLayout.left &&
+        prev.top === nextLayout.top &&
+        prev.horizontal === nextLayout.horizontal &&
+        prev.vertical === nextLayout.vertical
+          ? prev
+          : nextLayout,
+      );
+    };
+    position();
+    if (!tooltipPortal) return;
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [activePoint, height, tooltipAnchor.offset, tooltipAnchor.x, tooltipAnchor.y, tooltipPortal, width]);
 
   const handleHover = (point: BeeswarmPoint, index: number, event: BeeswarmTooltipEvent = null) => {
     setSinglePointDeselected(false);
@@ -373,6 +394,20 @@ export default function BeeswarmPlot({
     );
   }
 
+  const tooltip =
+    activePoint && tooltipsEnabled ? (
+      <BeeswarmTooltip
+        point={activePoint}
+        pinned={activePointIsPinned}
+        portal={tooltipPortal}
+        layout={tooltipLayout}
+        testIdPrefix={testIdPrefix}
+        tooltipRef={tooltipRef}
+        renderTooltip={renderTooltip}
+        onClose={clearPinnedPoint}
+      />
+    ) : null;
+
   return (
     <div
       ref={wrapperRef}
@@ -380,16 +415,12 @@ export default function BeeswarmPlot({
       data-testid={`${testIdPrefix}-plot`}
       onMouseLeave={clearHover}
     >
-      {activePoint && tooltipsEnabled ? (
-        <BeeswarmTooltip
-          point={activePoint}
-          pinned={activePointIsPinned}
-          layout={tooltipLayout}
-          testIdPrefix={testIdPrefix}
-          tooltipRef={tooltipRef}
-          renderTooltip={renderTooltip}
-          onClose={clearPinnedPoint}
-        />
+      {tooltip ? (
+        tooltipPortal ? (
+          createPortal(tooltip, document.body)
+        ) : (
+          tooltip
+        )
       ) : showIdleSummary ? (
         <div className={styles.hoverPanel} data-testid={`${testIdPrefix}-hover`}>
           <p className={styles.hoverLabel}>Hover a question to inspect the split.</p>

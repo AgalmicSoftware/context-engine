@@ -10,6 +10,11 @@ import {
   savePendingAutoJoin,
   type WorkerGroupAutoJoinIntent,
 } from '../../domains/worker/workerGroupAutoJoinIntent';
+import {
+  clearWorkerGroupAutoJoinCancellation,
+  isWorkerGroupAutoJoinCancelled,
+  rememberWorkerGroupAutoJoinCancellation,
+} from '../../domains/worker/workerGroupAutoJoinPreference';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
@@ -23,7 +28,7 @@ export type WorkerGroupAutoJoinProps = {
 };
 type Props = WorkerGroupAutoJoinProps;
 type Context = NonNullable<ReturnType<typeof resolveWorkerGroupAutoJoinContext>>;
-type Progress = { phase: 'loading' | 'joining' | 'done' | 'error'; message: string };
+type Progress = { phase: 'loading' | 'joining' | 'done' | 'cancelled' | 'error'; message: string };
 
 const subscribeLocation = (notify: () => void) => {
   window.addEventListener('popstate', notify);
@@ -57,6 +62,7 @@ function AutoJoinIntent({
   const finishedRef = useRef(false);
   const completedAccountRef = useRef<string>();
   const cancelRef = useRef(() => {});
+  const cancelledAccountRef = useRef<string>();
   const [groupLabel, setGroupLabel] = useState(groupId);
   const [retry, setRetry] = useState(0);
   const [progress, setProgress] = useState<Progress>({ phase: 'loading', message: 'Preparing to join group…' });
@@ -81,6 +87,23 @@ function AutoJoinIntent({
   }, [ready, workerUrl, sessionId, sessionSlug, groupId]);
 
   useEffect(() => {
+    const scope = { workerUrl, sessionSlug, sessionId, groupId, account };
+    // A cancellation before sign-in belongs to the first account that signs in
+    // for this invitation. It must not silently turn into a join on login.
+    if (ready && cancelledAccountRef.current === '') {
+      rememberWorkerGroupAutoJoinCancellation(scope);
+      clearWorkerGroupAutoJoinCancellation({ ...scope, account: '' });
+      cancelledAccountRef.current = account;
+    }
+    if (!finishedRef.current && isWorkerGroupAutoJoinCancelled(scope)) {
+      finishedRef.current = true;
+      cancelledAccountRef.current = account;
+      onConsumed();
+      clearPendingAutoJoin(intent);
+      finishWorkerGroupAutoJoin(sessionSlug, groupId);
+      setProgress({ phase: 'cancelled', message: 'Auto-join cancelled. Join whenever you choose.' });
+      return undefined;
+    }
     if (!ready || finishedRef.current) return undefined;
     let active = true;
     const stop = () => {
@@ -149,9 +172,23 @@ function AutoJoinIntent({
     onConsumed();
     clearPendingAutoJoin(intent);
     finishWorkerGroupAutoJoin(sessionSlug, groupId);
-    setProgress({ phase: 'done', message: 'Auto-join cancelled.' });
+    cancelledAccountRef.current = account;
+    const saved = rememberWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId, account });
+    setProgress({
+      phase: 'cancelled',
+      message: saved ? 'Auto-join cancelled.' : 'Auto-join cancelled for this visit. Browser storage is unavailable.',
+    });
   };
-  const done = progress.phase === 'done';
+  const cancelled = progress.phase === 'cancelled';
+  const done = progress.phase === 'done' || cancelled;
+  const joinExplicitly = () => {
+    clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId, account });
+    cancelledAccountRef.current = undefined;
+    finishedRef.current = false;
+    savePendingAutoJoin({ ...intent, sessionId });
+    setProgress({ phase: 'loading', message: 'Preparing to join group…' });
+    setRetry((value) => value + 1);
+  };
   if (done && !progress.message) return null;
   if (done && completedAccountRef.current && completedAccountRef.current !== account) return null;
   return (
@@ -160,6 +197,11 @@ function AutoJoinIntent({
       message={!ready && !done ? 'Will be joined upon sign-in' : progress.message}
       isError={progress.phase === 'error'}
     >
+      {cancelled ? (
+        <button type="button" className={styles.secondaryButton} onClick={joinExplicitly}>
+          Join {groupLabel}
+        </button>
+      ) : null}
       {done ? (
         <button
           type="button"
@@ -288,6 +330,13 @@ export default function WorkerGroupAutoJoin(props: Props) {
         type="button"
         className={styles.secondaryButton}
         onClick={() => {
+          rememberWorkerGroupAutoJoinCancellation({
+            workerUrl: intent.workerOrigin,
+            sessionSlug: intent.sessionSlug,
+            sessionId: intent.sessionId,
+            groupId: intent.groupId,
+            account: props.account,
+          });
           clearPendingAutoJoin(intent);
           finishWorkerGroupAutoJoin(intent.sessionSlug, intent.groupId);
           setIntent(null);

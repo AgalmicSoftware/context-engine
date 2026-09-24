@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
+import { resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 
 const baseConfig = {
   slug: 'session-a',
@@ -592,6 +593,36 @@ test('accepts gpt-live-1 and documented legacy models while rejecting invented o
   for (const model of ['gpt-realtime-custom', 'gpt-realtime', 'gpt-live-invented', 'GPT-LIVE-1']) {
     const result = applySessionConfigMutation({ existingConfig: cloneJson(profileBearingConfig), mutation: { kind: 'set-config', incomingConfig: { interviewMode: { realtimeModel: model } } }, slug: 'session-a' });
     assert.equal(result.ok, false); assert.equal(result.status, 400);
+  }
+});
+
+test('unrelated mutations migrate only previously accepted stored realtime models', () => {
+  for (const legacyModel of ['gpt-realtime', 'gpt-realtime-preview', 'GPT-REALTIME']) {
+    const existingConfig = { ...cloneJson(baseConfig), interviewMode: { enabled: true, realtimeModel: legacyModel } };
+    for (const mutation of [
+      { kind: 'set-config', incomingConfig: { sessionName: 'Renamed' } },
+      { kind: 'set-config', incomingConfig: { interviewMode: { enabled: false } } },
+      { kind: 'set-config', incomingConfig: { sessionName: 'Renamed', interviewMode: { ...existingConfig.interviewMode } } },
+      { kind: 'set-limits', incomingLimits: { perAnonymousIpPerDay: 20 } },
+      { kind: 'merge-lit-credentials', litCredentials: { litActionCid: 'bafy-synthetic-action' } },
+    ]) {
+      const result = applySessionConfigMutation({ existingConfig, mutation, slug: 'session-a' });
+      assert.equal(result.ok, true, JSON.stringify({ legacyModel, mutation, result }));
+      assert.equal(resolveRealtimeInterviewModel(result.config), 'gpt-live-1');
+      if (mutation.incomingConfig?.interviewMode?.enabled !== false) {
+        assert.equal(result.config.interviewMode.realtimeModel, 'gpt-live-1');
+      }
+      assert.equal(existingConfig.interviewMode.realtimeModel, legacyModel);
+    }
+    const replacement = applySessionConfigMutation({ existingConfig, slug: 'session-a',
+      mutation: { kind: 'set-config', incomingConfig: { interviewMode: { realtimeModel: 'gpt-realtime-invented' } } } });
+    assert.equal(replacement.ok, false);
+    assert.equal(replacement.status, 400);
+  }
+  for (const realtimeModel of ['gpt-5', 42, '', 'gpt-live-invented']) {
+    const result = applySessionConfigMutation({ existingConfig: { ...baseConfig, interviewMode: { realtimeModel } },
+      mutation: { kind: 'set-limits', incomingLimits: { perWalletPerDay: 5 } }, slug: 'session-a' });
+    assert.equal(result.ok, false);
   }
 });
 

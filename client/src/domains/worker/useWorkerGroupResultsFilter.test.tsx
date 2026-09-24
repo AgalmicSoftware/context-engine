@@ -76,7 +76,8 @@ it('invalidates on join/leave events and does not fetch after sign-out', async (
   act(() => {
     dispatchWorkerGroupsChanged(scope);
   });
-  expect(result.current.cohort.status).toBe('loading');
+  expect(result.current.cohort.status).toBe('ready');
+  expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
   await waitFor(() => expect(result.current.cohort.members[group.groupId]?.size).toBe(0));
   token.mockClear();
   rerender({ ...input, account: '' });
@@ -112,4 +113,22 @@ it('rejects session changes before authenticating or reading the old Group', asy
 it('rejects a truncated final page even if no continuation cursor was returned', async () => {
   members.mockResolvedValue({ ...page(a), memberCount: 2 });
   await expect(loadWorkerGroupCohort(selection, 'token')).rejects.toThrow('incomplete');
+});
+
+it('keeps loaded members visible while a focus refresh is pending', async () => {
+  const { result } = renderHook(() => useWorkerGroupResultsFilter(input));
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  let finish: (value: WorkerGroupMemberPage) => void = () => {};
+  members.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(members).toHaveBeenCalledTimes(2));
+  expect(result.current.cohort.status).toBe('ready');
+  expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
+  await act(async () => finish(page(b)));
+  expect([...result.current.cohort.members[group.groupId]]).toEqual([b]);
 });

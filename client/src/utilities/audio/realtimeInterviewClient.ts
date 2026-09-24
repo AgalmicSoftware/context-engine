@@ -57,6 +57,25 @@ export const readRealtimeResponderTurn = (event: unknown): RealtimeInterviewTurn
   return { itemId: trim(record.item_id || record.itemId), text: trim(record.transcript), role: 'responder' };
 };
 
+const readRealtimeInterviewerTurn = (event: Record<string, unknown>): RealtimeInterviewTurn | null => {
+  if (event.type === 'session.output_transcript.delta') {
+    const fragment = readRealtimeResponderTurn({ ...event, type: 'session.input_transcript.delta' });
+    return fragment ? { ...fragment, role: 'interviewer' } : null;
+  }
+  if (!['response.output_audio_transcript.done', 'response.audio_transcript.done'].includes(trim(event.type)))
+    return null;
+  const text = trim(event.transcript);
+  if (!text) return null;
+  // Both legacy event names can describe the same completed output. Use content
+  // identity, not event identity, so replay never duplicates an interviewer question.
+  const itemId = trim(event.item_id || event.response_id || event.event_id);
+  return {
+    itemId: itemId ? `interviewer:${itemId}:${event.output_index ?? 0}:${event.content_index ?? 0}` : '',
+    text,
+    role: 'interviewer',
+  };
+};
+
 export const buildRealtimeInterviewTranscript = (turns: RealtimeInterviewTurn[]): string => {
   const ordered = turns.some((turn) => turn.fragment)
     ? [...turns].sort((a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity))
@@ -227,13 +246,7 @@ export const startSessionRealtimeInterview = async ({
           }),
         );
     }
-    const turn: RealtimeInterviewTurn | null =
-      event.type === 'session.output_transcript.delta'
-        ? (() => {
-            const fragment = readRealtimeResponderTurn({ ...event, type: 'session.input_transcript.delta' });
-            return fragment ? { ...fragment, role: 'interviewer' } : null;
-          })()
-        : readRealtimeResponderTurn(event);
+    const turn = readRealtimeInterviewerTurn(event) || readRealtimeResponderTurn(event);
     if (!turn || (turn.itemId && turns.some((entry) => entry.itemId === turn.itemId))) return;
     turns.push({ ...turn, itemId: turn.itemId || `fragment-${turns.length}` });
     onTranscript(buildRealtimeInterviewTranscript(turns), [...turns]);

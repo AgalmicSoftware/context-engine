@@ -33,10 +33,13 @@ interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
 }
 
 interface ReadSessionStorageBlobOptions extends StorageWorkerOptions {
+  signal?: AbortSignal;
   storageRef?: unknown;
 }
 
 interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
+  ownResponses?: { account: string; sessionId: string };
+  signal?: AbortSignal;
   resource?: unknown;
   cursor?: unknown;
   limit?: unknown;
@@ -46,6 +49,13 @@ interface SessionStorageRefsPage {
   items: unknown[];
   cursor: string | null;
   listComplete: boolean;
+}
+
+export class LegacyOwnResponseListingError extends Error {
+  constructor() {
+    super('This Worker uses the public response listing. Wait for complete session data.');
+    this.name = 'LegacyOwnResponseListingError';
+  }
 }
 
 const normalizeWorkerBaseUrl = (rawUrl: unknown): string => toStr(rawUrl).trim().replace(/\/+$/, '');
@@ -209,6 +219,7 @@ export const readSessionStorageBlob = async ({
   sessionConfig = null,
   context = null,
   workerUrl = '',
+  signal,
 }: ReadSessionStorageBlobOptions = {}): Promise<Response> => {
   const ref = normalizeStorageRef(storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
   if (!ref || ref.backend !== STORAGE_BACKENDS.CLOUDFLARE) throw new Error('Cloudflare storageRef is required.');
@@ -216,7 +227,7 @@ export const readSessionStorageBlob = async ({
   const endpoint = `${baseUrl}/storage/read?id=${encodeURIComponent(ref.id)}`;
   const response = await fetchWorkerWithAuth(
     endpoint,
-    { method: 'GET' },
+    { method: 'GET', ...(signal ? { signal } : {}) },
     {
       sessionSlug,
       sessionConfig,
@@ -241,6 +252,8 @@ export const listSessionStorageRefsPage = async ({
   resource = 'docsContext',
   cursor = null,
   limit = null,
+  ownResponses,
+  signal,
 }: ListSessionStorageRefsPageOptions = {}): Promise<SessionStorageRefsPage> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const params = new URLSearchParams({ resource: toStr(resource).trim() || 'docsContext' });
@@ -248,21 +261,46 @@ export const listSessionStorageRefsPage = async ({
   const normalizedLimit = Math.trunc(Number(limit));
   if (normalizedCursor) params.set('cursor', normalizedCursor);
   if (Number.isFinite(normalizedLimit) && normalizedLimit > 0) params.set('limit', String(normalizedLimit));
+  if (ownResponses) params.set('mine', 'true');
   const endpoint = `${baseUrl}/storage/list?${params.toString()}`;
   const response = await fetchWorkerWithAuth(
     endpoint,
-    { method: 'GET' },
+    { method: 'GET', ...(signal ? { signal } : {}) },
     {
       sessionSlug,
       sessionConfig,
       context,
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
-      preferAnonymous: true,
+      preferAnonymous: !ownResponses,
     },
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) throw new Error((body?.error as string) || `Storage list failed (${response.status}).`);
+  // 0.6.2 ignores mine=true but already supplies pagination. Only its exact
+  // unscoped shape may use public-cache readiness; partial identity proofs fail closed.
+  if (
+    ownResponses &&
+    !normalizedCursor &&
+    response.status === 200 &&
+    body &&
+    !Object.hasOwn(body, 'responder') &&
+    !Object.hasOwn(body, 'sessionId') &&
+    Array.isArray(body.items) &&
+    typeof body.listComplete === 'boolean' &&
+    (body.listComplete ? body.cursor === null : typeof body.cursor === 'string' && !!body.cursor.trim())
+  )
+    throw new LegacyOwnResponseListingError();
+  if (
+    ownResponses &&
+    (toStr(body.responder).toLowerCase() !== ownResponses.account.toLowerCase() ||
+      toStr(body.sessionId).toLowerCase() !== ownResponses.sessionId.toLowerCase() ||
+      typeof body.listComplete !== 'boolean' ||
+      !Array.isArray(body.items) ||
+      (!body.listComplete && !toStr(body.cursor).trim()) ||
+      (body.listComplete && !!toStr(body.cursor).trim()))
+  )
+    throw new Error('This Worker could not verify your complete saved answers. Check the client and Worker versions.');
   const nextCursor = toStr(body?.cursor).trim() || null;
   return {
     items: Array.isArray(body?.items) ? body.items : [],

@@ -20,6 +20,16 @@ describe('compare session runtime', () => {
     expect(resolveCompareSessionSlug({ pathname: '/session/OnChain', search: '' })).toBe('OnChain');
   });
 
+  it('keeps an explicit comparison session instead of a stale global selection', () => {
+    expect(
+      resolveCompareSessionSlug({
+        activeSessionSlug: 'stale',
+        pathname: '/compare',
+        search: '?session=hosted-session',
+      }),
+    ).toBe('hosted-session');
+  });
+
   it('selects only the active session cache when a session is resolved', () => {
     const entries = [
       { slug: 'alpha', value: { id: 'alpha' } },

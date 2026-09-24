@@ -83,13 +83,13 @@ it('preserves signed arrays when hydrating saved responses and includes budgets 
     allowOverwrite: true,
   });
   expect(JSON.stringify(patch)).toContain('[3,-4]');
-  expect(buildSurveyResultsQuestionsCsvExport([question])).toContain('"Parks;Transit","25"');
+  expect(buildSurveyResultsQuestionsCsvExport([question])).toContain('"[""Parks"",""Transit""]","25"');
   const csv = buildSurveyResultsResponsesCsvExport({
     networkQuestions: { q1: question },
     aggregatorQuestionResponses: {
       q1: [{ responder: 'participant', response: { questionID: 'q1', answer: { value: [3, -4] } } }],
     },
   });
-  expect(csv).toContain('"3, -4"');
+  expect(csv).toContain('"[3,-4]"');
   expect(csv.split('\n')[1]).toMatch(/,"25"$/);
 });

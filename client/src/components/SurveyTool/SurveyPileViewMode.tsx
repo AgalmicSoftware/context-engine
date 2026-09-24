@@ -1,3 +1,8 @@
+import {
+  loadSessionInterviewSavedAnswers,
+  mergeInterviewSavedAnswerBaseline,
+  type InterviewSavedSlice,
+} from './sessionInterviewSavedAnswers';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
@@ -250,6 +255,7 @@ import {
 import {
   normalizeSessionSlug,
   resolveSessionAliases,
+  resolveSessionContractRef,
   resolveSessionSlugFromPathname,
 } from '../../utilities/session/sessionNaming.js';
 import {
@@ -2480,6 +2486,7 @@ export const buildSessionInterviewSubmitContextToken = (props: Record<string, un
     }) ||
     resolveConfiguredSessionWorkerUrlFromConfig(sessionConfig);
   const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
+  const responseContract = resolveSessionContractRef({ sessionConfig, contractKey: 'surveys' });
   const identityParts = [
     slug,
     networkId,
@@ -2491,6 +2498,9 @@ export const buildSessionInterviewSubmitContextToken = (props: Record<string, un
     String(sessionStorage.backend || storageProfile.backend || ''),
     String(storageResources.questions || ''),
     String(storageResources.surveys || ''),
+    String(storageResources.responses || ''),
+    String(responseContract.address || '').toLowerCase(),
+    String(responseContract.chainId || ''),
   ];
   return identityParts.join('|');
 };
@@ -2577,6 +2587,52 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
     return { status: 'failed' as const, message: 'No new or changed responses to submit.' };
   }
   return engine.encryptAndUpload();
+};
+
+export const loadSessionInterviewOwnAnswers = async (
+  engine: PileViewModeEngine,
+  questionIds: string[],
+  signal: AbortSignal,
+): Promise<InterviewSavedSlice | null> => {
+  const props = engine.props;
+  const token = buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(props));
+  const isCurrent = () =>
+    !signal.aborted &&
+    token ===
+      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const responses = await loadSessionInterviewSavedAnswers({
+    questionIds,
+    account: String(props.account || '')
+      .trim()
+      .toLowerCase(),
+    provider: props.provider,
+    sessionSlug: resolveEffectiveSlug(props),
+    sessionConfig: props.sessionConfig || {},
+    signal,
+  });
+  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  if (responses === null) return null;
+  const userAnswers = { responses };
+  const saved = engine.buildSliceFromUserAnswers(userAnswers);
+  await new Promise<void>((resolve) =>
+    engine.setState((previous: PileViewModeEngine['state']) => {
+      if (!isCurrent()) return null;
+      const merged = mergeInterviewSavedAnswerBaseline(
+        previous.surveysResponseState?.[0],
+        previous.editBaseline,
+        saved,
+        questionIds,
+        (a, b) => engine.valuesEqual(a, b),
+      );
+      return {
+        userAnswers,
+        editBaseline: merged.baseline,
+        surveysResponseState: [merged.slice, ...(previous.surveysResponseState || []).slice(1)],
+      };
+    }, resolve),
+  );
+  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  return saved || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
 };
 
 export const submitSessionInterviewResponses = async (engine: PileViewModeEngine, questionIds: string[] = []) => {
@@ -2809,7 +2865,18 @@ const renderPileResponseInput = (
         />
       );
 
-    case 'quadratic':
+    case 'quadratic': {
+      const baseline = resolveRevertPendingBaselineSlice({
+        editBaseline: engine.state.editBaseline,
+        isLoggedIn: Boolean(engine.props.loginComplete && engine.props.account),
+        userAnswers: engine.state.userAnswers,
+        buildSliceFromUserAnswers: (answers) => engine.buildSliceFromUserAnswers(answers),
+        buildSliceFromLocalCache: () => engine.buildSliceFromLocalCache(),
+      });
+      const savedAnswer = baseline.answers?.[question.id];
+      const savedValue =
+        savedAnswer && typeof savedAnswer === 'object' && 'value' in savedAnswer ? (savedAnswer.value ?? '') : '';
+
       return (
         <QuadraticAllocationInput
           questionId={question.id}
@@ -2818,8 +2885,11 @@ const renderPileResponseInput = (
           value={answer.value}
           disabled={engine.state.isSubmitting}
           onChange={updateAnswer}
+          onReset={() => updateAnswer(savedValue)}
+          canReset={JSON.stringify(answer.value ?? '') !== JSON.stringify(savedValue)}
         />
       );
+    }
     case 'multichoice': {
       const options = engine.getQuestionOptionsForInput(question);
       const isSingleSelect = isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question);
@@ -2856,7 +2926,7 @@ const renderPileResponseInput = (
             className={styles.ratingSlider}
           />
           <span className={styles.ratingValueDisplay}>
-            <span aria-label="Current rating">{ratingValue}</span>
+            <span aria-label="Current rating">{answer.value == null || answer.value === '' ? '–' : ratingValue}</span>
           </span>
         </div>
       );
@@ -3444,6 +3514,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   })
                 }
                 onRecordProvenance={engine.recordInterviewProvenance}
+                onLoadSavedResponses={(questionIds, signal) =>
+                  loadSessionInterviewOwnAnswers(engine, questionIds, signal)
+                }
                 onSubmitResponses={(questionIds) => submitSessionInterviewResponses(engine, questionIds)}
                 onViewResults={engine.viewResultsFromSessionVoiceModeModal}
                 renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion) =>

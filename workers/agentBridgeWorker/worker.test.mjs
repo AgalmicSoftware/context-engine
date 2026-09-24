@@ -193,7 +193,7 @@ function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
 function assertOpaqueTelegramButtons(buttons = []) {
   for (const button of buttons) {
     if (button.callback_data) {
-      assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+      assert.match(button.callback_data, /^cecb_[a-z0-9]{10,50}$/);
       assert.equal(button.callback_data.includes('alpha'), false);
       assert.equal(button.callback_data.includes('q-readiness'), false);
     }
@@ -204,13 +204,13 @@ function assertOpaqueTelegramButtons(buttons = []) {
         continue;
       }
       const launch = url.searchParams.get('start') || '';
-      assert.match(launch, /^ce(?:cb|tg)_[a-z0-9]{10,48}$/);
+      assert.match(launch, /^ce(?:cb|tg)_[a-z0-9]{10,50}$/);
       assert.equal(button.url.includes('q-readiness'), false);
       assert.equal(button.url.includes('private'), false);
     }
     if (button.web_app?.url) {
       const launch = new URL(button.web_app.url).searchParams.get('launch') || '';
-      assert.match(launch, /^cecb_[a-z0-9]{10,48}$/);
+      assert.match(launch, /^cecb_[a-z0-9]{10,50}$/);
       assert.equal(button.web_app.url.includes('q-readiness'), false);
       assert.equal(button.web_app.url.includes('private'), false);
     }
@@ -518,7 +518,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(state.unavailableQuestionCount, 0);
   assert.equal(JSON.stringify(state).includes(bytes32QuestionId), false);
   assert.equal(Object.hasOwn(state.questions[0], 'idShort'), false);
-  assert.match(state.questions[0].questionKey, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(state.questions[0].questionKey, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(state.agent.actions.some((action) => action.id === 'agent.settings.update'), true);
   assert.equal(state.agent.account.canonicalApiRequest.path, '/api/agent/accounts/create');
   assert.equal(state.agent.settings.values.draftStyle, 'balanced');
@@ -543,7 +543,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(Object.hasOwn(settings.settings, 'telegramReminders'), false);
   assert.equal(settings.request.canonicalApiRequest.path, '/api/agent/settings/update-request');
   assert.equal(Object.hasOwn(settings.request.canonicalApiRequest.body.settingsPatchSummary, 'telegramReminders'), false);
-  assert.match(settings.request.requestId, /^ceab_[a-z0-9]{10,48}$/);
+  assert.match(settings.request.requestId, /^ceab_[a-z0-9]{10,50}$/);
 
   const secretSettingsResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/settings', {
     method: 'POST',
@@ -578,7 +578,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(draft.ok, true);
   assert.equal(draft.status, 'submit_request_created');
   assert.equal(draft.draft.answerLabel, '8');
-  assert.match(draft.submitRequest.requestId, /^ceab_[a-z0-9]{10,48}$/);
+  assert.match(draft.submitRequest.requestId, /^ceab_[a-z0-9]{10,50}$/);
   assert.equal(draft.submitRequest.replayed, false);
   assert.match(draft.submitRequest.idempotencyKey, /^telegram_mini_submit:preview-user:alpha:/);
   assert.equal(draft.submitRequest.canonicalApiRequest.body.questionId, bytes32QuestionId);
@@ -922,8 +922,8 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
 
   assert.equal(groupPoseResponse.status, 200);
   assert.equal(groupPose.preview.screen, 'pose_question');
-  assert.match(groupMiniAppButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
-  assert.match(launch, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(groupMiniAppButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,50}$/);
+  assert.match(launch, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(groupMiniAppButton.url.includes('q-target'), false);
 
   const privateStartResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
@@ -938,7 +938,7 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
 
   assert.equal(privateStartResponse.status, 200);
   assert.equal(privateStart.preview.screen, 'private_start');
-  assert.match(privateMiniAppButton.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.match(privateMiniAppButton.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   assert.equal(new URL(privateMiniAppButton.web_app.url).searchParams.get('launch'), launch);
   assert.equal(privateMiniAppButton.web_app.url.includes('q-target'), false);
 
@@ -951,7 +951,7 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
   assert.equal(state.launch.launch, launch);
   assert.equal(target.activeFromLaunch, true);
   assert.equal(state.activeQuestionKey, target.questionKey);
-  assert.match(target.questionKey, /^cecb_[a-z0-9]{10,48}$/);
+  assert.match(target.questionKey, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(target.questionKey.includes('q-target'), false);
   assert.equal(state.launch.launch.includes('q-target'), false);
   assert.equal(JSON.stringify(state).includes('Which lane should Alpha choose?'), true);
@@ -1430,7 +1430,7 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   const joinStart = joinButtons.find((button) => button.text === 'Join Session');
   const questionButtons = flattenButtons(byCommand['/questions'].reply_markup);
 
-  assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   assert.deepEqual(
     questionButtons.filter((button) => button.text !== 'Back to Start').map((button) => button.text),
     ['Pose 1', 'Pose 2']

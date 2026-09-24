@@ -1805,7 +1805,6 @@ const renderSummaryStats = (report) => {
   const participants = new Set(rows.flatMap((answers) => answers.map((answer) => answer.responder))).size;
   const responses = rows.reduce((sum, answers) => sum + answers.length, 0);
   const average = participants ? responses / participants : 0;
-  const binaryCount = (value) => `${escapeHtml(value)} (${escapeHtml(value)} Binary)`;
   const activeFilter = report.mode === 'persona'
     ? `Persona mode: ${report.personaProfile?.label || report.personaId || 'Unknown'} (weights-only)`
     : 'None';
@@ -1816,10 +1815,10 @@ const renderSummaryStats = (report) => {
     bodyClassName: 'statsSectionCollapsible',
     body: `<div class="statsSection" data-benchmark-id="${escapeHtml(report.benchmarkId || '')}" data-benchmark-mode="${escapeHtml(report.mode || 'self')}" data-benchmark-issue-count="${escapeHtml(runsWithIssues)}"${personaAttribute}>
       <div class="statsRow">
-        <div class="statsItem">${renderStatLabel('Participants', 'Model participants with at least one readable averaged response. All benchmark questions are binary.')}<span class="statValue">${binaryCount(participants)}</span></div>
-        <div class="statsItem">${renderStatLabel('Questions', 'Questions with at least one readable response.')}<span class="statValue">${binaryCount(rows.length)}</span></div>
-        <div class="statsItem">${renderStatLabel('Responses', 'One averaged response per model and question, including Agree, Unsure, and Disagree. Repeated runs are nested observations.')}<span class="statValue">${binaryCount(responses)}</span></div>
-        <div class="statsItem">${renderStatLabel('Responses/Participant Avg', 'Responses divided by model participants with readable answers.')}<span class="statValue">${binaryCount(average.toFixed(2))}</span></div>
+        <div class="statsItem">${renderStatLabel('Participants', 'Model participants with at least one readable averaged response. All benchmark questions are binary.')}<span class="statValue">${escapeHtml(participants)}</span></div>
+        <div class="statsItem">${renderStatLabel('Questions', 'Questions with at least one readable response.')}<span class="statValue">${escapeHtml(rows.length)}</span></div>
+        <div class="statsItem">${renderStatLabel('Responses', 'One averaged response per model and question, including Agree, Unsure, and Disagree. Repeated runs are nested observations.')}<span class="statValue">${escapeHtml(responses)}</span></div>
+        <div class="statsItem">${renderStatLabel('Responses/Participant Avg', 'Responses divided by model participants with readable answers.')}<span class="statValue">${escapeHtml(average.toFixed(2))}</span></div>
       </div>
       <div class="statsRow">
         <div class="statsItem">${renderStatLabel('Active Filters', 'Summary of all active filters applied to this data.')}<div class="statValue"><span>${escapeHtml(activeFilter)}</span></div></div>
@@ -4003,7 +4002,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .beeswarmPointNoData:hover .beeswarmCircleNoData,
     .beeswarmPointNoData:focus-visible .beeswarmCircleNoData { opacity: 0.78; }
     .beeswarmCircleHover { fill: #ff9900; }
-    .beeTooltip { position: absolute; width: 300px; background: var(--ce-color-tooltip-bg); border: 1px solid var(--ce-color-tooltip-border); padding: 10px; font-size: 0.85rem; color: var(--ce-color-tooltip-text); pointer-events: auto; z-index: 999; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+    .beeTooltip { position: absolute; width: 300px; box-sizing: border-box; max-width: calc(100vw - 28px); max-height: calc(100dvh - 28px); overflow-y: auto; overscroll-behavior: contain; background: var(--ce-color-tooltip-bg); border: 1px solid var(--ce-color-tooltip-border); padding: 10px; font-size: 0.85rem; color: var(--ce-color-tooltip-text); pointer-events: auto; z-index: 999; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
     .beeTooltip[hidden] { display: none; }
     .beeTooltip .ce-report-muted { color: var(--ce-color-tooltip-muted); }
     .clusterLegendSection { width: 100%; margin-top: 12px; margin-bottom: 20px; }

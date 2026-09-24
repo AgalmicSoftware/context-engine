@@ -19,6 +19,18 @@ all-neutral response.
 For example, `[7, -7]` costs 98 credits and is valid under the default budget.
 `[8, -6]` costs 100 and is rejected. With a 25-credit budget, `[3, -4]` is valid.
 
+The pile editor keeps the same fixed card height as other question types. Labels
+and sliders share a row where space permits; narrow cards stack them. Options
+scroll vertically while the remaining-credit budget stays visible, with part of
+the next label showing when there are more options. A down-arrow button advances
+to the next options. An up arrow appears below the top; only up remains at the bottom. Oppose, remaining credits,
+Support, and reset share one row above the options. Reset is inactive when the
+answer matches the saved baseline, including when both are unanswered, so it cannot
+create an accidental draft. An edited neutral allocation can still be reset to a
+previously saved nonzero answer.
+The Questions toolbar's **Clear pending changes** button restores the saved
+response baseline, just like the pile's X control.
+
 ## Data format and identity
 
 ```json
@@ -113,8 +125,8 @@ control gives one squared-cost example, the shared budget, and the option to lea
 On standalone question pages, votes and remaining credits update locally during a drag;
 the completed allocation reaches the page's normal edit and draft-save handler on release
 or loss of focus. Keyboard changes update the answer immediately.
-The Reset undo-arrow icon returns every slider to zero and records a neutral allocation. It uses 50% opacity,
-with full opacity on hover or keyboard focus. Pile cards grow to fit their sliders; progress
+In pile cards, the Reset undo-arrow restores the saved answer, or clears the pending answer when none was saved. In draft editors it returns sliders to zero as a neutral allocation. It uses 50% opacity,
+with full opacity on hover or keyboard focus. Pile cards keep a fixed height and scroll their options; progress
 and submission remain in the pile's shared controls outside the question card.
 If signing or saving fails, the pile shows the error beneath the question
 and keeps the pending allocation available for retry.
@@ -123,3 +135,5 @@ The main client, Telegram mini-app, and companion browser use this interaction. 
 and smart-contract storage modes use the same ordered numeric arrays, definition validation,
 per-question budget, encryption encoding, and signed vote analysis. No Solidity interface change
 is required: question metadata and response payloads carry the new type through existing storage.
+
+The overflow scroll arrow sits below the options viewport in a yellow button, keeping it visible while the options scroll.

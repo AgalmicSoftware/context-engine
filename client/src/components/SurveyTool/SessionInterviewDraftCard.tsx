@@ -1,3 +1,4 @@
+import { responseValuesEqual as valuesEqual } from './responseValueEquality';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from 'reactstrap';
@@ -34,14 +35,6 @@ type Props = InterviewQuestionControls & {
   disabled: boolean;
   onSelect: (selected: boolean) => void;
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
-};
-
-const valuesEqual = (left: unknown, right: unknown): boolean => {
-  try {
-    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
-  } catch (_) {
-    return left === right;
-  }
 };
 
 const addEditedField = (edited: InterviewDraftResponse, field: EditableField): EditableField[] => {

@@ -86,6 +86,29 @@ describe('workerCanonicalRouteController', () => {
     expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
   });
 
+  it.each(['/compare', '/compare/', '/u/0x1111111111111111111111111111111111111111'])(
+    'scopes verified query configuration to its exact session and origin on %s',
+    (path) => {
+      const { host } = buildHost();
+      const controller = createWorkerCanonicalRouteController(host);
+      const config = { slug: 'worker-session', configRevision: 'revision-1' };
+      controller.handleBootstrapResolved({
+        config,
+        configRevision: 'revision-1',
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        sessionSlug: config.slug,
+        workerOrigin: 'https://worker.example.com',
+      });
+      window.history.replaceState({}, '', `${path}?session=worker-session`);
+      expect(controller.getActiveVerifiedConfig('worker-session')).toBe(config);
+      expect(controller.getActiveVerifiedConfig('other-session')).toBeNull();
+      window.history.replaceState({}, '', `${path}?session=worker-session&worker=https%3A%2F%2Fother.example.com`);
+      expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
+      window.history.replaceState({}, '', `${path}?session=other-session`);
+      expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
+    },
+  );
+
   it('returns one stable controller per AppShell host', () => {
     const { host } = buildHost();
     expect(getWorkerCanonicalRouteController(host)).toBe(getWorkerCanonicalRouteController(host));

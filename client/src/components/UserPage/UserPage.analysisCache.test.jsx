@@ -207,6 +207,7 @@ describe('UserPage analysis cache and routing', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
     const result = {
+      generation: { provider: 'openrouter', model: 'provider/resolved-model', source: 'reported' },
       summary: 'fresh summary',
       details: 'fresh details',
       name: 'Fresh Analysis',
@@ -224,7 +225,7 @@ describe('UserPage analysis cache and routing', () => {
       const { fingerprint, entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
       expect(fingerprint).toEqual(expect.any(String));
       expect(entry).toMatchObject({
-        version: 1,
+        version: 2,
         fingerprint,
         cachedAt: now,
         expiresAt: now + 24 * 60 * 60 * 1000,
@@ -237,8 +238,21 @@ describe('UserPage analysis cache and routing', () => {
         },
         result,
       });
-      expect(instance.state.analysisServedFromCache).toBe(false);
-      expect(instance.state.analysisCachedAt).toBeNull();
+      expect(instance.state.analysisGeneration).toEqual(result.generation);
+      instance._hydrateAnalysisFromCache(entry);
+      expect(instance.state.analysisGeneration).toEqual(result.generation);
+      expect(instance.state.analysisServedFromCache).toBe(true);
+      expect(instance.state.analysisCachedAt).toBe(now);
+      entry.version = 1;
+      expect(
+        instance._readAnalysisCacheEntry({
+          action: 'read',
+          addressLower,
+          networkId: networkID,
+          sessionSlug: slug,
+          fingerprint,
+        }),
+      ).toBeNull();
     } finally {
       nowSpy.mockRestore();
     }

@@ -1,3 +1,4 @@
+import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
@@ -9,6 +10,7 @@ import {
   createPileViewRuntimeStrategy,
   recordInterviewProvenance,
   submitSessionInterviewResponses,
+  loadSessionInterviewOwnAnswers,
 } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
@@ -292,7 +294,67 @@ describe('SurveyPileViewMode runtime surface', () => {
     fireEvent.change(parks, { target: { value: '4' } });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(parks).toHaveValue('3');
+    expect(screen.getByRole('button', { name: /Submit.*1/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset', exact: true }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Submit.*1/i })).not.toBeInTheDocument());
+    expect(parks).toHaveValue('0');
+    expect(screen.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
   });
+
+  it.each([
+    { saved: [3, -4], draft: [0, 0] },
+    { saved: [0, 0], draft: [1, -1] },
+  ])(
+    'undoes an edited saved quadratic answer without leaving a pending submission ($saved)',
+    async ({ saved, draft }) => {
+      const runtimeStrategy = createPileViewRuntimeStrategy();
+      let engine;
+      renderPile({
+        runtimeStrategy: {
+          ...runtimeStrategy,
+          render: (current) => {
+            engine = current;
+            return runtimeStrategy.render(current);
+          },
+        },
+        questionPool: [
+          {
+            id: 'quadratic-q',
+            type: 'quadratic',
+            prompt: 'Allocate support',
+            options: ['Parks', 'Transit'],
+            voiceCredits: 25,
+          },
+        ],
+        cacheHasLoaded: false,
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: false,
+        isSBTCacheReady: false,
+        isSurveyCacheReady: false,
+      });
+      const parks = await screen.findByLabelText('Parks');
+      const savedSlice = {
+        answers: { 'quadratic-q': { value: saved, encrypted: false } },
+        importance: {},
+        conviction: {},
+        additionalComments: { 'quadratic-q': { value: 'Keep this saved comment', encrypted: false } },
+      };
+      // Seed the same hydrated edit baseline used after retrieving a saved response.
+      // Subsequent edits, reset and pending-submit calculation use the real runtime.
+      act(() => engine.setState({ editBaseline: savedSlice, surveysResponseState: [savedSlice] }));
+      expect(parks).toHaveValue(String(saved[0]));
+      fireEvent.change(parks, { target: { value: String(draft[0]) } });
+      fireEvent.change(screen.getByLabelText('Transit'), { target: { value: String(draft[1]) } });
+      expect(screen.getByRole('button', { name: /Submit.*1/i })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Reset', exact: true }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: /Submit.*1/i })).not.toBeInTheDocument());
+      expect(parks).toHaveValue(String(saved[0]));
+      expect(screen.getByLabelText('Transit')).toHaveValue(String(saved[1]));
+      expect(engine.state.surveysResponseState[0].answers['quadratic-q'].value).toEqual(saved);
+      expect(engine.state.surveysResponseState[0].additionalComments).toEqual(savedSlice.additionalComments);
+      expect(screen.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
+    },
+  );
 
   it('updates a pile rating through the shared slider persistence helper', async () => {
     renderPile({
@@ -1490,7 +1552,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('min', '1');
     expect(slider).toHaveAttribute('max', '10');
-    expect(screen.getByLabelText('Current rating')).toHaveTextContent('1');
+    expect(screen.getByLabelText('Current rating')).toHaveTextContent('–');
     expect(screen.queryByText('Almost none of it')).not.toBeInTheDocument();
     expect(screen.queryByText('All of it')).not.toBeInTheDocument();
   });
@@ -1502,4 +1564,72 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     expect(await screen.findByTestId('mock-pile-create')).toHaveAttribute('data-hide-survey-toggle', 'true');
   });
+});
+
+describe('independent interview own-answer hydration', () => {
+  it('installs a complete baseline and ignores an old account’s late load', async () => {
+    let resolve;
+    const load = jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const engine = {
+      props: { account: '0xabc', loginComplete: true, sessionSlug: 'demo', sessionConfig: { slug: 'demo' } },
+      state: {
+        surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        editBaseline: {},
+      },
+      valuesEqual: Object.is,
+      buildSliceFromUserAnswers: jest.fn(() => ({
+        answers: { q1: { value: 'saved' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      })),
+      setState(update, callback) {
+        this.state = { ...this.state, ...update(this.state) };
+        callback();
+      },
+    };
+    try {
+      const pending = loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal);
+      engine.props = { ...engine.props, account: '0xdef' };
+      resolve([{ questionID: 'q1', answer: { value: 'saved' } }]);
+      await expect(pending).rejects.toThrow('account or session changed');
+      expect(engine.state.editBaseline).toEqual({});
+      const current = loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal);
+      resolve([{ questionID: 'q1', answer: { value: 'saved' } }]);
+      await expect(current).resolves.toMatchObject({ answers: { q1: { value: 'saved' } } });
+      expect(engine.state.surveysResponseState[0].answers.q1).toEqual({ value: 'saved' });
+      expect(engine.state.userAnswers.responses).toHaveLength(1);
+    } finally {
+      load.mockRestore();
+    }
+  });
+});
+
+it('invalidates interview readiness when response storage or contract targets change', () => {
+  const base = {
+    sessionSlug: 'alpha',
+    sessionConfig: {
+      slug: 'alpha',
+      contracts: { surveys: { address: '0xabc', chainId: 11155420 } },
+      storageProfile: { resources: { responses: 'arweave' } },
+    },
+  };
+  const token = buildSessionInterviewSubmitContextToken(base);
+  expect(
+    buildSessionInterviewSubmitContextToken({
+      ...base,
+      sessionConfig: { ...base.sessionConfig, storageProfile: { resources: { responses: 'cloudflare' } } },
+    }),
+  ).not.toBe(token);
+  expect(
+    buildSessionInterviewSubmitContextToken({
+      ...base,
+      sessionConfig: { ...base.sessionConfig, contracts: { surveys: { address: '0xdef', chainId: 11155420 } } },
+    }),
+  ).not.toBe(token);
 });

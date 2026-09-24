@@ -165,6 +165,7 @@ import {
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageComparePanel from './UserPageComparePanel';
+import { resolveCompareCachesReady } from './compareSessionRuntime';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
@@ -221,7 +222,7 @@ const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
 const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
 const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
-const USER_ANALYSIS_CACHE_VERSION = 1;
+const USER_ANALYSIS_CACHE_VERSION = 2;
 const USER_ANALYSIS_TTL_MS = 24 * 60 * 60 * 1000;
 
 type UnknownRecord = Record<string, unknown>;
@@ -3735,10 +3736,12 @@ class UserPage extends Component<any, any> {
 
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
-            activeSessionSlug={this.props.activeSessionSlug ?? this.props.sessionSlug ?? ''}
+            activeSessionSlug={this.props.sessionConfig?.slug || this.getActiveSessionSlug()}
             firstAddress={propViewAddress}
             account={account}
-            sessionCachesReady={this.props.isAllCachesReady}
+            sessionCachesReady={resolveCompareCachesReady(this.props)}
+            sessionCacheError={this.props.comparisonSessionError}
+            loadSessionData={this.props.loadComparisonSessionData}
             scanSpecificUserProfile={this.props.scanSpecificUserProfile}
           />
         </UserPageComparePanel>
@@ -3826,7 +3829,7 @@ class UserPage extends Component<any, any> {
 
             {renderUserPageMembershipSections({
               account,
-              activeSessionSlug: this.getActiveSessionSlug(),
+              activeSessionSlug: this.props.sessionConfig?.slug || this.getActiveSessionSlug(),
               isOwner,
               isSimulated,
               onChainProfileEnabled: this.props.onChainProfileEnabled,
@@ -3862,6 +3865,7 @@ class UserPage extends Component<any, any> {
           analysisElapsedMs={analysisElapsedMs}
           analysisError={analysisError}
           analysisErrorAction={analysisErrorAction}
+          analysisGeneration={this.state.analysisGeneration}
           analysisHistoricalFigure={analysisHistoricalFigure}
           analysisHistoricalReasoning={analysisHistoricalReasoning}
           analysisModalDisplayState={analysisModalDisplayState}

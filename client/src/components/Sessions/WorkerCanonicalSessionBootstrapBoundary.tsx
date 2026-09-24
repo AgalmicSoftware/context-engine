@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import {
   fetchWorkerCanonicalSessionBootstrap,
@@ -215,7 +216,11 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
 
   return (
     <div role="status" aria-live="polite" data-testid="ce-worker-canonical-bootstrap-status">
-      {viewState.message}
+      {viewState.kind === 'loading' ? (
+        <ElapsedLoadingLabel key={`${sessionSlug}:${retryNonce}`} label={viewState.message} />
+      ) : (
+        viewState.message
+      )}
     </div>
   );
 };

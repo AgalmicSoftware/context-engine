@@ -25,7 +25,7 @@ it('preserves a custom quadratic budget through filtered CSV and report snapshot
     networkQuestions: { q1: question },
   });
   expect(filtered[0]).toMatchObject({ voiceCredits: 25 });
-  expect(buildSurveyResultsQuestionsCsvExport(filtered)).toContain('"Parks;Transit","25"');
+  expect(buildSurveyResultsQuestionsCsvExport(filtered)).toContain('"[""Parks"",""Transit""]","25"');
   const reportQuestions = buildSurveyResultsHtmlReportQuestionsForExport({ filteredQuestions: filtered });
   const snapshot = buildRedactedSessionResultsSnapshot({ sections: { report: { questions: reportQuestions } } });
   expect(snapshot.sections.report.questions[0]).toMatchObject({ voiceCredits: 25 });

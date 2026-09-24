@@ -1,0 +1,9 @@
+# Profile analysis and comparison
+
+User Analysis summarizes the profile's visible answers and affiliations. Its prose describes themes, preferences and reservations rather than listing rating scores, quadratic votes or credit arithmetic. Missing or encrypted answers are not treated as neutral views.
+
+The analysis displays the model reported by the AI provider. When a Worker omits that metadata, the label says **Requested AI model** instead. Model provenance is stored with the summary, so changing AI settings does not relabel a cached result. Older summaries without model information say **AI model: not recorded**. The updated prompt uses a new cache version; opening analysis regenerates an older-format summary through the usual authorized AI request.
+
+Comparisons opened from a profile keep that profile's session in the comparison URL. A cold profile or comparison link first fetches and verifies the Hosted Worker configuration; a saved discovery address alone does not establish readiness. Hosted comparisons use the session's complete question, survey and response caches; they do not wait for an unrelated chain membership cache. Switching sessions reruns the comparison using that session's visible data. Loading indicators show elapsed seconds. Failed or stalled loading shows an error and a retry control without presenting empty comparison results or treating incomplete responses as ready. A Worker that rejects the browser origin shows that specific error; local testing requires an already permitted origin or a synthetic fixture. Chain-backed comparisons retain their existing cache and profile-scan requirements.
+
+Selected wallets appear as compact identity pills; use the clear button to replace one. Comparison controls use the active theme: rounded pills and a teal action in Context Engine, square beveled controls in Classic 95.

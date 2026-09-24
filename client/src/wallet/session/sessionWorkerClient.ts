@@ -119,25 +119,37 @@ export const createInMemorySoftSessionClient = (): SoftSessionClient => {
 export const createWorkerSoftSessionClient = (): SoftSessionClient => {
   if (typeof Worker === 'undefined') return createInMemorySoftSessionClient();
   let worker: Worker | null = null;
+  let starting: Promise<Worker> | null = null;
+  let generation = 0;
   let seq = 0;
   const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 
   const ensureWorker = async (): Promise<Worker> => {
     if (worker) return worker;
-    const { createSessionWorker } = await import('./sessionWorkerFactory.js');
-    worker = createSessionWorker();
-    worker.onmessage = (event: MessageEvent<{ id: string; ok: boolean; result?: unknown; error?: string }>) => {
-      const item = pending.get(event.data.id);
-      if (!item) return;
-      pending.delete(event.data.id);
-      if (event.data.ok) item.resolve(event.data.result);
-      else item.reject(new Error(event.data.error || 'Wallet worker request failed.'));
-    };
-    worker.onerror = (event) => {
-      pending.forEach((item) => item.reject(new Error(event.message || 'Wallet worker failed.')));
-      pending.clear();
-    };
-    return worker;
+    if (starting) return starting;
+    const requestedGeneration = generation;
+    starting = import('./sessionWorkerFactory.js')
+      .then(({ createSessionWorker }) => {
+        if (requestedGeneration !== generation) throw new Error('Passkey wallet is locked.');
+        worker = createSessionWorker();
+        worker.onmessage = (event: MessageEvent<{ id: string; ok: boolean; result?: unknown; error?: string }>) => {
+          const item = pending.get(event.data.id);
+          if (!item) return;
+          pending.delete(event.data.id);
+          if (event.data.ok) item.resolve(event.data.result);
+          else item.reject(new Error(event.data.error || 'Wallet worker request failed.'));
+        };
+        worker.onerror = (event) => {
+          pending.forEach((item) => item.reject(new Error(event.message || 'Wallet worker failed.')));
+          pending.clear();
+        };
+        return worker;
+      })
+      .catch((error) => {
+        if (requestedGeneration === generation) starting = null;
+        throw error;
+      });
+    return starting;
   };
 
   const callWorker = (payload: Record<string, unknown>): Promise<unknown> => {
@@ -145,7 +157,9 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
       ensureWorker()
-        .then((activeWorker) => activeWorker.postMessage({ ...payload, id }))
+        .then((activeWorker) => {
+          if (pending.has(id)) activeWorker.postMessage({ ...payload, id });
+        })
         .catch((error) => {
           pending.delete(id);
           reject(error);
@@ -162,12 +176,13 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
       return callWorker({ type: 'request', ...args });
     },
     async lock() {
-      if (worker) {
-        await callWorker({ type: 'lock' });
-        worker.terminate();
-        worker = null;
-      }
+      // Termination discards the signer without waiting for a busy worker to acknowledge a lock.
+      generation += 1;
+      pending.forEach((item) => item.reject(new Error('Passkey wallet is locked.')));
       pending.clear();
+      worker?.terminate();
+      worker = null;
+      starting = null;
     },
   };
 };

@@ -94,6 +94,26 @@ describe('session interview protocol', () => {
     });
   });
 
+  it('matches the Worker public catalog without treating privacy topics as access restrictions', async () => {
+    const { __test__interviewQuestionCatalog: worker } =
+      await import('../../../../workers/sessionCorsWorker/interviewQuestionCatalog.js');
+    const input = [
+      { id: 'encrypted', prompt: 'Should chats be encrypted?', type: 'binary' },
+      { id: 'locked', prompt: 'Should a decision be locked after voting?', type: 'freeform' },
+      { id: 'blocked', prompt: 'When should blocked users return?', type: 'freeform' },
+      { id: 'mask', prompt: '[encrypted]' },
+      { id: 'private', prompt: 'Private view', promptEncrypted: { ciphertext: 'sealed' } },
+      { id: 'gate', prompt: 'Gated view', gates: ['group'] },
+      { id: 'hidden', prompt: 'Hidden view', visibility: 'private' },
+    ];
+    expect(normalizeInterviewQuestions(input).map((question) => question.id)).toEqual([
+      'encrypted',
+      'locked',
+      'blocked',
+    ]);
+    expect(normalizeInterviewQuestions(input)).toEqual(worker.dedupeQuestions(input));
+  });
+
   it('canonicalizes question hashing order and resolves realtime model provenance', () => {
     expect(resolveRealtimeInterviewSource({ ai: { realtimeModel: 'gpt-realtime-2.1' } }).modelId).toBe(
       'gpt-realtime-2.1',
@@ -164,17 +184,17 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain(
       'https://worker.example/agent/interview-catalog?slug=demo%20one&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%20one',
     );
-    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v5"');
+    expect(kickoff).toContain('prefillPromptVersion "ce-interview-brief-v4" or "ce-interview-brief-v5"');
     expect(kickoff).toContain('stop and report a stale catalog');
     expect(kickoff).toContain('conversation history, memory, and connected sources already available to you');
     expect(kickoff).toContain('reasonable inferences');
     expect(kickoff).toContain('question-relevant background, views, experience, uncertainties, and caveats');
     expect(kickoff).toContain('Distinguish stated facts from inferred context');
     expect(kickoff).toContain(
-      'multichoice answers use one exact option when singleSelect is true, otherwise an array of exact options',
+      'v5: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop',
     );
     expect(kickoff).toContain(
-      'quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
+      'Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
     );
     expect(kickoff).toContain('Every response needs confidence from 0 to 1');
     expect(kickoff).toContain('additionalComments is text');
@@ -185,7 +205,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('Use null when the platform does not reveal a searched count');
     expect(kickoff).not.toContain('responderContext.name');
     expect(kickoff).not.toContain('preferred name');
-    expect(kickoff).toContain('"responderContext":{"summary":"concise relevant background/views/uncertainties"');
+    expect(kickoff).toContain('"responderContext":{"summary":"relevant background/views/uncertainties"');
     expect(kickoff).toContain('"facts":[{"fact":"stated or inferred context"');
     expect(kickoff).toContain('the exact single-line JSON packet');
     expect(kickoff).toContain('Nothing is submitted;');
@@ -490,6 +510,26 @@ describe('session interview protocol', () => {
     ).toEqual([
       { questionId: 'rating-low', answer: 1, confidence: 0.6 },
       { questionId: 'rating-high', answer: 10, confidence: 0.7 },
+    ]);
+  });
+
+  it.each([null, undefined, '', '   ', false, true, [], [4], {}, 'not numeric'])(
+    'omits invalid rating answers instead of inventing a scale value: %p',
+    (answer) => {
+      const questions = normalizeInterviewQuestions([
+        { id: 'rating', prompt: 'How much?', type: 'rating', scale: { min: 1, max: 10 } },
+      ]);
+      const responses = [{ questionId: 'rating', answer, confidence: 0.8 }];
+      expect(parseInterviewDraftResponses(JSON.stringify({ responses }), questions)).toEqual([]);
+      expect(readImportedInterviewDraftResponses({ ...packet, responses }, questions)).toEqual([]);
+    },
+  );
+
+  it.each([0, '0', 4, ' 4.5 '])('preserves explicit numeric rating values: %p', (answer) => {
+    const questions = normalizeInterviewQuestions([{ id: 'rating', prompt: 'How much?', type: 'rating' }]);
+    const responses = [{ questionId: 'rating', answer, importance: null, conviction: '', confidence: 0.8 }];
+    expect(parseInterviewDraftResponses(JSON.stringify({ responses }), questions)).toEqual([
+      { questionId: 'rating', answer: Number(answer), confidence: 0.8 },
     ]);
   });
 

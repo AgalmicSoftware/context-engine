@@ -252,6 +252,31 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 
 	const adminToken = await login({ env, wallet: admin });
 	const participantToken = await login({ env, wallet: participant });
+	for (const fields of [
+		{ accessConditions: 'NOT VALID JSON' },
+		{ accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }, null] } },
+		{ groupIds: '["finance"' },
+		{ uploadPolicy: { groupIds: ['finance'] } },
+	]) {
+		const before = storageKv.dump();
+		const rejected = await fetchWorker(makeRequest('/storage/upload', {
+			method: 'POST', token: participantToken,
+			body: { data: 'rejected policy fixture', ...fields },
+		}), env);
+		assert.equal(rejected.status, 400, await rejected.clone().text());
+		assert.deepEqual(storageKv.dump(), before);
+	}
+	const form = new FormData();
+	form.append('file', new Blob(['rejected multipart fixture']), 'payload.txt');
+	form.append('accessConditions', '');
+	form.append('accessConditions', 'NOT VALID JSON');
+	const duplicatePolicy = await fetchWorker(new Request('https://worker.example/storage/upload', {
+		method: 'POST',
+		headers: { Origin: ORIGIN, 'X-Session-Slug': SESSION_SLUG, Authorization: `Bearer ${participantToken}` },
+		body: form,
+	}), env);
+	assert.equal(duplicatePolicy.status, 400, await duplicatePolicy.clone().text());
+	assert.equal(storageKv.dump().size, 0);
 	const marker = 'credential-free bundle runtime plaintext marker';
 	const uploadResponse = await fetchWorker(
 		makeRequest('/storage/upload', {

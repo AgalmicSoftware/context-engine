@@ -228,11 +228,12 @@ export function buildAggregatorFromLocalCache(
       const parsedRecord = asRecord(parsed);
       const answerValue = parsedRecord.answer;
       const ans = asRecord(answerValue);
-      const isBinary = parsedRecord.type === 'binary';
+      const responseType = String(parsedRecord.type || asRecord(questions[qId]).type || '').toLowerCase();
+      const isSupported = ['binary', 'rating', 'freeform', 'multichoice', 'quadratic'].includes(responseType);
       const isEnc = !!(ans.encrypted || ans.encryptedPortion);
       const isMasked = ans.value === '*';
 
-      if (isBinary && answerValue && !isEnc && !isMasked) {
+      if (isSupported && answerValue && !isEnc && !isMasked) {
         const responseJson = rawResponseString || JSON.stringify(parsed);
         aggregatorMap[qId].push({
           responder: resAddr,

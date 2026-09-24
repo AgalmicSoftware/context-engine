@@ -271,7 +271,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       additionalComments: hasOwn(submissionValueSnapshot, 'additionalComments')
         ? submissionValueSnapshot.additionalComments
         : (additional.value ?? ''),
-      importance: importance !== null ? importance : null,
+      // Research describes the bytes submitted, including the legacy conviction fallback.
+      importance: importanceForPayload !== null ? importanceForPayload : null,
       conviction: conviction !== null ? conviction : null,
     };
     const comparisonFields = ['answer', 'additionalComments', 'importance', 'conviction'] as const;

@@ -1,3 +1,6 @@
+import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
+import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
@@ -29,7 +32,6 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import {
   buildExternalInterviewKickoff,
   buildRealtimeInterviewInstructions,
-  hashInterviewQuestions,
   mapInterviewEvidenceToResponses,
   normalizeInterviewQuestions,
   readImportedInterviewDraftResponses,
@@ -38,6 +40,10 @@ import {
   type InterviewQuestion,
   type SessionVoiceMode,
 } from './sessionInterview';
+import {
+  resolveInterviewPrefillQuestions,
+  scopeInterviewPrefillToQuestions,
+} from './sessionInterviewCatalogValidation';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
 import {
   resolveSuggestedQuestionAuthoringState,
@@ -84,6 +90,7 @@ type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   context?: unknown;
   workerUrl?: string;
   existingResponseSlice?: UnknownRecord | null;
+  onLoadSavedResponses?: InterviewSavedAnswerLoader;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
   account?: unknown;
@@ -106,6 +113,7 @@ type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
 
 type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
+  onReviewStateChange: (dirty: boolean) => void;
 };
 
 function SessionInterviewPanel({
@@ -114,7 +122,8 @@ function SessionInterviewPanel({
   sessionConfig = null,
   context,
   workerUrl = '',
-  existingResponseSlice = null,
+  existingResponseSlice: formResponseSlice = null,
+  onLoadSavedResponses,
   prefillPacket = null,
   initialError = '',
   account = '',
@@ -138,10 +147,13 @@ function SessionInterviewPanel({
   renderAdditionalInput,
   renderFieldLock,
   onClose,
+  onReviewStateChange,
 }: SessionInterviewPanelProps) {
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
   const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
+  const catalogAbortRef = useRef<AbortController | null>(null);
+  const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
@@ -201,6 +213,7 @@ function SessionInterviewPanel({
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
+      catalogAbortRef.current?.abort();
       if (copyResetRef.current) clearTimeout(copyResetRef.current);
       if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
     };
@@ -266,9 +279,32 @@ function SessionInterviewPanel({
   ].join('|');
   const hasReadinessContextToken =
     responseReadinessContextToken !== undefined && responseReadinessContextToken !== null;
+  const ownAnswers = useInterviewSavedAnswers({
+    load: onLoadSavedResponses,
+    contextKey: activeSubmitContextToken,
+    questionIds: [...questions.map((question) => question.id), ...drafts.map((draft) => draft.questionId)],
+    active: authenticatedForSubmit,
+    onLoaded: (slice) => {
+      const conflicts = drafts.filter((draft) => hasDraftValue(responseFieldValue(slice, 'answers', draft.questionId)));
+      if (!conflicts.length) return;
+      setSelected((current) => ({
+        ...current,
+        ...Object.fromEntries(conflicts.map((draft) => [draft.questionId, false])),
+      }));
+      pendingSubmitBaseContextRef.current = '';
+      pendingSubmitActiveContextRef.current = '';
+      setPendingSubmitAfterLogin(false);
+      setStatus('Saved answers loaded. Select any answers you want to replace.');
+    },
+  });
+  const existingResponseSlice = ownAnswers.slice || formResponseSlice;
+  const existingResponsesRef = useRef(existingResponseSlice);
+  existingResponsesRef.current = existingResponseSlice;
   const responseStateReadyForSubmit =
-    isResponsesCacheReady !== false &&
-    (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
+    onLoadSavedResponses && !ownAnswers.legacy
+      ? ownAnswers.ready
+      : isResponsesCacheReady !== false &&
+        (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
   const suggestedQuestionAuthoringState = resolveSuggestedQuestionAuthoringState({
     account,
     loginComplete,
@@ -363,24 +399,27 @@ function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
-          const currentQuestionSetHash = await hashInterviewQuestions(
+          catalogAbortRef.current = new AbortController();
+          const matchedQuestions = await resolveInterviewPrefillQuestions({
+            packet: prefillPacket,
             questions,
-            prefillPacket.promptVersion || 'ce-interview-brief-v1',
-          );
+            sessionSlug,
+            loadWorkerUrl: resolveWorkerUrl,
+            sessionUrl: buildInterviewReturnSessionUrl(),
+            signal: catalogAbortRef.current.signal,
+          });
           if (disposedRef.current) return;
-          if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
-            throw new Error(
-              'This prefill link was created for an older or different question set. Ask the AI for a fresh link.',
-            );
-          }
           // Validate imported evidence once; later additions must not block continued interviews.
           validatedPrefillRef.current = prefillPacket;
+          validatedPrefillQuestionsRef.current = matchedQuestions;
         }
         const importedDrafts = nextTranscript.trim()
           ? null
-          : readImportedInterviewDraftResponses(prefillPacket, questions);
+          : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions);
         const contextPacket: InterviewPrefillPacket | null =
-          prefillPacket ||
+          (prefillPacket
+            ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
+            : null) ||
           (responderContext.trim()
             ? {
                 version: 1,
@@ -395,7 +434,8 @@ function SessionInterviewPanel({
           const url = await resolveWorkerUrl();
           if (disposedRef.current) return;
           mapped = await mapInterviewEvidenceToResponses({
-            questions,
+            questions:
+              !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions,
             transcript: nextTranscript,
             prefillPacket: contextPacket,
             sessionSlug,
@@ -429,7 +469,7 @@ function SessionInterviewPanel({
           editedDrafts,
           selected,
           mapped,
-          (id) => !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', id)),
+          (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
           importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
         );
         for (const draft of review.drafts) {
@@ -437,7 +477,7 @@ function SessionInterviewPanel({
             review.edited[draft.questionId] = {
               ...review.edited[draft.questionId],
               additionalComments: String(
-                responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || '',
+                responseFieldValue(existingResponsesRef.current, 'additionalComments', draft.questionId) || '',
               ),
             };
           }
@@ -481,7 +521,6 @@ function SessionInterviewPanel({
       editedDrafts,
       selected,
       suggestedQuestions,
-      existingResponseSlice,
       prefillPacket,
       questions,
       resolveWorkerUrl,
@@ -527,13 +566,13 @@ function SessionInterviewPanel({
     setShowTranscript(false);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
-        ? prefillPacket
+        ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
         : null;
     const importedDrafts = validatedPrefillPacket
-      ? readImportedInterviewDraftResponses(validatedPrefillPacket, questions)
+      ? readImportedInterviewDraftResponses(validatedPrefillPacket, validatedPrefillQuestionsRef.current || questions)
       : null;
-    void recorder.start(
-      buildRealtimeInterviewInstructions({
+    try {
+      const instructions = buildRealtimeInterviewInstructions({
         questions,
         responderContext,
         openingPrompt: interviewOpening.opening,
@@ -541,12 +580,17 @@ function SessionInterviewPanel({
         previousTranscript: transcriptRef.current,
         prefillPacket: validatedPrefillPacket,
         importedDrafts,
+        onContextLimited: setMappingNotice,
         reviewedResponses: drafts.map((draft) => ({
           prediction: draft,
           reviewed: editedDrafts[draft.questionId],
         })),
-      }),
-    );
+      });
+      void recorder.start(instructions);
+    } catch (instructionError) {
+      setError(instructionError instanceof Error ? instructionError.message : 'Could not prepare voice context.');
+      setStatus('Error');
+    }
   };
 
   const endInterview = async () => {
@@ -671,15 +715,12 @@ function SessionInterviewPanel({
   ]);
 
   const copyAgentPrompt = async () => {
-    if (!kickoff || !navigator.clipboard?.writeText) return;
-    try {
-      await navigator.clipboard.writeText(kickoff);
-      setPromptCopied(true);
-      if (copyResetRef.current) clearTimeout(copyResetRef.current);
-      copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
-    } catch {
-      setPromptCopied(false);
-    }
+    setPromptCopied(false);
+    if (!kickoff || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(kickoff);
+    setPromptCopied(true);
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
   };
 
   const sessionUrl = buildInterviewReturnSessionUrl();
@@ -736,6 +777,24 @@ function SessionInterviewPanel({
           (idle && (readiness.state !== 'ready' || interviewOpening.loading))
         ? 'pending'
         : 'ready';
+  useEffect(() => {
+    onReviewStateChange(
+      !submitSucceeded &&
+        !isInterviewBusy &&
+        Boolean(
+          transcript.trim() || drafts.length || prefillPacket || responderContext.trim() || suggestedQuestions.length,
+        ),
+    );
+  }, [
+    submitSucceeded,
+    isInterviewBusy,
+    transcript,
+    drafts.length,
+    prefillPacket,
+    responderContext,
+    suggestedQuestions.length,
+    onReviewStateChange,
+  ]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
@@ -852,15 +911,22 @@ function SessionInterviewPanel({
           {kickoff && !hasImportedExternalPrefill ? (
             <SessionInterviewMemoryKickoffCard
               kickoff={kickoff}
+              validateKickoff={() =>
+                verifyInterviewKickoffCatalog({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })
+              }
               promptCopied={promptCopied}
               showAgentPrompt={showAgentPrompt}
-              onCopyPrompt={() => {
-                void copyAgentPrompt();
-              }}
+              onCopyPrompt={copyAgentPrompt}
               onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
             />
           ) : null}
 
+          {ownAnswers.error ? (
+            <div className={styles.sessionListeningError} role="alert">
+              Could not load your saved answers: {ownAnswers.error}
+              <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
+            </div>
+          ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection
               title="Review proposed responses"
@@ -1023,37 +1089,70 @@ function SessionInterviewPanel({
 
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [] } = props;
+  const [hasUnsavedReview, setHasUnsavedReview] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  useEffect(() => {
+    if (!isOpen || mode !== 'interview') {
+      setHasUnsavedReview(false);
+      setConfirmDiscard(false);
+    }
+  }, [isOpen, mode]);
+  const requestClose = () => {
+    if (hasUnsavedReview) setConfirmDiscard(true);
+    else onClose();
+  };
   const questions = useMemo(() => normalizeInterviewQuestions(questionPool), [questionPool]);
   const title = mode === 'interview' ? 'Interview' : mode === 'recordGroup' ? 'Group Conversation' : 'Voice mode';
   return (
-    <Modal
-      isOpen={isOpen}
-      toggle={onClose}
-      size="lg"
-      centered
-      labelledBy="ce-session-voice-mode-title"
-      returnFocusAfterClose
-      contentClassName={styles.sessionVoiceModeModal}
-      data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
-    >
-      {mode === 'interview' ? (
-        isOpen ? (
-          <SessionInterviewPanel {...props} questions={questions} />
-        ) : null
-      ) : (
-        <>
-          <ModalHeader id="ce-session-voice-mode-title" toggle={onClose}>
-            {title}
-          </ModalHeader>
-          <ModalBody>
-            {!mode ? (
-              <SessionVoiceModeChooser onSelectMode={onSelectMode} />
-            ) : (
-              <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
-            )}
-          </ModalBody>
-        </>
-      )}
-    </Modal>
+    <>
+      <Modal
+        isOpen={isOpen}
+        toggle={requestClose}
+        size="lg"
+        centered
+        labelledBy="ce-session-voice-mode-title"
+        returnFocusAfterClose
+        contentClassName={styles.sessionVoiceModeModal}
+        data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
+      >
+        {mode === 'interview' ? (
+          isOpen ? (
+            <SessionInterviewPanel
+              {...props}
+              onClose={requestClose}
+              questions={questions}
+              onReviewStateChange={setHasUnsavedReview}
+            />
+          ) : null
+        ) : (
+          <>
+            <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
+              {title}
+            </ModalHeader>
+            <ModalBody>
+              {!mode ? (
+                <SessionVoiceModeChooser onSelectMode={onSelectMode} />
+              ) : (
+                <SessionListeningPanel {...props} panelMode="recordGroup" embeddedInModal onClose={onClose} />
+              )}
+            </ModalBody>
+          </>
+        )}
+      </Modal>
+      <CEConfirmDialog
+        isOpen={isOpen && confirmDiscard}
+        title="Discard this interview?"
+        body="Your transcript, imported prefill, and unsaved review edits will be lost."
+        confirmLabel="Discard interview"
+        cancelLabel="Keep reviewing"
+        danger
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          onClose();
+        }}
+        testId="ce-interview-discard"
+      />
+    </>
   );
 }

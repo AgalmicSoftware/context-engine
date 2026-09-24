@@ -560,6 +560,29 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     expect(sbtSection.props.sbtEntries[0].sbtInfo.name).toBe('[encrypted]');
   });
 
+  it('carries the profile session and Hosted readiness into comparison', () => {
+    const loadComparisonSessionData = jest.fn();
+    const instance = makeInstance({
+      activeSessionSlug: 'stale-global-session',
+      sessionConfig: { slug: 'profile-session' },
+      onChainProfileEnabled: false,
+      isAllCachesReady: false,
+      isSBTCacheReady: false,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      isResponsesCacheReady: true,
+      loadComparisonSessionData,
+    });
+    const nodes = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.loadSessionData === loadComparisonSessionData,
+    );
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].props).toEqual(
+      expect.objectContaining({ activeSessionSlug: 'profile-session', sessionCachesReady: true }),
+    );
+  });
+
   it('omits the on-chain SBT section when the active session disables on-chain profile data', () => {
     const instance = makeInstance({
       onChainProfileEnabled: false,
@@ -577,7 +600,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const instance = makeInstance({
       account: viewAddress,
-      activeSessionSlug: 'demo-sh',
+      activeSessionSlug: 'stale-global-session',
       onChainProfileEnabled: false,
       sessionConfig: {
         slug: 'demo-sh',
@@ -597,6 +620,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       expect.objectContaining({
         account: viewAddress,
         sessionSlug: 'demo-sh',
+        showMemberships: true,
         sessionConfig: expect.objectContaining({ slug: 'demo-sh', sessionModeProfile }),
       }),
     );

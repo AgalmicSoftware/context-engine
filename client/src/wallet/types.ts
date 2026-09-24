@@ -7,6 +7,7 @@ export type PasskeyWalletDerivationVersion = 'passkey-prf-hkdf-secp256k1-v1';
 export interface EncryptedWalletRecord {
   id: string;
   userId?: string;
+  disconnected?: boolean;
   rpId: string;
   credentialId: string;
   evmAddress: HexString;
@@ -22,6 +23,7 @@ export interface EncryptedWalletRecord {
 export interface PasskeyDerivedWalletRecord {
   id: string;
   userId?: string;
+  disconnected?: boolean;
   rpId: string;
   credentialId: string;
   evmAddress: HexString;

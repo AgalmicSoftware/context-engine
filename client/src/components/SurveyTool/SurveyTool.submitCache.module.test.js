@@ -1,4 +1,5 @@
 import { writeSubmittedResponsesToLocalCaches } from './surveyToolPostSubmitCacheController';
+import { mergeWorkerQuestionResponses } from '../../utilities/survey/workerResponseHydration';
 import { normalizeSubmitReceipt } from './surveyToolSubmitTransactionController';
 import { buildSubmissionGroupContext } from './surveyToolHydrationFlow';
 import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
@@ -574,6 +575,68 @@ describe('SurveyTool submit cache writes', () => {
     } finally {
       await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
       await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    }
+  });
+
+  it('writes each Worker question with its authoritative precise receipt time despite client clock skew', async () => {
+    const slug = 'edge-worker-submit';
+    const responder = '0xabc';
+    const config = makeWorkerConfig('https://ordering.example.test', '0x00112233445566778899aabbccddeeff');
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: slug });
+    const early = Date.parse('2026-09-20T12:00:00.100Z') / 1000;
+    const late = Date.parse('2026-09-20T12:00:00.900Z') / 1000;
+    await cacheScripts.writeCache('questionsCache', slug, {
+      worker: withWorkerCanonicalCacheIdentity(
+        {
+          workerResponseCacheVersion: 1,
+          questions: {},
+          questionResponses: { q1: { [responder]: { answer: { value: 'old' } } } },
+          questionResponsesMeta: { q1: { [responder]: { ts: early, storageRefId: 'old' } } },
+        },
+        identity,
+      ),
+    });
+    const now = jest.spyOn(Date, 'now').mockReturnValue((early - 600) * 1000);
+    try {
+      const result = await writeSubmittedResponsesToLocalCaches(
+        {
+          receipt: {
+            workerCanonicalSubmission: true,
+            questionResponseRefs: [
+              { questionId: 'q1', storageRef: { id: 'new-q1', createdAt: new Date(late * 1000).toISOString() } },
+              { questionId: 'q2', storageRef: { id: 'new-q2', createdAt: new Date(early * 1000).toISOString() } },
+            ],
+          },
+          questionResponses: [
+            { questionID: 'q1', answer: { value: 'new' } },
+            { questionID: 'q2', answer: { value: 'other' } },
+          ],
+        },
+        makeCacheDeps({ account: responder, effectiveDraftSlug: slug, network: null, resolveBySlug: () => config }),
+      );
+      expect(result.questionCacheWritten).toBe(true);
+      const cache = await cacheScripts.readCache('questionsCache', slug);
+      expect(cache.worker.questionResponses.q1[responder].answer.value).toBe('new');
+      expect(cache.worker.questionResponsesMeta.q1[responder]).toMatchObject({ ts: late, storageRefId: 'new-q1' });
+      expect(cache.worker.questionResponsesMeta.q2[responder]).toMatchObject({ ts: early, storageRefId: 'new-q2' });
+      const reloaded = mergeWorkerQuestionResponses(
+        cache,
+        [
+          {
+            questionId: 'q1',
+            responder,
+            response: { answer: { value: 'old' }, blockNumber: 999999 },
+            timestamp: early,
+            storageRefId: 'older-unseen',
+          },
+        ],
+        slug,
+        identity,
+      );
+      expect(reloaded.worker.questionResponses.q1[responder].answer.value).toBe('new');
+    } finally {
+      now.mockRestore();
+      await cacheScripts.removeCache('questionsCache', slug);
     }
   });
 

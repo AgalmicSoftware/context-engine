@@ -189,7 +189,7 @@ describe('surveyResultsExportPlans', () => {
     });
   });
 
-  it('builds questions-only CSV with stable quoting and list separators', () => {
+  it('builds questions-only CSV with stable quoting and JSON option arrays', () => {
     expect(
       buildSurveyResultsQuestionsCsvExport([
         {
@@ -202,8 +202,32 @@ describe('surveyResultsExportPlans', () => {
       ]),
     ).toBe(
       '"questionID","prompt","type","tags","options","voiceCredits"\n' +
-        '"q1","Question ""One""","multichoice","tag-a;tag-b","Alpha;Beta",""',
+        '"q1","Question ""One""","multichoice","tag-a;tag-b","[""Alpha"",""Beta""]",""',
     );
+  });
+
+  it('round-trips punctuation inside option names and selected answers', () => {
+    const options = ['Alpha; Beta', 'Comma, option', 'A "quote"', 'Line\nbreak'];
+    const readCells = (csv: string) =>
+      Array.from(csv.matchAll(/"((?:[^"]|"")*)"(?:,|\n|$)/g), (match) => match[1].replace(/""/g, '"'));
+    const questionsCsv = buildSurveyResultsQuestionsCsvExport([{ id: 'q1', type: 'multichoice', options }]);
+    expect(JSON.parse(readCells(questionsCsv)[10])).toEqual(options);
+    for (const individuals of [false, true]) {
+      const response = { questionID: 'q1', answer: { value: options } };
+      const csv = buildSurveyResultsResponsesCsvExport({
+        networkQuestions: { q1: { type: 'multichoice', options } },
+        ...(individuals
+          ? {
+              viewMode: 'survey',
+              surveyViewMode: 'individuals',
+              filteredResponses: [{ responder: '0x111', response: { responses: [response] } }],
+            }
+          : { aggregatorQuestionResponses: { q1: [{ responder: '0x111', response }] } }),
+      });
+      const cells = readCells(csv);
+      expect(JSON.parse(cells[individuals ? 4 : 3])).toEqual(options);
+      expect(JSON.parse(cells[6])).toEqual(options);
+    }
   });
 
   it('builds survey-individual response CSV with latest-row dedupe', () => {
@@ -258,7 +282,7 @@ describe('surveyResultsExportPlans', () => {
       'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits',
     );
     expect(lines[1]).toBe(
-      '"0x111","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z",""',
+      '"0x111","q1","Question One","multichoice","[""Alpha"",""Beta"",""Gamma""]","7","[""Alpha"",""Gamma""]","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z",""',
     );
     expect(lines[2]).toBe(
       '"0x222","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z",""',
@@ -302,10 +326,10 @@ describe('surveyResultsExportPlans', () => {
       'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits',
     );
     expect(lines[1]).toBe(
-      '"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x111","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z",""',
+      '"q1","Aggregate Question","multichoice","[""Alpha"",""Beta"",""Gamma""]","0x111","9","[""Alpha"",""Gamma""]","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z",""',
     );
     expect(lines[2]).toBe(
-      '"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x222","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z",""',
+      '"q1","Aggregate Question","multichoice","[""Alpha"",""Beta"",""Gamma""]","0x222","5","[""Beta""]","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z",""',
     );
   });
 

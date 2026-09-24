@@ -552,7 +552,9 @@ Admin test panel:
   registry/Arweave profiles may use `{ "source": { "kind":
   "admin-snapshot", "snapshot": ... } }` only when the browser has a
   same-session, unlocked submitted-response snapshot. The Worker sanitizes the
-  snapshot and rejects encrypted or locked rows. A successful run immediately
+  snapshot and rejects encrypted or locked rows. Browser snapshots retain rating
+  bounds and labels, selection limits, quadratic budgets, and structured answer
+  arrays (including neutral zeros). A successful run immediately
   replaces the latest visible artifact for authorized viewers; Generate and
   Refresh remain admin-only actions.
 - Automatic generated-results work is durable background work only for
@@ -568,6 +570,21 @@ Admin test panel:
   separate provider or model. Inputs are submitted responses only; Circles is
   the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
   from the session subject matter.
+- Generated Breakdown `groups` obey `anonymizedGroupsEnabled` and `minGroupSize`.
+  The Worker counts distinct cited participants from the permitted input, applies
+  the policy before saving, and reapplies current settings to previously stored
+  artifacts on public/admin reads and cached replies. Claims, Circles/atlas,
+  Risk Matrix entries, session-wide summaries, and raw snapshots are unaffected
+  by the group threshold; their existing visibility/access rules still apply.
+  Legacy configurations without a group policy retain their previous behavior.
+  Older artifacts with truncated membership citations may need regeneration to
+  show a group above the former 16-citation limit.
+- Canonical generated-analysis input validates readable answers against the full
+  stored question before counting them: rating bounds, exact choice options and
+  selection limits, and signed quadratic allocations within the question budget.
+  Invalid answers are excluded even when accompanied by a comment; genuinely
+  unanswered comment-only rows remain supported. This does not change opaque
+  storage admission or the historical admin-snapshot format.
 - The Worker source snapshot keeps the full submitted-response counts distinct
   from the bounded AI input counts. The AI input keeps rating endpoint metadata
   (`scale.min`/`max` and endpoint labels) and quadratic `voiceCredits`, then
@@ -611,6 +628,46 @@ Authenticated clients can use the worker as the session storage boundary:
     refs are returned, the client completes without an on-chain transaction.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
+    In Worker-canonical sessions whose results visibility is not
+    `public_full_if_storage_public`, individual response reads also require
+    that recorded author, a current session admin, or an authenticated
+    delegated storage grant. A participant's ordinary `storage` route scope
+    permits submission and own-response reload, not other participants' raw
+    answers. Lists apply the same restriction to each row, and older rows
+    lacking trusted author metadata remain unavailable to ordinary participants.
+    Existing per-item access conditions still apply to every permitted reader.
+    This is a read-time protection for existing and new rows; it does not
+    rewrite stored data or revoke plaintext already downloaded. Aggregate-only
+    visibility does not authorize raw reads to compute a client-side summary;
+    a combined summary needs an authorized server-generated aggregate.
+  - JSON and multipart uploads share per-upload policy validation. Group IDs
+    accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
+    of precedence, using the first nonempty list. Multipart `groupIds` and
+    `groups` may be repeated fields or JSON-encoded arrays; for example,
+    `groupIds=["reviewers","organizers"]` has the same meaning as the JSON
+    array. IDs are normalized and deduplicated. Malformed JSON, objects,
+    nested arrays, and non-string IDs return `400`; every supplied alias is
+    validated even when another alias takes precedence. Only `groupIds` and
+    `groups` may repeat in multipart policy fields; singular group aliases,
+    access-condition documents, and upload-policy fields must occur at most
+    once, so a second restriction cannot be silently discarded.
+  - Per-upload `accessConditions` (or legacy `conditions`) must be an object
+    or JSON-encoded object with a nonempty `conditions` array. `match` accepts
+    `any` or `all` and defaults to `any` when omitted. Supported rule kinds
+    are `worker_role`, `agent_grant_scope`, `worker_group`, and `sbt_onchain`;
+    supplied rule fields must be valid for that kind. Legacy field aliases,
+    the omitted-role admin default, and the session-chain fallback remain
+    supported. An omitted, null, or blank optional condition field selects
+    the existing session fallback. Malformed nonempty JSON, invalid operators,
+    unsupported kinds, and incomplete rules return `400` before payload or
+    index writes, rather than silently dropping a restriction. Existing
+    stored-policy read compatibility is unchanged.
+  - Explicit `uploadPolicy` (or `documentUploadPolicy` / `policy`) must name
+    `group_allowlist` or `sbt_allowlist`, either as a legacy mode string or an
+    object using `mode`, `kind`, or `type`. A malformed nonempty value or an
+    object without a mode returns `400`, including invalid aliases hidden
+    behind another supplied policy. Omitted, null, or blank optional policies
+    retain the existing fallback behavior.
   - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
@@ -619,8 +676,8 @@ Authenticated clients can use the worker as the session storage boundary:
     payload resources fail with `413` before any payload or index row is written.
     Raising `CE_MAX_UPLOAD_BYTES` cannot raise this KV ceiling; use R2 for
     larger payloads.
-- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. For R2 bytes, the matching KV index row is authoritative for per-item authorization metadata, while the session's `storageProfile.payloadAccessControl` remains the coarse fallback policy; R2 custom metadata is only a locator and is never an access-policy fallback. The worker validates the row's id/resource and authorizes it before consuming object body methods. A missing index binding returns `501`, a cleanly absent row returns `404`, and an unreadable, malformed, or mismatched row returns `503` without returning payload bytes. Public-read sessions may be served anonymously only when the resolved per-item conditions or session fallback policy allows it; gated sessions require authenticated route preflight. Successful reads return the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
-- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. For R2 bytes, the matching KV index row is authoritative for per-item authorization metadata, and the session's `storageProfile.payloadAccessControl` must also pass; R2 custom metadata is only a locator and is never an access-policy fallback. The worker validates the row's id/resource and authorizes it before consuming object body methods. A missing index binding returns `501`, a cleanly absent row returns `404`, and an unreadable, malformed, or mismatched row returns `503` without returning payload bytes. Public-read sessions may be served anonymously only when both the session policy and any additional per-item restrictions allow it; gated sessions require authenticated route preflight. Successful reads return the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
     contract. Fresh clients paginate the `questions` and `surveys` indexes,
@@ -669,6 +726,12 @@ may omit the unchanged storage object, but the complete merged record is
 revalidated before KV persistence.
 
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
+
+Cloudflare uploads must pass the session's configured storage gate before any
+payload policy is considered. Payload conditions and groups can further restrict
+readers, but cannot replace or broaden that gate. Resource names are restricted
+to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
+`media`, and `images`; list rows must match the exact resource namespace.
 
 - Current pure Worker profiles use `gate: "role_gate"` with
   `encryption: "worker_envelope"` by default, or `encryption: "none"` when the
@@ -1095,6 +1158,14 @@ remain authoritative; failures expose an explicit Retry action. Success or
 cancellation clears the saved invitation and removes its matching `joinGroup`
 parameter without disturbing other URL parameters. Account changes invalidate
 pending authentication; failures retain the invitation for explicit retry.
+Cancel is remembered in this browser for the account, Worker/session, and Group,
+with no expiry. Following the same link again (including the bare EDDY entry)
+shows an explicit **Join** action instead of joining automatically; the interview
+redirect still works. An explicit Join in the notice, Group page, or interview
+recommendations clears that preference. Cancellation never leaves an existing
+membership. Before sign-in the cancellation is stored for the signed-out visitor;
+when that invitation’s visitor signs in, it is assigned to that account.
+A changed canonical session identity does not inherit another session's choice.
 No credentials are saved with an invitation. Browser storage restrictions can
 limit persistence to the current page.
 
@@ -1149,7 +1220,8 @@ R2 / Durable Objects:
   compatible live config during resume. Payload-plus-index uploads intentionally
   retain at-least-once retry semantics: success means both writes completed, while
   a failed or response-lost attempt may leave an invisible orphan or a readable
-  duplicate. There is no upload receipt journal or key-rotation state machine.
+  duplicate. Supplying an upload `requestId` does not deduplicate those writes.
+  There is no upload receipt journal or key-rotation state machine.
 - `CE_WORKER_GROUP_COORDINATOR` optionally binds an independently migrated
   `WorkerGroupWriteCoordinator` namespace. When present, Worker Group routes
   use it while authorization, deployment, and session-key coordination remain
@@ -1602,8 +1674,6 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   worker-specific authenticated route-context deps, missing-config constant,
   and env-bound secret-path, non-secret action, and secret-action helper
   bundles before calling the authenticated route-entry and route dispatchers.
-- `nonce:{slug}:{address}` → diagnostic nonce mirror (TTL 5m; the Durable Object is authoritative)
-- `usedNonce:{slug}:{nonce}` → diagnostic used mirror (TTL 10m; the Durable Object is authoritative)
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
 - route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
@@ -2143,8 +2213,8 @@ Signed login/bootstrap requests:
   - Returns only an inert JSON question catalog: `type`, `version`,
     `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
     `answerContract`, `researchCoverageContract`, and `questions`. Binary options,
-    the 0-10 rating range, and the additive self-reported research-coverage count
-    fields are explicit. It deliberately contains no agent instructions; the
+    the default 0–10 rating range, per-question scale overrides, and additive
+    self-reported research-coverage count fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.
   - Choice questions expose `singleSelect`: true allows one option; false (the
     default for multichoice) allows multiple options. Legacy `oneSelectionOnly`
@@ -2156,7 +2226,14 @@ Signed login/bootstrap requests:
   - `ce-interview-brief-v5` hashes include selection mode. Previously generated
     v1–v4 links remain readable using their original catalog hash format, while
     their draft answers are validated against the current question settings.
-    Deploy both client and Worker changes before generating v5 prefills.
+    The client clipboard request negotiates v4 or v5 catalogs, validates type,
+    schema version and session slug, and copies the advertised prompt version
+    and hash unchanged. V4 choice drafts use one exact option string; an answer
+    requiring multiple selections is omitted with a limitation notice. V5 choice
+    drafts require boolean selection metadata. Older v1–v3 packets remain
+    importable but are not requested for new generation. Verify the served
+    client/Worker contracts during rollout; bundle publication alone does not
+    establish which version a deployed Worker serves.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     on-chain discovery requires configured block limits and is capped at a
@@ -2164,7 +2241,7 @@ Signed login/bootstrap requests:
   - Applies the session's anonymous rate-limit bucket before reading questions.
   - The compact client clipboard prompt tells ordinary ChatGPT/Claude to search only
     already-authorized history, memory, and connected sources directly related
-    to those questions. It rejects stale catalog versions, requests reviewable
+    to those questions. It rejects unsupported/mismatched catalogs, requests reviewable
     response drafts with per-answer confidence and basis, shows the exact JSON
     before encoding, asks for distinct searched/used chat, memory, source, and
     user-statement counts (`null` when a platform cannot expose a searched count),
@@ -2472,3 +2549,49 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 
 We plan to explore TEE/attested proxy options for stronger trust guarantees in a future version.
 We may also migrate the proxy to alternate compute hosts to reduce reliance on a single edge provider.
+
+Group-filtered reports keep their loaded cohort visible during background refreshes.
+Changing the account, Worker, session, or filter clears that cohort before loading
+the new selection. Failed refreshes still expose the existing error state.
+
+Authenticated generated-results artifact reads verify the token’s session identity
+and authorization epoch, then recheck the current storage scope and rate limit.
+Anonymous artifact reads continue through the configured public-view policy.
+
+
+### Interview saved-answer readiness
+
+Interview submission waits for the signed-in participant's saved answers for the
+interview questions, independently of the public results cache. A partial public
+listing remains partial; it is never treated as proof that the participant has
+no saved answers. Account, session, or question-set changes invalidate readiness.
+Loading preserves local edits and updates the saved baseline. If loading finds
+an existing answer while submission is queued, that answer is deselected so the
+participant can explicitly review and choose whether to replace it.
+
+For Worker-canonical Hosted sessions, the client uses authenticated
+`GET /storage/list?resource=responses&mine=true`. Ownership comes from the
+verified requester, not a supplied responder parameter or the answer payload.
+The response includes `responder`, the canonical `sessionId`, and the existing
+`items`, `cursor`, and `listComplete` fields, with `Cache-Control: private, no-store`.
+Every page is checked against the expected account and session before its answer
+payloads are read. Session and per-payload authorization still apply; unavailable
+metadata or denied own payloads fail the lookup rather than imply an empty history.
+The ordinary public listing contract and its UI cap are unchanged.
+
+This reuses the existing metadata index and requires no data migration. The own
+lookup follows all pages, including beyond the public UI's 100-page cap, and
+reads only the participant's payloads, in batches of eight. Metadata scanning
+still scales with total stored response versions; this is not a new per-user
+index. It uses the same Worker timestamp and storage-reference ordering as the
+public cache to select the latest edits. Closing the interview or changing its
+identity cancels the in-flight lookup. Failures show **Retry saved answers** and
+do not enable submission. An older Worker lacking the scope/completeness fields
+cannot silently report an empty saved history; deploy compatible client and
+Worker versions together.
+
+For chain-authoritative sessions, the lookup reuses strict per-account,
+per-question contract pointer reads, also in batches of eight. A zero pointer
+proves there is no saved answer; RPC or payload-read failures do not. This covers
+both decentralized Arweave payloads and chain-authoritative Cloudflare payloads
+without changing a contract interface.

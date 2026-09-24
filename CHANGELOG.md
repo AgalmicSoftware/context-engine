@@ -2,7 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.6.3] - 2026-09-23
+
+### Client fixes — available when the site deploys
+
+- Show comparison summaries and clearly labelled perspective maps together, with
+  model attribution and expandable comparisons for each answer type.
+
+- Keep session-scoped profile groups on the selected session, distinguish private memberships from empty results, and place theme and color-blind controls together when space allows.
+
+- Keep profile comparisons in the selected session, load Hosted answers without waiting for chain membership, verify the session configuration on a fresh visit, and show elapsed seconds and Retry when session data cannot load. Restore compact participant pills and comparison styling in both themes.
+
+- Show which AI model generated a profile summary and describe preferences in
+  plain language rather than listing scores and vote totals.
+
+- Make interview prompt copying work on the first ready tap in Safari and iOS.
+  Check session compatibility in advance, offer Retry when that check fails,
+  and reveal the prompt for manual copying if clipboard access fails.
+- Keep interview submission working with older session Workers by waiting for
+  complete public response hydration when the older saved-answer lookup is
+  detected. Current Workers retain strict saved-answer identity and completion
+  checks. Existing v4 and v5 interview catalogs remain supported.
+- Preserve interview review edits and complete voice instructions, handle
+  legacy transcript events, and improve rating and quadratic-answer validation.
+- Correct report totals, response ordering and exports; keep partial results
+  visible with a warning when a large response history exceeds the loading cap.
+- Improve keyboard access, report contrast, group filtering and cancellation,
+  and passkey locking. Reduce the initial application bootstrap download.
+
+### Worker fixes — sessions created after this release
+
+New sessions receive the Worker package from this release. The package:
+
+- Enforces private response-read permissions and the configured upload gate.
+- Validates storage resource names and checks current authentication on the
+  results-analysis artifact route, including stale tokens.
+- Improves nonce handling and batches response-index reads.
+- Supports authenticated `mine=true` saved-answer listings with responder,
+  session and pagination proofs.
+- Verifies the public configuration used by setup and publication, and keeps
+  Verify usable before the first Publish.
+- Strengthens Telegram invite, group and administrator authorization and
+  validates all supported answer types in generated results.
+
+Sessions created before 0.6.3 keep their existing Worker and remain supported
+by the client. Creators may redeploy to pick up Worker-side fixes.
+
+## Previously published changes
 
 - Align report response bars with pile colors and add persistent Color-blind mode
   under Theme settings, applying shared response and chart palettes across the
@@ -376,11 +422,11 @@ All notable changes to this project will be documented in this file.
   separately as Advanced access, Worker-native creation stays scoped to the
   active session, and registry-backed sessions retain the SBT flow. Native
   Group card bodies now open the full SBT-style detail layout in a new tab;
-      canonical list links use `/groups?sessionName=<slug>` and non-address
-      Worker detail links use `/group/<groupId>?sessionName=<slug>`. Legacy
-      `/groups/:slug` links normalize to those routes, while address-shaped
-      Worker IDs remain at `/groups?sessionName=<slug>#group-<groupId>` so
-      `/group/<address>` stays reserved for SBT detail.
+  canonical list links use `/groups?sessionName=<slug>` and non-address
+  Worker detail links use `/group/<groupId>?sessionName=<slug>`. Legacy
+  `/groups/:slug` links normalize to those routes, while address-shaped
+  Worker IDs remain at `/groups?sessionName=<slug>#group-<groupId>` so
+  `/group/<address>` stays reserved for SBT detail.
   Full detail translates SBT stats into member capacity and a live join
   deadline, exposes member counts and identities only through authenticated
   visibility-aware responses, and renders the Group's public document

@@ -87,3 +87,19 @@ Older references to `demoGroups.json` are historical and no longer canonical.
 - [`sbts-cache-structure.md`](sbts-cache-structure.md)
 - [`bookmarks-cache-structure.md`](bookmarks-cache-structure.md)
 - [`user-cache-structure.md`](user-cache-structure.md)
+
+Worker response caches order immutable response revisions by the Worker's precise
+creation timestamp, including per-question timestamps returned by successful
+submissions, preserving milliseconds in the existing seconds-based cache
+fields. Equal timestamps use the case-sensitive storage reference as a stable
+fallback, not proof of chronology. Payload-supplied blockchain fields do not
+participate in Worker ordering; on-chain response ordering is unchanged.
+
+The response-cache version clears legacy Worker response rows, response metadata,
+and seen-reference sets once before rehydration. Question/discovery data and
+other chain scopes remain intact. Failed reads remain retryable, and subsequent
+runs reuse immutable references. Rolling back to older client code can restore
+the former ordering behavior; reload/rebuild affected caches after rollback.
+
+Older submission receipts without per-question storage metadata use precise local
+time for the immediate cache write; clock skew can affect that legacy fallback.

@@ -1,5 +1,5 @@
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
-import { normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
+import { applyResultsAnalysisExposurePolicy, normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
 import {
   sha256Hex,
   stableCanonicalSerialize,
@@ -29,6 +29,7 @@ import {
 } from './aiProviderExecution.js';
 import { json as jsonResponse } from './responseKvHelpers.js';
 import { normalizePayloadAccessControl } from './payloadAccessControl.js';
+import { formatValidAnalysisAnswer } from './resultsAnalysisAnswerValidation.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -69,7 +70,7 @@ const getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSett
   config?.resultsAnalysis,
 );
 const getCanonicalSessionId = (config = {}) => normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
-const publicDraft = (draft) => {
+const publicDraft = (draft, config) => {
   if (!isObj(draft)) return null;
   const {
     participantWatermark,
@@ -80,8 +81,14 @@ const publicDraft = (draft) => {
     attemptId,
     ...rest
   } = draft;
-  return rest;
+  return config ? { ...rest, artifact: applyCurrentArtifactPolicy(rest.artifact, config) } : rest;
 };
+
+const applyCurrentArtifactPolicy = (artifact, config) => applyResultsAnalysisExposurePolicy({
+  artifact,
+  exposure: normalizedResultsProfile(config)?.exposure,
+  sections: normalizeRequestedSections([], getResultsAnalysisSettings(config)),
+});
 
 const normalizeSessionIdHex = (value) => {
   const raw = lower(value).replace(/^0x/, '').replace(/-/g, '');
@@ -197,11 +204,6 @@ const normalizeRatingScale = (question = {}) => {
     minLabel: normalizeRatingLabel(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
     maxLabel: normalizeRatingLabel(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax),
   };
-};
-
-const normalizeVoiceCredits = (value) => {
-  const numeric = Number(value);
-  return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 99;
 };
 
 const normalizeSubmittedAt = (value) => {
@@ -340,13 +342,14 @@ const normalizeQuestionRecord = (question) => {
     prompt: normalizeQuestionPrompt(question.prompt || question.questionPrompt || question.questionText || question.text || question.title),
     type,
     options: Array.isArray(question.options)
-      ? question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => normalizeQuestionPrompt(option).slice(0, 140)).filter(Boolean)
+      ? question.options.filter((option) => typeof option === 'string').map((option) => option.trim()).filter(Boolean)
       : [],
     tags: Array.isArray(question.tags)
       ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean)
       : [],
     ...(scale ? { scale } : {}),
-    ...(type === 'quadratic' ? { voiceCredits: normalizeVoiceCredits(question.voiceCredits) } : {}),
+    ...(type === 'multichoice' ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice), ...(Number.isSafeInteger(question.maxSelections) && question.maxSelections > 0 ? { maxSelections: question.maxSelections } : {}) } : {}),
+    ...(type === 'quadratic' ? { voiceCredits: question.voiceCredits === undefined ? 99 : question.voiceCredits } : {}),
   };
 };
 
@@ -422,14 +425,19 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     const digest = await participantDigest(participantSource);
     const answerValue = hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response);
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
-    const answer = valueFromAnswerLike(answerValue).slice(0, 4000);
+    const knownQuestion = questionMap.get(questionId) || {};
+    const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
+    if (validatedAnswer === null) {
+      excludedCount += 1;
+      continue;
+    }
+    const answer = validatedAnswer.slice(0, 4000);
     const additionalComments = valueFromAnswerLike(additionalValue).slice(0, 2000);
     if (!answer && !additionalComments) {
       excludedCount += 1;
       continue;
     }
     participantDigests.add(digest);
-    const knownQuestion = questionMap.get(questionId) || {};
     const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0;
     const dedupeKey = `${questionId}:${digest}`;
     const candidate = {
@@ -491,9 +499,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     id: question.questionId,
     prompt: question.prompt.slice(0, AI_LIMITS.maxQuestionPromptChars),
     type: question.type,
-    options: question.options,
+    options: question.options.slice(0, AI_LIMITS.maxOptionsPerQuestion).map((option) => option.slice(0, 140)),
     tags: question.tags,
     ...(question.scale ? { scale: question.scale } : {}),
+    ...(question.type === 'multichoice' ? { singleSelect: question.singleSelect, ...(question.maxSelections ? { maxSelections: question.maxSelections } : {}) } : {}),
     ...(question.type === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
   }));
   const aiSnapshot = {
@@ -662,7 +671,7 @@ const sectionShapes = `{
   "atlas": { "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }], "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }] }
 }`;
 
-const buildPrompt = ({ sections, source }) => `You are generating Context Engine session analysis artifacts.
+const buildPrompt = ({ sections, source, exposure }) => `You are generating Context Engine session analysis artifacts.
 Return only valid JSON. Do not include markdown fences.
 Generate only these result views: ${sections.join(', ')}.
 
@@ -676,6 +685,7 @@ Privacy and grounding rules:
 - If the visible sample is thin because of input limits, mention uncertainty in summaries.
 - Generate RiskMatrix axes from this session's subject matter. Do not use fixed likelihood/impact axes unless those are the best subject-specific axes for the session.
 - Do not use demo-only dimensions unless those exact dimensions are present in segmentDimensions.
+- Follow the session's group-summary exposure policy: ${JSON.stringify(exposure || {})}. This policy applies only to breakdown.groups. When groups are disabled, return an empty groups list. Otherwise cite every distinct supporting participant on each group and omit groups below minGroupSize; never invent citations to reach the minimum. Keep overall synthesis, claims, atlas nodes, and Risk Matrix entries independent of this group threshold.
 
 Generate this JSON shape, including only requested top-level keys:
 ${sectionShapes}
@@ -814,8 +824,8 @@ const buildReservationKey = async ({ sourceSignature, viewSignature }) => (
   `sha256:${await sha256Hex(stableCanonicalSerialize({ sourceSignature, viewSignature, version: ANALYSIS_ARTIFACT_VERSION }))}`
 );
 
-const filterDraftForStatus = (draft, includeDraft) => {
-  const safe = publicDraft(draft);
+const filterDraftForStatus = (draft, includeDraft, config) => {
+  const safe = publicDraft(draft, config);
   if (includeDraft) return safe;
   if (!isObj(safe)) return null;
   const { artifact, snapshot, ...rest } = safe;
@@ -874,7 +884,7 @@ export const buildResultsAnalysisStatusBody = ({ slug, config, coordinatorState,
       jobState: state.jobState || 'idle',
       active: summarizeActiveState(state.active),
       lastFailure: summarizeFailureState(state.lastFailure),
-      lastGood: filterDraftForStatus(state.lastGood, includeDraft),
+      lastGood: filterDraftForStatus(state.lastGood, includeDraft, config),
     },
   };
 };
@@ -916,7 +926,8 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
   const sections = normalizeRequestedSections(body.sections, settings);
   if (!sections.length) return { ok: false, status: 400, jobState: 'failed', error: 'No supported results-analysis sections requested.', capability };
   const sourceDescriptor = await buildSourceDescriptor({ kind: sourceKind, source });
-  const viewSignature = `sha256:${await sha256Hex(stableCanonicalSerialize({ sections, version: ANALYSIS_ARTIFACT_VERSION }))}`;
+  const exposure = normalizedResultsProfile(config)?.exposure;
+  const viewSignature = `sha256:${await sha256Hex(stableCanonicalSerialize({ sections, exposure, version: ANALYSIS_ARTIFACT_VERSION }))}`;
   const reservationKey = await buildReservationKey({ sourceSignature: sourceDescriptor.signature, viewSignature });
   const requestId = trim(body.requestId || body.id || '');
   const reserve = deps?.reserveCoordinatedResultsAnalysis || reserveCoordinatedResultsAnalysisDefault;
@@ -935,7 +946,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
     },
   });
   if (reservation?.kind === 'terminal') {
-    return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft) };
+    return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft, config) };
   }
   if (reservation?.kind === 'pending') {
     return { ok: true, status: 202, jobState: 'running', reservation: summarizeReservation(reservation, requestId), capability };
@@ -954,7 +965,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
           env,
           slug,
           config,
-          prompt: buildPrompt({ sections, source }),
+          prompt: buildPrompt({ sections, source, exposure }),
           headers,
           deps,
         });
@@ -990,6 +1001,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
       generatedAt,
       model: aiProvenance.model,
     });
+    artifact = applyCurrentArtifactPolicy(artifact, config);
   } catch (error) {
     const failure = { ok: false, error: error?.message || 'AI results analysis output failed validation.', status: 502, failedAt: generatedAt };
     await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure } });
@@ -1029,7 +1041,7 @@ export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {
   if (!finalization?.ok) {
     return { ok: false, status: finalization?.status || 503, jobState: 'failed', reservation: summarizeReservation(reservation, requestId), capability, error: finalization?.error || 'Results analysis finalization failed.' };
   }
-  return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft) };
+  return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft, config) };
 };
 
 export const maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, committedResponses = [], requestId = '', deps } = {}) => {
@@ -1109,7 +1121,9 @@ export const evaluateResultsAnalysisViewerEligibility = ({ config } = {}) => {
 export const readPublishedResultsAnalysisArtifact = async ({ env, slug, config, includeSnapshot = true, deps } = {}) => {
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
   const coordinatorState = await readStatus({ env, slug });
-  const lastGood = publicDraft(coordinatorState?.state?.lastGood);
+  // Stored artifacts outlive their creation policy. Reapply current privacy and
+  // visibility settings on every read, including artifacts created by older Workers.
+  const lastGood = publicDraft(coordinatorState?.state?.lastGood, config);
   if (!lastGood?.artifact) {
     return {
       ok: false,
