@@ -127,3 +127,22 @@ test('marks invalid quadratic allocations and leaves absent votes absent', () =>
   expect(screen.getAllByText('No visible answer')).toHaveLength(2);
   expect(screen.queryByText('+20')).not.toBeInTheDocument();
 });
+
+test('assigns binary answer tones without coloring missing or unknown answers', () => {
+  const answers = ['yes', 'no', 'neutral', 'unrecognized', null];
+  render(
+    <ComparePresentation
+      {...props}
+      users={answers.map((answer, index) => ({
+        address: `subject-${index}`,
+        questions: [{ id: 'b', type: 'binary', prompt: 'A shared question?', answer }],
+      }))}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Explore answers/ }));
+  expect(screen.getByText('Agree')).toHaveAttribute('data-answer', 'agree');
+  expect(screen.getByText('Disagree')).toHaveAttribute('data-answer', 'disagree');
+  expect(screen.getByText('Unsure')).toHaveAttribute('data-answer', 'unsure');
+  expect(screen.getByText('unrecognized')).not.toHaveAttribute('data-answer');
+  expect(screen.getByText('No visible answer')).not.toHaveAttribute('data-answer');
+});

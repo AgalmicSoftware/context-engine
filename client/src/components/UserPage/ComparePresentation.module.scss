@@ -212,6 +212,21 @@
   border: 1px solid var(--ce-panel-text-muted);
   border-radius: var(--ce-radius-pill);
   padding: 0.15rem 0.7rem;
+  &[data-answer='agree'] {
+    background: var(--ce-binary-choice-agree-bg);
+    color: var(--ce-color-white);
+  }
+  &[data-answer='disagree'] {
+    background: var(--ce-binary-choice-disagree-bg);
+    color: var(--ce-color-white);
+  }
+  &[data-answer='unsure'] {
+    background: var(--ce-binary-choice-unsure-bg);
+    color: var(--ce-color-black);
+  }
+  &[data-answer] {
+    font-weight: 700;
+  }
 }
 .tableScroll {
   overflow-x: auto;
@@ -303,4 +318,8 @@
     font-weight: 700;
     color: var(--ce-panel-text);
   }
+}
+
+:global(:root[data-ce-color-vision='color-blind']) .answerPill[data-answer] {
+  color: var(--ce-color-black);
 }

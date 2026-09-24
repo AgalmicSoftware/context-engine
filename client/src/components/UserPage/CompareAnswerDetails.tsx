@@ -237,7 +237,14 @@ export default function CompareAnswerDetails({ users }: { users: ComparisonUser[
                     ) : type === 'freeform' ? (
                       <blockquote>{textValue(value) || 'No visible answer'}</blockquote>
                     ) : (
-                      <span className={styles.answerPill}>
+                      <span
+                        className={styles.answerPill}
+                        data-answer={
+                          type === 'binary' && ['Agree', 'Disagree', 'Unsure'].includes(binaryLabel(value))
+                            ? binaryLabel(value).toLowerCase()
+                            : undefined
+                        }
+                      >
                         {type === 'binary' ? binaryLabel(value) : textValue(value) || 'No visible answer'}
                       </span>
                     )}

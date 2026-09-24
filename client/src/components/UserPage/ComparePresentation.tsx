@@ -220,7 +220,7 @@ export default function ComparePresentation({
           ) : (
             <>
               <section data-testid={E2E_TESTIDS.COMPARE_AGREEMENTS}>
-                <h3>Shared ground</h3>
+                <h3>Similarities</h3>
                 {result?.agreements.length ? (
                   result.agreements.map((text, i) => <p key={i}>{text}</p>)
                 ) : (
