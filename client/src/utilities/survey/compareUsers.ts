@@ -200,12 +200,24 @@ function normalizeBinarySign(val: unknown): number {
   if (v === 'unsure' || v === 'unknown' || v === 'neutral' || v === 'null' || v === '0') return 0;
   return 0;
 }
-// Exported for cross-implementation parity fixtures.
-export function normalizeRatingSignedValue(valRaw: unknown): number {
+// Exported for cross-implementation parity fixtures. Without a usable question
+// scale, answers are read on the canonical 0-10 scale.
+export function normalizeRatingSignedValue(valRaw: unknown, scale?: unknown): number {
+  const scaleRecord = scale && typeof scale === 'object' ? (scale as Record<string, unknown>) : {};
+  const scaleMin = scaleRecord.min;
+  const scaleMax = scaleRecord.max;
+  const hasScale =
+    typeof scaleMin === 'number' &&
+    typeof scaleMax === 'number' &&
+    Number.isFinite(scaleMin) &&
+    Number.isFinite(scaleMax) &&
+    scaleMax > scaleMin;
+  const min = hasScale ? scaleMin : RATING_MIN;
+  const max = hasScale ? scaleMax : RATING_MAX;
   const v = typeof valRaw === 'number' ? valRaw : Number(valRaw);
-  const span = RATING_MAX - RATING_MIN;
-  if (!Number.isFinite(v) || v < RATING_MIN || v > RATING_MAX || span <= 0) return 0;
-  const mid = (RATING_MIN + RATING_MAX) / 2;
+  const span = max - min;
+  if (!Number.isFinite(v) || v < min || v > max || span <= 0) return 0;
+  const mid = (min + max) / 2;
   return clamp((2 * (v - mid)) / span, -1, 1);
 }
 function makeToken(qid: unknown, option: unknown = undefined): string {
@@ -320,7 +332,7 @@ export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedSt
       const sign = normalizeBinarySign(ans);
       if (sign !== 0) tokens.set(makeToken(qid), { sign, weight: 1 * impMul });
     } else if (type === 'rating') {
-      const v = normalizeRatingSignedValue(ans);
+      const v = normalizeRatingSignedValue(ans, q?.scale);
       if (v !== 0) tokens.set(makeToken(qid), { sign: v > 0 ? 1 : -1, weight: Math.abs(v) * impMul });
     } else if (type === 'quadratic' && Array.isArray(ans) && ans.length >= 2 && ans.every(Number.isSafeInteger)) {
       ans.forEach((vote, index) => {

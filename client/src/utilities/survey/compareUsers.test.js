@@ -7,6 +7,7 @@ import {
   getCompareSbtKey,
   getCompareSbtLabel,
   isValidAddress,
+  normalizeRatingSignedValue,
   opinionVennTriplet,
   pcaLiteCompass,
   sanitizeCompass,
@@ -438,6 +439,34 @@ describe('compare user pure helpers', () => {
     expect(stance.sign).toBe(expectedValue > 0 ? 1 : -1);
     expect(stance.weight).toBeCloseTo(Math.abs(expectedValue));
   });
+
+  it.each([
+    [{ min: 0, max: 100 }, 90, 1, 0.8],
+    [{ min: 0, max: 100 }, 50, 0, 0],
+    [{ min: 1, max: 10 }, 10, 1, 1],
+    [{ min: 1, max: 10 }, 1, -1, 1],
+  ])('encodes rating answers on the question scale %j (answer %s)', (scale, answer, sign, weight) => {
+    const { tokens } = encodeStancesForUser({
+      questions: [{ id: 'rating', type: 'rating', answer, scale }],
+    });
+    const stance = tokens.get('rating');
+
+    if (sign === 0) {
+      expect(stance).toBeUndefined();
+      return;
+    }
+    expect(stance.sign).toBe(sign);
+    expect(stance.weight).toBeCloseTo(weight);
+  });
+
+  it.each([null, {}, { min: 5, max: 5 }, { min: 10, max: 0 }, { min: '', max: 100 }])(
+    'keeps the canonical 0-10 scale when the question scale %j is unusable',
+    (scale) => {
+      expect(normalizeRatingSignedValue(10, scale)).toBe(1);
+      expect(normalizeRatingSignedValue(0, scale)).toBe(-1);
+      expect(normalizeRatingSignedValue(90, scale)).toBe(0);
+    },
+  );
 
   it.each([' ', '\t', '\n', '*'])('drops blank or sentinel rating answer %j', (answer) => {
     const { tokens } = encodeStancesForUser({
