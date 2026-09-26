@@ -7,11 +7,8 @@
  * Key exports: getEffectiveArweaveKey, getEffectiveFaucetConfig, getLocalResourceKeys
  */
 import { sessionRegistryStore } from '../web3/sessionRegistry.js';
-import { cryptoUtils } from '../crypto/cryptography.js';
-import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
-import store from '../../store.js';
 import {
   canonicalizeSessionSlug,
   isReservedSessionSlugKey,
@@ -211,78 +208,6 @@ const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
 };
 
 // Legacy alias removed — function is now resolveSessionConfig directly.
-
-const getWalletContext = (
-  override: ResourceKeyResolutionContext = {},
-): {
-  account: string;
-  providerLike: ResourceKeyProviderLike;
-  chainId: number | string | null;
-} => {
-  try {
-    const state = store?.getState?.();
-    const profile: UnknownRecord = isObj(state?.profile) ? state.profile : {};
-    const network: UnknownRecord = isObj(profile.network) ? profile.network : {};
-    const chainId = override.chainId || network.id || network.chainId || null;
-    const providerLike = typeof profile.provider === 'string' || isObj(profile.provider) ? profile.provider : 'wagmi';
-    return {
-      account: override.account || toStr(profile.account),
-      providerLike: override.providerLike || providerLike,
-      chainId: typeof chainId === 'string' || typeof chainId === 'number' ? chainId : null,
-    };
-  } catch {
-    return {
-      account: override.account || '',
-      providerLike: override.providerLike || 'wagmi',
-      chainId: override.chainId || null,
-    };
-  }
-};
-
-const getLitHooks = (override: ResourceKeyResolutionContext = {}): UnknownRecord | null => {
-  if (override.lit) return override.lit;
-  const hooks = getGlobalLitHooks();
-  return isObj(hooks) ? hooks : null;
-};
-
-const resolveEncryptedValue = async (
-  encrypted: unknown,
-  context: ResourceKeyResolutionContext = {},
-): Promise<{ value: unknown; status: string; encryptedAvailable: boolean }> => {
-  if (!encrypted) {
-    return { value: '', status: 'missing', encryptedAvailable: false };
-  }
-  const envelopeJson = typeof encrypted === 'string' ? encrypted : JSON.stringify(encrypted);
-  if (!envelopeJson || envelopeJson === 'null') {
-    return { value: '', status: 'missing', encryptedAvailable: false };
-  }
-
-  const wallet = getWalletContext(context);
-  const lit = getLitHooks(context);
-  if (!wallet.account) {
-    return { value: '', status: 'wallet-required', encryptedAvailable: true };
-  }
-  if (!lit || typeof lit.getKey !== 'function') {
-    return { value: '', status: 'lit-unavailable', encryptedAvailable: true };
-  }
-
-  try {
-    const value = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
-      account: wallet.account,
-      chainId: wallet.chainId,
-      providerLike: wallet.providerLike,
-      litOpts: { getKey: lit.getKey },
-    });
-    const stringValue = value == null ? '' : value;
-    return {
-      value: stringValue,
-      status: stringValue ? 'encrypted' : 'locked',
-      encryptedAvailable: true,
-    };
-  } catch (_) {
-    return { value: '', status: 'locked', encryptedAvailable: true };
-  }
-};
 
 const resolveSessionArweaveKey = async (
   sessionCfg: SessionConfig | null,
