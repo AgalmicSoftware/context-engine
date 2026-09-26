@@ -363,7 +363,7 @@ import {
   buildNormalizedRenderedQuestionIds,
   resolveQuestionSlugMapLookup,
   resolveExitEditingBaselineSlice,
-  resolveRevertPendingBaselineSlice,
+  resolveRevertPendingAnswerValue,
   shouldBackfillPriorResponses,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
@@ -2858,6 +2858,7 @@ const renderPileResponseInput = (
     decryptTooltip,
     isAnswerDecrypting,
     onAnswerChange,
+    answerResetValue,
     inputNamePrefix = 'q',
     enableAiRewrite = true,
   }: any,
@@ -2889,16 +2890,17 @@ const renderPileResponseInput = (
       );
 
     case 'quadratic': {
-      const baseline = resolveRevertPendingBaselineSlice({
-        editBaseline: engine.state.editBaseline,
-        isLoggedIn: Boolean(engine.props.loginComplete && engine.props.account),
-        userAnswers: engine.state.userAnswers,
-        buildSliceFromUserAnswers: (answers) => engine.buildSliceFromUserAnswers(answers),
-        buildSliceFromLocalCache: () => engine.buildSliceFromLocalCache(),
-      });
-      const savedAnswer = baseline.answers?.[question.id];
-      const savedValue =
-        savedAnswer && typeof savedAnswer === 'object' && 'value' in savedAnswer ? (savedAnswer.value ?? '') : '';
+      // Draft editors undo to their own draft; the pile undoes to the saved answer.
+      const resetValue = onAnswerChange
+        ? answerResetValue
+        : resolveRevertPendingAnswerValue(question.id, {
+            editBaseline: engine.state.editBaseline,
+            isLoggedIn: Boolean(engine.props.loginComplete && engine.props.account),
+            userAnswers: engine.state.userAnswers,
+            buildSliceFromUserAnswers: (answers) => engine.buildSliceFromUserAnswers(answers),
+            buildSliceFromLocalCache: () => engine.buildSliceFromLocalCache(),
+          });
+      const canUndo = resetValue !== undefined;
 
       return (
         <QuadraticAllocationInput
@@ -2908,8 +2910,8 @@ const renderPileResponseInput = (
           value={answer.value}
           disabled={engine.state.isSubmitting}
           onChange={updateAnswer}
-          onReset={() => updateAnswer(savedValue)}
-          canReset={JSON.stringify(answer.value ?? '') !== JSON.stringify(savedValue)}
+          onReset={canUndo ? () => updateAnswer(resetValue) : undefined}
+          canReset={canUndo ? JSON.stringify(answer.value ?? '') !== JSON.stringify(resetValue ?? '') : undefined}
         />
       );
     }
@@ -3540,7 +3542,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 }
                 onSubmitResponses={(questionIds) => submitSessionInterviewResponses(engine, questionIds)}
                 onViewResults={engine.viewResultsFromSessionVoiceModeModal}
-                renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion) =>
+                renderAnswerInput={(questionId, value, onAnswerChange, interviewQuestion, resetValue) =>
                   engine.renderPileResponseInput({
                     // The live interview catalog can discover questions before the pile cache does.
                     question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
@@ -3549,6 +3551,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                       interviewQuestion || { id: questionId, type: 'freeform' },
                     answer: { value },
                     onAnswerChange,
+                    answerResetValue: resetValue,
                     inputNamePrefix: 'interview-draft',
                     enableAiRewrite: false,
                   })

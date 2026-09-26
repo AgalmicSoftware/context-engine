@@ -159,6 +159,7 @@ export {
   buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
   resolveExitEditingBaselineSlice,
+  resolveRevertPendingAnswerValue,
   resolveRevertPendingBaselineSlice,
   shouldBackfillPriorResponses,
   shouldHandleStartFresh,

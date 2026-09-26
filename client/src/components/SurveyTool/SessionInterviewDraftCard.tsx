@@ -19,6 +19,7 @@ export type InterviewQuestionControls = {
     value: unknown,
     onChange: (value: unknown) => void,
     question?: InterviewQuestion,
+    resetValue?: unknown,
   ) => React.ReactNode;
   renderAdditionalInput?: (questionId: string, value: string, onChange: (value: string) => void) => React.ReactNode;
   renderFieldLock?: (questionId: string, field: 'answer' | 'additional') => React.ReactNode;
@@ -37,9 +38,10 @@ type Props = InterviewQuestionControls & {
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
 };
 
-const addEditedField = (edited: InterviewDraftResponse, field: EditableField): EditableField[] => {
+const withEditedField = (edited: InterviewDraftResponse, field: EditableField, isEdited: boolean): EditableField[] => {
   const fields = new Set<EditableField>((edited.userEditedFields || []) as EditableField[]);
-  fields.add(field);
+  if (isEdited) fields.add(field);
+  else fields.delete(field);
   return [...fields];
 };
 
@@ -228,7 +230,9 @@ export default function SessionInterviewDraftCard({
   const useNativeAnswer = isNativeAnswerType(question);
   const markEdit = (field: EditableField, value: unknown) => {
     if (valuesEqual(value, edited[field])) return { [field]: value } as Partial<InterviewDraftResponse>;
-    return { [field]: value, userEditedFields: addEditedField(edited, field) } as Partial<InterviewDraftResponse>;
+    // A full revert to the AI draft returns that field to its unedited state.
+    const userEditedFields = withEditedField(edited, field, !valuesEqual(value, draft[field]));
+    return { [field]: value, userEditedFields } as Partial<InterviewDraftResponse>;
   };
   const onAnswerChange = (answer: unknown) => onEdit(markEdit('answer', answer));
   const onCommentsChange = (additionalComments: string) => {
@@ -255,7 +259,7 @@ export default function SessionInterviewDraftCard({
       <div className={styles.questionText}>{prompt}</div>
       <div className={styles.editorStack}>
         {useNativeAnswer && renderAnswerInput ? (
-          renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question)
+          renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
         ) : question?.type === 'quadratic' ? (
           <QuadraticAllocationInput
             questionId={draft.questionId}
@@ -263,6 +267,8 @@ export default function SessionInterviewDraftCard({
             voiceCredits={question.voiceCredits}
             value={answerValue}
             onChange={onAnswerChange}
+            onReset={() => onAnswerChange(draft.answer)}
+            canReset={!valuesEqual(answerValue, draft.answer)}
             disabled={disabled}
           />
         ) : question?.type === 'multichoice' ? (

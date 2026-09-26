@@ -486,6 +486,50 @@ it('renders signed quadratic votes in the full response view and forwards valid 
   expect(onAnswerChange).toHaveBeenCalledWith([-2, -4]);
 });
 
+describe('full-view quadratic Reset', () => {
+  const question = { id: 'quadratic-q', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
+  const renderReset = (value: unknown, answerResetValue: unknown) => {
+    const onAnswerChange = jest.fn();
+    render(
+      <SurveyQuestionsFullQuestionResponseInput
+        question={question}
+        answer={{ value }}
+        answerResetValue={answerResetValue}
+        onAnswerChange={onAnswerChange}
+      />,
+    );
+    const reset = screen.getByRole('button', { name: 'Reset' });
+    return { onAnswerChange, reset };
+  };
+
+  it('keeps Reset disabled for an untouched saved allocation', () => {
+    const { onAnswerChange, reset } = renderReset([3, -4], [3, -4]);
+    expect(reset).toHaveAttribute('title', 'Undo answer changes');
+    expect(reset).toBeDisabled();
+    fireEvent.click(reset);
+    expect(onAnswerChange).not.toHaveBeenCalled();
+  });
+
+  it('undoes an edited allocation to the saved answer instead of zeroing it', () => {
+    const { onAnswerChange, reset } = renderReset([1, 2], [3, -4]);
+    fireEvent.click(reset);
+    expect(onAnswerChange.mock.calls).toEqual([[[3, -4]]]);
+  });
+
+  it('restores a saved all-zero allocation', () => {
+    const { onAnswerChange, reset } = renderReset([1, 2], [0, 0]);
+    expect(reset).toHaveAttribute('title', 'Undo answer changes');
+    fireEvent.click(reset);
+    expect(onAnswerChange.mock.calls).toEqual([[[0, 0]]]);
+  });
+
+  it('undoes an unsaved allocation back to unanswered, as the pile does', () => {
+    const { onAnswerChange, reset } = renderReset([1, 2], '');
+    fireEvent.click(reset);
+    expect(onAnswerChange.mock.calls).toEqual([['']]);
+  });
+});
+
 it('defers only pointer drags on the standalone question route', () => {
   const onAnswerChange = jest.fn();
   render(
