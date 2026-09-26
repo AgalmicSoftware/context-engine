@@ -2,6 +2,14 @@ import { LegacyOwnResponseListingError } from '../../utilities/storage/storageCl
 import { isWorkerCanonicalSessionConfig, loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { isWorkerResponseNewer } from '../../utilities/survey/workerResponseRecency';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort';
+import {
+  buildChangedFieldResolvers,
+  buildIndexedQuestionEntryKeys,
+  computeChangedQidsAndFields,
+  type ChangedFieldResolverDeps,
+  type ResponseSlice as DiffSlice,
+} from './surveyToolChangedFieldsController';
+import { hasMeaningfulFieldValue } from './surveyToolDraftState';
 
 type RecordValue = Record<string, unknown>;
 const fields = ['answers', 'additionalComments', 'importance', 'conviction'] as const;
@@ -78,13 +86,67 @@ export const loadSessionInterviewSavedAnswers = async ({
   return responses;
 };
 
+export type InterviewSavedAnswerDiffDeps = ChangedFieldResolverDeps & {
+  normalizeQuestionIdKey: (questionId: string) => string;
+  valuesEqual: (a: unknown, b: unknown) => boolean;
+  ratingEnvelopeQids?: Set<string>;
+};
+
+// The pile's pending-edit flags that make each saved field a local edit.
+const LOCAL_EDIT_FLAGS: Record<(typeof fields)[number], string[]> = {
+  answers: ['answer', 'encryptedAnswer'],
+  additionalComments: ['additional', 'encryptedAdditional'],
+  importance: ['importance'],
+  conviction: ['conviction'],
+};
+
+const toDiffSlice = (slice: InputSlice | null): DiffSlice => ({
+  answers: { ...slice?.answers } as DiffSlice['answers'],
+  additionalComments: { ...slice?.additionalComments } as DiffSlice['additionalComments'],
+  importance: { ...slice?.importance },
+  conviction: { ...slice?.conviction },
+});
+
+// Local edits are what the pile would submit: value and encryption-policy
+// changes count, while re-derived hashes and ciphertext do not.
+const findLocalEdits = (
+  current: InputSlice | null,
+  baseline: InputSlice | null,
+  questionIds: string[],
+  diff: InterviewSavedAnswerDiffDeps,
+) => {
+  const currentSlice = toDiffSlice(current);
+  const baselineSlice = toDiffSlice(baseline);
+  const keysOf = (source: RecordValue) => buildIndexedQuestionEntryKeys(source, diff.normalizeQuestionIdKey);
+  const { changedMap } = computeChangedQidsAndFields({
+    ids: new Set(questionIds.map(diff.normalizeQuestionIdKey)),
+    baselineSlice,
+    currentSlice,
+    baselineAnswerKeys: keysOf(baselineSlice.answers),
+    currentAnswerKeys: keysOf(currentSlice.answers),
+    baselineAdditionalKeys: keysOf(baselineSlice.additionalComments),
+    currentAdditionalKeys: keysOf(currentSlice.additionalComments),
+    baselineImportanceKeys: keysOf(baselineSlice.importance),
+    currentImportanceKeys: keysOf(currentSlice.importance),
+    baselineConvictionKeys: keysOf(baselineSlice.conviction),
+    currentConvictionKeys: keysOf(currentSlice.conviction),
+    ratingEnvelopeQids: diff.ratingEnvelopeQids || new Set(),
+    valuesEqual: diff.valuesEqual,
+    hasMeaningfulFieldValue: hasMeaningfulFieldValue as (entry: unknown) => boolean,
+    ...buildChangedFieldResolvers(diff),
+  });
+  return (field: (typeof fields)[number], id: string) =>
+    LOCAL_EDIT_FLAGS[field].some((flag) => changedMap[diff.normalizeQuestionIdKey(id)]?.[flag]);
+};
+
 export const mergeInterviewSavedAnswerBaseline = (
   current: InputSlice | null,
   baseline: InputSlice | null,
   saved: InputSlice | null,
   questionIds: string[],
-  valuesEqual: (a: unknown, b: unknown) => boolean,
+  diff: InterviewSavedAnswerDiffDeps,
 ): { slice: InterviewSavedSlice; baseline: InterviewSavedSlice } => {
+  const isLocalEdit = findLocalEdits(current, baseline, questionIds, diff);
   const next = {} as InterviewSavedSlice;
   const nextBaseline = {} as InterviewSavedSlice;
   for (const field of fields) {
@@ -92,7 +154,7 @@ export const mergeInterviewSavedAnswerBaseline = (
     nextBaseline[field] = { ...baseline?.[field] };
     for (const id of questionIds) {
       // Loading a baseline must not discard a local edit made while it was in flight.
-      if (!Object.hasOwn(next[field], id) || valuesEqual(current?.[field]?.[id], baseline?.[field]?.[id])) {
+      if (!Object.hasOwn(next[field], id) || !isLocalEdit(field, id)) {
         if (Object.hasOwn(saved?.[field] || {}, id)) next[field][id] = saved?.[field]?.[id];
         else delete next[field][id];
       }

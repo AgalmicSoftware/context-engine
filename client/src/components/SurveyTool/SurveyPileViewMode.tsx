@@ -2636,7 +2636,16 @@ export const loadSessionInterviewOwnAnswers = async (
         previous.editBaseline,
         saved,
         questionIds,
-        (a, b) => engine.valuesEqual(a, b),
+        {
+          normalizeQuestionIdKey,
+          valuesEqual: engine.valuesEqual,
+          ratingEnvelopeQids: buildRatingEnvelopeQidSetFromUserAnswers(previous.userAnswers),
+          getDefaultResponseEncryptionAudience: engine.getDefaultResponseEncryptionAudience,
+          normalizeResponseEncryptionAudience: engine.normalizeResponseEncryptionAudience,
+          getDefaultResponseEncryptionAudienceForQid: engine.getDefaultResponseEncryptionAudienceForQid,
+          resolveFieldEncryptionGateId: engine.resolveFieldEncryptionGateId,
+          normalizeFieldAudienceMode: engine.normalizeFieldAudienceMode,
+        },
       );
       return {
         userAnswers,
