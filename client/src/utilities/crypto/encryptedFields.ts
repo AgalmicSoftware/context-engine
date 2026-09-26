@@ -162,42 +162,7 @@ export const resolveEncryptedFieldValue = async (
 
   const encryptedFields = groupCfg?.encryptedFields;
   const envelope = encryptedFields && typeof encryptedFields === 'object' ? encryptedFields[key] : null;
-
-  if (!envelope) {
-    return { value: '', status: 'missing', encryptedAvailable: false };
-  }
-
-  const envelopeJson = typeof envelope === 'string' ? envelope : JSON.stringify(envelope);
-  if (!envelopeJson || envelopeJson === 'null') {
-    return { value: '', status: 'missing', encryptedAvailable: false };
-  }
-
-  const wallet = getWalletContext(context);
-  const lit = getLitHooks(context);
-
-  if (!wallet.account) {
-    return { value: '', status: 'wallet-required', encryptedAvailable: true };
-  }
-  if (!lit || typeof lit.getKey !== 'function') {
-    return { value: '', status: 'lit-unavailable', encryptedAvailable: true };
-  }
-
-  try {
-    const value = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
-      account: wallet.account,
-      chainId: wallet.chainId,
-      providerLike: wallet.providerLike,
-      litOpts: lit || undefined,
-    });
-    const decoded = value == null ? '' : value;
-    return {
-      value: decoded,
-      status: decoded ? 'encrypted' : 'locked',
-      encryptedAvailable: true,
-    };
-  } catch {
-    return { value: '', status: 'locked', encryptedAvailable: true };
-  }
+  return resolveEncryptedValue(envelope, context);
 };
 
 export const encryptedFieldsUtils = {
