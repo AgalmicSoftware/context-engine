@@ -1,6 +1,9 @@
-export {};
+import workerReleasePin from './workerReleasePin.json';
 
 const processEnv = process.env as Record<string, string | undefined>;
+
+const releaseAssetUrl = (commit: string, file: string) =>
+  `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-${commit}/${file}`;
 
 const ENV_KEYS = [
   'REACT_APP_CE_SHARED_WORKER_URL',
@@ -73,42 +76,60 @@ describe('publicDeploymentConfig', () => {
       expect(config.DEFAULT_SHARED_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
       expect(config.DEPLOY_HELPER_URL).toBe(EXPECTED_DEPLOY_HELPER_URL);
       expect(config.HEALTHCHECK_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('');
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
     });
   });
 
-  it('keeps the default worker bundle pointed at a JavaScript asset', () => {
+  it('downloads every Worker asset and deploys natively from the pinned immutable release', () => {
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
-      const { buildPublicRepoLatestReleaseAssetUrl } = require('./publicRepoMetadata.js');
 
-      expect(config.WORKER_BUNDLE_URL).toContain('.js');
-      expect(config.WORKER_BUNDLE_URL).toBe(buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'));
+      expect(config.WORKER_BUNDLE_URL).toBe(releaseAssetUrl(workerReleasePin.commit, 'sessionCorsWorker.bundle.js'));
       expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(
-        buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
+        releaseAssetUrl(workerReleasePin.commit, 'agentBridgeWorker.bundle.js'),
       );
       expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(
-        buildPublicRepoLatestReleaseAssetUrl('worker-release-manifest.json'),
+        releaseAssetUrl(workerReleasePin.commit, 'worker-release-manifest.json'),
       );
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe(workerReleasePin.commit);
+      expect(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL)).toContain(
+        `/tree/${workerReleasePin.commit}/deploy/cloudflare/session-worker`,
+      );
+      expect(JSON.stringify(config)).not.toContain('/releases/latest/');
     });
   });
 
-  it('enables Cloudflare-native deploy only for a full immutable public replay commit', () => {
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = '0123456789abcdef0123456789abcdef01234567';
+  it('moves the native deploy and default downloads together to an explicit release commit', () => {
+    const commit = '0123456789abcdef0123456789abcdef01234567';
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = commit.toUpperCase();
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toContain('https://deploy.workers.cloudflare.com/');
       expect(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL)).toContain(
-        '/tree/0123456789abcdef0123456789abcdef01234567/deploy/cloudflare/session-worker',
+        `/tree/${commit}/deploy/cloudflare/session-worker`,
       );
+      expect(config.WORKER_BUNDLE_URL).toBe(releaseAssetUrl(commit, 'sessionCorsWorker.bundle.js'));
+      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(releaseAssetUrl(commit, 'agentBridgeWorker.bundle.js'));
+      expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(releaseAssetUrl(commit, 'worker-release-manifest.json'));
     });
+  });
 
-    jest.resetModules();
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'main';
-    jest.isolateModules(() => {
-      const config = require('./publicDeploymentConfig.js');
+  it('fails closed instead of falling back to latest when the release commit is invalid', () => {
+    const expectNoReleaseDefaults = (config: Record<string, unknown>) => {
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('');
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
+      expect(config.WORKER_BUNDLE_URL).toBe('');
+      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe('');
+      expect(config.WORKER_RELEASE_MANIFEST_URL).toBe('');
+    };
+
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'main';
+    jest.isolateModules(() => expectNoReleaseDefaults(require('./publicDeploymentConfig.js')));
+
+    clearPublicDeploymentEnv();
+    jest.resetModules();
+    jest.isolateModules(() => {
+      jest.doMock('./workerReleasePin.json', () => ({ commit: 'v0.6.3' }));
+      expectNoReleaseDefaults(require('./publicDeploymentConfig.js'));
     });
   });
 

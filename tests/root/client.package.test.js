@@ -52,8 +52,9 @@ test('Netlify builds the client from the repository-root deployment contract', (
   assert.match(config, /base\s*=\s*"client"/);
   assert.match(
     config,
-    /command\s*=\s*"npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=\$COMMIT_REF npm run build"/
+    /command\s*=\s*"node \.\.\/scripts\/verify-release-assets\.mjs && npm ci && npm run build"/
   );
+  assert.doesNotMatch(config, /COMMIT_REF/);
   assert.match(config, /publish\s*=\s*"build"/);
   assert.match(config, /NODE_VERSION\s*=\s*"20"/);
   assert.match(

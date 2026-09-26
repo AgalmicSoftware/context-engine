@@ -222,11 +222,12 @@ admin address, and two generated Worker runtime secrets shown by the wizard;
 then deploy and paste the resulting `workers.dev` URL back into the wizard.
 
 The deploy URL must pin an exact 40-character commit so the reviewed source is
-immutable. A release enables the native card by setting
-`REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to the reviewed public
-replay commit. The private source commit is not interchangeable with its public
-replay SHA. Moving branches, tags, abbreviated hashes, and non-GitHub sources
-are rejected. The token-based helper procedure later in this guide applies only
+immutable. Clients use the public commit of the Worker release pinned in
+`client/src/variables/workerReleasePin.json`, the same release the wizard
+downloads Worker bundles from. `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`
+can select another verified public release commit. The private source commit
+is not interchangeable with its public replay SHA. Moving branches, tags,
+abbreviated hashes, and non-GitHub sources are rejected. The token-based helper procedure later in this guide applies only
 to the legacy fallback. See
 [API token setup and handling](session-cors-worker.md#api-token-setup-and-handling)
 for its account selection, one-attempt handling, expiration, and revocation
@@ -929,8 +930,8 @@ want to avoid Wrangler and the native Git-template flow.
 
 Recommended source files:
 
-- Bundled release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
-- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
+- Bundled release asset from the pinned release: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<pinned commit>/sessionCorsWorker.bundle.js`, where the pinned commit is in `client/src/variables/workerReleasePin.json`
+- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<pinned commit>/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
 - Generated repo-local fallback bundle after `nvm use 20 && npm run worker:bundle`: `dist/sessionCorsWorker.bundle.js`
 - Canonical worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 

@@ -584,7 +584,7 @@ const WorkerDeploySection = ({
                   </Label>
                   <Input
                     value={deployForm.bundleUrl ?? ''}
-                    placeholder="https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js"
+                    placeholder="https://github.com/<org>/<repo>/releases/download/<release-tag>/sessionCorsWorker.bundle.js"
                     data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
                     onChange={(e) => setDeployForm((prev) => ({ ...prev, bundleUrl: e.target.value }))}
                   />

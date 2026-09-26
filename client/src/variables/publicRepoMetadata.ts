@@ -10,8 +10,10 @@ export const PUBLIC_DISCOVERABILITY_URL = 'https://contextengine.sh/discoverabil
 export const PUBLIC_LLMS_URL = 'https://contextengine.sh/llms.txt';
 export const PUBLIC_DISCOVERABILITY_PATH = '/discoverability.html';
 export const PUBLIC_LLMS_PATH = '/llms.txt';
-export const buildPublicRepoLatestReleaseAssetUrl = (filename = ''): string =>
-  filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoReleaseAssetUrl = (tag = '', filename = ''): string =>
+  tag && filename
+    ? `${PUBLIC_REPO_URL}/releases/download/${encodeURIComponent(tag)}/${String(filename).replace(/^\/+/, '')}`
+    : '';
 export const buildPublicRepoBlobUrl = (pathname = ''): string =>
   pathname ? `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : '';
 export const buildPublicRepoTreeUrl = (pathname = ''): string =>

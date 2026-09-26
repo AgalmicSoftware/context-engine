@@ -1,8 +1,10 @@
 # Canonical Netlify deployment contract. Dashboard settings should only select
-# the repository and production branch; build behavior lives here.
+# the repository and production branch; build behavior lives here. The client
+# deploys Workers from the release pinned in client/src/variables/workerReleasePin.json,
+# so the build first verifies that release's assets and digests.
 [build]
   base = "client"
-  command = "npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=$COMMIT_REF npm run build"
+  command = "node ../scripts/verify-release-assets.mjs && npm ci && npm run build"
   publish = "build"
 
 [build.environment]
