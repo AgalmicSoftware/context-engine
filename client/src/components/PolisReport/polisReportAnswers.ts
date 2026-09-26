@@ -1,5 +1,6 @@
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
+import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 
 export type ReportRecord = Record<string, unknown>;
 export type AnswerType = 'freeform' | 'rating' | 'multichoice' | 'quadratic';
@@ -88,22 +89,30 @@ export function readReportAnswer(payload: ReportRecord, question: ReportRecord):
     case 'rating': {
       if ((typeof value !== 'number' && typeof value !== 'string') || value === '') return null;
       if (typeof value === 'string' && !value.trim()) return null;
-      const scale = record(question.scale);
-      const min = typeof scale.min === 'number' ? scale.min : 0;
-      const max = typeof scale.max === 'number' ? scale.max : 10;
+      const { min, max } = normalizeRatingScale(question);
       const number = Number(value);
-      return Number.isFinite(number) && max > min && number >= min && number <= max ? number : null;
+      return Number.isFinite(number) && number >= min && number <= max ? number : null;
     }
     case 'multichoice': {
+      // Match the Worker's analysis validation: one malformed or unknown pick
+      // excludes the whole answer, and selection limits apply.
       const options = Array.isArray(question.options) ? question.options.map(label).filter(Boolean) : [];
-      const picks = (Array.isArray(value) ? value : [value]).map((pick) =>
-        label(record(pick).label || record(pick).value || pick),
-      );
-      const canonical = picks.map(
-        (pick) => options.find((option) => option.toLowerCase() === pick.toLowerCase()) || (options.length ? '' : pick),
-      );
-      const selected = [...new Set(canonical.filter(Boolean))];
-      return selected.length ? selected : null;
+      const picks = (Array.isArray(value) ? value : [value]).map(label);
+      if (!picks.length || picks.some((pick) => !pick)) return null;
+      // Without option metadata, picks cannot be checked and stand as given.
+      const canonical = options.length
+        ? picks.map((pick) => options.find((option) => option.toLowerCase() === pick.toLowerCase()) || '')
+        : picks;
+      if (canonical.some((pick) => !pick)) return null;
+      const selected = [...new Set(canonical)];
+      const { maxSelections } = question;
+      const limit =
+        question.singleSelect || question.oneSelectionOnly || question.singleChoice
+          ? 1
+          : typeof maxSelections === 'number' && Number.isSafeInteger(maxSelections) && maxSelections > 0
+            ? maxSelections
+            : selected.length;
+      return selected.length <= limit ? selected : null;
     }
     case 'quadratic':
       return validateQuadraticAllocation(value, question) ? null : value;
@@ -173,9 +182,7 @@ export function buildReportAnswerQuestions(
   const questions: ReportAnswerQuestion[] = [];
   collectReportAnswers(aggregator, metadata, scope).forEach(({ id, meta, type, values }) => {
     if (type === 'binary') return;
-    const scale = record(meta.scale);
-    const min = typeof scale.min === 'number' ? scale.min : 0;
-    const max = typeof scale.max === 'number' ? scale.max : 10;
+    const { min, max } = normalizeRatingScale(meta);
     const question: ReportAnswerQuestion = {
       id,
       type,
