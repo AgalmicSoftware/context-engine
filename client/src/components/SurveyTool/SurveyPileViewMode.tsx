@@ -2462,6 +2462,20 @@ const handleAdditionalPile = (
 const readPlainRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+// Interview drafts set answers; they never toggle them. Re-applying the value a
+// binary question already holds would clear it through the pile's toggle.
+export const applySessionInterviewAnswer = (engine: PileViewModeEngine, questionId: string, answer: unknown) =>
+  new Promise<void>((resolve) => {
+    const current = readPlainRecord(
+      engine.state.surveysResponseState?.[0]?.answers?.[normalizeQuestionIdKey(questionId)],
+    ).value;
+    if (engine.valuesEqual(current, answer)) {
+      resolve();
+      return;
+    }
+    engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
+  });
+
 export const buildSessionInterviewSubmitContextToken = (props: Record<string, unknown> = {}) => {
   const sessionConfig = readPlainRecord(props.sessionConfig);
   const sessionModeProfile = readPlainRecord(sessionConfig.sessionModeProfile);
@@ -3494,9 +3508,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
                 initialError={String(interviewPrefillError || '')}
                 onApplyAnswer={(questionId: string, answer: unknown) =>
-                  new Promise<void>((resolve) => {
-                    engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
-                  })
+                  applySessionInterviewAnswer(engine, questionId, answer)
                 }
                 onApplyAdditional={(questionId: string, comments: string) =>
                   new Promise<void>((resolve) => {
