@@ -33,6 +33,9 @@ export function parseReportResponse(value: unknown): ReportRecord {
   }
 }
 const label = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+// The Worker's analysis reads number and boolean freeform answers as text.
+const scalarText = (value: unknown): string =>
+  ['string', 'number', 'boolean'].includes(typeof value) ? String(value).trim() : '';
 export function reportQuestionMetadata(meta: unknown, payload: ReportRecord): ReportRecord {
   return { ...payload, ...record(meta) };
 }
@@ -85,7 +88,7 @@ export function readReportAnswer(payload: ReportRecord, question: ReportRecord):
     case 'binary':
       return normalizePolisBinaryVote(value);
     case 'freeform':
-      return label(value) || null;
+      return scalarText(value) || null;
     case 'rating': {
       if ((typeof value !== 'number' && typeof value !== 'string') || value === '') return null;
       if (typeof value === 'string' && !value.trim()) return null;

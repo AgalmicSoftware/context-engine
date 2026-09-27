@@ -102,6 +102,19 @@ describe('Worker analysis-validation parity', () => {
     expect(result).toMatchObject({ count: 1, options: [{ count: 1 }, { count: 0 }] });
   });
 
+  it('keeps number and boolean freeform answers as text', () => {
+    const result = summarize(
+      [
+        row('freeform', 42, 'number'),
+        row('freeform', 0, 'zero'),
+        row('freeform', false, 'boolean'),
+        row('freeform', '  ', 'blank'),
+      ],
+      { type: 'freeform' },
+    );
+    expect(result).toMatchObject({ count: 3, texts: ['42', '0', 'false'] });
+  });
+
   it('enforces maxSelections', () => {
     const result = summarize(
       [row('multichoice', ['Bus', 'Garden', 'Lighting'], 'three'), row('multichoice', ['Bus', 'Garden'], 'two')],
