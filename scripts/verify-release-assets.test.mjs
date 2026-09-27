@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -256,4 +257,56 @@ test('the command fails before any download when the selected commit is invalid'
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /release check failed: release commit must be a full 40-character SHA/);
+});
+
+// The Netlify build relies on the exit status, so run the real command
+// against a local release server.
+const runCommand = (env) =>
+  new Promise((resolve) => {
+    const child = spawn(process.execPath, [SCRIPT_PATH], { env: { ...process.env, ...env } });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => (stdout += chunk));
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+
+const withReleaseServer = async (handler, run) => {
+  const server = http.createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    return await run(`http://127.0.0.1:${server.address().port}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+};
+
+test('the command exits non-zero and names every missing asset', async () => {
+  const result = await withReleaseServer(
+    (_request, response) => response.writeHead(404).end('Not Found'),
+    (origin) => runCommand({ CE_RELEASE_COMMIT: COMMIT, CE_RELEASE_ASSET_BASE_URL: origin }),
+  );
+
+  assert.equal(result.status, 1);
+  for (const file of ['worker-release-manifest.json', 'sessionCorsWorker.bundle.js', 'agentBridgeWorker.bundle.js']) {
+    assert.ok(result.stderr.includes(`release check failed: ${file}: HTTP 404`), `${file}\n${result.stderr}`);
+  }
+});
+
+test('the command follows asset redirects and exits zero for a verified release', async () => {
+  const release = buildRelease();
+  // GitHub answers release downloads with a redirect to its asset host.
+  const result = await withReleaseServer(
+    (request, response) => {
+      const [, prefix, file] = request.url.match(/^\/(assets\/)?(.*)$/);
+      if (!prefix) response.writeHead(302, { location: `/assets/${file}` }).end();
+      else if (Object.hasOwn(release.assets, file)) response.writeHead(200).end(release.assets[file]);
+      else response.writeHead(404).end('Not Found');
+    },
+    (origin) => runCommand({ CE_RELEASE_COMMIT: COMMIT, CE_RELEASE_ASSET_BASE_URL: origin }),
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.match(/^verified: /gm)?.length, 3, result.stdout);
+  assert.match(result.stdout, new RegExp(`Worker release worker-bundles-${COMMIT} verified`));
 });
