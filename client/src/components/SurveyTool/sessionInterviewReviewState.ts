@@ -2,8 +2,8 @@ import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import type { InterviewDraftResponse } from './sessionInterview';
 
 // Review seeds '' for drafts that arrive without a comment, so an empty
-// comment counts as no comment when deciding what the responder edited.
-const interviewDraftFieldValue = (field: string, value: unknown) =>
+// comment counts as no comment when comparing a draft with its prediction.
+export const interviewDraftFieldValue = (field: string, value: unknown) =>
   field === 'additionalComments' ? String(value ?? '') : value;
 
 export function mergeInterviewReview(

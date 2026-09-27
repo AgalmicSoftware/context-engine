@@ -1,4 +1,5 @@
 import { responseValuesEqual as valuesEqual } from './responseValueEquality';
+import { interviewDraftFieldValue } from './sessionInterviewReviewState';
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : {};
@@ -49,7 +50,10 @@ export const buildInterviewChangedFields = (originalValue: unknown, finalValue: 
   const final = record(finalValue);
   return FIELD_KEYS.filter((field) => {
     if (!hasOwn(original, field) && !hasOwn(final, field)) return false;
-    return !valuesEqual(original[field], final[field]);
+    return !valuesEqual(
+      interviewDraftFieldValue(field, original[field]),
+      interviewDraftFieldValue(field, final[field]),
+    );
   });
 };
 
