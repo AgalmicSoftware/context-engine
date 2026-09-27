@@ -677,6 +677,28 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(onChange).toHaveBeenCalledWith([3, -2]);
   });
 
+  it('undoes interview quadratic edits to the drafted allocation the modal passes', async () => {
+    renderPile({}, { route: '/session/demo?mode=interview' });
+    await screen.findByTestId('mock-voice-mode-modal');
+    const question = {
+      id: 'live-quadratic',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    const draft = [3, -4];
+    const onChange = jest.fn();
+    const { rerender } = render(mockVoiceModeProps.renderAnswerInput(question.id, draft, onChange, question, draft));
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+
+    rerender(mockVoiceModeProps.renderAnswerInput(question.id, [1, -2], onChange, question, draft));
+    const reset = screen.getByRole('button', { name: 'Reset' });
+    expect(reset).toHaveAttribute('title', 'Undo answer changes');
+    fireEvent.click(reset);
+    expect(onChange.mock.calls).toEqual([[draft]]);
+  });
+
   it('imports a valid prefill hash when the mounted session URL changes', async () => {
     const encoded = encodeInterviewPrefillPacket({
       version: 1,
