@@ -283,6 +283,39 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
   });
 
+  it('restores the proposal marker when a comment is cleared on a draft without one', () => {
+    // The review seeds an empty comment when the AI proposed none.
+    const draft = { questionId: 'q1', answer: 'Draft' };
+    const onEdit = jest.fn();
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>({ ...draft, additionalComments: '' });
+      return (
+        <SessionInterviewDraftCard
+          draft={draft}
+          edited={edited}
+          selected
+          existing={false}
+          disabled={false}
+          onSelect={jest.fn()}
+          onEdit={(patch) => {
+            onEdit(patch);
+            setEdited((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+    render(<Review />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Additional comments' }));
+    fireEvent.click(screen.getByRole('button', { name: /Additional comments for q1/i }));
+    const comments = screen.getByRole('textbox', { name: /Additional comments for q1/i });
+    fireEvent.change(comments, { target: { value: 'x' } });
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
+    fireEvent.change(comments, { target: { value: '' } });
+    expect(onEdit).toHaveBeenLastCalledWith({ additionalComments: '', userEditedFields: [] });
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
+  });
+
   it('wraps injected prose editors with focus, bounded autosize and a Done editing return path', async () => {
     const renderAnswerInput = jest.fn((_questionId, value, onChange) => (
       <textarea

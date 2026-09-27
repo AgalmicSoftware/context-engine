@@ -1,6 +1,11 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import type { InterviewDraftResponse } from './sessionInterview';
 
+// Review seeds '' for drafts that arrive without a comment, so an empty
+// comment counts as no comment when deciding what the responder edited.
+export const interviewDraftFieldValue = (field: string, value: unknown) =>
+  field === 'additionalComments' ? String(value ?? '') : value;
+
 export function mergeInterviewReview(
   previous: InterviewDraftResponse[],
   edited: Record<string, InterviewDraftResponse>,
@@ -36,7 +41,8 @@ export function mergeInterviewReview(
       for (const field of ['answer', 'additionalComments', 'importance', 'conviction'] as const) {
         if (
           userEditedFields.has(field) ||
-          JSON.stringify(edited[draft.questionId][field]) !== JSON.stringify(prior[field])
+          JSON.stringify(interviewDraftFieldValue(field, edited[draft.questionId][field])) !==
+            JSON.stringify(interviewDraftFieldValue(field, prior[field]))
         ) {
           userEditedFields.add(field);
           reviewed = { ...reviewed, [field]: edited[draft.questionId][field] };
