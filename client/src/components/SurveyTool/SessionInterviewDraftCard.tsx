@@ -11,7 +11,6 @@ import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { InterviewDraftResponse, InterviewQuestion } from './sessionInterview';
-import { interviewDraftFieldValue } from './sessionInterviewReviewState';
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
@@ -232,11 +231,9 @@ export default function SessionInterviewDraftCard({
   const markEdit = (field: EditableField, value: unknown) => {
     if (valuesEqual(value, edited[field])) return { [field]: value } as Partial<InterviewDraftResponse>;
     // A full revert to the AI draft returns that field to its unedited state.
-    const isEdited = !valuesEqual(
-      interviewDraftFieldValue(field, value),
-      interviewDraftFieldValue(field, draft[field]),
-    );
-    const userEditedFields = withEditedField(edited, field, isEdited);
+    // An emptied comment stays an edit even when the AI proposed none, because
+    // the card may have been showing the responder's saved comment.
+    const userEditedFields = withEditedField(edited, field, !valuesEqual(value, draft[field]));
     return { [field]: value, userEditedFields } as Partial<InterviewDraftResponse>;
   };
   const onAnswerChange = (answer: unknown) => onEdit(markEdit('answer', answer));

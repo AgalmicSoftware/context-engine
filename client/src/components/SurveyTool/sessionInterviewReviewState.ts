@@ -3,7 +3,7 @@ import type { InterviewDraftResponse } from './sessionInterview';
 
 // Review seeds '' for drafts that arrive without a comment, so an empty
 // comment counts as no comment when deciding what the responder edited.
-export const interviewDraftFieldValue = (field: string, value: unknown) =>
+const interviewDraftFieldValue = (field: string, value: unknown) =>
   field === 'additionalComments' ? String(value ?? '') : value;
 
 export function mergeInterviewReview(
