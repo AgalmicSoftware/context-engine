@@ -90,6 +90,15 @@ describe('runtime SCSS theme contract', () => {
     });
   });
 
+  test('component styles never bundle their own copy of the global stylesheet', () => {
+    // The app entry loads it once; a module copy re-applies its element and theme rules late.
+    const globalSheetImport = /@(?:use|import|forward)\s+['"][^'"]*contextEngine(?:\.scss)?['"]/;
+    const offenders = findScssFiles(path.resolve(scssDir, 'components')).filter((filename) =>
+      globalSheetImport.test(fs.readFileSync(filename, 'utf8')),
+    );
+    expect(offenders.map((filename) => path.relative(scssDir, filename))).toEqual([]);
+  });
+
   test('the document root exposes the semantic theme style-query container', () => {
     const source = fs.readFileSync(path.resolve(scssDir, 'assets/css/contextEngine.scss'), 'utf8');
     expect(source).toMatch(/html\s*{[\s\S]*?container-name:\s*ce-theme;/);

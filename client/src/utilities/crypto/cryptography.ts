@@ -38,6 +38,8 @@ import {
   signInvite,
 } from './sbtAuthorization';
 import { Buffer } from 'buffer';
+import { assertResponseFieldAudience } from '@ce-shared/encryption/responseFieldPolicy.mjs';
+import type { WorkerFieldContext, WorkerFieldRecipient } from './workerResponseFieldKeys';
 import { ethers, utils } from 'ethers';
 import {
   aesGcmDecrypt,
@@ -134,6 +136,9 @@ type CryptoEncryptOptions = UnknownRecord & {
   onlyTheseQids?: unknown[];
   questionPool?: unknown;
   lit?: LitOptions;
+  sessionConfig?: WorkerFieldContext['sessionConfig'];
+  sessionSlug?: string;
+  encryptionAudience?: string;
   hasher?: PoseidonHasher | null;
   poseidon?: PoseidonHasher | null;
   kind?: unknown;
@@ -149,6 +154,9 @@ type CryptoDecryptOptions = UnknownRecord & {
   chainId?: ChainIdInput;
   surveyId?: string;
   lit?: LitOptions;
+  sessionConfig?: WorkerFieldContext['sessionConfig'];
+  sessionSlug?: string;
+  encryptionAudience?: string;
   litOpts?: LitOptions;
   throwOnError?: boolean;
   preferLitRecipients?: boolean;
@@ -639,15 +647,9 @@ const _resolveFromAndChainId = async (
     }
   };
   const normalizeChain = (id: unknown): number | null => {
-    if (typeof id === 'number' && Number.isFinite(id)) return id;
-    if (typeof id === 'bigint') return Number(id);
-    if (typeof id === 'string') {
-      const t = id.trim();
-      if (/^0x/i.test(t)) return parseInt(t, 16);
-      const n = Number(t);
-      if (Number.isFinite(n)) return n;
-    }
-    return null;
+    if (!['number', 'bigint', 'string'].includes(typeof id)) return null;
+    const n = Number(id);
+    return Number.isSafeInteger(n) && n > 0 ? n : null;
   };
 
   // Resolve "from"
@@ -1257,7 +1259,11 @@ const encryptField = async ({
   questionPool,
   litOpts,
   hasher,
+  audience = 'self',
+  workerContext,
 }: {
+  audience?: string;
+  workerContext?: WorkerFieldContext;
   providerLike: ProviderLike;
   account?: string;
   chainId: ChainIdInput;
@@ -1270,6 +1276,17 @@ const encryptField = async ({
   litOpts?: LitOptions;
   hasher?: PoseidonHasher | null;
 }) => {
+  if (workerContext?.sessionConfig) assertResponseFieldAudience(workerContext.sessionConfig, audience);
+  if (['self_admin', 'session'].includes(audience) && !workerContext?.sessionConfig) {
+    throw new Error('Verified session context is required for Worker encryption.');
+  }
+  // Worker-canonical sessions have no registry chain. Self encryption still needs
+  // the signer's EIP-712 domain, resolved before context/AAD/commitments are built.
+  if (chainId == null) {
+    const identity = await _resolveFromAndChainId(providerLike, { account });
+    chainId = identity.chainId;
+    account = identity.from;
+  }
   const contextHex = computeContext({ chainId, account, surveyId, qId, fieldKey });
   assertBytes32Hex(contextHex);
   const aadObj = buildAAD({ contextHex, chainId, surveyId, qId, fieldKey });
@@ -1315,8 +1332,15 @@ const encryptField = async ({
     contextHex,
     cekRaw,
   });
-  const litRecipients = await maybeAddLitRecipients(cekRaw, litOpts);
-  const recipients = [selfRecipient, ...litRecipients];
+  const litRecipients = audience === 'gate' ? await maybeAddLitRecipients(cekRaw, litOpts) : [];
+  if (audience === 'gate' && !litRecipients.length)
+    throw new Error('No key recipients are available for the selected gate.');
+  const recipients: EnvelopeRecipient[] = [selfRecipient, ...litRecipients];
+  if (['self_admin', 'session'].includes(audience)) {
+    const { wrapWorkerResponseFieldKey } = await import('./workerResponseFieldKeys');
+    recipients.push(await wrapWorkerResponseFieldKey(cekRaw, audience, contextHex, { ...workerContext, account }));
+  }
+  // Only-me never sends its CEK to the Worker; admin access requires an explicit recipient.
 
   const envelope = buildEnvelope({
     iv,
@@ -1343,7 +1367,9 @@ const unwrapCekFromRecipients = async ({
   providerLike,
   litOpts,
   preferLitRecipients = false,
+  workerContext,
 }: {
+  workerContext?: WorkerFieldContext;
   env: Envelope;
   account?: string;
   chainId: ChainIdInput;
@@ -1418,6 +1444,11 @@ const unwrapCekFromRecipients = async ({
     if (litCek) return litCek;
   }
 
+  const workerRecipient = env.recipients.find((r) => r.type === 'worker-response-field-v1');
+  if (workerRecipient && workerContext?.sessionConfig) {
+    const { unwrapWorkerResponseFieldKey } = await import('./workerResponseFieldKeys');
+    return unwrapWorkerResponseFieldKey(workerRecipient as WorkerFieldRecipient, contextHex, workerContext);
+  }
   throw lastErr || new Error('Unable to unwrap CEK (self and lit paths failed).');
 };
 
@@ -1509,7 +1540,9 @@ const decryptEnvelopeToValue = async ({
   expectedSurveyId,
   expectedQId,
   expectedFieldKey,
+  workerContext,
 }: {
+  workerContext?: WorkerFieldContext;
   envelopeJson: unknown;
   account?: string;
   chainId: ChainIdInput;
@@ -1524,6 +1557,9 @@ const decryptEnvelopeToValue = async ({
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
   const env = parseEnvelope(jsonStr);
   validateEnvelopeBinding(env, { expectedSurveyId, expectedQId, expectedFieldKey });
+  // Reuse the authenticated envelope domain when the session has no chain;
+  // switching the wallet's current network must not change its wrapping key.
+  chainId = env.aad?.chainId ?? chainId;
   const cacheKey = buildDecryptEnvelopeCacheKey({
     jsonStr,
     account,
@@ -1533,7 +1569,9 @@ const decryptEnvelopeToValue = async ({
     preferLitRecipients,
   });
 
-  const cached = decryptCacheLruGet(cacheKey);
+  // Worker membership/admin changes must be checked on each new decrypt request.
+  const useCache = !env.recipients.some((r) => r.type === 'worker-response-field-v1');
+  const cached = useCache ? decryptCacheLruGet(cacheKey) : undefined;
   if (cached) {
     const ts = Number(cached.ts || 0);
     if (cached.ok) {
@@ -1553,7 +1591,7 @@ const decryptEnvelopeToValue = async ({
     }
   }
 
-  const inFlight = _decryptEnvelopeInFlight.get(cacheKey);
+  const inFlight = useCache ? _decryptEnvelopeInFlight.get(cacheKey) : undefined;
   if (inFlight) {
     perfDebugDecryptEnvelope('inflight_hit');
     return await inFlight;
@@ -1567,6 +1605,7 @@ const decryptEnvelopeToValue = async ({
       providerLike,
       litOpts,
       preferLitRecipients,
+      workerContext,
     });
     if (!(cekRaw instanceof Uint8Array) || cekRaw.length !== 32) {
       throw new Error('Unwrapped CEK has invalid length.');
@@ -1590,13 +1629,14 @@ const decryptEnvelopeToValue = async ({
     return { value: pt.value, kind: pt.kind || env?.meta?.kind || 'freeform', zkSalt: pt.salt };
   })();
 
-  _decryptEnvelopeInFlight.set(cacheKey, run);
+  if (useCache) _decryptEnvelopeInFlight.set(cacheKey, run);
   try {
     const result = await run;
-    decryptCacheLruSet(cacheKey, { ok: true, ts: Date.now(), value: result });
+    if (useCache) decryptCacheLruSet(cacheKey, { ok: true, ts: Date.now(), value: result });
     return { ...(result || {}) };
   } catch (err) {
-    decryptCacheLruSet(cacheKey, { ok: false, ts: Date.now(), errMsg: toErrorMessage(err, 'Decryption failed.') });
+    if (useCache)
+      decryptCacheLruSet(cacheKey, { ok: false, ts: Date.now(), errMsg: toErrorMessage(err, 'Decryption failed.') });
     perfDebugDecryptEnvelope('error');
     throw err;
   } finally {
@@ -1656,6 +1696,8 @@ const encryptMultipleAnswers = async (
       fieldKey: fieldKind,
       kind,
       value: fieldObj.value,
+      audience: String(fieldObj.encryptionAudience || (litOpts ? 'gate' : 'self')),
+      workerContext: { sessionConfig: opts.sessionConfig, sessionSlug: opts.sessionSlug, account },
       questionPool,
       litOpts,
       hasher,
@@ -1746,6 +1788,7 @@ const decryptMultipleAnswers = async (
       chainId,
       providerLike,
       litOpts,
+      workerContext: { sessionConfig: opts.sessionConfig, sessionSlug: opts.sessionSlug, account },
       expectedSurveyId: surveyId,
       expectedQId: qId,
       expectedFieldKey: fieldKey,
@@ -1835,6 +1878,7 @@ const decryptSingleField = async (
         chainId,
         providerLike,
         litOpts,
+        workerContext: { sessionConfig: opts.sessionConfig, sessionSlug: opts.sessionSlug, account },
         expectedSurveyId: surveyId,
         expectedQId: qId,
         expectedFieldKey: 'answer',
@@ -1857,6 +1901,7 @@ const decryptSingleField = async (
         chainId,
         providerLike,
         litOpts,
+        workerContext: { sessionConfig: opts.sessionConfig, sessionSlug: opts.sessionSlug, account },
         expectedSurveyId: surveyId,
         expectedQId: qId,
         expectedFieldKey: 'additional',
@@ -1987,6 +2032,11 @@ const decryptEnvelopeValue = async (envelopeJson: unknown, opts: CryptoDecryptOp
     providerLike: providerLike as ProviderLike,
     litOpts,
     preferLitRecipients: !!preferLitRecipients,
+    workerContext: {
+      sessionConfig: opts.sessionConfig,
+      sessionSlug: opts.sessionSlug,
+      account: toOptionalString(account),
+    },
   });
   return value;
 };
@@ -2013,6 +2063,8 @@ const encryptEnvelopeValue = async (value: unknown, opts: CryptoEncryptOptions =
     qId,
     kind,
     value,
+    audience: opts.encryptionAudience || (litOpts ? 'gate' : 'self'),
+    workerContext: { sessionConfig: opts.sessionConfig, sessionSlug: opts.sessionSlug, account },
     questionPool: Array.isArray(opts.questionPool) ? (opts.questionPool as QuestionLike[]) : undefined,
     litOpts,
     hasher,

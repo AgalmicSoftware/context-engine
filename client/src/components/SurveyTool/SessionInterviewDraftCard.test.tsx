@@ -93,8 +93,110 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(onEdit).toHaveBeenLastCalledWith({ answer: [3, -2], userEditedFields: ['answer'] });
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
     if (injected) {
-      expect(renderAnswerInput.mock.calls.at(-1)).toEqual(['q-budget', [3, -2], expect.any(Function), question]);
+      expect(renderAnswerInput.mock.calls.at(-1)).toEqual([
+        'q-budget',
+        [3, -2],
+        expect.any(Function),
+        question,
+        [3, -4],
+      ]);
     }
+  });
+
+  it('undoes quadratic edits to the AI allocation and clears only that edited marker', () => {
+    const draft = { questionId: 'q-budget', answer: [3, -4], additionalComments: 'AI note', confidence: 0.6 };
+    const question = {
+      id: 'q-budget',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    const onEdit = jest.fn();
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
+      return (
+        <SessionInterviewDraftCard
+          draft={draft}
+          edited={edited}
+          question={question}
+          selected
+          existing={false}
+          disabled={false}
+          onSelect={jest.fn()}
+          onEdit={(patch) => {
+            onEdit(patch);
+            setEdited((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+    render(<Review />);
+    const reset = screen.getByRole('button', { name: 'Reset' });
+    expect(reset).toHaveAttribute('title', 'Undo answer changes');
+    expect(reset).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Additional comments for Allocate support/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Additional comments for Allocate support/i }), {
+      target: { value: 'Human note' },
+    });
+    expect(onEdit).toHaveBeenLastCalledWith({
+      additionalComments: 'Human note',
+      userEditedFields: ['answer', 'additionalComments'],
+    });
+
+    fireEvent.click(reset);
+    expect(onEdit).toHaveBeenLastCalledWith({ answer: [3, -4], userEditedFields: ['additionalComments'] });
+    expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+    expect(screen.getByRole('textbox', { name: /Additional comments for Allocate support/i })).toHaveValue(
+      'Human note',
+    );
+    expect(reset).toBeDisabled();
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
+    const writtenAnswers = onEdit.mock.calls.flatMap(([patch]) => ('answer' in patch ? [patch.answer] : []));
+    expect(writtenAnswers).toEqual([
+      [3, -2],
+      [3, -4],
+    ]);
+  });
+
+  it('restores an all-zero AI allocation and returns the card to its unedited state', () => {
+    const draft = { questionId: 'q-budget', answer: [0, 0], confidence: 0.6 };
+    const question = {
+      id: 'q-budget',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    const onEdit = jest.fn();
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
+      return (
+        <SessionInterviewDraftCard
+          draft={draft}
+          edited={edited}
+          question={question}
+          selected
+          existing={false}
+          disabled={false}
+          onSelect={jest.fn()}
+          onEdit={(patch) => {
+            onEdit(patch);
+            setEdited((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+    render(<Review />);
+    fireEvent.change(screen.getByRole('slider', { name: 'Parks' }), { target: { value: '2' } });
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onEdit).toHaveBeenLastCalledWith({ answer: [0, 0], userEditedFields: [] });
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
   });
 
   it('shows full prose by default and enters edit mode by keyboard without Agent/User labels', () => {
@@ -153,7 +255,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
   });
 
-  it('keeps the proposal marker through focus-only editing and hides it after a restored edit', () => {
+  it('keeps the proposal marker through focus-only editing and restores it after a full revert', () => {
     const draft = { questionId: 'q1', answer: 'Draft', additionalComments: '' };
     function Review() {
       const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
@@ -176,7 +278,40 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Draft answer for q1/i }));
     fireEvent.change(screen.getByRole('textbox', { name: /Draft answer for q1/i }), { target: { value: 'Changed' } });
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: /Draft answer for q1/i }), { target: { value: 'Draft' } });
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
+  });
+
+  it('keeps a cleared saved comment marked as a human edit', () => {
+    // The review shows the saved comment when the AI proposed none.
+    const draft = { questionId: 'q1', answer: 'Draft' };
+    const onEdit = jest.fn();
+    function Review() {
+      const [edited, setEdited] = useState<InterviewDraftResponse>({ ...draft, additionalComments: 'Saved note' });
+      return (
+        <SessionInterviewDraftCard
+          draft={draft}
+          edited={edited}
+          selected
+          existing
+          savedComment="Saved note"
+          disabled={false}
+          onSelect={jest.fn()}
+          onEdit={(patch) => {
+            onEdit(patch);
+            setEdited((current) => ({ ...current, ...patch }));
+          }}
+        />
+      );
+    }
+    render(<Review />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Additional comments for q1/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Additional comments for q1/i }), {
+      target: { value: '' },
+    });
+    expect(onEdit).toHaveBeenLastCalledWith({ additionalComments: '', userEditedFields: ['additionalComments'] });
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
   });
 

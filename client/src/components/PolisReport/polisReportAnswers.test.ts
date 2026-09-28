@@ -69,6 +69,72 @@ describe('Polis answer summaries', () => {
   });
 });
 
+describe('Worker analysis-validation parity', () => {
+  const summarize = (rows: unknown[], meta: Record<string, unknown>) =>
+    buildReportAnswerQuestions({ q: rows }, { q: meta }).find((question) => question.id === 'q');
+
+  it('excludes a whole multiple-choice answer when any pick is unknown or malformed', () => {
+    const result = summarize(
+      [
+        row('multichoice', ['Bus', 'Tram'], 'unknown-pick'),
+        row('multichoice', ['Bus', 3], 'number-pick'),
+        row('multichoice', ['Bus', '  '], 'blank-pick'),
+        row('multichoice', [{ label: 'Bus' }], 'object-pick'),
+        row('multichoice', ['garden'], 'valid'),
+      ],
+      { type: 'multichoice', options: ['Bus', 'Garden'] },
+    );
+    expect(result).toMatchObject({
+      count: 1,
+      options: [
+        { label: 'Bus', count: 0 },
+        { label: 'Garden', count: 1 },
+      ],
+    });
+  });
+
+  it.each(['singleSelect', 'oneSelectionOnly', 'singleChoice'])('allows one pick for %s questions', (alias) => {
+    const result = summarize([row('multichoice', ['Bus', 'Garden'], 'two'), row('multichoice', ['Bus'], 'one')], {
+      type: 'multichoice',
+      options: ['Bus', 'Garden'],
+      [alias]: true,
+    });
+    expect(result).toMatchObject({ count: 1, options: [{ count: 1 }, { count: 0 }] });
+  });
+
+  it('keeps number and boolean freeform answers as text', () => {
+    const result = summarize(
+      [
+        row('freeform', 42, 'number'),
+        row('freeform', 0, 'zero'),
+        row('freeform', false, 'boolean'),
+        row('freeform', '  ', 'blank'),
+      ],
+      { type: 'freeform' },
+    );
+    expect(result).toMatchObject({ count: 3, texts: ['42', '0', 'false'] });
+  });
+
+  it('enforces maxSelections', () => {
+    const result = summarize(
+      [row('multichoice', ['Bus', 'Garden', 'Lighting'], 'three'), row('multichoice', ['Bus', 'Garden'], 'two')],
+      { type: 'multichoice', options: ['Bus', 'Garden', 'Lighting'], maxSelections: 2 },
+    );
+    expect(result).toMatchObject({ count: 1, options: [{ count: 1 }, { count: 1 }, { count: 0 }] });
+  });
+
+  it.each([{ ratingScale: { min: 1, max: 5 } }, { scale: { minimum: 1, maximum: 5 } }, { min: 1, max: 5 }])(
+    'bounds ratings by the %j scale representation',
+    (scale) => {
+      const result = summarize(
+        [row('rating', 7, 'above'), row('rating', 0, 'below'), row('rating', 5, 'top'), row('rating', 1, 'bottom')],
+        { type: 'rating', ...scale },
+      );
+      expect(result).toMatchObject({ count: 2, average: 3, min: 1, max: 5 });
+    },
+  );
+});
+
 describe('Polis response statistics', () => {
   it('counts every answer type once per participant/question and reports the binary subset including Unsure', () => {
     const responses = {

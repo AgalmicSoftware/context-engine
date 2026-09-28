@@ -48,6 +48,9 @@ type SurveyQuestionsLockAudienceControlProps = {
   gateActive?: boolean;
   currentGateId?: string;
   selfActive?: boolean;
+  allowAdminAudience?: boolean;
+  allowSessionAudience?: boolean;
+  currentAudience?: string;
   plaintextActive?: boolean;
   followActive?: boolean;
   allowPlaintextOption?: boolean;
@@ -76,6 +79,9 @@ const SurveyQuestionsLockAudienceControl = ({
   gateActive = false,
   currentGateId = '',
   selfActive = false,
+  allowAdminAudience = false,
+  allowSessionAudience = false,
+  currentAudience = 'self',
   plaintextActive = false,
   followActive = false,
   allowPlaintextOption = false,
@@ -150,6 +156,23 @@ const SurveyQuestionsLockAudienceControl = ({
           >
             <span className={styles.convictionToggleLabel}>{normalizedSelfAudienceLabel}</span>
           </button>
+          {[
+            ...(allowAdminAudience ? [{ value: 'self_admin', label: 'Me + admin' }] : []),
+            ...(allowSessionAudience ? [{ value: 'session', label: 'Session members' }] : []),
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={buildSurveyQuestionsLockAudienceToggleClassName(
+                styles,
+                !!fieldState?.encrypted && currentAudience === option.value,
+              )}
+              onClick={() => onSelectAudience?.(option.value)}
+              data-testid={`ce-survey-lock-audience-${option.value}`}
+            >
+              <span className={styles.convictionToggleLabel}>{option.label}</span>
+            </button>
+          ))}
           {gateOptions.map((option) => {
             const showGateDetails = expandedGateId === option.gateId;
             const sbtItems = Array.isArray(option.sbtItems) ? option.sbtItems : [];

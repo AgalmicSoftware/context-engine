@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -35,6 +36,7 @@ const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
+const ReverseAlignmentAtlas = React.lazy(() => import('./ReverseAlignmentAtlas'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -417,7 +419,8 @@ export default function OnePageSessionStandardShell({
         ? 'Refresh AI Views'
         : 'Generate AI Views';
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showContextSection = isDemoSlug || !!sessionContext;
+  const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
+  const showContextSection = isDemoSlug || !!sessionContext || showTopicPreview;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -691,6 +694,11 @@ export default function OnePageSessionStandardShell({
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
                 {renderSessionContext(sessionContext)}
+                {showTopicPreview && (
+                  <Suspense fallback={<LazyFallback label="Loading Reverse Alignment Atlas..." minHeight="20vh" />}>
+                    <ReverseAlignmentAtlas />
+                  </Suspense>
+                )}
                 {isDemoSlug && (
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
                     <CorpusViewer
@@ -812,6 +820,7 @@ export default function OnePageSessionStandardShell({
           </div>
           {showResults && (
             <div className={styles.miniSectionContent}>
+              {showTopicPreview && <ReverseAlignmentTopicMap />}
               <div>
                 {effectiveResultsViewMode === 'polis' && (
                   <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>

@@ -16,7 +16,12 @@ For a visual overview, see the [interview research diagrams](assets/interview-re
 
 ## Consent Controls
 
-Interview review exposes two independent choices:
+Interview review exposes two independent choices under the initially collapsed
+**AI submission info** dropdown. It also contains the metadata disclosure and,
+when available, the optional responder-name checkbox. Expanding it does not
+change consent. Its muted green toggle shares one bordered, lighter-blue footer
+with **Submit responses**; the options open above that compact footer. The
+**Review proposed responses** heading uses bold weight to separate drafts clearly.
 
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |

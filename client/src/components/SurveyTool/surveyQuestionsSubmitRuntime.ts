@@ -358,6 +358,8 @@ export const createSurveyQuestionsSubmitRuntime = (
               provider: submitContext.provider,
               account: submitContext.account,
               chainId: submitContext.chainId,
+              sessionSlug: submitContext.effectiveDraftSlug,
+              sessionConfig: resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
               surveyId,
               questionPool: poolForCommit,
               hasher: stateRef.current.hasher,
@@ -392,14 +394,12 @@ export const createSurveyQuestionsSubmitRuntime = (
           activeSlice = base;
           newArr[surveyIndex] = base;
           setState(buildSurveysResponseStatePatch(newArr));
-
-          // Verify against the freshly merged slice instead of immediately rereading
-          // `stateRef.current`, which can still hold the pre-encryption draft until React
-          // flushes the async class-state update.
-          await verifyEncryption(changedQids, base);
         }
       }
 
+      // Check even when no new encryption ran: an audience-only edit must not
+      // reuse masked ciphertext whose recipients still grant the old audience.
+      await verifyEncryption(changedQids, activeSlice);
       setState(buildCurrentStepState(2));
 
       // Await the receipt to ensure transaction is confirmed before optimistic update

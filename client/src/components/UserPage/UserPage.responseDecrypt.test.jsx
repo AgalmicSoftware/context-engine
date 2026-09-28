@@ -199,7 +199,7 @@ describe('UserPage response decrypt helpers', () => {
       },
       'q1',
       'answer',
-      {
+      expect.objectContaining({
         account: '0x00000000000000000000000000000000000000bb',
         provider: 'wagmi',
         providerKind: 'wagmi',
@@ -208,9 +208,33 @@ describe('UserPage response decrypt helpers', () => {
         acceptedSurveyIds: [surveyId, ethers.constants.HashZero],
         lit: null,
         throwOnError: true,
-      },
+      }),
     );
   });
+
+  it.each(['question', 'survey'])(
+    'uses the source %s session when a profile aggregates other sessions',
+    async (kind) => {
+      const instance = makeInstance({
+        account: '0x00000000000000000000000000000000000000bb',
+        activeSessionSlug: 'active',
+      });
+      const sourceConfig = { slug: 'source', corsWorkerUrl: 'https://source.example.org/' };
+      instance._getSessionConfigForSlugExact = jest.fn((slug) => (slug === 'source' ? sourceConfig : null));
+      const response = { questionID: 'q1', answer: { value: '*', encrypted: true, encryptedPortion: '{"v":2}' } };
+      instance.state.questionResponseInfo = kind === 'question' ? [{ id: 'q1', sessionSlug: 'source' }] : [];
+      instance.state.surveyResponseInfo = [{ id: 's1', slug: 'source' }];
+      instance.state.detailedSurveyResponses = { s1: [{ questionData: { id: 'q1' }, responseData: response }] };
+      cryptoUtils.decryptSingleField.mockResolvedValue({ answers: { q1: { value: 'clear' } } });
+      await instance.handleDecryptQuestionAnswer('q1', 'answer', response);
+      expect(cryptoUtils.decryptSingleField).toHaveBeenCalledWith(
+        expect.anything(),
+        'q1',
+        'answer',
+        expect.objectContaining({ sessionSlug: 'source', sessionConfig: sourceConfig }),
+      );
+    },
+  );
 
   it('keeps encrypted response state unchanged when decrypt execution fails', async () => {
     const instance = makeInstance({

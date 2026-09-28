@@ -5,7 +5,7 @@ description: Detailed Context Engine Telegram bot, Mini App, admin, and operator
 
 # CE Telegram Bot Reference
 
-**Reference version:** 2026-07-18 (v42)
+**Reference version:** 2026-09-28 (v42)
 
 This is the detailed Telegram bot, Mini App, admin, and operator reference. It
 preserves endpoint details and troubleshooting notes that are too large for the
@@ -726,7 +726,8 @@ Build preferences as drafts keyed by exact `questionId`:
       "q-binary": { "value": "agree", "comments": "Optional rationale." },
       "q-rating": { "value": 4, "comments": "Optional rationale." },
       "q-freeform": { "text": "Natural language answer.", "comments": "" },
-      "q-choice": { "values": ["Option A"], "comments": "" }
+      "q-choice": { "values": ["Option A"], "comments": "" },
+      "q-quadratic": { "value": [3, -2, 0], "comments": "" }
     }
   }
 }
@@ -738,6 +739,9 @@ Supported answer shapes:
 - `rating`: `value` is a number.
 - `freeform`: `text` is the answer body.
 - `multichoice`: `values` is an array of selected option labels.
+- `quadratic`: `value` is an array with one signed whole-number vote per option,
+  in the listed order. Use 0 for neutral; the squared votes must total at most
+  the question's `voiceCredits` (99 by default).
 
 ### Writing Good Additional Comments
 
@@ -1581,6 +1585,11 @@ show. Never expose "under the hood" token, endpoint, or storage details in the
 onboarding message.
 
 ## Changelog
+
+### 2026-09-28 (v42)
+
+- Documented the quadratic answer shape for preference drafts and Agent Only
+  Mode answers.
 
 ### 2026-07-18 (v42)
 

@@ -1,4 +1,5 @@
 /** @file surveyToolCanDecryptController.ts */
+import { resolveResponseFieldPolicy } from '@ce-shared/encryption/responseFieldPolicy.mjs';
 
 import {
   buildCanDecryptOtherResponsesSnapshot,
@@ -84,7 +85,7 @@ export const evaluateCanDecryptPreCheck = (snapshot: CanDecryptSnapshot): CanDec
   if (!snapshot.loggedIn) {
     return { earlyExit: true, status: 'needs-wallet' };
   }
-  if (snapshot.recipients.length === 0) {
+  if (snapshot.recipients.length === 0 && !snapshot.workerMediated) {
     return { earlyExit: true, status: 'no-gate' };
   }
   return { earlyExit: false };
@@ -94,6 +95,11 @@ export const resolveCanDecryptGateAccess = async (
   params: ResolveCanDecryptGateAccessParams,
   checkAccess: CheckAccessFn,
 ): Promise<{ canDecrypt: boolean; status: string }> => {
+  // This enables an attempt, not plaintext access. The Worker validates the
+  // individual field's owner/admin/member policy on every key release.
+  if (params.account && resolveResponseFieldPolicy(params.cfg).centralized) {
+    return { canDecrypt: true, status: 'worker-check-required' };
+  }
   const verdicts: Array<{ status: string }> = [];
   for (const resourceKey of params.resourceKeysToCheck) {
     verdicts.push(

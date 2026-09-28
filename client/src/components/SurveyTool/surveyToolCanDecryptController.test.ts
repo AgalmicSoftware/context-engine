@@ -261,3 +261,35 @@ describe('surveyToolCanDecryptController', () => {
     });
   });
 });
+
+it('offers an authenticated Worker decrypt attempt without requiring a Lit gate', async () => {
+  const cfg = {
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+      storage: { backend: 'cloudflare' },
+      encryption: { mode: 'none' },
+    },
+    storageProfile: { backend: 'cloudflare' },
+  };
+  const context = buildCanDecryptContext({
+    getEffectiveDraftSlug: () => 'example',
+    resolveEffectiveSlugFromProps: () => 'example',
+    resolveEffectiveResponseGateConfig: () => cfg,
+    getResponseGatePolicy: () => ({ recipients: [] }),
+    account: '0xabc',
+    loginComplete: true,
+    singleQuestionMode: true,
+    isStandalone: true,
+    sbtCacheRevision: 0,
+  });
+  expect(evaluateCanDecryptPreCheck(context.snapshot).earlyExit).toBe(false);
+  const checkAccess = jest.fn();
+  expect(
+    await resolveCanDecryptGateAccess({ cfg, slug: 'example', account: '0xabc', resourceKeysToCheck: [] }, checkAccess),
+  ).toEqual({ canDecrypt: true, status: 'worker-check-required' });
+  expect(checkAccess).not.toHaveBeenCalled();
+  expect(evaluateCanDecryptPreCheck({ ...context.snapshot, loggedIn: false })).toEqual({
+    earlyExit: true,
+    status: 'needs-wallet',
+  });
+});

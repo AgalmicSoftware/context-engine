@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { resolveRevertPendingAnswerValue } from './surveyToolHydrationFlow';
 import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 
 export type SurveyQuestionsQuestionDisplayRuntime = SurveyQuestionsLegacyRecord;
@@ -198,10 +199,22 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     glowAnswer,
   }: SurveyQuestionsLegacyValue) => {
     const handlers = getQuestionInputHandlers(surveyIndex, question.id);
+    // Quadratic Reset undoes to the saved answer, as the pile does.
+    const answerResetValue =
+      question?.type === 'quadratic'
+        ? resolveRevertPendingAnswerValue(question.id, {
+            editBaseline: stateRef.current.editBaseline,
+            isLoggedIn: Boolean(propsRef.current.loginComplete && propsRef.current.account),
+            userAnswers: stateRef.current.userAnswers,
+            buildSliceFromUserAnswers: (answers: unknown) => engine.buildSliceFromUserAnswers(answers),
+            buildSliceFromLocalCache: () => engine.buildSliceFromLocalCache(),
+          })
+        : undefined;
     return (
       <SurveyQuestionsFullQuestionResponseInput
         question={question}
         answer={answer}
+        answerResetValue={answerResetValue}
         glowAnswer={glowAnswer}
         isSubmitting={stateRef.current.isSubmitting}
         singleQuestionMode={propsRef.current.singleQuestionMode}

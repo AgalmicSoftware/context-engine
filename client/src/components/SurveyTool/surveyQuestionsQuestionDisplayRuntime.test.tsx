@@ -193,6 +193,22 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
     expect(toggleAnswerEncryption).toHaveBeenCalledWith(2, 'q1', true);
   });
 
+  it('gives quadratic inputs the saved answer as their undo target', () => {
+    const stateRef = {
+      current: {
+        ...createContext().stateRef.current,
+        editBaseline: { answers: { q1: { value: [1, 2] } } },
+      },
+    };
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext({ stateRef }));
+    const render = (question: SurveyQuestionsLegacyRecord) =>
+      runtime.renderFullQuestionResponseInput({ question, qIndex: 0, surveyIndex: 0, answer: { value: [3, -2] } });
+
+    expect(render({ id: 'q1', type: 'quadratic' }).props.answerResetValue).toEqual([1, 2]);
+    expect(render({ id: 'q2', type: 'quadratic' }).props.answerResetValue).toBe('');
+    expect(render({ id: 'q1', type: 'freeform' }).props.answerResetValue).toBeUndefined();
+  });
+
   it('computes audio input worker props once per question display render', () => {
     const firstWorkerProps = {
       context: { account: '0xabc', chainId: 11155420 },

@@ -95,6 +95,9 @@ export const normalizeResponseEncryptionAudience = (
   const raw = String(value || '')
     .trim()
     .toLowerCase();
+  // Keep explicit Worker policies intact. Capability checks belong at the UI
+  // and encryption boundary; silently downgrading to self loses the chosen audience.
+  if (raw === 'self_admin' || raw === 'session') return raw;
   if (raw === 'gate') {
     if (qid) {
       return deps.getEffectiveRecipientsForQid(qid).length ? 'gate' : 'self';

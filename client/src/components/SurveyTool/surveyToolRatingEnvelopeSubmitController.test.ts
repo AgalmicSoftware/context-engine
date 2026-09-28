@@ -617,3 +617,19 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
   });
 });
+
+it('re-encrypts ratings when the selected audience changes instead of retaining old recipients', async () => {
+  const oldEnvelope = JSON.stringify({
+    recipients: [{ type: 'self-eip712-v1' }, { type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }],
+  });
+  const deps = buildMockDeps();
+  const context = makeContext({
+    sliceForSubmit: { answers: { q1: { encrypted: true, encryptionAudience: 'self' } } },
+    questionResponses: [{ questionID: 'q1', importance: 5, importanceEncrypted: oldEnvelope }],
+  });
+  await processRatingEnvelopesForSubmit(context, deps);
+  expect(deps.encryptEnvelopeValue).toHaveBeenCalledWith(5, expect.objectContaining({ encryptionAudience: 'self' }));
+  expect(context.questionResponses[0].importance).toBeNull();
+  context.questionResponses[0].importanceEncrypted = oldEnvelope;
+  await expect(processRatingEnvelopesForSubmit(context, deps)).rejects.toThrow('Decrypt the ratings');
+});

@@ -1,4 +1,5 @@
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
+import { responseValuesEqual } from './responseValueEquality';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
@@ -674,6 +675,28 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
     fireEvent.change(screen.getByRole('slider', { name: 'Transit' }), { target: { value: '-2' } });
     expect(onChange).toHaveBeenCalledWith([3, -2]);
+  });
+
+  it('undoes interview quadratic edits to the drafted allocation the modal passes', async () => {
+    renderPile({}, { route: '/session/demo?mode=interview' });
+    await screen.findByTestId('mock-voice-mode-modal');
+    const question = {
+      id: 'live-quadratic',
+      type: 'quadratic',
+      prompt: 'Allocate support',
+      options: ['Parks', 'Transit'],
+      voiceCredits: 25,
+    };
+    const draft = [3, -4];
+    const onChange = jest.fn();
+    const { rerender } = render(mockVoiceModeProps.renderAnswerInput(question.id, draft, onChange, question, draft));
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+
+    rerender(mockVoiceModeProps.renderAnswerInput(question.id, [1, -2], onChange, question, draft));
+    const reset = screen.getByRole('button', { name: 'Reset' });
+    expect(reset).toHaveAttribute('title', 'Undo answer changes');
+    fireEvent.click(reset);
+    expect(onChange.mock.calls).toEqual([[draft]]);
   });
 
   it('imports a valid prefill hash when the mounted session URL changes', async () => {
@@ -1582,6 +1605,11 @@ describe('independent interview own-answer hydration', () => {
         editBaseline: {},
       },
       valuesEqual: Object.is,
+      getDefaultResponseEncryptionAudience: () => 'self',
+      normalizeResponseEncryptionAudience: (audience) => audience,
+      getDefaultResponseEncryptionAudienceForQid: () => 'self',
+      resolveFieldEncryptionGateId: () => null,
+      normalizeFieldAudienceMode: (mode) => mode || 'explicit',
       buildSliceFromUserAnswers: jest.fn(() => ({
         answers: { q1: { value: 'saved' } },
         importance: {},
@@ -1604,6 +1632,44 @@ describe('independent interview own-answer hydration', () => {
       await expect(current).resolves.toMatchObject({ answers: { q1: { value: 'saved' } } });
       expect(engine.state.surveysResponseState[0].answers.q1).toEqual({ value: 'saved' });
       expect(engine.state.userAnswers.responses).toHaveLength(1);
+    } finally {
+      load.mockRestore();
+    }
+  });
+
+  it('keeps an in-flight encryption edit whose answer text matches the saved answer', async () => {
+    const load = jest
+      .spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers')
+      .mockResolvedValue([{ questionID: 'q1', answer: { value: 'Agree' } }]);
+    const plain = { value: 'Agree', encrypted: false, encryptionAudience: 'self' };
+    const encrypted = { ...plain, encrypted: true };
+    const engine = {
+      props: { account: '0xabc', loginComplete: true, sessionSlug: 'demo', sessionConfig: { slug: 'demo' } },
+      state: {
+        surveysResponseState: [{ answers: { q1: encrypted }, importance: {}, conviction: {}, additionalComments: {} }],
+        editBaseline: { answers: { q1: plain }, importance: {}, conviction: {}, additionalComments: {} },
+      },
+      valuesEqual: (a, b) => responseValuesEqual(a, b, true),
+      getDefaultResponseEncryptionAudience: () => 'self',
+      normalizeResponseEncryptionAudience: (audience) => audience,
+      getDefaultResponseEncryptionAudienceForQid: () => 'self',
+      resolveFieldEncryptionGateId: () => null,
+      normalizeFieldAudienceMode: (mode) => mode || 'explicit',
+      buildSliceFromUserAnswers: jest.fn(() => ({
+        answers: { q1: plain },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      })),
+      setState(update, callback) {
+        this.state = { ...this.state, ...update(this.state) };
+        callback();
+      },
+    };
+    try {
+      await loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal);
+      expect(engine.state.surveysResponseState[0].answers.q1).toEqual(encrypted);
+      expect(engine.state.editBaseline.answers.q1).toEqual(plain);
     } finally {
       load.mockRestore();
     }

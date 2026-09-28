@@ -1,3 +1,4 @@
+import { responseEnvelopeMatchesAudience } from '../../utilities/crypto/responseEnvelopeAudience';
 import { hasMeaningfulFieldValue, shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
 import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
@@ -149,6 +150,17 @@ export const verifyEncryptionIntegrity = (
     if (limitSet && !limitSet.has(qId)) continue;
     const answer = stateToCheck.answers ? stateToCheck.answers[qId] : null;
     const additional = stateToCheck.additionalComments ? stateToCheck.additionalComments[qId] : null;
+
+    for (const field of [answer, additional]) {
+      if (
+        field?.encrypted &&
+        field.encryptedPortion &&
+        responseEnvelopeMatchesAudience(field.encryptedPortion, field.encryptionAudience) === false
+      ) {
+        failures.push(`Decrypt and re-encrypt the response for ${qId} before changing its audience.`);
+        verificationPassed = false;
+      }
+    }
 
     if (
       answer &&

@@ -1,6 +1,19 @@
 import { getSessionEntryRedirect } from './sessionEntryRedirect';
 
 describe('EDDY session entry redirect', () => {
+  it.each(['rxc-test', 'rxc-ra-test'])('expands %s without adding interview or group-join intent', (slug) => {
+    const target = new URL(getSessionEntryRedirect(`/${slug}`)!, 'https://contextengine.sh');
+    expect(target.pathname).toBe(`/session/${slug}`);
+    expect(target.search).toBe('');
+    const interview = new URL(
+      getSessionEntryRedirect(`/${slug}/`, '?mode=interview', '#context')!,
+      'https://contextengine.sh',
+    );
+    expect(interview.pathname).toBe(`/session/${slug}`);
+    expect(interview.search).toBe('?mode=interview');
+    expect(interview.searchParams.has('joinGroup')).toBe(false);
+    expect(interview.hash).toBe('#context');
+  });
   it.each(['/session/eddy26', '/session/eddy26/'])('expands the bare event URL %s', (path) => {
     const target = new URL(getSessionEntryRedirect(path)!, 'https://contextengine.sh');
     expect(target.pathname).toBe('/session/eddy26');

@@ -10,6 +10,7 @@ import {
 import {
   validateInboundWorkerSessionSlug,
 } from './sessionSlugResolution.js';
+import { resolveResponseFieldPolicy } from '../../shared/encryption/responseFieldPolicy.mjs';
 
 export { projectPublicWorkerSessionConfig };
 
@@ -93,6 +94,15 @@ export const dispatchSessionConfigBootstrapRequest = async ({
   return deps?.json?.({
     ok: true,
     sessionSlug: slug,
-    config: projectPublicWorkerSessionConfig(config),
+    config: {
+      ...projectPublicWorkerSessionConfig(config),
+      // Runtime advertisement, never trust a persisted capability on an older Worker.
+      responseFieldEncryption: {
+        ...(config.responseFieldEncryption?.mode ? { mode: config.responseFieldEncryption.mode } : {}),
+        version: resolveResponseFieldPolicy(config, { workerAvailable: true }).admin &&
+          !!env?.CE_STORAGE_ENVELOPE_KEK &&
+          typeof (env?.CE_STORAGE_AUDIT_KV || env?.CE_STORAGE_INDEX_KV || env?.STORAGE_INDEX_KV || env?.STORAGE_KV)?.put === 'function' ? 1 : 0,
+      },
+    },
   }, 200, buildBootstrapHeaders(corsContext.headers));
 };

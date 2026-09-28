@@ -1346,6 +1346,15 @@ export const resolveRevertPendingBaselineSlice = ({
   return buildEmptyResponseSlice();
 };
 
+// The saved answer that undo returns one question to; '' when none is saved.
+export const resolveRevertPendingAnswerValue = (
+  questionId: string,
+  args: ResolveRevertPendingBaselineSliceArgs = {},
+): unknown => {
+  const saved = resolveRevertPendingBaselineSlice(args).answers?.[questionId];
+  return saved && typeof saved === 'object' && 'value' in saved ? (saved.value ?? '') : '';
+};
+
 export const buildRevertPendingStatePatch = ({
   prevSurveysResponseState = null,
   surveyIndex = 0,

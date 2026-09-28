@@ -163,6 +163,20 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['rxc-test', 'https://ce-rxc-test-96862a1dc78f.agalmic.workers.dev'],
+    ['rxc-ra-test', 'https://ce-rxc-ra-test-784bb9e31813.agalmic.workers.dev'],
+  ])('bootstraps the %s clean route from bundled discovery', (slug, workerOrigin) => {
+    const result = resolveMainSiteSessionRouteForRender({
+      sessionTokenRaw: slug,
+      searchStr: '',
+      controller,
+      resolveSessionSlugFromPathToken: (token) => token,
+      resolveStandardSessionRoute: jest.fn(),
+    });
+    expect(result).toMatchObject({ kind: 'bootstrap', workerOrigin, workerSessionSlug: slug });
+  });
+
   it('keeps registry-resolved demo-interview-5 routes on the standard path', () => {
     const registryConfig = {
       slug: 'demo-interview-5',

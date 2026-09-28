@@ -34,6 +34,8 @@ type SurveyQuestionsFullQuestionResponseInputProps = {
   question: SurveyQuestionRecord;
   qIndex?: number;
   answer: SurveyAnswerRecord;
+  // The saved answer that quadratic Reset undoes to ('' when none is saved).
+  answerResetValue?: unknown;
   glowAnswer?: boolean;
   isSubmitting?: boolean;
   singleQuestionMode?: boolean;
@@ -48,6 +50,7 @@ type SurveyQuestionsFullQuestionResponseInputProps = {
 export const SurveyQuestionsFullQuestionResponseInput = ({
   question,
   answer,
+  answerResetValue,
   glowAnswer = false,
   isSubmitting = false,
   singleQuestionMode = false,
@@ -127,7 +130,8 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
   };
 
   switch (inputDescriptor.kind) {
-    case 'quadratic':
+    case 'quadratic': {
+      const canUndo = answerResetValue !== undefined;
       return (
         <QuadraticAllocationInput
           questionId={question.id}
@@ -137,8 +141,11 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
           disabled={isSubmitting}
           deferDragUpdates={singleQuestionMode}
           onChange={emitAnswerChange}
+          onReset={canUndo ? () => emitAnswerChange(answerResetValue) : undefined}
+          canReset={canUndo ? JSON.stringify(answer.value ?? '') !== JSON.stringify(answerResetValue ?? '') : undefined}
         />
       );
+    }
     case 'multichoice': {
       return (
         <MultichoiceQuestionInput

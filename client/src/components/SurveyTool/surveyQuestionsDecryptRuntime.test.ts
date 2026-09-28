@@ -199,8 +199,27 @@ describe('surveyQuestionsDecryptRuntime', () => {
       { q1: { encrypted: true } },
       {},
       expect.objectContaining({
-        decryptEnvelopeValue: context.cryptoUtils.decryptEnvelopeValue,
+        decryptEnvelopeValue: expect.any(Function),
         logWarn: expect.any(Function),
+      }),
+    );
+  });
+
+  it('binds rating key releases to the active session context', async () => {
+    const context = createContext();
+    Object.assign(context.propsRef.current, { sessionConfig: { sessionId: 'session-id' } });
+    const runtime = createSurveyQuestionsDecryptRuntime(context);
+    await runtime.decryptQuestionRatingEnvelopes({});
+    const ports = (context.decryptQuestionRatingEnvelopesHelper as jest.Mock).mock.calls[0][2] as {
+      decryptEnvelopeValue: (value: string, options: Record<string, unknown>) => Promise<unknown>;
+    };
+    await ports.decryptEnvelopeValue('envelope', { account: 'owner' });
+    expect(context.cryptoUtils.decryptEnvelopeValue).toHaveBeenCalledWith(
+      'envelope',
+      expect.objectContaining({
+        account: 'owner',
+        sessionSlug: 'edge',
+        sessionConfig: { sessionId: 'session-id' },
       }),
     );
   });

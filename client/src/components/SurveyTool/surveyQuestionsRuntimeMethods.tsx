@@ -367,6 +367,8 @@ export const createSurveyQuestionsRuntimeMethods = (
     toggleQuestionFieldEncryptionEnabled,
   } = createSurveyQuestionsLockAudienceRuntime({
     ...context,
+    resolveEffectiveResponseGateConfig,
+    resolveEffectiveSlug,
     buildEmptyResponseFieldState,
     buildInheritedAdditionalFieldState,
     invalidateDiffCaches: () => invalidateDiffCaches(),
@@ -2143,6 +2145,8 @@ export const createSurveyQuestionsRuntimeMethods = (
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {
+            sessionSlug: submissionGroupKey,
+            sessionConfig: resolveEffectiveResponseGateConfig(submissionGroupKey, context.props || propsRef.current),
             provider: context.provider,
             account: context.account,
             chainId:

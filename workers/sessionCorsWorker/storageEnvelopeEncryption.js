@@ -139,6 +139,27 @@ const unwrapBytesWithKey = async ({ wrappingKey, wrapped, aad = '', deps = {} })
   return new Uint8Array(plaintext);
 };
 
+// A distinct authenticated domain prevents field CEKs from being replayed as
+// storage/session keys. Policy is included verbatim: changing the audience,
+// owner, session or field context invalidates the wrap.
+export const wrapResponseFieldKey = async ({ env, keyBytes, policy, deps = {} }) =>
+  wrapBytesWithKey({
+    wrappingKey: await importDeploymentKek({ env, deps }),
+    plaintextBytes: keyBytes,
+    aad: `ce-response-field-key-v1:${JSON.stringify(policy)}`,
+    deps,
+  });
+
+export const unwrapResponseFieldKey = async ({ env, wrapped, policy, deps = {} }) => {
+  const args = { wrapped, aad: `ce-response-field-key-v1:${JSON.stringify(policy)}`, deps };
+  try {
+    return await unwrapBytesWithKey({ ...args, wrappingKey: await importDeploymentKek({ env, deps }) });
+  } catch (error) {
+    if (!readDeploymentSecret({ env, previous: true, deps })) throw error;
+    return unwrapBytesWithKey({ ...args, wrappingKey: await importDeploymentKek({ env, previous: true, deps }) });
+  }
+};
+
 const readSessionKeyRecord = (config = {}) => {
   const envelope = isObj(config.storageEnvelope) ? config.storageEnvelope : {};
   return isObj(envelope.sessionKey) ? envelope.sessionKey : null;

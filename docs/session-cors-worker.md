@@ -830,6 +830,60 @@ Access conditions may be attached per payload or at session level:
 
 `match: "any"` releases when any condition passes; `match: "all"` requires every condition. Empty or missing conditions fall back to the configured gate. Unknown condition kinds fail closed. `worker_group` checks canonical worker group membership and deleted groups fail closed.
 
+### Response field audiences
+
+The answer/comment lock follows the session's encryption capability. An explicit
+`sessionModeProfile.encryption.mode: "none"` hides locks for new answers unless a
+Worker-canonical Cloudflare session explicitly opts into
+`responseFieldEncryption: { "mode": "optional" }`. This opt-in leaves whole-payload
+storage and Results visibility unchanged. Previously encrypted answers keep their locked indicator and decrypt path.
+Legacy sessions without a mode profile retain their existing self/Lit behavior.
+
+- **Only me** uses the submitter's signature-derived wrapping key. Neither session
+  admins nor the Worker receive a recipient key for this audience. Losing access
+  to that signing identity also loses access to its private fields.
+- **Me + admin** is available on Worker-canonical Cloudflare sessions with
+  `worker_envelope` or optional field encryption enabled, and `responseFieldEncryption.version: 1` advertised
+  by `/session-config`. The advertisement requires a deployed key route, a
+  deployment KEK, and a KV audit binding. It is absent on older Workers.
+- **Session members** additionally requires a private storage access policy.
+  The Worker checks the current session gate/conditions on each key release;
+  admins do not implicitly bypass that membership check. Public sessions omit
+  this option. The submitter retains their independent self recipient.
+
+Authenticated `POST /storage/response-field-key/wrap` and `/unwrap` use storage
+scope and rate limits. Their `worker-response-field-v1` recipient binds the
+session ID/slug, submitter, audience, and field context into AES-GCM authenticated
+data under the deployment KEK, with a separate domain from storage envelope keys.
+Unwrap requires successful authorization and a durable key-release audit before
+returning a key with `Cache-Control: private, no-store`. The browser resolves the
+Worker from the active session config, never from a URL inside ciphertext.
+Worker-recipient plaintext is not reused from the cryptography decrypt cache.
+
+Changing an audience requires new field encryption; changing metadata cannot
+change existing ciphertext recipients. Disabling new encryption does not remove
+existing author/admin key access. Removing session membership blocks subsequent
+Worker releases, but cannot revoke plaintext or keys a reader already obtained.
+Cloudflare audiences trust the Worker operator; Only me keeps its key out of the
+Worker. These are additional per-field protections, separate from encryption of
+stored response payloads. The existing CE-CC self/Lit envelope format is unchanged;
+CE-CC does not offer the browser's new Cloudflare audience controls.
+
+Deploy both the client and session Worker for Cloudflare audience support, then
+enable the session's encryption profile or optional field policy. Changing this setting alone cannot add
+routes to an older Worker. Public full-results profile validation still requires
+public, unencrypted storage; this change does not alter that profile contract.
+
+### Linked community groups
+
+`linkedWorkerGroups` is an array of `{ sessionSlug, sessionId, workerUrl, groupId }`
+references to existing Worker-native groups. The Groups section bootstraps the
+owning HTTPS Worker, validates its slug and pinned session ID, and displays the
+original group's logo and membership controls. Authentication and explicit joins
+use the owning session; opening the page does not join the group. A reference
+never creates a duplicate group or copies membership into the referring session.
+Unavailable or mismatched sessions fail closed with a visible error.
+
 ### Encrypted Envelope Archive
 
 Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archival bundle for Cloudflare payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and wrapped session-key metadata. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.
@@ -1361,6 +1415,18 @@ Runtime:
     "limits": { "perWalletPerDay": 1000, "perAnonymousIpPerDay": 0 }
   }
   ```
+
+  The `rxc-test` Results section also includes an interactive Reverse Alignment
+  topic-map preview with twelve empty topic bubbles and a “Waiting for more data”
+  state. Selecting a bubble shows its empty assignment state. No question or
+  response IDs are assigned; the admin AI action that will populate those
+  associations is a separate future step.
+
+  Self-encrypted response fields in worker-canonical sessions without a registry
+  chain resolve their EIP-712 chain domain from the signing provider. That domain
+  is retained in the envelope's authenticated metadata and reused for decryption
+  when the session has no chain. This does not add a registry or transaction
+  requirement, and it does not change session storage encryption settings.
 
   `sessionContext` is optional public presentation metadata. The client renders
   its `title`, `paragraphs`, and HTTPS `links` as React text and anchors; it is

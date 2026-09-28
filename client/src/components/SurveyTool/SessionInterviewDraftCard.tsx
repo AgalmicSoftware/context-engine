@@ -11,6 +11,7 @@ import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { InterviewDraftResponse, InterviewQuestion } from './sessionInterview';
+import { interviewDraftFieldValue } from './sessionInterviewReviewState';
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
@@ -19,6 +20,7 @@ export type InterviewQuestionControls = {
     value: unknown,
     onChange: (value: unknown) => void,
     question?: InterviewQuestion,
+    resetValue?: unknown,
   ) => React.ReactNode;
   renderAdditionalInput?: (questionId: string, value: string, onChange: (value: string) => void) => React.ReactNode;
   renderFieldLock?: (questionId: string, field: 'answer' | 'additional') => React.ReactNode;
@@ -32,14 +34,17 @@ type Props = InterviewQuestionControls & {
   question?: InterviewQuestion;
   selected: boolean;
   existing: boolean;
+  // The responder's saved comment, which review shows when the AI proposed none.
+  savedComment?: string;
   disabled: boolean;
   onSelect: (selected: boolean) => void;
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
 };
 
-const addEditedField = (edited: InterviewDraftResponse, field: EditableField): EditableField[] => {
+const withEditedField = (edited: InterviewDraftResponse, field: EditableField, isEdited: boolean): EditableField[] => {
   const fields = new Set<EditableField>((edited.userEditedFields || []) as EditableField[]);
-  fields.add(field);
+  if (isEdited) fields.add(field);
+  else fields.delete(field);
   return [...fields];
 };
 
@@ -204,6 +209,7 @@ export default function SessionInterviewDraftCard({
   question,
   selected,
   existing,
+  savedComment = '',
   disabled,
   onSelect,
   onEdit,
@@ -226,9 +232,18 @@ export default function SessionInterviewDraftCard({
   const rawComments = String(edited.additionalComments || '');
   const answerValue = edited.answer;
   const useNativeAnswer = isNativeAnswerType(question);
+  // Review shows the saved comment when the AI proposed none, so edits start from it.
+  const startingValue = (field: EditableField) =>
+    field === 'additionalComments' ? draft.additionalComments || savedComment : draft[field];
   const markEdit = (field: EditableField, value: unknown) => {
     if (valuesEqual(value, edited[field])) return { [field]: value } as Partial<InterviewDraftResponse>;
-    return { [field]: value, userEditedFields: addEditedField(edited, field) } as Partial<InterviewDraftResponse>;
+    // A full revert to the starting value returns that field to its unedited state.
+    const isEdited = !valuesEqual(
+      interviewDraftFieldValue(field, value),
+      interviewDraftFieldValue(field, startingValue(field)),
+    );
+    const userEditedFields = withEditedField(edited, field, isEdited);
+    return { [field]: value, userEditedFields } as Partial<InterviewDraftResponse>;
   };
   const onAnswerChange = (answer: unknown) => onEdit(markEdit('answer', answer));
   const onCommentsChange = (additionalComments: string) => {
@@ -255,7 +270,7 @@ export default function SessionInterviewDraftCard({
       <div className={styles.questionText}>{prompt}</div>
       <div className={styles.editorStack}>
         {useNativeAnswer && renderAnswerInput ? (
-          renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question)
+          renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
         ) : question?.type === 'quadratic' ? (
           <QuadraticAllocationInput
             questionId={draft.questionId}
@@ -263,6 +278,8 @@ export default function SessionInterviewDraftCard({
             voiceCredits={question.voiceCredits}
             value={answerValue}
             onChange={onAnswerChange}
+            onReset={() => onAnswerChange(draft.answer)}
+            canReset={!valuesEqual(answerValue, draft.answer)}
             disabled={disabled}
           />
         ) : question?.type === 'multichoice' ? (

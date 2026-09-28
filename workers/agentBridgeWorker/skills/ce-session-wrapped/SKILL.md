@@ -5,7 +5,7 @@ description: "Run a generic Context Engine session wrapped flow: onboard by invi
 
 # Context Engine Session Wrapped Runtime
 
-**Skill version:** 2026-07-20 (session-wrapped-v1.1)
+**Skill version:** 2026-09-28 (session-wrapped-v1.2)
 **Protocol version:** Context Engine agent bridge v42
 
 Use this skill only to run a generic Context Engine session wrapped flow. Do
@@ -181,8 +181,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
    code.
 9. POST `/api/agent/agent-only/answers/bulk` in batches of up to 50 rows with
    the same `run_id`. Use unique `request_id` values. Validate before POSTing:
-   multichoice uses `values` arrays, choice/rating use `{ "value": ... }`, and
-   freeform uses `{ "text": ... }`.
+   multichoice uses `values` arrays, choice/rating use `{ "value": ... }`,
+   quadratic uses `{ "value": [...] }` with one signed whole-number vote per
+   option in order (0 is neutral) and squared votes totaling at most
+   `voiceCredits`, and freeform uses `{ "text": ... }`.
 10. Confidence is required, 0-100. Use 90-95 only for direct memory/profile
     evidence or repeated stable preferences; 70-89 for supported inference;
     40-69 for weak, mixed, transient, or population-prior evidence. Use 100

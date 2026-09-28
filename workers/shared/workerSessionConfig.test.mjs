@@ -101,3 +101,8 @@ test('public config projection includes structured session context', () => {
   assert.deepEqual(projected.sessionContext, context);
   assert.equal(Object.hasOwn(projected, 'sessionSecrets'), false);
 });
+
+test('deployment retains optional response encryption and exact linked group references', () => {
+  const fields = { responseFieldEncryption: { mode: 'optional' }, linkedWorkerGroups: [{ sessionSlug: 'source', sessionId: `0x${'11'.repeat(16)}`, workerUrl: 'https://source.example/', groupId: 'community' }] };
+  assert.deepEqual(selectDeployWorkerSessionConfigFields(fields), fields);
+});
