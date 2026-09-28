@@ -941,6 +941,9 @@ function SessionInterviewPanel({
                   question={questions.find((question) => question.id === draft.questionId)}
                   selected={Boolean(selected[draft.questionId])}
                   existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
+                  savedComment={String(
+                    responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || '',
+                  )}
                   disabled={applying}
                   onSelect={(value) => {
                     setSubmitSucceeded(false);

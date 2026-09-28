@@ -11,6 +11,7 @@ import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { InterviewDraftResponse, InterviewQuestion } from './sessionInterview';
+import { interviewDraftFieldValue } from './sessionInterviewReviewState';
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
@@ -33,6 +34,8 @@ type Props = InterviewQuestionControls & {
   question?: InterviewQuestion;
   selected: boolean;
   existing: boolean;
+  // The responder's saved comment, which review shows when the AI proposed none.
+  savedComment?: string;
   disabled: boolean;
   onSelect: (selected: boolean) => void;
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
@@ -206,6 +209,7 @@ export default function SessionInterviewDraftCard({
   question,
   selected,
   existing,
+  savedComment = '',
   disabled,
   onSelect,
   onEdit,
@@ -228,12 +232,17 @@ export default function SessionInterviewDraftCard({
   const rawComments = String(edited.additionalComments || '');
   const answerValue = edited.answer;
   const useNativeAnswer = isNativeAnswerType(question);
+  // Review shows the saved comment when the AI proposed none, so edits start from it.
+  const startingValue = (field: EditableField) =>
+    field === 'additionalComments' ? draft.additionalComments || savedComment : draft[field];
   const markEdit = (field: EditableField, value: unknown) => {
     if (valuesEqual(value, edited[field])) return { [field]: value } as Partial<InterviewDraftResponse>;
-    // A full revert to the AI draft returns that field to its unedited state.
-    // An emptied comment stays an edit even when the AI proposed none, because
-    // the card may have been showing the responder's saved comment.
-    const userEditedFields = withEditedField(edited, field, !valuesEqual(value, draft[field]));
+    // A full revert to the starting value returns that field to its unedited state.
+    const isEdited = !valuesEqual(
+      interviewDraftFieldValue(field, value),
+      interviewDraftFieldValue(field, startingValue(field)),
+    );
+    const userEditedFields = withEditedField(edited, field, isEdited);
     return { [field]: value, userEditedFields } as Partial<InterviewDraftResponse>;
   };
   const onAnswerChange = (answer: unknown) => onEdit(markEdit('answer', answer));

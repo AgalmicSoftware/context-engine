@@ -294,7 +294,8 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
           draft={draft}
           edited={edited}
           selected
-          existing={false}
+          existing
+          savedComment="Saved note"
           disabled={false}
           onSelect={jest.fn()}
           onEdit={(patch) => {
