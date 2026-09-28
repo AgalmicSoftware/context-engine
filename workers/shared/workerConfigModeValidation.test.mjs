@@ -662,3 +662,25 @@ test('mode validation accepts Worker end timestamps and rejects invalid or decen
     { ok: false, path: 'sessionEndsAt' },
   );
 });
+
+test('optional fields and linked group references survive validation without relaxing Results rules', () => {
+  const profile = fastCloudflareProfile();
+  profile.preset = 'custom';
+  profile.encryption = { mode: 'none' };
+  profile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+  profile.results.visibility = 'public_full_if_storage_public';
+  const config = {
+    sessionModeProfile: profile,
+    storageProfile: structuredClone(profile.storage),
+    responseFieldEncryption: { mode: 'optional' },
+    linkedWorkerGroups: [{ sessionSlug: 'source', sessionId: `0x${'11'.repeat(16)}`, workerUrl: 'https://source.example/', groupId: 'community' }],
+  };
+  for (const validate of [validateWorkerConfigModeValues, validateDeploymentModeValues]) {
+    assert.equal(validate(config).ok, true, JSON.stringify(validate(config)));
+    assert.equal(validate({ ...config, responseFieldEncryption: { mode: 'anything' } }).ok, false);
+    assert.equal(validate({ ...config, linkedWorkerGroups: [{ ...config.linkedWorkerGroups[0], workerUrl: 'http://source.example/' }] }).ok, false);
+    const encrypted = structuredClone(config);
+    encrypted.sessionModeProfile.encryption = { mode: 'worker_envelope', keyProvider: 'worker_secret' };
+    assert.equal(validate(encrypted).ok, false);
+  }
+});

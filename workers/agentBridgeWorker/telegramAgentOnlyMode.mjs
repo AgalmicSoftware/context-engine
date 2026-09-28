@@ -774,7 +774,6 @@ function normalizeQuestionTypeForSnapshot(questionType = '') {
   if (['binary', 'agree-disagree', 'agree-unsure-disagree', 'agree'].includes(type)) return 'binary';
   if (type === 'rating') return 'rating';
   if (['multichoice', 'multi-choice', 'multiple-choice'].includes(type)) return 'multichoice';
-  if (type === 'quadratic') return 'quadratic';
   return 'freeform';
 }
 
@@ -1127,7 +1126,7 @@ function compactStatementAnswerSchema(schema = {}) {
   if (Array.isArray(source.options)) compact.options = source.options.map(compactValue).filter(Boolean);
   const selectionMode = safeString(source.selectionMode || source.selection_mode);
   if (selectionMode) compact.selectionMode = selectionMode;
-  for (const key of ['minSelections', 'maxSelections', 'min', 'max', 'step', 'maxChars', 'voiceCredits']) {
+  for (const key of ['minSelections', 'maxSelections', 'min', 'max', 'step', 'maxChars']) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== '') compact[key] = source[key];
   }
   return compact;

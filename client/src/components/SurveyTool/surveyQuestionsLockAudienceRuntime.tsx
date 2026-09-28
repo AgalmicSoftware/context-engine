@@ -1,3 +1,4 @@
+import { resolveResponseFieldPolicy } from '@ce-shared/encryption/responseFieldPolicy.mjs';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
 export type SurveyQuestionsLockAudienceRuntime = SurveyQuestionsLegacyRecord;
@@ -25,6 +26,8 @@ export const createSurveyQuestionsLockAudienceRuntime = (
     normalizeResponseEncryptionAudience,
     persistDraftSafely,
     propsRef,
+    resolveEffectiveResponseGateConfig,
+    resolveEffectiveSlug,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
     resolveQuestionGateOption,
@@ -70,6 +73,11 @@ export const createSurveyQuestionsLockAudienceRuntime = (
     showPlaintextOption = false,
     visualContext = 'default',
   }: SurveyQuestionsLegacyValue) => {
+    const sessionConfig =
+      typeof resolveEffectiveResponseGateConfig === 'function'
+        ? resolveEffectiveResponseGateConfig(resolveEffectiveSlug?.(propsRef?.current), propsRef?.current)
+        : propsRef?.current?.sessionConfig;
+    const fieldPolicy = resolveResponseFieldPolicy(sessionConfig);
     const qid: SurveyQuestionsLegacyValue = String(questionId || '').toLowerCase();
     const resolvedFieldKey: SurveyQuestionsLegacyValue =
       String(fieldKey || '')
@@ -98,10 +106,10 @@ export const createSurveyQuestionsLockAudienceRuntime = (
       questionId: qid,
       fieldKey: resolvedFieldKey,
       fieldState,
-      lockDisabled,
+      lockDisabled: lockDisabled || !fieldPolicy.enabled,
       lockTitle,
       glowAnswer,
-      forceAudienceMenu,
+      forceAudienceMenu: forceAudienceMenu || fieldPolicy.admin,
       selfAudienceLabel: normalizeGateLabelText(selfAudienceLabel) || 'for me',
       showPlaintextOption,
       visualContext,
@@ -122,6 +130,7 @@ export const createSurveyQuestionsLockAudienceRuntime = (
 
     return {
       ...displayState,
+      fieldPolicy,
       expandedGateId,
     };
   };
@@ -362,6 +371,8 @@ export const createSurveyQuestionsLockAudienceRuntime = (
   }: SurveyQuestionsLegacyValue) => {
     const {
       qid,
+      fieldPolicy,
+      currentAudience,
       effectiveFieldKey,
       isPileVisualContext,
       fieldState,
@@ -396,6 +407,7 @@ export const createSurveyQuestionsLockAudienceRuntime = (
       showPlaintextOption,
       visualContext,
     });
+    if (!fieldPolicy.enabled && !fieldState?.encrypted && !forcedGate) return null;
     const handleAudienceSelect: SurveyQuestionsLegacyValue = (
       audience: SurveyQuestionsLegacyValue,
       gateId: SurveyQuestionsLegacyValue = '',
@@ -437,7 +449,10 @@ export const createSurveyQuestionsLockAudienceRuntime = (
         lockButtonStyle={lockButtonStyle}
         fieldState={fieldState}
         forcedGate={forcedGate}
-        gateOptions={gateOptions}
+        gateOptions={fieldPolicy.enabled ? gateOptions : []}
+        allowAdminAudience={fieldPolicy.admin}
+        allowSessionAudience={fieldPolicy.session}
+        currentAudience={currentAudience}
         gateActive={gateActive}
         currentGateId={currentGateId}
         selfActive={selfActive}

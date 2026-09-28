@@ -1697,41 +1697,6 @@ test('single-select multichoice snapshots enforce one selected value', () => {
   );
 });
 
-test('statement page describes quadratic questions and their budget in full and compact form', async () => {
-  const testEnv = env();
-  const { questionId } = await persistTelegramProposedQuestion({
-    env: testEnv,
-    normalized: normalizedUser(),
-    sessionSlug: 'alpha',
-    prompt: 'Split support between parks and transit?',
-    questionType: 'quadratic',
-    options: ['Parks', 'Transit'],
-    voiceCredits: 25,
-    createdAt: '2026-06-12T15:00:00.000Z',
-  });
-  await saveAgentOnlyModeConfig({
-    env: testEnv,
-    sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [questionId] },
-    createdAt: '2026-06-12T15:00:00.000Z',
-  });
-
-  for (const compact of [false, true]) {
-    const page = await getAgentOnlyStatementsPage({
-      env: testEnv,
-      sessionSlug: 'alpha',
-      now: '2026-06-12T15:05:00.000Z',
-      compact,
-    });
-    assert.equal(page.statements.length, 1, `compact=${compact}`);
-    const [statement] = page.statements;
-    assert.equal(statement.question_type, 'quadratic', `compact=${compact}`);
-    assert.equal(statement.answer_schema.kind, 'quadratic', `compact=${compact}`);
-    assert.equal(statement.answer_schema.voiceCredits, 25, `compact=${compact}`);
-    assert.deepEqual(statement.answer_schema.options, ['Parks', 'Transit'], `compact=${compact}`);
-  }
-});
-
 test('statement page supports pre-launch response, cursor pagination, and no config leakage', async () => {
   const testEnv = env();
   await seedQuestions(testEnv);

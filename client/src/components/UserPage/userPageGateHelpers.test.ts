@@ -972,3 +972,29 @@ describe('userPageGateHelpers', () => {
     });
   });
 });
+
+it.each(['self_admin', 'session'])(
+  'preserves %s and permits a Worker decrypt attempt without Lit membership',
+  (audience) => {
+    expect(inferUserPageResponseFieldEncryptionAudience({ answer: { encryptionAudience: audience } })).toBe(audience);
+    const plan = buildUserPageEncryptedVisibilityStatusRequestPlan({
+      encryptionAudience: audience,
+      viewerAccount: '0xabc',
+      viewAddressLower: '0xdef',
+    });
+    expect(plan).toEqual(
+      expect.objectContaining({
+        action: 'terminal',
+        terminalReason: 'worker-audience',
+        displayState: expect.objectContaining({ visible: true, canDecryptOtherResponses: true }),
+      }),
+    );
+    expect(
+      buildUserPageEncryptedVisibilityStatusRequestPlan({
+        encryptionAudience: audience,
+        viewerAccount: '',
+        viewAddressLower: '0xdef',
+      }),
+    ).toEqual(expect.objectContaining({ terminalReason: 'missing-viewer-account' }));
+  },
+);

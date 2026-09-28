@@ -1,3 +1,4 @@
+import { responseEnvelopeMatchesAudience } from '../../utilities/crypto/responseEnvelopeAudience';
 import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
 import type { UnknownRecord } from './surveyToolTypes';
 
@@ -18,6 +19,8 @@ type RatingSliceForSubmit = {
 };
 
 type RatingEncryptionBaseOptions = {
+  sessionSlug?: string;
+  sessionConfig?: UnknownRecord;
   provider: unknown;
   account: string;
   chainId: number | string;
@@ -161,7 +164,7 @@ export function pickAudienceForRatingEncryption(
         }),
       };
     }
-    if (audience === 'self') return { audience: 'self', recipients: [] };
+    if (['self', 'self_admin', 'session'].includes(audience)) return { audience, recipients: [] };
   }
 
   if (additionalField?.encrypted) {
@@ -176,7 +179,7 @@ export function pickAudienceForRatingEncryption(
         }),
       };
     }
-    if (audience === 'self') return { audience: 'self', recipients: [] };
+    if (['self', 'self_admin', 'session'].includes(audience)) return { audience, recipients: [] };
   }
 
   const defaultAudience = deps.getDefaultResponseEncryptionAudienceForQid(qLower);
@@ -259,6 +262,19 @@ export async function processRatingEnvelopesForSubmit(
 
     questionsEncrypted += 1;
 
+    const audienceSelection = pickAudienceForRatingEncryption(qid, sliceForSubmit, deps);
+    for (const { fieldKey, envelopeKey } of RATING_FIELD_SPECS) {
+      if (
+        respObj[envelopeKey] &&
+        responseEnvelopeMatchesAudience(respObj[envelopeKey], audienceSelection.audience) === false
+      ) {
+        if (respObj[fieldKey] === undefined || respObj[fieldKey] === null) {
+          throw new Error(`Decrypt the ratings for ${qid} before changing their encryption audience.`);
+        }
+        changedByField[fieldKey] = true;
+      }
+    }
+
     const fieldsNeedingEncryption = RATING_FIELD_SPECS.filter(({ fieldKey, envelopeKey }) => {
       const value = respObj?.[fieldKey];
       const existingEnvelope = typeof respObj[envelopeKey] === 'string' ? respObj[envelopeKey] : '';
@@ -266,8 +282,9 @@ export async function processRatingEnvelopesForSubmit(
     });
 
     let lit = undefined;
+    let encryptionAudience = 'self';
     if (fieldsNeedingEncryption.length > 0) {
-      const audienceSelection = pickAudienceForRatingEncryption(qid, sliceForSubmit, deps);
+      encryptionAudience = audienceSelection.audience;
       if (audienceSelection.audience === 'gate') {
         const recipients = audienceSelection.recipients;
         if (!Array.isArray(recipients) || recipients.length === 0) {
@@ -291,6 +308,7 @@ export async function processRatingEnvelopesForSubmit(
 
         respObj[envelopeKey] = await deps.encryptEnvelopeValue(value, {
           ...encryptionBaseOpts,
+          encryptionAudience,
           ...(lit ? { lit } : {}),
           qId: `${fieldKey}:${qid}`,
         });
