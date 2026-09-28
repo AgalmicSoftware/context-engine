@@ -121,4 +121,22 @@ describe('unselected interview research', () => {
       /Revised prediction|Original prediction|Edited but rejected|Final private answer|Original note|Edited note|Basis/,
     );
   });
+
+  it('does not report an untouched empty comment as changed', () => {
+    // Review entries carry '' where the AI prediction had no comment.
+    const untouched = {
+      questionId: 'q3',
+      answer: 'Prediction',
+      additionalComments: '',
+      original: {
+        answer: 'Prediction',
+        revisions: [{ revision: 1, modelId: 'fixture', answer: 'Prediction', additionalComments: undefined }],
+      },
+    };
+    expect(buildUnselectedInterviewResearch([untouched])[0]).toMatchObject({
+      original: { additionalComments: '' },
+      reviewed: { additionalComments: '' },
+      changedFields: [],
+    });
+  });
 });

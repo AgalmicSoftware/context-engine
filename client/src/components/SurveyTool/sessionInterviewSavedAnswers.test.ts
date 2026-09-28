@@ -1,5 +1,10 @@
 import { LegacyOwnResponseListingError } from '../../utilities/storage/storageClient';
-import { loadSessionInterviewSavedAnswers, mergeInterviewSavedAnswerBaseline } from './sessionInterviewSavedAnswers';
+import {
+  loadSessionInterviewSavedAnswers,
+  mergeInterviewSavedAnswerBaseline,
+  type InterviewSavedAnswerDiffDeps,
+} from './sessionInterviewSavedAnswers';
+import { responseValuesEqual } from './responseValueEquality';
 import { loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -61,17 +66,103 @@ it('chooses the latest Hosted edit with stable same-time ordering', async () => 
   ).resolves.toEqual([{ answer: 'latest', questionID: 'q1' }]);
   expect(loadWorkerResponses).toHaveBeenCalledWith(expect.objectContaining({ ownResponses: true, account: '0xabc' }));
 });
+const field = (value: unknown, policy: Record<string, unknown> = {}) => ({
+  value,
+  encrypted: false,
+  encryptionAudience: 'self',
+  encryptionGateId: null,
+  audienceMode: 'explicit',
+  hash: '',
+  encryptedPortion: '',
+  ...policy,
+});
+const slice = ({
+  answers = {},
+  additionalComments = {},
+  importance = {},
+  conviction = {},
+}: Record<string, Record<string, unknown>> = {}) => ({ answers, additionalComments, importance, conviction });
+const diff: InterviewSavedAnswerDiffDeps = {
+  normalizeQuestionIdKey: (questionId: string) => questionId.trim().toLowerCase(),
+  valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b, true),
+  getDefaultResponseEncryptionAudience: () => 'self',
+  normalizeResponseEncryptionAudience: (audience: unknown) => audience,
+  getDefaultResponseEncryptionAudienceForQid: () => 'self',
+  resolveFieldEncryptionGateId: (entry) => entry?.encryptionGateId ?? null,
+  normalizeFieldAudienceMode: (mode) => mode || 'explicit',
+};
+
 it('merges the saved baseline without discarding in-flight local edits or unrelated questions', () => {
   const merged = mergeInterviewSavedAnswerBaseline(
-    { answers: { q1: 'local edit', q2: 'old', q3: 'unrelated' }, importance: { q1: 0 } },
-    { answers: { q1: 'old', q2: 'old' }, importance: { q1: 0 } },
-    { answers: { q1: 'saved', q2: 'latest' }, importance: { q1: 4 } },
+    slice({ answers: { q1: field('local edit'), q2: field('old'), q3: field('unrelated') }, importance: { q1: 0 } }),
+    slice({ answers: { q1: field('old'), q2: field('old') }, importance: { q1: 0 } }),
+    slice({ answers: { q1: field('saved'), q2: field('latest') }, importance: { q1: 4 } }),
     ['q1', 'q2'],
-    Object.is,
+    diff,
   );
-  expect(merged.slice.answers).toEqual({ q1: 'local edit', q2: 'latest', q3: 'unrelated' });
-  expect(merged.baseline.answers).toEqual({ q1: 'saved', q2: 'latest' });
+  expect(merged.slice.answers).toEqual({ q1: field('local edit'), q2: field('latest'), q3: field('unrelated') });
+  expect(merged.baseline.answers).toEqual({ q1: field('saved'), q2: field('latest') });
   expect(merged.slice.importance.q1).toBe(4);
+});
+
+it('keeps a locally changed answer and comment when saved answers load', () => {
+  const merged = mergeInterviewSavedAnswerBaseline(
+    slice({ answers: { q1: field('Agree') }, additionalComments: { q1: field('My reason') } }),
+    slice({ answers: { q1: field('Disagree') }, additionalComments: { q1: field('') } }),
+    slice({ answers: { q1: field('Disagree') }, additionalComments: { q1: field('Saved reason') } }),
+    ['q1'],
+    diff,
+  );
+  expect(merged.slice.answers.q1).toEqual(field('Agree'));
+  expect(merged.slice.additionalComments.q1).toEqual(field('My reason'));
+  expect(merged.baseline.additionalComments.q1).toEqual(field('Saved reason'));
+});
+
+it('keeps local encryption, audience, and gate changes when the answer text is unchanged', () => {
+  const plain = field('Agree');
+  const encryptedSelf = field('Agree', { encrypted: true });
+  const gated = (gateId: string) =>
+    field('Agree', { encrypted: true, encryptionAudience: 'gate', encryptionGateId: gateId });
+  const merged = mergeInterviewSavedAnswerBaseline(
+    slice({ answers: { q1: encryptedSelf, q2: gated('gate-1'), q3: gated('gate-2') } }),
+    slice({ answers: { q1: plain, q2: encryptedSelf, q3: gated('gate-1') } }),
+    slice({ answers: { q1: plain, q2: encryptedSelf, q3: gated('gate-1') } }),
+    ['q1', 'q2', 'q3'],
+    diff,
+  );
+  expect(merged.slice.answers).toEqual({ q1: encryptedSelf, q2: gated('gate-1'), q3: gated('gate-2') });
+});
+
+it('keeps a local edit whose saved answer is missing', () => {
+  const merged = mergeInterviewSavedAnswerBaseline(
+    slice({ answers: { q1: field('Agree') } }),
+    slice({ answers: { q1: field('Disagree') } }),
+    slice(),
+    ['q1'],
+    diff,
+  );
+  expect(merged.slice.answers.q1).toEqual(field('Agree'));
+  expect(merged.baseline.answers).toEqual({});
+});
+
+it('lets untouched local state, including re-derived metadata, take the refreshed saved answer', () => {
+  const saved = field('Agree', { hash: '0xsaved' });
+  const merged = mergeInterviewSavedAnswerBaseline(
+    slice({
+      answers: {
+        q1: field('Disagree', { encrypted: true, encryptedPortion: 'ciphertext-b', hash: '0xlocal' }),
+        q2: field('Unsure'),
+      },
+    }),
+    slice({
+      answers: { q1: field('Disagree', { encrypted: true, encryptedPortion: 'ciphertext-a' }), q2: field('Unsure') },
+    }),
+    slice({ answers: { q1: saved } }),
+    ['q1', 'q2'],
+    diff,
+  );
+  expect(merged.slice.answers).toEqual({ q1: saved });
+  expect(merged.baseline.answers).toEqual({ q1: saved });
 });
 
 it('requests the public-cache fallback only for the verified legacy listing', async () => {

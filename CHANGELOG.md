@@ -18,6 +18,17 @@ All notable changes to this project will be documented in this file.
   chain during decryption. Hide new response locks when encryption is disabled.
 - Keep Only me fields restricted to the submitter. Offer Me + admin on compatible
   Cloudflare sessions and Session only when membership is private.
+- Keep binary interview answers when drafts are submitted again, for example
+  after a cancelled signature or Continue interview, and keep unsaved pile edits
+  when the interview loads saved answers.
+- Make quadratic Reset an undo: it restores the AI's drafted allocation during
+  interview review and the saved answer elsewhere, and stays disabled when
+  nothing would change.
+- Keep a later AI comment when the first draft had none, and restore the
+  AI-proposed marker when a comment returns to its starting text.
+- Score comparison ratings on each question's own scale, and count report
+  answers with the same validation as the Worker's analysis.
+- Load the Session Wizard without a second copy of the global stylesheet.
 
 ### Worker — requires a session Worker update
 
@@ -28,6 +39,11 @@ All notable changes to this project will be documented in this file.
   while keeping ordinary responses and Results public by default.
 - Advertise these audiences only when the Worker has the encryption key and audit
   storage available. Existing session privacy settings remain unchanged.
+
+### Agent Bridge — requires an Agent Bridge Worker update
+
+- Describe quadratic questions to agents with their voice-credit budget, and
+  document the quadratic answer format in agent instructions and skills.
 
 ## [0.6.3] - 2026-09-23
 

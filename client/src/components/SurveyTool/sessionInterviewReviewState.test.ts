@@ -67,3 +67,17 @@ it('keeps a user edit across later predictions that first agree and then diverge
     'Later prediction',
   ]);
 });
+
+it('treats an untouched empty comment as the AI draft without one', () => {
+  // The modal seeds '' as the comment for drafts that arrive without one.
+  const first = { questionId: 'q1', answer: 'First prediction' };
+  const result = mergeInterviewReview(
+    [first],
+    { q1: { ...first, additionalComments: '' } },
+    { q1: true },
+    [{ ...first, additionalComments: 'New AI note' }],
+    () => true,
+  );
+  expect(result.edited.q1.additionalComments).toBe('New AI note');
+  expect(result.edited.q1.userEditedFields).toBeUndefined();
+});

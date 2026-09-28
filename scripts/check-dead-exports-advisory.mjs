@@ -150,8 +150,8 @@ function resolveClientImport(sourceFile, specifier, fileSet) {
   return candidates.find((candidate) => fileSet.has(candidate)) || null;
 }
 
-// Parity-locked runtime twins (e.g. rpcDefaults.{js,ts}, litChipotlePolicy.{js,ts})
-// are one module: the .js exists only for no-loader runtime consumers and is
+// Parity-locked runtime twins (e.g. rpcDefaults.{js,ts}) are one module:
+// the .js exists only for no-loader runtime consumers and is
 // pinned byte-equivalent in behavior by a parity test. Reachability and
 // export-usage accounting must not report either twin as dead while the other
 // is alive.

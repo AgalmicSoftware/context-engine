@@ -98,6 +98,31 @@ export interface PendingEditStatsResult {
   newCache: PendingEditStatsCache;
 }
 
+export type ChangedFieldResolverDeps = Pick<
+  ChangedFieldsOrchestrationDeps,
+  | 'getDefaultResponseEncryptionAudience'
+  | 'normalizeResponseEncryptionAudience'
+  | 'getDefaultResponseEncryptionAudienceForQid'
+  | 'resolveFieldEncryptionGateId'
+  | 'normalizeFieldAudienceMode'
+>;
+
+export const buildChangedFieldResolvers = (deps: ChangedFieldResolverDeps) => {
+  const defaultAudience = deps.getDefaultResponseEncryptionAudience();
+  return {
+    resolveAudience: (field: ResponseFieldState, qid: string | null) => {
+      if (field && typeof field === 'object' && field.encryptionAudience) {
+        return deps.normalizeResponseEncryptionAudience(field.encryptionAudience, qid as string);
+      }
+      return qid ? deps.getDefaultResponseEncryptionAudienceForQid(qid) : defaultAudience;
+    },
+    resolveGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) =>
+      deps.resolveFieldEncryptionGateId(field, qid, fieldKey),
+    resolveAudienceMode: (field: ResponseFieldState, fieldKey: string) =>
+      deps.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field),
+  };
+};
+
 export const buildIndexedQuestionEntryKeys = (
   source: Record<string, unknown> | null | undefined,
   normalizeKey: (key: string) => string,
@@ -237,7 +262,6 @@ export const orchestrateGetChangedQidsAndFields = (
   const baselineConvictionKeysByQid = deps.getIndexedQuestionEntryKeys(baselineSlice.conviction);
   const currentConvictionKeysByQid = deps.getIndexedQuestionEntryKeys(params.currentSlice.conviction);
 
-  const defaultAudience = deps.getDefaultResponseEncryptionAudience();
   const result = computeChangedQidsAndFields({
     ids,
     baselineSlice,
@@ -253,14 +277,7 @@ export const orchestrateGetChangedQidsAndFields = (
     ratingEnvelopeQids,
     valuesEqual: deps.valuesEqual,
     hasMeaningfulFieldValue: deps.hasMeaningfulFieldValue,
-    resolveAudience: (field, qid) => {
-      if (field && typeof field === 'object' && field.encryptionAudience) {
-        return deps.normalizeResponseEncryptionAudience(field.encryptionAudience, qid as string);
-      }
-      return qid ? deps.getDefaultResponseEncryptionAudienceForQid(qid) : defaultAudience;
-    },
-    resolveGateId: (field, qid, fieldKey) => deps.resolveFieldEncryptionGateId(field, qid, fieldKey),
-    resolveAudienceMode: (field, fieldKey) => deps.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field),
+    ...buildChangedFieldResolvers(deps),
   });
   const normalizedIdFilter = ids.size > 0 ? ids : null;
   const { currentSliceSignature, baselineSliceSignature } = getSliceSignatures(normalizedIdFilter);

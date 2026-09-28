@@ -125,7 +125,10 @@ control gives one squared-cost example, the shared budget, and the option to lea
 On standalone question pages, votes and remaining credits update locally during a drag;
 the completed allocation reaches the page's normal edit and draft-save handler on release
 or loss of focus. Keyboard changes update the answer immediately.
-In pile cards, the Reset undo-arrow restores the saved answer, or clears the pending answer when none was saved. In draft editors it returns sliders to zero as a neutral allocation. It uses 50% opacity,
+In pile cards and full question views, the Reset undo-arrow restores the saved answer, or clears the pending answer when none was saved.
+In interview draft editors it restores the AI's drafted allocation, including an all-neutral one, and clears that answer's edited marker.
+Reset stays disabled until the allocation differs from its undo target, so an untouched answer never gains a pending change.
+Surfaces without an undo target, such as the Telegram mini-app, keep a separate "Reset all votes to neutral" action. It uses 50% opacity,
 with full opacity on hover or keyboard focus. Pile cards keep a fixed height and scroll their options; progress
 and submission remain in the pile's shared controls outside the question card.
 If signing or saving fails, the pile shows the error beneath the question

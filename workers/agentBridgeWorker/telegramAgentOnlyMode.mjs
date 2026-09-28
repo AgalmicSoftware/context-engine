@@ -23,7 +23,7 @@ import {
   resolveWrappedQuestionSourceMode,
 } from './wrappedQuestionSource.mjs';
 
-export const AGENT_ONLY_INSTRUCTIONS_VERSION = '2026-06-16.v41-agent-only.1';
+export const AGENT_ONLY_INSTRUCTIONS_VERSION = '2026-09-28.v41-agent-only.2';
 export const AGENT_ONLY_MODE_CONFIG_KV_PREFIX = 'telegram:agent-mode-config:v1:';
 export const AGENT_ONLY_WINDOW_KV_PREFIX = 'telegram:agent-mode-window:v1:';
 export const AGENT_ONLY_ANSWER_EVENT_KV_PREFIX = 'telegram:agent-only:answer-event:v1:';
@@ -97,7 +97,7 @@ Create one fresh run_id for the full run. Optional token_usage before answering:
 
 Keep statements, prediction JSON, payloads, retries, and debug output out of chat/stdout. Internal prediction calls may return compact JSON keyed by local index; never print that JSON. Batch roughly 10-15 statements when useful, map local indexes back to exact statement_id values in code, and POST /api/agent/agent-only/answers/bulk in batches of up to 50 rows with the same run_id and unique request_id values.
 
-Answer every statement or privacy-skip it. Validate before POSTing: multichoice uses values arrays, choice/rating use { "value": ... }, and freeform uses { "text": ... }. Confidence is required, 0-100. Use 90-95 only for direct memory/profile evidence or repeated stable preferences; 70-89 for supported inference; 40-69 for weak, mixed, transient, or population-prior evidence. Use 100 only for an exact prior answer to the same statement or a saved preference that entails it. Avoid flat repeated defaults. Optional rationale: one sentence under 200 chars. The only skip is privacy_protective, with skipped true and no answer, confidence, rationale, or explanation.
+Answer every statement or privacy-skip it. Validate before POSTing: multichoice uses values arrays, choice/rating use { "value": ... }, quadratic uses { "value": [...] } with one signed whole-number vote per option in order (0 is neutral) and squared votes totaling at most voiceCredits, and freeform uses { "text": ... }. Confidence is required, 0-100. Use 90-95 only for direct memory/profile evidence or repeated stable preferences; 70-89 for supported inference; 40-69 for weak, mixed, transient, or population-prior evidence. Use 100 only for an exact prior answer to the same statement or a saved preference that entails it. Avoid flat repeated defaults. Optional rationale: one sentence under 200 chars. The only skip is privacy_protective, with skipped true and no answer, confidence, rationale, or explanation.
 
 Skip token allocations for the default Wrapped run. Do not POST /api/agent/agent-only/token-votes/bulk unless the principal explicitly asks for allocation research. The standard Wrapped image can be generated from predictions alone.
 
@@ -774,6 +774,7 @@ function normalizeQuestionTypeForSnapshot(questionType = '') {
   if (['binary', 'agree-disagree', 'agree-unsure-disagree', 'agree'].includes(type)) return 'binary';
   if (type === 'rating') return 'rating';
   if (['multichoice', 'multi-choice', 'multiple-choice'].includes(type)) return 'multichoice';
+  if (type === 'quadratic') return 'quadratic';
   return 'freeform';
 }
 
@@ -1126,7 +1127,7 @@ function compactStatementAnswerSchema(schema = {}) {
   if (Array.isArray(source.options)) compact.options = source.options.map(compactValue).filter(Boolean);
   const selectionMode = safeString(source.selectionMode || source.selection_mode);
   if (selectionMode) compact.selectionMode = selectionMode;
-  for (const key of ['minSelections', 'maxSelections', 'min', 'max', 'step', 'maxChars']) {
+  for (const key of ['minSelections', 'maxSelections', 'min', 'max', 'step', 'maxChars', 'voiceCredits']) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== '') compact[key] = source[key];
   }
   return compact;

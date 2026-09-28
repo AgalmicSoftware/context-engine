@@ -237,6 +237,12 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /never print that JSON/);
   assert.match(payload.instructions, /map local indexes back to exact statement_id values/);
   assert.match(payload.instructions, /multichoice uses values arrays/);
+  assert.match(
+    payload.instructions,
+    /quadratic uses \{ "value": \[\.\.\.\] \} with one signed whole-number vote per option in order \(0 is neutral\)/,
+  );
+  assert.match(payload.instructions, /squared votes totaling at most voiceCredits/);
+  assert.equal(payload.instructions_version, '2026-09-28.v41-agent-only.2');
   assert.match(payload.instructions, /Skip token allocations for the default Wrapped run/);
   assert.match(payload.instructions, /Do not POST \/api\/agent\/agent-only\/token-votes\/bulk/);
   assert.match(payload.instructions, /standard Wrapped image can be generated from predictions alone/);
@@ -1695,6 +1701,41 @@ test('single-select multichoice snapshots enforce one selected value', () => {
     __test__telegramAgentOnlyMode.normalizeAnswerForSchema({ values: ['Alpha', 'Beta'] }, statement.answer_schema),
     { ok: false, reason: 'answer_multichoice_too_many' },
   );
+});
+
+test('statement page describes quadratic questions and their budget in full and compact form', async () => {
+  const testEnv = env();
+  const { questionId } = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'Split support between parks and transit?',
+    questionType: 'quadratic',
+    options: ['Parks', 'Transit'],
+    voiceCredits: 25,
+    createdAt: '2026-06-12T15:00:00.000Z',
+  });
+  await saveAgentOnlyModeConfig({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    patch: { enabledQuestionIds: [questionId] },
+    createdAt: '2026-06-12T15:00:00.000Z',
+  });
+
+  for (const compact of [false, true]) {
+    const page = await getAgentOnlyStatementsPage({
+      env: testEnv,
+      sessionSlug: 'alpha',
+      now: '2026-06-12T15:05:00.000Z',
+      compact,
+    });
+    assert.equal(page.statements.length, 1, `compact=${compact}`);
+    const [statement] = page.statements;
+    assert.equal(statement.question_type, 'quadratic', `compact=${compact}`);
+    assert.equal(statement.answer_schema.kind, 'quadratic', `compact=${compact}`);
+    assert.equal(statement.answer_schema.voiceCredits, 25, `compact=${compact}`);
+    assert.deepEqual(statement.answer_schema.options, ['Parks', 'Transit'], `compact=${compact}`);
+  }
 });
 
 test('statement page supports pre-launch response, cursor pagination, and no config leakage', async () => {
