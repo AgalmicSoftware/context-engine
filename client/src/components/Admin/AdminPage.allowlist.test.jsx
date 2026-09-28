@@ -32,6 +32,15 @@ const mockUploadSessionMetadata = jest.fn();
 const mockUpdateSessionMetadataOnChain = jest.fn();
 const mockUpsertSessionRegistryCache = jest.fn();
 
+// Allowlist controls do not exercise chain transport. Keep background metadata
+// reads deterministic so this suite cannot retain live RPC sockets after teardown.
+jest.mock('../../domains/chain/rpcProvidersChainReadsPort', () => ({
+  rpcProvidersChainReadsPort: {
+    getLatestBlockNumberForChain: jest.fn(async () => 100),
+    getNativeBalanceWeiForChain: jest.fn(async () => '0'),
+  },
+}));
+
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
     resolveCorsProxyUrl: (...args) => mockResolveCorsProxyUrl(...args),
