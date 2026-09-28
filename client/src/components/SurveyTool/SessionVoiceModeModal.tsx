@@ -1013,35 +1013,40 @@ function SessionInterviewPanel({
             </section>
           ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
-            <div className={styles.sessionInterviewReviewActions}>
-              <div className={styles.sessionInterviewConsentOptions}>
-                {researchAvailable ? (
-                  <SessionInterviewResearchConsent
-                    packet={researchPacket}
-                    showProvenance={hasAiPrefill}
-                    revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
-                    includeProvenance={includeProvenance}
-                    includeComparison={includePredictionComparison}
-                    onProvenanceChange={setIncludeProvenance}
-                    onComparisonChange={setIncludePredictionComparison}
-                    coverageDetails={researchCoverageDetails}
-                    selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
-                    unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
-                    disabled={applying}
-                  />
-                ) : null}
-                {importedResponderName ? (
-                  <Label check className={styles.sessionInterviewProvenance}>
-                    <Input
-                      type="checkbox"
-                      checked={includeResponderName}
-                      onChange={(event) => setIncludeResponderName(event.target.checked)}
-                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
-                    />{' '}
-                    Include “{importedResponderName}” as the responder name with submitted responses
-                  </Label>
-                ) : null}
-              </div>
+            <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
+              {researchAvailable || importedResponderName ? (
+                <details className={styles.sessionInterviewConsentOptions}>
+                  <summary>AI submission info</summary>
+                  <div className={styles.sessionInterviewChoicesPanel}>
+                    {researchAvailable ? (
+                      <SessionInterviewResearchConsent
+                        packet={researchPacket}
+                        showProvenance={hasAiPrefill}
+                        revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
+                        includeProvenance={includeProvenance}
+                        includeComparison={includePredictionComparison}
+                        onProvenanceChange={setIncludeProvenance}
+                        onComparisonChange={setIncludePredictionComparison}
+                        coverageDetails={researchCoverageDetails}
+                        selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
+                        unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
+                        disabled={applying}
+                      />
+                    ) : null}
+                    {importedResponderName ? (
+                      <Label check className={styles.sessionInterviewProvenance}>
+                        <Input
+                          type="checkbox"
+                          checked={includeResponderName}
+                          onChange={(event) => setIncludeResponderName(event.target.checked)}
+                          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
+                        />{' '}
+                        Include “{importedResponderName}” as the responder name with submitted responses
+                      </Label>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
               <Button
                 color="primary"
                 onClick={() => {

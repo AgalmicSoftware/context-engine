@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input, Label } from 'reactstrap';
+import { Button, Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
@@ -29,9 +29,9 @@ export function ImportedResponderContextEditor({
       onToggle={(event) => onExpandedChange(event.currentTarget.open)}
     >
       <summary>Imported responder context</summary>
-      <Label for="ce-interview-context">Imported responder context details</Label>
       <Input
         id="ce-interview-context"
+        aria-label="Imported responder context details"
         type="textarea"
         value={value}
         onChange={(event) => onChange(event.target.value)}
