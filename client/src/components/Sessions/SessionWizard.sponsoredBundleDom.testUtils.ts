@@ -127,7 +127,7 @@ const configureAdvancedUseUrlDeploy = async ({
   }
 
   const bundleUrlInput = screen.getByPlaceholderText(
-    'https://github.com/<org>/<repo>/releases/download/<release-tag>/sessionCorsWorker.bundle.js',
+    'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js',
   );
   setControlledInputValue(bundleUrlInput, bundleUrl);
   await waitFor(() => {

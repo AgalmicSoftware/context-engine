@@ -6,8 +6,7 @@
 // All public deployment URLs below remain env-overridable via REACT_APP_CE_* variables.
 
 import { readPublicBoolEnv, readPublicEnv } from './publicEnv.js';
-import { buildPublicRepoReleaseAssetUrl } from './publicRepoMetadata.js';
-import workerReleasePin from './workerReleasePin.json';
+import { buildPublicRepoLatestReleaseAssetUrl } from './publicRepoMetadata.js';
 import {
   buildCloudflareNativeDeployUrl,
   normalizeCloudflareNativeDeployCommit,
@@ -23,36 +22,28 @@ export const DEPLOY_HELPER_URL = readPublicEnv('REACT_APP_CE_DEPLOY_HELPER_URL',
 
 export const HEALTHCHECK_WORKER_URL = readPublicEnv('REACT_APP_CE_HEALTHCHECK_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
 
-// Worker bundles, their release manifest and the native Cloudflare deploy come
-// from one immutable, verified release: workerReleasePin.json, or an explicit
-// REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT. An invalid commit leaves
-// these defaults empty instead of falling back to GitHub's moving "latest".
-export const CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = normalizeCloudflareNativeDeployCommit(
-  readPublicEnv('REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT', workerReleasePin.commit),
-);
-
-const WORKER_RELEASE_TAG = CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT
-  ? `worker-bundles-${CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT}`
-  : '';
-
 export const WORKER_BUNDLE_URL = readPublicEnv(
   'REACT_APP_CE_WORKER_BUNDLE_URL',
-  buildPublicRepoReleaseAssetUrl(WORKER_RELEASE_TAG, 'sessionCorsWorker.bundle.js'),
+  buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'),
 );
 
 export const AGENT_BRIDGE_WORKER_BUNDLE_URL = readPublicEnv(
   'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
-  buildPublicRepoReleaseAssetUrl(WORKER_RELEASE_TAG, 'agentBridgeWorker.bundle.js'),
+  buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
 );
 
 export const WORKER_RELEASE_MANIFEST_URL = readPublicEnv(
   'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
-  buildPublicRepoReleaseAssetUrl(WORKER_RELEASE_TAG, 'worker-release-manifest.json'),
+  buildPublicRepoLatestReleaseAssetUrl('worker-release-manifest.json'),
 );
 
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   true,
+);
+
+export const CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = normalizeCloudflareNativeDeployCommit(
+  readPublicEnv('REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT', ''),
 );
 
 export const CLOUDFLARE_NATIVE_DEPLOY_URL = buildCloudflareNativeDeployUrl({

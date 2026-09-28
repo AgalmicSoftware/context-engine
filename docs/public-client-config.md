@@ -58,7 +58,7 @@ protocol, pinned-authority, and durable-config checks.
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
-2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. Helper and healthcheck URLs are legacy/self-host overrides.
+2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid. A production release enables native Cloudflare deployment with its reviewed public replay commit; helper and healthcheck URLs are legacy/self-host overrides.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
@@ -90,26 +90,19 @@ For a custom-domain self-host, the values to check first are:
   wallet address namespace. Changing it changes derived wallet addresses.
 - `REACT_APP_CE_SHARED_WORKER_URL` when the deployment should use your own
   default/shared `sessionCorsWorker` instead of the demo fallback.
-- `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` only to select a Worker
-  release other than the pinned one. By default the client uses the release
-  pinned in `client/src/variables/workerReleasePin.json`. The native Cloudflare
-  deploy card replays that public commit, and the Session and Agent Bridge
-  bundles and their manifest download from its immutable `worker-bundles-<sha>`
-  release. An override moves all of these together. It must be the exact
-  40-character public commit of a published, verified release that contains
-  the reviewed `deploy/cloudflare/session-worker/` package. Branch names, tags,
-  abbreviated hashes, and non-GitHub sources fail closed: the native card and
-  default bundle downloads are disabled rather than falling back to `latest`.
+- `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to enable the native
+  Cloudflare deploy card. The value must be the exact 40-character commit that
+  publicly contains the reviewed `deploy/cloudflare/session-worker/` package.
+  Branch names, tags, abbreviated hashes, and non-GitHub sources fail closed.
 - `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own
   deploy-helper for the explicit legacy fallback.
 - `REACT_APP_CE_HEALTHCHECK_WORKER_URL` when worker diagnostics should target a
   specific worker.
-- `REACT_APP_CE_WORKER_BUNDLE_URL` and `REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL`
-  only when deploy flows should fetch Worker bundles from non-default URLs.
+- `REACT_APP_CE_WORKER_BUNDLE_URL` only when deploy flows should fetch a worker
+  bundle from a non-default URL.
 - `REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL` alongside any Worker bundle URL
   override. The manifest must come from the same immutable release and provides
-  the expected SHA-256 for both Session and Wrapped deploys. Explicit URLs
-  bypass the pin and its build check, so verify their release yourself.
+  the expected SHA-256 for both Session and Wrapped deploys.
 - `REACT_APP_DEFAULT_CHAIN_ID`, session scan variables, and registry/session
   defaults only when your deployment intentionally targets a different chain,
   registry/session surface, or profile scan scope.
@@ -147,21 +140,16 @@ blank. Netlify then runs the following contract from the repository:
 
 ```text
 base: client
-command: node ../scripts/verify-release-assets.mjs && npm ci && npm run build
+command: npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=$COMMIT_REF npm run build
 publish: build
 Node: 20
 ```
 
-The client deploys Workers from the release pinned in
-`client/src/variables/workerReleasePin.json`, never from the build's own commit
-or GitHub's moving `latest` release. The build first verifies that release: the
-pinned manifest SHA-256, its source commit, and the Session and Agent Bridge
-bundle digests. It fails before building if any asset is missing or differs.
-Manual and local builds use the same pin, so the native Deploy Button is
-available in them too. To move to another published `worker-bundles-<sha>`
-release, run `CE_RELEASE_COMMIT=<sha> npm run verify:release-assets` from the
-repository root. Then record that commit and the printed manifest SHA-256 in
-the pin file.
+`COMMIT_REF` is supplied by Netlify for Git-backed builds. Passing it through
+to `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` binds the native
+Cloudflare Deploy Button to the exact reviewed public commit that produced the
+client. Manual or local builds without `COMMIT_REF` keep the native button
+disabled rather than guessing a private or mutable source ref.
 
 Enable pull-request Deploy Previews so a candidate can be inspected before it
 reaches `main`. Leave general branch deploys disabled unless a named release
@@ -176,10 +164,10 @@ wildcard preview origin.
 For a manual fallback, drag `client/build/` into Netlify's deploy UI. Do not
 upload `client/build-vite/` or `client/vite-build/`. Those names are legacy
 ignored artifacts from older local builds and can contain partial or stale CSS
-output. Run `npm run verify:release-assets` from the repository root before a
-manual build so the uploaded client references a verified release. If a deploy
-looks unstyled or low-contrast, rebuild from `client/` and upload the fresh
-`client/build/` directory.
+output. Set `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to the exact
+public source commit before a manual build when the native Deploy Button must
+be available. If a deploy looks unstyled or low-contrast, rebuild from
+`client/` and upload the fresh `client/build/` directory.
 
 Because the app uses client-side routing, the root `netlify.toml` owns the Git
 deploy redirects. The matching `client/public/_redirects` file is retained in
