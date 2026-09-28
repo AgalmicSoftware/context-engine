@@ -1,4 +1,21 @@
 {
+  "rxc-test": {
+    "slug": "rxc-test",
+    "sessionId": "0xdd7bfab80119bb4692f041d3bcf8438f",
+    "sessionName": "RxC - Reverse Alignment",
+    "corsWorkerUrl": "https://ce-rxc-test-96862a1dc78f.agalmic.workers.dev/",
+    "workerCanonicalCleanRoute": true,
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      }
+    }
+  },
   "eddy26": {
     "slug": "eddy26",
     "sessionId": "0x864a48dfbde5a8ef4b5ac60a2980d842",
@@ -502,6 +519,23 @@
           "provider": "openai",
           "model": "whisper-1"
         }
+      }
+    }
+  },
+  "rxc-ra-test": {
+    "slug": "rxc-ra-test",
+    "sessionId": "0xb454652c2e6e6a4f62891ec68ff462bb",
+    "sessionName": "Reverse Alignment — RxC",
+    "corsWorkerUrl": "https://ce-rxc-ra-test-784bb9e31813.agalmic.workers.dev/",
+    "workerCanonicalCleanRoute": true,
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
       }
     }
   }

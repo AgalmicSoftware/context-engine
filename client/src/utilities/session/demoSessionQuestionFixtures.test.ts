@@ -193,6 +193,17 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
+  it.each(['rxc-test', 'rxc-ra-test'])('discovers %s without seeding demo questions', (slug) => {
+    const config = (demoSessions as Record<string, any>)[slug];
+    expect(getTemporaryDemoSessionQuestionFixtures(slug, config)).toEqual([]);
+    expect(config).toMatchObject({
+      slug,
+      sessionId: expect.stringMatching(/^0x[0-9a-f]{32}$/),
+      corsWorkerUrl: expect.stringContaining(`https://ce-${slug}-`),
+      workerCanonicalCleanRoute: true,
+    });
+  });
+
   it('does not seed fallback questions for the fifth realtime demo route', () => {
     const config = (demoSessions as Record<string, any>)['demo-interview-5'];
 

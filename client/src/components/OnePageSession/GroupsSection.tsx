@@ -20,6 +20,7 @@ import {
 } from '../../utilities/session/groupCreationPolicy';
 import styles from './OnePageSession.module.scss';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
+import LinkedWorkerGroup, { type LinkedWorkerGroupReference } from './LinkedWorkerGroup';
 
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 
@@ -133,6 +134,8 @@ const OnePageSessionGroupsSection = ({
     embeddedGroupsSessionConfig && typeof embeddedGroupsSessionConfig === 'object'
       ? embeddedGroupsSessionConfig
       : resolvedSessionConfig;
+  const linkedGroups = asRecord(sessionConfigForGroups).linkedWorkerGroups;
+  const groupReferences = Array.isArray(linkedGroups) ? (linkedGroups as LinkedWorkerGroupReference[]) : [];
   const groupCapabilities = resolveSessionCapabilityProjection(sessionConfigForGroups);
   const usesWorkerNativeGroups =
     groupCapabilities.source === 'profile' && groupCapabilities.profileValid && groupCapabilities.isWorkerCanonical;
@@ -234,6 +237,17 @@ const OnePageSessionGroupsSection = ({
         <div className={styles.miniSectionContent}>
           {usesWorkerNativeGroups ? (
             <>
+              {groupReferences.map((reference) => (
+                <LinkedWorkerGroup
+                  key={`${reference.sessionId}:${reference.groupId}`}
+                  reference={reference}
+                  account={account}
+                  provider={provider}
+                  networkChainId={networkChainId}
+                  refreshNonce={workerGroupsRefreshNonce}
+                  toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
+                />
+              ))}
               <WorkerSessionGroupsPanel
                 account={account}
                 provider={provider}
