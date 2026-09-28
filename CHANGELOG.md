@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4] - 2026-09-24
+
+### Client — available when the site deploys
+
+- Add a browsable Reverse Alignment Atlas with twelve focus areas, source context,
+  search, related topics, and mobile navigation for the RxC sessions. Keep the
+  unpopulated topic map in Results labelled "Waiting for more data".
+- Discover both RxC test sessions from their clean URLs on a fresh visit.
+- Display linked community groups from their verified owning session, preserving
+  existing memberships and logos without creating duplicate groups.
+- Put compact AI submission choices beside Submit responses, strengthen the
+  review heading, and remove the duplicate imported-context title.
+- Resolve the signing chain before encrypting responses and preserve the saved
+  chain during decryption. Hide new response locks when encryption is disabled.
+- Keep Only me fields restricted to the submitter. Offer Me + admin on compatible
+  Cloudflare sessions and Session only when membership is private.
+
+### Worker — requires a session Worker update
+
+- Add authenticated response-field key wrapping for administrator and private
+  session audiences, with current membership checks, bound session/field context,
+  audit records, and no plaintext key cache in the client.
+- Allow explicitly opted-in Cloudflare sessions to offer optional field encryption
+  while keeping ordinary responses and Results public by default.
+- Advertise these audiences only when the Worker has the encryption key and audit
+  storage available. Existing session privacy settings remain unchanged.
+
 ## [0.6.3] - 2026-09-23
 
 ### Client fixes — available when the site deploys
