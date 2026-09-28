@@ -1,0 +1,130 @@
+.map {
+  padding: 20px;
+  margin-top: 20px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: 14px;
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  h3,
+  h4 {
+    margin: 0;
+    color: inherit;
+  }
+  p {
+    margin: 10px 0;
+  }
+  a {
+    color: var(--ce-status-info-text);
+    text-decoration: underline;
+  }
+}
+.preview,
+.count {
+  font-size: 0.8rem;
+}
+.waiting {
+  font-weight: 700;
+  color: var(--ce-status-info-text);
+}
+.preview {
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.root {
+  width: fit-content;
+  margin: 24px auto 0;
+  padding: 12px 20px;
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: 40px;
+  font-weight: 800;
+}
+.branches {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.branch {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding-top: 26px;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 20px;
+    border-left: 1px solid var(--ce-status-info-text);
+  }
+  h4 {
+    font-size: 0.95rem;
+    text-align: center;
+  }
+}
+.topics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+// Keep topic bubbles round under the shared theme button recipe.
+.map .branch .topics button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px;
+  width: 100%;
+  aspect-ratio: 1;
+  text-align: center;
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 70%, var(--ce-surface-sunken));
+  border-radius: 50%;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  cursor: pointer;
+  .count {
+    white-space: nowrap;
+  }
+  &[aria-pressed='true'] {
+    border-color: var(--ce-status-info-text);
+    background: color-mix(in srgb, var(--ce-surface-sunken) 85%, var(--ce-status-info-text));
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+.empty {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px dashed var(--ce-status-info-text);
+  border-radius: 10px;
+}
+@media (max-width: 1050px) {
+  .branches {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .topics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: 680px;
+    margin: 0 auto;
+    width: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .topics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 340px;
+  }
+}

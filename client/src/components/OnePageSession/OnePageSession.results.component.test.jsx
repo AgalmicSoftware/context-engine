@@ -911,6 +911,29 @@ describe('OnePageSession results routing', () => {
     expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
   });
 
+  it.each(['rxc-test', 'rxc-ra-test'])(
+    'shows the atlas in %s Context and the empty topic preview in Results',
+    async (slug) => {
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={[`/session/${slug}`]}>
+          <OnePageSession {...props} slug={slug} sessionConfig={{ ...props.sessionConfig, slug }} />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(await screen.findByTestId('ce-rxc-context-atlas')).toBeVisible();
+      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
+      expect(screen.getAllByText('0 assigned')).toHaveLength(12);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+    },
+  );
+
   it('does not render an empty session context section', async () => {
     const props = buildProps();
 
