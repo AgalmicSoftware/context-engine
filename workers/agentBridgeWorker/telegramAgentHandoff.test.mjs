@@ -1086,7 +1086,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(source, /name:\s+context-engine/);
   assert.match(source, /^# Context Engine Agent Runtime/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-07-18 \(v42\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-09-28 \(v42\)/);
+  assert.match(source, /\{ "questionId": "q5", "value": \[3, -2, 0\] \}/);
+  assert.match(source, /For `quadratic` questions, `value` holds one signed whole-number vote per option/);
   assert.match(source, /short runtime skill/);
   assert.match(source, /ce-telegram-bot-reference\/SKILL\.md/);
   assert.match(source, /Never make unauthenticated\s+question, draft, answer, vote, or results requests/);
@@ -1143,6 +1145,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(reference, /^# CE Telegram Bot Reference/m);
   assert.match(reference, /Detailed Context Engine Telegram bot, Mini App, admin, and operator reference/);
   assert.match(reference, /POST \/api\/agent\/mini-app-launch/);
+  assert.match(reference, /`quadratic`: `value` is an array with one signed whole-number vote per option/);
+  assert.match(reference, /\*\*Reference version:\*\* 2026-09-28 \(v42\)/);
+  assert.match(reference, /### 2026-09-28 \(v42\)/);
   assert.match(source, /skillUpdateAvailable/);
   for (const installGuide of [readme, reference]) {
     assert.match(
@@ -1155,7 +1160,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+ce-session-wrapped/);
   assert.match(wrapped, /^# Context Engine Session Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-07-20 \(session-wrapped-v1\.1\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-09-28 \(session-wrapped-v1\.2\)/);
+  assert.match(wrapped, /quadratic uses `\{ "value": \[\.\.\.\] \}` with one signed whole-number vote per\s+option in order/);
   assert.match(wrapped, /Use this skill only to run a generic Context Engine session wrapped flow/);
   assert.match(wrapped, /not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
@@ -1249,12 +1255,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-07-18 (v42)');
+  assert.equal(body.version, '2026-09-28 (v42)');
   assert.equal(body.skill, 'context-engine');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(Object.hasOwn(body, 'changelogUrl'), false);
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-07-18 (v42)');
+  assert.equal(body.latestVersion, '2026-09-28 (v42)');
   assert.equal(body.updateNote, '');
 });
 
@@ -1272,8 +1278,8 @@ test('Telegram agent handoff exposes dedicated Session Wrapped skill metadata', 
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-07-20 (session-wrapped-v1.1)');
-  assert.equal(body.protocolVersion, '2026-07-18 (v42)');
+  assert.equal(body.version, '2026-09-28 (session-wrapped-v1.2)');
+  assert.equal(body.protocolVersion, '2026-09-28 (v42)');
   assert.equal(body.skill, 'ce-session-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-session-wrapped/SKILL.md');
   assert.equal(body.workerSkillVersionEndpoint, '/api/agent/skill-version');
@@ -1293,7 +1299,7 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
     location,
     /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/,
   );
-  assert.match(location, /v=2026-07-18-v42-/);
+  assert.match(location, /v=2026-09-28-v42-/);
 });
 
 test('Telegram agent handoff serves a dedicated Session Wrapped skill redirect', async () => {
@@ -1308,7 +1314,7 @@ test('Telegram agent handoff serves a dedicated Session Wrapped skill redirect',
     location,
     /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/,
   );
-  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
+  assert.match(location, /v=2026-09-28-session-wrapped-v1-2-/);
 });
 
 test('Telegram agent handoff serves a short Session Wrapped skill alias', async () => {
@@ -1323,7 +1329,7 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias', async 
     location,
     /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/,
   );
-  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
+  assert.match(location, /v=2026-09-28-session-wrapped-v1-2-/);
 });
 
 test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD probes', async () => {
@@ -1338,7 +1344,7 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD 
     location,
     /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/,
   );
-  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
+  assert.match(location, /v=2026-09-28-session-wrapped-v1-2-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -6041,7 +6047,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-07-18 (v42)');
+  assert.equal(questions.skillVersion, '2026-09-28 (v42)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -8028,7 +8034,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-07-18 (v42)');
+  assert.equal(initialStatus.version, '2026-09-28 (v42)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_root_token_required');
   assert.equal(setResponse.status, 200);

@@ -5,7 +5,7 @@ description: Use when an agent needs to connect a user to Context Engine, fetch 
 
 # Context Engine Agent Runtime
 
-**Skill version:** 2026-07-18 (v42)
+**Skill version:** 2026-09-28 (v42)
 
 Use this skill when acting as Hermes, OpenClaw, Claude Code, or another
 HTTP-capable agent for a user who wants Context Engine questions, answers,
@@ -334,10 +334,15 @@ The worker accepts these common shapes inside `preferences`:
     { "questionId": "q1", "answer": "agree" },
     { "questionId": "q2", "answer": 7 },
     { "questionId": "q3", "values": ["Geo", "Index"] },
-    { "questionId": "q4", "text": "Freeform answer" }
+    { "questionId": "q4", "text": "Freeform answer" },
+    { "questionId": "q5", "value": [3, -2, 0] }
   ]
 }
 ```
+
+For `quadratic` questions, `value` holds one signed whole-number vote per option
+in the listed order. Use 0 for neutral; the squared votes must total at most the
+question's `voiceCredits` (99 by default).
 
 Keep draft explanations concise. Use `comments` only when it adds real nuance:
 premise challenge, ambiguity, missing option, condition, concrete
