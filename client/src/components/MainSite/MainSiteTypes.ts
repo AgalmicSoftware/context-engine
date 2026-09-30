@@ -32,14 +32,9 @@ export type MainSiteProps = {
   activeSessionSlug?: string;
   wagmiChainOptions?: unknown[];
   wagmiBlocknumber?: number;
-  urlExtension?: MainSiteRecord;
   path?: string;
-  nftCode?: string;
   urlPath?: string;
   firstVisit?: boolean;
-  socket?: unknown;
-  matchesContractAddress?: string;
-  viewAddress?: string;
   [key: string]: unknown;
 };
 

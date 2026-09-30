@@ -58,9 +58,9 @@ const typedWrappedProps: React.ComponentProps<typeof TypedWrapped> = {
   urlExtension: 'session/demo',
 };
 void typedWrappedProps;
-// @ts-expect-error injected wagmi props are supplied by the HOC
 const typedWrappedPropsWithInjected: React.ComponentProps<typeof TypedWrapped> = {
   label: 'typed-probe',
+  // @ts-expect-error injected wagmi props are supplied by the HOC
   wagmiAddress: '0xabc',
 };
 void typedWrappedPropsWithInjected;

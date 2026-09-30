@@ -2524,8 +2524,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
     this.props.fetchSessionState();
 
-    mainSiteLog.log('this.props.urlExtension:', this.props.urlExtension);
-
     // Prioritize user load (deep search) if on a user profile
     const targetUser = this.getUserAddressFromPath(bootstrapPath);
     if (targetUser) {
@@ -2805,9 +2803,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     } catch (e) {
       mainSiteLog.warn('MainSite: cleanup', e);
     }
-    if (this.props.socket !== undefined) {
-    }
-
     try {
       if (typeof this._cacheUpdateUnsubscribe === 'function') {
         this._cacheUpdateUnsubscribe();

@@ -3,7 +3,6 @@ import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import store from '../store.js';
-import { SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
@@ -37,18 +36,11 @@ type AppProps = {
   params?: Record<string, string | undefined>;
 };
 
-type AppState = {
-  serverEndpoint: string;
-  matchesAddress: string;
-  urlExtension?: string;
-};
-
 type ColdLoadSnapshot = {
   firstVisit: boolean;
   shouldStartOnboarding: boolean;
 };
 
-let socket: unknown;
 let firstVisit = false;
 let _coldLoadSnapshot: ColdLoadSnapshot | null = null;
 const APP_HISTORY_SYNC_EVENT = 'ce:app-history-sync';
@@ -152,12 +144,7 @@ try {
   }
 }
 
-class App extends React.Component<AppProps, AppState> {
-  state: AppState = {
-    serverEndpoint: SERVER,
-    matchesAddress: '',
-  };
-
+class App extends React.Component<AppProps> {
   _lastSyncedRouteHeadKey: string | null = null;
   unsubscribeHistorySync: (() => void) | null = null;
 
@@ -238,18 +225,10 @@ class App extends React.Component<AppProps, AppState> {
           }
         : this.props.location || { pathname: '', search: '' };
 
-    const search = location.search || '';
-    const nftCode = search.substring(search.indexOf('=') + 1);
     const urlPath = (location.pathname || '').toString();
-    const viewAddress = urlPath.split('/u/')[1];
     const siteProps = {
-      nftCode,
       urlPath,
       firstVisit,
-      socket,
-      matchesContractAddress: this.state.matchesAddress,
-      urlExtension: this.state.urlExtension,
-      viewAddress,
     };
 
     return (
