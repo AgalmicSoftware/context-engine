@@ -306,7 +306,12 @@ export const buildSurveyDecryptSuccessState = (
   const nextSlice = {
     answers: {
       ...asRecord(previousSlice.answers),
-      ...sliceAnswers,
+      ...Object.fromEntries(
+        Object.entries(sliceAnswers).map(([qid, field]) => [
+          qid,
+          { ...asRecord(asRecord(previousSlice.answers)[qid]), ...asRecord(field) },
+        ]),
+      ),
     },
     importance: {
       ...asRecord(previousSlice.importance),
@@ -319,7 +324,12 @@ export const buildSurveyDecryptSuccessState = (
     },
     additionalComments: {
       ...asRecord(previousSlice.additionalComments),
-      ...sliceAdditionalComments,
+      ...Object.fromEntries(
+        Object.entries(sliceAdditionalComments).map(([qid, field]) => [
+          qid,
+          { ...asRecord(asRecord(previousSlice.additionalComments)[qid]), ...asRecord(field) },
+        ]),
+      ),
     },
   };
 
