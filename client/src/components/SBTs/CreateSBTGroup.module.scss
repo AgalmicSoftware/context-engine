@@ -274,17 +274,6 @@ $placeholder-color: var(--ce-panel-text-muted);
       display: block;
     }
 
-    .selectedFile {
-      margin-left: 0;
-      font-size: 0.92em;
-      color: $clickable-color;
-      min-width: 0;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
     input[type='text'] {
       margin-bottom: 0 !important;
       width: 100%;
@@ -626,22 +615,8 @@ $placeholder-color: var(--ce-panel-text-muted);
     overflow-wrap: anywhere;
   }
 
-  .inlineLinkButton {
-    appearance: none;
-    background: none;
-    border: 0;
-    padding: 0;
-    margin-top: 2px;
-    color: $clickable-color;
-    font-size: 0.9rem;
-    text-align: left;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
   /* Sub-options containers (indented) */
   .timeLimitedOptions,
-  .inviteLinksOptions,
   .groupPasswordInputContainer {
     margin-left: 0;
     margin-top: 0;
@@ -658,9 +633,6 @@ $placeholder-color: var(--ce-panel-text-muted);
 
   .timeLimitedOptions {
     color: var(--ce-color-black) !important;
-    .li {
-      color: var(--ce-color-black) !important;
-    }
   }
 
   .jsonPreviewBlock {
@@ -1435,11 +1407,6 @@ $placeholder-color: var(--ce-panel-text-muted);
       padding: 14px;
     }
 
-    .selectedFile {
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
-
     .tagInputGroup {
       width: auto;
       flex: 1 1 auto;
@@ -1611,7 +1578,6 @@ $placeholder-color: var(--ce-panel-text-muted);
   .settingRow,
   .distributionCheckboxRow,
   .timeLimitedOptions,
-  .inviteLinksOptions,
   .groupPasswordInputContainer {
     padding: 12px;
   }

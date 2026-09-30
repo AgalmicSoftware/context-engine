@@ -324,49 +324,6 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.addQuestionContainer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
-#newQuestionSelect {
-  flex-grow: 1;
-  margin-right: 10px;
-  font-size: 1.5em;
-  font-weight: 600;
-  padding: 5px;
-  background: $input-bg;
-  color: var(--ce-color-white);
-  border: 1px solid $input-border;
-}
-
-.addQuestionButton,
-#addQuestionButton {
-  color: var(--ce-color-white);
-  font-size: 1.5em;
-  font-weight: 600;
-  padding: 10px;
-  text-transform: uppercase;
-  background-color: transparent;
-  border: none;
-}
-
-#createSurveyIDPreview {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  color: var(--ce-color-white) !important;
-  font-size: 1em;
-  font-weight: 600;
-  margin-top: 10px;
-  font-family: var(--ce-font-mono);
-  background-color: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
-  padding: 10px;
-  border-radius: var(--ce-radius-5);
-}
-
 .createSurveyButton,
 #submitNewSurveyButton {
   @include finalSubmitCta.final-submit-cta-shell(
@@ -479,14 +436,6 @@ $user-page-background: var(--ce-surface-sunken);
   margin-left: 5px;
   height: 100%;
   font-weight: 600;
-}
-
-.questionId {
-  font-size: 0.65rem;
-  opacity: 0.65;
-  font-weight: 600;
-  margin-top: 5px;
-  margin-bottom: 5px;
 }
 
 .toggleLabel {
@@ -616,11 +565,6 @@ $user-page-background: var(--ce-surface-sunken);
   color: var(--ce-color-white) !important;
 }
 
-.tagsInput {
-  color: var(--ce-color-white) !important;
-  margin-bottom: 5px;
-}
-
 .errorButton {
   background-color: var(--ce-status-danger) !important;
   border-color: var(--ce-status-danger) !important;
@@ -652,13 +596,7 @@ $user-page-background: var(--ce-surface-sunken);
 }
 
 /* NEW STYLES FOR TAGS + QUICK UI */
-.checkboxLabel {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-weight: normal;
-  margin-bottom: 0;
-}
+
 .tagsContainer {
   display: flex;
   flex-wrap: wrap;
@@ -1150,25 +1088,6 @@ $user-page-background: var(--ce-surface-sunken);
     margin-bottom: 0;
     /* Override default input margin */
   }
-}
-
-.encryptionGateMode {
-  min-width: 180px;
-  margin-bottom: 0;
-  flex: 0 0 180px;
-
-  select {
-    background: $input-bg;
-    border: 1px solid $input-border;
-    color: $user-page-text-color;
-    border-radius: var(--ce-radius-6);
-  }
-}
-
-.encryptionWarning {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  color: var(--ce-status-danger-text);
 }
 
 .addDocUrlButton {

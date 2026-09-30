@@ -163,14 +163,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .slider {
     margin-top: 20px;
     max-width: 200px;
-    .rangeslider__fill {
-      background: var(--ce-color-success);
-    }
-
-    .rangeslider__handle {
-      background: var(--ce-color-surface);
-      border: 2px solid var(--ce-color-success);
-    }
   }
 
   .spectrum {
@@ -2031,10 +2023,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 10px;
   color: var(--ce-color-white);
   font-weight: bold;
-}
-
-.importanceSlider .rangeslider__fill {
-  background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
 }
 
 /* JSON Preview Copy Button (General Utility) */
@@ -6470,11 +6458,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   .ratingSlider {
     margin-block: 0 !important;
-  }
-  .rangeslider {
-    flex: 0 1 260px;
-    width: 260px;
-    max-width: 70vw;
   }
 }
 

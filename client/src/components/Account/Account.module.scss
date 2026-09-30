@@ -21,10 +21,6 @@
     padding-left: 0.75em;
     padding-right: 0.75em;
     opacity: 0.15;
-    .img {
-      vertical-align: top;
-      transform: scale (0.65);
-    }
   }
 
   .loginIcon {
@@ -273,10 +269,6 @@
     padding-left: 1em;
     padding-right: 1em;
     opacity: 0.15;
-    .img {
-      vertical-align: top;
-      transform: scale (0.8);
-    }
   }
 
   .loginIcon {
@@ -509,10 +501,6 @@
     padding-left: 1em;
     padding-right: 1em;
     opacity: 0.15;
-    .img {
-      vertical-align: top;
-      transform: scale (0.8);
-    }
   }
 
   .loginIcon {
@@ -743,9 +731,6 @@
     padding-left: 1em;
     padding-right: 1em;
     opacity: 0.15;
-    .img {
-      vertical-align: top;
-    }
   }
 
   .loginIcon {
@@ -988,9 +973,6 @@
     padding-left: 1em;
     padding-right: 1em;
     opacity: 0.15;
-    .img {
-      vertical-align: top;
-    }
   }
 
   .loginIcon {
@@ -3583,22 +3565,9 @@ h1 {
 // For phone-view, we want this to display differently
 
 /* Wallet modal fixes: readable label and mobile centering */
-:global(#w3a-modal .w3a-adapter-item > button p.ml-2),
-:global(#w3a-modal .w3a-adapter-item > button p) {
-  color: var(--ce-document-text) !important;
-}
 
 @media (max-width: 480px) {
   /* Center the wallet modal on small screens */
-  :global(#w3a-modal) {
-    display: flex !important;
-  }
-
-  :global(.w3a-parent-container #w3a-modal) {
-    display: unset !important;
-    padding: 0px !important;
-    margin-top: 150px;
-  }
 }
 
 /* --- Modal Overlap Fix (z-index) --- */

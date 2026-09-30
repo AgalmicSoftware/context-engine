@@ -1474,10 +1474,3 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 }
 
 /* Optional spinner style */
-.spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  color: $text-color;
-}
