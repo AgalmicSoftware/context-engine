@@ -52,6 +52,24 @@ const packet: InterviewPrefillPacket = {
 };
 
 describe('session interview protocol', () => {
+  it('preserves AI packet ratings while converting imported review drafts once', () => {
+    const incoming = {
+      ...packet,
+      responses: [{ questionId: 'q1', answer: 'Agree', importance: 60, conviction: 80, confidence: 0.8 }],
+    };
+    const decoded = decodeInterviewPrefillPacket(encodeInterviewPrefillPacket(incoming));
+    expect(decoded?.responses?.[0]).toMatchObject({ importance: 60, conviction: 80 });
+    const questions = normalizeInterviewQuestions([{ id: 'q1', prompt: 'Fixture question', type: 'binary' }]);
+    expect(readImportedInterviewDraftResponses(decoded, questions)?.[0]).toMatchObject({
+      importance: 6,
+      conviction: 8,
+    });
+    expect(readImportedInterviewDraftResponses(decoded, questions)?.[0]).toMatchObject({
+      importance: 6,
+      conviction: 8,
+    });
+  });
+
   it('resolves and updates only the two new voice mode query values', () => {
     expect(resolveSessionVoiceMode('?x=1&mode=interview')).toBe('interview');
     expect(resolveSessionVoiceMode('?mode=recordGroup')).toBe('recordGroup');
@@ -430,7 +448,7 @@ describe('session interview protocol', () => {
       {
         questionId: 'q1',
         answer: 'Staged rollout',
-        importance: 100,
+        importance: 10,
         conviction: 0,
         confidence: 1,
       },

@@ -337,15 +337,15 @@ export default function SessionInterviewDraftCard({
               sliderOpen={sliderOpen}
               sliderToggleExpandedByQuestion={{ [`interview-${draft.questionId}`]: sliderOpen }}
               sliderMode={sliderMode}
-              convictionValue={(edited.conviction ?? 0) / 10}
-              importanceValue={(edited.importance ?? 0) / 10}
-              activeSliderValue={(edited[sliderMode] ?? 0) / 10}
+              convictionValue={edited.conviction ?? 0}
+              importanceValue={edited.importance ?? 0}
+              activeSliderValue={edited[sliderMode] ?? 0}
               hasConvictionImportanceValue={edited.conviction !== undefined || edited.importance !== undefined}
               onSelectMode={(mode) => {
                 setSliderMode(mode);
                 setSliderOpen(true);
               }}
-              onChange={(value) => onEdit(markEdit(sliderMode, value * 10))}
+              onChange={(value) => onEdit(markEdit(sliderMode, value))}
             />
             <div className={styles.footerIconCluster}>
               {!hasHumanEditedDraft ? (

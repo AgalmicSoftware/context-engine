@@ -145,6 +145,13 @@ const clampRating = (value: unknown): number | undefined => {
   return number === undefined ? undefined : Math.max(0, Math.min(100, number));
 };
 
+// AI drafts and prefill packets rate importance/conviction 0-100; responses store
+// the 0-10 value the conviction/importance slider shows.
+const toResponseRating = (value: unknown): number | undefined => {
+  const rating = clampRating(value);
+  return rating === undefined ? undefined : Math.round(rating / 10);
+};
+
 const normalizeCoverageCount = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
@@ -169,7 +176,11 @@ const normalizeResearchCoverage = (value: unknown): InterviewResearchCoverage | 
   };
 };
 
-const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQuestion[]): InterviewDraftResponse[] => {
+const normalizeDraftCandidates = (
+  candidates: unknown,
+  questions?: InterviewQuestion[],
+  normalizeRating = toResponseRating,
+): InterviewDraftResponse[] => {
   const questionById = questions ? new Map(questions.map((question) => [question.id, question])) : null;
   const seen = new Set<string>();
   return (Array.isArray(candidates) ? candidates : [])
@@ -209,8 +220,12 @@ const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQues
         ...(toTrimmedString(response.additionalComments)
           ? { additionalComments: toTrimmedString(response.additionalComments).slice(0, 8000) }
           : {}),
-        ...(clampRating(response.importance) !== undefined ? { importance: clampRating(response.importance) } : {}),
-        ...(clampRating(response.conviction) !== undefined ? { conviction: clampRating(response.conviction) } : {}),
+        ...(normalizeRating(response.importance) !== undefined
+          ? { importance: normalizeRating(response.importance) }
+          : {}),
+        ...(normalizeRating(response.conviction) !== undefined
+          ? { conviction: normalizeRating(response.conviction) }
+          : {}),
         ...(toTrimmedString(response.evidence) ? { evidence: toTrimmedString(response.evidence).slice(0, 2000) } : {}),
         ...(Number.isFinite(confidence) ? { confidence: Math.max(0, Math.min(1, confidence)) } : {}),
       });
@@ -315,7 +330,11 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
   const responderContext = asRecord(packet.responderContext);
   const questionSetHash = toTrimmedString(packet.questionSetHash).toLowerCase();
   const promptVersion = toTrimmedString(packet.promptVersion);
-  const responses = normalizeDraftCandidates(packet.responses).filter((response) => response.confidence !== undefined);
+  // Preserve the AI packet's wire scale. Convert only when it becomes a local
+  // review draft, so decoding and reopening the packet cannot divide twice.
+  const responses = normalizeDraftCandidates(packet.responses, undefined, clampRating).filter(
+    (response) => response.confidence !== undefined,
+  );
   const facts = (Array.isArray(responderContext.facts) ? responderContext.facts : [])
     .slice(0, 100)
     .map((entry) => {

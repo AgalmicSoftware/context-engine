@@ -448,7 +448,12 @@ function SessionInterviewPanel({
             sessionConfig,
             workerUrl: url,
             previousResponses: drafts.map(({ revisions: _revisions, ...prediction }) => ({
-              prediction,
+              // The mapping prompt rates importance/conviction 0-100.
+              prediction: {
+                ...prediction,
+                ...(prediction.importance !== undefined ? { importance: prediction.importance * 10 } : {}),
+                ...(prediction.conviction !== undefined ? { conviction: prediction.conviction * 10 } : {}),
+              },
               reviewed: {
                 answer: editedDrafts[prediction.questionId]?.answer,
                 additionalComments: editedDrafts[prediction.questionId]?.additionalComments,

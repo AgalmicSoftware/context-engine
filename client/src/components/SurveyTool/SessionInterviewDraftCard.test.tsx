@@ -10,7 +10,7 @@ const readDraftCardScss = () => fs.readFileSync(path.join(__dirname, 'SessionInt
 
 describe('SessionInterviewDraftCard sliders', () => {
   it('exposes both modes and preserves their independent values when editing', () => {
-    const draft = { questionId: 'q1', answer: 'Agree', conviction: 40, importance: 60 };
+    const draft = { questionId: 'q1', answer: 'Agree', conviction: 4, importance: 6 };
     const onEdit = jest.fn();
     function Review() {
       const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
@@ -35,12 +35,12 @@ describe('SessionInterviewDraftCard sliders', () => {
     fireEvent.click(screen.getByRole('button', { name: /Importance/ }));
     expect(screen.getByRole('slider')).toHaveValue('6');
     fireEvent.change(screen.getByRole('slider'), { target: { value: '7' } });
-    expect(onEdit).toHaveBeenLastCalledWith({ importance: 70, userEditedFields: ['importance'] });
+    expect(onEdit).toHaveBeenLastCalledWith({ importance: 7, userEditedFields: ['importance'] });
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Conviction/ }));
     expect(screen.getByRole('slider')).toHaveValue('4');
     fireEvent.change(screen.getByRole('slider'), { target: { value: '8' } });
-    expect(onEdit).toHaveBeenLastCalledWith({ conviction: 80, userEditedFields: ['importance', 'conviction'] });
+    expect(onEdit).toHaveBeenLastCalledWith({ conviction: 8, userEditedFields: ['importance', 'conviction'] });
     fireEvent.click(screen.getByRole('button', { name: /Importance/ }));
     expect(screen.getByRole('slider')).toHaveValue('7');
   });

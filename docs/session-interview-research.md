@@ -80,7 +80,10 @@ older v1–v5 imports keep their original fingerprints. V5 binds selection mode 
 the question hash; v4 does not and its generation contract allows only one
 choice string. A missing v4 draft may reflect an unrepresentable multiple-choice
 answer, not lack of evidence. Ratings follow each question's scale; importance
-and conviction remain separate 0–100 fields. See [the interview contract](session-listening-mode.md).
+and conviction are separate 0–100 fields in AI requests and imported packets.
+The client converts them once into 0–10 review and stored response values, and
+converts local predictions back to 0–100 when continuing an AI interview.
+Existing stored responses are not migrated. See [the interview contract](session-listening-mode.md).
 
 Voice context can omit whole question/history/background/review rows to fit the
 realtime request limit. This does not truncate the full local transcript used
