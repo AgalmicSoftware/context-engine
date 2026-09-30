@@ -297,8 +297,8 @@ SPA fallback concept, but their redirect config syntax differs.
 ## RPC Defaults
 
 - Canonical anonymous RPC defaults live in `shared/rpcDefaults.cjs`. The
-  `client/src/variables/rpcDefaults.js` module is a thin runtime adapter with
-  types supplied by `rpcDefaults.d.ts`; Node scripts and worker fallbacks consume the same shared
+  `client/src/variables/rpcDefaults.js` and `.ts` modules are thin CommonJS and
+  Vite adapters; Node scripts and worker fallbacks consume the same shared
   manifest.
 - Session-sponsored RPC is not an anonymous default. For Survey contract reads,
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only

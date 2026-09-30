@@ -15,7 +15,7 @@ For scan-scope, profile deep-scan, and RPC guardrail flags, see
   - worker/session RPC overrides (`workers/sessionCorsWorker/worker.js`, Session Wizard/Admin worker config payloads)
 
 Built-in anonymous RPC defaults live in `shared/rpcDefaults.cjs`; the client
-`rpcDefaults.js` module is the runtime adapter; `rpcDefaults.d.ts` supplies its types.
+`rpcDefaults.js` and `.ts` modules are runtime adapters.
 
 ## Current client defaults
 
