@@ -66,12 +66,12 @@ origins.
 These surfaces contain related bytes but serve different consumers. They are
 not competing copies of the Worker:
 
-| Surface | Role | Git status | Use or edit policy |
-| --- | --- | --- | --- |
-| `workers/sessionCorsWorker/` | Canonical modular source and tests | Tracked | Make Session Worker implementation changes here. |
-| `deploy/cloudflare/session-worker/` | Self-contained native Deploy to Cloudflare template generated from the canonical source | Tracked | Cloudflare clones this Git subdirectory at an exact public commit. Maintain its README/config inputs, but do not hand-edit `worker.mjs` or `template-manifest.json`. |
-| `dist/sessionCorsWorker.bundle.js` | Repo-local bundle produced by `npm run worker:bundle` | Generated and untracked | Use for local verification or a one-off manual upload fallback. |
-| GitHub Release `sessionCorsWorker.bundle.js` | Immutable, checksummed downloadable bundle | Published release asset | Use for deploy-helper or manual dashboard deployment; it does not contain or replace the native Git template. |
+| Surface                                      | Role                                                                                    | Git status              | Use or edit policy                                                                                                                                                   |
+| -------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workers/sessionCorsWorker/`                 | Canonical modular source and tests                                                      | Tracked                 | Make Session Worker implementation changes here.                                                                                                                     |
+| `deploy/cloudflare/session-worker/`          | Self-contained native Deploy to Cloudflare template generated from the canonical source | Tracked                 | Cloudflare clones this Git subdirectory at an exact public commit. Maintain its README/config inputs, but do not hand-edit `worker.mjs` or `template-manifest.json`. |
+| `dist/sessionCorsWorker.bundle.js`           | Repo-local bundle produced by `npm run worker:bundle`                                   | Generated and untracked | Use for local verification or a one-off manual upload fallback.                                                                                                      |
+| GitHub Release `sessionCorsWorker.bundle.js` | Immutable, checksummed downloadable bundle                                              | Published release asset | Use for deploy-helper or manual dashboard deployment; it does not contain or replace the native Git template.                                                        |
 
 The native deploy button requires a public Git repository or isolated
 subdirectory, so the package under `deploy/` must exist in the repository. The
@@ -82,7 +82,7 @@ Public links:
 
 - Canonical Session Worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 - Native Cloudflare template: `https://github.com/AgalmicSoftware/context-engine/tree/main/deploy/cloudflare/session-worker`
-- Latest promoted release bundle: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
+- Pinned release bundle: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/sessionCorsWorker.bundle.js` (the selected build commit or `workerReleasePin.json`).
 - Deploy-helper source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
 
 `workers/deploy-helper/` and `workers/agentBridgeWorker/` are separate Worker
@@ -93,7 +93,8 @@ Session Worker source trees.
   immutable, commit-addressed GitHub release without moving `latest`.
   `.github/workflows/promote-worker-bundles.yml` separately verifies an
   operator-selected release before advancing the protected stable and GitHub
-  `latest` channels used by `releases/latest/download/...` URLs.
+  `latest` channels for operator-selected promotion. Client and deploy-helper
+  defaults use the immutable commit-addressed release instead of those channels.
 
 ## Deployment modes
 
@@ -550,7 +551,7 @@ Admin test panel:
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
   `{ "source": { "kind": "worker-canonical" } }`; non-canonical
   registry/Arweave profiles may use `{ "source": { "kind":
-  "admin-snapshot", "snapshot": ... } }` only when the browser has a
+"admin-snapshot", "snapshot": ... } }` only when the browser has a
   same-session, unlocked submitted-response snapshot. The Worker sanitizes the
   snapshot and rejects encrypted or locked rows. Browser snapshots retain rating
   bounds and labels, selection limits, quadratic budgets, and structured answer
@@ -836,7 +837,7 @@ The answer/comment lock follows the session's encryption capability. An explicit
 `sessionModeProfile.encryption.mode: "none"` hides locks for new answers unless a
 Worker-canonical Cloudflare session explicitly opts into
 `responseFieldEncryption: { "mode": "optional" }`. This opt-in leaves whole-payload
-storage and Results visibility unchanged. Previously encrypted answers keep their locked indicator and decrypt path.
+storage and Results visibility unchanged. Previously encrypted answers keep their usable lock, decrypt path and Only me editing even when new encryption is disabled.
 Legacy sessions without a mode profile retain their existing self/Lit behavior.
 
 - **Only me** uses the submitter's signature-derived wrapping key. Neither session
@@ -852,7 +853,7 @@ Legacy sessions without a mode profile retain their existing self/Lit behavior.
   this option. The submitter retains their independent self recipient.
 
 Authenticated `POST /storage/response-field-key/wrap` and `/unwrap` use storage
-scope and rate limits. Their `worker-response-field-v1` recipient binds the
+(or legacy arweave) scope and rate limits. Their `worker-response-field-v1` recipient binds the
 session ID/slug, submitter, audience, and field context into AES-GCM authenticated
 data under the deployment KEK, with a separate domain from storage envelope keys.
 Unwrap requires successful authorization and a durable key-release audit before
@@ -1331,6 +1332,7 @@ Runtime:
 ## KV data layout
 
 - `session:{slug}:config` JSON:
+
   ```json
   {
     "slug": "test-72",
@@ -1470,6 +1472,7 @@ Runtime:
     - writes fail closed when open config subtrees contain secret-like keys,
       Cloudflare deployment tokens, URL credentials, RPC/faucet values, or
       provider credential aliases.
+
 - `session:{slug}:secrets` v1 envelope JSON:
   ```json
   {
@@ -1653,12 +1656,9 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   authority-preflight + scope-evaluation wiring, bootstrap-admin
   session-read binding, and call-time logging behavior into the extracted
   helper boundaries.
-- Shared anonymous / registry-support adapter binding now routes through
-  `workers/sessionCorsWorker/anonymousRegistrySupportBinding.js`,
-  preserving the worker-local anonymous slug-resolution deps bundle,
-  on-chain anonymous gate authority/session-read binding, anonymous
-  rate-ID constants, and call-time warning behavior into the extracted
-  helper boundaries.
+- `worker.js` assembles the anonymous / registry-support adapters directly,
+  preserving the anonymous slug-resolution deps, on-chain gate authority,
+  session reads, rate-ID constants and call-time warnings.
 - Shared rate-limit / faucet-support binding now routes through
   `workers/sessionCorsWorker/rateLimitFaucetSupportBinding.js`,
   preserving the worker-local KV-backed rate-limit keying/ttl behavior while
@@ -2349,7 +2349,7 @@ Signed login/bootstrap requests:
     `openaiKey`. The key is never accepted from or returned to the browser.
   - Defaults to `gpt-live-1`. Posts JSON to OpenAI `/v1/live/sessions` with
     `{ session: { model, instructions, store: false, delegation: { type: "client" } },
-    transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
+transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     including terminal CRLF, and reads the answer from `transport.sdp`.
     Live negotiates audio through WebRTC and uses native continuous speech and
     transcripts; no Realtime `type`, `output_modalities`, transcription model,
@@ -2468,7 +2468,7 @@ Signed login/bootstrap requests:
 
 Manual:
 
-- Download the latest release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`.
+- Download the selected commit-addressed release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/sessionCorsWorker.bundle.js`. Verify that release with `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets` before using its matching manifest and bundles.
 - Or rebuild local fallback bundles from the repo root with `nvm use 20 && npm run worker:bundle`.
   - Session worker paste/upload file: `dist/sessionCorsWorker.bundle.js`
   - Deploy-helper paste/upload file: `dist/deployHelper.bundle.js`
@@ -2516,7 +2516,7 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     must reuse both that ID and `configRevision`; a definitive terminal response
     or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
-- The helper fetches the latest bundled worker asset and configures KV + bindings.
+- The helper fetches the pinned bundled Worker asset and configures KV + bindings. The deploy-helper script defaults to `workerReleasePin.json`; `--release-commit <40-character commit>` selects another immutable release. Explicit URL overrides remain available.
 - Fresh KV namespace seed writes retry only Cloudflare's transient
   `namespace not found` propagation response; unrelated write failures still
   fail immediately, and exhausted retries trigger the normal exact-resource
@@ -2610,7 +2610,7 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 
 ## Release bundle
 
-- The default deploy-helper bundle URL is the GitHub release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
+- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection.
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
 - Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.
@@ -2619,8 +2619,9 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
   bytes as an immutable, commit-addressed release without moving `latest`.
   After review, `.github/workflows/promote-worker-bundles.yml` re-verifies the
   selected release, retains the previous rollback ref, and advances the
-  protected stable and GitHub `latest` channels used by
-  `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`.
+  protected stable and GitHub `latest` channels for explicit operator promotion.
+  That process does not replace the commit-addressed URLs used by client and
+  helper defaults. A weekly verifier also checks the public-branch release.
 - The worker currently pins `ethers@6.15.0` intentionally. The root app and client remain on `ethers@5.7.2` until the broader client migration is done, so this version split is expected.
 
 ## Future work
@@ -2635,7 +2636,6 @@ the new selection. Failed refreshes still expose the existing error state.
 Authenticated generated-results artifact reads verify the token’s session identity
 and authorization epoch, then recheck the current storage scope and rate limit.
 Anonymous artifact reads continue through the configured public-view policy.
-
 
 ### Interview saved-answer readiness
 
