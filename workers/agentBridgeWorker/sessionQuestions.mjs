@@ -1,10 +1,8 @@
+import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
 import { safeString, lower, envFlagEnabled } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registrySessions.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
-import {
-  authenticateSessionWorker,
-  resolveSessionWorkerUrl,
-} from './onChainResponses.mjs';
+import { authenticateSessionWorker, resolveSessionWorkerUrl } from './onChainResponses.mjs';
 
 const DEFAULT_CHAIN_ID = '11155420';
 const ARWEAVE_GATEWAY = 'https://ar-io.dev';
@@ -25,7 +23,7 @@ const STORAGE_BACKENDS = Object.freeze({
 });
 
 const SURVEYS_BY_CHAIN = Object.freeze({
-  '11155420': '0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A',
+  11155420: '0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A',
 });
 
 const SELECTORS = Object.freeze({
@@ -62,19 +60,21 @@ function normalizeStorageBackend(value = '') {
 }
 
 function resolveQuestionStorageBackend(session = {}, env = {}) {
-  const metadata = session.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
-    ? session.metadata
-    : {};
-  const profile = metadata.storageProfile && typeof metadata.storageProfile === 'object' && !Array.isArray(metadata.storageProfile)
-    ? metadata.storageProfile
-    : {};
+  const metadata =
+    session.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
+      ? session.metadata
+      : {};
+  const profile =
+    metadata.storageProfile && typeof metadata.storageProfile === 'object' && !Array.isArray(metadata.storageProfile)
+      ? metadata.storageProfile
+      : {};
   return normalizeStorageBackend(
     env.AGENT_BRIDGE_QUESTION_STORAGE_BACKEND ||
-    profile.questionsBackend ||
-    profile.questionBackend ||
-    profile.backend ||
-    metadata.questionStorageBackend ||
-    metadata.storageBackend
+      profile.questionsBackend ||
+      profile.questionBackend ||
+      profile.backend ||
+      metadata.questionStorageBackend ||
+      metadata.storageBackend,
   );
 }
 
@@ -99,9 +99,7 @@ function storageRefForPointer(pointerId = '', resource = 'questions', backend = 
 
 function loginOriginForWorker(env = {}) {
   const configured = safeString(
-    env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN ||
-    env.LOCAL_AUTH_ORIGIN ||
-    env.AGENT_BRIDGE_PUBLIC_URL
+    env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN || env.LOCAL_AUTH_ORIGIN || env.AGENT_BRIDGE_PUBLIC_URL,
   );
   try {
     return new URL(configured || 'http://localhost:7391').origin;
@@ -137,9 +135,7 @@ function hexWord(value) {
 }
 
 function utf8ToHex(value = '') {
-  return [...new TextEncoder().encode(String(value))]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
+  return [...new TextEncoder().encode(String(value))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function encodeAbiStringArg(value = '') {
@@ -210,9 +206,7 @@ function base64urlFromBytes(bytes) {
   for (let index = 0; index < bytes.length; index += 0x8000) {
     binary += String.fromCharCode(...bytes.slice(index, index + 0x8000));
   }
-  const encoded = typeof btoa === 'function'
-    ? btoa(binary)
-    : Buffer.from(bytes).toString('base64');
+  const encoded = typeof btoa === 'function' ? btoa(binary) : Buffer.from(bytes).toString('base64');
   return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -226,9 +220,7 @@ function parseDataUriJson(uri = '') {
   if (!match) return null;
   const encoded = match[1];
   try {
-    const text = typeof atob === 'function'
-      ? atob(encoded)
-      : Buffer.from(encoded, 'base64').toString('utf8');
+    const text = typeof atob === 'function' ? atob(encoded) : Buffer.from(encoded, 'base64').toString('utf8');
     return JSON.parse(text);
   } catch {
     return null;
@@ -324,25 +316,16 @@ async function ethCall({
 }
 
 function resolveSurveysAddress(env = {}, chainId = DEFAULT_CHAIN_ID) {
-  return normalizeHexAddress(
-    resolveConfiguredSurveysAddress(env) ||
-    SURVEYS_BY_CHAIN[normalizeChainId(chainId)]
-  );
+  return normalizeHexAddress(resolveConfiguredSurveysAddress(env) || SURVEYS_BY_CHAIN[normalizeChainId(chainId)]);
 }
 
 function resolveConfiguredSurveysAddress(env = {}) {
-  return normalizeHexAddress(
-    env.AGENT_BRIDGE_SURVEYS_ADDRESS ||
-    env.SURVEYS_CONTRACT_ADDRESS ||
-    env.SURVEYS_ADDRESS
-  );
+  return normalizeHexAddress(env.AGENT_BRIDGE_SURVEYS_ADDRESS || env.SURVEYS_CONTRACT_ADDRESS || env.SURVEYS_ADDRESS);
 }
 
 function resolveMetadataSurveysAddress(metadata = {}) {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return '';
-  const contracts = metadata.contracts && typeof metadata.contracts === 'object'
-    ? metadata.contracts
-    : {};
+  const contracts = metadata.contracts && typeof metadata.contracts === 'object' ? metadata.contracts : {};
   const candidates = [
     contracts?.surveys?.address,
     contracts?.survey?.address,
@@ -363,10 +346,10 @@ function resolveMetadataSurveysAddress(metadata = {}) {
   return '';
 }
 
-async function fetchArweaveJson(pointerId = '', {
-  fetchImpl = globalThis.fetch,
-  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
-} = {}) {
+async function fetchArweaveJson(
+  pointerId = '',
+  { fetchImpl = globalThis.fetch, timeoutMs = DEFAULT_RPC_TIMEOUT_MS } = {},
+) {
   const id = safeString(pointerId);
   if (!/^[a-zA-Z0-9_-]{43}$/.test(id)) return null;
   for (const gateway of ARWEAVE_GATEWAYS) {
@@ -394,12 +377,10 @@ async function fetchArweaveJson(pointerId = '', {
   return null;
 }
 
-async function buildCloudflareQuestionStorageAuth({
-  env = {},
-  session = {},
-  fetchImpl = globalThis.fetch,
-} = {}) {
-  const sessionSlug = safeString(session.slug || session.sessionSlug || env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG);
+async function buildCloudflareQuestionStorageAuth({ env = {}, session = {}, fetchImpl = globalThis.fetch } = {}) {
+  const sessionSlug = safeString(
+    session.slug || session.sessionSlug || env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG,
+  );
   const workerUrl = resolveSessionWorkerUrl(env, session);
   if (!workerUrl || !sessionSlug) return { ok: false, reason: 'session_worker_url_missing' };
   const principal = {
@@ -421,18 +402,16 @@ async function buildCloudflareQuestionStorageAuth({
   });
 }
 
-async function fetchCloudflareStorageJson(pointerId = '', {
-  env = {},
-  session = {},
-  getAuth,
-  fetchImpl = globalThis.fetch,
-  timeoutMs = DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS,
-} = {}) {
+async function fetchCloudflareStorageJson(
+  pointerId = '',
+  { env = {}, session = {}, getAuth, fetchImpl = globalThis.fetch, timeoutMs = DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS } = {},
+) {
   const id = safeString(pointerId);
   if (!id || typeof fetchImpl !== 'function') return null;
-  const auth = typeof getAuth === 'function'
-    ? await getAuth()
-    : await buildCloudflareQuestionStorageAuth({ env, session, fetchImpl });
+  const auth =
+    typeof getAuth === 'function'
+      ? await getAuth()
+      : await buildCloudflareQuestionStorageAuth({ env, session, fetchImpl });
   if (!auth?.ok || !auth.token || !auth.workerUrl) return null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(new Error('Cloudflare storage fetch timed out')), timeoutMs);
@@ -458,10 +437,10 @@ async function fetchCloudflareStorageJson(pointerId = '', {
   }
 }
 
-async function fetchSessionMetadata(metadataURI = '', {
-  fetchImpl = globalThis.fetch,
-  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
-} = {}) {
+async function fetchSessionMetadata(
+  metadataURI = '',
+  { fetchImpl = globalThis.fetch, timeoutMs = DEFAULT_RPC_TIMEOUT_MS } = {},
+) {
   const dataJson = parseDataUriJson(metadataURI);
   if (dataJson && typeof dataJson === 'object') return dataJson;
   const txId = parseArweaveId(metadataURI);
@@ -515,9 +494,14 @@ async function fetchSessionConfigForQuestions({
       end: envEnd,
     },
     surveysAddress: configuredSurveysAddress || fallbackSurveysAddress,
-    sessionWorkerUrl: safeString(env.CE_SESSION_WORKER_BASE_URL || env.AGENT_BRIDGE_SESSION_WORKER_URL || env.SESSION_WORKER_URL),
+    sessionWorkerUrl: safeString(
+      env.CE_SESSION_WORKER_BASE_URL || env.AGENT_BRIDGE_SESSION_WORKER_URL || env.SESSION_WORKER_URL,
+    ),
   };
-  if (configuredSurveysAddress && (envStart != null || envFlagEnabled(env.AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY))) {
+  if (
+    configuredSurveysAddress &&
+    (envStart != null || envFlagEnabled(env.AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY))
+  ) {
     return session;
   }
   if (!registryAddress || !rpcUrls.length) return session;
@@ -545,15 +529,16 @@ async function fetchSessionConfigForQuestions({
       start: envStart ?? normalizeBlock(metadata?.blockLimits?.start),
       end: envEnd ?? normalizeBlock(metadata?.blockLimits?.end),
     };
-    session.surveysAddress = configuredSurveysAddress ||
+    session.surveysAddress =
+      configuredSurveysAddress ||
       resolveMetadataSurveysAddress(metadata) ||
       resolveSurveysAddress(env, session.chainId);
     session.sessionWorkerUrl = safeString(
       metadata.sessionWorkerUrl ||
-      metadata.workerUrl ||
-      metadata.corsWorkerUrl ||
-      metadata.CE_SESSION_WORKER_BASE_URL ||
-      session.sessionWorkerUrl
+        metadata.workerUrl ||
+        metadata.corsWorkerUrl ||
+        metadata.CE_SESSION_WORKER_BASE_URL ||
+        session.sessionWorkerUrl,
     );
   }
   if (session.blockLimits.start == null && envStart == null) {
@@ -586,12 +571,14 @@ async function fetchSessionCreatedBlock({
   const result = await rpcWithFallback({
     rpcUrls,
     method: 'eth_getLogs',
-    params: [{
-      address: registryAddress,
-      fromBlock: '0x0',
-      toBlock: 'latest',
-      topics: [SESSION_CREATED_TOPIC0],
-    }],
+    params: [
+      {
+        address: registryAddress,
+        fromBlock: '0x0',
+        toBlock: 'latest',
+        topics: [SESSION_CREATED_TOPIC0],
+      },
+    ],
     fetchImpl,
     timeoutMs,
   });
@@ -617,11 +604,7 @@ async function currentBlockNumber({ rpcUrls = [], fetchImpl = globalThis.fetch }
   return Number(BigInt(safeString(result.result || '0x0')));
 }
 
-function resolveScanWindow({
-  currentBlock = 0,
-  session = {},
-  env = {},
-} = {}) {
+function resolveScanWindow({ currentBlock = 0, session = {}, env = {} } = {}) {
   const fallbackBlocks = normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_SCAN_BLOCKS, DEFAULT_SCAN_BLOCKS);
   const explicitStart = normalizeBlock(session.blockLimits?.start);
   const explicitEnd = normalizeBlock(session.blockLimits?.end);
@@ -663,12 +646,14 @@ async function scanQuestionIds({
     const result = await rpcWithFallback({
       rpcUrls,
       method: 'eth_getLogs',
-      params: [{
-        address: surveysAddress,
-        fromBlock: `0x${from.toString(16)}`,
-        toBlock: `0x${to.toString(16)}`,
-        topics: [QUESTIONS_ADDED_TOPIC0],
-      }],
+      params: [
+        {
+          address: surveysAddress,
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+          topics: [QUESTIONS_ADDED_TOPIC0],
+        },
+      ],
       fetchImpl,
       timeoutMs: rpcTimeoutMs(env),
     });
@@ -696,16 +681,16 @@ function normalizeQuestionVisibility(payload = {}) {
   if (['private', 'sbt_gated', 'lit_encrypted'].includes(raw)) return raw;
   if (payload.private === true || payload.isPrivate === true) return 'private';
   if (payload.sbtGated === true || payload.gated === true) return 'sbt_gated';
-  const encryption = payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
-    ? payload.encryption
-    : null;
-  const hasEncryptedField = (
+  const encryption =
+    payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
+      ? payload.encryption
+      : null;
+  const hasEncryptedField =
     payload.litEncrypted === true ||
     payload.encrypted === true ||
     payload.promptEncrypted ||
     payload.optionsEncrypted ||
-    payload.tagsEncrypted
-  );
+    payload.tagsEncrypted;
   const encryptionGateCandidates = [
     ...(Array.isArray(encryption?.gates) ? encryption.gates : []),
     encryption?.gate,
@@ -714,8 +699,7 @@ function normalizeQuestionVisibility(payload = {}) {
       sbtAddresses: encryption?.sbtAddresses,
     },
   ].filter(Boolean);
-  const hasEncryptionGate = encryptionGateCandidates
-    .some((gate, index) => normalizeQuestionGate(gate, index));
+  const hasEncryptionGate = encryptionGateCandidates.some((gate, index) => normalizeQuestionGate(gate, index));
   if (hasEncryptedField || hasEncryptionGate) {
     return 'lit_encrypted';
   }
@@ -764,13 +748,12 @@ function normalizeQuestionGate(gate = {}, index = 0) {
 
 function normalizeQuestionEncryption(payload = {}, visibility = 'public') {
   const root = normalizeQuestionPayloadRoot(payload) || {};
-  const encryption = root.encryption && typeof root.encryption === 'object' && !Array.isArray(root.encryption)
-    ? root.encryption
-    : (
-        payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
-          ? payload.encryption
-          : {}
-      );
+  const encryption =
+    root.encryption && typeof root.encryption === 'object' && !Array.isArray(root.encryption)
+      ? root.encryption
+      : payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
+        ? payload.encryption
+        : {};
   const gateCandidates = [
     ...(Array.isArray(encryption.gates) ? encryption.gates : []),
     encryption.gate,
@@ -778,9 +761,7 @@ function normalizeQuestionEncryption(payload = {}, visibility = 'public') {
     root.gate,
     payload.gate,
   ].filter(Boolean);
-  const gates = gateCandidates
-    .map((gate, index) => normalizeQuestionGate(gate, index))
-    .filter(Boolean);
+  const gates = gateCandidates.map((gate, index) => normalizeQuestionGate(gate, index)).filter(Boolean);
   const sbtAddresses = normalizeSbtAddresses([
     ...gates.flatMap((gate) => gate.sbtAddresses || []),
     ...(Array.isArray(encryption.sbtAddresses) ? encryption.sbtAddresses : []),
@@ -788,7 +769,8 @@ function normalizeQuestionEncryption(payload = {}, visibility = 'public') {
     encryption.sbtAddress,
     root.sbtAddress,
   ]);
-  const encrypted = visibility === 'lit_encrypted' ||
+  const encrypted =
+    visibility === 'lit_encrypted' ||
     visibility === 'sbt_gated' ||
     root.encrypted === true ||
     payload.encrypted === true ||
@@ -805,9 +787,8 @@ function normalizeQuestionEncryption(payload = {}, visibility = 'public') {
 
 function normalizePayloadSessionSlug(payload = {}) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
-  const sessionObject = payload.session && typeof payload.session === 'object' && !Array.isArray(payload.session)
-    ? payload.session
-    : {};
+  const sessionObject =
+    payload.session && typeof payload.session === 'object' && !Array.isArray(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -817,7 +798,9 @@ function normalizePayloadSessionSlug(payload = {}) {
     payload.session,
   ]) {
     if (typeof candidate !== 'string' && typeof candidate !== 'number') continue;
-    const slug = lower(candidate).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
+    const slug = lower(candidate)
+      .replace(/[^a-z0-9_-]/g, '')
+      .slice(0, 128);
     if (slug) return slug;
   }
   return '';
@@ -841,9 +824,12 @@ function isSkippedQuestionPayload(value = {}) {
 function normalizeOptions(payload = {}) {
   const raw = payload.options || payload.answerOptions || payload.choices || payload.answers || [];
   if (!Array.isArray(raw)) return [];
-  return raw.map((entry) => safeString(typeof entry === 'object'
-    ? entry.label || entry.text || entry.value || entry.title || entry.name
-    : entry))
+  return raw
+    .map((entry) =>
+      safeString(
+        typeof entry === 'object' ? entry.label || entry.text || entry.value || entry.title || entry.name : entry,
+      ),
+    )
     .filter(Boolean)
     .slice(0, (payload.questionType || payload.type) === 'quadratic' ? Infinity : 20);
 }
@@ -855,57 +841,62 @@ function normalizeQuestionType(payload = {}) {
   if (['binary', 'boolean', 'yes_no', 'agree_disagree', 'agree_unsure_disagree'].includes(raw)) return 'binary';
   if (raw === 'quadratic') return 'quadratic';
   if (['rating', 'scale', 'linear_scale'].includes(raw)) return 'rating';
-  if ([
-    'multichoice',
-    'multi_choice',
-    'multiple_choice',
-    'multi_select',
-    'single_choice',
-    'single_select',
-  ].includes(raw)) return 'multichoice';
+  if (
+    ['multichoice', 'multi_choice', 'multiple_choice', 'multi_select', 'single_choice', 'single_select'].includes(raw)
+  )
+    return 'multichoice';
   return 'freeform';
 }
 
 function normalizeQuestionPayloadRoot(payload = {}) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  for (const candidate of [
-    payload,
-    payload.question,
-    payload.questionData,
-    payload.metadata,
-    payload.data,
-  ]) {
+  for (const candidate of [payload, payload.question, payload.questionData, payload.metadata, payload.data]) {
     if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
-      const hasQuestionShape = candidate.id || candidate.questionId || candidate.prompt || candidate.questionText || candidate.type || candidate.questionType;
+      const hasQuestionShape =
+        candidate.id ||
+        candidate.questionId ||
+        candidate.prompt ||
+        candidate.questionText ||
+        candidate.type ||
+        candidate.questionType;
       if (hasQuestionShape) return candidate;
     }
   }
   return payload;
 }
 
-function normalizeQuestionPayload(payload = {}, {
-  questionId = '',
-  pointerId = '',
-  pointerBackend = STORAGE_BACKENDS.ARWEAVE,
-  sessionSlug = '',
-  fallbackSessionSlug = '',
-} = {}) {
+function normalizeQuestionPayload(
+  payload = {},
+  {
+    questionId = '',
+    pointerId = '',
+    pointerBackend = STORAGE_BACKENDS.ARWEAVE,
+    sessionSlug = '',
+    fallbackSessionSlug = '',
+  } = {},
+) {
   const root = normalizeQuestionPayloadRoot(payload);
   if (!root || typeof root !== 'object' || Array.isArray(root)) return null;
-  const id = normalizeBytes32(root.questionId || root.id || payload.questionId || payload.id) || normalizeBytes32(questionId);
+  const id =
+    normalizeBytes32(root.questionId || root.id || payload.questionId || payload.id) || normalizeBytes32(questionId);
   if (!id) return null;
   const visibility = normalizeQuestionVisibility(root);
   const encryption = normalizeQuestionEncryption(payload, visibility);
-  const publicPrompt = visibility === 'public'
-    ? safeString(root.questionText || root.prompt || root.title || payload.questionText || payload.prompt || payload.title)
-    : '';
+  const publicPrompt =
+    visibility === 'public'
+      ? safeString(
+          root.questionText || root.prompt || root.title || payload.questionText || payload.prompt || payload.title,
+        )
+      : '';
   const type = normalizeQuestionType(root);
+  const scale = type === 'rating' ? normalizeRatingScale(root) : null;
   const normalized = {
     questionId: id,
     id,
     questionType: type,
     type,
     ...(type === 'quadratic' ? { voiceCredits: root.voiceCredits ?? 99 } : {}),
+    ...(scale ? { scale } : {}),
     prompt: publicPrompt,
     questionText: publicPrompt,
     title: publicPrompt || (visibility === 'public' ? 'Untitled question' : 'Locked question'),
@@ -927,7 +918,8 @@ function normalizeQuestionPayload(payload = {}, {
         }
       : {}),
     source: 'live_session_question',
-    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(fallbackSessionSlug),
+    sessionSlug:
+      normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(fallbackSessionSlug),
     ...(pointerBackend === STORAGE_BACKENDS.ARWEAVE ? { arweaveTxId: pointerId } : {}),
     storageRef: storageRefForPointer(pointerId, 'questions', pointerBackend),
   };
@@ -988,15 +980,16 @@ async function fetchQuestionPayload({
   if (!pointerBytes || pointerBytes === ZERO_BYTES32) return null;
   const pointerId = hexToBase64url(pointerBytes);
   if (!/^[a-zA-Z0-9_-]{43}$/.test(pointerId)) return null;
-  const payload = pointerBackend === STORAGE_BACKENDS.CLOUDFLARE
-    ? await fetchCloudflareStorageJson(pointerId, {
-      env,
-      session,
-      getAuth: getCloudflareAuth,
-      fetchImpl,
-      timeoutMs,
-    })
-    : await fetchArweaveJson(pointerId, { fetchImpl, timeoutMs });
+  const payload =
+    pointerBackend === STORAGE_BACKENDS.CLOUDFLARE
+      ? await fetchCloudflareStorageJson(pointerId, {
+          env,
+          session,
+          getAuth: getCloudflareAuth,
+          fetchImpl,
+          timeoutMs,
+        })
+      : await fetchArweaveJson(pointerId, { fetchImpl, timeoutMs });
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug });
   }
@@ -1005,20 +998,19 @@ async function fetchQuestionPayload({
   if (payloadSessionSlug && requestedSessionSlug && payloadSessionSlug !== requestedSessionSlug) {
     return skippedQuestionPayload('session_mismatch');
   }
-  const shouldStampUnscopedPayload = !payloadSessionSlug &&
-    requestedSessionSlug &&
-    allowUnscopedQuestionPayloads(env);
+  const shouldStampUnscopedPayload = !payloadSessionSlug && requestedSessionSlug && allowUnscopedQuestionPayloads(env);
   if (!payloadSessionSlug && requestedSessionSlug && !shouldStampUnscopedPayload) {
     return skippedQuestionPayload('session_slug_missing');
   }
-  return normalizeQuestionPayload(payload, {
-    questionId: id,
-    pointerId,
-    pointerBackend,
-    sessionSlug,
-    fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
-  }) ||
-    lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug });
+  return (
+    normalizeQuestionPayload(payload, {
+      questionId: id,
+      pointerId,
+      pointerBackend,
+      sessionSlug,
+      fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
+    }) || lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug })
+  );
 }
 
 function cacheTtlSeconds(env = {}) {
@@ -1040,8 +1032,10 @@ function normalizeOptionalPositiveInteger(value) {
 }
 
 function foregroundPayloadBatchSize(env = {}, questionLimit = 0) {
-  return normalizeOptionalPositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_PAYLOADS) ||
-    normalizeOptionalPositiveInteger(questionLimit);
+  return (
+    normalizeOptionalPositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_PAYLOADS) ||
+    normalizeOptionalPositiveInteger(questionLimit)
+  );
 }
 
 function cacheKey(sessionSlug = '') {
@@ -1051,8 +1045,7 @@ function cacheKey(sessionSlug = '') {
 function normalizeQuestionIndex(value = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (!Array.isArray(value.questions)) return null;
-  const questions = value.questions
-    .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry));
+  const questions = value.questions.filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry));
   const cachedAtMs = Number(value.cachedAtMs);
   return {
     ...value,
@@ -1096,8 +1089,9 @@ function questionRecordMatchesSession(question = {}, sessionSlug = '') {
 }
 
 function filterQuestionRecordsForSession(questions = [], sessionSlug = '') {
-  return (Array.isArray(questions) ? questions : [])
-    .filter((question) => questionRecordMatchesSession(question, sessionSlug));
+  return (Array.isArray(questions) ? questions : []).filter((question) =>
+    questionRecordMatchesSession(question, sessionSlug),
+  );
 }
 
 function isPayloadUnavailableQuestion(question = {}) {
@@ -1123,8 +1117,7 @@ function scopedCachedIndexForReturn(value = {}, cacheLayer = 'kv', sessionSlug =
 }
 
 function cacheNeedsImmediateScopeRefresh(index = {}) {
-  return Number(index?.questionCount || 0) === 0 &&
-    Number(index?.scopedOutQuestionCount || 0) > 0;
+  return Number(index?.questionCount || 0) === 0 && Number(index?.scopedOutQuestionCount || 0) > 0;
 }
 
 function scheduleIndexRefresh({
@@ -1136,13 +1129,15 @@ function scheduleIndexRefresh({
 } = {}) {
   if (typeof waitUntil !== 'function') return;
   if (!existingIndex || (existingIndex.complete === true && !hasPayloadUnavailableQuestions(existingIndex))) return;
-  waitUntil(refreshSessionQuestionIndex({
-    env,
-    sessionSlug,
-    existingIndex,
-    mode: 'complete',
-    fetchImpl,
-  }).catch(() => null));
+  waitUntil(
+    refreshSessionQuestionIndex({
+      env,
+      sessionSlug,
+      existingIndex,
+      mode: 'complete',
+      fetchImpl,
+    }).catch(() => null),
+  );
 }
 
 async function readKvQuestionIndex(env = {}, key = '') {
@@ -1168,9 +1163,7 @@ function questionIdFromRecord(question = {}) {
 function mergeQuestionRecords(existing = [], additions = [], placement = 'append') {
   const merged = [];
   const seen = new Set();
-  const ordered = placement === 'prepend'
-    ? [...additions, ...existing]
-    : [...existing, ...additions];
+  const ordered = placement === 'prepend' ? [...additions, ...existing] : [...existing, ...additions];
   for (const question of ordered) {
     const id = questionIdFromRecord(question);
     if (!id || seen.has(id)) continue;
@@ -1192,42 +1185,43 @@ async function fetchQuestionPayloads({
   env = {},
   fetchImpl = globalThis.fetch,
 } = {}) {
-  const ids = questionIds
-    .map((id) => normalizeBytes32(id))
-    .filter((id) => id && !seenQuestionIds.has(id));
+  const ids = questionIds.map((id) => normalizeBytes32(id)).filter((id) => id && !seenQuestionIds.has(id));
   const results = new Array(ids.length);
   let cursor = 0;
   let payloadFailureCount = 0;
   let skippedSessionMismatchCount = 0;
-  const workers = Array.from({
-    length: Math.min(ids.length, payloadConcurrency(env)),
-  }, async () => {
-    while (cursor < ids.length) {
-      const index = cursor;
-      cursor += 1;
-      const id = ids[index];
-      seenQuestionIds.add(id);
-      const question = await fetchQuestionPayload({
-        rpcUrls,
-        surveysAddress,
-        questionId: id,
-        session,
-        sessionSlug,
-        pointerBackend,
-        getCloudflareAuth,
-        env,
-        fetchImpl,
-        timeoutMs: questionPayloadTimeoutMs(env),
-      }).catch(() => null);
-      if (isSkippedQuestionPayload(question)) {
-        skippedSessionMismatchCount += 1;
-      } else if (question) {
-        results[index] = question;
-      } else {
-        payloadFailureCount += 1;
+  const workers = Array.from(
+    {
+      length: Math.min(ids.length, payloadConcurrency(env)),
+    },
+    async () => {
+      while (cursor < ids.length) {
+        const index = cursor;
+        cursor += 1;
+        const id = ids[index];
+        seenQuestionIds.add(id);
+        const question = await fetchQuestionPayload({
+          rpcUrls,
+          surveysAddress,
+          questionId: id,
+          session,
+          sessionSlug,
+          pointerBackend,
+          getCloudflareAuth,
+          env,
+          fetchImpl,
+          timeoutMs: questionPayloadTimeoutMs(env),
+        }).catch(() => null);
+        if (isSkippedQuestionPayload(question)) {
+          skippedSessionMismatchCount += 1;
+        } else if (question) {
+          results[index] = question;
+        } else {
+          payloadFailureCount += 1;
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(workers);
   return {
     attemptedCount: ids.length,
@@ -1278,21 +1272,22 @@ async function scanQuestionRange({
     };
   }
   const chunkSize = normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE, DEFAULT_LOG_CHUNK_SIZE);
-  const maxChunkCount = Number.isFinite(Number(maxChunks)) && Number(maxChunks) > 0
-    ? Math.floor(Number(maxChunks))
-    : Infinity;
+  const maxChunkCount =
+    Number.isFinite(Number(maxChunks)) && Number(maxChunks) > 0 ? Math.floor(Number(maxChunks)) : Infinity;
   for (let to = toBlock; to >= fromBlock && summary.chunksAttempted < maxChunkCount;) {
     const from = Math.max(fromBlock, to - chunkSize + 1);
     summary.chunksAttempted += 1;
     const result = await rpcWithFallback({
       rpcUrls,
       method: 'eth_getLogs',
-      params: [{
-        address: surveysAddress,
-        fromBlock: `0x${from.toString(16)}`,
-        toBlock: `0x${to.toString(16)}`,
-        topics: [QUESTIONS_ADDED_TOPIC0],
-      }],
+      params: [
+        {
+          address: surveysAddress,
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+          topics: [QUESTIONS_ADDED_TOPIC0],
+        },
+      ],
       fetchImpl,
       timeoutMs: rpcTimeoutMs(env),
     });
@@ -1316,11 +1311,12 @@ async function scanQuestionRange({
     const firstAvailableBatchSize = stopAfterFirstAvailable
       ? foregroundPayloadBatchSize(env, foregroundPayloadLimit)
       : 0;
-    const payloadBatches = firstAvailableBatchSize > 0
-      ? Array.from({ length: Math.ceil(chunkIds.length / firstAvailableBatchSize) }, (_, index) => (
-          chunkIds.slice(index * firstAvailableBatchSize, (index + 1) * firstAvailableBatchSize)
-        ))
-      : [chunkIds];
+    const payloadBatches =
+      firstAvailableBatchSize > 0
+        ? Array.from({ length: Math.ceil(chunkIds.length / firstAvailableBatchSize) }, (_, index) =>
+            chunkIds.slice(index * firstAvailableBatchSize, (index + 1) * firstAvailableBatchSize),
+          )
+        : [chunkIds];
     let stoppedWithinChunk = false;
     for (let batchIndex = 0; batchIndex < payloadBatches.length; batchIndex += 1) {
       const batchQuestionIds = payloadBatches[batchIndex];
@@ -1341,9 +1337,7 @@ async function scanQuestionRange({
       questions.push(...payloads.questions);
       if (stopAfterFirstAvailable && questions.length > 0) {
         stoppedWithinChunk = batchIndex < payloadBatches.length - 1;
-        nextScanToBlock = stoppedWithinChunk
-          ? to
-          : (from - 1 >= fromBlock ? from - 1 : null);
+        nextScanToBlock = stoppedWithinChunk ? to : from - 1 >= fromBlock ? from - 1 : null;
         break;
       }
     }
@@ -1372,10 +1366,7 @@ async function scanQuestionRange({
 
 function mergeScanSummaries(left = {}, right = {}) {
   return {
-    ids: [
-      ...(Array.isArray(left.ids) ? left.ids : []),
-      ...(Array.isArray(right.ids) ? right.ids : []),
-    ],
+    ids: [...(Array.isArray(left.ids) ? left.ids : []), ...(Array.isArray(right.ids) ? right.ids : [])],
     chunksAttempted: Number(left.chunksAttempted || 0) + Number(right.chunksAttempted || 0),
     chunksSucceeded: Number(left.chunksSucceeded || 0) + Number(right.chunksSucceeded || 0),
     chunksFailed: Number(left.chunksFailed || 0) + Number(right.chunksFailed || 0),
@@ -1395,7 +1386,8 @@ async function refreshSessionQuestionIndex({
   foregroundPayloadLimit = 0,
   fetchImpl = globalThis.fetch,
 } = {}) {
-  const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
+  const slug =
+    lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
   const key = cacheKey(slug);
   const previous = normalizeQuestionIndex(existingIndex);
   const rpcUrls = resolveRegistryRpcUrls(env);
@@ -1415,21 +1407,22 @@ async function refreshSessionQuestionIndex({
   }
   const pointerBackend = resolveQuestionStorageBackend(session, env);
   let cloudflareAuthPromise = null;
-  const getCloudflareAuth = pointerBackend === STORAGE_BACKENDS.CLOUDFLARE
-    ? () => {
-        if (!cloudflareAuthPromise) {
-          cloudflareAuthPromise = buildCloudflareQuestionStorageAuth({
-            env,
-            session: { ...session, sessionSlug: slug },
-            fetchImpl,
-          }).catch((error) => ({
-            ok: false,
-            reason: safeString(error?.message || error) || 'cloudflare_question_auth_failed',
-          }));
+  const getCloudflareAuth =
+    pointerBackend === STORAGE_BACKENDS.CLOUDFLARE
+      ? () => {
+          if (!cloudflareAuthPromise) {
+            cloudflareAuthPromise = buildCloudflareQuestionStorageAuth({
+              env,
+              session: { ...session, sessionSlug: slug },
+              fetchImpl,
+            }).catch((error) => ({
+              ok: false,
+              reason: safeString(error?.message || error) || 'cloudflare_question_auth_failed',
+            }));
+          }
+          return cloudflareAuthPromise;
         }
-        return cloudflareAuthPromise;
-      }
-    : null;
+      : null;
 
   let currentBlock = 0;
   try {
@@ -1459,9 +1452,7 @@ async function refreshSessionQuestionIndex({
 
   const previousQuestions = filterQuestionRecordsForSession(previous?.questions || [], slug);
   const retryUnavailableQuestions = previousQuestions.filter(isPayloadUnavailableQuestion);
-  const retryQuestionIds = retryUnavailableQuestions
-    .map(questionIdFromRecord)
-    .filter(Boolean);
+  const retryQuestionIds = retryUnavailableQuestions.map(questionIdFromRecord).filter(Boolean);
   let questions = previousQuestions.filter((question) => !isPayloadUnavailableQuestion(question));
   const seenQuestionIds = new Set(questions.map(questionIdFromRecord).filter(Boolean));
   let indexedFromBlock = previous?.indexedFromBlock;
@@ -1489,8 +1480,9 @@ async function refreshSessionQuestionIndex({
     payloadFailureCount += retryPayloads.payloadFailureCount;
     skippedSessionMismatchCount += Number(retryPayloads.skippedSessionMismatchCount || 0) || 0;
     const recoveredIds = new Set(retryPayloads.questions.map(questionIdFromRecord).filter(Boolean));
-    const stillUnavailable = retryUnavailableQuestions
-      .filter((question) => !recoveredIds.has(questionIdFromRecord(question)));
+    const stillUnavailable = retryUnavailableQuestions.filter(
+      (question) => !recoveredIds.has(questionIdFromRecord(question)),
+    );
     questions = mergeQuestionRecords(questions, [...retryPayloads.questions, ...stillUnavailable], 'append');
   }
 
@@ -1512,10 +1504,7 @@ async function refreshSessionQuestionIndex({
       label: 'initial',
     });
   } else if (complete !== true || indexedFromBlock > scanWindow.fromBlock) {
-    const historicalTo = Math.min(
-      normalizeBlock(nextScanToBlock) ?? indexedFromBlock - 1,
-      scanWindow.toBlock
-    );
+    const historicalTo = Math.min(normalizeBlock(nextScanToBlock) ?? indexedFromBlock - 1, scanWindow.toBlock);
     if (historicalTo >= scanWindow.fromBlock) {
       ranges.push({
         fromBlock: scanWindow.fromBlock,
@@ -1554,9 +1543,10 @@ async function refreshSessionQuestionIndex({
         indexedFromBlock = indexedFromBlock ?? rangeResult.lowestScannedBlock;
       } else {
         indexedToBlock = indexedToBlock ?? range.toBlock;
-        indexedFromBlock = indexedFromBlock == null
-          ? rangeResult.lowestScannedBlock
-          : Math.min(indexedFromBlock, rangeResult.lowestScannedBlock);
+        indexedFromBlock =
+          indexedFromBlock == null
+            ? rangeResult.lowestScannedBlock
+            : Math.min(indexedFromBlock, rangeResult.lowestScannedBlock);
       }
     }
     nextScanToBlock = rangeResult.nextScanToBlock;
@@ -1574,7 +1564,8 @@ async function refreshSessionQuestionIndex({
   if (!ranges.length) {
     complete = true;
   } else if (!partial) {
-    complete = indexedFromBlock != null &&
+    complete =
+      indexedFromBlock != null &&
       indexedFromBlock <= scanWindow.fromBlock &&
       (indexedToBlock ?? 0) >= scanWindow.toBlock &&
       aggregateScan.chunksFailed === 0 &&
@@ -1585,14 +1576,18 @@ async function refreshSessionQuestionIndex({
   const hadReadFailures = Number(aggregateScan.chunksFailed || 0) > 0 || payloadFailureCount > 0;
   const ok = questions.length > 0 || !hadReadFailures;
   const reason = questions.length
-    ? (complete ? 'live_questions_indexed' : 'live_questions_index_partial')
-    : (!complete && !hadReadFailures
-        ? 'live_questions_indexing'
-        : Number(aggregateScan.chunksAttempted || 0) > 0 && Number(aggregateScan.chunksSucceeded || 0) === 0
+    ? complete
+      ? 'live_questions_indexed'
+      : 'live_questions_index_partial'
+    : !complete && !hadReadFailures
+      ? 'live_questions_indexing'
+      : Number(aggregateScan.chunksAttempted || 0) > 0 && Number(aggregateScan.chunksSucceeded || 0) === 0
         ? 'question_log_scan_failed'
         : Number(aggregateScan.chunksFailed || 0) > 0
-        ? 'question_log_scan_partial_failed'
-        : (payloadFailureCount > 0 ? 'question_payload_load_failed' : 'live_questions_empty'));
+          ? 'question_log_scan_partial_failed'
+          : payloadFailureCount > 0
+            ? 'question_payload_load_failed'
+            : 'live_questions_empty';
   const result = {
     ok,
     reason,
@@ -1632,7 +1627,8 @@ export async function listCachedSessionQuestionsForBridge({
   forceRefresh = false,
   questionLimit = 0,
 } = {}) {
-  const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
+  const slug =
+    lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
   const ttlSeconds = cacheTtlSeconds(env);
   const key = cacheKey(slug);
   const memory = scopedCachedIndexForReturn(questionMemoryCache.get(key), 'memory', slug);
@@ -1653,7 +1649,12 @@ export async function listCachedSessionQuestionsForBridge({
   }
   const durableCached = scopedCachedIndexForReturn(kv || memory, kv ? 'kv' : 'memory', slug);
   const refreshBaseIndex = cacheNeedsImmediateScopeRefresh(durableCached) ? null : durableCached;
-  if (!forceRefresh && refreshBaseIndex && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(refreshBaseIndex)) {
+  if (
+    !forceRefresh &&
+    refreshBaseIndex &&
+    typeof waitUntil === 'function' &&
+    !hasPayloadUnavailableQuestions(refreshBaseIndex)
+  ) {
     scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: refreshBaseIndex, fetchImpl });
     return refreshBaseIndex;
   }
@@ -1672,13 +1673,15 @@ export async function listCachedSessionQuestionsForBridge({
     firstResult.complete !== true &&
     firstResult.nextScanToBlock != null
   ) {
-    waitUntil(refreshSessionQuestionIndex({
-      env,
-      sessionSlug: slug,
-      existingIndex: firstResult,
-      mode: 'complete',
-      fetchImpl,
-    }).catch(() => null));
+    waitUntil(
+      refreshSessionQuestionIndex({
+        env,
+        sessionSlug: slug,
+        existingIndex: firstResult,
+        mode: 'complete',
+        fetchImpl,
+      }).catch(() => null),
+    );
   }
   return firstResult;
 }

@@ -44345,7 +44345,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim12 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim13 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -75645,10 +75645,8 @@ init_interviewSettings();
 init_aiDefaults();
 init_responseKvHelpers();
 
-// shared/interviewQuestionCatalog.mjs
-var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
+// shared/questions/ratingScale.mjs
 var trim8 = (value) => String(value == null ? "" : value).trim();
-var lower4 = (value) => trim8(value).toLowerCase();
 var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var RATING_SCALE_METADATA_KEYS2 = [
   "min",
@@ -75701,6 +75699,12 @@ var normalizeRatingScale2 = (question = {}) => {
     )
   };
 };
+
+// shared/interviewQuestionCatalog.mjs
+var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
+var trim9 = (value) => String(value == null ? "" : value).trim();
+var lower4 = (value) => trim9(value).toLowerCase();
+var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower4(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -75708,16 +75712,16 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj15(value) ? value : {};
+  const question = isObj16(value) ? value : {};
   const id2 = lower4(question.id || question.questionId);
-  const prompt = trim8(question.prompt || question.question || question.title);
+  const prompt = trim9(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
     prompt
   ))
     return null;
   const type = lower4(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj15(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim9(isObj16(entry) ? entry.label || entry.value : entry)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale2(question) : null;
   return {
     id: id2,
@@ -75746,9 +75750,9 @@ var ZERO_BYTES32 = `0x${"00".repeat(32)}`;
 var MAX_QUESTIONS = 100;
 var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
-var trim9 = (value) => String(value == null ? "" : value).trim();
-var lower5 = (value) => trim9(value).toLowerCase();
-var isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim10 = (value) => String(value == null ? "" : value).trim();
+var lower5 = (value) => trim10(value).toLowerCase();
+var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var readJsonResponse = async (response3) => {
   if (!response3 || Number(response3.status || 0) < 200 || Number(response3.status || 0) >= 300) return null;
@@ -75779,7 +75783,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const items = Array.isArray(listing?.items) ? listing.items.slice(0, MAX_QUESTIONS) : [];
   const questions = [];
   for (const item of items) {
-    const id2 = trim9(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    const id2 = trim10(item?.storageRef?.id || item?.metadata?.id || item?.id);
     if (!id2) continue;
     const readResponse = await storageRoute2({
       path: "/storage/read",
@@ -75797,22 +75801,22 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return dedupeQuestions(questions);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj16(config.contracts) ? config.contracts : {};
-  const surveys = isObj16(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
-  return trim9(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+  const contracts = isObj17(config.contracts) ? config.contracts : {};
+  const surveys = isObj17(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  return trim10(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
-  const chainId = trim9(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj16(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj16(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj16(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj16(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj16(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const chainId = trim10(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const rpcConfig = isObj17(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj17(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj17(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj17(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj17(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
     ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
     ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
   ];
-  return [...new Set(source.map(trim9).filter((value) => /^https:\/\//i.test(value)))];
+  return [...new Set(source.map(trim10).filter((value) => /^https:\/\//i.test(value)))];
 };
 var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
@@ -75832,9 +75836,9 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   }
   throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
 };
-var wordAt = (hex, index) => trim9(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var wordAt = (hex, index) => trim10(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
 var decodeQuestionIds = (data = "") => {
-  const clean = trim9(data).replace(/^0x/, "");
+  const clean = trim10(data).replace(/^0x/, "");
   if (clean.length < 128) return [];
   const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || "0"}`));
   const lengthWordIndex = offsetBytes / 32;
@@ -75847,7 +75851,7 @@ var decodeQuestionIds = (data = "") => {
   return ids;
 };
 var base64urlFromHex = (hex = "") => {
-  const clean = trim9(hex).replace(/^0x/, "");
+  const clean = trim10(hex).replace(/^0x/, "");
   if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
   const bytes2 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
   let binary = "";
@@ -75857,7 +75861,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj16(payload.session) ? payload.session : {};
+  const session = isObj17(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -75879,7 +75883,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response3 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response3.ok) continue;
       const payload = await response3.json();
-      if (isObj16(payload)) return payload;
+      if (isObj17(payload)) return payload;
     } catch {
     }
   }
@@ -76127,8 +76131,8 @@ init_sessionLifecycle();
 init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
-var trim10 = (value) => String(value == null ? "" : value).trim();
-var isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim11 = (value) => String(value == null ? "" : value).trim();
+var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
   const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
   const body = [
@@ -76156,9 +76160,9 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj17(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj18(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
-  const instructions = trim10(body.instructions);
+  const instructions = trim11(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
   if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
   if (!instructions || instructions.length > 32e3) {
@@ -76167,8 +76171,8 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj17(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
-  const provider = trim10(interview.provider || "openai").toLowerCase();
+  const interview = isObj18(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const provider = trim11(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
 };
@@ -76185,7 +76189,7 @@ var proxyOpenAiRealtimeCall = async ({
   if (realtime.provider !== "openai") {
     return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
   }
-  const key = trim10(secrets?.openaiKey);
+  const key = trim11(secrets?.openaiKey);
   if (!key) {
     return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
@@ -76991,7 +76995,7 @@ var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
 var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
@@ -77130,7 +77134,7 @@ var parseJsonIfPossible = (value) => {
 };
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj18(body)) {
+  if (isObj19(body)) {
     const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
@@ -77174,7 +77178,7 @@ var fetchChipotleJson = async ({
   if (!response3.ok) {
     throw new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed"));
   }
-  if (isObj18(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj19(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -77185,8 +77189,8 @@ var resolveLitChipotleRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj18(body) ? body : {};
+  const litCredentials = isObj19(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj19(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -77217,8 +77221,8 @@ var resolveLitChipotleProvisioningRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj18(body) ? body : {};
+  const litCredentials = isObj19(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj19(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -77453,7 +77457,7 @@ var resolveConfigMappedChipotleRpcUrls = ({
 } = {}) => {
   const normalizedChainId = toChainId(chainId);
   if (!normalizedChainId) return [];
-  const map = isObj18(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+  const map = isObj19(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
   const mapped = normalizeChipotleRpcCandidateList(
     map[normalizedChainId] || map[String(normalizedChainId)] || []
   );
@@ -77476,7 +77480,7 @@ var resolveSessionChipotleRpcUrl = ({
   chainId = 0,
   op = ""
 } = {}) => {
-  const requestBody = isObj18(request) ? request : {};
+  const requestBody = isObj19(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
   const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
@@ -77517,7 +77521,7 @@ var buildSessionBootstrapMetadata = ({
   request = {},
   sessionSlug = ""
 } = {}) => {
-  const requestBody = isObj18(request) ? request : {};
+  const requestBody = isObj19(request) ? request : {};
   const slugSegment = normalizeSessionScopedNameSegment(
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
@@ -77544,7 +77548,7 @@ var createLitChipotleAccount = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj18(request) ? request : {};
+  const requestBody = isObj19(request) ? request : {};
   const response3 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
@@ -77775,7 +77779,7 @@ var provisionLitChipotleAction = async ({
   if (!toTrimmedString15(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const actionRequest = isObj18(request) ? request : {};
+  const actionRequest = isObj19(request) ? request : {};
   const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
@@ -77823,9 +77827,9 @@ var bootstrapLitChipotleSession = async ({
   sessionSlug = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
+  const litCredentials = isObj19(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestBody = isObj18(request) ? request : {};
+  const requestBody = isObj19(request) ? request : {};
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
@@ -78103,7 +78107,7 @@ var executeLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleApiKey(runtime);
-  const actionRequest = isObj18(request) ? request : {};
+  const actionRequest = isObj19(request) ? request : {};
   const code = toTrimmedString15(actionRequest.code);
   const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -78153,8 +78157,8 @@ var executeSessionLitChipotleAction = async ({
   requesterAddress = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj18(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj18(request) ? request : {};
+  const litCredentials = isObj19(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj19(request) ? request : {};
   const runtime = resolveLitChipotleRuntime({
     env,
     config,
@@ -80142,26 +80146,26 @@ var dispatchSessionConfigBootstrapRequest = async ({
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v5";
-var trim11 = (value) => String(value == null ? "" : value).trim();
-var isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim12 = (value) => String(value == null ? "" : value).trim();
+var isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj19(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj20(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
   try {
-    return new URL(trim11(entry)).origin;
+    return new URL(trim12(entry)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
 var normalizeRecruitmentSource = (value) => {
-  const normalized = trim11(value).replace(/\s+/g, "-").slice(0, 128);
+  const normalized = trim12(value).replace(/\s+/g, "-").slice(0, 128);
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
 };
 var normalizeJoinGroup = (value) => {
-  const normalized = trim11(value).toLowerCase();
+  const normalized = trim12(value).toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
 };
 var copySafeReturnParams = (sourceUrl, targetUrl) => {
@@ -80172,7 +80176,7 @@ var copySafeReturnParams = (sourceUrl, targetUrl) => {
 };
 var safeServedWorkerOrigin = (value) => {
   try {
-    const url = new URL(trim11(value));
+    const url = new URL(trim12(value));
     if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
       return url.origin;
     }
@@ -80182,10 +80186,10 @@ var safeServedWorkerOrigin = (value) => {
 };
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim11(value));
+    const url = new URL(trim12(value));
     if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim11(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim12(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -80203,7 +80207,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim11(left?.id).localeCompare(trim11(right?.id)) || trim11(left?.prompt).localeCompare(trim11(right?.prompt)) || trim11(left?.type).localeCompare(trim11(right?.type))
+  (left, right) => trim12(left?.id).localeCompare(trim12(right?.id)) || trim12(left?.prompt).localeCompare(trim12(right?.prompt)) || trim12(left?.type).localeCompare(trim12(right?.type))
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
