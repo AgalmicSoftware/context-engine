@@ -39,6 +39,7 @@ export type WorkerSessionGroupsPanelProps = {
   showEmptyState?: boolean;
   showLoadingState?: boolean;
   membershipsOnly?: boolean;
+  authenticateOnRender?: boolean;
   toggleLoginModal?: (open: boolean) => void;
 };
 
@@ -68,6 +69,7 @@ const WorkerSessionGroupsPanel = ({
   sessionName,
   showCreate,
   createOnly = false,
+  authenticateOnRender = true,
   refreshNonce = 0,
   selectedGroupId = '',
   groupIdFilter = '',
@@ -121,9 +123,10 @@ const WorkerSessionGroupsPanel = ({
   // Public discovery is anonymous only for signed-out visitors. Once an
   // account is available, authenticate so every route projects that account's
   // durable Worker memberships instead of reverting joined cards to "Join".
-  const shouldAuthenticateOnRender = !allowAnonymousGroupDiscovery || !!normalizedAccount;
+  const shouldAuthenticateOnRender = authenticateOnRender && (!allowAnonymousGroupDiscovery || !!normalizedAccount);
   const canRenderMemberships =
     !!workerToken ||
+    (!authenticateOnRender && !membershipsOnly && allowAnonymousGroupDiscovery) ||
     (!normalizedAccount && !membershipsOnly && allowAnonymousGroupDiscovery) ||
     (!!normalizedAccount && authStatus === 'error' && !membershipsOnly && allowAnonymousGroupDiscovery);
 
@@ -357,6 +360,22 @@ const WorkerSessionGroupsPanel = ({
       </WorkerGroupCreateMessage>
     );
   };
+
+  if (!authenticateOnRender && !workerToken && !allowAnonymousGroupDiscovery) {
+    return (
+      <div className={styles.workerGroupNotice}>
+        <span>{authError || 'Join to sign in and view this linked group.'}</span>
+        <button
+          type="button"
+          className={styles.telegramPrimaryButton}
+          disabled={authStatus === 'loading'}
+          onClick={requestActionAuthentication}
+        >
+          {authStatus === 'loading' ? 'Signing in…' : 'Join'}
+        </button>
+      </div>
+    );
+  }
 
   if (!normalizedAccount && !allowAnonymousGroupDiscovery) {
     if (createOnly) return <div data-testid="ce-session-worker-groups-native">{renderCreatePanel()}</div>;

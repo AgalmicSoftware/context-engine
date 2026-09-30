@@ -50,6 +50,7 @@ export default function LinkedWorkerGroup({ reference, ...props }: Props) {
       sessionConfig={state.config}
       sessionSlug={sessionSlug}
       groupIdFilter={groupId}
+      authenticateOnRender={false}
       inlineDetails
       showCreate={false}
       showGroupDescriptions={false}
