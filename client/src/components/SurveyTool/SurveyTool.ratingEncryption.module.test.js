@@ -68,7 +68,6 @@ const renderResponseInput = ({
   answerValue,
   question = {},
   singleQuestionMode = false,
-  onRatingChange = jest.fn(),
   onDeferredRatingCommit = jest.fn(),
 } = {}) =>
   SurveyQuestionsFullQuestionResponseInput({
@@ -81,8 +80,6 @@ const renderResponseInput = ({
     qIndex: 0,
     answer: { value: answerValue, encrypted: false },
     singleQuestionMode,
-    onRatingChange,
-    onRatingChangeComplete: jest.fn(),
     onDeferredRatingCommit,
   });
 

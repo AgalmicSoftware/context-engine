@@ -47,7 +47,6 @@ import BinaryChoiceInput from './BinaryChoiceInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import FullQuestionHeader from './FullQuestionHeader';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
 import GatedPromptNotice from './GatedPromptNotice';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import QuestionDecryptControl from './QuestionDecryptControl';

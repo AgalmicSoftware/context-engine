@@ -237,14 +237,12 @@ describe('SurveyQuestions render helpers', () => {
         singleQuestionMode
         audioInputWorkerProps={{ workerReady: true }}
         onAnswerChange={(value) => handleAnswer(5, question.id, value)}
-        onRatingChange={(value, event) => handleAnswer(5, question.id, value, { persistDraft: true, event })}
         onDeferredRatingCommit={(value) =>
           handleAnswer(5, question.id, value, {
             persistDraft: false,
             afterUpdate: sliderFlush,
           })
         }
-        onRatingChangeComplete={sliderFlush}
         onToggleAnswerEncryption={(encrypted) => toggleAnswerEncryption(5, question.id, encrypted)}
       />
     );
@@ -260,21 +258,14 @@ describe('SurveyQuestions render helpers', () => {
     });
 
     input.props.onAnswerChange('next answer');
-    input.props.onRatingChange(8, { type: 'keydown' });
     input.props.onDeferredRatingCommit(6);
-    input.props.onRatingChangeComplete();
     input.props.onToggleAnswerEncryption(true);
 
     expect(handleAnswer).toHaveBeenNthCalledWith(1, 5, 'q-response', 'next answer');
-    expect(handleAnswer).toHaveBeenNthCalledWith(2, 5, 'q-response', 8, {
-      persistDraft: true,
-      event: { type: 'keydown' },
-    });
-    expect(handleAnswer).toHaveBeenNthCalledWith(3, 5, 'q-response', 6, {
+    expect(handleAnswer).toHaveBeenNthCalledWith(2, 5, 'q-response', 6, {
       persistDraft: false,
       afterUpdate: sliderFlush,
     });
-    expect(sliderFlush).toHaveBeenCalledTimes(1);
     expect(toggleAnswerEncryption).toHaveBeenCalledWith(5, 'q-response', true);
   });
 

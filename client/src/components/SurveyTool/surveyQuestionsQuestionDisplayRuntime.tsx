@@ -132,9 +132,6 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
           persistDraft: false,
           afterUpdate: flushDraftPersistAfterSliderChange,
         }),
-      onRatingChange: (ratingAnswer: SurveyQuestionsLegacyValue, event: SurveyQuestionsLegacyValue) =>
-        handleAnswer(surveyIndex, questionId, ratingAnswer, buildSliderPersistOptions(event)),
-      onRatingChangeComplete: flushDraftPersistAfterSliderChange,
       onToggleAnswerEncryption: (newEncryptedState: SurveyQuestionsLegacyValue) =>
         toggleAnswerEncryption(surveyIndex, questionId, newEncryptedState),
     };
@@ -221,8 +218,6 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
         audioInputWorkerProps={getCachedAudioInputWorkerProps()}
         onAnswerChange={handlers.onAnswerChange}
         onDeferredRatingCommit={handlers.onDeferredRatingCommit}
-        onRatingChange={handlers.onRatingChange}
-        onRatingChangeComplete={handlers.onRatingChangeComplete}
         onToggleAnswerEncryption={handlers.onToggleAnswerEncryption}
       />
     );
