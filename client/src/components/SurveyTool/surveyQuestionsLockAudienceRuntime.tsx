@@ -106,7 +106,7 @@ export const createSurveyQuestionsLockAudienceRuntime = (
       questionId: qid,
       fieldKey: resolvedFieldKey,
       fieldState,
-      lockDisabled: lockDisabled || !fieldPolicy.enabled,
+      lockDisabled: lockDisabled || (!fieldPolicy.enabled && !fieldState?.encrypted),
       lockTitle,
       glowAnswer,
       forceAudienceMenu: forceAudienceMenu || fieldPolicy.admin,

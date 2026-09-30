@@ -1276,7 +1276,8 @@ const encryptField = async ({
   litOpts?: LitOptions;
   hasher?: PoseidonHasher | null;
 }) => {
-  if (workerContext?.sessionConfig) assertResponseFieldAudience(workerContext.sessionConfig, audience);
+  if (audience !== 'self' && workerContext?.sessionConfig)
+    assertResponseFieldAudience(workerContext.sessionConfig, audience);
   if (['self_admin', 'session'].includes(audience) && !workerContext?.sessionConfig) {
     throw new Error('Verified session context is required for Worker encryption.');
   }

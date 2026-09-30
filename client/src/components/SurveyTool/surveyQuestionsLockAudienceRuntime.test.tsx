@@ -114,5 +114,5 @@ it('hides new pile locks when encryption is explicitly disabled, while preservin
     answer: { encrypted: true },
     visualContext: 'pile',
   });
-  expect(locked.props.isLockDisabled).toBe(true);
+  expect(locked.props.isLockDisabled).toBe(false);
 });

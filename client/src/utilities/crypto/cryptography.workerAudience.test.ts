@@ -206,3 +206,48 @@ it.each(['admin', 'owner'])('only the %s field reader uses their applicable key 
   expect(calls.filter((method) => method === 'eth_signTypedData_v4')).toHaveLength(reader === 'owner' ? 1 : 0);
   expect(unwrapWorkerResponseFieldKey).toHaveBeenCalledTimes(reader === 'owner' ? 0 : 1);
 });
+
+it.each(['answer', 'rating'])('encrypts an edited Only me %s while session encryption is disabled', async (field) => {
+  const disabledConfig = {
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+      encryption: { mode: 'none' },
+      storage: { backend: 'cloudflare' },
+    },
+    storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+  };
+  const options = {
+    sessionSlug: 'example',
+    sessionConfig: disabledConfig,
+    provider: signer(owner),
+    account: owner.address,
+    surveyId: `0x${'ab'.repeat(32)}`,
+    questionPool: [{ id: 'q1', type: 'freeform' }],
+  };
+  const envelope =
+    field === 'rating'
+      ? await cryptoUtils.encryptEnvelopeValue(7, {
+          ...options,
+          kind: 'rating',
+          encryptionAudience: 'self',
+          qId: 'importance:q1',
+        })
+      : (
+          await cryptoUtils.encryptMultipleAnswers(
+            { answers: { q1: { value: 'edited answer', encrypted: true, encryptionAudience: 'self' } } },
+            options,
+          )
+        ).answers.q1.encryptedPortion;
+  expect(JSON.parse(envelope as string).recipients.map((recipient: { type: string }) => recipient.type)).toEqual([
+    'self-eip712-v1',
+  ]);
+  await expect(
+    cryptoUtils.decryptEnvelopeValue(envelope as string, {
+      sessionSlug: 'example',
+      sessionConfig: disabledConfig,
+      providerLike: signer(owner),
+      account: owner.address,
+    }),
+  ).resolves.toBe(field === 'rating' ? 7 : 'edited answer');
+  expect(wrapWorkerResponseFieldKey).not.toHaveBeenCalled();
+});

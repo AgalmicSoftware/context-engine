@@ -125,11 +125,11 @@ it('Only me excludes both admin and Lit recipients even when Lit hooks are avail
   ).resolves.toBe('submitter-only secret');
 });
 
-it('rejects new encryption before wallet signing when the session disables it', async () => {
+it('rejects Worker encryption before wallet signing when the session disables it', async () => {
   const signer = provider();
   await expect(
     cryptoUtils.encryptMultipleAnswers(
-      { answers: { q1: { encrypted: true, encryptionAudience: 'self', value: 'secret' } } },
+      { answers: { q1: { encrypted: true, encryptionAudience: 'self_admin', value: 'secret' } } },
       {
         provider: signer,
         account: wallet.address,
