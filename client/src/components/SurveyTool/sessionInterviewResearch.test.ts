@@ -57,7 +57,7 @@ describe('selected interview research', () => {
       originalPrediction: { answer: { redacted: true }, additionalComments: { redacted: true }, evidence: '' },
       predictionRevisions: [{ answer: { redacted: true }, additionalComments: { redacted: true }, evidence: '' }],
       finalSubmitted: { answer: { redacted: true }, additionalComments: { redacted: true } },
-      redactedFields: ['answer', 'additionalComments'],
+      redactedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
     });
     expect(JSON.stringify(result)).not.toMatch(/Private|Sensitive|Revision private|Revision evidence/);
   });
@@ -115,7 +115,7 @@ describe('unselected interview research', () => {
       original: { answer: { redacted: true }, additionalComments: { redacted: true }, evidence: '' },
       reviewed: { answer: { redacted: true }, additionalComments: { redacted: true } },
       submitted: { answer: { redacted: true } },
-      redactedFields: ['answer', 'additionalComments'],
+      redactedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
     });
     expect(JSON.stringify(result)).not.toMatch(
       /Revised prediction|Original prediction|Edited but rejected|Final private answer|Original note|Edited note|Basis/,

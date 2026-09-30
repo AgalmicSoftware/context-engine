@@ -63,9 +63,12 @@ describe('surveyToolResponsePayloadController', () => {
       ).responses![0];
       const finalRatings = { importance: ratings.expectedImportance, conviction: ratings.expectedConviction };
       expect(response).toMatchObject(finalRatings);
+      const researchRatings = encrypted
+        ? { importance: { redacted: true }, conviction: { redacted: true } }
+        : finalRatings;
       expect(response.interviewProvenance).toMatchObject({
-        finalSubmitted: finalRatings,
-        predictionComparison: { submitted: finalRatings },
+        finalSubmitted: researchRatings,
+        predictionComparison: { submitted: researchRatings },
       });
       if (encrypted) {
         expect(response.interviewProvenance).toMatchObject({
@@ -328,12 +331,12 @@ describe('surveyToolResponsePayloadController', () => {
         submitted: expect.objectContaining({
           answer: { redacted: true, reason: 'encrypted_field' },
           additionalComments: { redacted: true, reason: 'encrypted_field' },
-          importance: 80,
-          conviction: 70,
+          importance: { redacted: true, reason: 'encrypted_field' },
+          conviction: { redacted: true, reason: 'encrypted_field' },
         }),
         changedFields: ['answer', 'additionalComments', 'importance'],
         userEditedFields: [],
-        redactedFields: ['answer', 'additionalComments'],
+        redactedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
       }),
     );
     expect(JSON.stringify(provenance)).not.toContain('private');
