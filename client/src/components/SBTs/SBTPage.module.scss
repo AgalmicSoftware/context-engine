@@ -1069,6 +1069,44 @@ $input-border: var(--ce-input-border);
   margin-top: 10px;
 }
 
+.relevantInfo.compactRelevantInfo {
+  margin: 0;
+  padding: 0;
+  flex: 1 1 160px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  display: grid;
+  gap: 12px;
+
+  .docUrlsSection,
+  .docIDsSection,
+  .tagsSection {
+    margin-top: 0;
+    min-width: 0;
+  }
+
+  .tagsSection,
+  .tagList {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tagList {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .tagItem {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}
+
 .docUrlList,
 .docIdList {
   display: grid;

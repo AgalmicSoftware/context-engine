@@ -32,8 +32,12 @@ export type WorkerSessionGroupsPanelProps = {
   createOnly?: boolean;
   refreshNonce?: number;
   selectedGroupId?: string;
+  groupIdFilter?: string;
+  inlineDetails?: boolean;
   showGroupDescriptions?: boolean;
   showMembershipListHeader?: boolean;
+  showEmptyState?: boolean;
+  showLoadingState?: boolean;
   membershipsOnly?: boolean;
   toggleLoginModal?: (open: boolean) => void;
 };
@@ -66,8 +70,12 @@ const WorkerSessionGroupsPanel = ({
   createOnly = false,
   refreshNonce = 0,
   selectedGroupId = '',
+  groupIdFilter = '',
+  inlineDetails = false,
   showGroupDescriptions = true,
   showMembershipListHeader = true,
+  showEmptyState = true,
+  showLoadingState = true,
   membershipsOnly = false,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
@@ -406,8 +414,12 @@ const WorkerSessionGroupsPanel = ({
           sessionSlug={canonicalSessionSlug}
           refreshNonce={groupsRevision + refreshNonce}
           selectedGroupId={selectedGroupId}
+          groupIdFilter={groupIdFilter}
+          inlineDetails={inlineDetails}
           showDescriptions={showGroupDescriptions}
           showListHeader={showMembershipListHeader}
+          showEmptyState={showEmptyState}
+          showLoadingState={showLoadingState}
           membershipsOnly={membershipsOnly}
           participantAddress={normalizedAccount}
           onSignIn={requestActionAuthentication}

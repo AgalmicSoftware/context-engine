@@ -543,6 +543,58 @@
   min-width: 0;
 }
 
+.workerGroupDetailPage {
+  padding: 12px;
+
+  .workerGroupDetailCard {
+    flex-direction: column;
+
+    .workerGroupDetailIdentity {
+      display: grid;
+      grid-template-columns: clamp(80px, 18vw, 140px) minmax(0, 1fr);
+      align-items: center;
+      gap: 12px 16px;
+      width: 100%;
+      padding: 16px;
+      border-right: 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--ce-control-text) 16%, transparent);
+
+      .workerGroupDetailToolbar {
+        grid-column: 1 / -1;
+        padding: 0;
+        border-bottom: 0;
+      }
+
+      .workerGroupDetailImage {
+        padding: 0;
+      }
+
+      .workerGroupDetailDescription {
+        min-width: 0;
+        padding: 0;
+        text-align: left;
+
+        h1 {
+          margin: 0 0 8px;
+          font-size: clamp(1.15rem, 3vw, 1.6rem);
+        }
+
+        p {
+          margin: 0;
+          font-size: 0.95rem;
+          line-height: 1.45;
+        }
+      }
+    }
+
+    .workerGroupDetailContent {
+      width: 100%;
+      padding: 16px;
+      gap: 12px;
+    }
+  }
+}
+
 .workerGroupDetailDescription {
   font-family: var(--ce-font-body);
 
@@ -592,12 +644,43 @@
   }
 }
 
+.workerGroupDetailActionsSection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 12px;
+}
+
+.workerGroupDetailPage .workerGroupDetailCard .workerGroupDetailContent .workerGroupDetailActionsHeading {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
 .workerGroupDetailActions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+
   .workerGroupCardPrimaryButton,
   .workerGroupCardLeaveButton,
   .workerGroupCardMemberStatus,
   .workerGroupCardInactiveStatus {
-    max-width: 280px;
+    width: auto;
+    min-width: 88px;
+    max-width: 100%;
+  }
+
+  .telegramSecondaryButton {
+    min-height: 40px;
+    margin: 0;
+    font-size: 0.9rem;
   }
 }
 
@@ -605,6 +688,54 @@
   overflow-wrap: anywhere;
   font-family: var(--ce-font-mono);
   text-transform: none !important;
+  color: var(--ce-action-accent);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-action-accent);
+    text-decoration: underline;
+  }
+}
+
+.workerGroupDetailMoreSection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 12px 20px;
+}
+
+.workerGroupDetailPage .workerGroupDetailCard .workerGroupDetailMoreHeader {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+
+  .workerGroupDetailStaticHeader {
+    width: auto;
+    padding: 0;
+  }
+}
+
+.workerGroupDetailInfoButton {
+  appearance: none;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  padding: 6px;
+  background: transparent;
+  color: var(--ce-control-text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ce-action-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
 }
 
 .workerGroupDetailNotFound {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import WorkerSessionGroupsPanel, { type WorkerSessionGroupsPanelProps } from './WorkerSessionGroupsPanel';
+import styles from './OnePageSession.module.scss';
 
 export type LinkedWorkerGroupReference = {
   sessionSlug: string;
@@ -35,14 +36,21 @@ export default function LinkedWorkerGroup({ reference, ...props }: Props) {
       });
     return () => abort.abort();
   }, [sessionSlug, sessionId, workerUrl, target, props.refreshNonce]);
-  if (state?.target !== target) return <p role="status">Loading community group…</p>;
+  if (state?.target !== target) {
+    return (
+      <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`} role="status">
+        Loading groups…
+      </div>
+    );
+  }
   if (!state.config) return <p role="alert">{state.error}</p>;
   return (
     <WorkerSessionGroupsPanel
       {...props}
       sessionConfig={state.config}
       sessionSlug={sessionSlug}
-      selectedGroupId={groupId}
+      groupIdFilter={groupId}
+      inlineDetails
       showCreate={false}
       showGroupDescriptions={false}
       showMembershipListHeader={false}

@@ -259,6 +259,9 @@ const OnePageSessionGroupsSection = ({
                 refreshNonce={workerGroupsRefreshNonce}
                 showGroupDescriptions={false}
                 showMembershipListHeader={false}
+                showEmptyState={groupReferences.length === 0}
+                showLoadingState={groupReferences.length === 0}
+                inlineDetails
                 toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
               />
               {usesConfiguredOnChainGates ? (

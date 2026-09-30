@@ -879,7 +879,19 @@ public, unencrypted storage; this change does not alter that profile contract.
 `linkedWorkerGroups` is an array of `{ sessionSlug, sessionId, workerUrl, groupId }`
 references to existing Worker-native groups. The Groups section bootstraps the
 owning HTTPS Worker, validates its slug and pinned session ID, and displays the
-original group's logo and membership controls. Authentication and explicit joins
+original group's logo and membership controls in a compact card. Only the
+referenced group appears, including when the participant belongs to other groups
+in the owning session. In OnePageSession, opening a card expands its details
+inside the Groups section without changing the URL or opening a tab. Back to
+Groups restores the compact card and keyboard focus. Standalone group links
+still open the dedicated detail page. The local collection's duplicate loading
+and empty notices are omitted when linked groups are configured; loading errors remain
+visible. Linked-session verification and group discovery use the same readable
+“Loading groups…” notice. Full group details use a compact logo/header and place the membership
+and copy-link actions in one row, wrapping on narrow screens. Admin addresses
+are abbreviated profile links. Detail section headings share the same type size.
+The MORE heading, frameless help icon, and tags share a row that wraps when needed.
+Authentication and explicit joins
 use the owning session; opening the page does not join the group. A reference
 never creates a duplicate group or copies membership into the referring session.
 Unavailable or mismatched sessions fail closed with a visible error.

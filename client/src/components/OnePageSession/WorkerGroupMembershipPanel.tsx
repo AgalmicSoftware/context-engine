@@ -1,7 +1,7 @@
 import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faLink, faSpinner, faSyncAlt, faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faLink, faQuestionCircle, faSpinner, faSyncAlt, faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
@@ -22,6 +22,7 @@ import {
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
+import CETooltip from '../Shared/CETooltip';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
@@ -52,8 +53,12 @@ export type WorkerGroupMembershipPanelProps = {
   onSignIn?: () => void;
   onGroupsChanged?: () => void;
   selectedGroupId?: string;
+  groupIdFilter?: string;
+  inlineDetails?: boolean;
   showDescriptions?: boolean;
   showListHeader?: boolean;
+  showEmptyState?: boolean;
+  showLoadingState?: boolean;
   membershipsOnly?: boolean;
 };
 
@@ -233,6 +238,30 @@ const WorkerGroupMembersModal = ({
   );
 };
 
+const WorkerGroupBackControl = ({
+  onBack,
+  sessionSlug,
+  workerUrl,
+}: {
+  onBack?: () => void;
+  sessionSlug: string;
+  workerUrl: string;
+}) => {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (onBack) buttonRef.current?.focus();
+  }, [onBack]);
+  return onBack ? (
+    <button ref={buttonRef} type="button" className={sbtPageStyles.backButton} onClick={onBack}>
+      ← Back to Groups
+    </button>
+  ) : (
+    <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug, workerUrl })}>
+      ← Back to Groups
+    </a>
+  );
+};
+
 type WorkerGroupDetailViewProps = {
   canViewMembers: boolean;
   children: React.ReactNode;
@@ -245,6 +274,7 @@ type WorkerGroupDetailViewProps = {
   onCloseMembers: () => void;
   onLoadMoreMembers: () => void;
   onOpenMembers: () => void;
+  onBack?: () => void;
   sessionConfig: unknown;
   sessionSlug: string;
   workerToken: string;
@@ -263,11 +293,13 @@ const WorkerGroupDetailView = ({
   onCloseMembers,
   onLoadMoreMembers,
   onOpenMembers,
+  onBack,
   sessionConfig,
   sessionSlug,
   workerToken,
   workerUrl,
 }: WorkerGroupDetailViewProps) => {
+  const moreInfoId = `worker-group-more-info-${React.useId().replace(/:/g, '')}`;
   const safeGroupId = group.groupId.replace(/[^a-zA-Z0-9_-]/g, '-');
   const titleId = `worker-group-detail-${safeGroupId}-title`;
   const descriptionId = group.description ? `worker-group-detail-${safeGroupId}-description` : undefined;
@@ -300,17 +332,15 @@ const WorkerGroupDetailView = ({
   }, [group.joinEndsAt]);
 
   return (
-    <div className={sbtPageStyles.sbtPage} data-testid="ce-worker-group-detail">
-      <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug, workerUrl })}>
-        ← Back to Groups
-      </a>
+    <div className={`${sbtPageStyles.sbtPage} ${styles.workerGroupDetailPage}`} data-testid="ce-worker-group-detail">
+      <WorkerGroupBackControl onBack={onBack} sessionSlug={sessionSlug} workerUrl={workerUrl} />
       <article
         className={`${sbtPageStyles.sbtInfo} ${styles.workerGroupDetailCard}`}
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
-        <div className={sbtPageStyles.leftColumn}>
-          <div className={sbtPageStyles.bookmarkIcon}>
+        <div className={`${sbtPageStyles.leftColumn} ${styles.workerGroupDetailIdentity}`}>
+          <div className={`${sbtPageStyles.bookmarkIcon} ${styles.workerGroupDetailToolbar}`}>
             <span className={styles.workerGroupDetailStatus}>
               <span
                 className={`${styles.workerGroupDetailStatusDot} ${
@@ -330,7 +360,7 @@ const WorkerGroupDetailView = ({
               <FontAwesomeIcon icon={faLink} />
             </button>
           </div>
-          <div className={sbtPageStyles.image}>
+          <div className={`${sbtPageStyles.image} ${styles.workerGroupDetailImage}`}>
             <div className={sbtPageStyles.imageWrapper}>
               {group.imageUrl ? (
                 <WorkerGroupImage
@@ -353,7 +383,7 @@ const WorkerGroupDetailView = ({
             {group.description ? <p id={descriptionId}>{group.description}</p> : null}
           </div>
         </div>
-        <div className={sbtPageStyles.rightColumn}>
+        <div className={`${sbtPageStyles.rightColumn} ${styles.workerGroupDetailContent}`}>
           <section className={sbtPageStyles.statsSection}>
             <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader}`}>STATS</h2>
             <div className={sbtPageStyles.stats}>
@@ -417,23 +447,53 @@ const WorkerGroupDetailView = ({
               {group.adminAddress ? (
                 <p>
                   <span className={sbtPageStyles.label}>Admin:</span>
-                  <span className={styles.workerGroupDetailAddress}>{group.adminAddress}</span>
+                  <a
+                    href={buildPublicRoute(`/u/${group.adminAddress}`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.workerGroupDetailAddress}
+                    title={group.adminAddress}
+                    aria-label={`View admin profile ${group.adminAddress}`}
+                  >
+                    {getShortenedAddress(group.adminAddress, false)}
+                  </a>
                 </p>
               ) : null}
             </div>
           </section>
-          <section className={sbtPageStyles.actionsSection}>
-            <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader}`}>ACTIONS</h2>
-            <div className={`${sbtPageStyles.actions} ${styles.workerGroupDetailActions}`}>{children}</div>
+          <section
+            className={`${sbtPageStyles.actionsSection} ${styles.workerGroupDetailActionsSection}`}
+            aria-label="Group actions"
+          >
+            <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader} ${styles.workerGroupDetailActionsHeading}`}>
+              ACTIONS
+            </h2>
+            <div className={styles.workerGroupDetailActions}>{children}</div>
           </section>
           {hasRelevantInfo ? (
-            <section className={sbtPageStyles.moreDetailsSection}>
-              <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader}`}>MORE</h2>
+            <section className={`${sbtPageStyles.moreDetailsSection} ${styles.workerGroupDetailMoreSection}`}>
+              <div className={styles.workerGroupDetailMoreHeader}>
+                <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader}`}>MORE</h2>
+                <button
+                  type="button"
+                  id={moreInfoId}
+                  className={styles.workerGroupDetailInfoButton}
+                  data-ce-control-appearance="frameless"
+                  aria-label="About group documents and tags"
+                  onClick={(event) => event.currentTarget.focus()}
+                >
+                  <FontAwesomeIcon icon={faQuestionCircle} />
+                </button>
+                <CETooltip target={moreInfoId} placement="top" trigger="hover focus" autohide={false}>
+                  Relevant documents and tags for this group.
+                </CETooltip>
+              </div>
               <SbtPageRelevantInfo
+                compact
                 documentIDHashes={[]}
                 documentURLs={documentURLs}
                 documentUrlsArePublic={true}
-                introText="Relevant documents and tags for this group."
+                introText={null}
                 onOpenEncryptedDoc={() => undefined}
                 shouldRenderDocumentIdHashes={false}
                 shouldRenderDocumentUrls={documentURLs.length > 0}
@@ -474,8 +534,12 @@ const WorkerGroupMembershipPanel = ({
   onSignIn,
   onGroupsChanged,
   selectedGroupId: selectedGroupIdProp = '',
+  groupIdFilter: groupIdFilterProp = '',
+  inlineDetails = false,
   showDescriptions = true,
   showListHeader = true,
+  showEmptyState = true,
+  showLoadingState = true,
   membershipsOnly = false,
 }: WorkerGroupMembershipPanelProps) => {
   const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
@@ -483,7 +547,21 @@ const WorkerGroupMembershipPanel = ({
   const workerToken = workerTokenProp || envelope?.workerCredential?.token || '';
   const sessionId = normalizeWorkerCanonicalSessionIdHex(sessionIdProp || envelope?.sessionId || '');
   const sessionSlug = canonicalizeSessionSlug(sessionSlugProp || envelope?.sessionSlug || '');
-  const selectedGroupId = String(selectedGroupIdProp || '').trim();
+  const groupIdFilter = String(groupIdFilterProp || '').trim();
+  const navigationKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${groupIdFilter}`;
+  const [inlineSelection, setInlineSelection] = useState({ navigationKey, groupId: '' });
+  const inlineGroupId = inlineDetails && inlineSelection.navigationKey === navigationKey ? inlineSelection.groupId : '';
+  const selectedGroupId = String(selectedGroupIdProp || '').trim() || inlineGroupId;
+  const panelRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<{ navigationKey: string; groupId: string } | null>(null);
+  useEffect(() => {
+    setInlineSelection({ navigationKey, groupId: '' });
+    returnFocusRef.current = null;
+  }, [navigationKey]);
+  const closeInlineDetails = useCallback(() => {
+    returnFocusRef.current = { navigationKey, groupId: inlineGroupId };
+    setInlineSelection({ navigationKey, groupId: '' });
+  }, [inlineGroupId, navigationKey]);
   const anonymousDiscoveryActive = allowAnonymousGroupDiscovery && !workerToken;
   const targetKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${workerToken}\n${anonymousDiscoveryActive ? 'public' : 'private'}`;
   const targetKeyRef = useRef(targetKey);
@@ -501,6 +579,18 @@ const WorkerGroupMembershipPanel = ({
   const activeViewState = viewState.targetKey === targetKey ? viewState : emptyViewState(targetKey);
   const overview = activeViewState.overview;
   const status = activeViewState.status;
+  useEffect(() => {
+    const restore = returnFocusRef.current;
+    if (selectedGroupId || restore?.navigationKey !== navigationKey) return;
+    const card = Array.from(panelRef.current?.querySelectorAll('article') || []).find(
+      (element) => element.id === `group-${encodeURIComponent(restore.groupId)}`,
+    );
+    const button = card?.querySelector<HTMLButtonElement>('button[aria-label^="Open group details for "]');
+    if (button) {
+      button.focus();
+      returnFocusRef.current = null;
+    }
+  }, [navigationKey, selectedGroupId, status]);
   const error = activeViewState.error;
   const membershipStatus = membershipStatusState.targetKey === targetKey ? membershipStatusState.status : '';
   const shareStatus = shareState.targetKey === targetKey ? shareState.status : '';
@@ -583,7 +673,13 @@ const WorkerGroupMembershipPanel = ({
           .key,
       ),
   );
-  const displayedAvailableGroups = membershipsOnly ? [] : availableGroups;
+  // A linked group limits the card list; selectedGroupId is reserved for the full-detail route.
+  const displayedMemberships = overview.memberships.filter(
+    (membership) => !groupIdFilter || membership.group.groupId === groupIdFilter,
+  );
+  const displayedAvailableGroups = membershipsOnly
+    ? []
+    : availableGroups.filter((group) => !groupIdFilter || group.groupId === groupIdFilter);
   const selectedMembershipIdentity = buildWorkerGroupMembershipIdentity({ groupId: selectedGroupId, sessionSlug });
   const selectedMembership = selectedGroupId
     ? overview.memberships.find(
@@ -831,6 +927,11 @@ const WorkerGroupMembershipPanel = ({
     }
   };
   const openGroupDetails = (groupId: string) => {
+    if (inlineDetails) {
+      returnFocusRef.current = null;
+      setInlineSelection({ navigationKey, groupId });
+      return;
+    }
     if (typeof window === 'undefined' || !sessionSlug) return;
     const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId, workerUrl }), window.location.origin);
     window.open(link.toString(), '_blank', 'noopener,noreferrer');
@@ -894,7 +995,7 @@ const WorkerGroupMembershipPanel = ({
 
   if (selectedGroupId) {
     return (
-      <section className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
+      <section ref={panelRef} className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
         {status === 'loading' ? (
           <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading group…</div>
         ) : null}
@@ -923,6 +1024,7 @@ const WorkerGroupMembershipPanel = ({
             onCloseMembers={handleCloseMembers}
             onLoadMoreMembers={handleLoadMoreMembers}
             onOpenMembers={handleOpenMembers}
+            onBack={inlineGroupId && !selectedGroupIdProp ? closeInlineDetails : undefined}
           >
             {renderMembershipAction(selectedGroup, Boolean(selectedMembership))}
             <WorkerGroupAutoJoinLink group={selectedGroup} sessionSlug={sessionSlug} workerUrl={workerUrl} />
@@ -930,9 +1032,11 @@ const WorkerGroupMembershipPanel = ({
         ) : null}
         {status === 'ready' && !selectedGroup ? (
           <div className={styles.workerGroupDetailNotFound}>
-            <a className={sbtPageStyles.backButton} href={buildWorkerGroupsPath({ sessionSlug, workerUrl })}>
-              ← Back to Groups
-            </a>
+            <WorkerGroupBackControl
+              onBack={inlineGroupId && !selectedGroupIdProp ? closeInlineDetails : undefined}
+              sessionSlug={sessionSlug}
+              workerUrl={workerUrl}
+            />
             <p>This group is not visible or no longer exists.</p>
           </div>
         ) : null}
@@ -941,7 +1045,7 @@ const WorkerGroupMembershipPanel = ({
   }
 
   return (
-    <section className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
+    <section ref={panelRef} className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
       {showListHeader ? (
         <div className={`${styles.telegramListHeader} ${styles.workerGroupsListActions}`}>
           <button
@@ -955,7 +1059,7 @@ const WorkerGroupMembershipPanel = ({
           </button>
         </div>
       ) : null}
-      {status === 'loading' ? (
+      {showLoadingState && status === 'loading' ? (
         <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>
       ) : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
@@ -965,9 +1069,9 @@ const WorkerGroupMembershipPanel = ({
         </div>
       ) : null}
       {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
-      {overview.memberships.length || displayedAvailableGroups.length ? (
+      {displayedMemberships.length || displayedAvailableGroups.length ? (
         <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
-          {overview.memberships.map((membership) => (
+          {displayedMemberships.map((membership) => (
             <WorkerGroupCard
               key={membership.group.groupId}
               copyGroupLink={copyGroupLink}
@@ -1003,9 +1107,13 @@ const WorkerGroupMembershipPanel = ({
           ))}
         </div>
       ) : null}
-      {status === 'ready' && !overview.memberships.length && !displayedAvailableGroups.length ? (
+      {showEmptyState && status === 'ready' && !displayedMemberships.length && !displayedAvailableGroups.length ? (
         <div className={styles.telegramListEmpty}>
-          {membershipsOnly ? 'No Groups joined yet.' : 'No visible Groups are configured.'}
+          {groupIdFilter
+            ? 'This group is not visible or no longer exists.'
+            : membershipsOnly
+              ? 'No Groups joined yet.'
+              : 'No visible Groups are configured.'}
         </div>
       ) : null}
     </section>
