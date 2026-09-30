@@ -29,7 +29,7 @@ export default function ReverseAlignmentAtlas() {
         </div>
       </header>
       <div className={styles.explorer}>
-        <div className={styles.map} aria-label="Explore twelve focus areas">
+        <div className={styles.map} role="group" aria-label="Explore twelve focus areas">
           <img className={styles.artwork} src={artwork} alt="" width="1448" height="1086" loading="lazy" />
           {reverseAlignmentBranches.map((branch, branchIndex) => (
             <section key={branch.tone} className={`${styles.branch} ${styles[branch.tone]}`} aria-label={branch.label}>
@@ -55,7 +55,13 @@ export default function ReverseAlignmentAtlas() {
           <h4>{selected.label}</h4>
           <div className={styles.readingTabs} role="group" aria-label="Reading view">
             {(['Overview', 'Tensions', 'Sources'] as const).map((view) => (
-              <button type="button" key={view} data-ce-control-appearance="frameless" aria-pressed={tab === view} onClick={() => setTab(view)}>
+              <button
+                type="button"
+                key={view}
+                data-ce-control-appearance="frameless"
+                aria-pressed={tab === view}
+                onClick={() => setTab(view)}
+              >
                 {view}
               </button>
             ))}
@@ -92,18 +98,33 @@ export default function ReverseAlignmentAtlas() {
           <div className={styles.related}>
             <h5>Connected focus areas</h5>
             {selected.related.map((topicId) => (
-              <button type="button" key={topicId} data-ce-control-appearance="frameless" onClick={() => select(topicId)}>
+              <button
+                type="button"
+                key={topicId}
+                data-ce-control-appearance="frameless"
+                onClick={() => select(topicId)}
+              >
                 {reverseAlignmentTopics.find((topic) => topic.id === topicId)?.label}
                 <span aria-hidden="true"> ↗</span>
               </button>
             ))}
           </div>
           <div className={styles.tour}>
-            <button type="button" data-ce-control-appearance="frameless" onClick={() => move(-1)} aria-label="Previous focus area">
+            <button
+              type="button"
+              data-ce-control-appearance="frameless"
+              onClick={() => move(-1)}
+              aria-label="Previous focus area"
+            >
               <span aria-hidden="true">←</span>
             </button>
             <span>{reverseAlignmentTopics.indexOf(selected) + 1} / 12</span>
-            <button type="button" data-ce-control-appearance="frameless" onClick={() => move(1)} aria-label="Next focus area">
+            <button
+              type="button"
+              data-ce-control-appearance="frameless"
+              onClick={() => move(1)}
+              aria-label="Next focus area"
+            >
               <span aria-hidden="true">→</span>
             </button>
           </div>

@@ -5,6 +5,7 @@ import ReverseAlignmentAtlas from './ReverseAlignmentAtlas';
 it('browses all twelve source areas and follows editorial connections', () => {
   render(<ReverseAlignmentAtlas />);
   const map = screen.getByLabelText('Explore twelve focus areas');
+  expect(map).toBe(screen.getByRole('group', { name: 'Explore twelve focus areas' }));
   const reading = screen.getByRole('article', { name: 'Selected focus area' });
   expect(within(map).getAllByRole('button')).toHaveLength(12);
   fireEvent.click(within(map).getByRole('button', { name: 'Privacy' }));
