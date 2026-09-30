@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import CETooltip from '../Shared/CETooltip';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -418,6 +419,7 @@ export default function OnePageSessionStandardShell({
       : generatedHasArtifact
         ? 'Refresh AI Views'
         : 'Generate AI Views';
+  const sessionInfoTooltipId = `session-info-${React.useId().replace(/:/g, '')}`;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
   const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
   const showContextSection = isDemoSlug || !!sessionContext || showTopicPreview;
@@ -470,18 +472,19 @@ export default function OnePageSessionStandardShell({
       <div className={brandingSectionClassName}>
         <div className={titleContainerClassName}>
           <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
-          <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
+          <button
+            type="button"
+            id={sessionInfoTooltipId}
+            className={styles.sessionInfoButton}
+            data-ce-control-appearance="frameless"
+            aria-label="Session info"
+            onClick={(event) => event.currentTarget.focus()}
+          >
             <FontAwesomeIcon icon={faQuestionCircle} />
-            <span className={styles.tooltiptext}>
-              {sessionInfo ? (
-                <p>
-                  <em>{sessionInfo}</em>
-                </p>
-              ) : (
-                <p>Share input; your responses help generate a collective intelligence map.</p>
-              )}
-            </span>
-          </div>
+          </button>
+          <CETooltip target={sessionInfoTooltipId} placement="bottom" trigger="hover focus" autohide={false}>
+            {sessionInfo || 'Share input; your responses help generate a collective intelligence map.'}
+          </CETooltip>
         </div>
 
         {showQuestions ? (

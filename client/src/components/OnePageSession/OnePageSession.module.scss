@@ -823,6 +823,29 @@
   }
 }
 
+// Portal the title tooltip through CETooltip: the animated title clips its children.
+.sessionInfoButton {
+  appearance: none;
+  border: 0;
+  padding: 4px;
+  background: transparent;
+  color: var(--ce-session-chrome-contrast);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--ce-radius-6);
+  flex-shrink: 0;
+
+  &:hover {
+    color: var(--ce-action-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+}
+
 /* Make the Foresight logo bigger */
 .brandLogo {
   max-width: 350px;

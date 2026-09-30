@@ -148,6 +148,7 @@ export default function SessionInterviewMemoryKickoffCard({
               type="button"
               id="ce-interview-agent-prompt-help"
               className={styles.sessionInterviewHeaderButton}
+              data-ce-control-appearance="frameless"
               aria-label="About the interview prompt"
             >
               <FontAwesomeIcon icon={faQuestionCircle} />

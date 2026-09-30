@@ -111,7 +111,11 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
     const closeMetricsDetailsIcon = faWindowClose;
     const questionMarkMetricsIcon = (
-      <button className={styles.metricDetailsButton} onClick={this.toggleMetricsDetails}>
+      <button
+        className={styles.metricDetailsButton}
+        data-ce-control-appearance="frameless"
+        onClick={this.toggleMetricsDetails}
+      >
         <FontAwesomeIcon icon={faQuestionCircle} className={styles.metricsInfoIcon} />
       </button>
     );

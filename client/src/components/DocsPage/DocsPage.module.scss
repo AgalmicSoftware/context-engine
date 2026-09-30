@@ -211,12 +211,25 @@
   margin-top: 12px;
 }
 
-.docsInlineLink {
+.quickstartStep .docsInlineLink {
   display: inline-flex;
-  color: var(--docs-link);
+  color: var(--docs-document-text);
   font-weight: 700;
   text-decoration: underline;
+  text-decoration-thickness: 2px;
   text-underline-offset: 3px;
+
+  &:hover,
+  &:focus-visible,
+  &:active {
+    color: var(--docs-document-text);
+    text-decoration-thickness: 3px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
 }
 
 .docsInlineCode {

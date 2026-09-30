@@ -54,6 +54,9 @@
 .researchHelp:focus-visible {
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   color: var(--ce-text-inverse);
+}
+
+.researchHelp:focus-visible {
   outline: 2px solid var(--ce-action-accent);
   outline-offset: 2px;
 }

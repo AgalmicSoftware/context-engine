@@ -725,6 +725,15 @@ describe('OnePageSession view gating', () => {
     expect(brandingSectionBlock).not.toContain('linear-gradient');
   });
 
+  it('opens session info on button focus outside the clipping title container', async () => {
+    render(<OnePageSession {...buildProps()} />);
+    const button = await screen.findByRole('button', { name: 'Session info' });
+    act(() => button.focus());
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip.textContent.trim()).not.toBe('');
+    expect(button.closest(`.${styles.titleContainer}`)).not.toContainElement(tooltip);
+  });
+
   it('keeps the mobile title tooltip inside the viewport', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
 

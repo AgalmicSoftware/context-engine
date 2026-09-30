@@ -67,6 +67,7 @@ export default function SessionInterviewResearchConsent({
             type="button"
             id="ce-interview-research-help"
             className={styles.researchHelp}
+            data-ce-control-appearance="frameless"
             aria-label="About research metadata"
             aria-describedby="ce-interview-research-description"
           >
