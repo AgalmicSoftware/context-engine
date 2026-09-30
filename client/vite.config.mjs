@@ -97,33 +97,23 @@ const manualChunkGroups = [
   },
   {
     name: 'vendor-ethers',
-    patterns: [
-      '/node_modules/@ethersproject/',
-      '/node_modules/ethers/',
-    ],
+    patterns: ['/node_modules/@ethersproject/', '/node_modules/ethers/'],
   },
   {
     name: 'vendor-wallet-core',
-    patterns: [
-      '/node_modules/@noble/',
-      '/node_modules/@wagmi/',
-      '/node_modules/viem/',
-      '/node_modules/wagmi/',
-    ],
+    patterns: ['/node_modules/@noble/', '/node_modules/@wagmi/', '/node_modules/viem/', '/node_modules/wagmi/'],
   },
   {
     name: 'vendor-wallet-connectors',
-    patterns: [
-      '/node_modules/@metamask/',
-      '/node_modules/@rainbow-me/',
-      '/node_modules/@walletconnect/',
-    ],
+    patterns: ['/node_modules/@metamask/', '/node_modules/@rainbow-me/', '/node_modules/@walletconnect/'],
   },
   {
     name: 'vendor-arweave',
     patterns: [
       '/node_modules/arweave/',
       '/node_modules/arbundles/',
+      // Only arweave imports bignumber.js; keep it lazy with the SDK.
+      '/node_modules/bignumber.js/',
     ],
   },
   {
@@ -148,7 +138,6 @@ const manualChunkGroups = [
     patterns: [
       '/node_modules/aes-js/',
       '/node_modules/bech32/',
-      '/node_modules/bignumber.js/',
       '/node_modules/hash.js/',
       '/node_modules/inherits/',
       '/node_modules/js-sha3/',
@@ -158,18 +147,12 @@ const manualChunkGroups = [
   },
   {
     name: 'vendor-crypto-zk-poseidon',
-    patterns: [
-      '/node_modules/poseidon-lite/',
-    ],
+    patterns: ['/node_modules/poseidon-lite/'],
   },
-
 
   {
     name: 'vendor-media-audio',
-    patterns: [
-      '/node_modules/hark/',
-      '/node_modules/recordrtc/',
-    ],
+    patterns: ['/node_modules/hark/', '/node_modules/recordrtc/'],
   },
   {
     name: 'vendor-ui',
@@ -198,15 +181,14 @@ const manualChunkGroups = [
   },
   {
     name: 'vendor-polyfills',
-    patterns: [
-      '/node_modules/buffer/',
-      '/node_modules/process/',
-    ],
+    patterns: ['/node_modules/buffer/', '/node_modules/process/'],
   },
 ];
 
 export const resolveManualChunk = (id) => {
-  const normalizedId = String(id || '').split(path.sep).join('/');
+  const normalizedId = String(id || '')
+    .split(path.sep)
+    .join('/');
   if (normalizedId === '\0commonjsHelpers.js' || normalizedId === '\0vite/preload-helper') return 'vendor-runtime';
   // Keep synchronous demo question seeds cacheable without folding them back
   // into AppShell; full demo result fixtures remain owned by lazy consumers.
@@ -220,15 +202,15 @@ export const resolveManualChunk = (id) => {
   // Preserve import() boundaries for document export and its dependencies.
   if (isDocumentExportModule(normalizedId)) return undefined;
 
-  const group = manualChunkGroups.find(({ patterns }) => (
-    patterns.some((pattern) => normalizedId.includes(pattern))
-  ));
+  const group = manualChunkGroups.find(({ patterns }) => patterns.some((pattern) => normalizedId.includes(pattern)));
 
   return group ? group.name : 'vendor-misc';
 };
 
 const resolvePublicAssetPath = (requestUrl) => {
-  const rawPathname = String(requestUrl || '').split('?')[0].split('#')[0];
+  const rawPathname = String(requestUrl || '')
+    .split('?')[0]
+    .split('#')[0];
   if (!rawPathname || rawPathname === '/') return null;
   let pathname;
   try {
@@ -244,7 +226,9 @@ const resolvePublicAssetPath = (requestUrl) => {
 };
 
 const resolvePostsAssetPath = (requestUrl) => {
-  const rawPathname = String(requestUrl || '').split('?')[0].split('#')[0];
+  const rawPathname = String(requestUrl || '')
+    .split('?')[0]
+    .split('#')[0];
   if (!rawPathname || rawPathname === '/' || rawPathname === '/posts') return null;
   let pathname;
   try {
@@ -264,9 +248,7 @@ const resolvePostsAssetPath = (requestUrl) => {
 const readClientEnv = (mode) => {
   const loadedEnv = loadEnv(mode, __dirname, ['REACT_APP_', 'NEXT_PUBLIC_', 'PUBLIC_URL']);
   const reactAppEnv = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => (
-      key.startsWith('REACT_APP_') || key.startsWith('NEXT_PUBLIC_')
-    ))
+    Object.entries(process.env).filter(([key]) => key.startsWith('REACT_APP_') || key.startsWith('NEXT_PUBLIC_')),
   );
   const publicUrl = process.env.PUBLIC_URL ?? loadedEnv.PUBLIC_URL ?? '/';
   return {
@@ -339,10 +321,11 @@ const resolveExistingTsSibling = (request, importer) => {
     candidates.push(path.resolve(srcDir, tsRequest));
   }
 
-  return candidates.find((candidate) => (
-    !candidate.includes(`${path.sep}node_modules${path.sep}`) &&
-    fs.existsSync(candidate)
-  )) || null;
+  return (
+    candidates.find(
+      (candidate) => !candidate.includes(`${path.sep}node_modules${path.sep}`) && fs.existsSync(candidate),
+    ) || null
+  );
 };
 
 const jsToTsCompatibilityPlugin = () => ({
@@ -369,7 +352,7 @@ const litContractsSubpathShim = () => ({
       'access-control-conditions',
       'node_modules',
       '@lit-protocol',
-      'contracts'
+      'contracts',
     );
     const rootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
     const base = fs.existsSync(path.join(nestedBase, 'dist')) ? nestedBase : rootBase;
@@ -502,9 +485,7 @@ export default defineConfig(({ mode }) => {
       litContractsSubpathShim(),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
       lazyDocumentBuildPlugin(),
-      ...(process.env.CE_BUNDLE_REPORT === '1'
-        ? [createBundleReportPlugin({ rootDir: __dirname })]
-        : []),
+      ...(process.env.CE_BUNDLE_REPORT === '1' ? [createBundleReportPlugin({ rootDir: __dirname })] : []),
       publicAssetsCompatibilityPlugin(),
       postsAssetsCompatibilityPlugin(),
       {
@@ -531,10 +512,16 @@ export default defineConfig(({ mode }) => {
         { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
-        { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
+        {
+          find: /^zod-validation-error$/,
+          replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js'),
+        },
         { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
         { find: /^node:worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
-        { find: /^source-map-support\/register$/, replacement: path.resolve(srcDir, 'shims', 'source-map-support-register.ts') },
+        {
+          find: /^source-map-support\/register$/,
+          replacement: path.resolve(srcDir, 'shims', 'source-map-support-register.ts'),
+        },
       ],
     },
     server: {
