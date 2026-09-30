@@ -1035,11 +1035,13 @@ export const createSurveyQuestionsRuntimeMethods = (
         // We use a callback to ensure rehydration happens on the reset (empty) state,
         // followed by the fetch which merges on-chain data into the draft.
         resetFormStateForAccountChange(async () => {
-          setState(
-            buildResponseLoadingResetState(
+          setState({
+            ...buildResponseLoadingResetState(
               updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             ),
-          );
+            parsedViewAddressAnswers: null,
+            viewAddressAnswers: null,
+          });
 
           // 1. Apply Draft (Anon answers) onto Empty
           rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
@@ -1134,16 +1136,14 @@ export const createSurveyQuestionsRuntimeMethods = (
       if (propsRef.current.account !== prevProps.account || propsRef.current.viewAddress !== prevProps.viewAddress) {
         // Clear live form state before reacting to new account/viewAddress
         resetFormStateForAccountChange(async () => {
-          setState(
-            buildSurveyAccountViewResetState({
-              parsedViewAddressAnswers:
-                propsRef.current.viewAddress !== prevProps.viewAddress
-                  ? null
-                  : stateRef.current.parsedViewAddressAnswers,
+          setState({
+            ...buildSurveyAccountViewResetState({
+              parsedViewAddressAnswers: null,
               noResponse: propsRef.current.viewAddress !== prevProps.viewAddress ? false : stateRef.current.noResponse,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             }),
-          );
+            viewAddressAnswers: null,
+          });
 
           // 1. Rehydrate draft immediately so it exists before fetch returns
           if (propsRef.current.account && propsRef.current.account !== prevProps.account) {
