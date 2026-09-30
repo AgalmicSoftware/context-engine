@@ -254,28 +254,6 @@ import {
 } from './sbtRoutePathHelpers';
 import { reloadWindowLocation as reloadWindowLocationFn } from './reloadWindowLocation.js';
 import {
-  AboutPage as AboutPageRaw,
-  AdminPage as AdminPageRaw,
-  AgentPage as AgentPageRaw,
-  DebateMap as DebateMapRaw,
-  BookmarksPage as BookmarksPageRaw,
-  CompareAddresses as CompareAddressesRaw,
-  DocsPage as DocsPageRaw,
-  DemosIndex as DemosIndexRaw,
-  OnePageSession as OnePageSessionRaw,
-  RiskMatrixDemo as RiskMatrixDemoRaw,
-  SBTPage as SBTPageRaw,
-  SBTsPage as SBTsPageRaw,
-  SessionDocumentsPage as SessionDocumentsPageRaw,
-  SessionWizard as SessionWizardRaw,
-  SimulatedUserPage as SimulatedUserPageRaw,
-  SponsorPage as SponsorPageRaw,
-  SurveyPage as SurveyPageRaw,
-  SurveyTool as SurveyToolRaw,
-  TagPage as TagPageRaw,
-  UserPage as UserPageRaw,
-} from './routeLazyComponents.js';
-import {
   buildQuestionReadyStatePatch,
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
@@ -309,11 +287,6 @@ const mainSiteLog = createLogger('mainSite');
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-type MainSiteProfileMetaResult<T> = {
-  data: T;
-  hadError: boolean;
-  error?: string;
-};
 const styles = stylesRaw as Record<string, string>;
 const WagmiHooksHOC = WagmiHooksHOCRaw;
 const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
@@ -328,55 +301,6 @@ const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
 const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const SessionLoadingSkeleton = asMainSiteRouteComponent(SessionLoadingSkeletonRaw);
-const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
-const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
-const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
-const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
-const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
-const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
-const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
-const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
-const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
-const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
-
-const isMainSiteProfileMetaResult = <T,>(value: unknown): value is MainSiteProfileMetaResult<T> =>
-  !!value &&
-  typeof value === 'object' &&
-  (Object.prototype.hasOwnProperty.call(value, 'hadError') || Object.prototype.hasOwnProperty.call(value, 'data'));
-const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
-const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
-const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
-const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
-const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
-const SponsorPage = asMainSiteRouteComponent(SponsorPageRaw);
-const SurveyPage = asMainSiteRouteComponent(SurveyPageRaw);
-const SurveyTool = asMainSiteRouteComponent(SurveyToolRaw);
-const TagPage = asMainSiteRouteComponent(TagPageRaw);
-const UserPage = asMainSiteRouteComponent(UserPageRaw);
-
-interface RouteRenderCtx {
-  fullPath: string;
-  searchStr: string;
-  hashStr: string;
-  searchParams: URLSearchParams;
-  pathWithoutQuery: string;
-  pathSegments: string[];
-  firstPathSegment: string;
-  routeDemoMode: boolean;
-  requestedSessionId: string;
-  requestedChainId: number | null;
-  requestedSponsoredBundleId: string;
-  requestedSponsoredBundleKey: string | null;
-  defaultSlug: string;
-  defaultSessionCfg: MainSiteSessionConfigLike | null;
-  defaultSessionChainId: number | null;
-  defaultSessionNetwork: ReturnType<typeof _getSessionNetwork>;
-  cacheInitializationError: boolean;
-  surveyIDFromPath: string | null;
-  autoOpenResults: boolean;
-  parsedFilterStateFromUrl: Record<string, unknown>;
-  isResultsRoute: boolean;
-}
 
 type RefreshSurveyResponsesByIDFn = (surveyID: string) => Promise<void>;
 type RefreshQuestionResponsesFn = (
