@@ -409,12 +409,12 @@ export const extractUserPageAnalysisImportance = (value: unknown): unknown => {
   const meta = toAnalysisRecord(record.meta);
   const answer = toAnalysisRecord(record.answer);
   const candidate =
-    record.conviction ??
     record.importance ??
-    meta.conviction ??
+    record.conviction ??
     meta.importance ??
-    answer.conviction ??
-    answer.importance;
+    meta.conviction ??
+    answer.importance ??
+    answer.conviction;
   const candidateRecord = toAnalysisRecord(candidate);
   return candidate === '*' || (candidate && typeof candidate === 'object' && candidateRecord.encrypted === true)
     ? undefined

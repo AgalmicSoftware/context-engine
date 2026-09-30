@@ -776,7 +776,7 @@ export function applyFilterStateToAggregator(
             score += 1;
           }
         } else {
-          const rawImportance = parsed?.conviction ?? parsed?.importance ?? 0;
+          const rawImportance = parsed?.importance ?? parsed?.conviction ?? 0;
           const imp = Number(asRecord(rawImportance).value ?? rawImportance);
           if (!Number.isNaN(imp)) score += imp;
         }

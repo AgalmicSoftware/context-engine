@@ -1091,4 +1091,18 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
     expect(onCountUpdate).toHaveBeenNthCalledWith(1, 10, 3);
     expect(onCountUpdate).toHaveBeenNthCalledWith(2, 10, 2);
   });
+
+  it('totals importance before conviction for top-by-importance ranking', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'rating' }],
+      questionResponses: {},
+      filterState: {},
+      isQuestionCacheReady: true,
+    });
+    const stats = instance.getMemoizedQuestionResponseStats(
+      { q1: { '0xabc': JSON.stringify({ answer: { value: 4 }, importance: 3, conviction: 8 }) } },
+      [{ id: 'q1', type: 'rating' }],
+    );
+    expect(stats.get('q1')).toEqual({ responseCount: 1, totalImportance: 3 });
+  });
 });

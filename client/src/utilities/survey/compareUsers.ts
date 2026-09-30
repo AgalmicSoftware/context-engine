@@ -800,12 +800,12 @@ const extractImportance = (obj: unknown): unknown => {
   const meta = asRecord(record.meta);
   const answer = asRecord(record.answer);
   const cand =
-    record.conviction ??
     record.importance ??
-    meta.conviction ??
+    record.conviction ??
     meta.importance ??
-    answer.conviction ??
-    answer.importance;
+    meta.conviction ??
+    answer.importance ??
+    answer.conviction;
   return cand === '*' || asRecordOrNull(cand)?.encrypted === true ? undefined : cand;
 };
 

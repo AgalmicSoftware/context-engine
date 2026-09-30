@@ -1546,7 +1546,7 @@ class QuestionFilter extends React.Component<any, any> {
       responderKeys.forEach((resp) => {
         const parsed = this.parseResponse(respondersMap[resp]);
         const parsedRecord = toUnknownRecord(parsed);
-        const next = Number(parsedRecord.conviction ?? parsedRecord.importance ?? 0);
+        const next = Number(parsedRecord.importance ?? parsedRecord.conviction ?? 0);
         if (Number.isFinite(next)) totalImportance += next;
         if (!isFreeformBlankAnswer(questionType, parsed)) {
           responseCount += 1;

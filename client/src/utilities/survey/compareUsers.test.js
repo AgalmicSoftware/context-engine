@@ -388,6 +388,25 @@ describe('buildUsersFromCaches', () => {
     expect(keys[1][0]).toContain(':84532:');
     expect(fallbackBullets(users).agreements).toEqual([]);
   });
+
+  it('reads importance before conviction for compared answers', () => {
+    const users = buildUsersFromCaches(
+      ['0xUser1'],
+      [],
+      [
+        {
+          1: {
+            questions: { Q1: { type: 'rating', prompt: 'Rate readiness' } },
+            questionResponses: {
+              Q1: { '0xUser1': JSON.stringify({ answer: { value: 4 }, importance: 3, conviction: 8 }) },
+            },
+          },
+        },
+      ],
+      [],
+    );
+    expect(users[0].questions.find((q) => q.id === 'q1')).toMatchObject({ importance: 3 });
+  });
 });
 
 describe('compare user pure helpers', () => {
