@@ -1,8 +1,9 @@
 import demoSessions from '../../variables/demo/demo_sessions.json';
+import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
 import { buildPublicUrl } from './urlUtils';
 
 export const getSessionEntryRedirect = (pathname: string, search = '', hash = ''): string | null => {
-  if (/^\/rxc-(?:ra-)?test\/?$/.test(pathname)) {
+  if (isRxcSessionEntryPath(pathname)) {
     return buildPublicUrl(`/session${pathname.replace(/\/$/, '')}`, search, hash);
   }
   // Only the bare event link implies interview/join intent. Preserve explicit

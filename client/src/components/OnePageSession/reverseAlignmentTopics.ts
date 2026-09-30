@@ -1,3 +1,5 @@
+import { RXC_SESSION_SLUGS } from '../../utilities/session/rxcSessionSlugs';
+
 export const REVERSE_ALIGNMENT_SOURCE = 'https://reversealignment.ai/';
 
 // Editorial navigation groups, not an analysis of submitted questions or responses.
@@ -106,4 +108,4 @@ export const reverseAlignmentTopics = [
   },
 ] as const;
 
-export const hasReverseAlignmentContext = (slug: string) => ['rxc-test', 'rxc-ra-test'].includes(slug);
+export const hasReverseAlignmentContext = (slug: string) => RXC_SESSION_SLUGS.includes(slug);

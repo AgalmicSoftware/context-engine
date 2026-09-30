@@ -60,6 +60,7 @@ import {
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 import { getSessionEntryRedirect } from './sessionEntryRedirect';
+import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
 import {
   resolveExplicitWorkerSessionConfig,
   resolveExplicitWorkerSessionNetwork,
@@ -1294,7 +1295,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const routeLocation = readRouteLocationSearch();
     const { searchStr, searchParams } = routeLocation;
     let { hashStr } = routeLocation;
-    if (/^\/rxc-(?:ra-)?test\/?$/.test(fullPath)) {
+    if (isRxcSessionEntryPath(fullPath)) {
       return <Navigate replace to={getSessionEntryRedirect(fullPath, searchStr, hashStr)!} />;
     }
     const routeDemoMode = host.props.demoSurfaceMode !== false || searchParams.get('demo') === '1';
