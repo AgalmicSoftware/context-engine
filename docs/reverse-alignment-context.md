@@ -14,10 +14,14 @@ prompts are invitations for the session, not quotes from the source or submitted
 participant responses. The illustration is decorative; text and controls remain
 accessible HTML. The artwork loads only when the Context section opens.
 
-The Results section separately shows an empty topic map with **Waiting for more
-data**. Its topic bubbles have no question or response assignments. There is no
-classification action yet; a future administrator workflow can populate those
-assignments. The Context atlas does not imply that classification has happened.
+Results offers **Report**, **Debate Map**, and **Raw Results**. Report opens by
+default. Debate Map uses the shared Debate Atlas **Circles** view: open one of
+the three topic groups, then select a topic to inspect its assignments. This
+preview appears only in Debate Map and shows **Waiting for more data**. Its
+circles have no question or response assignments, votes, or sample responses.
+There is no classification action yet; a future administrator workflow can
+populate those assignments. The Context atlas does not imply that classification
+has happened. Raw Results continues to open the detailed results view.
 
 The atlas and preview apply to `rxc-test` and `rxc-ra-test`. This is client
 presentation, not session provisioning: each session still needs its own valid

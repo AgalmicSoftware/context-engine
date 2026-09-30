@@ -870,6 +870,29 @@ describe('DebateMap', () => {
     expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'parent-node' }));
   });
 
+  it('lets keyboard users drill into packed groups and open leaf circles', () => {
+    const onNodeClick = jest.fn();
+    render(
+      <AtlasViewComponent
+        data={[{ id: 'group', name: 'Topic group', children: [{ id: 'topic', name: 'Topic' }] }]}
+        atlasLayoutMode="packed"
+        readOnly
+        onNodeClick={onNodeClick}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Topic group' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('button', { name: 'Topic', exact: true })).toHaveAttribute('tabindex', '-1');
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Topic group' }), { key: 'Enter' });
+    expect(screen.getByRole('button', { name: /up level/i })).toBeVisible();
+    expect(onNodeClick).not.toHaveBeenCalled();
+    const topic = screen.getByRole('button', { name: 'Topic', exact: true });
+    expect(topic).toHaveAttribute('tabindex', '0');
+    fireEvent.keyDown(topic, { key: ' ' });
+    expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'topic' }));
+    fireEvent.click(screen.getByRole('button', { name: /up level/i }));
+    expect(screen.getByRole('button', { name: 'Topic group' })).toHaveAttribute('tabindex', '0');
+  });
+
   it('drills into packed child circles, hides the outer root circle, and exposes a clickable title action', () => {
     const onNodeClick = jest.fn();
 

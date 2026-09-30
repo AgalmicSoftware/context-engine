@@ -924,6 +924,7 @@ const PackedAtlasView = ({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [hoveredGroupId, setHoveredGroupId] = useState('');
   const isMobile = dimensions.w < 768;
+  const compactHeader = dimensions.w < 480;
   const packedTitle = atlasRoot ? String(atlasRoot?.name || '').trim() : '';
   const isTopLevelPackedView = !atlasRoot;
 
@@ -937,7 +938,7 @@ const PackedAtlasView = ({
         }
       : getAtlasCenterNode(atlasRoot, data, rootLabel);
     const inset = isMobile ? 12 : 18;
-    const headerHeight = atlasRoot ? (isMobile ? 34 : 28) : 0;
+    const headerHeight = atlasRoot ? (compactHeader ? 96 : isMobile ? 34 : 28) : 0;
     const desiredTopGutter = atlasRoot ? (isMobile ? 10 : 8) : isMobile ? 14 : 18;
     const packLayout = d3Pack()
       .size([Math.max(dimensions.w - inset * 2, 1), Math.max(dimensions.h - inset * 2 - headerHeight, 1)])
@@ -972,7 +973,7 @@ const PackedAtlasView = ({
       });
 
     return { nodes };
-  }, [atlasRoot, data, dimensions.h, dimensions.w, isMobile, readOnly, rootLabel]);
+  }, [atlasRoot, compactHeader, data, dimensions.h, dimensions.w, isMobile, readOnly, rootLabel]);
   const layoutNodeMap = useMemo(
     () => new Map(layout.nodes.map((node) => [String(node.id || '').trim(), node])),
     [layout.nodes],
@@ -991,7 +992,10 @@ const PackedAtlasView = ({
       />
 
       {packedTitle && (
-        <div className={styles.packedAtlasTitleRow}>
+        <div
+          className={styles.packedAtlasTitleRow}
+          style={compactHeader ? { top: 20, left: 148, right: 8, width: 'auto', transform: 'none' } : undefined}
+        >
           <button
             type="button"
             className={styles.packedAtlasTitleButton}
@@ -1021,11 +1025,22 @@ const PackedAtlasView = ({
             ? !showChildLabelsForGroup
             : node.hierarchyDepth === 2 && showChildLabelsForGroup
           : shouldAlwaysShowPackedLabel(node);
-        const labelFontSizePx = getPackedAtlasLabelFontSizePx(node, diameter, alwaysVisible);
+        const labelFontSizePx = Math.max(
+          readOnly && node.hierarchyDepth === 1 ? 14 : 0,
+          getPackedAtlasLabelFontSizePx(node, diameter, alwaysVisible),
+        );
+        const activateNode = () => {
+          const clickTarget = getPackedAtlasClickTarget(node, layoutNodeMap);
+          if (clickTarget) handleAtlasNodeClick(clickTarget);
+        };
 
         return (
           <div
             key={node.id}
+            role="button"
+            tabIndex={node.hierarchyDepth === 1 ? 0 : -1}
+            aria-label={node.name}
+            data-ce-control-appearance="frameless"
             className={`${styles.atlasNode} ${styles.packedAtlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
             style={{
               left: node.x,
@@ -1037,9 +1052,13 @@ const PackedAtlasView = ({
             data-ce-node-layout={ATLAS_LAYOUT_MODES.PACKED}
             onClick={(event) => {
               event.stopPropagation();
-              const clickTarget = getPackedAtlasClickTarget(node, layoutNodeMap);
-              if (!clickTarget) return;
-              handleAtlasNodeClick(clickTarget);
+              activateNode();
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              event.stopPropagation();
+              activateNode();
             }}
             onMouseEnter={() => {
               setHoveredNodeId(String(node.id || '').trim() || null);
@@ -1056,7 +1075,12 @@ const PackedAtlasView = ({
             >
               <div
                 className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}
-                style={{ fontSize: `${labelFontSizePx}px` }}
+                style={{
+                  fontSize: `${labelFontSizePx}px`,
+                  color: readOnly ? 'var(--ce-panel-text)' : undefined,
+                  fontFamily: readOnly ? 'var(--ce-font-body)' : undefined,
+                  inset: readOnly ? '6%' : undefined,
+                }}
               >
                 {node.name}
               </div>
