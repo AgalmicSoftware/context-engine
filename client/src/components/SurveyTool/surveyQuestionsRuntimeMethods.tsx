@@ -2055,7 +2055,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     failures.forEach((msg: SurveyQuestionsLegacyValue) => surveyLog.error(msg));
 
     if (!passed) {
-      throw new Error('Encryption verification failed. Some data marked for encryption was not processed correctly.');
+      throw new Error(
+        failures[0] || 'Encryption verification failed. Some data marked for encryption was not processed correctly.',
+      );
     }
     surveyLog.log('Encryption verification successful.');
     return true;
