@@ -34,11 +34,12 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
       expect(result.snapshot.questions).toHaveLength(1);
       expect(result.snapshot.responses).toEqual([
         expect.objectContaining({ questionId: 'q1', participantId: '0xaaa', answer: 'Use clearer reports' }),
+        expect.objectContaining({ questionId: 'q1', participantId: '0xbbc', answer: 'Visible answer' }),
       ]);
       expect(result.snapshot.responses[0]).toEqual(
         expect.objectContaining({ additionalComments: 'Add source counts' }),
       );
-      expect(result.counts.lockedCount).toBe(2);
+      expect(result.counts.lockedCount).toBe(1);
     }
   });
 
@@ -138,5 +139,59 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
   it('reports unsupported when cache is not hydrated', () => {
     const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({ networkNode: {}, sessionSlug: 'edge' });
     expect(result.ok).toBe(false);
+  });
+
+  it.each(['additional', 'additionalComments', 'comments', 'comment'])(
+    'keeps public answers while withholding a locked %s and rating envelopes',
+    async (commentField) => {
+      const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+        sessionSlug: 'edge',
+        networkNode: {
+          questions: { q1: { id: 'q1', prompt: 'Public answer?', type: 'text' } },
+          questionResponses: {
+            q1: {
+              participant: {
+                sessionSlug: 'edge',
+                answer: { value: 'public answer' },
+                [commentField]: { value: 'private note', encrypted: true, encryptedPortion: 'ciphertext' },
+                importanceEncrypted: { ciphertext: 'private rating' },
+              },
+            },
+          },
+        },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.reason);
+      expect(result.snapshot.responses).toEqual([
+        expect.objectContaining({ questionId: 'q1', answer: 'public answer' }),
+      ]);
+      expect(JSON.stringify(result.snapshot)).not.toMatch(/private note|ciphertext|private rating/);
+      const worker = await loadAdminSnapshotResultsAnalysisSource({
+        slug: 'edge',
+        config: { slug: 'edge' },
+        body: { source: { kind: 'admin-snapshot', snapshot: result.snapshot } },
+      });
+      expect(worker.ok).toBe(true);
+    },
+  );
+
+  it('withholds a masked comment and rejects an answer still carrying ciphertext', () => {
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: { q1: { id: 'q1', prompt: 'Public answer?', type: 'text' } },
+        questionResponses: {
+          q1: {
+            public: { sessionSlug: 'edge', answer: { value: 'public answer' }, additional: '*' },
+            locked: { sessionSlug: 'edge', answer: { value: 'decrypted answer', encryptedPortion: 'ciphertext' } },
+          },
+        },
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.snapshot.responses).toHaveLength(1);
+    expect(result.snapshot.responses[0]).not.toHaveProperty('additionalComments');
+    expect(result.counts.lockedCount).toBe(1);
   });
 });

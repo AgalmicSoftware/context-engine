@@ -39606,21 +39606,11 @@ var init_resultsAnalysisGeneration = __esm({
     toStr20 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     trim7 = (value) => toStr20(value).trim();
     lower3 = (value) => trim7(value).toLowerCase();
-    getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(
-      config?.resultsAnalysis
-    );
+    getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(config?.resultsAnalysis);
     getCanonicalSessionId = (config = {}) => normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
     publicDraft = (draft, config) => {
       if (!isObj13(draft)) return null;
-      const {
-        participantWatermark,
-        participantDigests,
-        sourceSignature,
-        viewSignature,
-        reservationKey,
-        attemptId,
-        ...rest
-      } = draft;
+      const { participantWatermark, participantDigests, sourceSignature, viewSignature, reservationKey, attemptId, ...rest } = draft;
       return config ? { ...rest, artifact: applyCurrentArtifactPolicy(rest.artifact, config) } : rest;
     };
     applyCurrentArtifactPolicy = (artifact, config) => applyResultsAnalysisExposurePolicy({
@@ -39660,30 +39650,23 @@ var init_resultsAnalysisGeneration = __esm({
       if (depth > 5) return false;
       if (!isObj13(value)) return false;
       if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-      if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
+      if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry)))
+        return true;
       return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
     };
     valueFromAnswerLike = (value) => {
       if (value == null) return "";
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return trim7(value);
-      if (Array.isArray(value)) return value.map(valueFromAnswerLike).filter((entry) => entry !== "").join("; ");
+      if (Array.isArray(value))
+        return value.map(valueFromAnswerLike).filter((entry) => entry !== "").join("; ");
       if (isObj13(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
       return "";
     };
     rowLooksLocked = (row) => {
       if (!isObj13(row)) return true;
       if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
-      const encryptedEnvelope = [
-        row.answer,
-        row.additional,
-        row.additionalComments,
-        row.comment,
-        row.comments,
-        row.response,
-        row.value
-      ].some((entry) => valueLooksEncrypted(entry));
-      if (encryptedEnvelope || valueLooksEncrypted(row)) return true;
-      const answer = row.answer;
+      const answer = hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response;
+      if (valueLooksEncrypted(answer)) return true;
       const value = isObj13(answer) && hasOwn6(answer, "value") ? answer.value : answer;
       const text = trim7(value);
       return text === "*" || /^\*+$/.test(text) || /^\[?(encrypted|locked|redacted)\]?$/i.test(text);
@@ -39691,16 +39674,7 @@ var init_resultsAnalysisGeneration = __esm({
     normalizeQuestionId = (value) => trim7(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim7(value).replace(/\s+/g, " ").slice(0, 1200);
     normalizeQuestionType = (value) => trim7(value).slice(0, 64) || "text";
-    RATING_SCALE_METADATA_KEYS = [
-      "min",
-      "minimum",
-      "max",
-      "maximum",
-      "minLabel",
-      "lowLabel",
-      "maxLabel",
-      "highLabel"
-    ];
+    RATING_SCALE_METADATA_KEYS = ["min", "minimum", "max", "maximum", "minLabel", "lowLabel", "maxLabel", "highLabel"];
     safeNumber = (value) => {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : null;
@@ -39848,7 +39822,10 @@ var init_resultsAnalysisGeneration = __esm({
         options: Array.isArray(question.options) ? question.options.filter((option) => typeof option === "string").map((option) => option.trim()).filter(Boolean) : [],
         tags: Array.isArray(question.tags) ? question.tags.slice(0, AI_LIMITS.maxTagsPerQuestion).map((tag) => normalizeQuestionPrompt(tag).slice(0, 120)).filter(Boolean) : [],
         ...scale ? { scale } : {},
-        ...type === "multichoice" ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice), ...Number.isSafeInteger(question.maxSelections) && question.maxSelections > 0 ? { maxSelections: question.maxSelections } : {} } : {},
+        ...type === "multichoice" ? {
+          singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice),
+          ...Number.isSafeInteger(question.maxSelections) && question.maxSelections > 0 ? { maxSelections: question.maxSelections } : {}
+        } : {},
         ...type === "quadratic" ? { voiceCredits: question.voiceCredits === void 0 ? 99 : question.voiceCredits } : {}
       };
     };
@@ -39891,14 +39868,21 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        if (!compareIdentity({ slug: expectedSlug, config: { ...config, sessionIdHex: expectedSessionId }, suppliedSlug: row.sessionSlug, suppliedSessionId: row.sessionId || row.sessionIdHex, allowInherited: strictLocked === true })) {
+        if (!compareIdentity({
+          slug: expectedSlug,
+          config: { ...config, sessionIdHex: expectedSessionId },
+          suppliedSlug: row.sessionSlug,
+          suppliedSessionId: row.sessionId || row.sessionIdHex,
+          allowInherited: strictLocked === true
+        })) {
           excludedCount += 1;
           continue;
         }
         if (rowLooksLocked(row)) {
           excludedCount += 1;
           lockedCount += 1;
-          if (strictLocked) return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
+          if (strictLocked)
+            return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
           continue;
         }
         const questionId = normalizeQuestionId(row.questionId || row.questionID || row.id);
@@ -39929,7 +39913,7 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const answer = validatedAnswer.slice(0, 4e3);
-        const additionalComments = valueFromAnswerLike(additionalValue).slice(0, 2e3);
+        const additionalComments = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue)) ? "" : valueFromAnswerLike(additionalValue).slice(0, 2e3);
         if (!answer && !additionalComments) {
           excludedCount += 1;
           continue;
@@ -39942,8 +39926,8 @@ var init_resultsAnalysisGeneration = __esm({
           participantKey: digest,
           answer,
           additionalComments,
-          importance: safeNumber(row.importance),
-          conviction: safeNumber(row.conviction),
+          importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : safeNumber(row.importance),
+          conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : safeNumber(row.conviction),
           submittedAt: normalizeSubmittedAt(row.submittedAt || row.createdAt || row.timestamp),
           questionPrompt: knownQuestion.prompt || "",
           questionType: knownQuestion.type || "text",
@@ -39953,9 +39937,13 @@ var init_resultsAnalysisGeneration = __esm({
         if (!existing || candidate.rowTime >= existing.rowTime) responseByQuestionParticipant.set(dedupeKey, candidate);
       }
       const sortedParticipantDigests = [...participantDigests].sort();
-      const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, "0")}`]));
+      const participantLabels = new Map(
+        sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, "0")}`])
+      );
       const participants = sortedParticipantDigests.map((digest) => ({ syntheticId: participantLabels.get(digest) }));
-      const responseRows = [...responseByQuestionParticipant.values()].sort((a, b2) => a.questionId.localeCompare(b2.questionId) || (participantLabels.get(a.participantKey) || "").localeCompare(participantLabels.get(b2.participantKey) || ""));
+      const responseRows = [...responseByQuestionParticipant.values()].sort(
+        (a, b2) => a.questionId.localeCompare(b2.questionId) || (participantLabels.get(a.participantKey) || "").localeCompare(participantLabels.get(b2.participantKey) || "")
+      );
       const sanitizedResponses = responseRows.map((row, index) => ({
         responseId: `r${index + 1}`,
         questionId: row.questionId,
@@ -40042,10 +40030,12 @@ var init_resultsAnalysisGeneration = __esm({
       const questions = [];
       for (const row of questionRows) {
         const metadata = row?.metadata;
-        if (!isObj13(metadata) || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
+        if (!isObj13(metadata) || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config))
+          continue;
         const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
         if (!isObj13(payload)) continue;
-        if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
+        if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex }))
+          continue;
         const normalized2 = normalizeQuestionRecord(payload);
         if (normalized2) questions.push(normalized2);
       }
@@ -40114,7 +40104,14 @@ var init_resultsAnalysisGeneration = __esm({
           encrypted: metadata.encrypted === true || payload.encrypted === true || payload.payloadEncrypted === true
         });
       }
-      const normalized = await normalizeSanitizedRows({ rows: responseRows, questions, slug, config, strictLocked: false, requireKnownQuestion: true });
+      const normalized = await normalizeSanitizedRows({
+        rows: responseRows,
+        questions,
+        slug,
+        config,
+        strictLocked: false,
+        requireKnownQuestion: true
+      });
       if (!normalized.ok) return normalized;
       return {
         ...normalized,
@@ -40193,9 +40190,7 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const modelProviders = isObj13(ai.modelProviders) ? ai.modelProviders : {};
       const taskEntry = isObj13(models2[task]) ? models2[task] : null;
       const model = trim7(taskEntry?.model || taskEntry?.name || models2[task] || models2.reasoning || ai.model || "");
-      const provider = lower3(
-        taskEntry?.provider || modelProviders[task] || modelProviders.reasoning || ai.provider || ai.mode || "openai"
-      ) || "openai";
+      const provider = lower3(taskEntry?.provider || modelProviders[task] || modelProviders.reasoning || ai.provider || ai.mode || "openai") || "openai";
       return { provider, model };
     };
     resolveAnalysisAiPayload = ({ config, prompt }) => {
@@ -40247,9 +40242,15 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       let response3;
       const proxyDeps = { fetch: deps?.fetch || globalThis.fetch?.bind(globalThis), json: deps?.json || json };
       const runProvider = async () => {
-        if (provider === "anthropic") return (deps?.proxyAnthropic || ((args) => proxyAnthropic({ ...args, deps: proxyDeps })))(proxyArgs);
-        if (provider === "openrouter") return (deps?.proxyOpenRouter || ((args) => proxyOpenRouter({ ...args, deps: proxyDeps })))(proxyArgs);
-        if (provider === "custom") return (deps?.proxyCustomRPC || ((args) => proxyCustomRPC({ ...args, deps: proxyDeps })))({ ...proxyArgs, auth: { scopes: { ai: true, custom_rpc: true } } });
+        if (provider === "anthropic")
+          return (deps?.proxyAnthropic || ((args) => proxyAnthropic({ ...args, deps: proxyDeps })))(proxyArgs);
+        if (provider === "openrouter")
+          return (deps?.proxyOpenRouter || ((args) => proxyOpenRouter({ ...args, deps: proxyDeps })))(proxyArgs);
+        if (provider === "custom")
+          return (deps?.proxyCustomRPC || ((args) => proxyCustomRPC({ ...args, deps: proxyDeps })))({
+            ...proxyArgs,
+            auth: { scopes: { ai: true, custom_rpc: true } }
+          });
         return (deps?.proxyOpenAI || ((args) => proxyOpenAI({ ...args, deps: proxyDeps })))(proxyArgs);
       };
       response3 = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, "AI results analysis generation timed out.");
@@ -40350,7 +40351,13 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const capability = resolveResultsAnalysisCapability({ config });
       const sourceKind = sourceKindFromBody(body);
       if (trigger === "automatic" && !["automatic", "both"].includes(settings.generationMode)) {
-        return { ok: false, status: 409, jobState: "unsupported", error: "Automatic results analysis is disabled for this session.", capability };
+        return {
+          ok: false,
+          status: 409,
+          jobState: "unsupported",
+          error: "Automatic results analysis is disabled for this session.",
+          capability
+        };
       }
       let coordinatorStateForRetry = null;
       if (trigger === "manual" && !["manual", "both"].includes(settings.generationMode)) {
@@ -40360,7 +40367,13 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         }
         const hasPriorFailure = !!coordinatorStateForRetry?.state?.lastFailure;
         if (!hasPriorFailure) {
-          return { ok: false, status: 409, jobState: "unsupported", error: "Manual results analysis is disabled for this session.", capability };
+          return {
+            ok: false,
+            status: 409,
+            jobState: "unsupported",
+            error: "Manual results analysis is disabled for this session.",
+            capability
+          };
         }
       }
       if (config?.scopes?.ai === false) {
@@ -40372,9 +40385,18 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
       const source = await resolveResultsAnalysisSource({ env, slug, config, body, trigger });
       if (!source.ok) return { ok: false, status: source.status || 400, jobState: "failed", error: source.error, capability };
       const eligibility = analysisEligibility(source);
-      if (!eligibility.eligible) return { ok: false, status: 422, jobState: "failed", error: "Results analysis input is not eligible.", reasons: eligibility.reasons, capability };
+      if (!eligibility.eligible)
+        return {
+          ok: false,
+          status: 422,
+          jobState: "failed",
+          error: "Results analysis input is not eligible.",
+          reasons: eligibility.reasons,
+          capability
+        };
       const sections = normalizeRequestedSections(body.sections, settings);
-      if (!sections.length) return { ok: false, status: 400, jobState: "failed", error: "No supported results-analysis sections requested.", capability };
+      if (!sections.length)
+        return { ok: false, status: 400, jobState: "failed", error: "No supported results-analysis sections requested.", capability };
       const sourceDescriptor = await buildSourceDescriptor({ kind: sourceKind, source });
       const exposure = normalizedResultsProfile(config)?.exposure;
       const viewSignature = `sha256:${await sha256Hex2(stableCanonicalSerialize({ sections, exposure, version: ANALYSIS_ARTIFACT_VERSION }))}`;
@@ -40396,13 +40418,27 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         }
       });
       if (reservation?.kind === "terminal") {
-        return { ok: true, status: 200, jobState: "succeeded", reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(reservation.draft || reservation.receipt?.draft, config) };
+        return {
+          ok: true,
+          status: 200,
+          jobState: "succeeded",
+          reservation: summarizeReservation(reservation, requestId),
+          capability,
+          draft: publicDraft(reservation.draft || reservation.receipt?.draft, config)
+        };
       }
       if (reservation?.kind === "pending") {
         return { ok: true, status: 202, jobState: "running", reservation: summarizeReservation(reservation, requestId), capability };
       }
       if (reservation?.kind !== "execute") {
-        return { ok: false, status: reservation?.status || 503, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: reservation?.error || "Results analysis generation is already pending." };
+        return {
+          ok: false,
+          status: reservation?.status || 503,
+          jobState: "failed",
+          reservation: summarizeReservation(reservation, requestId),
+          capability,
+          error: reservation?.error || "Results analysis generation is already pending."
+        };
       }
       const generatedAt = new Date(Number(deps?.now?.() || Date.now())).toISOString();
       const aiProvenance = resolveAnalysisAiPayload({ config, prompt: "" });
@@ -40437,7 +40473,14 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
             receipt: failure2
           }
         });
-        return { ok: false, status: failure2.status, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: failure2.error };
+        return {
+          ok: false,
+          status: failure2.status,
+          jobState: "failed",
+          reservation: summarizeReservation(reservation, requestId),
+          capability,
+          error: failure2.error
+        };
       }
       let artifact;
       try {
@@ -40450,9 +40493,25 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         });
         artifact = applyCurrentArtifactPolicy(artifact, config);
       } catch (error) {
-        const failure2 = { ok: false, error: error?.message || "AI results analysis output failed validation.", status: 502, failedAt: generatedAt };
-        await finalize({ env, slug, finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure2 } });
-        return { ok: false, status: failure2.status, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: failure2.error };
+        const failure2 = {
+          ok: false,
+          error: error?.message || "AI results analysis output failed validation.",
+          status: 502,
+          failedAt: generatedAt
+        };
+        await finalize({
+          env,
+          slug,
+          finalization: { requestId, reservationKey, attemptId: reservation.attemptId, success: false, receipt: failure2 }
+        });
+        return {
+          ok: false,
+          status: failure2.status,
+          jobState: "failed",
+          reservation: summarizeReservation(reservation, requestId),
+          capability,
+          error: failure2.error
+        };
       }
       const draftId = `sha256:${await sha256Hex2(stableCanonicalSerialize({ artifact, source: sourceDescriptor.snapshot, sections }))}`;
       const draft = {
@@ -40486,9 +40545,23 @@ ${JSON.stringify(source.aiSnapshot, null, 2)}`;
         }
       });
       if (!finalization?.ok) {
-        return { ok: false, status: finalization?.status || 503, jobState: "failed", reservation: summarizeReservation(reservation, requestId), capability, error: finalization?.error || "Results analysis finalization failed." };
+        return {
+          ok: false,
+          status: finalization?.status || 503,
+          jobState: "failed",
+          reservation: summarizeReservation(reservation, requestId),
+          capability,
+          error: finalization?.error || "Results analysis finalization failed."
+        };
       }
-      return { ok: true, status: 200, jobState: "succeeded", reservation: summarizeReservation(reservation, requestId), capability, draft: publicDraft(draft, config) };
+      return {
+        ok: true,
+        status: 200,
+        jobState: "succeeded",
+        reservation: summarizeReservation(reservation, requestId),
+        capability,
+        draft: publicDraft(draft, config)
+      };
     };
     maybeTriggerAutomaticResultsAnalysis = async ({ env, slug, config, committedResponses = [], requestId = "", deps } = {}) => {
       const settings = getResultsAnalysisSettings(config);
