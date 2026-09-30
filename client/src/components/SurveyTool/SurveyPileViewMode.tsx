@@ -2934,6 +2934,7 @@ const renderPileResponseInput = (
     case 'rating': {
       const ratingScale = normalizeRatingScale(question);
       const ratingValue = getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max);
+      const unanswered = answer.value == null || answer.value === '';
       return (
         <div className={styles.ratingContainer}>
           <CESlider
@@ -2946,12 +2947,16 @@ const renderPileResponseInput = (
                 ? onAnswerChange(val)
                 : engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event))
             }
-            onChangeComplete={engine.flushDraftPersistAfterSliderChange}
+            onChangeComplete={(val: number) => {
+              if (!unanswered) return engine.flushDraftPersistAfterSliderChange();
+              if (onAnswerChange) onAnswerChange(val);
+              else engine.handleAnswerPile(question.id, val);
+            }}
             disabled={engine.state.isSubmitting}
             className={styles.ratingSlider}
           />
           <span className={styles.ratingValueDisplay}>
-            <span aria-label="Current rating">{answer.value == null || answer.value === '' ? '–' : ratingValue}</span>
+            <span aria-label="Current rating">{unanswered ? '–' : ratingValue}</span>
           </span>
         </div>
       );

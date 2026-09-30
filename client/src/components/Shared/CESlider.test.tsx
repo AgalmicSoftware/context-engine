@@ -4,6 +4,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import CESlider from './CESlider';
 
 describe('CESlider', () => {
+  it('commits an arrow key at a bound without emitting a change', () => {
+    const onChange = jest.fn();
+    const onChangeComplete = jest.fn();
+    render(<CESlider min={1} max={5} value={1} onChange={onChange} onChangeComplete={onChangeComplete} />);
+    fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowLeft' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onChangeComplete).toHaveBeenCalledWith(1);
+  });
+
   it('clamps the rendered value inside the range', () => {
     render(<CESlider min={0} max={10} value={25} />);
 

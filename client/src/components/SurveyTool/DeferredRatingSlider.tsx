@@ -8,6 +8,7 @@ import { DEFAULT_RATING_SCALE, type RatingScale } from '../../utilities/survey/r
 type DeferredRatingSliderProps = {
   value: number;
   scale?: RatingScale;
+  answered?: boolean;
   disabled?: boolean;
   onCommit?: (value: number) => void;
 };
@@ -19,6 +20,7 @@ export const resolveDeferredRatingSliderStyle = (): React.CSSProperties => ({
 const DeferredRatingSlider = ({
   value,
   scale = DEFAULT_RATING_SCALE,
+  answered = true,
   disabled = false,
   onCommit,
 }: DeferredRatingSliderProps) => (
@@ -29,6 +31,7 @@ const DeferredRatingSlider = ({
     step={1}
     tooltip={false}
     disabled={disabled}
+    commitUnchanged={!answered}
     className={styles.ratingSlider}
     style={resolveDeferredRatingSliderStyle()}
     onCommit={onCommit}
@@ -39,7 +42,7 @@ const DeferredRatingSlider = ({
           <CESlider {...sliderProps} />
         </div>
         <FormText className={styles.ratingLabelText}>
-          <span aria-label="Current rating">{liveValue}</span>
+          <span aria-label="Current rating">{answered || liveValue !== value ? liveValue : '–'}</span>
         </FormText>
       </>
     )}

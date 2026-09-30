@@ -33,6 +33,7 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
       questionId: string;
       ratingValue: number;
       ratingScale: RatingScale;
+      answered: boolean;
       disabled: boolean;
       useDeferredRating: boolean;
     }
@@ -137,6 +138,7 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         questionId: question.id,
         ratingValue: getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max),
         ratingScale,
+        answered: !(answer.value == null || answer.value === ''),
         disabled,
         // Regression guard: keep pointer-drag ticks local; parent updates rebuild the full question list.
         useDeferredRating: true,

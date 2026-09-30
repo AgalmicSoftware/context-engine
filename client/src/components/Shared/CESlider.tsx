@@ -105,7 +105,10 @@ function CESlider({
       });
 
       event.preventDefault();
-      if (nextValue === resolvedValue) return;
+      if (nextValue === resolvedValue) {
+        onChangeComplete?.(nextValue);
+        return;
+      }
 
       if (typeof onChange === 'function') {
         onChange(nextValue, event.nativeEvent);

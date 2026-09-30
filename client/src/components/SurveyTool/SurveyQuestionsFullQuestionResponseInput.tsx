@@ -163,6 +163,7 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
         <DeferredRatingSlider
           value={inputDescriptor.ratingValue}
           scale={inputDescriptor.ratingScale}
+          answered={inputDescriptor.answered}
           disabled={inputDescriptor.disabled}
           onCommit={emitDeferredRatingCommit}
         />

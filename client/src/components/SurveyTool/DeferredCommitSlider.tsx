@@ -39,6 +39,8 @@ export type DeferredCommitSliderProps = {
   tooltip?: boolean;
   className?: string;
   style?: CSSProperties;
+  // Commit even when the value equals the prop, e.g. picking the shown minimum of an unanswered rating.
+  commitUnchanged?: boolean;
   onCommit?: (value: number) => void;
   children: (args: { value: number; sliderProps: DeferredCommitSliderRenderProps }) => ReactNode;
 };
@@ -71,7 +73,7 @@ export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSlid
     if (this.state.isInteracting) {
       this.setState(buildDeferredCommitSliderInteractingPatch(false));
     }
-    if (committedValue === propValue) return;
+    if (committedValue === propValue && !this.props.commitUnchanged) return;
     if (typeof this.props.onCommit === 'function') {
       this.props.onCommit(committedValue);
     }

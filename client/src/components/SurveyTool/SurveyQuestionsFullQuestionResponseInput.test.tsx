@@ -97,6 +97,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       questionId: 'q2',
       ratingValue: 7,
       ratingScale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
+      answered: true,
       disabled: false,
       useDeferredRating: true,
     });
@@ -135,6 +136,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       questionId: 'q-rating',
       ratingValue: 1,
       ratingScale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' },
+      answered: true,
       disabled: false,
       useDeferredRating: true,
     });

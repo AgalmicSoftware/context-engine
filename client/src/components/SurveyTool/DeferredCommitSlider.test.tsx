@@ -11,6 +11,21 @@ const syncClassSetState = (subject: any) => {
 };
 
 describe('DeferredCommitSlider', () => {
+  it('commits the displayed value when an unanswered slider permits unchanged commits', () => {
+    const onCommit = jest.fn();
+    const subject = new DeferredCommitSlider({
+      value: 1,
+      min: 1,
+      max: 5,
+      commitUnchanged: true,
+      onCommit,
+      children: () => null,
+    });
+    syncClassSetState(subject);
+    subject.handleChangeComplete();
+    expect(onCommit).toHaveBeenCalledWith(1);
+  });
+
   it('buffers single-question slider movement locally and only commits on completion', () => {
     const onCommit = jest.fn();
     const subject = new DeferredCommitSlider({
