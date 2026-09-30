@@ -214,7 +214,9 @@ export const buildSurveyResultsMultichoiceSummaryModel = (
 
   if (displayByKey.size === 0) {
     latestRows.forEach((row) => {
-      const value = row?.response?.answer?.value;
+      const answer = row?.response?.answer;
+      if (answer?.encrypted === true || answer?.value === '*') return;
+      const value = answer?.value;
       const items = Array.isArray(value) ? value : value == null ? [] : [value];
       items.forEach(addOption);
     });
