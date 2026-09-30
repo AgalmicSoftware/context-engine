@@ -297,7 +297,6 @@ export {
   mergeSbtLiveProgressEntry,
   buildQuestionReadyStatePatch,
   shouldClearQuestionProgressInFinalize,
-  shouldEnableSessionRegistryRefresh,
   SBT_PROGRESS_MIN_INTERVAL_MS,
   SBT_PROGRESS_FINAL_TAIL_BLOCKS,
   SBT_LIGHT_DISCOVERY_SCAN_UNITS,
@@ -2033,9 +2032,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     ...args
   ) => this._profileScanController.ensureRegistryHydratedForProfileScan(...args);
 
-  isOnchainSessionRegistryEnabled: SessionProfileScanController['isOnchainSessionRegistryEnabled'] = (...args) =>
-    this._profileScanController.isOnchainSessionRegistryEnabled(...args);
-
   refreshSessionUniverseRegistryCache: SessionProfileScanController['refreshSessionUniverseRegistryCache'] = (
     ...args
   ) => this._profileScanController.refreshSessionUniverseRegistryCache(...args);
@@ -2100,7 +2096,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     // Query-hinted survey URLs should resolve in that exact session context first.
     // This avoids long cross-session scans and matches shared-link intent.
     if (hintedSlug) {
-      if (!this.getSessionChainId(hintedSlug) && this.isOnchainSessionRegistryEnabled()) {
+      if (!this.getSessionChainId(hintedSlug)) {
         try {
           await this.ensureRegistryHydratedForProfileScan();
           allSlugs =

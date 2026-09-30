@@ -73,11 +73,6 @@ jest.mock('./profileScanTelemetry.js', () => ({
   isProfileScanTelemetryEnabled: jest.fn(() => false),
 }));
 
-jest.mock('./mainSiteProgressHelpers.js', () => ({
-  __esModule: true,
-  shouldEnableSessionRegistryRefresh: jest.fn(() => true),
-}));
-
 const { ethers } = require('ethers');
 const { createSessionProfileScanController } = require('./sessionProfileScanController.js');
 const litProtocolModule = require('../../utilities/crypto/litProtocol.js');
@@ -87,7 +82,6 @@ const sessionSlugModule = require('./sessionSlug.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const chainsModule = require('../../variables/chains.js');
 const debugTelemetryModule = require('./profileScanTelemetry.js');
-const progressHelpersModule = require('./mainSiteProgressHelpers.js');
 
 const VALID_RETRY_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -206,7 +200,6 @@ describe('createSessionProfileScanController', () => {
     sessionRegistryModule.sessionRegistryStore.getAllSessionSlugs.mockReturnValue([]);
     sessionRegistryModule.upsertSessionRegistryCache.mockImplementation(() => {});
     chainsModule.getSessionRegistryChainIds.mockReturnValue([84532]);
-    progressHelpersModule.shouldEnableSessionRegistryRefresh.mockReturnValue(true);
     debugTelemetryModule.isProfileScanColdDiagEnabled.mockReturnValue(false);
     debugTelemetryModule.isProfileScanTelemetryEnabled.mockReturnValue(false);
     debugTelemetryModule.emitProfileScanColdDiag.mockImplementation(function emitColdDiag() {

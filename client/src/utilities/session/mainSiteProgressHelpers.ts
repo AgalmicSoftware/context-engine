@@ -176,5 +176,3 @@ export const shouldClearQuestionProgressInFinalize = ({
   if (phase === 'hydrate' && hydratedQuestions < discoveredQuestions) return false;
   return true;
 };
-
-export const shouldEnableSessionRegistryRefresh = () => true;
