@@ -1051,6 +1051,7 @@ function SessionInterviewPanel({
                         <Input
                           type="checkbox"
                           checked={includeResponderName}
+                          disabled={applying}
                           onChange={(event) => setIncludeResponderName(event.target.checked)}
                           data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
                         />{' '}
