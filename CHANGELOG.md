@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.6.4] - 2026-09-24
+## [0.6.4] - 2026-09-28
 
 ### Client — available when the site deploys
 
@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
   search, related topics, and mobile navigation for the RxC sessions. Keep the
   unpopulated topic map in Results labelled "Waiting for more data".
 - Discover both RxC test sessions from their clean URLs on a fresh visit.
-- Display linked community groups from their verified owning session, preserving
+- Display linked community groups from their configured owning session, preserving
   existing memberships and logos without creating duplicate groups.
 - Put compact AI submission choices beside Submit responses, strengthen the
   review heading, and remove the duplicate imported-context title.
