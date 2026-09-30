@@ -106,6 +106,9 @@ type BuildSiweMessageOptions = {
   nonce?: unknown;
   statement?: unknown;
   uri?: unknown;
+  workerUrl?: unknown;
+  sessionId?: unknown;
+  sessionSlug?: unknown;
 };
 type AdminActionAuthOptions = {
   action?: unknown;
@@ -403,6 +406,9 @@ export const buildSiweMessage = ({
   statement,
   issuedAt,
   expirationTime,
+  workerUrl,
+  sessionId,
+  sessionSlug,
 }: BuildSiweMessageOptions = {}) => {
   const addr = toStr(address).trim();
   const host = toStr(domain || (typeof window !== 'undefined' ? window.location.host : '')).trim();
@@ -411,8 +417,13 @@ export const buildSiweMessage = ({
   const issued = issuedAt || new Date().toISOString();
   const exp = expirationTime || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const note = statement || 'Sign in to Context Engine.';
+  const id = toStr(sessionId).trim().toLowerCase();
+  const sessionResource = id
+    ? `urn:context-engine:session:id:${encodeURIComponent(id)}`
+    : `urn:context-engine:session:slug:${encodeURIComponent(normalizeSessionSlug(sessionSlug))}`;
+  const resources = workerUrl ? `\nResources:\n- ${new URL(toStr(workerUrl)).origin}\n- ${sessionResource}` : '';
 
-  return `${host} wants you to sign in with your Ethereum account:\n${addr}\n\n${note}\n\nURI: ${origin}\nVersion: 1\nChain ID: ${chain}\nNonce: ${nonce}\nIssued At: ${issued}\nExpiration Time: ${exp}`;
+  return `${host} wants you to sign in with your Ethereum account:\n${addr}\n\n${note}\n\nURI: ${origin}\nVersion: 1\nChain ID: ${chain}\nNonce: ${nonce}\nIssued At: ${issued}\nExpiration Time: ${exp}${resources}`;
 };
 
 const signMessage = async ({
@@ -707,6 +718,9 @@ export const getWorkerSessionToken = async ({
         nonce: nonceData.nonce,
         chainId,
         statement: 'Sign in to Context Engine.',
+        workerUrl: resolvedWorkerUrl,
+        sessionId,
+        sessionSlug: slug,
       });
       const signature = await signMessage({
         message,
