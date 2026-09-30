@@ -253,6 +253,10 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
       target: { value: 'Human revised note' },
     });
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
+    fireEvent.keyUp(screen.getByRole('textbox', { name: /Additional comments for q1/i }), { key: 'Escape' });
+    const revisedComment = screen.getByRole('button', { name: /Additional comments for q1/i });
+    expect(revisedComment).toHaveTextContent('Human revised note');
+    expect(revisedComment).toHaveFocus();
   });
 
   it('keeps the proposal marker through focus-only editing and restores it after a full revert', () => {
@@ -315,7 +319,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
   });
 
-  it('wraps injected prose editors with focus, bounded autosize and a Done editing return path', async () => {
+  it('wraps injected prose editors with focus, bounded autosize and a blur and Escape return path', async () => {
     const renderAnswerInput = jest.fn((_questionId, value, onChange) => (
       <textarea
         aria-label="Injected answer"
@@ -348,7 +352,12 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
     await waitFor(() => expect(injected.style.height).toBe('96px'));
     expect(injected.style.overflow).toBe('hidden');
     expect(injected.style.overflowY).toBe('auto');
-    fireEvent.click(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.queryByRole('button', { name: 'Done editing' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tap or press Enter to edit.')).not.toBeInTheDocument();
+    fireEvent.blur(injected, { relatedTarget: document.body });
+    fireEvent.click(screen.getByRole('button', { name: /Draft answer for Explain this/i }));
+    fireEvent.keyUp(screen.getByLabelText('Injected answer'), { key: 'Escape' });
+    expect(screen.getByRole('button', { name: /Draft answer for Explain this/i })).toHaveFocus();
     expect(screen.getByRole('button', { name: /Draft answer for Explain this/i })).toBeInTheDocument();
   });
 

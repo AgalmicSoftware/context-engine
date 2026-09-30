@@ -280,3 +280,7 @@ blocked on incomplete or failed saved-answer reads and offers a retry. Existing
 answers discovered during a queued submission are deselected for explicit review;
 local draft edits are retained. See [the Worker guide](session-cors-worker.md#interview-saved-answer-readiness)
 for Hosted and chain-authoritative lookup behavior.
+
+### Draft review presentation
+
+The voice-mode chooser describes the interview; AI prompt-copy guidance stays inside the interview. Draft prose opens for editing by click, Enter, or Space. Edits update immediately; leaving the editor or pressing Escape returns to the readable answer without a separate Done button. AI confidence and its support meter appear only inside the collapsed Basis disclosure alongside the evidence.
