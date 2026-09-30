@@ -15,10 +15,12 @@ import {
 } from '../workers/shared/deployHelperCore.mjs';
 import { DEFAULT_WORKER_ALLOWED_ORIGINS } from '../client/src/utilities/worker/defaultWorkerAllowedOrigins.mjs';
 import { buildWorkerBundles, WORKER_BUNDLE_TARGETS } from './worker-bundle.mjs';
+import { readWorkerReleasePin, workerReleaseBaseUrl } from './verify-release-assets.mjs';
 
 export const DEFAULT_DEPLOY_HELPER_BUNDLE_PATH = WORKER_BUNDLE_TARGETS.deployHelper.outputRelativePath;
-export const DEFAULT_SESSION_WORKER_BUNDLE_URL = 'https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js';
-export const DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL = 'https://github.com/AgalmicSoftware/context-engine/releases/latest/download/worker-release-manifest.json';
+const PINNED_WORKER_RELEASE_BASE_URL = workerReleaseBaseUrl(readWorkerReleasePin().commit);
+export const DEFAULT_SESSION_WORKER_BUNDLE_URL = `${PINNED_WORKER_RELEASE_BASE_URL}/sessionCorsWorker.bundle.js`;
+export const DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL = `${PINNED_WORKER_RELEASE_BASE_URL}/worker-release-manifest.json`;
 export const DEFAULT_DEPLOY_HELPER_NAMESPACE_TITLE_PREFIX = 'ContextEngineDeployHelper';
 export const DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS = normalizeOriginList(DEFAULT_WORKER_ALLOWED_ORIGINS);
 const DEPLOY_HELPER_SESSION_COORDINATOR_BINDING = 'CE_SESSION_COORDINATOR';
@@ -52,98 +54,89 @@ export const parseArgs = (argv = process.argv.slice(2)) => {
 };
 
 export const printUsage = () => {
-  console.log([
-    'Usage:',
-    '  npm run deploy-helper:deploy -- --worker-name ce-deploy-helper --api-token <cloudflare-token>',
-    '  npm run deploy-helper:deploy -- --worker-name ce-deploy-helper --api-token <cloudflare-token> --allowed-origins https://app.example.com,http://localhost:3000',
-    '',
-    'Flags:',
-    '  --worker-name <name>          Cloudflare worker script name for the deploy-helper',
-    '  --api-token <token>           Cloudflare API token with Workers KV Storage + Workers Scripts edit scopes',
-    '  --account-id <id>             Developer override; otherwise look up the one visible account using the token',
-    '  --allowed-origins <csv>       Optional comma/newline-delimited origin allowlist written into ALLOWED_ORIGINS',
-    '                                When omitted, seeds the hosted/local defaults used by /new before it prepends the current browser origin',
-    '                                Self-hosted custom app origins are not discoverable here; pass --allowed-origins explicitly',
-    '  --admin-secret <secret>       Optional ADMIN_SECRET (auto-generated when omitted)',
-    '  --worker-bundle-url <url>     Optional default session worker bundle URL written into WORKER_BUNDLE_URL',
-    '  --worker-bundle-manifest-url <url>',
-    '                                Expected-digest manifest written into WORKER_BUNDLE_MANIFEST_URL',
-    '  --compatibility-date <date>   Optional helper compatibility date (default from deployHelperCore)',
-    '  --worker-compat-date <date>   Optional WORKER_COMPATIBILITY_DATE binding for deployed session workers',
-    '  --default-session-slug <slug> Optional DEFAULT_SESSION_SLUG binding for the helper',
-    '  --bundle-path <path>          Optional helper bundle path (default dist/deployHelper.bundle.js)',
-    '  --subdomain <value>           Optional workers.dev account subdomain to request when the account has none',
-    '  --skip-build                  Use the existing bundle file instead of rebuilding it first',
-    '  --help                        Show this help text',
-    '',
-    'Output:',
-    '  Prints the deployed helper URL, KV namespace ID, workers.dev activation status, and the generated ADMIN_SECRET when one was created.',
-  ].join('\n'));
+  console.log(
+    [
+      'Usage:',
+      '  npm run deploy-helper:deploy -- --worker-name ce-deploy-helper --api-token <cloudflare-token>',
+      '  npm run deploy-helper:deploy -- --worker-name ce-deploy-helper --api-token <cloudflare-token> --allowed-origins https://app.example.com,http://localhost:3000',
+      '',
+      'Flags:',
+      '  --worker-name <name>          Cloudflare worker script name for the deploy-helper',
+      '  --api-token <token>           Cloudflare API token with Workers KV Storage + Workers Scripts edit scopes',
+      '  --account-id <id>             Developer override; otherwise look up the one visible account using the token',
+      '  --allowed-origins <csv>       Optional comma/newline-delimited origin allowlist written into ALLOWED_ORIGINS',
+      '                                When omitted, seeds the hosted/local defaults used by /new before it prepends the current browser origin',
+      '                                Self-hosted custom app origins are not discoverable here; pass --allowed-origins explicitly',
+      '  --admin-secret <secret>       Optional ADMIN_SECRET (auto-generated when omitted)',
+      '  --release-commit <sha>       Immutable Worker release (default client/src/variables/workerReleasePin.json)',
+      '  --worker-bundle-url <url>     Optional default session worker bundle URL written into WORKER_BUNDLE_URL',
+      '  --worker-bundle-manifest-url <url>',
+      '                                Expected-digest manifest written into WORKER_BUNDLE_MANIFEST_URL',
+      '  --compatibility-date <date>   Optional helper compatibility date (default from deployHelperCore)',
+      '  --worker-compat-date <date>   Optional WORKER_COMPATIBILITY_DATE binding for deployed session workers',
+      '  --default-session-slug <slug> Optional DEFAULT_SESSION_SLUG binding for the helper',
+      '  --bundle-path <path>          Optional helper bundle path (default dist/deployHelper.bundle.js)',
+      '  --subdomain <value>           Optional workers.dev account subdomain to request when the account has none',
+      '  --skip-build                  Use the existing bundle file instead of rebuilding it first',
+      '  --help                        Show this help text',
+      '',
+      'Output:',
+      '  Prints the deployed helper URL, KV namespace ID, workers.dev activation status, and the generated ADMIN_SECRET when one was created.',
+    ].join('\n'),
+  );
 };
 
-export const resolveDeployHelperDeployConfig = ({
-  flags = {},
-  env = process.env,
-  rootDir = process.cwd(),
-} = {}) => {
+export const resolveDeployHelperDeployConfig = ({ flags = {}, env = process.env, rootDir = process.cwd() } = {}) => {
   const apiToken = toStr(flags['api-token'] || env.CLOUDFLARE_API_TOKEN).trim();
   const workerName = toStr(flags['worker-name'] || env.DEPLOY_HELPER_WORKER_NAME).trim();
-  const accountId = toStr(
-    flags['account-id'] ||
-    env.CLOUDFLARE_ACCOUNT_ID ||
-    env.DEPLOY_HELPER_ACCOUNT_ID
-  ).trim();
-  const allowedOriginsInput = (
-    flags['allowed-origins'] ||
-    env.DEPLOY_HELPER_ALLOWED_ORIGINS ||
-    env.ALLOWED_ORIGINS ||
-    ''
-  );
+  const accountId = toStr(flags['account-id'] || env.CLOUDFLARE_ACCOUNT_ID || env.DEPLOY_HELPER_ACCOUNT_ID).trim();
+  const allowedOriginsInput =
+    flags['allowed-origins'] || env.DEPLOY_HELPER_ALLOWED_ORIGINS || env.ALLOWED_ORIGINS || '';
   const allowedOrigins = normalizeOriginList(
     parseAllowList(allowedOriginsInput).length
       ? parseAllowList(allowedOriginsInput)
-      : DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS
+      : DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS,
   );
-  const adminSecret = toStr(
-    flags['admin-secret'] ||
-    env.DEPLOY_HELPER_ADMIN_SECRET ||
-    env.ADMIN_SECRET
-  ).trim();
+  const adminSecret = toStr(flags['admin-secret'] || env.DEPLOY_HELPER_ADMIN_SECRET || env.ADMIN_SECRET).trim();
+  const releaseCommit = toStr(flags['release-commit'] || readWorkerReleasePin().commit)
+    .trim()
+    .toLowerCase();
+  if (!/^[a-f0-9]{40}$/.test(releaseCommit)) throw new Error('Invalid release commit: use a full 40-character SHA.');
+  const releaseBaseUrl = workerReleaseBaseUrl(releaseCommit);
   const workerBundleUrl = toStr(
     flags['worker-bundle-url'] ||
-    env.DEPLOY_HELPER_WORKER_BUNDLE_URL ||
-    env.WORKER_BUNDLE_URL ||
-    DEFAULT_SESSION_WORKER_BUNDLE_URL
+      env.DEPLOY_HELPER_WORKER_BUNDLE_URL ||
+      env.WORKER_BUNDLE_URL ||
+      `${releaseBaseUrl}/sessionCorsWorker.bundle.js`,
   ).trim();
   const workerBundleManifestUrl = toStr(
     flags['worker-bundle-manifest-url'] ||
-    env.DEPLOY_HELPER_WORKER_BUNDLE_MANIFEST_URL ||
-    env.WORKER_BUNDLE_MANIFEST_URL ||
-    DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL
+      env.DEPLOY_HELPER_WORKER_BUNDLE_MANIFEST_URL ||
+      env.WORKER_BUNDLE_MANIFEST_URL ||
+      `${releaseBaseUrl}/worker-release-manifest.json`,
   ).trim();
-  const compatibilityDate = toStr(
-    flags['compatibility-date'] ||
-    env.DEPLOY_HELPER_COMPATIBILITY_DATE ||
-    DEFAULT_COMPAT_DATE
-  ).trim() || DEFAULT_COMPAT_DATE;
-  const workerCompatibilityDate = toStr(
-    flags['worker-compat-date'] ||
-    env.DEPLOY_HELPER_WORKER_COMPATIBILITY_DATE ||
-    env.WORKER_COMPATIBILITY_DATE ||
-    DEFAULT_COMPAT_DATE
-  ).trim() || DEFAULT_COMPAT_DATE;
+  const compatibilityDate =
+    toStr(flags['compatibility-date'] || env.DEPLOY_HELPER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE).trim() ||
+    DEFAULT_COMPAT_DATE;
+  const workerCompatibilityDate =
+    toStr(
+      flags['worker-compat-date'] ||
+        env.DEPLOY_HELPER_WORKER_COMPATIBILITY_DATE ||
+        env.WORKER_COMPATIBILITY_DATE ||
+        DEFAULT_COMPAT_DATE,
+    ).trim() || DEFAULT_COMPAT_DATE;
   const defaultSessionSlug = toStr(
-    flags['default-session-slug'] ||
-    env.DEPLOY_HELPER_DEFAULT_SESSION_SLUG ||
-    env.DEFAULT_SESSION_SLUG
+    flags['default-session-slug'] || env.DEPLOY_HELPER_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG,
   ).trim();
   const bundlePath = resolve(rootDir, toStr(flags['bundle-path']).trim() || DEFAULT_DEPLOY_HELPER_BUNDLE_PATH);
   const namespaceTitle = `${DEFAULT_DEPLOY_HELPER_NAMESPACE_TITLE_PREFIX}:${workerName || 'deploy-helper'}`;
   const requestedSubdomain = toStr(flags.subdomain || env.DEPLOY_HELPER_SUBDOMAIN).trim();
   const skipBuild = flags['skip-build'] === true;
 
-  if (!apiToken) throw new Error('Missing required Cloudflare API token. Pass --api-token or set CLOUDFLARE_API_TOKEN.');
-  if (!workerName) throw new Error('Missing required worker name. Pass --worker-name or set DEPLOY_HELPER_WORKER_NAME.');
+  if (!apiToken)
+    throw new Error('Missing required Cloudflare API token. Pass --api-token or set CLOUDFLARE_API_TOKEN.');
+  if (!workerName)
+    throw new Error('Missing required worker name. Pass --worker-name or set DEPLOY_HELPER_WORKER_NAME.');
 
   return {
     apiToken,
@@ -164,11 +157,7 @@ export const resolveDeployHelperDeployConfig = ({
   };
 };
 
-export const ensureDeployHelperBundle = async ({
-  bundlePath,
-  rootDir = process.cwd(),
-  skipBuild = false,
-} = {}) => {
+export const ensureDeployHelperBundle = async ({ bundlePath, rootDir = process.cwd(), skipBuild = false } = {}) => {
   const resolvedBundlePath = resolve(rootDir, toStr(bundlePath).trim() || DEFAULT_DEPLOY_HELPER_BUNDLE_PATH);
   if (!skipBuild) {
     await buildWorkerBundles({
@@ -177,7 +166,9 @@ export const ensureDeployHelperBundle = async ({
     });
   }
   if (!existsSync(resolvedBundlePath)) {
-    throw new Error(`Deploy-helper bundle missing at ${resolvedBundlePath}. Run "npm run worker:bundle" or omit --skip-build.`);
+    throw new Error(
+      `Deploy-helper bundle missing at ${resolvedBundlePath}. Run "npm run worker:bundle" or omit --skip-build.`,
+    );
   }
   return {
     bundlePath: resolvedBundlePath,
@@ -185,12 +176,7 @@ export const ensureDeployHelperBundle = async ({
   };
 };
 
-export const findKvNamespaceByTitle = async ({
-  apiToken,
-  accountId,
-  title,
-  fetchImpl = globalThis.fetch,
-} = {}) => {
+export const findKvNamespaceByTitle = async ({ apiToken, accountId, title, fetchImpl = globalThis.fetch } = {}) => {
   const wantedTitle = toStr(title).trim();
   if (!wantedTitle) return null;
   let page = 1;
@@ -234,11 +220,16 @@ export const ensureDeployHelperKvNamespace = async ({
   });
   if (existing?.id) return existing;
 
-  const createResp = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: namespaceTitle }),
-  }, { fetchImpl });
+  const createResp = await cfFetch(
+    apiToken,
+    `/accounts/${accountId}/storage/kv/namespaces`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: namespaceTitle }),
+    },
+    { fetchImpl },
+  );
   if (!createResp.ok) {
     throw new Error(createResp.error || 'Failed to create deploy-helper KV namespace.');
   }
@@ -319,11 +310,7 @@ export const buildDeployHelperUploadMetadata = ({
   };
 };
 
-const buildDeployHelperUploadForm = ({
-  metadata,
-  bundleSource,
-  omitMigrations = false,
-} = {}) => {
+const buildDeployHelperUploadForm = ({ metadata, bundleSource, omitMigrations = false } = {}) => {
   const uploadMetadata = { ...(metadata || {}) };
   if (omitMigrations) delete uploadMetadata.migrations;
   const form = new FormData();
@@ -332,15 +319,18 @@ const buildDeployHelperUploadForm = ({
   return form;
 };
 
-const isAlreadyAppliedCoordinatorMigration = (result) => (
+const isAlreadyAppliedCoordinatorMigration = (result) =>
   Number(result?.status || 0) === 412 &&
-  /migration tag precondition failed/i.test([
-    result?.error,
-    ...(Array.isArray(result?.detail)
-      ? result.detail.map((entry) => toStr(entry?.message || entry))
-      : [result?.detail]),
-  ].filter(Boolean).join('\n'))
-);
+  /migration tag precondition failed/i.test(
+    [
+      result?.error,
+      ...(Array.isArray(result?.detail)
+        ? result.detail.map((entry) => toStr(entry?.message || entry))
+        : [result?.detail]),
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
 
 export const deployDeployHelperWorker = async ({
   apiToken,
@@ -397,32 +387,47 @@ export const deployDeployHelperWorker = async ({
   });
 
   const scriptUploadPath = `/accounts/${resolvedAccountId}/workers/scripts/${resolvedWorkerName}`;
-  let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-    method: 'PUT',
-    body: buildDeployHelperUploadForm({ metadata, bundleSource: resolvedBundleSource }),
-  }, { fetchImpl });
+  let scriptUpload = await cfFetch(
+    apiToken,
+    scriptUploadPath,
+    {
+      method: 'PUT',
+      body: buildDeployHelperUploadForm({ metadata, bundleSource: resolvedBundleSource }),
+    },
+    { fetchImpl },
+  );
   if (isAlreadyAppliedCoordinatorMigration(scriptUpload)) {
     // Re-deploying the same helper can encounter the already-installed v1 tag.
     // Keep the Durable Object binding and retry only the module upload without
     // replaying the one-time class migration.
-    scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-      method: 'PUT',
-      body: buildDeployHelperUploadForm({
-        metadata,
-        bundleSource: resolvedBundleSource,
-        omitMigrations: true,
-      }),
-    }, { fetchImpl });
+    scriptUpload = await cfFetch(
+      apiToken,
+      scriptUploadPath,
+      {
+        method: 'PUT',
+        body: buildDeployHelperUploadForm({
+          metadata,
+          bundleSource: resolvedBundleSource,
+          omitMigrations: true,
+        }),
+      },
+      { fetchImpl },
+    );
   }
   if (!scriptUpload.ok) {
     throw new Error(scriptUpload.error || 'Failed to upload the deploy-helper worker.');
   }
 
-  const secretResp = await cfFetch(apiToken, `/accounts/${resolvedAccountId}/workers/scripts/${resolvedWorkerName}/secrets`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'ADMIN_SECRET', type: 'secret_text', text: finalAdminSecret }),
-  }, { fetchImpl });
+  const secretResp = await cfFetch(
+    apiToken,
+    `/accounts/${resolvedAccountId}/workers/scripts/${resolvedWorkerName}/secrets`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'ADMIN_SECRET', type: 'secret_text', text: finalAdminSecret }),
+    },
+    { fetchImpl },
+  );
   if (!secretResp.ok) {
     throw new Error(secretResp.error || 'Failed to write ADMIN_SECRET for the deploy-helper.');
   }
@@ -487,7 +492,9 @@ if (isEntrypoint()) {
         console.error(`Generated ADMIN_SECRET for ${result.workerName}: ${result.adminSecret}`);
       }
       if (!result.workerUrl) {
-        console.error('Deploy-helper upload succeeded, but workers.dev URL was not confirmed. Check the returned subdomain fields.');
+        console.error(
+          'Deploy-helper upload succeeded, but workers.dev URL was not confirmed. Check the returned subdomain fields.',
+        );
       }
     }
   } catch (error) {
