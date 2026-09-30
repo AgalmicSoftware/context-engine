@@ -6,8 +6,6 @@ import styles from './SBTSelector.module.scss';
 import SBTSelector from './SBTSelector';
 import {
   asCacheObject,
-  asResponseEntry,
-  asSelectedSbtEntry,
   buildItemsSourceSignature,
   buildNetHoldersSet,
   buildNetHoldersSetFromCounts,
@@ -44,7 +42,6 @@ import {
   filterSbtFilterObjectItems,
   hasActiveSbtFilterState,
   hasSbtFilterFeaturedOptions,
-  isRecord,
   getSbtFilterItemCount,
   isLatestSbtFilterApplyRun,
   normalizeAggregatorResponseEntries,
@@ -99,7 +96,7 @@ import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { bindSbtFilterRuntimePorts } from './sbtFilterRuntimePorts';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFilter, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faFilter, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { createLogger } from '../../utilities/logging.js';
 import { updateCacheAtomic, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';

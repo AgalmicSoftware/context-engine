@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import { useId, useState } from 'react';
 import artwork from '../../assets/img/reverse-alignment-atlas-v1.jpg';
 import { REVERSE_ALIGNMENT_SOURCE, reverseAlignmentBranches, reverseAlignmentTopics } from './reverseAlignmentTopics';
 import styles from './ReverseAlignmentAtlas.module.scss';

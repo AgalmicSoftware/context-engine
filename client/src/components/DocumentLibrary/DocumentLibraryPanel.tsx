@@ -1,6 +1,6 @@
 /** @file DocumentLibraryPanel.tsx */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSync } from '@fortawesome/free-solid-svg-icons';
 import { Button, Modal, ModalBody, ModalHeader } from 'reactstrap';

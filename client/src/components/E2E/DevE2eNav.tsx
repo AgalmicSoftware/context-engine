@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import WorkerSessionGroupsPanel, { type WorkerSessionGroupsPanelProps } from './WorkerSessionGroupsPanel';
 import styles from './OnePageSession.module.scss';

@@ -23,10 +23,8 @@ import {
   MAX_SBT_INSTANCE_LISTENERS,
   SBT_INSTANCE_LISTENER_GROUPS,
   ENABLE_SBT_HISTORY_SCAN,
-  USE_ONCHAIN_SESSION_REGISTRY,
   DEFAULT_CHAIN_ID,
 } from '../../variables/appConfig.js';
-import { ARWEAVE_DEFAULT_GATEWAY_CANDIDATES } from '../../variables/arweaveGateways.js';
 import { createLogger, shouldLog } from '../logging.js';
 import { notify } from '../ui/notify.js';
 
@@ -147,8 +145,6 @@ import {
   getReadProviderForChain,
   getLocalAwareReadProviderForChain,
   getLocalAwareReadProviderForGroup,
-  resolveGroupPathRpcPreference,
-  readRpcProviderMode,
 } from './rpcProviders.js';
 import {
   resolveSession,
@@ -172,7 +168,7 @@ import {
   isNonexistentTokenError,
   notifyUserFacingTransactionError,
 } from './errorClassifiers.js';
-import { getSessionAddresses, getSessionBlockWindow, parsePositiveBlockNumber } from './sessionAddressHelpers.js';
+import { getSessionAddresses, parsePositiveBlockNumber } from './sessionAddressHelpers.js';
 import { resolveTxGasOverrides, sendContractWriteViaProvider } from './contractWrites.js';
 import { resolveReadProvider, resolveSignerProvider } from './providerAdapter.js';
 import {
@@ -190,10 +186,7 @@ import {
 } from './numberFormatting.js';
 import {
   isLogsRangeTooLargeError,
-  splitBlockRange,
   normalizeRpcDebugContext,
-  withProviderRpcDebugContext,
-  isNonRecoverableGetLogsError,
   createFetchLogsSmartWithProvider,
 } from './rpcSmartLogFetch.js';
 import { normalizeCreate2Salt, hasNonZeroHashValue } from './deterministicFactoryHelpers.js';

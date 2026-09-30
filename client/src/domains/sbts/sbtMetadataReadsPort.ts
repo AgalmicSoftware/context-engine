@@ -4,7 +4,6 @@ import type {
   SbtGroupKeyOrConfig,
   SbtMetadataReadsPort,
   SbtMetadataRecord,
-  SbtOnChainConfig,
   SbtOnChainConfigFields,
   SbtProviderRef,
   SbtReadOptions,

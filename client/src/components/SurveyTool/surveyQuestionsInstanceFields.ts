@@ -1,6 +1,5 @@
 import type { ChangedFieldsDiffCache, PendingEditStatsCache } from './surveyToolChangedFieldsController';
 import type { ResponseSlice as SurveyToolResponseSlice, UnknownRecord } from './surveyToolTypes';
-import type { SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes';
 import type { SurveyQuestionsStateUpdate } from './surveyQuestionsState';
 import type { SurveyAudioWorkerPropsMemo } from './surveyToolRuntimeSupport';
 

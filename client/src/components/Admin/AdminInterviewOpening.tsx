@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from 'reactstrap';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 export default function AdminInterviewOpening({

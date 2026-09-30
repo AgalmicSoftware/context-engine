@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { QuestionFilterSbtSection } from './QuestionFilterSections';
 import {
   resolveEffectiveSessionContext,

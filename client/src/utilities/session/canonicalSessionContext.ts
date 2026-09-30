@@ -7,7 +7,6 @@
  *              resolveSessionConfigFromSources, resolveCanonicalSessionConfig,
  *              resolveCanonicalSessionContext
  */
-import { toStr } from '../shared/primitives.js';
 import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import {
   AUTHORITY_MATRIX,
@@ -21,7 +20,7 @@ import {
   parseWorkerConfig,
   parseLocalResourceOverrides,
 } from './sessionParsers.js';
-import { canonicalizeSessionSlug, isReservedSessionSlugKey, normalizeSessionSlugAliasToken } from './sessionSlug';
+import { canonicalizeSessionSlug, normalizeSessionSlugAliasToken } from './sessionSlug';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from './sessionWorkerUrlCompatibility.js';
 import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection';
 import type {

@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId } from 'react';
 import { FormText, Input, Label } from 'reactstrap';
 import {
   RESULTS_ANALYSIS_THRESHOLD_MAX,

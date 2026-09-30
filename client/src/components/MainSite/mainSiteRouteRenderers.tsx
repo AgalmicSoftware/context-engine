@@ -13,11 +13,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { resolveCompareCachesReady, resolveCompareSessionSlug } from '../UserPage/compareSessionRuntime';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import {
-  buildQuestionRoutePath,
-  isKnownOrGeneralSessionSlug,
-  shouldRetryMaskedQuestionRefresh,
-} from '../../utilities/survey/questionRouting.js';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';

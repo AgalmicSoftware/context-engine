@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId } from 'react';
 import { Input, Label } from 'reactstrap';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';

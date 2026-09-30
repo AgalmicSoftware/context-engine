@@ -53,11 +53,7 @@ import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
 import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
 import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
-import {
-  processRatingEnvelopesForSubmit,
-  type RatingEnvelopeDeps,
-  type RatingEnvelopeContext,
-} from './surveyToolRatingEnvelopeSubmitController';
+import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import { writeSubmittedResponsesToLocalCaches as writeSubmittedResponsesToLocalCachesHelper } from './surveyToolPostSubmitCacheController';
 import {
   ensureIdentifierHash,
@@ -190,7 +186,6 @@ import {
   buildQuestionPromptDecryptDisplayState,
   isQuestionPromptMasked as isQuestionPromptMaskedHelper,
 } from './surveyToolViewState.js';
-import { buildResponseGateConfigSignature } from './surveyToolResponseAccess';
 import { decideAutoDecryptBlocked, decideAutomaticPromptDecryptByKind } from './surveyQuestionsDecryptEligibility.js';
 import {
   buildDecryptContextKeyFromContext,
@@ -472,9 +467,6 @@ import {
   runSurveyQuestionsStaleSubmitController,
   runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
-  type SurveyQuestionsSubmitPendingStats,
-  type SurveyQuestionsSubmitStaleStatePatch,
-  type SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import {
   applySurveyQuestionsRuntimeInitialState,
@@ -485,16 +477,13 @@ import {
 import {
   createSurveyQuestionsInstanceFields,
   type SurveyQuestionsBootstrapRetryArgs,
-  type SurveyQuestionsCacheQuestion,
   type SurveyQuestionsCachedResponseEntryArgs,
   type SurveyQuestionsDraftHydrationEntryArgs,
   type SurveyQuestionsDraftTrackingState,
   type SurveyQuestionsHydrationPatch,
   type SurveyQuestionsInstanceFields,
   type SurveyQuestionsLocalCacheHydrationEntryArgs,
-  type SurveyQuestionsPendingStatsInput,
   type SurveyQuestionsQuestionIdResolver,
-  type SurveyQuestionsRecord,
   type SurveyQuestionsResponseFieldState,
   type SurveyQuestionsResponseHydrationEntryArgs,
   type SurveyQuestionsResponseHydrationListArgs,
@@ -582,23 +571,10 @@ import {
   buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
   publishSurveyQuestionPoolIfCurrent,
-  type SurveyQuestionsAuthoringPanelDisplayState,
-  type SurveyQuestionsAuthoringRouteReadinessDescriptor,
-  type SurveyQuestionsFullLoadingProgressState,
-  type SurveyQuestionsJsonPanelDisplayState,
   type SurveyQuestionsLegacyValue,
   type SurveyQuestionsProps,
-  type SurveyQuestionsPrimarySubmitPlan,
-  type SurveyQuestionsRenderReadinessDescriptor,
-  type SurveyQuestionsRouteViewDisplayState,
   type SurveyQuestionsRuntimeStrategy,
   type SurveyQuestionsState,
-  type SurveyQuestionsSubmitFooterDisplayState,
-  type SurveyQuestionsSubmitReadinessDescriptor,
-  type SurveyQuestionsMaskedQuestionVisibilityState,
-  type SurveySubmitFailureStatePatch,
-  type SurveySubmitStartStatePatch,
-  type SurveySubmitSuccessStatePatch,
 } from './surveyQuestionsTypes.js';
 import { createSurveyQuestionsRuntimeMethods } from './surveyQuestionsRuntimeMethods';
 

@@ -14,7 +14,6 @@ import {
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 
-import GateTooltip from '../Gates/GateTooltip';
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import CETooltip from '../Shared/CETooltip';
 import LazyFallback from '../Shared/LazyFallback';

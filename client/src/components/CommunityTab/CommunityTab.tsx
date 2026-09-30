@@ -1,5 +1,5 @@
 /** @file CommunityTab.tsx */
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faUsers,
@@ -34,7 +34,7 @@ import {
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
 import { createLogger } from 'utilities/logging.js';
-import { peekCacheSync, readCache, subscribeCacheUpdates, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, readCache, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
@@ -50,10 +50,7 @@ import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { buildRatingMatrixFromDemo, getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
 import { buildCommunityBeeswarmPointsFromResults } from './communityBeeswarmPoints';
-import {
-  WORKER_CANONICAL_CACHE_SCOPE_KEY,
-  type WorkerCanonicalCacheIdentity,
-} from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { type WorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import {
   subscribeWorkerGroupsChanged,
   type WorkerGroupsChangedDetail,

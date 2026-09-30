@@ -1,7 +1,7 @@
 import WorkerResponseHydrationNotice from './WorkerResponseHydrationNotice';
 /** @file AppShell.tsx */
 
-import React, { Component, Suspense } from 'react';
+import React, { Component } from 'react';
 import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoinHost';
 import { connect } from 'react-redux';
 import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
@@ -30,12 +30,10 @@ import {
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
 import { chainScanReadsPort } from '../../domains/chain/chainScanReadsPort.js';
-import { profileScanPort } from '../../domains/profiles/profileScanPort.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
-import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
@@ -45,16 +43,11 @@ import {
   DEFAULT_SESSION_SLUG,
   DEFAULT_SESSION_SLUG_ALIAS,
 } from '../../variables/appConfig.js';
-import { getChainById, getSessionRegistryChainIds } from '../../variables/chains.js';
+import { getChainById } from '../../variables/chains.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
-import {
-  createInitialProfileScanReport,
-  createProfileScanFanoutPlan,
-  resolveProfileScanAttemptedCoverageSlugs,
-} from '../../utilities/session/profileScanReportHelpers.js';
 import {
   createSessionMetaRefreshController,
   type SessionMetaRefreshController,
@@ -92,7 +85,6 @@ import {
 } from '../../utilities/survey/sessionResponseHydrationController.js';
 import { isResponseRecencyAtLeast, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
-import { t } from '../../utilities/ui/terminology.js';
 import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { createMainSiteDgStorage, type MainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
 import {
@@ -131,7 +123,6 @@ import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionP
 
 import { createLogger } from 'utilities/logging.js';
 import {
-  buildQuestionRoutePath,
   isKnownOrGeneralSessionSlug,
   shouldRetryMaskedQuestionRefresh,
 } from '../../utilities/survey/questionRouting.js';
@@ -141,15 +132,12 @@ import {
   getSessionNetwork as _getSessionNetwork,
   type MainSiteSessionConfigLike,
 } from '../../utilities/session/mainSiteSessionConfig.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   resolveMainSiteExplicitSessionSlugFromPath,
   resolveMainSiteGlobalPrimarySessionSlug,
-  resolveMainSiteQuestionRouteSessionContext,
   resolveMainSiteRenderActiveSessionSlug,
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
-  resolveMainSiteSessionRouteContext,
   resolveMainSiteSessionRouteSourceSlug,
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
@@ -168,10 +156,7 @@ import {
   findGroupSlugForSurvey as findGroupSlugForSurveyFn,
   resolveGroupSlugForSbtAddress as resolveGroupSlugForSbtAddressFn,
 } from './groupSlugLookup.js';
-import {
-  hasAutoFlag as hasAutoFlagFn,
-  manageAutoHashPersistence as manageAutoHashPersistenceFn,
-} from './autoHashPersistence';
+import { manageAutoHashPersistence as manageAutoHashPersistenceFn } from './autoHashPersistence';
 import {
   prepareSurveyMetadataCacheEntry as prepareSurveyMetadataCacheEntryFn,
   prepareQuestionMetadataCacheEntry as prepareQuestionMetadataCacheEntryFn,
@@ -182,26 +167,13 @@ import {
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,
 } from '../../utilities/cache/sessionCacheConstants.js';
-import {
-  buildMainSiteCacheManagerReadyStatePatch,
-  isRouteResponderAddress,
-} from '../../utilities/session/mainSiteUtils.js';
-import {
-  composeMainSiteAuthViewProps,
-  composeMainSiteLoginViewProps,
-  composeMainSiteQuestionCacheViewProps,
-  composeMainSiteSessionCacheViewProps,
-  composeMainSiteSurveyCacheViewProps,
-  composeMainSiteWalletViewProps,
-} from './mainSiteViewProps.js';
+import { buildMainSiteCacheManagerReadyStatePatch } from '../../utilities/session/mainSiteUtils.js';
 import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
   SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
-import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE, isStaticNonCacheRoute } from './routeConfig.js';
-import { resolveMainSiteRouteMatch } from './routeTable.js';
-import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
+import { isStaticNonCacheRoute } from './routeConfig.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
 import {
@@ -211,12 +183,7 @@ import {
   resolveMainSiteDisplaySessionConfig,
   resolveMainSiteDisplaySessionNetwork,
 } from './mainSiteCapabilityHostRuntime';
-import {
-  buildPublicRoute,
-  buildPublicUrl,
-  replaceRouteResponderQueryParam,
-  stripConfiguredPublicBasePath,
-} from './urlUtils.js';
+import { buildPublicUrl, stripConfiguredPublicBasePath } from './urlUtils.js';
 import {
   getEffectiveRoutePath as getEffectiveRoutePathFn,
   isGeneralRoutePath as isGeneralRoutePathFn,
@@ -253,12 +220,6 @@ import {
   getUserAddressFromPath as getUserAddressFromPathFn,
 } from './sbtRoutePathHelpers';
 import { reloadWindowLocation as reloadWindowLocationFn } from './reloadWindowLocation.js';
-import {
-  buildQuestionReadyStatePatch,
-  shouldClearQuestionProgressInFinalize,
-  shouldCommitThrottledProgress,
-  shouldFlushCoalescedRun,
-} from '../../utilities/session/mainSiteProgressHelpers.js';
 
 type SurveyGroupScanQueueOptions = {
   hintedSlug?: unknown;

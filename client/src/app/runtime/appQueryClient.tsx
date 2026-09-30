@@ -1,4 +1,4 @@
-import React, { useEffect, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { wagmiClient } from './appWagmiRuntime';
 import { queryKeys } from '../../utilities/query/queryKeys';

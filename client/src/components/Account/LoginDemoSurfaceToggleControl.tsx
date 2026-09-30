@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button } from 'reactstrap';
 import styles from './Account.module.scss';
 

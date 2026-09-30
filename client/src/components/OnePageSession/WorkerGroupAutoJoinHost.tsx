@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useLayoutEffect } from 'react';
+import { lazy, Suspense, useLayoutEffect } from 'react';
 import {
   readAutoJoinLink,
   readPendingAutoJoin,

@@ -107,7 +107,6 @@ import {
   normalizeUserPageDeepScanTooltipLines,
   normalizeUserAnalysisResult,
   normalizeUserPageBookmarksCache,
-  normalizeUserPageGateSlug,
   normalizeUserPageQuestionResponseInfoOrder,
   normalizeUserPageSingleQuestionResponsePayload,
   mergeUserPageQueuedCacheRefreshFlags,

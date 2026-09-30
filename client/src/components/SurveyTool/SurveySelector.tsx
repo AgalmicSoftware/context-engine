@@ -1,26 +1,7 @@
 /** @file SurveySelector.tsx */
 
 import React, { Component } from 'react';
-import {
-  Button,
-  Dropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
-  FormGroup,
-  Label,
-  Input,
-  Card,
-  CardBody,
-  FormText,
-  InputGroup,
-  InputGroupText,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from 'reactstrap';
-import { Link } from 'react-router-dom';
-import CETooltip from '../Shared/CETooltip';
+import { Button, Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'reactstrap';
 
 // Styles
 import '../../assets/css/contextEngine.scss';
@@ -28,114 +9,22 @@ import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faBookmark,
   faLock,
-  faUnlock,
   faPlus,
   faMinus,
   faCaretDown,
-  faCaretUp,
-  faCheck,
   faTimes,
-  faArrowLeft,
-  faArrowRight,
   faSpinner,
-  faExpand,
   faExternalLinkAlt,
   faFilter,
-  faExclamationCircle,
-  faCog,
-  faMicrophone,
-  faChevronLeft,
-  faChevronRight,
-  faComment,
-  faQuestionCircle,
-  faBullhorn,
-  faRobot,
 } from '@fortawesome/free-solid-svg-icons';
 
-import AudioInput from '../Shared/AudioInput/AudioInput';
 import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
-import QuestionTagDropdown from './QuestionTagDropdown';
-import SingleQuestionResponse from './SingleQuestionResponse';
-import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import LazyFallback from '../Shared/LazyFallback';
-import SessionChipSelector from '../Shared/SessionChipSelector';
-import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
 // Crypto and contract utilities
-import contractScripts, {
-  getAllSessionSlugs,
-  getSessionConfigBySlug as getStrictSessionConfigBySlug,
-  getSessionSlugByName,
-} from '../../utilities/web3/chainGateway.js';
-import { ethers, utils } from 'ethers';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { createLogger } from 'utilities/logging.js';
-import { notify } from '../../utilities/ui/notify.js';
-import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
-import {
-  buildQuestionRoutePath,
-  isMaskedQuestionPayload,
-  parseQuestionSessionIdFromSearch,
-  parseQuestionSessionSlugFromSearch,
-  pickBetterQuestionPayload,
-  shouldRetryMaskedQuestionRefresh,
-} from '../../utilities/survey/questionRouting.js';
-import {
-  normalizeSessionSlug,
-  resolveSessionAliases,
-  resolveSessionSlugFromPathname,
-} from '../../utilities/session/sessionNaming.js';
-import {
-  resolveSurveyToolDecryptHydrationContext,
-  resolveSurveyToolDraftSessionContext,
-  resolveSurveyToolDraftStorageContext,
-  resolveSurveyToolEffectiveSlug,
-  resolveSurveyToolEnsureQuestionCachedContext,
-  resolveSurveyToolExplicitSessionContext,
-  resolveSurveyToolIdLookupContext,
-  resolveSurveyToolLockAudienceSessionNameContext,
-  resolveSurveyToolQuestionConfigContext,
-  resolveSurveyToolQuestionCountContext,
-  resolveSurveyToolQuestionPayloadCacheWriteContext,
-  resolveSurveyToolQuestionsDashboardLoadContext,
-  resolveSurveyToolPileFilterContext,
-  resolveSurveyToolPileLoadContext,
-  resolveSurveyToolPileWarmSeedContext,
-  resolveSurveyToolPileResponseReadContext,
-  resolveSurveyToolQuestionReadCacheContext,
-  resolveSurveyToolQuestionBootstrapContext,
-  resolveSurveyToolResponseJsonContext,
-  resolveSurveyToolResponseHydrationContext,
-  resolveSurveyToolResponseGateSessionContext,
-  resolveSurveyToolSubmittedCacheWriteContext,
-  resolveSurveyToolSurveyReadContext,
-  resolveSurveyToolUpdateCacheContext,
-} from './surveyToolSessionResolution.js';
-import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  updateCacheAtomic,
-  writeCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
-import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import {
-  isTargetedSbtMetadataLookupEnabled,
-  resolveSbtDisplayLabel,
-  warmSbtDisplayNamesTargeted,
-} from '../../utilities/sbt/sbtDisplayNames.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { normalizeRatingValue, RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
 import {
   areSurveySpecificQuestionsLoaded,
   buildQuestionsDashboardFilterLoadingPatch,
@@ -164,105 +53,33 @@ import {
 } from './surveySelectorHelpers.js';
 
 import {
-  EMPTY_QUESTION_POOL,
-  DEBUG_PREFILL,
-  GATE_SBT_HYDRATION_RETRY_MS,
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
-  areEnvelopesEquivalent,
-  areQuestionPayloadsEquivalent,
   buildQuestionCountScopeContextKey,
   buildQuestionDashboardLoadContextSignature,
   buildQuestionFilterStorageKeyPrefix,
-  buildQuestionIdScopeSignature,
-  buildQuestionScanProgressDisplay,
-  buildRatingEnvelopeQidSetFromUserAnswers,
-  buildRenderedIdsSignature,
-  buildSliceToken,
-  buildSurveyDraftSemanticSignature,
-  buildSurveyResponseSliceSignature,
-  canUseRecentQuestionPayloadForAccount,
-  clampSliderValue,
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
   ensureQuestionsNet,
   ensureSurveysNet,
-  formatQuestionScanBlockCount,
   getActiveSessionSlugFromProps,
   getBlockedQuestionIdsSet,
-  getConvictionFromResponse,
-  getConvictionFromSlice,
-  getConvictionFromSliceStrict,
   dedupeQuestionReadSlugs,
   getExtraQuestionReadSlugs,
-  getHighlightedQuestionIdsSet,
-  getImportanceFromResponse,
-  getImportanceFromSlice,
-  getNormalizedUiRatingValue,
-  getPendingStatsSnapshotFromState,
-  getSessionSlugHintFromProps,
-  getSessionSlugPinnedFromProps,
-  hasCacheHydratedFlag,
-  hasConvictionOrImportanceValueForQuestion,
-  hasMeaningfulFieldValue,
-  isIncomingResponseMetaNewer,
-  isSingleSelectMultichoice,
   isSurveyToolFilterStateActive,
-  mergeDecryptedViewedResponse,
   mergeQuestionResponses,
-  mergeSurveyResponsePayloads,
-  normalizeMultichoiceValue,
-  normalizeQuestionIdKey,
   normalizeQuestionProgressSlug,
   normalizeSessionSlugValue,
   normalizeSurveyToolFilterState,
-  readQuestionsCache,
   readQuestionsCacheAsync,
   readQuestionsCacheRef,
-  readRecentQuestionPayload,
-  readSurveysCache,
   readSurveysCacheAsync,
-  readSurveysCacheRef,
-  resolveCurrentTagSessionSlug,
-  resolveDecryptHydrationContext,
-  resolveDraftSessionContext,
-  resolveDraftStorageContext,
   resolveEffectiveSlug,
-  resolveEnsureQuestionCachedContext,
-  resolveExplicitSessionContext,
-  resolveLockAudienceSessionNameContext,
-  resolvePileFilterContext,
-  resolvePileLoadContext,
-  resolvePileResponseReadContext,
-  resolvePileWarmSeedContext,
-  resolveQuestionBootstrapContext,
   resolveQuestionCountContext,
-  resolveQuestionPayloadCacheWriteContext,
-  resolveQuestionReadCacheContext,
   resolveQuestionsDashboardLoadContext,
-  resolveResponseHydrationContext,
-  resolveResponseJsonContext,
-  resolveSlugForIds,
-  resolveSubmittedCacheWriteContext,
   resolveSurveyReadContext,
-  resolveUpdateCacheContext,
-  scheduleMicrotask,
   serializeSurveyToolFilterState,
-  shouldAutoEncryptAdditionalOnAudienceChange,
-  shouldEncryptResponseFieldForSubmit,
-  shouldForceOverwriteDraftValues,
-  shouldRenderInlineSubmitButton,
-  shouldRenderSubmittedIndicator,
-  shouldShowPileFullLoadingState,
-  shouldShowSingleQuestionResponseLookupSpinner,
-  stampResponsePayloadWithMeta,
   surveyLog,
-  toNumberOrNull,
-  toResponseRecencyMeta,
-  updateSubmittedSinceLastEdit,
-  writeQuestionsCache,
-  writeSurveysCache,
-  bumpSurveyPerfCounter,
 } from './surveyToolUtils';
 import {
   appendMissingAuthoritativePoolQuestions,

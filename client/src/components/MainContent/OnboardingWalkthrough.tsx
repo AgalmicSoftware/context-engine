@@ -1,6 +1,6 @@
 /** @file OnboardingWalkthrough.tsx */
 
-import React, { Component } from 'react';
+import { Component } from 'react';
 
 import 'assets/css/contextEngine.scss';
 import styles from './MainContent.module.scss';

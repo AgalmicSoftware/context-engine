@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { buildWorkerGroupAutoJoinPath, canAutoJoinWorkerGroup } from '../../domains/worker/workerGroupAutoJoin';
 import type { WorkerGroup } from '../../domains/worker/workerGroupPorts';
 import styles from './OnePageSession.module.scss';

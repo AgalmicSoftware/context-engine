@@ -5,23 +5,9 @@ import { connect } from 'react-redux';
 import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
 import { asGroupRecord } from '../../domains/worker/workerGroupResultsFilter';
 import { projectWorkerGroupResultsState } from './surveyResultsWorkerGroups';
-import { Form, Card, CardHeader, CardBody, FormText, InputGroup, InputGroupText, Collapse } from 'reactstrap';
 
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyResults.module.scss';
-
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretUp,
-  faCaretDown,
-  faCheck,
-  faArrowLeft,
-  faArrowRight,
-  faQuestionCircle,
-  faSearch,
-  faExpand,
-  faExclamationCircle,
-} from '@fortawesome/free-solid-svg-icons';
 
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
@@ -51,7 +37,6 @@ import {
   buildSurveyResultsFilterActivePatch,
   buildSurveyResultsFilterLoadingStatePatch,
   buildSurveyResultsFilterLoadingUpdate,
-  buildSurveyResultsFilteredQuestionsCountPatch,
   buildSurveyResultsFilteredResponsesPatchPlan,
   buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
@@ -62,7 +47,6 @@ import {
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsViewStatePatch,
-  countQuestionModeResponses,
   stringifySurveyResultsAggregatorResponses,
   type SurveyResultsAggregateRow,
   type SurveyResultsFilterQuestionRecord,
@@ -124,7 +108,6 @@ import {
   getResponseQuestionType,
   hasExplicitSessionQueryPinInPath,
   normalizeNonceKey,
-  resolveNetBucketReadOnly,
 } from './surveyResultsRuntimeHelpers';
 import { buildSurveyResultsHtmlReportModalProps } from './surveyResultsHtmlReportModalProps';
 import { getSurveyResultsQuestionCardDomId } from './surveyResultsQuestionSummaryStatusController';
@@ -188,7 +171,6 @@ import { renderSurveyResultsRenderSurface } from './surveyResultsRenderSurface';
 import {
   buildSessionResultsAnalysisPrompt,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
-  SESSION_RESULTS_EXPORT_FORMAT_PDF,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsAnalysisSectionKey,
   type SessionResultsExportFormat,

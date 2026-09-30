@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import { createWorkerGroupAsParticipant, normalizeWorkerGroupDefaultTags } from '../../domains/worker/workerGroupPorts';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';

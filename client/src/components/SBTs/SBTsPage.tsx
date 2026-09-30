@@ -35,7 +35,6 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import {
-  asSBTsPageFeaturedProgress as asFeaturedProgress,
   asSBTsPageFeaturedSbt as asFeaturedSbt,
   buildSBTsPageCacheFeaturedCardModel as buildCacheFeaturedCardModel,
   buildSBTsPageFeaturedEntryModel as buildFeaturedEntryModel,
@@ -48,7 +47,6 @@ import {
   isSBTsPageSessionAutoFeatureEnabled as isSessionAutoFeatureEnabled,
   isSBTsPageRecord as isRecord,
   normalizeSBTsPageFeaturedEntries as normalizeFeaturedEntries,
-  resolveSBTsPageAutoFeatureBySessionSlug as resolveAutoFeatureBySessionSlug,
   resolveSBTsPageDisplaySessionConfig as resolveDisplaySessionConfig,
   resolveSBTsPageDisplaySessionLists as resolveDisplaySessionLists,
   resolveSBTsPageFeaturedSbtSessionSlug as resolveFeaturedSbtSessionSlug,
@@ -61,7 +59,6 @@ import type {
   FeaturedEntriesArgs,
   FeaturedEntry,
   FeaturedListArgs,
-  FeaturedProgressLike,
   FeaturedRenderEntry,
   FeaturedSbtLike,
   FeaturedSbtMetadataLike,

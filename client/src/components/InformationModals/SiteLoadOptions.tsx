@@ -1,5 +1,4 @@
 /** @file SiteLoadOptions.tsx */
-import React from 'react';
 import 'assets/css/contextEngine.scss';
 import styles from './Modals.module.scss';
 import { CardFooter } from 'reactstrap';

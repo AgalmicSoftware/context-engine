@@ -3,7 +3,6 @@ import type { AppShell } from './AppShell';
 import type { MainSiteState } from './MainSiteTypes';
 import { chainScanReadsPort } from '../../domains/chain/chainScanReadsPort.js';
 import { profileScanPort } from '../../domains/profiles/profileScanPort.js';
-import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import {
   ensureQuestionArweaveCacheBranches,

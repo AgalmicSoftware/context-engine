@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './CorpusViewer.module.scss';

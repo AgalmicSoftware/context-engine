@@ -2,7 +2,7 @@ import AdminInterviewOpening from './AdminInterviewOpening';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, FormGroup, FormText } from 'reactstrap';
+import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -131,7 +131,6 @@ import {
   getAdminLitResourceLabel,
 } from './adminPageResourceDisplayHelpers';
 import {
-  ADMIN_AI_PROVIDER_OPTIONS,
   ADMIN_EDITABLE_CONTRACT_KEY_SET,
   applyAdminMetadataDraft,
   buildAdminMetadataDraft,

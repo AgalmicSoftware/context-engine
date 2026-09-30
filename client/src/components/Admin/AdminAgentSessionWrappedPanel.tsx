@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, FormGroup, FormText, Input, Label } from 'reactstrap';
 import { DEPLOY_HELPER_URL } from '../../variables/publicDeploymentConfig.js';
 import type { AgentSessionWrappedCapability } from '../../utilities/session/agentSessionWrapped.js';

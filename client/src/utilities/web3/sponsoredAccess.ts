@@ -18,12 +18,7 @@ import {
   getGateSbtAddresses as getGateSbtAddressesImpl,
   normalizeGateMode as normalizeGateModeImpl,
 } from './sponsoredAccessState.js';
-import type {
-  SponsoredGate,
-  SponsoredGateState,
-  SponsoredResource,
-  SponsoredAccessResult,
-} from './sponsoredAccessState.js';
+import type { SponsoredResource, SponsoredAccessResult } from './sponsoredAccessState.js';
 
 type SessionConfigLike = Record<string, unknown>;
 type UserHasSBTFn = (

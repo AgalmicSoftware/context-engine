@@ -1,5 +1,5 @@
 /** @file LoginButton.tsx */
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { connect } from 'react-redux';
 import type { RootState } from '../../reducers/index.js';
 import { createLogger } from '../../utilities/logging';
