@@ -633,7 +633,7 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
  * This function is **AI-only** and returns raw model outputs (parsed),
  * leaving deterministic fallbacks to higher-level orchestrators.
  *
- * @param {"compare"|"axes"|"venn"} task
+ * @param {"compare"|"axes"} task
  * @param {{users:Array}} payload
  * @returns {Promise<unknown>} Parsed JSON per task.
  */
@@ -682,7 +682,7 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
   }
 
   const envelope = {
-    task: t === 'compare' || t === 'axes' || t === 'venn' ? t : 'compare',
+    task: t === 'compare' || t === 'axes' ? t : 'compare',
     users: safeUsers,
   };
 
