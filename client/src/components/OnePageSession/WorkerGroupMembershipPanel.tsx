@@ -1,7 +1,15 @@
 import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faLink, faQuestionCircle, faSpinner, faSyncAlt, faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
+import {
+  faInfinity,
+  faLink,
+  faQuestionCircle,
+  faSpinner,
+  faSyncAlt,
+  faTimes,
+  faUser,
+} from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
@@ -465,7 +473,9 @@ const WorkerGroupDetailView = ({
             className={`${sbtPageStyles.actionsSection} ${styles.workerGroupDetailActionsSection}`}
             aria-label="Group actions"
           >
-            <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader} ${styles.workerGroupDetailActionsHeading}`}>
+            <h2
+              className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader} ${styles.workerGroupDetailActionsHeading}`}
+            >
               ACTIONS
             </h2>
             <div className={styles.workerGroupDetailActions}>{children}</div>
@@ -836,7 +846,6 @@ const WorkerGroupMembershipPanel = ({
         sessionSlug,
         sessionId,
         groupId: group.groupId,
-        account: participantAddress,
       });
       if (!isMembershipMutationCurrent(mutation)) return;
       requestIdRef.current += 1;

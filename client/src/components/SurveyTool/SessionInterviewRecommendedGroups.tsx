@@ -354,7 +354,7 @@ export function SessionInterviewRecommendedGroups({
         ) {
           return;
         }
-        clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId, account: requestAccount });
+        clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId });
         const joined = membershipGroupIds(overview, sessionSlug).has(groupId);
         if (joined) {
           setJoinedGroupState((current) => ({
