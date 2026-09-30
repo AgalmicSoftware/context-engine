@@ -1,3 +1,4 @@
+import { toStr } from './stringCoercion.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import { applyResultsAnalysisExposurePolicy, normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
 import { sha256Hex, stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
@@ -45,7 +46,6 @@ const DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1000;
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(config?.resultsAnalysis);

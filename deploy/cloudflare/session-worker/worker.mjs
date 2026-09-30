@@ -59,8 +59,8 @@ var __privateWrapper = (obj, member, setter, getter) => ({
 // shared/rpcDefaults.cjs
 var require_rpcDefaults = __commonJS({
   "shared/rpcDefaults.cjs"(exports, module) {
-    var toStr21 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    var normalizeUrl = (value) => toStr21(value).trim();
+    var toStr12 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+    var normalizeUrl = (value) => toStr12(value).trim();
     var freezeUrlList = (value) => Object.freeze((Array.isArray(value) ? value : [value]).map((entry) => normalizeUrl(entry)).filter(Boolean));
     var freezeUrlListMap = (map) => Object.freeze(
       Object.fromEntries(Object.entries(map || {}).map(([key, value]) => [Number(key), freezeUrlList(value)]))
@@ -513,10 +513,10 @@ var init_workerGroupUrl = __esm({
 });
 
 // workers/sessionCorsWorker/sessionSlugResolution.js
-var toStr7, INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
+var INVALID_SESSION_SLUG_ERROR, SLUG_MISMATCH_ERROR, SLUG_ALIAS_MISMATCH_ERROR, MISSING_SLUG_ERROR, DEFAULT_SESSION_STORAGE_KEY, EMPTY_VALIDATION_RESULT, hasExplicitWorkerSlugInput, canonicalizeReservedWorkerAlias, normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey, getDefaultWorkerSessionSlug, hasExplicitDefaultWorkerSessionSlug, resolveWorkerTenantSlug, resolveRequestedWorkerSlugPayload, resolveWorkerBodySlugContext, resolveWorkerRequestSlugContext;
 var init_sessionSlugResolution = __esm({
   "workers/sessionCorsWorker/sessionSlugResolution.js"() {
-    toStr7 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
+    init_stringCoercion();
     INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, numbers, "_" or "-".';
     SLUG_MISMATCH_ERROR = "sessionSlug does not match worker session.";
     SLUG_ALIAS_MISMATCH_ERROR = "sessionSlug aliases do not match.";
@@ -527,7 +527,7 @@ var init_sessionSlugResolution = __esm({
       slug: "",
       error: ""
     });
-    hasExplicitWorkerSlugInput = (raw) => raw != null && toStr7(raw).trim().length > 0;
+    hasExplicitWorkerSlugInput = (raw) => raw != null && toStr6(raw).trim().length > 0;
     canonicalizeReservedWorkerAlias = (slug = "") => {
       if (!slug) return "";
       if (slug === "general") return "";
@@ -535,14 +535,14 @@ var init_sessionSlugResolution = __esm({
       return slug;
     };
     normalizeWorkerSessionSlug = (raw) => {
-      const slug = toStr7(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      const slug = toStr6(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
       if (!slug) return "";
       return canonicalizeReservedWorkerAlias(slug);
     };
     sessionSlugStorageKey = (raw) => normalizeWorkerSessionSlug(raw) || DEFAULT_SESSION_STORAGE_KEY;
     validateInboundWorkerSessionSlug = (raw) => {
       if (raw == null) return EMPTY_VALIDATION_RESULT;
-      const rawStr = toStr7(raw).trim();
+      const rawStr = toStr6(raw).trim();
       if (!rawStr) return EMPTY_VALIDATION_RESULT;
       if (rawStr.toLowerCase() === "general") return EMPTY_VALIDATION_RESULT;
       const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
@@ -644,7 +644,7 @@ var init_sessionSlugResolution = __esm({
       countEmptyHeaderAsExplicit = false
     } = {}) => {
       const headerPresent = headerSlug != null;
-      const headerHasValue = headerPresent && toStr7(headerSlug).trim().length > 0;
+      const headerHasValue = headerPresent && toStr6(headerSlug).trim().length > 0;
       const tokenSlugResult = validateInboundWorkerSessionSlug(tokenSlug);
       if (tokenHasSlug && !tokenSlugResult.ok) {
         return { ok: false, error: tokenSlugResult.error };
@@ -804,9 +804,10 @@ var init_artifactFetch = __esm({
 });
 
 // workers/sessionCorsWorker/storageRefNormalization.js
-var STORAGE_BACKENDS, CLOUDFLARE_REF_ID_RE, CLOUDFLARE_REF_FORBIDDEN_RE, toStr8, isObj, trim, normalizeStorageBackend, isArweaveStorageBackend, isSafeCloudflareStorageRefId, assertNoCloudflarePrivateMaterial, normalizeCloudflareStorageUri, normalizeStorageRef, deriveStorageRefFromLegacyArweaveTxId, resolvePayloadStorageRef, getLegacyArweaveTxId, attachStorageRefCompatibilityFields;
+var STORAGE_BACKENDS, CLOUDFLARE_REF_ID_RE, CLOUDFLARE_REF_FORBIDDEN_RE, isObj, trim, normalizeStorageBackend, isArweaveStorageBackend, isSafeCloudflareStorageRefId, assertNoCloudflarePrivateMaterial, normalizeCloudflareStorageUri, normalizeStorageRef, deriveStorageRefFromLegacyArweaveTxId, resolvePayloadStorageRef, getLegacyArweaveTxId, attachStorageRefCompatibilityFields;
 var init_storageRefNormalization = __esm({
   "workers/sessionCorsWorker/storageRefNormalization.js"() {
+    init_stringCoercion();
     STORAGE_BACKENDS = Object.freeze({
       ARWEAVE: "arweave",
       LIT_ARWEAVE: "lit-arweave",
@@ -814,9 +815,8 @@ var init_storageRefNormalization = __esm({
     });
     CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
     CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
-    toStr8 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     isObj = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    trim = (value) => toStr8(value).trim();
+    trim = (value) => toStr6(value).trim();
     normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEAVE) => {
       const raw = trim(value).toLowerCase();
       if (raw === STORAGE_BACKENDS.CLOUDFLARE || raw === "cf" || raw === "r2") return STORAGE_BACKENDS.CLOUDFLARE;
@@ -870,13 +870,16 @@ var init_storageRefNormalization = __esm({
     deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) => {
       const txId = trim(arweaveTxId);
       if (!txId) return null;
-      return normalizeStorageRef({
-        backend: opts.backend || (opts.encrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE),
-        id: txId,
-        contentType: opts.contentType,
-        gate: opts.gate,
-        resource: opts.resource
-      }, opts);
+      return normalizeStorageRef(
+        {
+          backend: opts.backend || (opts.encrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE),
+          id: txId,
+          contentType: opts.contentType,
+          gate: opts.gate,
+          resource: opts.resource
+        },
+        opts
+      );
     };
     resolvePayloadStorageRef = (record, opts = {}) => {
       const raw = isObj(record) ? record : {};
@@ -1097,7 +1100,7 @@ var init_sessionSecretsEnvelope = __esm({
 });
 
 // workers/shared/workerReleaseManifest.mjs
-var SHA_PATTERN, SHA256_PATTERN, RELEASE_MANIFEST_FILE, ARTIFACT_SET, toStr9, normalizeWorkerBundleSha256, deriveWorkerReleaseManifestUrl, readWorkerBundleDigestFromManifest, fetchExpectedWorkerBundleDigest;
+var SHA_PATTERN, SHA256_PATTERN, RELEASE_MANIFEST_FILE, ARTIFACT_SET, toStr7, normalizeWorkerBundleSha256, deriveWorkerReleaseManifestUrl, readWorkerBundleDigestFromManifest, fetchExpectedWorkerBundleDigest;
 var init_workerReleaseManifest = __esm({
   "workers/shared/workerReleaseManifest.mjs"() {
     init_artifactFetch();
@@ -1105,14 +1108,14 @@ var init_workerReleaseManifest = __esm({
     SHA256_PATTERN = /^[a-f0-9]{64}$/;
     RELEASE_MANIFEST_FILE = "worker-release-manifest.json";
     ARTIFACT_SET = "context-engine-worker-bundles";
-    toStr9 = (value) => String(value ?? "").trim();
+    toStr7 = (value) => String(value ?? "").trim();
     normalizeWorkerBundleSha256 = (value) => {
-      const normalized = toStr9(value).toLowerCase();
+      const normalized = toStr7(value).toLowerCase();
       return SHA256_PATTERN.test(normalized) ? normalized : "";
     };
     deriveWorkerReleaseManifestUrl = (bundleUrl) => {
       try {
-        const parsed = new URL(toStr9(bundleUrl));
+        const parsed = new URL(toStr7(bundleUrl));
         if (parsed.protocol !== "https:" || !parsed.pathname.includes("/")) return "";
         parsed.pathname = `${parsed.pathname.slice(0, parsed.pathname.lastIndexOf("/") + 1)}${RELEASE_MANIFEST_FILE}`;
         parsed.search = "";
@@ -1129,10 +1132,10 @@ var init_workerReleaseManifest = __esm({
       if (manifest.schemaVersion !== 1 || manifest.artifactSet !== ARTIFACT_SET) {
         return { ok: false, error: "Worker release manifest schema or artifact set is unsupported." };
       }
-      if (!SHA_PATTERN.test(toStr9(manifest.source?.commit)) || !SHA_PATTERN.test(toStr9(manifest.source?.tree)) || !toStr9(manifest.source?.ref).startsWith("refs/heads/") || !SHA_PATTERN.test(toStr9(manifest.replay?.privateSourceCommit)) || !SHA_PATTERN.test(toStr9(manifest.replay?.publicReplayCommit)) || toStr9(manifest.replay?.publicCommit) !== toStr9(manifest.source?.commit) || toStr9(manifest.replay?.publicTree) !== toStr9(manifest.source?.tree) || toStr9(manifest.builder?.workflow) !== "CI" || !/^[1-9][0-9]*$/.test(toStr9(manifest.builder?.runId))) {
+      if (!SHA_PATTERN.test(toStr7(manifest.source?.commit)) || !SHA_PATTERN.test(toStr7(manifest.source?.tree)) || !toStr7(manifest.source?.ref).startsWith("refs/heads/") || !SHA_PATTERN.test(toStr7(manifest.replay?.privateSourceCommit)) || !SHA_PATTERN.test(toStr7(manifest.replay?.publicReplayCommit)) || toStr7(manifest.replay?.publicCommit) !== toStr7(manifest.source?.commit) || toStr7(manifest.replay?.publicTree) !== toStr7(manifest.source?.tree) || toStr7(manifest.builder?.workflow) !== "CI" || !/^[1-9][0-9]*$/.test(toStr7(manifest.builder?.runId))) {
         return { ok: false, error: "Worker release manifest provenance is incomplete or inconsistent." };
       }
-      const matches = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter((entry) => toStr9(entry?.file) === artifactFile && toStr9(entry?.kind) === artifactKind);
+      const matches = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter((entry) => toStr7(entry?.file) === artifactFile && toStr7(entry?.kind) === artifactKind);
       if (matches.length !== 1) {
         return { ok: false, error: `Worker release manifest must contain exactly one ${artifactKind} artifact.` };
       }
@@ -1149,7 +1152,7 @@ var init_workerReleaseManifest = __esm({
       fetchImpl = globalThis.fetch
     }) => {
       const normalizedUrl = deriveWorkerReleaseManifestUrl(manifestUrl);
-      if (!normalizedUrl || normalizedUrl !== toStr9(manifestUrl)) {
+      if (!normalizedUrl || normalizedUrl !== toStr7(manifestUrl)) {
         return { ok: false, error: "Worker release manifest URL must be an explicit HTTPS manifest asset URL." };
       }
       try {
@@ -1161,7 +1164,7 @@ var init_workerReleaseManifest = __esm({
         const manifest = JSON.parse(text);
         return readWorkerBundleDigestFromManifest(manifest, { artifactFile, artifactKind });
       } catch (error) {
-        return { ok: false, error: `Failed to read Worker release manifest: ${toStr9(error?.message || error)}` };
+        return { ok: false, error: `Failed to read Worker release manifest: ${toStr7(error?.message || error)}` };
       }
     };
   }
@@ -1178,10 +1181,10 @@ async function persistAgentSessionWrappedCapability({
   capability = null,
   cfFetchImpl
 } = {}) {
-  const token = toStr10(apiToken);
-  const account = toStr10(accountId);
-  const kvId = toStr10(kvNamespaceId);
-  const configKey = toStr10(sessionConfigKey);
+  const token = toStr8(apiToken);
+  const account = toStr8(accountId);
+  const kvId = toStr8(kvNamespaceId);
+  const configKey = toStr8(sessionConfigKey);
   const slug = safeSlug(sessionSlug);
   const workerOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
   const normalizedCapability = normalizeCapability(capability);
@@ -1237,8 +1240,8 @@ async function executeAgentSessionWrappedDeployment({
     if (mutationMarked) result.body.deploymentRequestPending = true;
     return result;
   };
-  const apiToken = toStr10(body.apiToken || body.token);
-  const resolvedAccountId = toStr10(accountId);
+  const apiToken = toStr8(body.apiToken || body.token);
+  const resolvedAccountId = toStr8(accountId);
   const sessionSlug = safeSlug(body.sessionSlug);
   const sessionWorkerOrigin = normalizeHttpsOrigin(body.sessionWorkerOrigin || body.sessionWorkerUrl);
   const sessionDeploymentIdentity = safeDeploymentIdentity(body.sessionDeploymentIdentity);
@@ -1251,15 +1254,15 @@ async function executeAgentSessionWrappedDeployment({
     return fail(400, "validate", "Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.");
   }
   if (typeof cfFetchImpl !== "function") return fail(500, "validate", "Cloudflare deployment client is unavailable.");
-  if (body.telegramEnabled === true || toStr10(body.telegramBotToken || body.telegramWebhookSecret)) {
+  if (body.telegramEnabled === true || toStr8(body.telegramBotToken || body.telegramWebhookSecret)) {
     return fail(400, "validate", "Telegram configuration is not part of the default dedicated Wrapped deployment.");
   }
-  const suppliedBundleSha256 = toStr10(body.bundleSha256);
+  const suppliedBundleSha256 = toStr8(body.bundleSha256);
   let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
   if (suppliedBundleSha256 && !expectedBundleSha256) {
     return fail(400, "bundle_provenance", "bundleSha256 must be a complete SHA-256 hex digest.");
   }
-  if (!toStr10(body.bundleText) && toStr10(body.bundleManifestUrl)) {
+  if (!toStr8(body.bundleText) && toStr8(body.bundleManifestUrl)) {
     const manifestDigest = await fetchExpectedWorkerBundleDigest({
       manifestUrl: body.bundleManifestUrl,
       artifactFile: "agentBridgeWorker.bundle.js",
@@ -1287,7 +1290,7 @@ async function executeAgentSessionWrappedDeployment({
     `/accounts/${resolvedAccountId}/workers/subdomain`,
     { method: "GET" }
   );
-  const subdomain = toStr10(accountSubdomain.data?.result?.subdomain);
+  const subdomain = toStr8(accountSubdomain.data?.result?.subdomain);
   if (!accountSubdomain.ok || !subdomain) {
     return fail(502, "workers_dev_subdomain", accountSubdomain.error || "Cloudflare workers.dev subdomain is unavailable.");
   }
@@ -1310,7 +1313,7 @@ async function executeAgentSessionWrappedDeployment({
     cfFetchImpl
   });
   if (!inventory.ok) return fail(inventory.status || 502, "kv_inventory", inventory.error);
-  let kvId = toStr10(inventory.match?.id);
+  let kvId = toStr8(inventory.match?.id);
   let kvReused = !!kvId;
   if (!kvId) {
     await beforeMutation();
@@ -1319,7 +1322,7 @@ async function executeAgentSessionWrappedDeployment({
       `/accounts/${resolvedAccountId}/storage/kv/namespaces`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: kvTitle }) }
     );
-    kvId = toStr10(created.data?.result?.id);
+    kvId = toStr8(created.data?.result?.id);
     if (!created.ok || !kvId) return fail(502, "kv_create", created.error || "Cloudflare did not create Wrapped KV.");
     kvReused = false;
   }
@@ -1342,7 +1345,7 @@ async function executeAgentSessionWrappedDeployment({
     return fail(409, "worker_preflight", "Existing Worker does not match this Wrapped deployment identity.");
   }
   const beforeBindingMap = bindingMap(beforeSettings.data?.result?.bindings);
-  const bundleAlreadyUploaded = exists2 && toStr10(beforeBindingMap.get("AGENT_BRIDGE_BUNDLE_SHA256")?.text) === bundleSha256;
+  const bundleAlreadyUploaded = exists2 && toStr8(beforeBindingMap.get("AGENT_BRIDGE_BUNDLE_SHA256")?.text) === bundleSha256;
   let uploadMetadata = null;
   if (!bundleAlreadyUploaded) {
     await beforeMutation();
@@ -1369,7 +1372,7 @@ async function executeAgentSessionWrappedDeployment({
     if (!listedSecrets.ok || !Array.isArray(listedSecrets.data?.result)) {
       return fail(502, "worker_secret_inventory", listedSecrets.error || "Unable to verify existing Wrapped secrets.");
     }
-    existingSecrets = new Set(listedSecrets.data.result.filter((entry) => toStr10(entry?.type) === "secret_text").map((entry) => toStr10(entry?.name)));
+    existingSecrets = new Set(listedSecrets.data.result.filter((entry) => toStr8(entry?.type) === "secret_text").map((entry) => toStr8(entry?.name)));
   }
   const generated = [];
   const preserved = [];
@@ -1390,7 +1393,7 @@ async function executeAgentSessionWrappedDeployment({
       let reconciled = false;
       if (isAmbiguousMutationFailure(written)) {
         const inventory2 = await cfFetchImpl(apiToken, secretsPath, { method: "GET" });
-        reconciled = inventory2.ok && Array.isArray(inventory2.data?.result) && inventory2.data.result.some((entry) => toStr10(entry?.type) === "secret_text" && toStr10(entry?.name) === name);
+        reconciled = inventory2.ok && Array.isArray(inventory2.data?.result) && inventory2.data.result.some((entry) => toStr8(entry?.type) === "secret_text" && toStr8(entry?.name) === name);
       }
       if (!reconciled) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
     }
@@ -1411,7 +1414,7 @@ async function executeAgentSessionWrappedDeployment({
     healthResponse = await fetchImpl(`${workerUrl}/health`, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
     health = await healthResponse.json();
   } catch (error) {
-    return fail(503, "authority_health_probe", toStr10(error?.message || error) || "Wrapped health request failed.");
+    return fail(503, "authority_health_probe", toStr8(error?.message || error) || "Wrapped health request failed.");
   }
   const authorityReady = healthResponse.ok && health?.ok === true && health?.worker === "agentBridgeWorker" && health?.protocolVersion === AGENT_SESSION_WRAPPED_PROTOCOL_VERSION && health?.agentSessionWrappedConfigured === true && health?.agentSessionWrappedReady === agentHttpEnabled && safeSlug(health?.dedicatedSession?.sessionSlug) === sessionSlug && normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin && health?.dedicatedSession?.accessEnabled === agentHttpEnabled;
   if (!authorityReady) {
@@ -1447,7 +1450,7 @@ async function executeAgentSessionWrappedDeployment({
     }
   });
 }
-var AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND, AGENT_SESSION_WRAPPED_PROTOCOL_VERSION, COMPATIBILITY_DATE, REQUIRED_SECRET_NAMES, toStr10, safeSlug, safeDeploymentIdentity, normalizeHttpsOrigin, normalizeHttpsUrl, normalizeAuthorityMode, encode, bytesToHex2, sha256Hex, randomSecret, response, failure, isAmbiguousMutationFailure, policyFor, workerNameFor, bindingMap, settingsOwnDeployment, buildUploadForm, readBundle, listMatchingKvNamespaces, normalizeCapability;
+var AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND, AGENT_SESSION_WRAPPED_PROTOCOL_VERSION, COMPATIBILITY_DATE, REQUIRED_SECRET_NAMES, toStr8, safeSlug, safeDeploymentIdentity, normalizeHttpsOrigin, normalizeHttpsUrl, normalizeAuthorityMode, encode, bytesToHex2, sha256Hex, randomSecret, response, failure, isAmbiguousMutationFailure, policyFor, workerNameFor, bindingMap, settingsOwnDeployment, buildUploadForm, readBundle, listMatchingKvNamespaces, normalizeCapability;
 var init_agentSessionWrappedDeployment = __esm({
   "workers/shared/agentSessionWrappedDeployment.mjs"() {
     init_artifactFetch();
@@ -1459,18 +1462,18 @@ var init_agentSessionWrappedDeployment = __esm({
       "DEMO_SIGNER_ROOT_SECRET",
       "AGENT_BRIDGE_AGENT_API_TOKEN"
     ]);
-    toStr10 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+    toStr8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
     safeSlug = (value) => {
-      const slug = toStr10(value).toLowerCase();
+      const slug = toStr8(value).toLowerCase();
       return /^[a-z0-9_-]{1,128}$/.test(slug) ? slug : "";
     };
     safeDeploymentIdentity = (value) => {
-      const identity = toStr10(value);
+      const identity = toStr8(value);
       return /^[A-Za-z0-9._:-]{8,180}$/.test(identity) ? identity : "";
     };
     normalizeHttpsOrigin = (value) => {
       try {
-        const parsed = new URL(toStr10(value));
+        const parsed = new URL(toStr8(value));
         if (parsed.protocol !== "https:" || parsed.username || parsed.password) return "";
         if (parsed.pathname !== "/" || parsed.search || parsed.hash) return "";
         return parsed.origin;
@@ -1480,7 +1483,7 @@ var init_agentSessionWrappedDeployment = __esm({
     };
     normalizeHttpsUrl = (value) => {
       try {
-        const parsed = new URL(toStr10(value));
+        const parsed = new URL(toStr8(value));
         if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) return "";
         return parsed.toString();
       } catch {
@@ -1488,7 +1491,7 @@ var init_agentSessionWrappedDeployment = __esm({
       }
     };
     normalizeAuthorityMode = (value) => {
-      const mode = toStr10(value).toLowerCase();
+      const mode = toStr8(value).toLowerCase();
       return ["worker_canonical", "evm_registry_canonical", "registry_canonical"].includes(mode) ? mode : "";
     };
     encode = (value) => new TextEncoder().encode(String(value || ""));
@@ -1500,7 +1503,7 @@ var init_agentSessionWrappedDeployment = __esm({
       return bytesToHex2(bytes2);
     };
     response = (ok, status, body) => ({ ok, status, body });
-    failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr10(error) });
+    failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr8(error) });
     isAmbiguousMutationFailure = (result = {}) => {
       const status = Number(result?.status || 0);
       return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
@@ -1523,18 +1526,18 @@ var init_agentSessionWrappedDeployment = __esm({
       return `${prefix || "ce-wrapped-session"}-${deploymentId.slice(0, 12)}`;
     };
     bindingMap = (bindings = []) => new Map(
-      (Array.isArray(bindings) ? bindings : []).map((binding) => [toStr10(binding?.name), binding])
+      (Array.isArray(bindings) ? bindings : []).map((binding) => [toStr8(binding?.name), binding])
     );
     settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true }) => {
       if (!settings?.ok) return false;
       const result = settings.data?.result || {};
-      if (toStr10(result.main_module) && toStr10(result.main_module) !== "worker.mjs") return false;
+      if (toStr8(result.main_module) && toStr8(result.main_module) !== "worker.mjs") return false;
       const actual = bindingMap(result.bindings);
       const kv = actual.get("AGENT_ACTION_KV");
-      if (toStr10(kv?.type) !== "kv_namespace" || toStr10(kv?.namespace_id) !== kvNamespaceId) return false;
+      if (toStr8(kv?.type) !== "kv_namespace" || toStr8(kv?.namespace_id) !== kvNamespaceId) return false;
       return expectedBindings.filter((binding) => binding.type === "plain_text").filter((binding) => verifyBundle || binding.name !== "AGENT_BRIDGE_BUNDLE_SHA256").every((binding) => {
         const observed = actual.get(binding.name);
-        return toStr10(observed?.type) === "plain_text" && toStr10(observed?.text) === binding.text;
+        return toStr8(observed?.type) === "plain_text" && toStr8(observed?.text) === binding.text;
       });
     };
     buildUploadForm = ({ bundleSource, bindings }) => {
@@ -1558,7 +1561,7 @@ var init_agentSessionWrappedDeployment = __esm({
         const source = await fetchArtifactText(url, { fetchImpl });
         return source.trim() ? { ok: true, source } : { ok: false, error: "Agent Bridge bundle is empty." };
       } catch (error) {
-        return { ok: false, error: `Failed to fetch Agent Bridge bundle: ${toStr10(error?.message || error)}` };
+        return { ok: false, error: `Failed to fetch Agent Bridge bundle: ${toStr8(error?.message || error)}` };
       }
     };
     listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImpl }) => {
@@ -1568,16 +1571,16 @@ var init_agentSessionWrappedDeployment = __esm({
         { method: "GET" }
       );
       if (!listed.ok) return { ok: false, error: listed.error || "Failed to list KV namespaces." };
-      const matches = (Array.isArray(listed.data?.result) ? listed.data.result : []).filter((entry) => toStr10(entry?.title) === title && toStr10(entry?.id));
+      const matches = (Array.isArray(listed.data?.result) ? listed.data.result : []).filter((entry) => toStr8(entry?.title) === title && toStr8(entry?.id));
       if (matches.length > 1) return { ok: false, status: 409, error: "Multiple KV namespaces match this Wrapped deployment identity." };
       return { ok: true, match: matches[0] || null };
     };
     normalizeCapability = (value) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) return null;
       const origin = normalizeHttpsOrigin(value.origin);
-      const protocolVersion = toStr10(value.protocolVersion);
-      const revision = toStr10(value.revision);
-      const verifiedAt = toStr10(value.verifiedAt);
+      const protocolVersion = toStr8(value.protocolVersion);
+      const revision = toStr8(value.revision);
+      const verifiedAt = toStr8(value.verifiedAt);
       if (Number(value.version) !== 1 || typeof value.enabled !== "boolean" || !origin || protocolVersion !== AGENT_SESSION_WRAPPED_PROTOCOL_VERSION || !/^wrapped-[0-9a-f]{16}$/.test(revision) || !Number.isFinite(Date.parse(verifiedAt))) return null;
       return { version: 1, enabled: value.enabled, origin, protocolVersion, revision, verifiedAt };
     };
@@ -1655,12 +1658,12 @@ var init_workerSessionPublicConfig = __esm({
 });
 
 // workers/shared/workerSessionConfig.mjs
-var isObj2, toStr11, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
+var isObj2, toStr9, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
 var init_workerSessionConfig = __esm({
   "workers/shared/workerSessionConfig.mjs"() {
     init_workerSessionPublicConfig();
     isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    toStr11 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+    toStr9 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
       "sessionId",
       "sessionIdHex",
@@ -1700,7 +1703,7 @@ var init_workerSessionConfig = __esm({
       "storageProfile",
       "workerAuthority"
     ]);
-    normalizeKey = (value) => toStr11(value).replace(/[^a-z0-9]/gi, "").toLowerCase();
+    normalizeKey = (value) => toStr9(value).replace(/[^a-z0-9]/gi, "").toLowerCase();
     OMIT_PUBLIC_VALUE = Symbol("omit-public-worker-config-value");
     SAFE_PUBLIC_KEY_FIELD_NAMES = /* @__PURE__ */ new Set(["keyprovider", "publickey", "resourcekey"]);
     SAFE_STRUCTURAL_AUTHORIZATION_PATHS = /* @__PURE__ */ new Set([
@@ -2620,7 +2623,7 @@ var init_workerConfigModeValidation = __esm({
 });
 
 // workers/shared/deployHelperCore.mjs
-var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr12, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, buildFreshDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
+var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr10, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, buildFreshDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_artifactFetch();
@@ -2716,11 +2719,11 @@ var init_deployHelperCore = __esm({
       participantScopes: Object.freeze(["ai", "transcribe", "storage", "groups", "fetch"]),
       anonymousScopes: Object.freeze([])
     });
-    toStr12 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
+    toStr10 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
     isObj4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasScheme = (value) => /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value);
     ensureHttpUrl = (raw) => {
-      const trimmed = toStr12(raw).trim();
+      const trimmed = toStr10(raw).trim();
       if (!trimmed) return "";
       if (hasScheme(trimmed)) return trimmed;
       if (trimmed.startsWith("//")) return `https:${trimmed}`;
@@ -2731,7 +2734,7 @@ var init_deployHelperCore = __esm({
       return `https://${trimmed}`;
     };
     normalizeOrigin = (raw) => {
-      const trimmed = toStr12(raw).trim();
+      const trimmed = toStr10(raw).trim();
       if (!trimmed) return "";
       const withScheme = ensureHttpUrl(trimmed);
       if (withScheme.startsWith("/")) return "";
@@ -2753,7 +2756,7 @@ var init_deployHelperCore = __esm({
     };
     validateInboundSlug = (raw) => {
       if (raw == null) return { ok: true, slug: "", error: "" };
-      const rawStr = toStr12(raw).trim();
+      const rawStr = toStr10(raw).trim();
       if (!rawStr) return { ok: true, slug: "", error: "" };
       if (rawStr.toLowerCase() === "general") return { ok: true, slug: "", error: "" };
       const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
@@ -2773,7 +2776,7 @@ var init_deployHelperCore = __esm({
       } catch {
         return {};
       }
-      const trimmed = toStr12(text).trim();
+      const trimmed = toStr10(text).trim();
       if (!trimmed) return {};
       try {
         return JSON.parse(trimmed);
@@ -2799,7 +2802,7 @@ var init_deployHelperCore = __esm({
       } catch (err) {
         return {
           ok: false,
-          error: `Cloudflare API request failed: ${toStr12(err?.message || err).trim() || "Unknown error."}`,
+          error: `Cloudflare API request failed: ${toStr10(err?.message || err).trim() || "Unknown error."}`,
           detail: void 0,
           status: 502,
           data: null
@@ -2820,7 +2823,7 @@ var init_deployHelperCore = __esm({
       if (!result || result.ok || Number(result.status || 0) !== 404) return false;
       const detail = Array.isArray(result.detail) ? result.detail : [];
       if (detail.some((entry) => Number(entry?.code || 0) === 10013)) return true;
-      const message = [result.error, ...detail.map((entry) => entry?.message)].map((value) => toStr12(value).trim().toLowerCase()).filter(Boolean).join(" ");
+      const message = [result.error, ...detail.map((entry) => entry?.message)].map((value) => toStr10(value).trim().toLowerCase()).filter(Boolean).join(" ");
       return message.includes("get namespace") && message.includes("namespace not found");
     };
     putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOptions }) => {
@@ -2886,7 +2889,7 @@ var init_deployHelperCore = __esm({
       return Array.from(bytes2).map((b2) => b2.toString(16).padStart(2, "0")).join("");
     };
     sha256Hex2 = async (value) => {
-      const input = new TextEncoder().encode(toStr12(value));
+      const input = new TextEncoder().encode(toStr10(value));
       const digest = await crypto.subtle.digest("SHA-256", input);
       return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
     };
@@ -2908,9 +2911,9 @@ var init_deployHelperCore = __esm({
     };
     stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
     buildBundleDiagnostics = async (bundleSource, sourceKind) => {
-      const normalized = toStr12(bundleSource);
+      const normalized = toStr10(bundleSource);
       return {
-        source: toStr12(sourceKind).trim() || "unknown",
+        source: toStr10(sourceKind).trim() || "unknown",
         length: normalized.length,
         sha256: await sha256Hex2(normalized),
         hasAnyExport: normalized.includes("export "),
@@ -2924,9 +2927,9 @@ var init_deployHelperCore = __esm({
       };
     };
     formatBundleDiagnostics = (diagnostics = {}) => {
-      const sha2564 = toStr12(diagnostics?.sha256).trim();
+      const sha2564 = toStr10(diagnostics?.sha256).trim();
       return [
-        `source=${toStr12(diagnostics?.source).trim() || "unknown"}`,
+        `source=${toStr10(diagnostics?.source).trim() || "unknown"}`,
         `len=${Number(diagnostics?.length || 0) || 0}`,
         `sha256=${sha2564 ? sha2564.slice(0, 16) : "n/a"}`,
         `export=${diagnostics?.hasAnyExport === true ? "1" : "0"}`,
@@ -2947,7 +2950,7 @@ var init_deployHelperCore = __esm({
           return "";
         }
       }
-      return toStr12(value).trim();
+      return toStr10(value).trim();
     };
     sanitizeSecrets = (incoming) => {
       const allowed = [
@@ -2986,7 +2989,7 @@ var init_deployHelperCore = __esm({
       if (!Array.isArray(value)) {
         return { ok: false, error: `Worker-canonical authority ${field} must be an array.` };
       }
-      const normalized = value.map((scope) => toStr12(scope).trim().toLowerCase());
+      const normalized = value.map((scope) => toStr10(scope).trim().toLowerCase());
       if (normalized.some((scope) => !ALLOWED_WORKER_AUTHORITY_SCOPES.has(scope))) {
         return { ok: false, error: `Worker-canonical authority ${field} contains an unsupported scope.` };
       }
@@ -2997,7 +3000,7 @@ var init_deployHelperCore = __esm({
       if (!isObj4(value) || !Array.isArray(value.conditions)) {
         return { ok: false, error: "Worker-canonical authority loginGate must contain a conditions array." };
       }
-      const match = toStr12(value.match).trim().toLowerCase();
+      const match = toStr10(value.match).trim().toLowerCase();
       if (match && match !== "any" && match !== "all") {
         return { ok: false, error: 'Worker-canonical authority loginGate.match must be "any" or "all".' };
       }
@@ -3006,14 +3009,14 @@ var init_deployHelperCore = __esm({
         if (!isObj4(condition)) {
           return { ok: false, error: "Worker-canonical authority loginGate contains an invalid condition." };
         }
-        const kind = toStr12(condition.kind).trim().toLowerCase();
+        const kind = toStr10(condition.kind).trim().toLowerCase();
         if (kind === "worker_role") {
-          const role = toStr12(condition.role || "admin").trim().toLowerCase() || "admin";
+          const role = toStr10(condition.role || "admin").trim().toLowerCase() || "admin";
           conditions.push({ kind, role });
           continue;
         }
         if (kind === "worker_group") {
-          const groupId = toStr12(condition.groupId).trim();
+          const groupId = toStr10(condition.groupId).trim();
           if (!groupId) {
             return { ok: false, error: "Worker-canonical worker_group conditions require groupId." };
           }
@@ -3062,11 +3065,11 @@ var init_deployHelperCore = __esm({
     };
     workerAuthorityPoliciesMatch = (expected, actual) => JSON.stringify(expected || null) === JSON.stringify(actual || null);
     buildFreshDeploymentName = (requestedName, deploymentId) => {
-      const base = toStr12(requestedName).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "ce-session-worker";
-      return `${base}-${toStr12(deploymentId).slice(0, 12)}`;
+      const base = toStr10(requestedName).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "ce-session-worker";
+      return `${base}-${toStr10(deploymentId).slice(0, 12)}`;
     };
     normalizeDeploymentRequestId = (value) => {
-      const normalized = toStr12(value).trim();
+      const normalized = toStr10(value).trim();
       return DEPLOYMENT_REQUEST_ID_RE.test(normalized) ? normalized : "";
     };
     collectKnownRequestCredentials = (body) => {
@@ -3091,7 +3094,7 @@ var init_deployHelperCore = __esm({
       return [...credentials].sort((a, b2) => b2.length - a.length);
     };
     redactKnownCredentials = (value, credentials) => {
-      let redacted = toStr12(value);
+      let redacted = toStr10(value);
       credentials.forEach((credential) => {
         redacted = redacted.split(credential).join("[REDACTED]");
       });
@@ -3232,23 +3235,23 @@ var init_deployHelperCore = __esm({
       const digestBody = { ...isObj4(body) ? body : {} };
       delete digestBody.deploymentRequestId;
       delete digestBody.accountId;
-      digestBody.apiToken = toStr12(digestBody.apiToken || digestBody.token).trim();
+      digestBody.apiToken = toStr10(digestBody.apiToken || digestBody.token).trim();
       delete digestBody.token;
       const requestDigest = await sha256Hex2(stableCanonicalSerialize({
         body: digestBody,
-        requestOrigin: normalizeOrigin(requestOrigin) || toStr12(requestOrigin).trim()
+        requestOrigin: normalizeOrigin(requestOrigin) || toStr10(requestOrigin).trim()
       }));
       const immutableIdentityDigest = await sha256Hex2(stableCanonicalSerialize({
-        requestOrigin: normalizeOrigin(requestOrigin) || toStr12(requestOrigin).trim(),
-        deploymentKind: toStr12(body?.deploymentKind).trim(),
-        sessionDeploymentIdentity: toStr12(body?.sessionDeploymentIdentity).trim(),
-        requestedWorkerName: toStr12(body?.workerName).trim(),
-        sessionSlug: toStr12(body?.sessionSlug).trim(),
-        sessionWorkerOrigin: toStr12(body?.sessionWorkerOrigin || body?.sessionWorkerUrl).trim(),
-        authorityMode: toStr12(body?.authorityMode).trim(),
-        sessionId: toStr12(body?.sessionId).trim().toLowerCase(),
-        sessionIdHex: toStr12(body?.sessionIdHex).trim().toLowerCase(),
-        adminAddress: toStr12(body?.adminAddress).trim().toLowerCase()
+        requestOrigin: normalizeOrigin(requestOrigin) || toStr10(requestOrigin).trim(),
+        deploymentKind: toStr10(body?.deploymentKind).trim(),
+        sessionDeploymentIdentity: toStr10(body?.sessionDeploymentIdentity).trim(),
+        requestedWorkerName: toStr10(body?.workerName).trim(),
+        sessionSlug: toStr10(body?.sessionSlug).trim(),
+        sessionWorkerOrigin: toStr10(body?.sessionWorkerOrigin || body?.sessionWorkerUrl).trim(),
+        authorityMode: toStr10(body?.authorityMode).trim(),
+        sessionId: toStr10(body?.sessionId).trim().toLowerCase(),
+        sessionIdHex: toStr10(body?.sessionIdHex).trim().toLowerCase(),
+        adminAddress: toStr10(body?.adminAddress).trim().toLowerCase()
       }));
       const bundleCorrectionBody = { ...isObj4(body) ? body : {} };
       delete bundleCorrectionBody.deploymentRequestId;
@@ -3259,7 +3262,7 @@ var init_deployHelperCore = __esm({
       delete bundleCorrectionBody.bundleUrl;
       const bundleCorrectionDigest = await sha256Hex2(stableCanonicalSerialize({
         body: bundleCorrectionBody,
-        requestOrigin: normalizeOrigin(requestOrigin) || toStr12(requestOrigin).trim()
+        requestOrigin: normalizeOrigin(requestOrigin) || toStr10(requestOrigin).trim()
       }));
       const deploymentId = await sha256Hex2(`context-engine-deployment:${deploymentRequestId}`);
       return {
@@ -3300,13 +3303,13 @@ var init_deployHelperCore = __esm({
       JSON.stringify(record)
     );
     normalizeResourceStage = (value, fallback) => {
-      const normalized = toStr12(value).trim().toLowerCase();
+      const normalized = toStr10(value).trim().toLowerCase();
       if (normalized === STORAGE_RESOURCE_STAGES.ACTIVE) return STORAGE_RESOURCE_STAGES.ACTIVE;
       if (normalized === STORAGE_RESOURCE_STAGES.STAGED) return STORAGE_RESOURCE_STAGES.STAGED;
       return fallback;
     };
     normalizePayloadAccessMode = (value) => {
-      const normalized = toStr12(value).trim().toLowerCase();
+      const normalized = toStr10(value).trim().toLowerCase();
       if (normalized === PAYLOAD_ACCESS_MODES2.PUBLIC_READ || normalized === "public" || normalized === "public-read") {
         return PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
       }
@@ -3314,7 +3317,7 @@ var init_deployHelperCore = __esm({
       return PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE;
     };
     normalizePayloadAccessGate = (value, fallback = PAYLOAD_ACCESS_GATES2.SBT_GATE) => {
-      const normalized = toStr12(value).trim().toLowerCase().replace(/-/g, "_");
+      const normalized = toStr10(value).trim().toLowerCase().replace(/-/g, "_");
       if (!normalized) return fallback;
       if (normalized === "none" || normalized === "public" || normalized === PAYLOAD_ACCESS_MODES2.PUBLIC_READ) {
         return PAYLOAD_ACCESS_GATES2.NONE;
@@ -3332,7 +3335,7 @@ var init_deployHelperCore = __esm({
     };
     normalizePayloadEncryptionMode = (value, fallback = PAYLOAD_ENCRYPTION_MODES2.NONE) => {
       const raw = isObj4(value) ? value.mode : value;
-      const normalized = toStr12(raw).trim().toLowerCase().replace(/-/g, "_");
+      const normalized = toStr10(raw).trim().toLowerCase().replace(/-/g, "_");
       if (!normalized) return fallback;
       if (normalized === "none" || normalized === "plain" || normalized === "plaintext") {
         return PAYLOAD_ENCRYPTION_MODES2.NONE;
@@ -3378,7 +3381,7 @@ var init_deployHelperCore = __esm({
     normalizeStorageProfileInput = (incoming) => {
       if (incoming == null) return null;
       if (isObj4(incoming)) return incoming;
-      const trimmed = toStr12(incoming).trim();
+      const trimmed = toStr10(incoming).trim();
       return trimmed ? { backend: trimmed } : null;
     };
     normalizeDeployStorageProfile = (incoming) => {
@@ -3453,7 +3456,7 @@ var init_deployHelperCore = __esm({
     };
     firstTrimmed = (...values) => {
       for (const value of values) {
-        const trimmed = toStr12(value).trim();
+        const trimmed = toStr10(value).trim();
         if (trimmed) return trimmed;
       }
       return "";
@@ -3478,7 +3481,7 @@ var init_deployHelperCore = __esm({
     };
     truthyR2Marker = (value) => {
       if (value === true) return true;
-      const normalized = toStr12(value).trim().toLowerCase();
+      const normalized = toStr10(value).trim().toLowerCase();
       return normalized === "r2" || TRUE_STRINGS.has(normalized);
     };
     hasExplicitR2Request = (incoming, bucketName = "") => {
@@ -3513,7 +3516,7 @@ var init_deployHelperCore = __esm({
     };
     normalizeEmbeddedDeployHelperEnabled = (value, fallback = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED) => {
       if (typeof value === "boolean") return value;
-      const trimmed = toStr12(value).trim().toLowerCase();
+      const trimmed = toStr10(value).trim().toLowerCase();
       if (!trimmed) return fallback;
       if (TRUE_STRINGS.has(trimmed)) return true;
       if (FALSE_STRINGS.has(trimmed)) return false;
@@ -3558,7 +3561,7 @@ var init_deployHelperCore = __esm({
       let subdomainEnabled = false;
       let subdomainError = "";
       const activationFailures = [];
-      const fallbackSubdomain = accountId ? `ce-${toStr12(accountId).replace(/[^a-z0-9-]/gi, "").slice(0, 10)}` : "";
+      const fallbackSubdomain = accountId ? `ce-${toStr10(accountId).replace(/[^a-z0-9-]/gi, "").slice(0, 10)}` : "";
       const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
       const subdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {}, cfFetchOptions);
       if (subdomainResp.ok) {
@@ -3586,7 +3589,7 @@ var init_deployHelperCore = __esm({
         }
       };
       if (!subdomain) {
-        await ensureAccountSubdomain(toStr12(requestedSubdomain).trim() || fallbackSubdomain);
+        await ensureAccountSubdomain(toStr10(requestedSubdomain).trim() || fallbackSubdomain);
       } else if (subdomainStatus && subdomainStatus !== "active") {
         await ensureAccountSubdomain(subdomain);
       }
@@ -3665,7 +3668,7 @@ var init_deployHelperCore = __esm({
       env = null
     } = {}) => {
       const lookup = await lookupCloudflareAccount({
-        apiToken: toStr12(body?.apiToken || body?.token).trim(),
+        apiToken: toStr10(body?.apiToken || body?.token).trim(),
         fetchImpl,
         apiBaseUrl,
         env
@@ -3678,19 +3681,19 @@ var init_deployHelperCore = __esm({
     validateDeployHelperPublicConfigInputs = (body = {}) => {
       if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return "";
       const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
-      if (allowOriginsInput.some((origin) => toStr12(origin).includes("*"))) {
+      if (allowOriginsInput.some((origin) => toStr10(origin).includes("*"))) {
         return "Worker CORS allowlists must contain exact origins.";
       }
-      const customRpcUrl = toStr12(body?.secrets?.customRpcUrl).trim();
+      const customRpcUrl = toStr10(body?.secrets?.customRpcUrl).trim();
       if (!customRpcUrl) return "";
-      const workerCanonicalRequest = toStr12(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+      const workerCanonicalRequest = toStr10(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
       if (workerCanonicalRequest) return "";
       const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
       const publicRpcUrls = [
         body?.rpcUrl,
         ...Object.values(rpcUrlsByChainId).flatMap((value) => Array.isArray(value) ? value : [value]),
         body?.faucet?.rpcUrl
-      ].map((value) => toStr12(value).trim()).filter(Boolean);
+      ].map((value) => toStr10(value).trim()).filter(Boolean);
       return publicRpcUrls.includes(customRpcUrl) ? "The custom RPC secret must not be duplicated into public config." : "";
     };
     executeDeployHelperRequestCore = async ({
@@ -3703,44 +3706,44 @@ var init_deployHelperCore = __esm({
       resolvedAccountId = ""
     } = {}) => {
       const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
-      const apiToken = toStr12(body?.apiToken || body?.token).trim();
+      const apiToken = toStr10(body?.apiToken || body?.token).trim();
       const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
       const cfFetchOptions = { fetchImpl, apiBaseUrl };
       if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
         return executeAgentSessionWrappedDeployment({
           body,
           env,
-          accountId: toStr12(resolvedAccountId).trim(),
+          accountId: toStr10(resolvedAccountId).trim(),
           cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
           fetchImpl,
           markMutationStarted: idempotencyContext?.markMutationStarted
         });
       }
-      const requestedWorkerName = toStr12(body?.workerName).trim();
+      const requestedWorkerName = toStr10(body?.workerName).trim();
       const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? "";
       const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
       const defaultSlug = defaultSlugCheck.slug;
       const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
       const displaySlug = sessionSlug || "general";
-      const bundleText = typeof body?.bundleText === "string" ? body.bundleText : toStr12(body?.bundleText);
+      const bundleText = typeof body?.bundleText === "string" ? body.bundleText : toStr10(body?.bundleText);
       const hasBundleText = bundleText.trim() !== "";
-      const bundleUrl = toStr12(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
+      const bundleUrl = toStr10(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
       const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex2(bundleText) : "";
-      const suppliedBundleSha256 = toStr12(body?.bundleSha256).trim();
+      const suppliedBundleSha256 = toStr10(body?.bundleSha256).trim();
       let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
       let bundleSource = hasBundleText ? bundleText : "";
       const bundleSourceKind = hasBundleText ? "bundleText" : "bundleUrl";
       let bundleDiagnostics = null;
       const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
-      const rpcUrl = toStr12(body?.rpcUrl).trim();
+      const rpcUrl = toStr10(body?.rpcUrl).trim();
       const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
       const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
       const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
       const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
       const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
-      if (!hasBundleText && toStr12(body?.bundleManifestUrl).trim()) {
+      if (!hasBundleText && toStr10(body?.bundleManifestUrl).trim()) {
         const manifestDigest = await fetchExpectedWorkerBundleDigest({
-          manifestUrl: toStr12(body.bundleManifestUrl).trim(),
+          manifestUrl: toStr10(body.bundleManifestUrl).trim(),
           artifactFile: "sessionCorsWorker.bundle.js",
           artifactKind: "session-cors-worker",
           fetchImpl
@@ -3758,7 +3761,7 @@ var init_deployHelperCore = __esm({
           bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
         } catch (error) {
           return buildFailure(502, {
-            error: `Failed to fetch bundle: ${toStr12(error?.message || error).trim() || "Unknown error."}`
+            error: `Failed to fetch bundle: ${toStr10(error?.message || error).trim() || "Unknown error."}`
           }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
         }
         bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
@@ -3768,17 +3771,17 @@ var init_deployHelperCore = __esm({
           error: "Worker bundle SHA-256 does not match the verified release manifest."
         });
       }
-      const accountId = toStr12(resolvedAccountId).trim();
+      const accountId = toStr10(resolvedAccountId).trim();
       if (!accountId) {
         return buildFailure(404, { error: "No accounts found for token." });
       }
-      const registryAddress = toStr12(body?.registryAddress).trim();
+      const registryAddress = toStr10(body?.registryAddress).trim();
       const registryChainId = Number(body?.registryChainId || 0) || 0;
-      const hatsAddress = toStr12(body?.hatsAddress).trim();
-      const adminHatId = toStr12(body?.adminHatId).trim();
-      const adminAddress = toStr12(body?.adminAddress).trim();
-      const workerCanonicalRequested = toStr12(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
-      const groupCreationPolicy = body?.groupCreationPolicy == null ? "admin_only" : toStr12(body.groupCreationPolicy).trim().toLowerCase();
+      const hatsAddress = toStr10(body?.hatsAddress).trim();
+      const adminHatId = toStr10(body?.adminHatId).trim();
+      const adminAddress = toStr10(body?.adminAddress).trim();
+      const workerCanonicalRequested = toStr10(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+      const groupCreationPolicy = body?.groupCreationPolicy == null ? "admin_only" : toStr10(body.groupCreationPolicy).trim().toLowerCase();
       if (!["admin_only", "participants"].includes(groupCreationPolicy)) {
         return buildFailure(400, {
           error: 'groupCreationPolicy must be "admin_only" or "participants".'
@@ -3791,8 +3794,8 @@ var init_deployHelperCore = __esm({
       if (!workerCanonicalAuthority.ok) {
         return buildFailure(400, { error: workerCanonicalAuthority.error });
       }
-      const deploymentId = toStr12(idempotencyContext?.deploymentId).trim() || randomSecret2();
-      const workerName = toStr12(idempotencyContext?.workerName).trim() || buildFreshDeploymentName(requestedWorkerName, deploymentId);
+      const deploymentId = toStr10(idempotencyContext?.deploymentId).trim() || randomSecret2();
+      const workerName = toStr10(idempotencyContext?.workerName).trim() || buildFreshDeploymentName(requestedWorkerName, deploymentId);
       const buildDeploymentFailure = (status, payload, options) => buildFailure(status, {
         ...payload,
         // This is the non-secret marker embedded in CE_DEPLOYMENT_ID. Preserve it
@@ -3807,7 +3810,7 @@ var init_deployHelperCore = __esm({
         cfFetchOptions
       );
       const workerNameConfirmedAbsent = !workerNamePreflight.ok && Number(workerNamePreflight.status || 0) === 404;
-      const mayResumeExistingWorker = workerNamePreflight.ok && !!toStr12(idempotencyContext?.requestMarker).trim();
+      const mayResumeExistingWorker = workerNamePreflight.ok && !!toStr10(idempotencyContext?.requestMarker).trim();
       if (!workerNamePreflight.ok && !workerNameConfirmedAbsent) {
         return buildFailure(502, {
           error: workerNamePreflight.error || "Failed to determine whether the worker already exists.",
@@ -3824,7 +3827,7 @@ var init_deployHelperCore = __esm({
       const accountSubdomain = await ensureWorkersDevAccountSubdomain({
         apiToken,
         accountId,
-        requestedSubdomain: toStr12(body?.subdomain || body?.workersSubdomain).trim(),
+        requestedSubdomain: toStr10(body?.subdomain || body?.workersSubdomain).trim(),
         fetchImpl,
         apiBaseUrl,
         env
@@ -3843,9 +3846,9 @@ var init_deployHelperCore = __esm({
       const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
       const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
       const faucet2 = {
-        rpcUrl: toStr12(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
-        amountEth: toStr12(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
-        balanceThresholdEth: toStr12(faucetInput.balanceThresholdEth).trim() || DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH
+        rpcUrl: toStr10(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
+        amountEth: toStr10(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
+        balanceThresholdEth: toStr10(faucetInput.balanceThresholdEth).trim() || DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH
       };
       const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
         body?.embeddedDeployHelperEnabled ?? body?.deployHelperEnabled,
@@ -3860,7 +3863,7 @@ var init_deployHelperCore = __esm({
             return {
               ok: false,
               result: buildFailure(502, {
-                error: `Failed to fetch bundle: ${toStr12(err?.message || err).trim() || "Unknown error."}`
+                error: `Failed to fetch bundle: ${toStr10(err?.message || err).trim() || "Unknown error."}`
               }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(err) })
             };
           }
@@ -3936,7 +3939,7 @@ var init_deployHelperCore = __esm({
         env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
         slug: sessionSlug || displaySlug
       });
-      const requestMarker = toStr12(idempotencyContext?.requestMarker).trim();
+      const requestMarker = toStr10(idempotencyContext?.requestMarker).trim();
       const kvTitleSuffix = requestMarker ? `:req-${requestMarker}` : "";
       const kvTitlePrefix = `ContextEngineSessionCorsWorker:${displaySlug}`.slice(0, KV_NAMESPACE_TITLE_MAX_LENGTH - kvTitleSuffix.length);
       const kvNamespaceTitle = `${kvTitlePrefix}${kvTitleSuffix}`;
@@ -3953,7 +3956,7 @@ var init_deployHelperCore = __esm({
           );
           if (!listResult.ok) return { ok: false, result: listResult, matches: [] };
           const namespaces = Array.isArray(listResult.data?.result) ? listResult.data.result : [];
-          matches.push(...namespaces.filter((namespace) => toStr12(namespace?.title).trim() === kvNamespaceTitle && toStr12(namespace?.id).trim()));
+          matches.push(...namespaces.filter((namespace) => toStr10(namespace?.title).trim() === kvNamespaceTitle && toStr10(namespace?.id).trim()));
           const reportedTotalPages = Number(listResult.data?.result_info?.total_pages || 1) || 1;
           if (reportedTotalPages > 1e3) {
             return {
@@ -3971,41 +3974,41 @@ var init_deployHelperCore = __esm({
         if (!settingsResult?.ok || !namespaceId) return false;
         const settings = settingsResult.data?.result || {};
         const bindings = Array.isArray(settings?.bindings) ? settings.bindings : [];
-        const named = (name) => bindings.filter((binding) => toStr12(binding?.name).trim() === name);
+        const named = (name) => bindings.filter((binding) => toStr10(binding?.name).trim() === name);
         const hasExactPlainText = (name, expected, { caseInsensitive = false } = {}) => {
           const matches = named(name);
-          if (matches.length !== 1 || toStr12(matches[0]?.type).trim() !== "plain_text") return false;
-          const actual = toStr12(matches[0]?.text).trim();
+          if (matches.length !== 1 || toStr10(matches[0]?.type).trim() !== "plain_text") return false;
+          const actual = toStr10(matches[0]?.text).trim();
           return caseInsensitive ? actual.toLowerCase() === expected.toLowerCase() : actual === expected;
         };
         const hasExactKv = (name, expectedNamespaceId) => {
           const matches = named(name);
-          return matches.length === 1 && toStr12(matches[0]?.type).trim() === "kv_namespace" && toStr12(matches[0]?.namespace_id).trim() === expectedNamespaceId;
+          return matches.length === 1 && toStr10(matches[0]?.type).trim() === "kv_namespace" && toStr10(matches[0]?.namespace_id).trim() === expectedNamespaceId;
         };
         const hasExactR2 = (name, expectedBucketName) => {
           const matches = named(name);
-          return matches.length === 1 && toStr12(matches[0]?.type).trim() === "r2_bucket" && toStr12(matches[0]?.bucket_name).trim() === expectedBucketName;
+          return matches.length === 1 && toStr10(matches[0]?.type).trim() === "r2_bucket" && toStr10(matches[0]?.bucket_name).trim() === expectedBucketName;
         };
         const hasExactDurableObject = (name, expectedClassName) => {
           const matches = named(name);
-          return matches.length === 1 && toStr12(matches[0]?.type).trim() === "durable_object_namespace" && toStr12(matches[0]?.class_name).trim() === expectedClassName;
+          return matches.length === 1 && toStr10(matches[0]?.type).trim() === "durable_object_namespace" && toStr10(matches[0]?.class_name).trim() === expectedClassName;
         };
-        const observedMainModule = toStr12(settings?.main_module).trim();
+        const observedMainModule = toStr10(settings?.main_module).trim();
         const moduleIdentityMatches = !observedMainModule || observedMainModule === "worker.mjs";
         const storageIndexMatches = storageBindingPlan.requiresStorageIndexKv ? hasExactKv("CE_STORAGE_INDEX_KV", namespaceId) : named("CE_STORAGE_INDEX_KV").length === 0;
         const r2Matches = storageBindingPlan.r2BucketName ? hasExactR2("CE_STORAGE_R2", storageBindingPlan.r2BucketName) : named("CE_STORAGE_R2").length === 0;
         const adminMatches = adminAddress ? hasExactPlainText("BOOTSTRAP_ADMIN_ADDRESS", adminAddress, { caseInsensitive: true }) : named("BOOTSTRAP_ADMIN_ADDRESS").length === 0;
         const bundleIdentityBindings = named(BUNDLE_SHA256_BINDING_NAME);
-        const observedBundleSha256 = bundleIdentityBindings.length === 1 && toStr12(bundleIdentityBindings[0]?.type).trim() === "plain_text" ? toStr12(bundleIdentityBindings[0]?.text).trim().toLowerCase() : "";
-        const expectedBundleSha2562 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr12(idempotencyContext?.bundleSha256).trim().toLowerCase();
+        const observedBundleSha256 = bundleIdentityBindings.length === 1 && toStr10(bundleIdentityBindings[0]?.type).trim() === "plain_text" ? toStr10(bundleIdentityBindings[0]?.text).trim().toLowerCase() : "";
+        const expectedBundleSha2562 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr10(idempotencyContext?.bundleSha256).trim().toLowerCase();
         const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedBundleSha2562 || observedBundleSha256 === expectedBundleSha2562);
-        const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr12(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
+        const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr10(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
         return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
       };
       const readWorkerBundleSha256 = (settingsResult) => {
         const bindings = Array.isArray(settingsResult?.data?.result?.bindings) ? settingsResult.data.result.bindings : [];
-        const matches = bindings.filter((binding) => toStr12(binding?.name).trim() === BUNDLE_SHA256_BINDING_NAME && toStr12(binding?.type).trim() === "plain_text");
-        const value = matches.length === 1 ? toStr12(matches[0]?.text).trim().toLowerCase() : "";
+        const matches = bindings.filter((binding) => toStr10(binding?.name).trim() === BUNDLE_SHA256_BINDING_NAME && toStr10(binding?.type).trim() === "plain_text");
+        const value = matches.length === 1 ? toStr10(matches[0]?.text).trim().toLowerCase() : "";
         return /^[0-9a-f]{64}$/.test(value) ? value : "";
       };
       let kvId = "";
@@ -4046,7 +4049,7 @@ var init_deployHelperCore = __esm({
               deploymentRequestPending: true
             });
           }
-          kvId = toStr12(existingMarkedNamespaces.matches[0]?.id).trim();
+          kvId = toStr10(existingMarkedNamespaces.matches[0]?.id).trim();
         }
       }
       if (!resumeWorkerSettings && workerNameConfirmedAbsent && idempotencyContext?.isReplay === true && idempotencyContext?.uploadStarted === true && kvId) {
@@ -4099,7 +4102,7 @@ var init_deployHelperCore = __esm({
       if (!resumeUploadedWorker) {
         const preparedBundle = await prepareBundleDiagnostics();
         if (!preparedBundle.ok) return preparedBundle.result;
-        if (idempotencyContext?.bundleSha256 && toStr12(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 && idempotencyContext?.definitiveUploadRejected !== true) {
+        if (idempotencyContext?.bundleSha256 && toStr10(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 && idempotencyContext?.definitiveUploadRejected !== true) {
           return buildFailure(409, {
             error: "Deployment bundle content changed after this request started; upload was stopped.",
             deploymentRequestPending: true
@@ -4112,7 +4115,7 @@ var init_deployHelperCore = __esm({
           await idempotencyContext?.markMutationStarted?.();
         } catch (error) {
           return buildFailure(503, {
-            error: `Failed to advance deployment request journal: ${toStr12(error?.message || error).trim() || "Unknown error."}`
+            error: `Failed to advance deployment request journal: ${toStr10(error?.message || error).trim() || "Unknown error."}`
           }, { fallbackEligible: true });
         }
         kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
@@ -4120,7 +4123,7 @@ var init_deployHelperCore = __esm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: kvNamespaceTitle })
         }, cfFetchOptions);
-        kvId = toStr12(kvCreate.data?.result?.id).trim();
+        kvId = toStr10(kvCreate.data?.result?.id).trim();
         createdKvThisInvocation = kvCreate.ok && !!kvId;
         if (!kvId && requestMarker) {
           for (let attempt = 0; attempt <= NEW_KV_NAMESPACE_RETRY_DELAYS_MS.length; attempt += 1) {
@@ -4132,7 +4135,7 @@ var init_deployHelperCore = __esm({
               });
             }
             if (reconciled.matches.length === 1) {
-              kvId = toStr12(reconciled.matches[0]?.id).trim();
+              kvId = toStr10(reconciled.matches[0]?.id).trim();
               break;
             }
             const delayMs = NEW_KV_NAMESPACE_RETRY_DELAYS_MS[attempt];
@@ -4229,7 +4232,7 @@ var init_deployHelperCore = __esm({
           new_tag: SESSION_COORDINATOR_MIGRATION_TAG,
           new_sqlite_classes: [SESSION_COORDINATOR_CLASS_NAME]
         },
-        compatibility_date: toStr12(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
+        compatibility_date: toStr10(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
         compatibility_flags: ["nodejs_compat"]
       };
       const readWorkerSettingsAfterUpload = async () => {
@@ -4385,7 +4388,7 @@ var init_deployHelperCore = __esm({
             await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
           } catch (error) {
             return buildDeploymentFailure(503, {
-              error: `Failed to journal deployment upload identity: ${toStr12(error?.message || error).trim() || "Unknown error."}`,
+              error: `Failed to journal deployment upload identity: ${toStr10(error?.message || error).trim() || "Unknown error."}`,
               deploymentRequestPending: true,
               orphanResources: {
                 kvNamespaceId: kvId,
@@ -4401,7 +4404,7 @@ var init_deployHelperCore = __esm({
           }, cfFetchOptions);
           const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
             scriptUpload.error,
-            ...Array.isArray(scriptUpload.detail) ? scriptUpload.detail.map((entry) => toStr12(entry?.message || entry)) : [scriptUpload.detail]
+            ...Array.isArray(scriptUpload.detail) ? scriptUpload.detail.map((entry) => toStr10(entry?.message || entry)) : [scriptUpload.detail]
           ].filter(Boolean).join("\n"));
           if (migrationPreconditionFailure) {
             scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
@@ -4426,7 +4429,7 @@ var init_deployHelperCore = __esm({
               try {
                 await idempotencyContext?.markDefinitiveUploadRejected?.(bundleDiagnostics?.sha256);
               } catch (error) {
-                rejectionJournalError = toStr12(error?.message || error).trim() || "Unknown error.";
+                rejectionJournalError = toStr10(error?.message || error).trim() || "Unknown error.";
               }
             }
             const orphanResources = stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted ? {
@@ -4484,7 +4487,7 @@ var init_deployHelperCore = __esm({
             }
           }, { fallbackEligible: true });
         }
-        resumedSecretBindings = new Set(listedSecrets.filter((binding) => toStr12(binding?.type).trim() === "secret_text").map((binding) => toStr12(binding?.name).trim()).filter(Boolean));
+        resumedSecretBindings = new Set(listedSecrets.filter((binding) => toStr10(binding?.type).trim() === "secret_text").map((binding) => toStr10(binding?.name).trim()).filter(Boolean));
       }
       let envelopeKekSecretSet = false;
       const tokenSecretPreserved = resumedSecretBindings.has("TOKEN_HMAC_SECRET");
@@ -4504,7 +4507,7 @@ var init_deployHelperCore = __esm({
         apiToken,
         accountId,
         workerName,
-        requestedSubdomain: toStr12(body?.subdomain || body?.workersSubdomain).trim(),
+        requestedSubdomain: toStr10(body?.subdomain || body?.workersSubdomain).trim(),
         knownAccountSubdomain: accountSubdomain,
         fetchImpl,
         apiBaseUrl,
@@ -4559,7 +4562,7 @@ var init_deployHelperCore = __esm({
           if (!resumeUploadedWorker || !result?.ok) return false;
           const readbackConfig = result.data?.result || result.data || {};
           if (Object.keys(readbackConfig).length === 0) return false;
-          return toStr12(readbackConfig.slug).trim() === toStr12(configWithWorkerUrl.slug).trim() && (!configWithWorkerUrl.sessionId || toStr12(readbackConfig.sessionId).trim() === toStr12(configWithWorkerUrl.sessionId).trim()) && (!configWithWorkerUrl.adminAddress || toStr12(readbackConfig.adminAddress).trim().toLowerCase() === toStr12(configWithWorkerUrl.adminAddress).trim().toLowerCase()) && (!workerCanonicalRequested || workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority));
+          return toStr10(readbackConfig.slug).trim() === toStr10(configWithWorkerUrl.slug).trim() && (!configWithWorkerUrl.sessionId || toStr10(readbackConfig.sessionId).trim() === toStr10(configWithWorkerUrl.sessionId).trim()) && (!configWithWorkerUrl.adminAddress || toStr10(readbackConfig.adminAddress).trim().toLowerCase() === toStr10(configWithWorkerUrl.adminAddress).trim().toLowerCase()) && (!workerCanonicalRequested || workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority));
         };
         const readbackIsRetryable = (result) => {
           if (!result?.ok) {
@@ -4639,7 +4642,7 @@ var init_deployHelperCore = __esm({
         const pending = !!idempotencyContext && isAmbiguousCloudflareMutationFailure(result);
         if (!pending) return { ok: false, pending: false };
         const inventory = await cfFetch(apiToken, runtimeSecretsPath, { method: "GET" }, cfFetchOptions);
-        const committed = inventory.ok && Array.isArray(inventory?.data?.result) && inventory.data.result.some((entry) => toStr12(entry?.type).trim() === "secret_text" && toStr12(entry?.name).trim() === name);
+        const committed = inventory.ok && Array.isArray(inventory?.data?.result) && inventory.data.result.some((entry) => toStr10(entry?.type).trim() === "secret_text" && toStr10(entry?.name).trim() === name);
         return { ok: committed, pending: !committed };
       };
       const retainedRuntimeSecretResources = () => ({
@@ -4751,18 +4754,18 @@ var init_deployHelperCore = __esm({
     };
     resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
       const resolvedBody = { ...isObj4(body) ? body : {} };
-      if (!toStr12(resolvedBody.bundleManifestUrl)) {
-        const defaultBundleManifestUrl = toStr12(
+      if (!toStr10(resolvedBody.bundleManifestUrl)) {
+        const defaultBundleManifestUrl = toStr10(
           resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND ? env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL : env?.WORKER_BUNDLE_MANIFEST_URL
         );
         if (defaultBundleManifestUrl) resolvedBody.bundleManifestUrl = defaultBundleManifestUrl;
       }
-      if (!toStr12(resolvedBody.agentBridgeBundleManifestUrl)) {
-        const defaultAgentManifestUrl = toStr12(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+      if (!toStr10(resolvedBody.agentBridgeBundleManifestUrl)) {
+        const defaultAgentManifestUrl = toStr10(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
         if (defaultAgentManifestUrl) resolvedBody.agentBridgeBundleManifestUrl = defaultAgentManifestUrl;
       }
       const resolveOne = async ({ manifestField, digestField, artifactFile, artifactKind }) => {
-        const manifestUrl = toStr12(resolvedBody[manifestField]).trim();
+        const manifestUrl = toStr10(resolvedBody[manifestField]).trim();
         if (!manifestUrl) return null;
         const manifestDigest = await fetchExpectedWorkerBundleDigest({
           manifestUrl,
@@ -4771,7 +4774,7 @@ var init_deployHelperCore = __esm({
           fetchImpl
         });
         if (!manifestDigest.ok) return buildFailure(502, { error: manifestDigest.error });
-        const supplied = toStr12(resolvedBody[digestField]).trim();
+        const supplied = toStr10(resolvedBody[digestField]).trim();
         const suppliedDigest = normalizeWorkerBundleSha256(supplied);
         if (supplied && !suppliedDigest) {
           return buildFailure(400, { error: `${digestField} must be a complete SHA-256 hex digest.` });
@@ -4816,15 +4819,15 @@ var init_deployHelperCore = __esm({
       if (body?.groupSlug != null && body?.sessionSlug == null) {
         return "Legacy groupSlug is no longer accepted. Use sessionSlug instead.";
       }
-      if (!toStr12(body?.apiToken || body?.token).trim()) return "Missing apiToken.";
+      if (!toStr10(body?.apiToken || body?.token).trim()) return "Missing apiToken.";
       if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return "";
-      if (!toStr12(body?.workerName).trim()) return "Missing workerName.";
+      if (!toStr10(body?.workerName).trim()) return "Missing workerName.";
       const defaultSlugCheck = validateInboundSlug(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? "");
       if (body?.sessionSlug == null && !defaultSlugCheck.ok) return defaultSlugCheck.error;
-      if (toStr12(body?.bundleSha256).trim() && !normalizeWorkerBundleSha256(body.bundleSha256)) {
+      if (toStr10(body?.bundleSha256).trim() && !normalizeWorkerBundleSha256(body.bundleSha256)) {
         return "bundleSha256 must be a complete SHA-256 hex digest.";
       }
-      if (!toStr12(body?.bundleText).trim() && !toStr12(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim()) {
+      if (!toStr10(body?.bundleText).trim() && !toStr10(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim()) {
         return "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).";
       }
       const mode = validateDeploymentModeValues(body);
@@ -4836,7 +4839,7 @@ var init_deployHelperCore = __esm({
     executeDeployHelperRequest = async (options = {}) => {
       const localError = validateDeployHelperLocalInputs(options.body, options.env);
       if (localError) return buildFailure(400, { error: localError });
-      const requestId = toStr12(options.body?.deploymentRequestId).trim();
+      const requestId = toStr10(options.body?.deploymentRequestId).trim();
       if (requestId && !normalizeDeploymentRequestId(requestId)) {
         return buildFailure(400, { error: "deploymentRequestId must contain 8-128 safe identifier characters." });
       }
@@ -4847,7 +4850,7 @@ var init_deployHelperCore = __esm({
           deploymentRequestPending: true
         }, { fallbackEligible: true });
       }
-      const accountLookup = toStr12(options.resolvedAccountId).trim() ? { ok: true, accountId: toStr12(options.resolvedAccountId).trim() } : await resolveDeploymentAccountId({
+      const accountLookup = toStr10(options.resolvedAccountId).trim() ? { ok: true, accountId: toStr10(options.resolvedAccountId).trim() } : await resolveDeploymentAccountId({
         body: options.body,
         env: options.env,
         fetchImpl: options.fetchImpl || globalThis.fetch
@@ -4866,7 +4869,7 @@ var init_deployHelperCore = __esm({
       });
       if (!provenance.ok) return provenance.failure;
       options = { ...options, body: provenance.body };
-      const rawRequestId = toStr12(options?.body?.deploymentRequestId).trim();
+      const rawRequestId = toStr10(options?.body?.deploymentRequestId).trim();
       if (!rawRequestId) return executeDeployHelperRequestCore(options);
       const context = await buildDeploymentRequestContext({
         body: options?.body,
@@ -4877,7 +4880,7 @@ var init_deployHelperCore = __esm({
           error: "deploymentRequestId must contain 8-128 safe identifier characters."
         });
       }
-      const coordinatedRequestDigest = toStr12(options?.coordinatedRequestDigest).trim().toLowerCase();
+      const coordinatedRequestDigest = toStr10(options?.coordinatedRequestDigest).trim().toLowerCase();
       if (options?.coordinationBypass === true && /^[0-9a-f]{64}$/.test(coordinatedRequestDigest)) {
         context.requestDigest = coordinatedRequestDigest;
       }
@@ -4954,7 +4957,7 @@ var init_deployHelperCore = __esm({
       const buildTerminalJournalReplay = (record) => {
         const result2 = record?.result;
         if (result2?.ok !== true) return result2;
-        const recordedFullRequestDigest = toStr12(record?.fullRequestDigest).trim().toLowerCase();
+        const recordedFullRequestDigest = toStr10(record?.fullRequestDigest).trim().toLowerCase();
         const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
         if (fullRequestDigestMatches) return result2;
         return {
@@ -4981,11 +4984,11 @@ var init_deployHelperCore = __esm({
         ]);
       } catch (error) {
         return buildFailure(503, {
-          error: `Failed to read deployment request journal: ${toStr12(error?.message || error).trim() || "Unknown error."}`
+          error: `Failed to read deployment request journal: ${toStr10(error?.message || error).trim() || "Unknown error."}`
         }, { fallbackEligible: true });
       }
       if (terminalRecord) {
-        if (Number(terminalRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr12(terminalRecord.requestDigest).trim() !== context.requestDigest) {
+        if (Number(terminalRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr10(terminalRecord.requestDigest).trim() !== context.requestDigest) {
           return buildRequestDigestConflict();
         }
         if (terminalRecord.state === "terminal" && isObj4(terminalRecord.result)) {
@@ -4996,14 +4999,14 @@ var init_deployHelperCore = __esm({
         return buildFailure(409, { error: "Deployment request terminal journal state is invalid." });
       }
       if (uploadRejectedRecord) {
-        const rejectedBundleSha256 = toStr12(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
-        if (toStr12(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
+        const rejectedBundleSha256 = toStr10(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
+        if (toStr10(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
           return buildRequestDigestConflict();
         }
-        if (Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRejectedRecord.state !== "definitive_upload_rejected" || !/^[0-9a-f]{64}$/.test(toStr12(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) || toStr12(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId || toStr12(uploadRejectedRecord.workerName).trim() !== context.workerName || toStr12(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker || !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)) {
+        if (Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRejectedRecord.state !== "definitive_upload_rejected" || !/^[0-9a-f]{64}$/.test(toStr10(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) || toStr10(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId || toStr10(uploadRejectedRecord.workerName).trim() !== context.workerName || toStr10(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker || !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)) {
           return buildFailure(409, { error: "Deployment request upload-rejection journal state is invalid." });
         }
-        if (toStr12(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !== context.bundleCorrectionDigest) {
+        if (toStr10(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !== context.bundleCorrectionDigest) {
           return buildFailure(409, {
             error: "A rejected deployment bundle may be corrected only when every non-bundle deployment field is unchanged.",
             deploymentRequestConflict: true,
@@ -5014,14 +5017,14 @@ var init_deployHelperCore = __esm({
         context.rejectedBundleSha256 = rejectedBundleSha256;
       }
       if (uploadRecord) {
-        if (toStr12(uploadRecord.requestDigest).trim() !== context.requestDigest) {
+        if (toStr10(uploadRecord.requestDigest).trim() !== context.requestDigest) {
           return buildRequestDigestConflict();
         }
-        if (Number(uploadRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRecord.state !== "upload_started" || !/^[0-9a-f]{64}$/.test(toStr12(uploadRecord.bundleSha256).trim().toLowerCase())) {
+        if (Number(uploadRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRecord.state !== "upload_started" || !/^[0-9a-f]{64}$/.test(toStr10(uploadRecord.bundleSha256).trim().toLowerCase())) {
           return buildFailure(409, { error: "Deployment request upload journal state is invalid." });
         }
         context.uploadStarted = true;
-        context.bundleSha256 = toStr12(uploadRecord.bundleSha256).trim().toLowerCase();
+        context.bundleSha256 = toStr10(uploadRecord.bundleSha256).trim().toLowerCase();
       }
       if (context.definitiveUploadRejected === true && context.bundleSha256 && context.bundleSha256 !== context.rejectedBundleSha256) {
         return buildFailure(409, { error: "Deployment request upload journal conflicts with its rejection state." });
@@ -5031,7 +5034,7 @@ var init_deployHelperCore = __esm({
         context.bundleSha256 = context.rejectedBundleSha256;
       }
       if (existingRecord) {
-        if (Number(existingRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr12(existingRecord.requestDigest).trim() !== context.requestDigest) {
+        if (Number(existingRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr10(existingRecord.requestDigest).trim() !== context.requestDigest) {
           return buildRequestDigestConflict();
         }
         if (existingRecord.state === "terminal" && isObj4(existingRecord.result)) {
@@ -5054,7 +5057,7 @@ var init_deployHelperCore = __esm({
           });
         } catch (error) {
           return buildFailure(503, {
-            error: `Failed to initialize deployment request journal: ${toStr12(error?.message || error).trim() || "Unknown error."}`
+            error: `Failed to initialize deployment request journal: ${toStr10(error?.message || error).trim() || "Unknown error."}`
           }, { fallbackEligible: true });
         }
       }
@@ -5064,7 +5067,7 @@ var init_deployHelperCore = __esm({
         context.mutationStarted = true;
       };
       context.markUploadStarted = async (bundleSha256) => {
-        const normalizedBundleSha256 = toStr12(bundleSha256).trim().toLowerCase();
+        const normalizedBundleSha256 = toStr10(bundleSha256).trim().toLowerCase();
         if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
           throw new TypeError("Cannot journal an invalid deployment bundle identity.");
         }
@@ -5086,7 +5089,7 @@ var init_deployHelperCore = __esm({
         }
       };
       context.markDefinitiveUploadRejected = async (bundleSha256) => {
-        const normalizedBundleSha256 = toStr12(bundleSha256).trim().toLowerCase();
+        const normalizedBundleSha256 = toStr10(bundleSha256).trim().toLowerCase();
         if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
           throw new TypeError("Cannot journal an invalid rejected bundle identity.");
         }
@@ -5383,14 +5386,13 @@ var init_resultsAnalysisSettings = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigNormalization.js
-var toStr13, isObj6, hasOwn3, normalizeEmbeddedDeployHelperEnabled2, cloneValue, appendListEntries, normalizeWorkerAllowOrigins, normalizeWorkerRpcUrlsByChainId, normalizeWorkerConfigRecord, mergeWorkerConfigRecords, mergeWorkerLimitRecords;
+var isObj6, hasOwn3, normalizeEmbeddedDeployHelperEnabled2, cloneValue, appendListEntries, normalizeWorkerAllowOrigins, normalizeWorkerRpcUrlsByChainId, normalizeWorkerConfigRecord, mergeWorkerConfigRecords, mergeWorkerLimitRecords;
 var init_sessionConfigNormalization = __esm({
   "workers/sessionCorsWorker/sessionConfigNormalization.js"() {
     init_sessionSlugResolution();
     init_stringCoercion();
     init_sessionColorSchemeConfig();
     init_resultsAnalysisSettings();
-    toStr13 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     isObj6 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     normalizeEmbeddedDeployHelperEnabled2 = (raw) => {
@@ -5413,7 +5415,7 @@ var init_sessionConfigNormalization = __esm({
         raw.forEach((entry) => appendListEntries(target, entry));
         return;
       }
-      const value = toStr13(raw).trim();
+      const value = toStr6(raw).trim();
       if (!value) return;
       value.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean).forEach((entry) => target.push(entry));
     };
@@ -5478,11 +5480,7 @@ var init_sessionConfigNormalization = __esm({
       delete normalized.deployHelperEnabled;
       return normalized;
     };
-    mergeWorkerConfigRecords = ({
-      existingConfig,
-      incomingConfig,
-      slug
-    } = {}) => {
+    mergeWorkerConfigRecords = ({ existingConfig, incomingConfig, slug } = {}) => {
       const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
       const incoming = isObj6(incomingConfig) ? cloneValue(incomingConfig) : {};
       const merged = {
@@ -5499,19 +5497,18 @@ var init_sessionConfigNormalization = __esm({
       };
       return normalizeWorkerConfigRecord(merged, { slug }) || {};
     };
-    mergeWorkerLimitRecords = ({
-      existingConfig,
-      incomingLimits,
-      slug
-    } = {}) => {
+    mergeWorkerLimitRecords = ({ existingConfig, incomingLimits, slug } = {}) => {
       const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
-      return normalizeWorkerConfigRecord({
-        ...existing,
-        limits: {
-          ...isObj6(existing.limits) ? existing.limits : {},
-          ...isObj6(incomingLimits) ? cloneValue(incomingLimits) : {}
-        }
-      }, { slug }) || {};
+      return normalizeWorkerConfigRecord(
+        {
+          ...existing,
+          limits: {
+            ...isObj6(existing.limits) ? existing.limits : {},
+            ...isObj6(incomingLimits) ? cloneValue(incomingLimits) : {}
+          }
+        },
+        { slug }
+      ) || {};
     };
   }
 });
@@ -5928,15 +5925,15 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var toStr14, trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, safeKeyPart, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, legacyEncodedMemberKey, legacyCaseFoldedMemberKey, legacyMemberPrefix, legacyEncodedPrincipalPrefix, legacyCaseFoldedPrincipalPrefix, legacyEncodedMemberIndexKey, legacyCaseFoldedMemberIndexKey, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_workerGroupUrl();
     init_sessionSlugResolution();
     init_sessionConfigMutation();
     init_workerConfigModeValidation();
-    toStr14 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    trim2 = (value) => toStr14(value).trim();
+    init_stringCoercion();
+    trim2 = (value) => toStr6(value).trim();
     isObj7 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     WORKER_GROUP_JOIN_MODES = Object.freeze({
       OPEN: "open",
@@ -7199,16 +7196,7 @@ ${row.principalKey}`, row);
       principal: member?.principal,
       addedAt: trim2(member?.addedAt)
     });
-    listWorkerGroupMembersForPrincipal = async ({
-      env,
-      slug,
-      sessionId,
-      groupId,
-      principal,
-      cursor,
-      limit,
-      deps = {}
-    } = {}) => {
+    listWorkerGroupMembersForPrincipal = async ({ env, slug, sessionId, groupId, principal, cursor, limit, deps = {} } = {}) => {
       const normalizedGroupId = normalizeWorkerGroupId(groupId);
       if (!normalizedGroupId) {
         return { ok: false, status: 400, reason: "invalid_worker_group_id" };
@@ -11794,9 +11782,9 @@ var require_utils2 = __commonJS({
       }
     };
     exports.Hash = Hash2;
-    var toStr21 = {}.toString;
+    var toStr12 = {}.toString;
     function checkOpts2(defaults, opts) {
-      if (opts !== void 0 && toStr21.call(opts) !== "[object Object]")
+      if (opts !== void 0 && toStr12.call(opts) !== "[object Object]")
         throw new Error("Options should be object or undefined");
       const merged = Object.assign(defaults, opts);
       return merged;
@@ -36447,11 +36435,11 @@ var init_sessionConfigSecretsStore = __esm({
 });
 
 // workers/sessionCorsWorker/payloadAccessControl.js
-var toStr16, trim4, lower2, isObj10, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
+var trim4, lower2, isObj10, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
 var init_payloadAccessControl = __esm({
   "workers/sessionCorsWorker/payloadAccessControl.js"() {
-    toStr16 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    trim4 = (value) => toStr16(value).trim();
+    init_stringCoercion();
+    trim4 = (value) => toStr6(value).trim();
     lower2 = (value) => trim4(value).toLowerCase().replace(/-/g, "_");
     isObj10 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     LEGACY_PAYLOAD_ACCESS_MODES = Object.freeze({
@@ -36522,7 +36510,10 @@ var init_payloadAccessControl = __esm({
       const fallbackLegacy = normalizeLegacyPayloadAccessMode(fallback);
       if (isObj10(value) && (Object.prototype.hasOwnProperty.call(value, "gate") || Object.prototype.hasOwnProperty.call(value, "encryption"))) {
         return {
-          gate: normalizeGate(value.gate, fallbackLegacy === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ ? PAYLOAD_ACCESS_GATES3.NONE : PAYLOAD_ACCESS_GATES3.SBT_GATE),
+          gate: normalizeGate(
+            value.gate,
+            fallbackLegacy === LEGACY_PAYLOAD_ACCESS_MODES.PUBLIC_READ ? PAYLOAD_ACCESS_GATES3.NONE : PAYLOAD_ACCESS_GATES3.SBT_GATE
+          ),
           encryption: normalizeEncryption(value.encryption, PAYLOAD_ENCRYPTION_MODES3.NONE)
         };
       }
@@ -36553,10 +36544,11 @@ var init_payloadAccessControl = __esm({
 });
 
 // workers/sessionCorsWorker/storageEnvelopeEncryption.js
-var textEncoder2, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, toStr17, trim5, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso2, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit;
+var textEncoder2, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim5, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso2, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit;
 var init_storageEnvelopeEncryption = __esm({
   "workers/sessionCorsWorker/storageEnvelopeEncryption.js"() {
     init_sessionWriteCoordinator();
+    init_stringCoercion();
     textEncoder2 = new TextEncoder();
     textDecoder2 = new TextDecoder();
     STORAGE_ENVELOPE_KEK_SECRET_NAME2 = "CE_STORAGE_ENVELOPE_KEK";
@@ -36564,8 +36556,7 @@ var init_storageEnvelopeEncryption = __esm({
     ENVELOPE_VERSION = 1;
     AES_GCM2 = "AES-GCM";
     AES_256_GCM = "AES-256-GCM";
-    toStr17 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    trim5 = (value) => toStr17(value).trim();
+    trim5 = (value) => toStr6(value).trim();
     isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));
     safeSlugPart = (value) => trim5(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
@@ -36814,15 +36805,7 @@ var init_storageEnvelopeEncryption = __esm({
         }
       };
     };
-    decryptPayloadWithStorageEnvelope = async ({
-      env,
-      config,
-      slug,
-      payloadId,
-      ciphertextBytes,
-      envelope,
-      deps = {}
-    }) => {
+    decryptPayloadWithStorageEnvelope = async ({ env, config, slug, payloadId, ciphertextBytes, envelope, deps = {} }) => {
       if (!isObj11(envelope) || envelope.encryption !== "worker_envelope") {
         throw new Error("Storage envelope metadata is missing.");
       }
@@ -36852,14 +36835,7 @@ var init_storageEnvelopeEncryption = __esm({
         return trim5(Date.now());
       }
     };
-    writeStorageEnvelopeKeyReleaseAudit = async ({
-      env = {},
-      slug,
-      payloadId,
-      principal,
-      conditionMatched,
-      deps = {}
-    } = {}) => {
+    writeStorageEnvelopeKeyReleaseAudit = async ({ env = {}, slug, payloadId, principal, conditionMatched, deps = {} } = {}) => {
       const timestamp = nowIso2(deps);
       const entry = {
         version: ENVELOPE_VERSION,
@@ -36874,10 +36850,7 @@ var init_storageEnvelopeEncryption = __esm({
       if (!kv || typeof kv.put !== "function") {
         throw new Error("Storage envelope audit store is not configured.");
       }
-      await kv.put(
-        `ce-storage-audit:${entry.sessionSlug}:${entry.payloadId}:${timestamp}:${auditSuffix(deps)}`,
-        JSON.stringify(entry)
-      );
+      await kv.put(`ce-storage-audit:${entry.sessionSlug}:${entry.payloadId}:${timestamp}:${auditSuffix(deps)}`, JSON.stringify(entry));
       return { ok: true, store: "kv", entry };
     };
   }
@@ -37043,7 +37016,7 @@ var init_responseFieldKeyRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, toStr18, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder2, decoder2, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim6, isObj12, isJsonContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, bytesToBase64url3, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, base64urlToBytes3, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -37056,12 +37029,12 @@ var init_storageRouteExecution = __esm({
     init_sessionConfigMutation();
     init_sessionSlugResolution();
     init_responseFieldKeyRoute();
+    init_stringCoercion();
     encoder2 = new TextEncoder();
     decoder2 = new TextDecoder();
     RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol("resolve-storage-gate-runtime-config");
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
-    toStr18 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    trim6 = (value) => toStr18(value).trim();
+    trim6 = (value) => toStr6(value).trim();
     isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isJsonContentType = (contentType) => {
       const mediaType = trim6(contentType).split(";", 1)[0].trim().toLowerCase();
@@ -37285,10 +37258,7 @@ var init_storageRouteExecution = __esm({
           raw.contract,
           raw.address
         ].map(trim6).filter(Boolean),
-        chainId: resolveChainIdWithLegacyFallback(
-          raw.chainId,
-          resolveChainIdWithLegacyFallback(raw.networkChainId, 0)
-        ) || null,
+        chainId: resolveChainIdWithLegacyFallback(raw.chainId, resolveChainIdWithLegacyFallback(raw.networkChainId, 0)) || null,
         anyOrAll: normalizeGateMode(raw.anyOrAll || raw.match || raw.gateMode)
       };
     };
@@ -37340,7 +37310,7 @@ var init_storageRouteExecution = __esm({
       if (!isObj12(raw)) return { ok: false, error: "Invalid JSON." };
       const data = Object.prototype.hasOwnProperty.call(raw, "data") ? raw.data : "";
       const contentType = trim6(raw.contentType) || (typeof data === "string" ? "text/plain" : "application/json");
-      const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr18(data);
+      const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr6(data);
       const bytes2 = encoder2.encode(serialized);
       const tooLarge2 = rejectBytesOverLimit({ bytes: bytes2, maxUploadBytes });
       if (tooLarge2) return tooLarge2;
@@ -37549,22 +37519,14 @@ var init_storageRouteExecution = __esm({
       const scope = trim6(condition.scope || condition.value);
       if (!scope) return { ok: false, reason: "missing_agent_grant_scope" };
       const scopes = isObj12(authScopes) ? authScopes : {};
-      const scopeLists = [
-        scopes.agent_grant,
-        scopes.agentGrant,
-        scopes.delegationScopes
-      ].filter(Array.isArray);
+      const scopeLists = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
       const ok = scopes[scope] === true || scopeLists.some((items) => items.map(trim6).includes(scope));
       return ok ? { ok: true, matchedCondition: { kind: "agent_grant_scope", scope } } : { ok: false, reason: "agent_grant_scope_denied", condition: { kind: "agent_grant_scope", scope } };
     };
     evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
       const address2 = normalizeAddress(requesterAddress);
       if (!address2) return { ok: false, reason: "missing_principal" };
-      const sbtAddresses = [
-        ...Array.isArray(condition.sbtAddresses) ? condition.sbtAddresses : [],
-        condition.contract,
-        condition.address
-      ].map(trim6).filter(Boolean);
+      const sbtAddresses = [...Array.isArray(condition.sbtAddresses) ? condition.sbtAddresses : [], condition.contract, condition.address].map(trim6).filter(Boolean);
       if (!sbtAddresses.length) return { ok: false, reason: "missing_sbt_condition_contract" };
       const chainId = resolveChainIdWithLegacyFallback(
         condition.chainId,
@@ -37615,15 +37577,7 @@ var init_storageRouteExecution = __esm({
       }
       return { ok: false, reason: "sbt_onchain_denied", condition: { kind: "sbt_onchain", chainId, anyOrAll: mode } };
     };
-    checkWorkerGroupMembership = async ({
-      env,
-      slug,
-      config,
-      groupId,
-      requesterAddress,
-      authScopes,
-      deps
-    }) => {
+    checkWorkerGroupMembership = async ({ env, slug, config, groupId, requesterAddress, authScopes, deps }) => {
       const check = typeof deps?.isWorkerGroupMember === "function" ? deps.isWorkerGroupMember : isWorkerGroupMember;
       return check({
         env,
@@ -37635,15 +37589,7 @@ var init_storageRouteExecution = __esm({
         deps
       });
     };
-    evaluateWorkerGroupCondition = async ({
-      condition,
-      env,
-      slug,
-      config,
-      requesterAddress,
-      authScopes,
-      deps
-    }) => {
+    evaluateWorkerGroupCondition = async ({ condition, env, slug, config, requesterAddress, authScopes, deps }) => {
       const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
       if (!groupIds.length) return { ok: false, reason: "missing_worker_group", condition: { kind: "worker_group" } };
       let firstFailure = null;
@@ -37694,9 +37640,7 @@ var init_storageRouteExecution = __esm({
       return { ok: false, reason: "unknown_condition_kind", condition: { kind: kind || "unknown" } };
     };
     resolvePayloadAccessConditions = ({ metadata, access }) => {
-      const payloadConditions = normalizeAccessConditionDocument(
-        metadata?.accessConditions || metadata?.envelope?.accessConditions
-      );
+      const payloadConditions = normalizeAccessConditionDocument(metadata?.accessConditions || metadata?.envelope?.accessConditions);
       if (payloadConditions?.conditions?.length) {
         return { document: payloadConditions, source: "payload" };
       }
@@ -37705,16 +37649,7 @@ var init_storageRouteExecution = __esm({
       }
       return { document: null, source: "gate_fallback" };
     };
-    evaluateAccessConditionDocument = async ({
-      document,
-      source,
-      env,
-      slug,
-      config,
-      requesterAddress,
-      authScopes,
-      deps
-    }) => {
+    evaluateAccessConditionDocument = async ({ document, source, env, slug, config, requesterAddress, authScopes, deps }) => {
       const conditions = Array.isArray(document?.conditions) ? document.conditions : [];
       if (!conditions.length) return { ok: false, reason: "empty_conditions" };
       const match = document.match === "all" ? "all" : "any";
@@ -37757,16 +37692,7 @@ var init_storageRouteExecution = __esm({
       ...normalizeGroupIdList(metadata?.payloadAccessControl?.groupId),
       ...normalizeGroupIdList(access.groupIds)
     ]);
-    authorizeWorkerGroupAccess = async ({
-      env,
-      slug,
-      config,
-      groupIds,
-      requesterAddress,
-      authScopes,
-      baseHeaders,
-      deps
-    }) => {
+    authorizeWorkerGroupAccess = async ({ env, slug, config, groupIds, requesterAddress, authScopes, baseHeaders, deps }) => {
       if (!groupIds.length) {
         return {
           ok: false,
@@ -37799,10 +37725,15 @@ var init_storageRouteExecution = __esm({
       }
       return {
         ok: false,
-        response: responseJson(deps, {
-          error: "Access denied: worker group gate failed.",
-          reason: firstFailure?.reason || "worker_group_membership_denied"
-        }, 403, baseHeaders)
+        response: responseJson(
+          deps,
+          {
+            error: "Access denied: worker group gate failed.",
+            reason: firstFailure?.reason || "worker_group_membership_denied"
+          },
+          403,
+          baseHeaders
+        )
       };
     };
     resolveBareRoleGateCondition = (config = {}) => {
@@ -37825,10 +37756,15 @@ var init_storageRouteExecution = __esm({
       if (!roleAccess.ok) {
         return {
           ok: false,
-          response: responseJson(deps, {
-            error: "Access denied: worker role gate failed.",
-            reason: roleAccess.reason || "worker_role_denied"
-          }, roleAccess.reason === "missing_principal" ? 401 : 403, baseHeaders)
+          response: responseJson(
+            deps,
+            {
+              error: "Access denied: worker role gate failed.",
+              reason: roleAccess.reason || "worker_role_denied"
+            },
+            roleAccess.reason === "missing_principal" ? 401 : 403,
+            baseHeaders
+          )
         };
       }
       return {
@@ -37850,7 +37786,8 @@ var init_storageRouteExecution = __esm({
       if (address2 && resolveRoleAddressSet2({ config, role: "admin" }).has(address2)) return true;
       const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
       const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
-      if (delegatedScopes.some((items) => items.map(trim6).includes("storage")) || scopes.storage === true && agent.ok && agent.principal.kind === "agent") return true;
+      if (delegatedScopes.some((items) => items.map(trim6).includes("storage")) || scopes.storage === true && agent.ok && agent.principal.kind === "agent")
+        return true;
       if (!address2 || scopes.storage !== true && scopes.arweave !== true) return false;
       if (operation === "list") return true;
       return !!trim6(metadata?.responder) && normalizeAddress(metadata.responder) === address2;
@@ -37873,10 +37810,15 @@ var init_storageRouteExecution = __esm({
       if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
         return {
           ok: false,
-          response: responseJson(deps, {
-            error: "Access denied: individual response access requires its author, a session admin, or a delegated storage grant.",
-            reason: "private_response_owner_required"
-          }, 403, baseHeaders)
+          response: responseJson(
+            deps,
+            {
+              error: "Access denied: individual response access requires its author, a session admin, or a delegated storage grant.",
+              reason: "private_response_owner_required"
+            },
+            403,
+            baseHeaders
+          )
         };
       }
       const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
@@ -37888,7 +37830,8 @@ var init_storageRouteExecution = __esm({
         if (!groupAccess.ok) return groupAccess;
       }
       const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
-      if (!payloadConditions?.conditions?.length || JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
+      if (!payloadConditions?.conditions?.length || JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions))
+        return sessionAccess;
       return authorizeCloudflareStorageGate({ ...args, metadata });
     };
     authorizeCloudflareStorageGate = async ({
@@ -37925,10 +37868,15 @@ var init_storageRouteExecution = __esm({
         }
         return {
           ok: false,
-          response: responseJson(deps, {
-            error: "Access denied: Cloudflare storage conditions failed.",
-            reason: conditionResult.reason
-          }, 403, baseHeaders)
+          response: responseJson(
+            deps,
+            {
+              error: "Access denied: Cloudflare storage conditions failed.",
+              reason: conditionResult.reason
+            },
+            403,
+            baseHeaders
+          )
         };
       }
       if (access.encryption === PAYLOAD_ENCRYPTION_MODES3.LIT) {
@@ -37988,7 +37936,12 @@ var init_storageRouteExecution = __esm({
       if (!gateRead.ok || !gateRead.gate) {
         return {
           ok: false,
-          response: responseJson(deps, { error: gateRead.error || "Cloudflare worker SBT gate unavailable." }, gateRead.status || 403, baseHeaders)
+          response: responseJson(
+            deps,
+            { error: gateRead.error || "Cloudflare worker SBT gate unavailable." },
+            gateRead.status || 403,
+            baseHeaders
+          )
         };
       }
       const gate = gateRead.gate;
@@ -38004,10 +37957,15 @@ var init_storageRouteExecution = __esm({
       if (!gate.chainId) {
         return {
           ok: false,
-          response: responseJson(deps, {
-            error: "Invalid chain ID for Cloudflare worker SBT gate.",
-            reason: "invalid_sbt_gate_chain"
-          }, 403, baseHeaders)
+          response: responseJson(
+            deps,
+            {
+              error: "Invalid chain ID for Cloudflare worker SBT gate.",
+              reason: "invalid_sbt_gate_chain"
+            },
+            403,
+            baseHeaders
+          )
         };
       }
       let gateConfig = config;
@@ -38016,10 +37974,15 @@ var init_storageRouteExecution = __esm({
       } catch {
         return {
           ok: false,
-          response: responseJson(deps, {
-            error: "Cloudflare worker SBT gate RPC credentials unavailable.",
-            reason: "sbt_rpc_secret_unavailable"
-          }, 403, baseHeaders)
+          response: responseJson(
+            deps,
+            {
+              error: "Cloudflare worker SBT gate RPC credentials unavailable.",
+              reason: "sbt_rpc_secret_unavailable"
+            },
+            403,
+            baseHeaders
+          )
         };
       }
       const rpcUrls = typeof deps?.resolveRpcUrlListForGate === "function" ? deps.resolveRpcUrlListForGate(gateConfig, gate.chainId) : [];
@@ -38107,17 +38070,27 @@ var init_storageRouteExecution = __esm({
         if (!policy.sbtAddresses.length) {
           return {
             ok: false,
-            response: responseJson(deps, { error: "Invalid SBT upload policy.", reason: "missing_sbt_upload_policy_contract" }, 400, baseHeaders)
+            response: responseJson(
+              deps,
+              { error: "Invalid SBT upload policy.", reason: "missing_sbt_upload_policy_contract" },
+              400,
+              baseHeaders
+            )
           };
         }
         const chainId = policy.chainId || null;
         if (!chainId) {
           return {
             ok: false,
-            response: responseJson(deps, {
-              error: "Invalid SBT upload policy chain ID.",
-              reason: "invalid_sbt_upload_policy_chain"
-            }, 400, baseHeaders)
+            response: responseJson(
+              deps,
+              {
+                error: "Invalid SBT upload policy chain ID.",
+                reason: "invalid_sbt_upload_policy_chain"
+              },
+              400,
+              baseHeaders
+            )
           };
         }
         let gateConfig = config;
@@ -38126,10 +38099,15 @@ var init_storageRouteExecution = __esm({
         } catch {
           return {
             ok: false,
-            response: responseJson(deps, {
-              error: "SBT upload policy RPC credentials unavailable.",
-              reason: "sbt_rpc_secret_unavailable"
-            }, 403, baseHeaders)
+            response: responseJson(
+              deps,
+              {
+                error: "SBT upload policy RPC credentials unavailable.",
+                reason: "sbt_rpc_secret_unavailable"
+              },
+              403,
+              baseHeaders
+            )
           };
         }
         const rpcUrls = typeof deps?.resolveRpcUrlListForGate === "function" ? deps.resolveRpcUrlListForGate(gateConfig, chainId) : [];
@@ -38157,7 +38135,12 @@ var init_storageRouteExecution = __esm({
         }
         return {
           ok: false,
-          response: responseJson(deps, { error: "Access denied: SBT upload policy failed.", reason: "sbt_upload_policy_denied" }, 403, baseHeaders)
+          response: responseJson(
+            deps,
+            { error: "Access denied: SBT upload policy failed.", reason: "sbt_upload_policy_denied" },
+            403,
+            baseHeaders
+          )
         };
       }
       return {
@@ -38231,10 +38214,15 @@ var init_storageRouteExecution = __esm({
         gate: payload?.gate,
         encrypted: backend === STORAGE_BACKENDS.LIT_ARWEAVE
       });
-      return responseJson(deps, {
-        id: parsed.id,
-        ...compatible
-      }, 200, baseHeaders);
+      return responseJson(
+        deps,
+        {
+          id: parsed.id,
+          ...compatible
+        },
+        200,
+        baseHeaders
+      );
     };
     handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps }) => {
       const r2 = getStorageR2Binding(env);
@@ -38409,10 +38397,15 @@ var init_storageRouteExecution = __esm({
           });
         }
       }
-      return responseJson(deps, {
-        id: id2,
-        storageRef
-      }, 200, baseHeaders);
+      return responseJson(
+        deps,
+        {
+          id: id2,
+          storageRef
+        },
+        200,
+        baseHeaders
+      );
     };
     readRequestId = async ({ request, url }) => {
       const fromQuery = trim6(url.searchParams.get("id") || url.searchParams.get("storageId"));
@@ -38495,12 +38488,7 @@ var init_storageRouteExecution = __esm({
           try {
             rawMetadata = await index.get(buildIndexKey({ slug, resource: indexedResource, id: id2 }));
           } catch {
-            return responseJson(
-              deps,
-              { error: "Cloudflare storage index metadata is unavailable." },
-              503,
-              baseHeaders
-            );
+            return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
           }
           if (rawMetadata == null || typeof rawMetadata === "string" && !trim6(rawMetadata)) {
             return responseJson(deps, { error: "Storage object not found." }, 404, baseHeaders);
@@ -38508,20 +38496,10 @@ var init_storageRouteExecution = __esm({
           try {
             metadata = typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
           } catch {
-            return responseJson(
-              deps,
-              { error: "Cloudflare storage index metadata is unavailable." },
-              503,
-              baseHeaders
-            );
+            return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
           }
           if (!isObj12(metadata) || trim6(metadata.id) !== id2 || (trim6(metadata.resource) || "docsContext") !== indexedResource) {
-            return responseJson(
-              deps,
-              { error: "Cloudflare storage index metadata is unavailable." },
-              503,
-              baseHeaders
-            );
+            return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
           }
         }
       }
@@ -38631,21 +38609,20 @@ var init_storageRouteExecution = __esm({
       });
       const nextCursor = listed?.list_complete === false ? trim6(listed?.cursor) : "";
       if (listed?.list_complete === false && !nextCursor) {
-        return responseJson(
-          deps,
-          { error: "Cloudflare storage list cursor is unavailable." },
-          503,
-          baseHeaders
-        );
+        return responseJson(deps, { error: "Cloudflare storage list cursor is unavailable." }, 503, baseHeaders);
       }
       const keys = Array.isArray(listed?.keys) ? listed.keys : [];
       const rows = [];
       try {
         for (let offset = 0; offset < keys.length; offset += 8) {
-          rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
-            const name = trim6(keyEntry?.name || keyEntry);
-            return { name, raw: name ? await index.get(name) : null };
-          })));
+          rows.push(
+            ...await Promise.all(
+              keys.slice(offset, offset + 8).map(async (keyEntry) => {
+                const name = trim6(keyEntry?.name || keyEntry);
+                return { name, raw: name ? await index.get(name) : null };
+              })
+            )
+          );
         }
       } catch {
         return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
@@ -38705,12 +38682,17 @@ var init_storageRouteExecution = __esm({
           }
         });
       }
-      return responseJson(deps, {
-        items,
-        cursor: nextCursor || null,
-        listComplete: !nextCursor,
-        ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
-      }, 200, mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
+      return responseJson(
+        deps,
+        {
+          items,
+          cursor: nextCursor || null,
+          listComplete: !nextCursor,
+          ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
+        },
+        200,
+        mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders
+      );
     };
     listCloudflareMetadataRows = async ({ index, slug, resource = "" }) => {
       const rows = [];
@@ -38863,10 +38845,7 @@ var init_storageRouteExecution = __esm({
         storageListError,
         readErrors,
         gatewayErrors: [],
-        errors: [
-          ...storageListError ? [storageListError] : [],
-          ...readErrors
-        ],
+        errors: [...storageListError ? [storageListError] : [], ...readErrors],
         wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
         keyProvider,
         deploymentKekContinuityRequired,
@@ -38909,7 +38888,13 @@ var init_storageRouteExecution = __esm({
       if (path === "/storage/upload" && method === "POST") {
         const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
         const uploadPayload = await (deps?.readStorageUploadRequestPayload || readStorageUploadRequestPayload)(request, { maxUploadBytes });
-        if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || "Invalid storage upload payload." }, uploadPayload?.status || 400, baseHeaders);
+        if (!uploadPayload?.ok)
+          return responseJson(
+            deps,
+            { error: uploadPayload?.error || "Invalid storage upload payload." },
+            uploadPayload?.status || 400,
+            baseHeaders
+          );
         const payload = uploadPayload.payload || {};
         if (!isStorageResource(payload.resource)) return responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders);
         const backend = resolveConfiguredStorageBackend({
@@ -39564,9 +39549,10 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, toStr19, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder3, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj13, hasOwn6, trim7, lower3, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
+    init_stringCoercion();
     init_resultsAnalysisSettings();
     init_resultsAnalysisArtifactValidation();
     init_deployHelperCore();
@@ -39603,8 +39589,7 @@ var init_resultsAnalysisGeneration = __esm({
     DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1e3;
     isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn6 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-    toStr19 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    trim7 = (value) => toStr19(value).trim();
+    trim7 = (value) => toStr6(value).trim();
     lower3 = (value) => trim7(value).toLowerCase();
     getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(config?.resultsAnalysis);
     getCanonicalSessionId = (config = {}) => normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
@@ -70578,7 +70563,7 @@ var resolveFaucetRpcUrl = ({
   faucetCfg,
   deps
 } = {}) => {
-  const toStr21 = typeof deps?.toStr === "function" ? deps.toStr : fallbackToString2;
+  const toStr12 = typeof deps?.toStr === "function" ? deps.toStr : fallbackToString2;
   const toChainId2 = typeof deps?.toChainId === "function" ? deps.toChainId : toChainId;
   const normalizeRpcUrlList2 = typeof deps?.normalizeRpcUrlList === "function" ? deps.normalizeRpcUrlList : normalizeRpcUrlList;
   const resolveRpcUrlListForGate2 = typeof deps?.resolveRpcUrlListForGate === "function" ? deps.resolveRpcUrlListForGate : () => [];
@@ -70589,7 +70574,7 @@ var resolveFaucetRpcUrl = ({
     deps: { normalizeRpcUrlList: normalizeRpcUrlList2, toChainId: toChainId2 }
   });
   if (runtimeSecret.length) return runtimeSecret[0];
-  const explicit = toStr21(faucetCfg?.rpcUrl).trim();
+  const explicit = toStr12(faucetCfg?.rpcUrl).trim();
   if (explicit) return explicit;
   const mapped = chainId ? resolveRpcUrlListForGate2(config, chainId) : [];
   const fallback = normalizeRpcUrlList2(config?.rpcUrl);
@@ -70712,7 +70697,7 @@ init_chainIdNormalization();
 var createRpcContractProbeHelpersWithWorkerDeps = ({
   deps
 } = {}) => {
-  const toStr21 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+  const toStr12 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
   const fetchImpl = deps?.fetch || globalThis.fetch;
   const URLWithCtor = deps?.URL || URL;
   const getRegistryInterface = deps?.getRegistryInterface;
@@ -70728,7 +70713,7 @@ var createRpcContractProbeHelpersWithWorkerDeps = ({
     return err;
   };
   const maskRpcUrl = (raw) => {
-    const url = toStr21(raw).trim();
+    const url = toStr12(raw).trim();
     if (!url) return "";
     try {
       const parsed = new URLWithCtor(url);
@@ -70744,7 +70729,7 @@ var createRpcContractProbeHelpersWithWorkerDeps = ({
     }
   };
   const rpcRequest = async ({ rpcUrl, method, params }) => {
-    const target = toStr21(rpcUrl).trim();
+    const target = toStr12(rpcUrl).trim();
     if (!target) throw new Error("RPC URL missing");
     assertRpcUrlAllowed(target);
     const res = await fetchImpl(target, {
@@ -70790,7 +70775,7 @@ var createRpcContractProbeHelpersWithWorkerDeps = ({
     });
   };
   const probeRpcUrl = async ({ rpcUrl, label }) => {
-    const target = toStr21(rpcUrl).trim();
+    const target = toStr12(rpcUrl).trim();
     if (!target) return;
     const startedAt = now();
     try {
@@ -70983,20 +70968,11 @@ init_chainIdNormalization();
 // workers/sessionCorsWorker/workerCanonicalAuthority.js
 init_workerGroups();
 init_sessionConfigMutation();
-var toStr15 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var trim3 = (value) => toStr15(value).trim();
+init_stringCoercion();
+var trim3 = (value) => toStr6(value).trim();
 var lower = (value) => trim3(value).toLowerCase();
 var isObj8 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set([
-  "ai",
-  "transcribe",
-  "storage",
-  "groups",
-  "arweave",
-  "faucet",
-  "fetch",
-  "lit"
-]);
+var ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set(["ai", "transcribe", "storage", "groups", "arweave", "faucet", "fetch", "lit"]);
 var normalizeScopeList = (value) => Array.isArray(value) ? [...new Set(value.map(lower).filter((scope) => ALLOWED_WORKER_SCOPE_KEYS.has(scope)))] : [];
 var listAddresses = (value) => {
   if (Array.isArray(value)) return value.flatMap(listAddresses);
@@ -71059,13 +71035,7 @@ var passesLoginGate = async ({ address: address2, config, env, slug, policy, dep
   return gate.match === "all" ? results.every(Boolean) : results.some(Boolean);
 };
 var isWorkerCanonicalSessionConfig = (config) => lower(config?.sessionModeProfile?.authority?.mode) === "worker_canonical";
-var resolveWorkerCanonicalLoginScopes = async ({
-  address: address2,
-  config,
-  env,
-  slug,
-  deps
-} = {}) => {
+var resolveWorkerCanonicalLoginScopes = async ({ address: address2, config, env, slug, deps } = {}) => {
   if (!isWorkerCanonicalSessionConfig(config)) {
     throw new Error("Access denied: worker-canonical authority profile missing.");
   }
@@ -76874,8 +76844,8 @@ var ethersUtils = (() => {
     arrayify: utils.arrayify || ethers_exports.getBytes
   };
 })();
-var toStr20 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var normalizeChipotleGateMode = (value) => toStr20(value).trim().toLowerCase() === "all" ? "all" : "any";
+var toStr11 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+var normalizeChipotleGateMode = (value) => toStr11(value).trim().toLowerCase() === "all" ? "all" : "any";
 var normalizeChipotleChainId = (value) => {
   const parsed = Number(value || 0);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
@@ -76884,7 +76854,7 @@ var normalizeChipotleSbtAddresses = (values = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   (Array.isArray(values) ? values : [values]).forEach((raw) => {
-    const value = toStr20(raw).trim();
+    const value = toStr11(raw).trim();
     if (!value) return;
     if (!ethersUtils.isAddress(value)) {
       throw new Error("Lit Chipotle policy contains an invalid SBT address.");
@@ -76911,7 +76881,7 @@ var stableChipotleStringify = (value) => {
       });
       return out;
     }
-    return toStr20(entry);
+    return toStr11(entry);
   };
   return JSON.stringify(walk(value));
 };
@@ -76930,11 +76900,11 @@ var buildLitChipotlePolicy = ({
   if (!normalizedSbtAddresses.length) {
     throw new Error("Lit Chipotle policy requires at least one SBT address.");
   }
-  const normalizedLitActionCid = toStr20(litActionCid).trim();
+  const normalizedLitActionCid = toStr11(litActionCid).trim();
   if (!normalizedLitActionCid) {
     throw new Error("Lit Chipotle policy requires a Lit Action CID.");
   }
-  const normalizedLitPkpId = toStr20(litPkpId).trim();
+  const normalizedLitPkpId = toStr11(litPkpId).trim();
   if (!normalizedLitPkpId) {
     throw new Error("Lit Chipotle policy requires a Lit PKP ID.");
   }
@@ -76952,7 +76922,7 @@ var fingerprintLitChipotlePolicy = (policy = {}) => {
   return ethersUtils.keccak256(ethersUtils.toUtf8Bytes(stableChipotleStringify(canonicalPolicy)));
 };
 var normalizeChipotleCekHex = (value) => {
-  const raw = toStr20(value).trim();
+  const raw = toStr11(value).trim();
   if (!/^0x[0-9a-f]{64}$/i.test(raw)) {
     throw new Error("Lit Chipotle CEK must be a 32-byte hex string.");
   }
@@ -81541,10 +81511,10 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     }
   }
   if (isFaucetAction) {
-    const toStr21 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-    const hasProofBackedFaucetRequest = !!toStr21(body?.sbtAddress).trim();
-    const requestedRecipient = toStr21(body?.to || body?.recipient || body?.address).trim().toLowerCase();
-    const normalizedAddress = toStr21(address2).trim().toLowerCase();
+    const toStr12 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+    const hasProofBackedFaucetRequest = !!toStr12(body?.sbtAddress).trim();
+    const requestedRecipient = toStr12(body?.to || body?.recipient || body?.address).trim().toLowerCase();
+    const normalizedAddress = toStr12(address2).trim().toLowerCase();
     const isSelfFundingRequest = !!requestedRecipient && requestedRecipient === normalizedAddress;
     const preflight2 = await deps?.evaluateAuthenticatedRoutePreflight?.({
       scopes,

@@ -1,13 +1,9 @@
 import { normalizeWorkerGroupUrl } from '../../shared/workerGroupUrl.mjs';
-import {
-	normalizeWorkerSessionSlug,
-	sessionSlugStorageKey,
-	validateInboundWorkerSessionSlug,
-} from './sessionSlugResolution.js';
+import { normalizeWorkerSessionSlug, sessionSlugStorageKey, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
+import { toStr } from './stringCoercion.js';
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -180,13 +176,15 @@ const principalPrefix = ({ slug, sessionId, principalKey }) =>
 
 const legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
 const legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
-const legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
+const legacyGroupIndexKey = ({ slug, groupId }) =>
+	`ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
 const legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
 const legacyEncodedMemberKey = ({ slug, groupId, principalKey }) =>
 	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
 const legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) =>
 	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
-const legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:`;
+const legacyMemberPrefix = ({ slug, groupId }) =>
+	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:`;
 const legacyEncodedPrincipalPrefix = ({ slug, principalKey }) =>
 	`ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
 const legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) =>
@@ -1478,16 +1476,7 @@ const redactWorkerGroupMemberForViewer = (member) => ({
 	addedAt: trim(member?.addedAt),
 });
 
-export const listWorkerGroupMembersForPrincipal = async ({
-	env,
-	slug,
-	sessionId,
-	groupId,
-	principal,
-	cursor,
-	limit,
-	deps = {},
-} = {}) => {
+export const listWorkerGroupMembersForPrincipal = async ({ env, slug, sessionId, groupId, principal, cursor, limit, deps = {} } = {}) => {
 	const normalizedGroupId = normalizeWorkerGroupId(groupId);
 	if (!normalizedGroupId) {
 		return { ok: false, status: 400, reason: 'invalid_worker_group_id' };
