@@ -1474,6 +1474,7 @@ Runtime:
       provider credential aliases.
 
 - `session:{slug}:secrets` v1 envelope JSON:
+
   ```json
   {
     "v": 1,
@@ -1498,6 +1499,9 @@ Runtime:
     deploy-helper writes store the v1 envelope.
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.
+
+- `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
+- route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
 ## Session authority model
 
@@ -1544,7 +1548,7 @@ Arweave retain their existing roles for decentralized sessions.
 
 ### Worker-side boundaries
 
-The worker decomposes session handling into ~80 narrow authority/normalization
+The worker decomposes session handling into narrow authority/normalization
 modules under `workers/sessionCorsWorker/`. Key boundary files:
 
 - `worker.js` — static ABI/default/error bundle and direct runtime assembly
@@ -1556,204 +1560,6 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
 - `loginGateAuthority.js` — on-chain gate/scope evaluation
 - `faucetGateAuthority.js` — faucet gate lookup/validation
 - `faucetEligibilityAuthority.js` — faucet proof decision tree
-
-## Worker module extraction boundaries
-
-- Shared JSON response + KV JSON helper operations now route through
-  `workers/sessionCorsWorker/responseKvHelpers.js`, preserving
-  `Content-Type: application/json`, cloned base headers, malformed-KV
-  `null` fallback, and `expirationTtl` option behavior used by session
-  config/secrets reads and writes.
-- Shared session config / secrets store operations now route through
-  `workers/sessionCorsWorker/sessionConfigSecretsStore.js`, preserving
-  normalized config reads, fail-closed invalid-config rejection on writes,
-  and the existing session config/secrets KV key layout used by auth, admin,
-  bootstrap, and authenticated route flows.
-- Shared CORS primitive operations now route through
-  `workers/sessionCorsWorker/corsPrimitives.js`, preserving `allowOrigins`
-  parsing, origin-allowance checks, reflected `Access-Control-Allow-Origin`
-  behavior, and the common auth/admin/bootstrap/anonymous/authenticated
-  header contract.
-- Shared default route-base-header shell operations now route through
-  `workers/sessionCorsWorker/routeBaseHeaders.js`, preserving request
-  `Origin` extraction plus the default/no-allowlist
-  `corsHeaders(origin, null)` behavior used by `OPTIONS`, `/auth/*`,
-  `/admin/*`, bootstrap `/arweave/upload`, anonymous `/ai` /
-  `/transcribe` pre-config failures, and authenticated pre-auth responses
-  like `/health`.
-- Shared top-level route selection now routes through
-  `workers/sessionCorsWorker/topLevelRouteSelection.js`, preserving
-  `OPTIONS`, auth, admin, bootstrap/authenticated Arweave, anonymous, and
-  authenticated-fallback branch matching plus admin-action trimming and the
-  current authorization-header classification used before deeper helpers run.
-- Auth request routing is composed in
-  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which passes the
-  worker-specific `/auth/nonce` nonce-builder/KV-write deps and the
-  `/auth/login` used-nonce/token-ttl deps directly into the extracted auth
-  request dispatch helpers.
-- Shared auth login request authority now routes through
-  `workers/sessionCorsWorker/authLoginRequestAuthority.js`, preserving
-  signed slug resolution, existing-session CORS passthrough,
-  SIWE/signature/nonce validation, missing-config `404`, and on-chain scope
-  computation before token signing runs.
-- Admin request routing is composed in
-  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which passes the
-  used-nonce ttl binding plus the worker-specific admin auth/config/secrets
-  helper bundle directly into the extracted admin request dispatcher.
-- Shared admin request authority now routes through
-  `workers/sessionCorsWorker/adminRequestAuthority.js`, preserving signed
-  slug resolution, existing-session CORS passthrough, SIWE/signature/nonce
-  validation, bootstrap-vs-configured-admin authorization sequencing, and
-  the final `Admin authorization failed.` contract before config/secrets/
-  limits writes.
-- Bootstrap Arweave upload routing is composed in
-  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which preserves the
-  bootstrap request log plus the env-bound slug/config/admin/secrets helper
-  bundle before calling the extracted bootstrap upload dispatcher.
-- Bootstrap admin-signature verification is composed in
-  `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, which passes
-  used-nonce ttl binding plus the worker-specific logging and slug-mismatch
-  constant bundle directly into the extracted bootstrap admin-signature
-  verifier.
-- Shared Arweave upload execution now routes through
-  `workers/sessionCorsWorker/arweaveUploadExecution.js`, preserving
-  Arweave module resolution, upload-payload/JWK/tag/association
-  composition, upload-start/success/error logging, and the
-  `transactions.post(...)` fallback error contract for both bootstrap and
-  authenticated uploads.
-- Worker-local Arweave, transcribe, AI-provider, fetch, and faucet dependencies
-  are assembled centrally by
-  `workers/sessionCorsWorker/workerExecutionServiceBinding.js`. The binding
-  preserves each execution helper's logging, JSON, outbound-request, RPC,
-  contract, and validation dependencies without maintaining one wrapper module
-  per service.
-- Shared transcribe execution now routes through
-  `workers/sessionCorsWorker/transcribeExecution.js`, preserving provider
-  selection, request-vs-worker key precedence, blocked-custom-url
-  rejection, upstream error mapping, and final `{ text }` response
-  normalization for authenticated and anonymous transcribe requests.
-- Shared AI provider execution now routes through
-  `workers/sessionCorsWorker/aiProviderExecution.js`, preserving
-  Anthropic/OpenRouter request header/body/error normalization, OpenAI
-  request-vs-worker key precedence, responses-vs-chat request shaping,
-  custom RPC request-vs-worker `rpcUrl` / key precedence, blocked-target
-  rejection, `safeFetch(...)` passthrough, and final `{ completion, raw }`
-  response normalization for authenticated and anonymous AI requests.
-- Shared fetch helper execution now routes through
-  `workers/sessionCorsWorker/fetchExecution.js`, preserving normalized-target
-  failure passthrough, `safeFetch(...)` passthrough handling,
-  content-length/status/type validation, HTML stripping, and final
-  image/HTML/JSON response normalization for authenticated `fetch_image` and
-  `fetch_url` requests.
-- Shared auth/CORS/admin adapter binding now routes through
-  `workers/sessionCorsWorker/authCorsAdminBinding.js`, preserving the
-  worker-local CORS deps bundle, existing-session config lookup binding,
-  auth token/slug binding, and admin registry/hats deps into the extracted
-  auth/admin/CORS helper boundaries.
-- Shared registry/login/bootstrap adapter binding now routes through
-  `workers/sessionCorsWorker/registryLoginBootstrapBinding.js`, preserving
-  the worker-local SessionRegistry RPC/json deps bundles, bound login
-  authority-preflight + scope-evaluation wiring, bootstrap-admin
-  session-read binding, and call-time logging behavior into the extracted
-  helper boundaries.
-- `worker.js` assembles the anonymous / registry-support adapters directly,
-  preserving the anonymous slug-resolution deps, on-chain gate authority,
-  session reads, rate-ID constants and call-time warnings.
-- Shared rate-limit / faucet-support binding now routes through
-  `workers/sessionCorsWorker/rateLimitFaucetSupportBinding.js`,
-  preserving the worker-local KV-backed rate-limit keying/ttl behavior while
-  `workers/sessionCorsWorker/faucetGateAuthority.js` now owns the deeper
-  on-chain session-gate lookup ordering, faucet validation-state reads, and
-  password-validation RPC fallback accumulation into the extracted helper
-  boundary.
-- Shared low-level RPC / contract / probe binding now routes through
-  `workers/sessionCorsWorker/rpcContractProbeBinding.js`, preserving RPC URL
-  masking, JSON-RPC request/error handling, contract-call
-  encoding/decoding, SessionRegistry interface binding, and RPC probe
-  logging/ordering into the extracted helper boundary.
-- Shared ethers interface/provider/gate binding now routes through
-  `workers/sessionCorsWorker/ethersInterfaceProviderGateBinding.js`,
-  preserving interface caching, provider/contract construction,
-  positive-balance coercion, and SBT gate failure logging into the
-  extracted helper boundary.
-- Shared ethers primitive/value binding now routes through
-  `workers/sessionCorsWorker/ethersPrimitiveValueBinding.js`, preserving
-  session-id canonicalization, BigInt coercion, ethers-function fallback
-  order, exact unavailable error strings, raw-address passthrough, and
-  ethers v5-compatible `utils` fallbacks into the extracted helper
-  boundary.
-- Shared group-proof / address / hashing binding now routes through
-  `workers/sessionCorsWorker/groupProofAddressHashBinding.js`, preserving
-  canonical address normalization, group faucet proof hash construction,
-  recovered-signer normalization, exact missing/invalid proof error
-  strings, and thrown-error normalization into the extracted helper
-  boundary.
-- Shared outbound URL blocking / redirect safety binding now routes through
-  `workers/sessionCorsWorker/outboundUrlSafetyBinding.js`, preserving
-  localhost/private target rejection, IPv4-mapped IPv6 handling, metadata
-  endpoint blocking, redirect header filtering, single-redirect follow
-  behavior, and blocked-target / too-many-redirect `403` behavior into the
-  extracted helper boundary.
-- Shared registry/faucet RPC binding now routes through
-  `workers/sessionCorsWorker/registryFaucetRpcBinding.js`, preserving
-  registry slug canonicalization, registry/gate/faucet RPC list resolution
-  ordering, Base Sepolia/Base mainnet faucet fallback ordering, first-RPC
-  selection, and bytes32 hash validation into the extracted helper
-  boundary.
-- Shared execution-service assembly binding now routes through
-  `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving
-  the exact deps/constants/defaults bundles passed into the extracted AI,
-  transcribe, fetch, faucet, Arweave upload, and bootstrap admin-signature
-  helpers before the top-level route shell invokes them.
-- Shared top-level worker route-shell binding now routes through
-  `workers/sessionCorsWorker/workerRouteShellBinding.js`, preserving
-  URL/path/method derivation, shared route selection/base-header
-  composition, `OPTIONS` `204` handling, `/arweave/upload` preflight
-  logging, env-slug resolution, and the auth/bootstrap/admin/anonymous/
-  authenticated handoff order before the downstream route-entry helpers run.
-- Shared worker route-runtime assembly now routes through
-  `workers/sessionCorsWorker/workerRouteRuntimeBinding.js`, preserving the
-  higher-level registry/login/bootstrap, anonymous/rate-limit, auth/CORS/
-  admin, execution-service, and final route-shell composition that feeds
-  the exported worker runtime contract.
-- Shared worker low-level helper assembly now routes through
-  `workers/sessionCorsWorker/workerLowLevelHelperBinding.js`, preserving
-  the worker-specific outbound URL safety, ethers primitive,
-  registry/faucet RPC, ethers interface/provider/gate, group-proof hashing,
-  and RPC/contract probe composition that feeds the extracted route-runtime
-  boundary.
-- Top-level runtime assembly now happens directly in
-  `workers/sessionCorsWorker/worker.js`. It resolves the canonical dependency
-  record, passes explicit `deps` / `constants` / `defaults` bundles to the
-  low-level and route-runtime bindings, and exposes the final
-  `workerAuthGateUtils` / `fetch` contract without one-caller input or
-  top-level binding modules.
-- Shared worker runtime dep resolution now routes through
-  `workers/sessionCorsWorker/workerRuntimeDepResolution.js`, preserving the
-  imported normalization, auth, token, config, Arweave, faucet, and route
-  dispatch helper fallback bundle plus missing-slug / slug-mismatch
-  constant fallback shaping before runtime-input assembly.
-- Anonymous route-entry setup now routes through
-  `workers/sessionCorsWorker/anonymousRouteEntry.js`, preserving anonymous
-  slug resolution, missing-slug selection, session-config lookup, CORS
-  passthrough, rate-identity + rate-limit setup, and the final
-  `/ai` / `/transcribe` handoff into the anonymous route dispatcher.
-- Authenticated route-entry setup now routes through
-  `workers/sessionCorsWorker/authenticatedRouteEntry.js`, preserving
-  `requireAuth(...)`, authenticated `/health` success, authenticated route
-  context resolution, and the final authenticated route dispatcher handoff.
-- Anonymous route-entry composition now happens in
-  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which preserves the
-  worker-specific missing-slug/session-config constants plus the env-bound
-  session-secrets lookup and provider/transcribe helper bundle before calling
-  the anonymous route-entry and route dispatchers.
-- Authenticated route-entry composition now happens in
-  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which preserves the
-  worker-specific authenticated route-context deps, missing-config constant,
-  and env-bound secret-path, non-secret action, and secret-action helper
-  bundles before calling the authenticated route-entry and route dispatchers.
-- `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
-- route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
 ## Registry fields (on-chain)
 
