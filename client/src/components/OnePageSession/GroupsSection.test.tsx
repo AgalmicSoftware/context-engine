@@ -209,11 +209,11 @@ describe('OnePageSessionGroupsSection authority routing', () => {
         },
       },
     ],
-  ])('preserves the existing SBT collection for a %s session', (_label, config) => {
+  ])('preserves the existing SBT collection for a %s session', async (_label, config) => {
     const props = buildProps(config);
     render(<OnePageSessionGroupsSection {...props} />);
 
-    expect(screen.getByTestId('sbt-groups-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('sbt-groups-page')).toBeInTheDocument();
     expect(screen.getByText('SBTs', { selector: 'span' })).toBeInTheDocument();
     expect(screen.queryByTestId('worker-groups-panel')).not.toBeInTheDocument();
     expect(mockSbtGroupsPage).toHaveBeenCalledWith(

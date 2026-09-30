@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -9,10 +9,11 @@ import {
   faSyncAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
-import SBTsPage from '../SBTs/SBTsPage';
+import LazyFallback from '../Shared/LazyFallback';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
+import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import {
   GROUP_CREATION_POLICIES,
   LEGACY_GROUP_CREATION_POLICY,
@@ -21,6 +22,9 @@ import {
 import styles from './OnePageSession.module.scss';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 import LinkedWorkerGroup, { type LinkedWorkerGroupReference } from './LinkedWorkerGroup';
+
+// Only registry (on-chain) sessions render the SBT groups page, so Worker-native Groups skip its code.
+const SBTsPage = lazyWithRetry(() => import('../SBTs/SBTsPage'));
 
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 
@@ -295,37 +299,39 @@ const OnePageSessionGroupsSection = ({
               ) : null}
             </>
           ) : usesRegistryGroups ? (
-            <SBTsPage
-              key={`sbtspage:${embeddedGroupsSessionSlug || 'general'}`}
-              provider={provider}
-              network={network}
-              account={account}
-              loginComplete={loginComplete}
-              toggleLoginModal={toggleLoginModal}
-              miniaturized={true}
-              hideMiniActionRow={true}
-              sessionName={sessionName}
-              sessionInfo={sessionInfo}
-              defaultFeaturedSBTs={defaultFeaturedSBTs}
-              defaultSbtTags={defaultSbtTags}
-              isSBTCacheReady={isSBTCacheReady}
-              autoMintingMode={autoMintingMode}
-              showCreateGroupAboveFeatured={true}
-              showCreateGroupExternal={showEmbeddedCreateGroup}
-              onCreateGroupToggleExternal={onToggleEmbeddedCreateGroup}
-              preferCacheBackedFeaturedCards={true}
-              requireExplicitAutoFeatureSessionSlug={true}
-              refreshSbtData={refreshSbtData}
-              sessionSlug={embeddedGroupsSessionSlug}
-              contracts={contracts}
-              blockLimits={blockLimits}
-              networkChainId={networkChainId}
-              sessionConfig={embeddedGroupsSessionConfig}
-              sbtScanProgressBySlug={sbtScanProgressBySlug}
-              sbtRealtimeCoverageBySlug={sbtRealtimeCoverageBySlug}
-              ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-              ensureLightSbtUniverse={ensureLightSbtUniverse}
-            />
+            <Suspense fallback={<LazyFallback label="Loading Groups..." minHeight="8vh" />}>
+              <SBTsPage
+                key={`sbtspage:${embeddedGroupsSessionSlug || 'general'}`}
+                provider={provider}
+                network={network}
+                account={account}
+                loginComplete={loginComplete}
+                toggleLoginModal={toggleLoginModal}
+                miniaturized={true}
+                hideMiniActionRow={true}
+                sessionName={sessionName}
+                sessionInfo={sessionInfo}
+                defaultFeaturedSBTs={defaultFeaturedSBTs}
+                defaultSbtTags={defaultSbtTags}
+                isSBTCacheReady={isSBTCacheReady}
+                autoMintingMode={autoMintingMode}
+                showCreateGroupAboveFeatured={true}
+                showCreateGroupExternal={showEmbeddedCreateGroup}
+                onCreateGroupToggleExternal={onToggleEmbeddedCreateGroup}
+                preferCacheBackedFeaturedCards={true}
+                requireExplicitAutoFeatureSessionSlug={true}
+                refreshSbtData={refreshSbtData}
+                sessionSlug={embeddedGroupsSessionSlug}
+                contracts={contracts}
+                blockLimits={blockLimits}
+                networkChainId={networkChainId}
+                sessionConfig={embeddedGroupsSessionConfig}
+                sbtScanProgressBySlug={sbtScanProgressBySlug}
+                sbtRealtimeCoverageBySlug={sbtRealtimeCoverageBySlug}
+                ensureLightSbtDiscovery={ensureLightSbtDiscovery}
+                ensureLightSbtUniverse={ensureLightSbtUniverse}
+              />
+            </Suspense>
           ) : (
             <div className={styles.workerGroupNotice} data-testid={E2E_TESTIDS.SESSION_GROUPS_UNAVAILABLE}>
               Groups are unavailable because this session has no valid Worker or registry Groups authority.
