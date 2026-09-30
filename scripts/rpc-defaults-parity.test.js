@@ -2,72 +2,49 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
-const { buildSync } = require('esbuild');
 
 const ROOT = path.resolve(__dirname, '..');
 const RPC_DEFAULTS_JS_PATH = path.join(ROOT, 'client', 'src', 'variables', 'rpcDefaults.js');
-const RPC_DEFAULTS_TS_PATH = path.join(ROOT, 'client', 'src', 'variables', 'rpcDefaults.ts');
+const CANONICAL_RPC_DEFAULTS_PATH = path.join(ROOT, 'shared', 'rpcDefaults.cjs');
 
 const requireFresh = (modulePath) => {
   delete require.cache[require.resolve(modulePath)];
   return require(modulePath);
 };
 
-const loadTypescriptRpcDefaults = () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-rpc-defaults-ts-'));
-  try {
-    const output = buildSync({
-      entryPoints: [RPC_DEFAULTS_TS_PATH],
-      bundle: true,
-      format: 'cjs',
-      platform: 'node',
-      sourcemap: false,
-      target: 'node20',
-      write: false,
-    });
-    const compiledPath = path.join(tempDir, 'rpcDefaults.cjs');
-    fs.writeFileSync(compiledPath, output.outputFiles[0].contents);
-    return requireFresh(compiledPath);
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
-};
-
 const normalizeMap = (value) =>
-  Object.fromEntries(Object.entries(value || {}).map(([key, entry]) => [String(key), Array.isArray(entry) ? [...entry] : entry]));
+  Object.fromEntries(
+    Object.entries(value || {}).map(([key, entry]) => [String(key), Array.isArray(entry) ? [...entry] : entry]),
+  );
 
 const collectChainIds = (...modules) => {
   const ids = new Set();
   modules.forEach((mod) => {
-    [
-      mod.publicRpcUrlsByChainId,
-      mod.pathRpcUrlsByChainId,
-      mod.faucetFallbackRpcUrlsByChainId,
-    ].forEach((map) => {
+    [mod.publicRpcUrlsByChainId, mod.pathRpcUrlsByChainId, mod.faucetFallbackRpcUrlsByChainId].forEach((map) => {
       Object.keys(map || {}).forEach((key) => ids.add(Number(key)));
     });
   });
   return [...ids].filter((id) => Number.isFinite(id)).sort((a, b) => a - b);
 };
 
-test('rpcDefaults JS and TS adapters expose identical canonical chain defaults', () => {
+test('rpcDefaults JS adapter exposes the canonical chain defaults', () => {
   const jsDefaults = requireFresh(RPC_DEFAULTS_JS_PATH);
-  const tsModule = loadTypescriptRpcDefaults();
-  const tsDefaults = tsModule.default || tsModule;
+  const canonicalDefaults = requireFresh(CANONICAL_RPC_DEFAULTS_PATH);
 
-  assert.deepEqual(normalizeMap(jsDefaults.publicRpcUrlsByChainId), normalizeMap(tsDefaults.publicRpcUrlsByChainId));
-  assert.deepEqual(normalizeMap(jsDefaults.pathRpcUrlsByChainId), normalizeMap(tsDefaults.pathRpcUrlsByChainId));
+  assert.deepEqual(
+    normalizeMap(jsDefaults.publicRpcUrlsByChainId),
+    normalizeMap(canonicalDefaults.publicRpcUrlsByChainId),
+  );
+  assert.deepEqual(normalizeMap(jsDefaults.pathRpcUrlsByChainId), normalizeMap(canonicalDefaults.pathRpcUrlsByChainId));
   assert.deepEqual(
     normalizeMap(jsDefaults.faucetFallbackRpcUrlsByChainId),
-    normalizeMap(tsDefaults.faucetFallbackRpcUrlsByChainId),
+    normalizeMap(canonicalDefaults.faucetFallbackRpcUrlsByChainId),
   );
 
-  collectChainIds(jsDefaults, tsDefaults).forEach((chainId) => {
-    assert.deepEqual(jsDefaults.getPublicRpcUrls(chainId), tsDefaults.getPublicRpcUrls(chainId));
-    assert.equal(jsDefaults.getPathRpcUrl(chainId), tsDefaults.getPathRpcUrl(chainId));
-    assert.deepEqual(jsDefaults.getFaucetFallbackRpcUrls(chainId), tsDefaults.getFaucetFallbackRpcUrls(chainId));
+  collectChainIds(jsDefaults, canonicalDefaults).forEach((chainId) => {
+    assert.deepEqual(jsDefaults.getPublicRpcUrls(chainId), canonicalDefaults.getPublicRpcUrls(chainId));
+    assert.equal(jsDefaults.getPathRpcUrl(chainId), canonicalDefaults.getPathRpcUrl(chainId));
+    assert.deepEqual(jsDefaults.getFaucetFallbackRpcUrls(chainId), canonicalDefaults.getFaucetFallbackRpcUrls(chainId));
   });
 });

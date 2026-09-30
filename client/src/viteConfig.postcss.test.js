@@ -53,8 +53,8 @@ describe('vite PostCSS compatibility', () => {
     expect(config).toContain("'@ce-shared/rpcDefaults.cjs'");
     expect(config).toContain("find: '@ce-shared'");
     expect(cryptographySource).toContain("from 'utilities/crypto/groupPasswordDerivation.cjs'");
-    expect(fs.readFileSync(path.join(clientRoot, 'src', 'variables', 'rpcDefaults.ts'), 'utf8')).toContain(
-      "from '@ce-shared/rpcDefaults.cjs'",
+    expect(fs.readFileSync(path.join(clientRoot, 'src', 'variables', 'rpcDefaults.js'), 'utf8')).toContain(
+      "require('../../../shared/rpcDefaults.cjs')",
     );
   });
 

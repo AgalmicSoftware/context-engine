@@ -75,6 +75,7 @@ and `client/src/variables/appConfig.ts`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
+
 - None are required solely because the app is hosted on Netlify.
 - `NEXT_PUBLIC_RP_ID` / `REACT_APP_NEXT_PUBLIC_RP_ID` before enabling the
   embedded passkey EOA wallet in production. This is the passkey RP ID and
@@ -245,6 +246,7 @@ allowlist editor or the worker admin routes documented in
 [`docs/session-cors-worker.md`](session-cors-worker.md).
 
 Smoke-test the deployed domain with:
+
 - worker `/health`
 - a basic AI request
 - an Arweave upload/read path
@@ -295,8 +297,8 @@ SPA fallback concept, but their redirect config syntax differs.
 ## RPC Defaults
 
 - Canonical anonymous RPC defaults live in `shared/rpcDefaults.cjs`. The
-  `client/src/variables/rpcDefaults.js` and `.ts` modules are thin CommonJS and
-  Vite adapters; Node scripts and worker fallbacks consume the same shared
+  `client/src/variables/rpcDefaults.js` module is a thin runtime adapter with
+  types supplied by `rpcDefaults.d.ts`; Node scripts and worker fallbacks consume the same shared
   manifest.
 - Session-sponsored RPC is not an anonymous default. For Survey contract reads,
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only
