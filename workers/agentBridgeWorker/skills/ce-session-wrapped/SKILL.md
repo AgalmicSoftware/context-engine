@@ -1,12 +1,12 @@
 ---
 name: ce-session-wrapped
-description: "Run a generic Context Engine session wrapped flow: onboard by invite, fetch session statements, predict answers, and return a shareable Mini App result."
+description: 'Run a generic Context Engine session wrapped flow: onboard by invite, fetch session statements, predict answers, and return a shareable Mini App result.'
 ---
 
 # Context Engine Session Wrapped Runtime
 
 **Skill version:** 2026-09-28 (session-wrapped-v1.2)
-**Protocol version:** Context Engine agent bridge v42
+**Protocol version:** Context Engine agent bridge v43
 
 Use this skill only to run a generic Context Engine session wrapped flow. Do
 not use the broader `context-engine` skill, local reference docs, setup
@@ -35,8 +35,19 @@ Small fixture question bank for dry-run planning only:
 
 ```json
 [
-  { "statement_id": "fixture-q-1", "type": "choice", "prompt": "Should this session prioritize clear onboarding?", "options": ["agree", "unsure", "disagree"] },
-  { "statement_id": "fixture-q-2", "type": "rating", "prompt": "How useful is a shareable session summary?", "min": 1, "max": 5 },
+  {
+    "statement_id": "fixture-q-1",
+    "type": "choice",
+    "prompt": "Should this session prioritize clear onboarding?",
+    "options": ["agree", "unsure", "disagree"]
+  },
+  {
+    "statement_id": "fixture-q-2",
+    "type": "rating",
+    "prompt": "How useful is a shareable session summary?",
+    "min": 1,
+    "max": 5
+  },
   { "statement_id": "fixture-q-3", "type": "freeform", "prompt": "What should the next session improve?" }
 ]
 ```
@@ -147,7 +158,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. Resolve the private credential.
-2. GET `/api/agent/skill-version`; silently verify protocol v42.
+2. GET `/api/agent/skill-version`; silently verify protocol v43.
 3. GET `/api/agent/agent-only/start` with the Bearer token.
 4. Create one fresh `run_id` for the whole run.
 5. Optional `token_usage`: before answer submission, make at most one quiet
@@ -155,10 +166,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
    Python `sqlite3` only if immediately available. Use Unix epoch cutoff
    `int(time.time()) - 2592000`. Sum
    `COALESCE(input_tokens,0) + COALESCE(output_tokens,0) +
-   COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)` from
+COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)` from
    `sessions` where `started_at >= cutoff` and `source = 'telegram'`; group
    daily rows with `date(CAST(started_at AS INTEGER), 'unixepoch',
-   'localtime')`. Do not assume a precomputed aggregate column exists; do not
+'localtime')`. Do not assume a precomputed aggregate column exists; do not
    use SQL datetime string filters against `started_at`. If unavailable or
    unclear, omit `token_usage`. Do not discover files, inspect logs/configs/
    sessions, install tools, or run runtime-insights commands. Never print rows

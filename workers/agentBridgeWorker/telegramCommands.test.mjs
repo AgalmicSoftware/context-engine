@@ -90,15 +90,17 @@ function baseEnv(overrides = {}) {
       riskCeiling: 'submit',
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        docLibraryEnabled: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          docLibraryEnabled: true,
+        },
+      ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -143,15 +145,17 @@ function agentTokenEnv(overrides = {}) {
       riskCeiling: 'submit',
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
     }),
     ...overrides,
   });
@@ -165,12 +169,10 @@ function groupMessage(text) {
   return groupMessageFrom(text);
 }
 
-function groupMessageFrom(text, {
-  chatId = -100123,
-  title = 'Alpha Lobby',
-  telegramUserId = 42,
-  username = 'host',
-} = {}) {
+function groupMessageFrom(
+  text,
+  { chatId = -100123, title = 'Alpha Lobby', telegramUserId = 42, username = 'host' } = {},
+) {
   return {
     update_id: 7001,
     message: {
@@ -186,10 +188,7 @@ function privateMessage(text) {
   return privateMessageFrom(text);
 }
 
-function privateMessageFrom(text, {
-  telegramUserId = '42',
-  username = 'participant',
-} = {}) {
+function privateMessageFrom(text, { telegramUserId = '42', username = 'participant' } = {}) {
   return {
     update_id: 7002,
     message: {
@@ -201,11 +200,7 @@ function privateMessageFrom(text, {
   };
 }
 
-function privateVoiceMessage({
-  telegramUserId = '42',
-  username = 'participant',
-  fileId = 'voice-file-1',
-} = {}) {
+function privateVoiceMessage({ telegramUserId = '42', username = 'participant', fileId = 'voice-file-1' } = {}) {
   return {
     update_id: 7003,
     message: {
@@ -235,10 +230,11 @@ async function withTimeout(promise, ms = 100, message = 'operation timed out') {
   }
 }
 
-async function managedAccountAddressFor({
-  telegramUserId = '42',
-  username = 'participant',
-} = {}, env = baseEnv(), now = '2026-05-08T12:00:00.000Z') {
+async function managedAccountAddressFor(
+  { telegramUserId = '42', username = 'participant' } = {},
+  env = baseEnv(),
+  now = '2026-05-08T12:00:00.000Z',
+) {
   const account = await deriveManagedDemoAccount({
     principal: { telegramUserId, username },
     deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
@@ -272,10 +268,7 @@ function u16le(bytes, offset) {
 }
 
 function u32le(bytes, offset) {
-  return (bytes[offset] |
-    (bytes[offset + 1] << 8) |
-    (bytes[offset + 2] << 16) |
-    (bytes[offset + 3] << 24)) >>> 0;
+  return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
 }
 
 function readZipTextFiles(bytes) {
@@ -313,13 +306,16 @@ function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
       });
     }
     if (String(url).endsWith('/storage/upload')) {
-      return new Response(JSON.stringify({
-        id: txId,
-        storageRef: { backend: 'arweave', id: txId, resource: 'responses' },
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          id: txId,
+          storageRef: { backend: 'arweave', id: txId, resource: 'responses' },
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     return new Response(JSON.stringify({ amountEth: '0.05', txHash: `0x${'34'.repeat(32)}` }), {
       status: 200,
@@ -340,10 +336,13 @@ function registryFetchForSlugs(slugs = []) {
     }
     if (data.startsWith('0x27916a76')) {
       const index = Number(BigInt(`0x${data.slice(10) || '0'}`));
-      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: encodeRegistryStringResult(slugs[index] || '') }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', id: body.id, result: encodeRegistryStringResult(slugs[index] || '') }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, error: { message: 'unknown call' } }), {
       status: 200,
@@ -367,28 +366,43 @@ function launchFromButton(button = {}) {
 }
 
 test('parseTelegramCommandText handles mentions without accepting commands for another bot', () => {
-  assert.deepEqual(parseTelegramCommandText('/join@ce_demo_bot alpha', {
-    botUsername: 'ce_demo_bot',
-  }), {
-    isCommand: true,
-    command: '/join',
-    args: ['alpha'],
-    argText: 'alpha',
-    mention: 'ce_demo_bot',
-    addressedToOtherBot: false,
-  });
-  assert.equal(parseTelegramCommandText('/join@other_bot alpha', {
-    botUsername: 'ce_demo_bot',
-  }).addressedToOtherBot, true);
-  assert.equal(parseTelegramCommandText('/ce_join@ce_demo_bot alpha', {
-    botUsername: 'ce_demo_bot',
-  }).command, '/join');
-  assert.equal(parseTelegramCommandText('/drop_question 2', {
-    botUsername: 'ce_demo_bot',
-  }).command, '/pose_question');
-  assert.equal(parseTelegramCommandText('/ce_drop_question 2', {
-    botUsername: 'ce_demo_bot',
-  }).command, '/pose_question');
+  assert.deepEqual(
+    parseTelegramCommandText('/join@ce_demo_bot alpha', {
+      botUsername: 'ce_demo_bot',
+    }),
+    {
+      isCommand: true,
+      command: '/join',
+      args: ['alpha'],
+      argText: 'alpha',
+      mention: 'ce_demo_bot',
+      addressedToOtherBot: false,
+    },
+  );
+  assert.equal(
+    parseTelegramCommandText('/join@other_bot alpha', {
+      botUsername: 'ce_demo_bot',
+    }).addressedToOtherBot,
+    true,
+  );
+  assert.equal(
+    parseTelegramCommandText('/ce_join@ce_demo_bot alpha', {
+      botUsername: 'ce_demo_bot',
+    }).command,
+    '/join',
+  );
+  assert.equal(
+    parseTelegramCommandText('/drop_question 2', {
+      botUsername: 'ce_demo_bot',
+    }).command,
+    '/pose_question',
+  );
+  assert.equal(
+    parseTelegramCommandText('/ce_drop_question 2', {
+      botUsername: 'ce_demo_bot',
+    }).command,
+    '/pose_question',
+  );
   assert.equal(parseTelegramCommandText('hello').isCommand, false);
 });
 
@@ -407,8 +421,9 @@ test('agent action menu is group-safe and persists only opaque launch records', 
   const buttons = flattenButtons(result.response.replyMarkup);
   const settings = buttons.find((button) => button.text === 'Settings');
   const viewQuestions = buttons.find((button) => button.text === 'View Questions');
-  const storedActionKeys = Array.from(env.AGENT_ACTION_KV.store.keys())
-    .filter((key) => key.startsWith('telegram:action:'));
+  const storedActionKeys = Array.from(env.AGENT_ACTION_KV.store.keys()).filter((key) =>
+    key.startsWith('telegram:action:'),
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_action_menu');
@@ -417,8 +432,14 @@ test('agent action menu is group-safe and persists only opaque launch records', 
   assert.match(result.response.text, /Account and settings inputs open in private chat or Mini App/);
   assert.equal(result.response.text.includes('Address:'), false);
   assert.equal(result.catalog.canonicalBoundary, '/api/agent/*');
-  assert.equal(result.catalog.capabilities.some((capability) => capability.id === 'agent.settings.update'), false);
-  assert.equal(buttons.some((button) => button.text === 'Create Agent'), false);
+  assert.equal(
+    result.catalog.capabilities.some((capability) => capability.id === 'agent.settings.update'),
+    false,
+  );
+  assert.equal(
+    buttons.some((button) => button.text === 'Create Agent'),
+    false,
+  );
   assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,50}$/);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
@@ -463,7 +484,10 @@ test('agent create and settings commands route group inputs private and model ca
   assert.equal(groupCreate.privateChatRequired, true);
   assert.match(groupCreate.response.text, /No account state is shown in group chat/);
   assert.equal(groupCreate.response.text.includes('Address:'), false);
-  assert.match(flattenButtons(groupCreate.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
+  assert.match(
+    flattenButtons(groupCreate.response.replyMarkup)[0].url,
+    /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/,
+  );
 
   assert.equal(privateCreate.screen, 'agent_account_create');
   assert.match(privateCreate.response.text, /Agent account/);
@@ -478,7 +502,10 @@ test('agent create and settings commands route group inputs private and model ca
   assert.equal(groupSettings.screen, 'agent_settings_overview');
   assert.equal(groupSettings.privateChatRequired, true);
   assert.equal(groupSettings.response.text.includes('Draft style:'), false);
-  assert.match(flattenButtons(groupSettings.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
+  assert.match(
+    flattenButtons(groupSettings.response.replyMarkup)[0].url,
+    /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/,
+  );
 
   assert.equal(privateSettings.screen, 'agent_settings_overview');
   assert.match(privateSettings.response.text, /Draft style: balanced/);
@@ -494,8 +521,7 @@ test('settings edit callback stays private and points input collection at Mini A
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const edit = flattenButtons(settings.response.replyMarkup)
-    .find((button) => button.text === 'Edit Settings');
+  const edit = flattenButtons(settings.response.replyMarkup).find((button) => button.text === 'Edit Settings');
   const callback = await buildTelegramCommandResponse({
     update: {
       update_id: 7100,
@@ -580,7 +606,15 @@ test('/sessions reads the current telegram_only policy list', async () => {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'old-alpha',
-      sessions: [{ sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
+      sessions: [
+        {
+          sessionSlug: 'old-alpha',
+          sessionName: 'Old Alpha',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+        },
+      ],
     }),
     AGENT_ACTION_KV: new MemoryKv(),
   };
@@ -593,8 +627,20 @@ test('/sessions reads the current telegram_only policy list', async () => {
   env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
     defaultSessionSlug: 'old-alpha',
     sessions: [
-      { sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
-      { sessionSlug: 'new-beta', sessionName: 'New Beta', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
+      {
+        sessionSlug: 'old-alpha',
+        sessionName: 'Old Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+      },
+      {
+        sessionSlug: 'new-beta',
+        sessionName: 'New Beta',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+      },
     ],
   });
   const fresh = await buildTelegramCommandResponse({
@@ -658,13 +704,16 @@ test('Telegram group allowlist filters and blocks group session binding', async 
     env,
     now: '2026-05-08T12:00:03.000Z',
   });
-  await env.AGENT_ACTION_KV.put('telegram:group-session:-100123', JSON.stringify({
-    version: 1,
-    chatId: '-100123',
-    sessionSlug: 'alpha',
-    sessionName: 'Alpha Session',
-    linkedAt: '2026-05-08T12:00:04.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:group-session:-100123',
+    JSON.stringify({
+      version: 1,
+      chatId: '-100123',
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      linkedAt: '2026-05-08T12:00:04.000Z',
+    }),
+  );
   const staleStart = await buildTelegramCommandResponse({
     update: groupMessage('/start'),
     env,
@@ -690,12 +739,14 @@ test('Telegram group access is closed by default until an admin or open-access p
   const now = '2026-05-08T12:00:00.000Z';
   const closedPolicy = {
     defaultSessionSlug: 'alpha',
-    sessions: [{
-      sessionSlug: 'alpha',
-      sessionName: 'Alpha Session',
-      telegramBridgeEnabled: true,
-      telegramOnly: true,
-    }],
+    sessions: [
+      {
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      },
+    ],
   };
   const deniedEnv = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify(closedPolicy),
@@ -708,13 +759,15 @@ test('Telegram group access is closed by default until an admin or open-access p
   const openEnv = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupOpenAccess: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+        },
+      ],
     }),
   });
 
@@ -754,28 +807,33 @@ test('group approval link commands return verified in-group guidance without min
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupApprovalRequired: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupApprovalRequired: true,
+        },
+      ],
     }),
   });
   const legacyPayload = 'cetg_1234567890abcdef';
-  await env.AGENT_ACTION_KV.put(`telegram:action:${legacyPayload}`, JSON.stringify({
-    type: 'agent_bridge_opaque_action',
-    actionId: legacyPayload,
-    action: 'approve_telegram_group',
-    lane: 'group_lobby',
-    serverContextRef: {
-      sessionSlug: 'alpha',
-      approvedByTelegramUserId: '42',
-      approvedByAccountAddress: accountAddress,
-    },
-    createdAt: now,
-  }));
+  await env.AGENT_ACTION_KV.put(
+    `telegram:action:${legacyPayload}`,
+    JSON.stringify({
+      type: 'agent_bridge_opaque_action',
+      actionId: legacyPayload,
+      action: 'approve_telegram_group',
+      lane: 'group_lobby',
+      serverContextRef: {
+        sessionSlug: 'alpha',
+        approvedByTelegramUserId: '42',
+        approvedByAccountAddress: accountAddress,
+      },
+      createdAt: now,
+    }),
+  );
   const putCountBefore = env.AGENT_ACTION_KV.putCalls.length;
   const guidance = await buildTelegramCommandResponse({
     update: privateMessage('/group_link alpha'),
@@ -809,26 +867,31 @@ test('admin can revoke a Telegram group approval and close access again', async 
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+      ],
     }),
   });
-  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
-    version: 1,
-    type: 'telegram_group_approval',
-    sessionSlug: 'alpha',
-    sessionName: 'Alpha Session',
-    chatId: '-100123',
-    chatTitle: 'Alpha Lobby',
-    approvedAt: now,
-    approvedByTelegramUserId: '42',
-    approvedByAccountAddress: accountAddress.toLowerCase(),
-    approvalTokenId: 'admin_launch',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:group-approval:alpha:-100123',
+    JSON.stringify({
+      version: 1,
+      type: 'telegram_group_approval',
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      chatId: '-100123',
+      chatTitle: 'Alpha Lobby',
+      approvedAt: now,
+      approvedByTelegramUserId: '42',
+      approvedByAccountAddress: accountAddress.toLowerCase(),
+      approvalTokenId: 'admin_launch',
+    }),
+  );
 
   const beforeRevoke = await buildTelegramCommandResponse({
     update: groupMessage('/sessions'),
@@ -878,7 +941,10 @@ test('/sessions paginates tall Telegram session lists', async () => {
   assert.match(first.response.text, /Sessions \(5\/6\)/);
   assert.equal(first.response.text.includes('- six (six)'), false);
   assert.equal(nonNavigationButtons(first.response.replyMarkup).filter((button) => button.callback_data).length, 6);
-  assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
+  assert.equal(
+    buttons.some((button) => button.text === 'Back to Start'),
+    true,
+  );
 
   const second = await buildTelegramCommandResponse({
     update: {
@@ -898,7 +964,10 @@ test('/sessions paginates tall Telegram session lists', async () => {
   });
   assert.match(second.response.text, /Sessions \(6\/6\)/);
   assert.match(second.response.text, /- six \(six\)/);
-  assert.equal(flattenButtons(second.response.replyMarkup).some((button) => button.text === 'Load Next'), false);
+  assert.equal(
+    flattenButtons(second.response.replyMarkup).some((button) => button.text === 'Load Next'),
+    false,
+  );
 });
 
 test('/sessions lists only Telegram-enabled sessions', async () => {
@@ -911,13 +980,17 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
         {
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
-          telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'beta',
           sessionName: 'Beta Session',
-          telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: false,
         },
         {
@@ -940,8 +1013,14 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
   assert.match(result.response.text, /- alpha \(Alpha Session\)/);
   assert.match(result.response.text, /- beta \(Beta Session\)/);
   assert.equal(result.response.text.includes('Gamma Session'), false);
-  assert.deepEqual(nonNavigationButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
-  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Back to Start'), true);
+  assert.deepEqual(
+    nonNavigationButtons(result.response.replyMarkup).map((button) => button.text),
+    ['Alpha Session', 'Beta Session'],
+  );
+  assert.equal(
+    flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Back to Start'),
+    true,
+  );
 });
 
 test('/sessions and /start honor the Cloudflare Telegram session created-after cutoff', async () => {
@@ -987,7 +1066,10 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
   assert.match(sessions.response.text, /- old-alpha \(Old Alpha\)/);
   assert.match(sessions.response.text, /- new-beta \(New Beta\)/);
   assert.equal(sessions.response.text.includes('Missing Created At'), false);
-  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), ['Old Alpha', 'New Beta']);
+  assert.deepEqual(
+    nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text),
+    ['Old Alpha', 'New Beta'],
+  );
 
   const start = await buildTelegramCommandResponse({
     update: privateMessage('/start'),
@@ -1051,10 +1133,10 @@ test('/sessions keeps the default visible when the cutoff is newer than its crea
   assert.match(sessions.response.text, /- new-non-default \(New Non Default\)/);
   assert.equal(sessions.response.text.includes('Old Non Default'), false);
   assert.equal(sessions.response.text.includes('E2E New Session'), false);
-  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
-    'Old Default',
-    'New Non Default',
-  ]);
+  assert.deepEqual(
+    nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text),
+    ['Old Default', 'New Non Default'],
+  );
 });
 
 test('/sessions keeps the default visible when cutoff metadata is missing', async () => {
@@ -1098,10 +1180,10 @@ test('/sessions keeps the default visible when cutoff metadata is missing', asyn
   assert.match(sessions.response.text, /- metadata-free-default \(Metadata Free Default\)/);
   assert.match(sessions.response.text, /- fresh-session \(Fresh Session\)/);
   assert.equal(sessions.response.text.includes('Metadata Free Other'), false);
-  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
-    'Metadata Free Default',
-    'Fresh Session',
-  ]);
+  assert.deepEqual(
+    nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text),
+    ['Metadata Free Default', 'Fresh Session'],
+  );
 });
 
 test('/sessions can use the Edge 2026 cutoff to hide the test session', async () => {
@@ -1154,10 +1236,10 @@ test('/sessions can use the Edge 2026 cutoff to hide the test session', async ()
   assert.equal(sessions.response.text.includes('EE26 Test'), false);
   assert.match(sessions.response.text, /- ee-26-organizers \(EE26 Organizers\)/);
   assert.match(sessions.response.text, /- ee-26-users \(EE26 Users\)/);
-  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
-    'EE26 Organizers',
-    'EE26 Users',
-  ]);
+  assert.deepEqual(
+    nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text),
+    ['EE26 Organizers', 'EE26 Users'],
+  );
 
   const start = await buildTelegramCommandResponse({
     update: privateMessage('/start'),
@@ -1214,12 +1296,15 @@ test('agent skill-update flag writes a durable KV record', async () => {
 
 test('loadSessionPolicy applies a valid admin default-session pin', async () => {
   const kv = new MemoryKv();
-  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
-    version: 1,
-    sessionSlug: 'beta',
-    updatedBy: '0x1234...abcd',
-    updatedAt: '2026-05-29T12:00:00.000Z',
-  }));
+  await kv.put(
+    'telegram:admin-default-session:v1',
+    JSON.stringify({
+      version: 1,
+      sessionSlug: 'beta',
+      updatedBy: '0x1234...abcd',
+      updatedAt: '2026-05-29T12:00:00.000Z',
+    }),
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
@@ -1241,11 +1326,14 @@ test('loadSessionPolicy applies a valid admin default-session pin', async () => 
 
 test('admin default-session pin wins over the schedule', async () => {
   const kv = new MemoryKv();
-  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
-    version: 1,
-    sessionSlug: 'beta',
-    updatedAt: '2026-05-29T12:00:00.000Z',
-  }));
+  await kv.put(
+    'telegram:admin-default-session:v1',
+    JSON.stringify({
+      version: 1,
+      sessionSlug: 'beta',
+      updatedAt: '2026-05-29T12:00:00.000Z',
+    }),
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_SESSION_POLICY_NOW: '2026-05-30T00:00:00.000Z',
@@ -1272,19 +1360,20 @@ test('admin default-session pin wins over the schedule', async () => {
 
 test('loadSessionPolicy ignores a stale admin default-session pin', async () => {
   const kv = new MemoryKv();
-  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
-    version: 1,
-    sessionSlug: 'missing-session',
-    updatedAt: '2026-05-29T12:00:00.000Z',
-  }));
+  await kv.put(
+    'telegram:admin-default-session:v1',
+    JSON.stringify({
+      version: 1,
+      sessionSlug: 'missing-session',
+      updatedAt: '2026-05-29T12:00:00.000Z',
+    }),
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
-      ],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
   });
 
@@ -1374,45 +1463,53 @@ test('private voice message updates the latest Mini App launch draft', async () 
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        sponsoredAiAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          sponsoredAiAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+        },
+      ],
     }),
   });
   const launch = 'cecb_voice_draft';
-  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
-    action: 'submit_response',
-    lane: 'telegram_mini_app',
-    callbackData: launch,
-    miniAppLaunch: true,
-    serverContextRef: {
-      sessionSlug: 'alpha',
-      questionId: 'q-readiness',
-      questionSeries: {
-        questionIds: ['q-readiness'],
-        skippedQuestionIds: [],
-        draftAnswersByQuestionId: {
-          'q-readiness': { text: 'Existing draft' },
+  await env.AGENT_ACTION_KV.put(
+    `telegram:action:${launch}`,
+    JSON.stringify({
+      action: 'submit_response',
+      lane: 'telegram_mini_app',
+      callbackData: launch,
+      miniAppLaunch: true,
+      serverContextRef: {
+        sessionSlug: 'alpha',
+        questionId: 'q-readiness',
+        questionSeries: {
+          questionIds: ['q-readiness'],
+          skippedQuestionIds: [],
+          draftAnswersByQuestionId: {
+            'q-readiness': { text: 'Existing draft' },
+          },
         },
       },
-    },
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:mini-app-latest-launch:v1:42', JSON.stringify({
-    type: 'telegram_mini_app_latest_launch',
-    version: 1,
-    telegramUserId: '42',
-    sessionSlug: 'alpha',
-    launch,
-    questionIds: ['q-readiness'],
-    updatedAt: '2026-05-29T12:00:00.000Z',
-  }));
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:mini-app-latest-launch:v1:42',
+    JSON.stringify({
+      type: 'telegram_mini_app_latest_launch',
+      version: 1,
+      telegramUserId: '42',
+      sessionSlug: 'alpha',
+      launch,
+      questionIds: ['q-readiness'],
+      updatedAt: '2026-05-29T12:00:00.000Z',
+    }),
+  );
   const calls = [];
   const fetchImpl = async (url, init = {}) => {
     const target = String(url);
@@ -1432,13 +1529,16 @@ test('private voice message updates the latest Mini App launch draft', async () 
     if (target.endsWith('/getFile')) {
       const body = JSON.parse(init.body);
       assert.equal(body.file_id, 'voice-file-1');
-      return new Response(JSON.stringify({
-        ok: true,
-        result: { file_path: 'voice/file_1.ogg' },
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          result: { file_path: 'voice/file_1.ogg' },
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     if (target.includes('/file/bot123456:test-token/voice/file_1.ogg')) {
       return new Response(new Uint8Array([1, 2, 3]), {
@@ -1476,15 +1576,18 @@ test('private voice message updates the latest Mini App launch draft', async () 
   const stored = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(
     stored.serverContextRef.questionSeries.draftAnswersByQuestionId['q-readiness'].text,
-    'Existing draft\n\nspoken update'
+    'Existing draft\n\nspoken update',
   );
-  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), [
-    '/auth/nonce',
-    '/auth/login',
-    '/bot123456:test-token/getFile',
-    '/file/bot123456:test-token/voice/file_1.ogg',
-    '/transcribe',
-  ]);
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    [
+      '/auth/nonce',
+      '/auth/login',
+      '/bot123456:test-token/getFile',
+      '/file/bot123456:test-token/voice/file_1.ogg',
+      '/transcribe',
+    ],
+  );
 
   const second = await buildTelegramCommandResponse({
     update: privateVoiceMessage({ fileId: 'voice-file-2' }),
@@ -1505,8 +1608,7 @@ test('/questions and callback dispatch list questions without leaking locked pro
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const viewQuestions = flattenButtons(joined.response.replyMarkup)
-    .find((button) => button.text === 'View Questions');
+  const viewQuestions = flattenButtons(joined.response.replyMarkup).find((button) => button.text === 'View Questions');
   const callback = await buildTelegramCommandResponse({
     update: {
       update_id: 7003,
@@ -1528,10 +1630,10 @@ test('/questions and callback dispatch list questions without leaking locked pro
   assert.equal(callback.response.method, 'editMessageText');
   assert.match(callback.response.text, /^Questions \(2\/2\)\n\n1\. What should Alpha decide next\?/);
   assert.equal(callback.response.text.includes('Choose a question'), false);
-  assert.deepEqual(nonNavigationButtons(callback.response.replyMarkup).map((button) => button.text), [
-    'Pose 1',
-    'Pose 2',
-  ]);
+  assert.deepEqual(
+    nonNavigationButtons(callback.response.replyMarkup).map((button) => button.text),
+    ['Pose 1', 'Pose 2'],
+  );
   assert.equal(callback.response.text.includes('q-readiness'), false);
   assert.equal(callback.response.text.includes('q-locked'), false);
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
@@ -1570,11 +1672,14 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
   assert.match(result.response.text, /2\. Encrypted question/);
   const buttons = flattenButtons(result.response.replyMarkup);
   assert.equal(nonNavigationButtons(result.response.replyMarkup).length, 2);
-  assert.deepEqual(nonNavigationButtons(result.response.replyMarkup).map((button) => button.text), [
-    'Pose 1',
-    'Pose 2',
-  ]);
-  assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
+  assert.deepEqual(
+    nonNavigationButtons(result.response.replyMarkup).map((button) => button.text),
+    ['Pose 1', 'Pose 2'],
+  );
+  assert.equal(
+    buttons.some((button) => button.text === 'Back to Start'),
+    true,
+  );
   for (const button of buttons) {
     assert.match(button.callback_data, /^cecb_[a-z0-9]{10,50}$/);
     assert.equal(button.callback_data.includes(publicQuestionId), false);
@@ -1609,7 +1714,10 @@ test('/questions assigns stable numbers that survive list reordering', async () 
   assert.match(firstList.response.text, /2\. Alpha second question\?/);
   assert.doesNotMatch(firstList.response.text, /\(#\d+\)/);
   assert.match(firstList.response.text, /Alpha first question\?\n\n2\. Alpha second question\?/);
-  assert.equal(flattenButtons(firstList.response.replyMarkup).some((button) => button.text === 'Back to Start'), true);
+  assert.equal(
+    flattenButtons(firstList.response.replyMarkup).some((button) => button.text === 'Back to Start'),
+    true,
+  );
 
   env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([
     {
@@ -1685,16 +1793,16 @@ test('/questions caps Telegram rows at five and keeps the chat page minimal', as
   assert.equal(result.response.text.includes('Question 6 prompt'), false);
 
   const buttons = flattenButtons(result.response.replyMarkup);
-  assert.deepEqual(buttons.slice(0, 5).map((button) => button.text), [
-    'Pose 1',
-    'Pose 2',
-    'Pose 3',
-    'Pose 4',
-    'Pose 5',
-  ]);
+  assert.deepEqual(
+    buttons.slice(0, 5).map((button) => button.text),
+    ['Pose 1', 'Pose 2', 'Pose 3', 'Pose 4', 'Pose 5'],
+  );
   const loadNext = buttons.find((button) => button.text === 'Load Next');
   assert.match(loadNext.callback_data, /^cecb_[a-z0-9]{10,50}$/);
-  assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
+  assert.equal(
+    buttons.some((button) => button.text === 'Open Mini App'),
+    false,
+  );
 
   const nextPage = await buildTelegramCommandResponse({
     update: {
@@ -1714,7 +1822,10 @@ test('/questions caps Telegram rows at five and keeps the chat page minimal', as
   });
   assert.match(nextPage.response.text, /^Questions \(7\/7\)\n\n6\. Question 6 prompt/);
   assert.equal(nextPage.response.text.includes('7. Question 7 prompt'), true);
-  assert.equal(flattenButtons(nextPage.response.replyMarkup).some((button) => button.text === 'Load Next'), false);
+  assert.equal(
+    flattenButtons(nextPage.response.replyMarkup).some((button) => button.text === 'Load Next'),
+    false,
+  );
 });
 
 test('/questions omits Mini App buttons in private chat', async () => {
@@ -1729,7 +1840,10 @@ test('/questions omits Mini App buttons in private chat', async () => {
     now: '2026-05-08T12:00:00.000Z',
   });
   assert.equal(result.ok, true);
-  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Open Mini App'), false);
+  assert.equal(
+    flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Open Mini App'),
+    false,
+  );
 });
 
 test('/questions prioritizes answerable questions before payload-unavailable rows', async () => {
@@ -1781,10 +1895,12 @@ test('/questions prioritizes answerable questions before payload-unavailable row
   assert.equal(result.ok, true);
   assert.match(result.response.text, /^Questions \(2\/2\)\n\n1\. How much do you trust this result\?/);
   assert.match(result.response.text, /2\. Failed to load question prompt\./);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).slice(0, 2).map((button) => button.text), [
-    'Pose 1',
-    'Pose 2',
-  ]);
+  assert.deepEqual(
+    flattenButtons(result.response.replyMarkup)
+      .slice(0, 2)
+      .map((button) => button.text),
+    ['Pose 1', 'Pose 2'],
+  );
   assert.equal(result.response.text.includes('0x22222222'), false);
   assert.equal(result.response.text.includes('0x11111111'), false);
   assert.equal(posed.ok, true);
@@ -1828,10 +1944,12 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   assert.match(list.response.text, /^Questions \(2\/2\)/);
   assert.match(list.response.text, /Failed to load question prompt\./);
   assert.match(list.response.text, /Encrypted question/);
-  assert.deepEqual(flattenButtons(list.response.replyMarkup).slice(0, 2).map((button) => button.text), [
-    'Pose 1',
-    'Pose 2',
-  ]);
+  assert.deepEqual(
+    flattenButtons(list.response.replyMarkup)
+      .slice(0, 2)
+      .map((button) => button.text),
+    ['Pose 1', 'Pose 2'],
+  );
   assert.equal(list.response.text.includes('0x78787878'), false);
   assert.equal(list.response.text.includes('0x90909090'), false);
   assert.equal(list.response.text.includes('Encrypted prompt must not leak'), false);
@@ -1841,7 +1959,10 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   assert.equal(posed.response.text.includes('0x78787878'), false);
   assert.match(posed.response.text, /public payload could not be loaded yet/);
   const buttons = flattenButtons(posed.response.replyMarkup);
-  assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
+  assert.equal(
+    buttons.some((button) => button.text === 'Open Mini App'),
+    false,
+  );
   assert.equal(posed.payloadUnavailable, true);
   assert.equal(posed.posed, false);
 });
@@ -1879,15 +2000,19 @@ test('/results consensus shows top difference questions from submitted records',
   let counter = 0;
   async function putResponse(questionId, telegramUserId, label) {
     counter += 1;
-    await seedSubmitRecord(env.AGENT_ACTION_KV, `telegram:submit-request:${counter}`, JSON.stringify({
-      status: 'direct_submitted',
-      sessionSlug: 'alpha',
-      telegramUserId,
-      questionId,
-      answer: { label, value: label.toLowerCase() },
-      onChain: { ok: true, txHash: `0x${String(counter).padStart(2, '0').repeat(32)}` },
-      createdAt: `2026-05-08T12:00:${String(counter).padStart(2, '0')}.000Z`,
-    }));
+    await seedSubmitRecord(
+      env.AGENT_ACTION_KV,
+      `telegram:submit-request:${counter}`,
+      JSON.stringify({
+        status: 'direct_submitted',
+        sessionSlug: 'alpha',
+        telegramUserId,
+        questionId,
+        answer: { label, value: label.toLowerCase() },
+        onChain: { ok: true, txHash: `0x${String(counter).padStart(2, '0').repeat(32)}` },
+        createdAt: `2026-05-08T12:00:${String(counter).padStart(2, '0')}.000Z`,
+      }),
+    );
   }
   await putResponse('q-a', '1', 'Agree');
   await putResponse('q-a', '2', 'Agree');
@@ -1922,7 +2047,10 @@ test('/results consensus shows top difference questions from submitted records',
   assert.match(result.response.text, /3\. ● Should the group publish the summary\?/);
   assert.equal(result.response.text.includes('Should the group run another pilot?'), false);
   assert.equal(result.response.text.includes('open note'), false);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Next 3']);
+  assert.deepEqual(
+    flattenButtons(result.response.replyMarkup).map((button) => button.text),
+    ['Next 3'],
+  );
   assert.equal(result.response.text.includes('Demo mode'), false);
 
   const nextButton = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Next 3');
@@ -1947,21 +2075,27 @@ test('/results consensus shows top difference questions from submitted records',
   assert.equal(next.screen, 'results_consensus');
   assert.match(next.response.text, /Most difference 4-4 of 4/);
   assert.match(next.response.text, /4\. ● Should the group run another pilot\?/);
-  assert.deepEqual(flattenButtons(next.response.replyMarkup).map((button) => button.text), ['Previous 3']);
+  assert.deepEqual(
+    flattenButtons(next.response.replyMarkup).map((button) => button.text),
+    ['Previous 3'],
+  );
 });
 
 test('submitted result reads use per-session indexes instead of capped global scans', async () => {
   const env = baseEnv();
   for (let index = 0; index < 650; index += 1) {
-    await env.AGENT_ACTION_KV.put(`telegram:submit-request:noise-${String(index).padStart(3, '0')}`, JSON.stringify({
-      requestId: `noise-${index}`,
-      status: 'direct_submitted',
-      sessionSlug: 'other-session',
-      telegramUserId: `noise-${index}`,
-      questionId: 'q-noise',
-      answer: { label: 'Agree', value: 'agree' },
-      createdAt: `2026-05-08T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
-    }));
+    await env.AGENT_ACTION_KV.put(
+      `telegram:submit-request:noise-${String(index).padStart(3, '0')}`,
+      JSON.stringify({
+        requestId: `noise-${index}`,
+        status: 'direct_submitted',
+        sessionSlug: 'other-session',
+        telegramUserId: `noise-${index}`,
+        questionId: 'q-noise',
+        answer: { label: 'Agree', value: 'agree' },
+        createdAt: `2026-05-08T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      }),
+    );
   }
   for (let index = 0; index < 3; index += 1) {
     const record = {
@@ -1978,7 +2112,10 @@ test('submitted result reads use per-session indexes instead of capped global sc
 
   const records = await loadSubmittedResultRecords(env, 'alpha');
 
-  assert.deepEqual(records.map((record) => record.requestId), ['alpha-0', 'alpha-1', 'alpha-2']);
+  assert.deepEqual(
+    records.map((record) => record.requestId),
+    ['alpha-0', 'alpha-1', 'alpha-2'],
+  );
   assert.ok(!env.AGENT_ACTION_KV.listPrefixes.includes('telegram:submit-request:'));
 });
 
@@ -2019,42 +2156,58 @@ test('/results group shows participant graph with question legend', async () => 
       { questionId: 'q-2', questionType: 'freeform', prompt: 'Second prompt?' },
     ]),
   });
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:one', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '42',
-    questionId: 'q-1',
-    answer: { label: 'Agree', value: 'agree' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:00.000Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:two', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '42',
-    questionId: 'q-2',
-    answer: { label: 'Unsure', value: 'unsure' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:01.000Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:three', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '43',
-    questionId: 'q-1',
-    answer: { label: 'Disagree', value: 'disagree' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:02.000Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:four', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '43',
-    questionId: 'q-2',
-    answer: { label: 'Agree', value: 'agree' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:03.000Z',
-  }));
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:one',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-1',
+      answer: { label: 'Agree', value: 'agree' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:00.000Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:two',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-2',
+      answer: { label: 'Unsure', value: 'unsure' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:01.000Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:three',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '43',
+      questionId: 'q-1',
+      answer: { label: 'Disagree', value: 'disagree' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:02.000Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:four',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '43',
+      questionId: 'q-2',
+      answer: { label: 'Agree', value: 'agree' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:03.000Z',
+    }),
+  );
 
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/results group'),
@@ -2072,10 +2225,10 @@ test('/results group shows participant graph with question legend', async () => 
   assert.match(result.response.text, /P1 -> Q1:Agree, Q2:Unsure/);
   assert.match(result.response.text, /P2 -> Q1:Disagree, Q2:Agree/);
   assert.match(result.response.text, /1\. First prompt\?/);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), [
-    'Analyze Group 1',
-    'Analyze Group 2',
-  ]);
+  assert.deepEqual(
+    flattenButtons(result.response.replyMarkup).map((button) => button.text),
+    ['Analyze Group 1', 'Analyze Group 2'],
+  );
 });
 
 test('/results group analysis callback uses session worker AI for the selected participant group', async () => {
@@ -2085,16 +2238,19 @@ test('/results group analysis callback uses session worker AI for the selected p
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true, telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        sponsoredAiAllowed: true,
-        sessionWorkerUrl: 'https://session-worker.example',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          sponsoredAiAllowed: true,
+          sessionWorkerUrl: 'https://session-worker.example',
+        },
+      ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-1', questionType: 'agree_unsure_disagree', prompt: 'Should Alpha ship quickly?' },
@@ -2125,75 +2281,97 @@ test('/results group analysis callback uses session worker AI for the selected p
       assert.match(body.messages?.[1]?.content || '', /Additional comments and freeform responses/);
       assert.match(body.messages?.[1]?.content || '', /Shipping is okay if rollback is ready/);
       assert.match(body.messages?.[1]?.content || '', /Check the venue capacity before launch/);
-      return new Response(JSON.stringify({
-        completion: JSON.stringify({
-          name: 'Launch Balancers',
-          short: 'They support moving forward while still noticing review tradeoffs.',
-          long: 'This group is more favorable toward shipping quickly than the overall room. Its strongest distinction is willingness to proceed while others hold more concern.',
+      return new Response(
+        JSON.stringify({
+          completion: JSON.stringify({
+            name: 'Launch Balancers',
+            short: 'They support moving forward while still noticing review tradeoffs.',
+            long: 'This group is more favorable toward shipping quickly than the overall room. Its strongest distinction is willingness to proceed while others hold more concern.',
+          }),
         }),
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     return new Response(JSON.stringify({ error: 'unexpected route' }), {
       status: 404,
       headers: { 'content-type': 'application/json' },
     });
   };
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:one', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '42',
-    questionId: 'q-1',
-    answer: { label: 'Agree', value: 'agree', comments: 'Shipping is okay if rollback is ready.' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:00.000Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:two', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '42',
-    questionId: 'q-2',
-    answer: { label: 'Agree', value: 'agree' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:01.000Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:freeform', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '42',
-    questionId: 'q-3',
-    answer: { questionType: 'freeform', text: 'Check the venue capacity before launch.' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:01.500Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:three', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '43',
-    questionId: 'q-1',
-    answer: { label: 'Disagree', value: 'disagree' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:02.000Z',
-  }));
-  await seedSubmitRecord(env.AGENT_ACTION_KV, 'telegram:submit-request:four', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '43',
-    questionId: 'q-2',
-    answer: { label: 'Disagree', value: 'disagree' },
-    onChain: { ok: true },
-    createdAt: '2026-05-08T12:00:03.000Z',
-  }));
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:one',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-1',
+      answer: { label: 'Agree', value: 'agree', comments: 'Shipping is okay if rollback is ready.' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:00.000Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:two',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-2',
+      answer: { label: 'Agree', value: 'agree' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:01.000Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:freeform',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-3',
+      answer: { questionType: 'freeform', text: 'Check the venue capacity before launch.' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:01.500Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:three',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '43',
+      questionId: 'q-1',
+      answer: { label: 'Disagree', value: 'disagree' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:02.000Z',
+    }),
+  );
+  await seedSubmitRecord(
+    env.AGENT_ACTION_KV,
+    'telegram:submit-request:four',
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: '43',
+      questionId: 'q-2',
+      answer: { label: 'Disagree', value: 'disagree' },
+      onChain: { ok: true },
+      createdAt: '2026-05-08T12:00:03.000Z',
+    }),
+  );
 
   const graph = await buildTelegramCommandResponse({
     update: groupMessage('/results group'),
     env,
     now: '2026-05-08T12:01:00.000Z',
   });
-  const analyze = flattenButtons(graph.response.replyMarkup)
-    .find((button) => button.text === 'Analyze Group 1');
+  const analyze = flattenButtons(graph.response.replyMarkup).find((button) => button.text === 'Analyze Group 1');
   const analysis = await buildTelegramCommandResponse({
     update: {
       update_id: 7012,
@@ -2217,8 +2395,14 @@ test('/results group analysis callback uses session worker AI for the selected p
   assert.match(analysis.response.text, /They support moving forward/);
   assert.match(analysis.response.text, /more favorable toward shipping quickly/);
   assert.equal(analysis.response.text.includes('AI analysis unavailable'), false);
-  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/ai']);
-  assert.deepEqual(flattenButtons(analysis.response.replyMarkup).map((button) => button.text), ['Participants graph']);
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/auth/nonce', '/auth/login', '/ai'],
+  );
+  assert.deepEqual(
+    flattenButtons(analysis.response.replyMarkup).map((button) => button.text),
+    ['Participants graph'],
+  );
 });
 
 test('/results without arguments explains available result views', async () => {
@@ -2236,30 +2420,50 @@ test('/results without arguments explains available result views', async () => {
   assert.match(result.response.text, /Selected session: Alpha Session/);
   assert.equal(result.response.text.includes('Choose a results view'), false);
   assert.match(result.response.text, /Consensus: highlights questions with the most disagreement/);
-  assert.match(result.response.text, /Consensus:[\s\S]*\n\nGroup: Response clusters across questions\.[\s\S]*\n\nTopic Map/);
+  assert.match(
+    result.response.text,
+    /Consensus:[\s\S]*\n\nGroup: Response clusters across questions\.[\s\S]*\n\nTopic Map/,
+  );
   assert.equal(result.response.text.includes('Topic map: circles view'), false);
   assert.equal(result.response.text.includes('/results [ consensus | group | topic ]'), false);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group', 'Topic Map']);
+  assert.deepEqual(
+    flattenButtons(result.response.replyMarkup).map((button) => button.text),
+    ['Consensus', 'Group', 'Topic Map'],
+  );
 });
 
 test('/results topic returns a topic-map image when enough answered questions exist', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
-      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+      {
+        questionId: 'q-onboarding',
+        questionType: 'binary',
+        prompt: 'Should onboarding be one click?',
+        tags: ['onboarding'],
+      },
+      {
+        questionId: 'q-privacy',
+        questionType: 'binary',
+        prompt: 'Should raw responses stay private?',
+        tags: ['privacy'],
+      },
     ]),
   });
   let counter = 0;
   async function putResponse(questionId, telegramUserId, label) {
     counter += 1;
-    await seedSubmitRecord(env.AGENT_ACTION_KV, `telegram:submit-request:${counter}`, JSON.stringify({
-      status: 'direct_submitted',
-      sessionSlug: 'alpha',
-      telegramUserId,
-      questionId,
-      answer: { label, value: label.toLowerCase() },
-      createdAt: `2026-05-08T12:02:0${counter}.000Z`,
-    }));
+    await seedSubmitRecord(
+      env.AGENT_ACTION_KV,
+      `telegram:submit-request:${counter}`,
+      JSON.stringify({
+        status: 'direct_submitted',
+        sessionSlug: 'alpha',
+        telegramUserId,
+        questionId,
+        answer: { label, value: label.toLowerCase() },
+        createdAt: `2026-05-08T12:02:0${counter}.000Z`,
+      }),
+    );
   }
   await putResponse('q-onboarding', '1', 'Agree');
   await putResponse('q-onboarding', '2', 'Agree');
@@ -2313,14 +2517,16 @@ test('/results uses the joined Telegram-enabled session without requiring SBT jo
         {
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'beta',
           sessionName: 'Beta Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: false,
           requiredSbtGroups: [{ groupId: 'beta-sbt', name: 'Beta SBT', joinMode: 'public' }],
@@ -2337,8 +2543,7 @@ test('/results uses the joined Telegram-enabled session without requiring SBT jo
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const betaButton = flattenButtons(sessions.response.replyMarkup)
-    .find((button) => button.text === 'Beta Session');
+  const betaButton = flattenButtons(sessions.response.replyMarkup).find((button) => button.text === 'Beta Session');
   const selected = await buildTelegramCommandResponse({
     update: {
       update_id: 7011,
@@ -2375,43 +2580,50 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
   const storageId = arweaveId(33);
   const calls = [];
   const kv = new MemoryKv();
-  await seedSubmitRecord(kv, 'telegram:submit-request:export-one', JSON.stringify({
-    version: 1,
-    requestId: 'export-one',
-    status: 'direct_submitted',
-    action: 'direct_submit_response',
-    lane: 'telegram_private_account',
-    telegramUserId: '42',
-    chatId: '42',
-    sessionSlug: 'alpha',
-    questionId: `0x${'12'.repeat(32)}`,
-    answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
-    onChain: {
-      ok: true,
+  await seedSubmitRecord(
+    kv,
+    'telegram:submit-request:export-one',
+    JSON.stringify({
+      version: 1,
+      requestId: 'export-one',
       status: 'direct_submitted',
-      accountAddress,
-      txHash: `0x${'34'.repeat(32)}`,
-      storageRef: { backend: 'cloudflare', id: storageId, resource: 'responses' },
-      storageId,
-      responseHash: `0x${'56'.repeat(32)}`,
-      chainId: 11155420,
-    },
-    createdAt: now,
-  }));
+      action: 'direct_submit_response',
+      lane: 'telegram_private_account',
+      telegramUserId: '42',
+      chatId: '42',
+      sessionSlug: 'alpha',
+      questionId: `0x${'12'.repeat(32)}`,
+      answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+      onChain: {
+        ok: true,
+        status: 'direct_submitted',
+        accountAddress,
+        txHash: `0x${'34'.repeat(32)}`,
+        storageRef: { backend: 'cloudflare', id: storageId, resource: 'responses' },
+        storageId,
+        responseHash: `0x${'56'.repeat(32)}`,
+        chainId: 11155420,
+      },
+      createdAt: now,
+    }),
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true, telegramOnly: true,
-        managedAccountSubmitAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-        storageProfile: { backend: 'cloudflare' },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          managedAccountSubmitAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+          storageProfile: { backend: 'cloudflare' },
+        },
+      ],
     }),
   });
   env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
@@ -2431,26 +2643,34 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
     }
     if (target.endsWith('/storage/list?resource=responses')) {
       assert.equal(init.headers.Authorization, 'Bearer worker-token');
-      return new Response(JSON.stringify({
-        items: [{
-          storageRef: { backend: 'cloudflare', id: storageId, resource: 'responses' },
-          metadata: { resource: 'responses', contentType: 'application/json', createdAt: now },
-        }],
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              storageRef: { backend: 'cloudflare', id: storageId, resource: 'responses' },
+              metadata: { resource: 'responses', contentType: 'application/json', createdAt: now },
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     if (target.endsWith(`/storage/read?id=${encodeURIComponent(storageId)}`)) {
       assert.equal(init.headers.Authorization, 'Bearer worker-token');
-      return new Response(JSON.stringify({
-        sessionSlug: 'alpha',
-        questionId: `0x${'12'.repeat(32)}`,
-        response: { value: 'agree', label: 'Agree' },
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          sessionSlug: 'alpha',
+          questionId: `0x${'12'.repeat(32)}`,
+          response: { value: 'agree', label: 'Agree' },
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -2472,49 +2692,54 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
   assert.deepEqual(Array.from(result.response.document.bytes.slice(0, 4)), [80, 75, 3, 4]);
   assert.equal(result.exportedPayloadCount, 1);
   assert.equal(result.submitRecordCount, 1);
-  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), [
-    '/auth/nonce',
-    '/auth/login',
-    '/storage/list',
-    '/storage/read',
-  ]);
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read'],
+  );
 });
 
 test('/export_all falls back to Telegram submit records when storage payload listing is unavailable', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
-  await seedSubmitRecord(kv, 'telegram:submit-request:storage-list-fallback', JSON.stringify({
-    requestId: 'storage-list-fallback',
-    action: 'submit_response',
-    status: 'direct_submitted',
-    lane: 'telegram_private_account',
-    sessionSlug: 'telegram-demo-2',
-    telegramUserId: '42',
-    questionId: `0x${'12'.repeat(32)}`,
-    questionIdShort: '0x121212...1212',
-    answer: {
-      label: 'Agree',
-      value: 'agree',
-      controlType: 'binary',
-      comments: 'This needs a rollback plan.',
-    },
-    onChain: null,
-    createdAt: now,
-  }));
+  await seedSubmitRecord(
+    kv,
+    'telegram:submit-request:storage-list-fallback',
+    JSON.stringify({
+      requestId: 'storage-list-fallback',
+      action: 'submit_response',
+      status: 'direct_submitted',
+      lane: 'telegram_private_account',
+      sessionSlug: 'telegram-demo-2',
+      telegramUserId: '42',
+      questionId: `0x${'12'.repeat(32)}`,
+      questionIdShort: '0x121212...1212',
+      answer: {
+        label: 'Agree',
+        value: 'agree',
+        controlType: 'binary',
+        comments: 'This needs a rollback plan.',
+      },
+      onChain: null,
+      createdAt: now,
+    }),
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'telegram-demo-2',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'telegram-demo-2',
-        sessionName: 'Telegram Demo 2',
-        telegramBridgeEnabled: true, telegramOnly: true,
-        managedAccountSubmitAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'telegram-demo-2',
+          sessionName: 'Telegram Demo 2',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          managedAccountSubmitAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+        },
+      ],
     }),
   });
   env.AGENT_BRIDGE_FETCH = async (url) => {
@@ -2532,12 +2757,15 @@ test('/export_all falls back to Telegram submit records when storage payload lis
       });
     }
     if (target.endsWith('/storage/list?resource=responses')) {
-      return new Response(JSON.stringify({
-        error: 'Storage route read/list is only available for Cloudflare storage.',
-      }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          error: 'Storage route read/list is only available for Cloudflare storage.',
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -2559,7 +2787,10 @@ test('/export_all falls back to Telegram submit records when storage payload lis
   assert.equal(result.partial, true);
   assert.equal(result.synthesizedFromSubmitRecords, true);
   assert.match(result.response.text, /Responses were exported from Telegram submit records\./);
-  assert.match(result.response.text, /Storage payloads unavailable: Storage route read\/list is only available for Cloudflare storage\./);
+  assert.match(
+    result.response.text,
+    /Storage payloads unavailable: Storage route read\/list is only available for Cloudflare storage\./,
+  );
   assert.equal(result.response.document.filename, 'context-engine-telegram-demo-2-responses.zip');
   const normalizedAccountAddress = accountAddress.toLowerCase();
   const files = readZipTextFiles(result.response.document.bytes);
@@ -2586,13 +2817,16 @@ test('/export_all denies non-allowlisted Telegram managed wallets', async () => 
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true, telegramOnly: true,
-        sessionWorkerUrl: 'https://session.example',
-        storageProfile: { backend: 'cloudflare' },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionWorkerUrl: 'https://session.example',
+          storageProfile: { backend: 'cloudflare' },
+        },
+      ],
     }),
   });
 
@@ -2616,13 +2850,16 @@ test('/start and /me show admin actions only to the configured export admin', as
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true, telegramOnly: true,
-        sessionWorkerUrl: 'https://session.example',
-        storageProfile: { backend: 'cloudflare' },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionWorkerUrl: 'https://session.example',
+          storageProfile: { backend: 'cloudflare' },
+        },
+      ],
     }),
   });
   const deniedEnv = baseEnv({
@@ -2645,7 +2882,9 @@ test('/start and /me show admin actions only to the configured export admin', as
     env: deniedEnv,
     now,
   });
-  const adminButton = flattenButtons(allowedStart.response.replyMarkup).find((button) => button.text === 'Admin Actions');
+  const adminButton = flattenButtons(allowedStart.response.replyMarkup).find(
+    (button) => button.text === 'Admin Actions',
+  );
   const adminView = await buildTelegramCommandResponse({
     update: {
       update_id: 7101,
@@ -2662,10 +2901,12 @@ test('/start and /me show admin actions only to the configured export admin', as
     env: allowedEnv,
     now,
   });
-  const resultsSettingsButton = flattenButtons(adminView.response.replyMarkup)
-    .find((button) => button.text === 'Results Settings');
-  const questionQueueButton = flattenButtons(adminView.response.replyMarkup)
-    .find((button) => button.text === 'Question Queue');
+  const resultsSettingsButton = flattenButtons(adminView.response.replyMarkup).find(
+    (button) => button.text === 'Results Settings',
+  );
+  const questionQueueButton = flattenButtons(adminView.response.replyMarkup).find(
+    (button) => button.text === 'Question Queue',
+  );
   const settingsView = await buildTelegramCommandResponse({
     update: {
       update_id: 7102,
@@ -2682,8 +2923,9 @@ test('/start and /me show admin actions only to the configured export admin', as
     env: allowedEnv,
     now,
   });
-  const enableGroupsButton = flattenButtons(settingsView.response.replyMarkup)
-    .find((button) => button.text === 'Enable Anonymized Groups');
+  const enableGroupsButton = flattenButtons(settingsView.response.replyMarkup).find(
+    (button) => button.text === 'Enable Anonymized Groups',
+  );
   const toggled = await buildTelegramCommandResponse({
     update: {
       update_id: 7103,
@@ -2724,18 +2966,31 @@ test('/start and /me show admin actions only to the configured export admin', as
   const policyAfterToggle = await loadSessionPolicy(allowedEnv);
   const alphaAfterToggle = policyAfterToggle.linkedSessions.find((session) => session.sessionSlug === 'alpha');
 
-  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About', 'Admin Actions']);
-  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'Admin Actions'), true);
-  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), false);
-  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), false);
-  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About']);
+  assert.deepEqual(
+    flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text),
+    ['Mini App', 'Onboard Agent', 'About', 'Admin Actions'],
+  );
+  assert.equal(
+    flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'Admin Actions'),
+    true,
+  );
+  assert.equal(
+    flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'),
+    false,
+  );
+  assert.equal(
+    flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'),
+    false,
+  );
+  assert.deepEqual(
+    flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text),
+    ['Mini App', 'Onboard Agent', 'About'],
+  );
   assert.equal(adminView.screen, 'admin_actions');
-  assert.deepEqual(flattenButtons(adminView.response.replyMarkup).map((button) => button.text), [
-    'Export Responses',
-    'Export Access',
-    'Results Settings',
-    'Question Queue',
-  ]);
+  assert.deepEqual(
+    flattenButtons(adminView.response.replyMarkup).map((button) => button.text),
+    ['Export Responses', 'Export Access', 'Results Settings', 'Question Queue'],
+  );
   assert.match(adminView.response.text, /run \/join alpha in that group as a configured session admin/);
   assert.equal(settingsView.screen, 'results_settings');
   assert.match(settingsView.response.text, /Anonymized groups: off/);
@@ -2753,18 +3008,22 @@ test('/start admin actions target the latest submitted session before the regist
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
-  await seedSubmitRecord(kv, 'telegram:submit-request:latest-export-session', JSON.stringify({
-    requestId: 'latest-export-session',
-    status: 'direct_submitted',
-    sessionSlug: 'telegram-demo-2',
-    telegramUserId: '42',
-    onChain: {
-      ok: true,
-      accountAddress,
-      storageRef: { backend: 'cloudflare', id: arweaveId(44), resource: 'responses' },
-    },
-    createdAt: now,
-  }));
+  await seedSubmitRecord(
+    kv,
+    'telegram:submit-request:latest-export-session',
+    JSON.stringify({
+      requestId: 'latest-export-session',
+      status: 'direct_submitted',
+      sessionSlug: 'telegram-demo-2',
+      telegramUserId: '42',
+      onChain: {
+        ok: true,
+        accountAddress,
+        storageRef: { backend: 'cloudflare', id: arweaveId(44), resource: 'responses' },
+      },
+      createdAt: now,
+    }),
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
@@ -2775,14 +3034,16 @@ test('/start admin actions target the latest submitted session before the regist
         {
           sessionSlug: 'test-session',
           sessionName: 'Registry First Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           sessionWorkerUrl: 'https://session.example',
         },
         {
           sessionSlug: 'telegram-demo-2',
           sessionName: 'Telegram Demo 2',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           sessionWorkerUrl: 'https://session.example',
           storageProfile: { backend: 'cloudflare' },
@@ -2813,7 +3074,9 @@ test('/start admin actions target the latest submitted session before the regist
     env,
     now,
   });
-  const exportButton = flattenButtons(adminView.response.replyMarkup).find((button) => button.text === 'Export Responses');
+  const exportButton = flattenButtons(adminView.response.replyMarkup).find(
+    (button) => button.text === 'Export Responses',
+  );
   const actionRecord = JSON.parse(await kv.get(`telegram:action:${exportButton.callback_data}`));
 
   assert.equal(actionRecord.serverContextRef.sessionSlug, 'telegram-demo-2');
@@ -2823,10 +3086,14 @@ test('configured export admin can grant and revoke another Telegram managed wall
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const adminAddress = await privateManagedAccountAddress(baseEnv(), now);
-  const guestAddress = await managedAccountAddressFor({
-    telegramUserId: '43',
-    username: 'guest',
-  }, baseEnv(), now);
+  const guestAddress = await managedAccountAddressFor(
+    {
+      telegramUserId: '43',
+      username: 'guest',
+    },
+    baseEnv(),
+    now,
+  );
   const env = baseEnv({
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
@@ -2834,13 +3101,16 @@ test('configured export admin can grant and revoke another Telegram managed wall
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true, telegramOnly: true,
-        sessionWorkerUrl: 'https://session.example',
-        storageProfile: { backend: 'cloudflare' },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionWorkerUrl: 'https://session.example',
+          storageProfile: { backend: 'cloudflare' },
+        },
+      ],
     }),
   });
   env.AGENT_BRIDGE_FETCH = async (url) => {
@@ -2910,7 +3180,10 @@ test('configured export admin can grant and revoke another Telegram managed wall
 
   assert.equal(grant.screen, 'response_export_access_updated');
   assert.equal(grant.added, true);
-  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About', 'Admin Actions']);
+  assert.deepEqual(
+    flattenButtons(guestStart.response.replyMarkup).map((button) => button.text),
+    ['Mini App', 'Onboard Agent', 'About', 'Admin Actions'],
+  );
   assert.equal(guestExport.screen, 'response_export');
   assert.equal(guestExport.response.method, 'sendDocument');
   assert.equal(guestGrantAttempt.screen, 'response_export_access_updated');
@@ -2963,8 +3236,9 @@ test('dispatchTelegramCommandResponse uploads rendered result photos and falls b
     },
   });
 
-  const resultPhotoKeys = Array.from(urlEnv.AGENT_ACTION_KV.store.keys())
-    .filter((key) => key.startsWith('telegram:result-photo:'));
+  const resultPhotoKeys = Array.from(urlEnv.AGENT_ACTION_KV.store.keys()).filter((key) =>
+    key.startsWith('telegram:result-photo:'),
+  );
   assert.equal(urlDispatched.telegram.ok, true);
   assert.equal(resultPhotoKeys.length, 1);
   assert.match(urlCalls[0].init.body.get('photo'), /^https:\/\/bridge\.example\/telegram\/result-photo\/cecb_/);
@@ -2990,7 +3264,10 @@ test('dispatchTelegramCommandResponse uploads rendered result photos and falls b
   });
 
   assert.equal(fallback.telegram.ok, true);
-  assert.deepEqual(fallbackCalls.map((call) => String(call.url).split('/').pop()), ['sendPhoto', 'sendDocument']);
+  assert.deepEqual(
+    fallbackCalls.map((call) => String(call.url).split('/').pop()),
+    ['sendPhoto', 'sendDocument'],
+  );
 });
 
 test('dispatchTelegramCommandResponse falls back when Telegram media upload times out', async () => {
@@ -3023,7 +3300,10 @@ test('dispatchTelegramCommandResponse falls back when Telegram media upload time
   });
 
   assert.equal(dispatched.telegram.ok, true);
-  assert.deepEqual(calls.map((call) => call.url.split('/').pop()), ['sendPhoto', 'sendDocument']);
+  assert.deepEqual(
+    calls.map((call) => call.url.split('/').pop()),
+    ['sendPhoto', 'sendDocument'],
+  );
 });
 
 test('/questions does not invent demo questions when live question cache is empty', async () => {
@@ -3108,21 +3388,27 @@ test('loadQuestionsForSession skips malformed live and proposed records', async 
       },
     ],
   });
-  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-bad-proposed', JSON.stringify({
-    version: 1,
-    questionId: 'q-bad-proposed',
-    sessionSlug: 'alpha',
-    questionType: 'freeform',
-    prompt: { text: 'Malformed proposed prompt' },
-    status: 'active',
-    createdAt: '2026-05-29T12:00:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:proposed-question:alpha:q-bad-proposed',
+    JSON.stringify({
+      version: 1,
+      questionId: 'q-bad-proposed',
+      sessionSlug: 'alpha',
+      questionType: 'freeform',
+      prompt: { text: 'Malformed proposed prompt' },
+      status: 'active',
+      createdAt: '2026-05-29T12:00:00.000Z',
+    }),
+  );
 
   const loaded = await loadQuestionsForSession(env, 'alpha');
 
   assert.equal(loaded.ok, true);
   assert.equal(loaded.questionCount, 1);
-  assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-live-good']);
+  assert.deepEqual(
+    loaded.questions.map((question) => question.questionId),
+    ['q-live-good'],
+  );
   assert.equal(loaded.skippedMalformed, 5);
 });
 
@@ -3134,19 +3420,23 @@ test('/questions reads telegram_only preloaded policy questions without chain in
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'telegram-native',
-        sessions: [{
-          sessionSlug: 'telegram-native',
-          sessionName: 'Telegram Native',
-          telegramOnly: true,
-          telegramBridgeEnabled: true,
-          telegramGroupOpenAccess: true,
-          managedAccountSubmitAllowed: true,
-          questions: [{
-            questionId: 'q-native-1',
-            questionType: 'binary',
-            prompt: 'Should this session avoid chain question indexing?',
-          }],
-        }],
+        sessions: [
+          {
+            sessionSlug: 'telegram-native',
+            sessionName: 'Telegram Native',
+            telegramOnly: true,
+            telegramBridgeEnabled: true,
+            telegramGroupOpenAccess: true,
+            managedAccountSubmitAllowed: true,
+            questions: [
+              {
+                questionId: 'q-native-1',
+                questionType: 'binary',
+                prompt: 'Should this session avoid chain question indexing?',
+              },
+            ],
+          },
+        ],
       }),
       REGISTRY_FETCH: async () => {
         throw new Error('registry should not be called');
@@ -3183,16 +3473,15 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
       });
     }
     if (target.pathname.endsWith('/storage/list')) {
-      return new Response(JSON.stringify({
-        items: [
-          { id: 'q-storage-1' },
-          { id: 'q-storage-2' },
-          { id: 'q-storage-3' },
-        ],
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          items: [{ id: 'q-storage-1' }, { id: 'q-storage-2' }, { id: 'q-storage-3' }],
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     if (target.pathname.endsWith('/storage/read')) {
       activeReads += 1;
@@ -3201,15 +3490,18 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
       await readBarrier;
       const id = target.searchParams.get('id');
       activeReads -= 1;
-      return new Response(JSON.stringify({
-        questionId: id,
-        questionType: 'binary',
-        prompt: `Loaded ${id}`,
-        sessionSlug: 'telegram-cloudflare',
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          questionId: id,
+          questionType: 'binary',
+          prompt: `Loaded ${id}`,
+          sessionSlug: 'telegram-cloudflare',
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -3217,41 +3509,44 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
     });
   };
 
-  const result = await withTimeout(buildTelegramCommandResponse({
-    update: groupMessage('/questions telegram-cloudflare'),
-    env: baseEnv({
-      AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
-      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
-      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
-        defaultSessionSlug: 'telegram-cloudflare',
-        sessions: [{
-          sessionSlug: 'telegram-cloudflare',
-          sessionName: 'Telegram Cloudflare',
-          telegramOnly: true,
-          telegramBridgeEnabled: true,
-          telegramGroupOpenAccess: true,
-          sessionWorkerUrl: 'https://session.example',
-          workerSessionSlug: 'telegram-cloudflare',
-          questionSource: 'cloudflare_storage',
-          storageProfile: { backend: 'cloudflare' },
-        }],
+  const result = await withTimeout(
+    buildTelegramCommandResponse({
+      update: groupMessage('/questions telegram-cloudflare'),
+      env: baseEnv({
+        AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+        AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+        AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+          defaultSessionSlug: 'telegram-cloudflare',
+          sessions: [
+            {
+              sessionSlug: 'telegram-cloudflare',
+              sessionName: 'Telegram Cloudflare',
+              telegramOnly: true,
+              telegramBridgeEnabled: true,
+              telegramGroupOpenAccess: true,
+              sessionWorkerUrl: 'https://session.example',
+              workerSessionSlug: 'telegram-cloudflare',
+              questionSource: 'cloudflare_storage',
+              storageProfile: { backend: 'cloudflare' },
+            },
+          ],
+        }),
+        QUESTION_FETCH: fetchImpl,
       }),
-      QUESTION_FETCH: fetchImpl,
+      now: '2026-05-08T12:00:00.000Z',
     }),
-    now: '2026-05-08T12:00:00.000Z',
-  }), 500, 'telegram_only Cloudflare question reads were not concurrent');
+    500,
+    'telegram_only Cloudflare question reads were not concurrent',
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.questionSourceReason, 'telegram_only_cloudflare_questions_loaded');
-  assert.equal(result.response.text, [
-    'Questions (3/3)',
-    '',
-    '1. Loaded q-storage-1',
-    '',
-    '2. Loaded q-storage-2',
-    '',
-    '3. Loaded q-storage-3',
-  ].join('\n'));
+  assert.equal(
+    result.response.text,
+    ['Questions (3/3)', '', '1. Loaded q-storage-1', '', '2. Loaded q-storage-2', '', '3. Loaded q-storage-3'].join(
+      '\n',
+    ),
+  );
   assert.equal(maxActiveReads, 3);
 });
 
@@ -3285,15 +3580,18 @@ test('/questions reads Cloudflare question storage without falling back to on-ch
       });
     }
     if (target.pathname.endsWith('/storage/read')) {
-      return new Response(JSON.stringify({
-        questionId: target.searchParams.get('id'),
-        questionType: 'binary',
-        prompt: 'Loaded from Cloudflare without chain indexing.',
-        sessionSlug: 'cloudflare-worker',
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          questionId: target.searchParams.get('id'),
+          questionType: 'binary',
+          prompt: 'Loaded from Cloudflare without chain indexing.',
+          sessionSlug: 'cloudflare-worker',
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     throw new Error(`unexpected_url_${target.pathname}`);
   };
@@ -3305,17 +3603,19 @@ test('/questions reads Cloudflare question storage without falling back to on-ch
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'cloudflare-worker',
-        sessions: [{
-          sessionSlug: 'cloudflare-worker',
-          sessionName: 'Cloudflare Worker',
-          telegramBridgeEnabled: true,
-          telegramGroupOpenAccess: true,
-          sessionMode: 'telegram_enabled',
-          sessionWorkerUrl: 'https://session.example',
-          workerSessionSlug: 'cloudflare-worker',
-          questionSource: 'cloudflare_storage',
-          storageProfile: { backend: 'cloudflare' },
-        }],
+        sessions: [
+          {
+            sessionSlug: 'cloudflare-worker',
+            sessionName: 'Cloudflare Worker',
+            telegramBridgeEnabled: true,
+            telegramGroupOpenAccess: true,
+            sessionMode: 'telegram_enabled',
+            sessionWorkerUrl: 'https://session.example',
+            workerSessionSlug: 'cloudflare-worker',
+            questionSource: 'cloudflare_storage',
+            storageProfile: { backend: 'cloudflare' },
+          },
+        ],
       }),
       QUESTION_FETCH: fetchImpl,
       REGISTRY_FETCH: async () => {
@@ -3327,14 +3627,13 @@ test('/questions reads Cloudflare question storage without falling back to on-ch
 
   assert.equal(result.ok, true);
   assert.equal(result.questionSourceReason, 'telegram_only_cloudflare_questions_loaded');
-  assert.equal(result.response.text, [
-    'Questions (1/1)',
-    '',
-    '1. Loaded from Cloudflare without chain indexing.',
-  ].join('\n'));
+  assert.equal(
+    result.response.text,
+    ['Questions (1/1)', '', '1. Loaded from Cloudflare without chain indexing.'].join('\n'),
+  );
   assert.deepEqual(
     fetchCalls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read']
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read'],
   );
 });
 
@@ -3344,31 +3643,36 @@ test('telegram_only storage auth failures still surface proposed questions', asy
     AGENT_BRIDGE_QUESTION_SOURCE: 'live',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramOnly: true,
-        telegramBridgeEnabled: true,
-        telegramGroupOpenAccess: true,
-        sessionWorkerUrl: 'https://session.example',
-        workerSessionSlug: 'alpha',
-        questionSource: 'cloudflare_storage',
-        storageProfile: { backend: 'cloudflare' },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        },
+      ],
     }),
     QUESTION_FETCH: async () => {
       throw new Error('session auth unavailable');
     },
   });
-  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-proposed-ok', JSON.stringify({
-    version: 1,
-    questionId: 'q-proposed-ok',
-    sessionSlug: 'alpha',
-    questionType: 'binary',
-    prompt: 'Should proposed questions stay visible when storage auth fails?',
-    status: 'active',
-    createdAt: '2026-05-29T12:00:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:proposed-question:alpha:q-proposed-ok',
+    JSON.stringify({
+      version: 1,
+      questionId: 'q-proposed-ok',
+      sessionSlug: 'alpha',
+      questionType: 'binary',
+      prompt: 'Should proposed questions stay visible when storage auth fails?',
+      status: 'active',
+      createdAt: '2026-05-29T12:00:00.000Z',
+    }),
+  );
 
   const loaded = await loadQuestionsForSession(env, 'alpha');
 
@@ -3376,7 +3680,10 @@ test('telegram_only storage auth failures still surface proposed questions', asy
   assert.equal(loaded.reason, 'proposed_questions_loaded_with_source_warning');
   assert.equal(loaded.authReason, 'session_worker_auth_failed');
   assert.equal(loaded.questionCount, 1);
-  assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-proposed-ok']);
+  assert.deepEqual(
+    loaded.questions.map((question) => question.questionId),
+    ['q-proposed-ok'],
+  );
 });
 
 test('/questions live_or_fixture does not show fixture questions when live loading is slow', async () => {
@@ -3391,14 +3698,16 @@ test('/questions live_or_fixture does not show fixture questions when live loadi
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'telegram-demo-3',
         riskCeiling: 'submit',
-        sessions: [{
-          sessionSlug: 'telegram-demo-3',
-          sessionName: 'Telegram Demo 3',
-          default: true,
-          telegramBridgeEnabled: true,
-          telegramGroupOpenAccess: true,
-          managedAccountSubmitAllowed: true,
-        }],
+        sessions: [
+          {
+            sessionSlug: 'telegram-demo-3',
+            sessionName: 'Telegram Demo 3',
+            default: true,
+            telegramBridgeEnabled: true,
+            telegramGroupOpenAccess: true,
+            managedAccountSubmitAllowed: true,
+          },
+        ],
       }),
       AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
         {
@@ -3416,7 +3725,10 @@ test('/questions live_or_fixture does not show fixture questions when live loadi
   assert.equal(result.ok, true);
   assert.equal(result.questionSource, 'telegram_worker_question_cache');
   assert.equal(result.questionSourceReason, 'live_question_cache_timeout');
-  assert.equal(result.response.text, 'Questions (0/0)\n\nQuestions are still loading from Cloudflare. Run /questions again shortly.');
+  assert.equal(
+    result.response.text,
+    'Questions (0/0)\n\nQuestions are still loading from Cloudflare. Run /questions again shortly.',
+  );
   assert.equal(result.response.text.includes('What should demo 3 test first?'), false);
   assert.equal(waited.length, 1);
 });
@@ -3452,7 +3764,8 @@ test('group session binding makes later question and doc commands use the joined
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
@@ -3460,7 +3773,8 @@ test('group session binding makes later question and doc commands use the joined
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
@@ -3535,14 +3849,16 @@ test('private session join makes later question commands use the selected sessio
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
@@ -3599,14 +3915,16 @@ test('private session join schedules question prefetch without blocking the join
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
@@ -3654,14 +3972,17 @@ test('group session join schedules question prefetch without blocking the join r
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'demo',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'demo',
-        sessionName: 'Demo Session',
-        default: true,
-        telegramBridgeEnabled: true, telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'demo',
+          sessionName: 'Demo Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -3707,16 +4028,19 @@ test('private session join schedules faucet funding when session policy allows i
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true, telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        sponsoredFaucetAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          sponsoredFaucetAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+        },
+      ],
     }),
   });
 
@@ -3749,15 +4073,18 @@ test('/sessions join callback returns before slow session worker setup completes
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'telegram-demo-3',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'telegram-demo-3',
-        sessionName: 'Telegram Demo 3',
-        default: true,
-        telegramBridgeEnabled: true, telegramOnly: true,
-        managedAccountSubmitAllowed: true,
-        sponsoredFaucetAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'telegram-demo-3',
+          sessionName: 'Telegram Demo 3',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          managedAccountSubmitAllowed: true,
+          sponsoredFaucetAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+        },
+      ],
     }),
   });
   const sessions = await buildTelegramCommandResponse({
@@ -3765,27 +4092,30 @@ test('/sessions join callback returns before slow session worker setup completes
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const joinButton = flattenButtons(sessions.response.replyMarkup)
-    .find((button) => button.text === 'Telegram Demo 3');
+  const joinButton = flattenButtons(sessions.response.replyMarkup).find((button) => button.text === 'Telegram Demo 3');
   const waited = [];
 
-  const joined = await withTimeout(buildTelegramCommandResponse({
-    update: {
-      update_id: 7100,
-      callback_query: {
-        id: 'callback-join-demo3',
-        data: joinButton.callback_data,
-        from: { id: 42, username: 'participant' },
-        message: {
-          message_id: 88,
-          chat: { id: 42, type: 'private' },
+  const joined = await withTimeout(
+    buildTelegramCommandResponse({
+      update: {
+        update_id: 7100,
+        callback_query: {
+          id: 'callback-join-demo3',
+          data: joinButton.callback_data,
+          from: { id: 42, username: 'participant' },
+          message: {
+            message_id: 88,
+            chat: { id: 42, type: 'private' },
+          },
         },
       },
-    },
-    env,
-    now: '2026-05-08T12:00:01.000Z',
-    waitUntil: (promise) => waited.push(promise),
-  }), 100, 'join callback waited on slow session worker setup');
+      env,
+      now: '2026-05-08T12:00:01.000Z',
+      waitUntil: (promise) => waited.push(promise),
+    }),
+    100,
+    'join callback waited on slow session worker setup',
+  );
 
   assert.equal(joined.ok, true);
   assert.equal(joined.command, 'callback:join_session');
@@ -3805,14 +4135,16 @@ test('/sessions callback switches the group session used by later question comma
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
           telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
@@ -3838,8 +4170,7 @@ test('/sessions callback switches the group session used by later question comma
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const demoButton = flattenButtons(sessions.response.replyMarkup)
-    .find((button) => button.text === 'Demo Session');
+  const demoButton = flattenButtons(sessions.response.replyMarkup).find((button) => button.text === 'Demo Session');
 
   const selected = await buildTelegramCommandResponse({
     update: {
@@ -3881,8 +4212,7 @@ test('group Pose Question callback opens a choose-question menu instead of posin
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const poseQuestion = flattenButtons(joined.response.replyMarkup)
-    .find((button) => button.text === 'Pose Question');
+  const poseQuestion = flattenButtons(joined.response.replyMarkup).find((button) => button.text === 'Pose Question');
   const callback = await buildTelegramCommandResponse({
     update: {
       update_id: 7004,
@@ -3969,7 +4299,10 @@ test('/add_question requires a joined Telegram group and adds questions to the s
   assert.equal(added.ok, true);
   assert.equal(added.screen, 'add_question');
   assert.match(added.response.text, /Question added to Alpha Session/);
-  assert.equal(flattenButtons(added.response.replyMarkup).some((button) => button.text === 'Pose Question'), true);
+  assert.equal(
+    flattenButtons(added.response.replyMarkup).some((button) => button.text === 'Pose Question'),
+    true,
+  );
   assert.match(questions.response.text, /Should we fund this week\?/);
 });
 
@@ -3977,19 +4310,22 @@ test('/add_question exposes type chooser, supports multichoice syntax, and allow
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        defaultGroupChatId: '-100123',
-      }, {
-        sessionSlug: 'beta',
-        sessionName: 'Beta Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          defaultGroupChatId: '-100123',
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+      ],
     }),
   });
   const chooser = await buildTelegramCommandResponse({
@@ -4001,10 +4337,22 @@ test('/add_question exposes type chooser, supports multichoice syntax, and allow
 
   assert.equal(chooser.ok, true);
   assert.match(chooser.response.text, /Type: Freeform/);
-  assert.equal(chooserButtons.some((button) => button.text === 'Agree'), true);
-  assert.equal(chooserButtons.some((button) => button.text === 'Rating'), true);
-  assert.equal(chooserButtons.some((button) => button.text === 'Multi-choice'), true);
-  assert.equal(chooserButtons.some((button) => button.text === '✓ Freeform'), true);
+  assert.equal(
+    chooserButtons.some((button) => button.text === 'Agree'),
+    true,
+  );
+  assert.equal(
+    chooserButtons.some((button) => button.text === 'Rating'),
+    true,
+  );
+  assert.equal(
+    chooserButtons.some((button) => button.text === 'Multi-choice'),
+    true,
+  );
+  assert.equal(
+    chooserButtons.some((button) => button.text === '✓ Freeform'),
+    true,
+  );
 
   const multiButton = chooserButtons.find((button) => button.text === 'Multi-choice');
   const typed = await buildTelegramCommandResponse({
@@ -4059,38 +4407,44 @@ test('URL question generation drafts numbered candidates and keeps selected ques
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
       allowAddQuestion: true,
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        defaultGroupChatId: '-100123',
-        sponsoredAiAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-        workerSessionSlug: 'alpha',
-        sessionContext: 'Alpha focuses on source-grounded AI governance tradeoffs.',
-        questionTags: ['ai', 'governance'],
-      }, {
-        sessionSlug: 'beta',
-        sessionName: 'Beta Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          defaultGroupChatId: '-100123',
+          sponsoredAiAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          sessionContext: 'Alpha focuses on source-grounded AI governance tradeoffs.',
+          questionTags: ['ai', 'governance'],
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+      ],
     }),
     AGENT_BRIDGE_FETCH: async (url, options = {}) => {
       const target = String(url);
       if (target === 'https://example.com/article') {
-        return new Response(`<!doctype html><html><head><title>AI Governance Article</title></head><body>
+        return new Response(
+          `<!doctype html><html><head><title>AI Governance Article</title></head><body>
           <h1>AI Governance Article</h1>
           <p>This article argues that communities need practical AI governance norms, clear consent,
           participant review, and lightweight ways to surface disagreement before decisions are made.</p>
           <p>It also says source material should lead to questions that expose tradeoffs rather than
           quizzes about the article itself.</p>
-        </body></html>`, {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        });
+        </body></html>`,
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html' },
+          },
+        );
       }
       if (target.endsWith('/auth/nonce')) {
         return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
@@ -4112,19 +4466,22 @@ test('URL question generation drafts numbered candidates and keeps selected ques
         aiGenerationCall += 1;
         const regenerated = /Regeneration Feedback:/i.test(prompt);
         const prefix = regenerated ? 'Regenerated organizer tradeoff question' : 'AI governance question';
-        return new Response(JSON.stringify({
-          completion: JSON.stringify({
-            surveyTitle: 'AI Governance Article',
-            questions: Array.from({ length: 5 }, (_, index) => ({
-              prompt: `${prefix} ${index + 1} should be discussed by the group.`,
-              questionType: 'binary',
-              tags: ['ai', 'governance'],
-            })),
+        return new Response(
+          JSON.stringify({
+            completion: JSON.stringify({
+              surveyTitle: 'AI Governance Article',
+              questions: Array.from({ length: 5 }, (_, index) => ({
+                prompt: `${prefix} ${index + 1} should be discussed by the group.`,
+                questionType: 'binary',
+                tags: ['ai', 'governance'],
+              })),
+            }),
           }),
-        }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        );
       }
       throw new Error(`Unexpected fetch ${target}`);
     },
@@ -4145,7 +4502,10 @@ test('URL question generation drafts numbered candidates and keeps selected ques
   assert.equal(generated.screen, 'generate_questions');
   assert.match(generated.response.text, /Drafted 5 Agree questions for Alpha Session/);
   assert.match(generated.response.text, /1\. AI governance question 1/);
-  assert.match(generated.response.text, /1\. AI governance question 1 should be discussed by the group\.\n\n2\. AI governance question 2/);
+  assert.match(
+    generated.response.text,
+    /1\. AI governance question 1 should be discussed by the group\.\n\n2\. AI governance question 2/,
+  );
   assert.doesNotMatch(generated.response.text, /6\. AI governance question 6/);
   assert.match(generated.response.text, /Reply with numbers to keep/);
   assert.match(generated.response.text, /Reply regenerate with <feedback>/);
@@ -4153,7 +4513,10 @@ test('URL question generation drafts numbered candidates and keeps selected ques
   assert.equal(aiGenerationCall, 1);
   assert.match(aiPrompts[0], /Group Custom Instructions: Alpha focuses on source-grounded AI governance tradeoffs\./);
   assert.match(aiPrompts[0], /These should not be about the document itself, or in any sort of quiz format/);
-  assert.match(aiPrompts[0], /Prioritize questions that clarify contested terms, surface trade-offs, and invite constructive next steps/);
+  assert.match(
+    aiPrompts[0],
+    /Prioritize questions that clarify contested terms, surface trade-offs, and invite constructive next steps/,
+  );
   assert.match(aiPrompts[0], /prioritizing the most contentious or interesting hotspots first/);
   assert.match(aiPrompts[0], /Count fidelity: generate exactly the requested count/);
   assert.match(aiPrompts[0], /numberOfSeedStatementsOrPrompts: 5/);
@@ -4169,7 +4532,10 @@ test('URL question generation drafts numbered candidates and keeps selected ques
   assert.match(regenerated.response.text, /Regenerated 5 Agree questions for Alpha Session/);
   assert.match(regenerated.response.text, /Feedback: focus on organizer decision tradeoffs/);
   assert.match(regenerated.response.text, /1\. Regenerated organizer tradeoff question 1/);
-  assert.match(regenerated.response.text, /1\. Regenerated organizer tradeoff question 1 should be discussed by the group\.\n\n2\. Regenerated organizer tradeoff question 2/);
+  assert.match(
+    regenerated.response.text,
+    /1\. Regenerated organizer tradeoff question 1 should be discussed by the group\.\n\n2\. Regenerated organizer tradeoff question 2/,
+  );
   assert.equal(aiPrompts.length, 2);
   assert.match(aiPrompts[1], /Regeneration Feedback:\s+focus on organizer decision tradeoffs/);
   assert.match(aiPrompts[1], /Previous Candidates To Improve Or Replace/);
@@ -4206,24 +4572,29 @@ test('URL question generation retries empty AI output and accepts compact string
       riskCeiling: 'submit',
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        sponsoredAiAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-        workerSessionSlug: 'alpha',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sponsoredAiAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+        },
+      ],
     }),
     AGENT_BRIDGE_FETCH: async (url, options = {}) => {
       const target = String(url);
       if (target === 'https://example.com/source') {
-        return new Response('<html><head><title>Source</title></head><body>Agent village organizers need questions about participant onboarding, governance, consent, and experiment outcomes. The group wants practical deliberation prompts rather than quizzes.</body></html>', {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        });
+        return new Response(
+          '<html><head><title>Source</title></head><body>Agent village organizers need questions about participant onboarding, governance, consent, and experiment outcomes. The group wants practical deliberation prompts rather than quizzes.</body></html>',
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html' },
+          },
+        );
       }
       if (target.endsWith('/auth/nonce')) {
         return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
@@ -4250,17 +4621,20 @@ test('URL question generation retries empty AI output and accepts compact string
         }
         assert.equal(body.max_output_tokens, 12000);
         assert.equal(body.reasoning_effort, 'minimal');
-        return new Response(JSON.stringify({
-          completion: JSON.stringify({
-            questions: [
-              'Organizers should prioritize participant onboarding before adding more agent features.',
-              { statement: 'The experiment should measure governance outcomes explicitly.', type: 'binary' },
-            ],
+        return new Response(
+          JSON.stringify({
+            completion: JSON.stringify({
+              questions: [
+                'Organizers should prioritize participant onboarding before adding more agent features.',
+                { statement: 'The experiment should measure governance outcomes explicitly.', type: 'binary' },
+              ],
+            }),
           }),
-        }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        );
       }
       throw new Error(`Unexpected fetch ${target}`);
     },
@@ -4288,24 +4662,29 @@ test('URL question generation falls back to source-grounded local drafts when AI
       riskCeiling: 'submit',
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Session Lab Organizers',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        sponsoredAiAllowed: true,
-        sessionWorkerUrl: 'https://session.example',
-        workerSessionSlug: 'alpha',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Session Lab Organizers',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sponsoredAiAllowed: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+        },
+      ],
     }),
     AGENT_BRIDGE_FETCH: async (url) => {
       const target = String(url);
       if (target === 'https://example.com/source') {
-        return new Response('<html><head><title>Source</title></head><body>Agent village organizers need questions about personal AI agents, participant consent, community governance, and experiment outcomes. The session should help organizers decide how to run a useful coordination experiment.</body></html>', {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        });
+        return new Response(
+          '<html><head><title>Source</title></head><body>Agent village organizers need questions about personal AI agents, participant consent, community governance, and experiment outcomes. The session should help organizers decide how to run a useful coordination experiment.</body></html>',
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html' },
+          },
+        );
       }
       if (target.endsWith('/auth/nonce')) {
         return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
@@ -4345,13 +4724,14 @@ test('URL question generation falls back to source-grounded local drafts when AI
 test('URL question source fetch rejects oversized responses before buffering content', async () => {
   const fetched = await fetchUrlQuestionSource({
     url: 'https://example.com/huge',
-    fetchImpl: async () => new Response('small placeholder body', {
-      status: 200,
-      headers: {
-        'content-type': 'text/html',
-        'content-length': '1000001',
-      },
-    }),
+    fetchImpl: async () =>
+      new Response('small placeholder body', {
+        status: 200,
+        headers: {
+          'content-type': 'text/html',
+          'content-length': '1000001',
+        },
+      }),
   });
 
   assert.equal(fetched.ok, false);
@@ -4365,16 +4745,18 @@ test('private Telegram-only authoring accepts dotenv-escaped session policy JSON
       defaultSessionSlug: 'telegram-demo-4',
       riskCeiling: 'submit',
       allowAddQuestion: true,
-      sessions: [{
-        sessionSlug: 'telegram-demo-4',
-        sessionName: 'Session Lab Organizers (Demo)',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        sessionMode: 'telegram_only',
-        managedAccountSubmitAllowed: true,
-        defaultGroupChatId: '-100123',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'telegram-demo-4',
+          sessionName: 'Session Lab Organizers (Demo)',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionMode: 'telegram_only',
+          managedAccountSubmitAllowed: true,
+          defaultGroupChatId: '-100123',
+        },
+      ],
     }),
   });
 
@@ -4401,13 +4783,15 @@ test('/groups manages lightweight Telegram-only group selections from the privat
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+      ],
     }),
   });
   await buildTelegramCommandResponse({
@@ -4448,7 +4832,10 @@ test('/groups manages lightweight Telegram-only group selections from the privat
   assert.equal(selected.ok, true);
   assert.equal(selected.screen, 'telegram_groups');
   assert.match(selected.response.text, /Role: Investor/);
-  assert.equal(flattenButtons(selected.response.replyMarkup).some((button) => button.text === '✓ Investor'), true);
+  assert.equal(
+    flattenButtons(selected.response.replyMarkup).some((button) => button.text === '✓ Investor'),
+    true,
+  );
 });
 
 test('/q natural language persists as a proposed question after a group joins', async () => {
@@ -4518,22 +4905,31 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(binary.response.text.includes('Options:'), false);
   assert.equal(binary.response.text.includes('Tap an answer'), false);
   assert.deepEqual(
-    flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Agree', 'Disagree', 'Unsure']
+    flattenButtons(binary.response.replyMarkup)
+      .map((button) => button.text)
+      .slice(0, 3),
+    ['Agree', 'Disagree', 'Unsure'],
   );
   assert.deepEqual(
     binary.response.replyMarkup.inline_keyboard.slice(0, 3).map((row) => row.map((button) => button.text)),
     [['Agree', 'Disagree'], ['Unsure'], ['Other Questions']],
   );
   assert.deepEqual(
-    flattenButtons(rating.response.replyMarkup).map((button) => button.text).slice(0, 11),
-    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+    flattenButtons(rating.response.replyMarkup)
+      .map((button) => button.text)
+      .slice(0, 11),
+    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
   );
   assert.deepEqual(
-    flattenButtons(multichoice.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Option A', 'Option B', 'Option C']
+    flattenButtons(multichoice.response.replyMarkup)
+      .map((button) => button.text)
+      .slice(0, 3),
+    ['Option A', 'Option B', 'Option C'],
   );
-  assert.equal(binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'), false);
+  assert.equal(
+    binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'),
+    false,
+  );
 
   const binaryButtons = flattenButtons(binary.response.replyMarkup);
   const onboardAgent = binaryButtons.find((button) => button.text === 'Onboard Agent');
@@ -4649,8 +5045,14 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
     .filter(([key]) => key.startsWith('telegram:submit-request:'))
     .map(([, value]) => JSON.parse(value));
   assert.equal(changedSubmitRecords.length, 2);
-  assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Agree'), true);
-  assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Disagree'), true);
+  assert.equal(
+    changedSubmitRecords.some((record) => record.answer.label === 'Agree'),
+    true,
+  );
+  assert.equal(
+    changedSubmitRecords.some((record) => record.answer.label === 'Disagree'),
+    true,
+  );
   const draftEditRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
     .filter(([key]) => key.startsWith(DRAFT_EDIT_METRIC_KV_PREFIX))
     .map(([, value]) => JSON.parse(value));
@@ -4694,8 +5096,7 @@ test('callback dispatch answers callback queries before editing messages', async
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const viewQuestions = flattenButtons(joined.response.replyMarkup)
-    .find((button) => button.text === 'View Questions');
+  const viewQuestions = flattenButtons(joined.response.replyMarkup).find((button) => button.text === 'View Questions');
   const commandResponse = await buildTelegramCommandResponse({
     update: {
       update_id: 7005,
@@ -4746,8 +5147,7 @@ test('callback dispatch sends a fresh message when editing an old message fails'
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
-  const viewQuestions = flattenButtons(joined.response.replyMarkup)
-    .find((button) => button.text === 'View Questions');
+  const viewQuestions = flattenButtons(joined.response.replyMarkup).find((button) => button.text === 'View Questions');
   const commandResponse = await buildTelegramCommandResponse({
     update: {
       update_id: 7006,
@@ -4787,30 +5187,39 @@ test('callback dispatch sends a fresh message when editing an old message fails'
   });
 
   assert.equal(dispatched.telegram.ok, true);
-  assert.equal(calls.map((call) => String(call[0]).split('/').pop()).join(','), 'answerCallbackQuery,editMessageText,sendMessage');
+  assert.equal(
+    calls.map((call) => String(call[0]).split('/').pop()).join(','),
+    'answerCallbackQuery,editMessageText,sendMessage',
+  );
 });
 
 test('/attachments lists public metadata and hides private storage refs', async () => {
   const kv = new MemoryKv();
   const imageBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
-  await kv.put('telegram:mini-app-document:v1:alpha:mini-doc-uploaded-plan', JSON.stringify({
-    docId: 'mini-doc-uploaded-plan',
-    sessionSlug: 'alpha',
-    title: 'Mini App uploaded notes',
-    fileType: 'png',
-    visibility: 'session',
-    storageProfile: 'cloudflare',
-    privateContentRef: 'kv://telegram:mini-app-document-bytes:v1:alpha:mini-doc-uploaded-plan',
-    createdAt: '2026-05-08T12:00:00.000Z',
-  }));
-  await kv.put('telegram:mini-app-document-bytes:v1:alpha:mini-doc-uploaded-plan', JSON.stringify({
-    sessionSlug: 'alpha',
-    docId: 'mini-doc-uploaded-plan',
-    title: 'Mini App uploaded notes',
-    fileType: 'png',
-    contentType: 'image/png',
-    dataBase64: Buffer.from(imageBytes).toString('base64'),
-  }));
+  await kv.put(
+    'telegram:mini-app-document:v1:alpha:mini-doc-uploaded-plan',
+    JSON.stringify({
+      docId: 'mini-doc-uploaded-plan',
+      sessionSlug: 'alpha',
+      title: 'Mini App uploaded notes',
+      fileType: 'png',
+      visibility: 'session',
+      storageProfile: 'cloudflare',
+      privateContentRef: 'kv://telegram:mini-app-document-bytes:v1:alpha:mini-doc-uploaded-plan',
+      createdAt: '2026-05-08T12:00:00.000Z',
+    }),
+  );
+  await kv.put(
+    'telegram:mini-app-document-bytes:v1:alpha:mini-doc-uploaded-plan',
+    JSON.stringify({
+      sessionSlug: 'alpha',
+      docId: 'mini-doc-uploaded-plan',
+      title: 'Mini App uploaded notes',
+      fileType: 'png',
+      contentType: 'image/png',
+      dataBase64: Buffer.from(imageBytes).toString('base64'),
+    }),
+  );
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/attachments alpha'),
     env: baseEnv({ AGENT_ACTION_KV: kv }),
@@ -4827,12 +5236,10 @@ test('/attachments lists public metadata and hides private storage refs', async 
   assert.equal(result.response.text.includes('r2://private'), false);
   assert.equal(result.response.text.includes('kv://telegram'), false);
   const buttons = flattenButtons(result.response.replyMarkup);
-  assert.deepEqual(buttons.map((button) => button.text), [
-    'Show 1 as image',
-    'Show 2 as image',
-    'Show 3 as image',
-    'View Questions',
-  ]);
+  assert.deepEqual(
+    buttons.map((button) => button.text),
+    ['Show 1 as image', 'Show 2 as image', 'Show 3 as image', 'View Questions'],
+  );
   assert.match(buttons[0].callback_data, /^cecb_[a-z0-9]{10,50}$/);
   const imageCallback = await buildTelegramCommandResponse({
     update: {
@@ -4888,15 +5295,25 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.doesNotMatch(result.response.text, /Chain:/);
   assert.doesNotMatch(result.response.text, /Use \/questions/);
   assert.equal(result.response.parseMode, '');
-  const addressButton = flattenButtons(result.response.replyMarkup)
-    .find((button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''));
+  const addressButton = flattenButtons(result.response.replyMarkup).find(
+    (button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''),
+  );
   assert.equal(addressButton, undefined);
   const buttons = flattenButtons(result.response.replyMarkup);
   const copyAddress = buttons.find((button) => button.text === 'Copy Address');
   assert.deepEqual(copyAddress?.copy_text, { text: accountAddress });
-  assert.equal(buttons.some((button) => button.text === 'View Questions'), true);
-  assert.equal(buttons.some((button) => button.text === 'Onboard Agent'), true);
-  assert.equal(buttons.some((button) => button.text === 'Activity'), true);
+  assert.equal(
+    buttons.some((button) => button.text === 'View Questions'),
+    true,
+  );
+  assert.equal(
+    buttons.some((button) => button.text === 'Onboard Agent'),
+    true,
+  );
+  assert.equal(
+    buttons.some((button) => button.text === 'Activity'),
+    true,
+  );
   const backToStart = buttons.find((button) => button.text === 'Back to Start');
   assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,50}$/);
   const start = await buildTelegramCommandResponse({
@@ -4931,13 +5348,17 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.equal(result.response.text, [
-    'Press Copy Agent Info and paste to your agent or Claude Code',
-    '',
-    'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
-  ].join('\n'));
-  const copyInfoButton = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info');
+  assert.equal(
+    result.response.text,
+    [
+      'Press Copy Agent Info and paste to your agent or Claude Code',
+      '',
+      'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
+    ].join('\n'),
+  );
+  const copyInfoButton = flattenButtons(result.response.replyMarkup).find(
+    (button) => button.text === 'Copy Agent Info',
+  );
   const copyInfo = copyInfoButton?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
@@ -4946,7 +5367,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.doesNotMatch(copyInfo, /\/questions first/);
   assert.match(copyInfo, /\ntoken=ceagt_/);
   assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=42/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=43/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);
@@ -4982,8 +5403,9 @@ test('/agent_token re-onboard revokes the prior token pointer', async () => {
     env,
     now,
   });
-  const firstCopy = flattenButtons(first.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstCopy =
+    flattenButtons(first.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   assert.equal(firstLoaded.ok, true);
@@ -4993,8 +5415,9 @@ test('/agent_token re-onboard revokes the prior token pointer', async () => {
     env,
     now,
   });
-  const secondCopy = flattenButtons(second.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const secondCopy =
+    flattenButtons(second.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const secondToken = secondCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
@@ -5020,8 +5443,7 @@ test('private Onboard Agent callback renders the copy install screen on first ta
     env,
     now,
   });
-  const onboard = flattenButtons(start.response.replyMarkup)
-    .find((button) => button.text === 'Onboard Agent');
+  const onboard = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'Onboard Agent');
 
   const result = await buildTelegramCommandResponse({
     update: {
@@ -5039,8 +5461,9 @@ test('private Onboard Agent callback renders the copy install screen on first ta
     env,
     now,
   });
-  const copyInfo = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const copyInfo =
+    flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.ok(onboard.callback_data);
@@ -5068,9 +5491,7 @@ test('expired private Onboard Agent callback mints a fresh copy token screen', a
           message_id: 78,
           chat: { id: 42, type: 'private' },
           reply_markup: {
-            inline_keyboard: [[
-              { text: 'Onboard Agent', callback_data: 'cecb_expired001' },
-            ]],
+            inline_keyboard: [[{ text: 'Onboard Agent', callback_data: 'cecb_expired001' }]],
           },
         },
       },
@@ -5078,8 +5499,9 @@ test('expired private Onboard Agent callback mints a fresh copy token screen', a
     env,
     now,
   });
-  const copyToken = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const copyToken =
+    flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const token = copyToken.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(result.screen, 'agent_token');
@@ -5099,10 +5521,10 @@ test('/start Onboard Agent deep-link mints private install info without exposing
     env,
     now,
   });
-  const onboard = flattenButtons(groupStart.response.replyMarkup)
-    .find((button) => button.text === 'Onboard Agent');
-  const miniAppOnboard = flattenButtons(groupStart.response.replyMarkup)
-    .find((button) => button.text === 'Onboard Agent (Mini App)');
+  const onboard = flattenButtons(groupStart.response.replyMarkup).find((button) => button.text === 'Onboard Agent');
+  const miniAppOnboard = flattenButtons(groupStart.response.replyMarkup).find(
+    (button) => button.text === 'Onboard Agent (Mini App)',
+  );
   assert.ok(onboard?.url);
   assert.ok(miniAppOnboard?.url);
   assert.equal(JSON.stringify(groupStart).includes('ceagt_'), false);
@@ -5119,8 +5541,9 @@ test('/start Onboard Agent deep-link mints private install info without exposing
     env,
     now,
   });
-  const copyInfo = flattenButtons(privateStart.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const copyInfo =
+    flattenButtons(privateStart.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text
+      ?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(privateStart.screen, 'agent_token');
@@ -5137,8 +5560,9 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
     env,
     now,
   });
-  const copyInfo = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const copyInfo =
+    flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(result.ok, true);
@@ -5160,8 +5584,9 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
     env,
     now,
   });
-  const firstCopy = flattenButtons(first.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstCopy =
+    flattenButtons(first.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   const firstPointer = await readTelegramAgentDelegationTokenUserPointer({
@@ -5190,8 +5615,14 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
   assert.equal(firstLoaded.ok, true);
   assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
   assert.match(linkedAgain.response.text, /Context Engine is already enabled/);
-  assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
-  assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
+  assert.equal(
+    buttons.some((button) => button.text === 'Copy Agent Info'),
+    false,
+  );
+  assert.equal(
+    buttons.some((button) => button.text === 'Copy New Agent Info'),
+    true,
+  );
   assert.ok(copyNew?.copy_text?.text);
   assert.equal(copyNew.callback_data, undefined);
   assert.match(secondToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
@@ -5216,8 +5647,7 @@ test('private Onboard Agent callback opens Mini App when already onboarded', asy
     env,
     now,
   });
-  const onboard = flattenButtons(start.response.replyMarkup)
-    .find((button) => button.text === 'Onboard Agent');
+  const onboard = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'Onboard Agent');
 
   const result = await buildTelegramCommandResponse({
     update: {
@@ -5242,8 +5672,14 @@ test('private Onboard Agent callback opens Mini App when already onboarded', asy
   assert.equal(result.screen, 'agent_onboarded_mini_app');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-existing-tap');
-  assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
-  assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
+  assert.equal(
+    buttons.some((button) => button.text === 'Copy Agent Info'),
+    false,
+  );
+  assert.equal(
+    buttons.some((button) => button.text === 'Copy New Agent Info'),
+    true,
+  );
   assert.ok(copyNew?.copy_text?.text);
   assert.equal(copyNew.callback_data, undefined);
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
@@ -5260,8 +5696,9 @@ test('already-onboarded agent screen exposes fresh install info as a copy button
     env,
     now,
   });
-  const firstCopy = flattenButtons(first.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstCopy =
+    flattenButtons(first.response.replyMarkup).find((button) => button.text === 'Copy Agent Info')?.copy_text?.text ||
+    '';
   const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   assert.equal(firstLoaded.ok, true);
@@ -5271,8 +5708,9 @@ test('already-onboarded agent screen exposes fresh install info as a copy button
     env,
     now,
   });
-  const copyNewButton = flattenButtons(linkedAgain.response.replyMarkup)
-    .find((button) => button.text === 'Copy New Agent Info');
+  const copyNewButton = flattenButtons(linkedAgain.response.replyMarkup).find(
+    (button) => button.text === 'Copy New Agent Info',
+  );
   const refreshedCopy = copyNewButton?.copy_text?.text || '';
   const refreshedToken = refreshedCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
@@ -5394,8 +5832,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.split('\n').includes('/me'), true);
   assert.equal(result.response.text.includes('/me - My Account'), false);
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
-  const miniApp = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Mini App');
+  const miniApp = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Mini App');
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,50}$/);
   const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
@@ -5432,26 +5869,34 @@ test('/start About button explains Context Engine and links the OSS repo and wor
 
   assert.equal(result.screen, 'about_context_engine');
   assert.match(result.response.text, /privacy-preserving opinion maps/);
-  assert.match(result.response.text, /Worker skill: https:\/\/github\.com\/AgalmicSoftware\/context-engine\/blob\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.match(
+    result.response.text,
+    /Worker skill: https:\/\/github\.com\/AgalmicSoftware\/context-engine\/blob\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/,
+  );
   const repo = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Open OSS Repo');
   assert.equal(repo.url, 'https://github.com/AgalmicSoftware/context-engine/tree/main');
   const skill = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Worker Skill.md');
-  assert.equal(skill.url, 'https://github.com/AgalmicSoftware/context-engine/blob/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md');
+  assert.equal(
+    skill.url,
+    'https://github.com/AgalmicSoftware/context-engine/blob/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md',
+  );
 });
 
 test('/start auto-joins a single Telegram-only session and keeps the welcome screen minimal', async () => {
   const policy = {
     defaultSessionSlug: 'alpha',
     riskCeiling: 'submit',
-    sessions: [{
-      sessionSlug: 'alpha',
-      sessionName: 'Alpha Session',
-      default: true,
-      telegramBridgeEnabled: true,
-      telegramOnly: true,
-      telegramGroupOpenAccess: true,
-      managedAccountSubmitAllowed: true,
-    }],
+    sessions: [
+      {
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+      },
+    ],
   };
   const privateEnv = baseEnv({
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
@@ -5512,8 +5957,20 @@ test('/start keeps session selection visible when multiple Telegram-only session
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
       sessions: [
-        { sessionSlug: 'alpha', sessionName: 'Alpha Session', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
-        { sessionSlug: 'beta', sessionName: 'Beta Session', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+        },
       ],
     }),
   });
@@ -5545,13 +6002,15 @@ test('group /start includes a Mini App deep link to the session picker', async (
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About']);
+  assert.deepEqual(
+    flattenButtons(result.response.replyMarkup).map((button) => button.text),
+    ['Mini App', 'Onboard Agent', 'About'],
+  );
   assert.equal(result.response.text.includes('/sessions'), false);
   assert.equal(result.response.text.includes('/groups'), false);
   assert.equal(result.response.text.includes('/add_question'), false);
   assert.equal(result.response.text.includes('/attachments'), false);
-  const miniApp = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Mini App');
+  const miniApp = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Mini App');
   assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,50}$/);
   const launch = new URL(miniApp.url).searchParams.get('start');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
@@ -5575,8 +6034,7 @@ test('expired private start payload refreshes Mini App entry point', async () =>
   assert.equal(result.active, false);
   assert.equal(result.refreshed, true);
   assert.match(result.response.text, /refreshed the Mini App entry point/);
-  const miniApp = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Mini App');
+  const miniApp = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Mini App');
   assert.ok(miniApp?.web_app?.url);
   const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
@@ -5587,14 +6045,17 @@ test('expired private start payload refreshes Mini App entry point', async () =>
 test('Mini App start payload shows session name instead of slug', async () => {
   const env = baseEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
   const launch = 'cecb_live000001';
-  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
-    action: 'view_questions',
-    lane: 'telegram_mini_app',
-    serverContextRef: { sessionSlug: 'alpha' },
-    callbackData: launch,
-    miniAppLaunch: true,
-    createdAt: '2026-05-08T12:00:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    `telegram:action:${launch}`,
+    JSON.stringify({
+      action: 'view_questions',
+      lane: 'telegram_mini_app',
+      serverContextRef: { sessionSlug: 'alpha' },
+      callbackData: launch,
+      miniAppLaunch: true,
+      createdAt: '2026-05-08T12:00:00.000Z',
+    }),
+  );
 
   const result = await buildTelegramCommandResponse({
     update: privateMessage(`/start ${launch}`),
