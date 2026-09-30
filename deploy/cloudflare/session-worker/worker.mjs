@@ -71846,11 +71846,7 @@ var resolveTrustedAdminOrigins = (env) => {
   const parsed = raw.split(/[\s,]+/).map((entry) => normalizeOrigin2(entry)).filter(Boolean);
   return parsed.length ? parsed : [...TRUSTED_ORIGINS];
 };
-var resolveTrustedLoginOrigins = ({
-  env,
-  config,
-  allowTrustedAdminOrigins = false
-} = {}, deps) => {
+var resolveTrustedLoginOrigins = ({ env, config, allowTrustedAdminOrigins = false } = {}, deps) => {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   const append = (value) => {
@@ -71873,23 +71869,19 @@ var resolveTrustedLoginOrigins = ({
   }
   return out;
 };
-var validateTrustedLoginRequestOrigin = ({
-  request,
-  env,
-  config,
-  allowTrustedAdminOrigins = false
-} = {}, deps) => {
-  const requestOrigin = normalizeOrigin2(
-    request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || ""
-  );
+var validateTrustedLoginRequestOrigin = ({ request, env, config, allowTrustedAdminOrigins = false } = {}, deps) => {
+  const requestOrigin = normalizeOrigin2(request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || "");
   if (!requestOrigin) {
     return { ok: false, error: "Missing Origin for worker login." };
   }
-  const trustedOrigins = resolveTrustedLoginOrigins({
-    env,
-    config,
-    allowTrustedAdminOrigins
-  }, deps);
+  const trustedOrigins = resolveTrustedLoginOrigins(
+    {
+      env,
+      config,
+      allowTrustedAdminOrigins
+    },
+    deps
+  );
   if (!trustedOrigins.includes(requestOrigin)) {
     return { ok: false, error: "Untrusted worker login origin." };
   }
@@ -71898,17 +71890,15 @@ var validateTrustedLoginRequestOrigin = ({
     origin: requestOrigin
   };
 };
-var validateBrowserLoginOrigin = ({
-  request,
-  siwe,
-  env,
-  config
-} = {}, deps) => {
-  const requestOriginCheck = validateTrustedLoginRequestOrigin({
-    request,
-    env,
-    config
-  }, deps);
+var validateBrowserLoginOrigin = ({ request, siwe, env, config } = {}, deps) => {
+  const requestOriginCheck = validateTrustedLoginRequestOrigin(
+    {
+      request,
+      env,
+      config
+    },
+    deps
+  );
   if (!requestOriginCheck?.ok) return requestOriginCheck;
   const requestOrigin = requestOriginCheck.origin;
   let siweOrigin = "";
@@ -71928,28 +71918,17 @@ var validateBrowserLoginOrigin = ({
     origin: requestOrigin
   };
 };
-var validateAdminActionAudience = ({
-  audience,
-  request,
-  env,
-  config,
-  initializingConfig
-} = {}, deps) => {
+var validateAdminActionAudience = ({ audience, request, env, config, initializingConfig } = {}, deps) => {
   const normalizedAudience = normalizeOrigin2(audience);
   if (!normalizedAudience) {
     return { ok: false, error: "Invalid admin audience." };
   }
-  const requestOrigin = normalizeOrigin2(
-    request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || ""
-  );
+  const requestOrigin = normalizeOrigin2(request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || "");
   if (requestOrigin && requestOrigin !== normalizedAudience) {
     return { ok: false, error: "Admin audience does not match request origin." };
   }
   const trustedOrigins = (typeof deps?.resolveTrustedAdminOrigins === "function" ? deps.resolveTrustedAdminOrigins(env) : resolveTrustedAdminOrigins(env)).map((entry) => normalizeOrigin2(entry)).filter(Boolean);
-  const configuredOrigins = resolveConfiguredAdminOrigins(
-    config,
-    initializingConfig
-  );
+  const configuredOrigins = resolveConfiguredAdminOrigins(config, initializingConfig);
   const workerOrigin = normalizeOrigin2(request?.url || env?.WORKER_URL || "");
   if (!trustedOrigins.includes(normalizedAudience) && !configuredOrigins.includes(normalizedAudience) && (!workerOrigin || workerOrigin !== normalizedAudience)) {
     return { ok: false, error: "Untrusted admin audience." };
@@ -71981,6 +71960,8 @@ var parseSiweMessage = (message) => {
     const expirationTime = getSiweFieldValue(line, "Expiration Time:");
     if (expirationTime != null) fields.expirationTime = expirationTime;
   });
+  const resourceIndex = lines.indexOf("Resources:");
+  const resources = resourceIndex < 0 ? void 0 : lines.slice(resourceIndex + 1).filter(Boolean).map((line) => line.startsWith("- ") ? line.slice(2).trim() : line);
   return {
     domain,
     address: address2,
@@ -71988,7 +71969,8 @@ var parseSiweMessage = (message) => {
     chainId: fields.chainId || "",
     nonce: fields.nonce || "",
     issuedAt: fields.issuedAt || "",
-    expirationTime: fields.expirationTime || ""
+    expirationTime: fields.expirationTime || "",
+    ...resources === void 0 ? {} : { resources }
   };
 };
 var validateSiwe = (siwe, deps) => {
@@ -79057,19 +79039,8 @@ var dispatchAuthNonceRequest = async ({
 
 // workers/sessionCorsWorker/authLoginRequestAuthority.js
 init_sessionConfigMutation();
-var resolveAuthLoginRequestAuthority = async ({
-  env,
-  request,
-  body,
-  slugHint,
-  baseHeaders,
-  deps
-} = {}) => {
-  const {
-    address: address2,
-    message,
-    signature
-  } = deps?.normalizeSignedWorkerRequest?.(body) || {};
+var resolveAuthLoginRequestAuthority = async ({ env, request, body, slugHint, baseHeaders, deps } = {}) => {
+  const { address: address2, message, signature } = deps?.normalizeSignedWorkerRequest?.(body) || {};
   const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint }) || {
     ok: false,
     error: "Invalid session slug."
@@ -79149,9 +79120,7 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, headers)
     };
   }
-  const workerCanonical = String(
-    config?.sessionModeProfile?.authority?.mode || ""
-  ).trim().toLowerCase() === "worker_canonical";
+  const workerCanonical = String(config?.sessionModeProfile?.authority?.mode || "").trim().toLowerCase() === "worker_canonical";
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
   const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
   if (workerCanonical && !sessionId) {
@@ -79166,14 +79135,30 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: "Session identity does not match worker session." }, 409, headers)
     };
   }
-  const loginOriginCheck = (typeof deps?.validateBrowserLoginOrigin === "function" ? deps.validateBrowserLoginOrigin : validateBrowserLoginOrigin)({
-    request,
-    siwe,
-    env,
-    config
-  }, {
-    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins
-  });
+  if (siwe.resources !== void 0) {
+    let workerOrigin = "";
+    try {
+      workerOrigin = new URL(request.url).origin;
+    } catch {
+    }
+    const slug = String(targetSlug || "").trim().toLowerCase();
+    const sessionResource = workerCanonical ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}` : `urn:context-engine:session:slug:${encodeURIComponent(slug === "general" ? "" : slug)}`;
+    const resources = siwe.resources;
+    if (!workerOrigin || !Array.isArray(resources) || resources.length !== 2 || !resources.includes(workerOrigin) || !resources.includes(sessionResource)) {
+      return { ok: false, response: deps?.json?.({ error: "Signed login resources do not match this Worker and session." }, 403, headers) };
+    }
+  }
+  const loginOriginCheck = (typeof deps?.validateBrowserLoginOrigin === "function" ? deps.validateBrowserLoginOrigin : validateBrowserLoginOrigin)(
+    {
+      request,
+      siwe,
+      env,
+      config
+    },
+    {
+      resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins
+    }
+  );
   if (!loginOriginCheck?.ok) {
     return {
       ok: false,
