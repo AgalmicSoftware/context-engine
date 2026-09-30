@@ -1432,19 +1432,22 @@ const unwrapCekFromRecipients = async ({
     }
   };
 
+  const workerRecipient = env.recipients.find((r) => r.type === 'worker-response-field-v1');
+  const workerOwner = isRecord(workerRecipient?.policy) ? workerRecipient.policy.owner : undefined;
+  const canTrySelfRecipient = !workerRecipient || workerOwner === String(account || '').toLowerCase();
+
   if (preferLitRecipients) {
     const litCek = await tryLitRecipients();
     if (litCek) return litCek;
-    const selfCek = await trySelfRecipient();
+    const selfCek = canTrySelfRecipient ? await trySelfRecipient() : null;
     if (selfCek) return selfCek;
   } else {
-    const selfCek = await trySelfRecipient();
+    const selfCek = canTrySelfRecipient ? await trySelfRecipient() : null;
     if (selfCek) return selfCek;
     const litCek = await tryLitRecipients();
     if (litCek) return litCek;
   }
 
-  const workerRecipient = env.recipients.find((r) => r.type === 'worker-response-field-v1');
   if (workerRecipient && workerContext?.sessionConfig) {
     const { unwrapWorkerResponseFieldKey } = await import('./workerResponseFieldKeys');
     return unwrapWorkerResponseFieldKey(workerRecipient as WorkerFieldRecipient, contextHex, workerContext);
