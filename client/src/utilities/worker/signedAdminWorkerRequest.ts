@@ -33,14 +33,14 @@ const getCurrentOrigin = (): string => {
   }
 };
 
-const buildAdminWorkerCorsMessage = (workerBase: unknown, detail: unknown = ''): string => {
+export const buildAdminWorkerCorsMessage = (workerBase: unknown, detail: unknown = ''): string => {
   const origin = getCurrentOrigin() || '<current-origin>';
   const worker = toStr(workerBase).trim() || 'session worker';
   const suffix = detail ? ` (${toStr(detail)})` : '';
   return `Worker request could not reach ${worker}${suffix}. This is usually CORS or worker availability; ensure ${origin} is in that worker session's allowOrigins. If this session still resolves an older worker URL, finish deploy/config sync or edit the worker URL override first.`;
 };
 
-const normalizeAdminWorkerFetchError = ({
+export const normalizeAdminWorkerFetchError = ({
   error,
   workerBase,
   responseStatus = 0,
@@ -72,7 +72,7 @@ const normalizeAdminWorkerFetchError = ({
   return raw || 'Failed to update worker allowOrigins.';
 };
 
-const isRetryableAdminNonceFailure = ({
+export const isRetryableAdminNonceFailure = ({
   responseStatus = 0,
   responseError = '',
 }: {
