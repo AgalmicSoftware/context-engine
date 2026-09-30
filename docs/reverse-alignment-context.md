@@ -1,10 +1,13 @@
 # Reverse Alignment context
 
 The RxC session Context section includes an illustrated field guide to the twelve
-focus areas on [Reverse Alignment](https://reversealignment.ai/). Search narrows
-the topic buttons; selecting one opens a reading panel with an overview,
-discussion prompt, source link, and related focus areas. Previous and Next visit
-all twelve areas. Mobile layouts present the same controls below the map artwork.
+focus areas on [Reverse Alignment](https://reversealignment.ai/). All twelve
+topic buttons are available directly; selecting one opens a reading panel with
+an overview, discussion prompt, source link, and related focus areas. Larger,
+borderless reading tabs and arrow-only Previous/Next controls provide navigation.
+The map grows with its controls so they stay clear of the reading panel; mobile
+layouts present the same controls below the map artwork. The guide has no search
+field or closing promotional footer.
 
 The three regions and their connections are editorial navigation. Discussion
 prompts are invitations for the session, not quotes from the source or submitted

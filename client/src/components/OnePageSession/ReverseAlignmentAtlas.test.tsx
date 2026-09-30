@@ -21,18 +21,13 @@ it('browses all twelve source areas and follows editorial connections', () => {
   expect(screen.queryByText('0 assigned')).not.toBeInTheDocument();
 });
 
-it('filters topics without changing the reading selection and can recover from an empty search', () => {
+it('shows every focus area directly without a search field or closing promotional section', () => {
   render(<ReverseAlignmentAtlas />);
-  const search = screen.getByRole('searchbox', { name: 'Find a focus area' });
   const map = screen.getByLabelText('Explore twelve focus areas');
-  fireEvent.change(search, { target: { value: 'privacy' } });
-  expect(within(map).getAllByRole('button')).toHaveLength(1);
-  expect(screen.getByRole('article')).toHaveTextContent('Communal sensemaking');
-  fireEvent.change(search, { target: { value: 'unmatched' } });
-  expect(within(map).queryAllByRole('button')).toHaveLength(0);
-  expect(screen.getByRole('status')).toHaveTextContent('No matching focus areas');
-  fireEvent.change(search, { target: { value: '' } });
+  expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  expect(screen.queryByText('12 focus areas. Many possible futures.')).not.toBeInTheDocument();
   expect(within(map).getAllByRole('button')).toHaveLength(12);
+  expect(screen.getByRole('article')).toHaveTextContent('Communal sensemaking');
 });
 
 it('wraps the guided navigation at each end of the atlas', () => {
@@ -40,8 +35,12 @@ it('wraps the guided navigation at each end of the atlas', () => {
   fireEvent.click(
     within(screen.getByLabelText('Explore twelve focus areas')).getByRole('button', { name: 'Identity' }),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Previous focus area' }));
+  const previous = screen.getByRole('button', { name: 'Previous focus area' });
+  const next = screen.getByRole('button', { name: 'Next focus area' });
+  expect(previous).toHaveTextContent(/^←$/);
+  expect(next).toHaveTextContent(/^→$/);
+  fireEvent.click(previous);
   expect(screen.getByRole('article')).toHaveTextContent('Labor transition');
-  fireEvent.click(screen.getByRole('button', { name: 'Next focus area' }));
+  fireEvent.click(next);
   expect(within(screen.getByRole('article')).getByRole('heading', { name: 'Identity' })).toBeVisible();
 });

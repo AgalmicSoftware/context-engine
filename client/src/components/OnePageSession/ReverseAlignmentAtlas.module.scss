@@ -10,7 +10,6 @@
     color: var(--ce-panel-text);
   }
   button,
-  input,
   a {
     &:focus-visible {
       outline: 3px solid var(--ce-focus-ring);
@@ -28,10 +27,6 @@
 }
 .header {
   padding: 24px;
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
-  align-items: center;
   h3 {
     margin: 8px 0;
     font-size: clamp(1.45rem, 2.8vw, 2.2rem);
@@ -50,26 +45,6 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.search {
-  flex: 0 1 230px;
-  color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
-  font-size: 0.8rem;
-  input {
-    display: block;
-    width: 100%;
-    margin-top: 8px;
-    border: 1px solid color-mix(in srgb, var(--ce-panel-text) 55%, var(--ce-surface-sunken));
-    background: var(--ce-surface);
-    color: var(--ce-panel-text);
-    border-radius: 8px;
-    padding: 12px;
-    font: inherit;
-    box-sizing: border-box;
-    &::placeholder {
-      color: var(--ce-panel-text-muted);
-    }
-  }
-}
 .explorer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(265px, 31%);
@@ -80,6 +55,14 @@
   align-self: center;
   aspect-ratio: 4 / 3;
   min-width: 0;
+  // Keep topic controls in flow so wrapped labels grow the map instead of
+  // spilling into the reading panel at intermediate widths or larger text sizes.
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas: 'trust trust collective collective' '. learning learning .';
+  align-content: space-around;
+  gap: 24px;
+  padding: 8% 8% 5%;
 }
 .artwork {
   position: absolute;
@@ -89,8 +72,8 @@
   object-fit: cover;
 }
 .branch {
-  position: absolute;
-  width: 36%;
+  position: relative;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -126,9 +109,6 @@
       box-shadow: 0 0 0 3px var(--ce-surface-sunken);
       font-weight: 800;
     }
-    &[hidden] {
-      display: none;
-    }
   }
 }
 .dot {
@@ -139,12 +119,10 @@
   flex-shrink: 0;
 }
 .trust {
-  left: 8%;
-  top: 13%;
+  grid-area: trust;
 }
 .collective {
-  right: 7%;
-  top: 13%;
+  grid-area: collective;
   button {
     border-color: var(--ce-status-warning-text);
     background: color-mix(in srgb, var(--ce-surface-sunken) 95%, var(--ce-status-warning-text));
@@ -157,8 +135,7 @@
   }
 }
 .learning {
-  left: 32%;
-  top: 63%;
+  grid-area: learning;
   button {
     border-color: var(--ce-status-info-text);
     background: var(--ce-surface-sunken);
@@ -170,20 +147,10 @@
     background: var(--ce-status-info-text);
   }
 }
-.noMatches {
-  position: absolute;
-  bottom: 8px;
-  left: 5%;
-  right: 5%;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--ce-surface-sunken);
-  text-align: center;
-}
 .reading {
   border-left: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
   background: var(--ce-surface);
-  padding: 22px;
+  padding: 28px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -194,30 +161,47 @@
     font-weight: 800;
   }
   h5 {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
     margin: 0 0 10px;
     font-weight: 700;
   }
   p {
     line-height: 1.65;
+    margin: 0 0 20px;
   }
 }
 .readingTabs {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 24px;
   button {
-    padding: 10px 5px;
+    position: relative;
+    padding: 10px 0;
+    min-height: 44px;
     border: none;
-    border-bottom: 2px solid transparent;
     background: transparent;
     color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
-    font-size: 0.8rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      border-radius: 3px;
+    }
+    &:hover {
+      color: var(--ce-panel-text);
+    }
     &[aria-pressed='true'] {
       color: var(--ce-action-accent);
-      border-bottom-color: var(--ce-action-accent);
-      font-weight: 800;
+      &::after {
+        background: var(--ce-action-accent);
+      }
     }
   }
 }
@@ -238,17 +222,24 @@
 }
 .related {
   margin-top: auto;
-  padding-top: 20px;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  h5 {
+    margin: 0 0 4px;
+  }
   button {
-    display: block;
     border: none;
-    border-bottom: 1px solid var(--ce-card-border);
-    padding: 10px 0;
+    padding: 8px 0;
+    min-height: 40px;
     background: none;
     color: var(--ce-status-info-text);
     text-align: left;
-    width: 100%;
-    font-size: 0.9rem;
+    max-width: 100%;
+    font-size: 1rem;
+    font-weight: 600;
     &:hover {
       color: var(--ce-panel-text);
     }
@@ -260,29 +251,22 @@
   justify-content: space-between;
   gap: 8px;
   margin-top: 24px;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
   button {
-    border: 1px solid var(--ce-card-border);
+    border: 0;
     border-radius: 6px;
-    background: var(--ce-surface-alt);
+    background: transparent;
     color: var(--ce-panel-text);
-    padding: 8px;
+    width: 48px;
+    min-height: 48px;
+    padding: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
     &:hover {
       background: var(--ce-surface-raised);
     }
-  }
-}
-.footer {
-  border-top: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  padding: 18px 24px;
-  line-height: 1.6;
-  font-size: 0.85rem;
-  span {
-    color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
   }
 }
 @media (max-width: 1100px) {
@@ -306,17 +290,13 @@
 }
 @media (max-width: 600px) {
   .header {
-    flex-direction: column;
-    align-items: stretch;
     padding: 18px;
-  }
-  .search {
-    flex-basis: auto;
   }
   .map {
     aspect-ratio: auto;
     padding: 65% 16px 16px;
-    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
     gap: 16px;
   }
   .artwork {
@@ -325,9 +305,7 @@
     object-fit: contain;
   }
   .branch {
-    position: relative;
-    inset: auto;
-    width: auto;
+    grid-area: auto;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
@@ -341,15 +319,10 @@
       font-size: 0.82rem;
     }
   }
-  .noMatches {
-    position: relative;
-    inset: auto;
-    margin: 0;
-  }
   .reading {
     padding: 18px;
   }
-  .footer {
-    padding: 18px;
+  .readingTabs {
+    gap: 8px 16px;
   }
 }
