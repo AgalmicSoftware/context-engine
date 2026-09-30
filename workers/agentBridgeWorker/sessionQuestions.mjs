@@ -834,7 +834,7 @@ function normalizeOptions(payload = {}) {
     .slice(0, (payload.questionType || payload.type) === 'quadratic' ? Infinity : 20);
 }
 
-function normalizeQuestionType(payload = {}) {
+export function normalizeQuestionType(payload = {}, fallback = 'freeform') {
   const raw = lower(payload.questionType || payload.type || payload.kind || payload.responseType || 'freeform')
     .replace(/\s+/g, '_')
     .replace(/-/g, '_');
@@ -845,7 +845,7 @@ function normalizeQuestionType(payload = {}) {
     ['multichoice', 'multi_choice', 'multiple_choice', 'multi_select', 'single_choice', 'single_select'].includes(raw)
   )
     return 'multichoice';
-  return 'freeform';
+  return fallback;
 }
 
 function normalizeQuestionPayloadRoot(payload = {}) {

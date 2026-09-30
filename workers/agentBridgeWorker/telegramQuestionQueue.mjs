@@ -8,6 +8,7 @@ import {
   sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { normalizeQuestionType } from './sessionQuestions.mjs';
 
 export const TELEGRAM_QUESTION_QUEUE_CONFIG_KV_PREFIX = 'telegram:question-queue-config:v1:';
 export const TELEGRAM_QUESTION_QUEUE_STATE_KV_PREFIX = 'telegram:question-queue-state:v1:';
@@ -45,17 +46,22 @@ function normalizeQuestionIds(value = []) {
 function normalizeTags(value = []) {
   return normalizeTokenList(value)
     .flatMap((entry) => entry.split(/\s+/))
-    .map((entry) => lower(entry).replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, ''))
+    .map((entry) =>
+      lower(entry)
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, ''),
+    )
     .filter(Boolean)
     .filter((entry, index, values) => values.indexOf(entry) === index);
 }
 
 function canonicalQuestionType(value = '') {
-  const type = lower(value).replace(/[^a-z0-9_ -]+/g, '').replace(/\s+/g, '_');
-  if (['agree_unsure_disagree', 'agree_disagree', 'yes_no', 'binary'].includes(type)) return 'binary';
-  if (['multi_choice', 'multiple_choice', 'multiselect', 'multi_select'].includes(type)) return 'multichoice';
-  if (['number', 'numeric', 'scale'].includes(type)) return 'rating';
-  return type || 'freeform';
+  const type = lower(value)
+    .replace(/[^a-z0-9_ -]+/g, '')
+    .replace(/\s+/g, '_');
+  if (type === 'multiselect') return 'multichoice';
+  if (['number', 'numeric'].includes(type)) return 'rating';
+  return normalizeQuestionType({ type }, type || 'freeform');
 }
 
 function normalizeQuestionTypes(value = []) {
@@ -66,10 +72,7 @@ function normalizeQuestionTypes(value = []) {
 }
 
 function envQuestionQueueConfig(env = {}, sessionSlug = '') {
-  const parsed = safeJsonParse(
-    env.AGENT_BRIDGE_QUESTION_QUEUE_JSON || env.AGENT_BRIDGE_SPONSORED_QUESTIONS_JSON,
-    null
-  );
+  const parsed = safeJsonParse(env.AGENT_BRIDGE_QUESTION_QUEUE_JSON || env.AGENT_BRIDGE_SPONSORED_QUESTIONS_JSON, null);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
   const slug = sanitizeSessionSlug(sessionSlug);
   if (parsed.sessions && typeof parsed.sessions === 'object' && !Array.isArray(parsed.sessions)) {
@@ -86,21 +89,14 @@ export function questionQueueConfigKey(sessionSlug = '') {
   return slug ? `${TELEGRAM_QUESTION_QUEUE_CONFIG_KV_PREFIX}${slug}` : '';
 }
 
-export function questionQueueStateKey({
-  sessionSlug = '',
-  telegramUserId = '',
-  queueKey = '',
-} = {}) {
+export function questionQueueStateKey({ sessionSlug = '', telegramUserId = '', queueKey = '' } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const user = kvKeySafePart(telegramUserId);
   const queue = kvKeySafePart(queueKey || 'default');
   return slug && user && queue ? `${TELEGRAM_QUESTION_QUEUE_STATE_KV_PREFIX}${slug}:${user}:${queue}` : '';
 }
 
-export async function loadTelegramQuestionQueueConfig({
-  env = {},
-  sessionSlug = '',
-} = {}) {
+export async function loadTelegramQuestionQueueConfig({ env = {}, sessionSlug = '' } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const defaults = envQuestionQueueConfig(env, slug);
   const fallback = {
@@ -154,42 +150,42 @@ export async function saveTelegramQuestionQueueConfig({
 }
 
 export function normalizeQuestionQueueCriteria(input = {}) {
-  const criteria = input.criteria && typeof input.criteria === 'object' && !Array.isArray(input.criteria)
-    ? input.criteria
-    : {};
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : {};
+  const criteria =
+    input.criteria && typeof input.criteria === 'object' && !Array.isArray(input.criteria) ? input.criteria : {};
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : {};
   const tags = normalizeTags(
     input.tags ||
-    criteria.tags ||
-    criteria.tagIds ||
-    preferences.tags ||
-    preferences.tagIds ||
-    preferences.interests ||
-    input.interests
+      criteria.tags ||
+      criteria.tagIds ||
+      preferences.tags ||
+      preferences.tagIds ||
+      preferences.interests ||
+      input.interests,
   );
   const questionTypes = normalizeQuestionTypes(
     input.questionTypes ||
-    input.questionType ||
-    criteria.questionTypes ||
-    criteria.questionType ||
-    preferences.questionTypes
+      input.questionType ||
+      criteria.questionTypes ||
+      criteria.questionType ||
+      preferences.questionTypes,
   );
   const excludeQuestionIds = normalizeQuestionIds(
-    input.excludeQuestionIds ||
-    criteria.excludeQuestionIds ||
-    preferences.excludeQuestionIds
+    input.excludeQuestionIds || criteria.excludeQuestionIds || preferences.excludeQuestionIds,
   );
   const includeSponsored = normalizeBoolean(input.includeSponsored ?? criteria.includeSponsored, true);
   const sponsoredFirst = normalizeBoolean(input.sponsoredFirst ?? criteria.sponsoredFirst, true);
   const skipServed = normalizeBoolean(input.skipServed ?? criteria.skipServed, true);
-  const queueKey = safeString(input.queueKey || criteria.queueKey) || stableFingerprint({
-    tags,
-    questionTypes,
-    includeSponsored,
-    sponsoredFirst,
-  });
+  const queueKey =
+    safeString(input.queueKey || criteria.queueKey) ||
+    stableFingerprint({
+      tags,
+      questionTypes,
+      includeSponsored,
+      sponsoredFirst,
+    });
   return {
     tags,
     questionTypes,
@@ -213,11 +209,10 @@ function questionMatchesCriteria(question = {}, criteria = {}) {
       question.prompt,
       question.questionType,
       Array.isArray(question.options) ? question.options.join(' ') : '',
-    ].map((value) => lower(value)).join(' ');
-    const matched = criteria.tags.some((tag) => (
-      questionTags.has(tag) ||
-      promptText.includes(tag.replace(/-/g, ' '))
-    ));
+    ]
+      .map((value) => lower(value))
+      .join(' ');
+    const matched = criteria.tags.some((tag) => questionTags.has(tag) || promptText.includes(tag.replace(/-/g, ' ')));
     if (!matched) return false;
   }
   return true;
@@ -227,10 +222,12 @@ function orderCandidates(questions = [], sponsoredIds = [], criteria = {}, serve
   const excluded = new Set(criteria.excludeQuestionIds);
   const base = questions.filter((question) => {
     const questionId = safeString(question.questionId || question.id);
-    return questionId &&
+    return (
+      questionId &&
       !excluded.has(questionId) &&
       !servedSet.has(questionId) &&
-      questionMatchesCriteria(question, criteria);
+      questionMatchesCriteria(question, criteria)
+    );
   });
   if (!criteria.includeSponsored || !criteria.sponsoredFirst || !sponsoredIds.length) return base;
   const byId = new Map(base.map((question) => [safeString(question.questionId || question.id), question]));
@@ -257,9 +254,10 @@ export async function selectNextTelegramQuestion({
   const key = questionQueueStateKey({ sessionSlug, telegramUserId, queueKey: criteria.queueKey });
   const kv = env?.AGENT_ACTION_KV;
   const now = safeString(createdAt) || new Date().toISOString();
-  const existing = key && kv && typeof kv.get === 'function' && !resetQueue
-    ? safeJsonParse(await kv.get(key).catch(() => null), null)
-    : null;
+  const existing =
+    key && kv && typeof kv.get === 'function' && !resetQueue
+      ? safeJsonParse(await kv.get(key).catch(() => null), null)
+      : null;
   const servedQuestionIds = Array.isArray(existing?.servedQuestionIds)
     ? existing.servedQuestionIds.map(safeString).filter(Boolean)
     : [];
@@ -286,10 +284,11 @@ export async function selectNextTelegramQuestion({
       sponsoredFirst: criteria.sponsoredFirst,
       skipServed: criteria.skipServed,
     };
-    const nextServed = cycled ? [selectedQuestionId] : [
-      ...servedQuestionIds.filter((questionId) => questionId !== selectedQuestionId),
-      selectedQuestionId,
-    ].slice(-MAX_SERVED_QUESTION_IDS);
+    const nextServed = cycled
+      ? [selectedQuestionId]
+      : [...servedQuestionIds.filter((questionId) => questionId !== selectedQuestionId), selectedQuestionId].slice(
+          -MAX_SERVED_QUESTION_IDS,
+        );
     const history = [
       ...(Array.isArray(existing?.history) ? existing.history : []),
       {
@@ -321,7 +320,9 @@ export async function selectNextTelegramQuestion({
     question: selected,
     sponsored,
     reason: selected
-      ? (sponsored ? 'sponsored_question_queue' : 'criteria_ranked_question_queue')
+      ? sponsored
+        ? 'sponsored_question_queue'
+        : 'criteria_ranked_question_queue'
       : 'no_matching_question',
     queue: {
       queueKey: criteria.queueKey,
@@ -331,7 +332,9 @@ export async function selectNextTelegramQuestion({
       reset: resetQueue,
       cycled,
       servedCount: selected
-        ? (cycled ? 1 : Math.min(MAX_SERVED_QUESTION_IDS, servedQuestionIds.length + 1))
+        ? cycled
+          ? 1
+          : Math.min(MAX_SERVED_QUESTION_IDS, servedQuestionIds.length + 1)
         : servedQuestionIds.length,
       candidateCount: candidates.length,
       sponsoredQuestionCount: sponsoredIds.length,
