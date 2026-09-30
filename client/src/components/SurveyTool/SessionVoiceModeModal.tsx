@@ -279,14 +279,11 @@ function SessionInterviewPanel({
   ].join('|');
   const hasReadinessContextToken =
     responseReadinessContextToken !== undefined && responseReadinessContextToken !== null;
-  const ownAnswers = useInterviewSavedAnswers({
-    load: onLoadSavedResponses,
-    contextKey: activeSubmitContextToken,
-    questionIds: [...questions.map((question) => question.id), ...drafts.map((draft) => draft.questionId)],
-    active: authenticatedForSubmit,
-    onLoaded: (slice) => {
+  // Answers discovered after a draft was selected need review before replacement.
+  const reviewSavedConflicts = useCallback(
+    (slice: SessionInterviewModalRecord | null | undefined) => {
       const conflicts = drafts.filter((draft) => hasDraftValue(responseFieldValue(slice, 'answers', draft.questionId)));
-      if (!conflicts.length) return;
+      if (!conflicts.length) return false;
       setSelected((current) => ({
         ...current,
         ...Object.fromEntries(conflicts.map((draft) => [draft.questionId, false])),
@@ -295,7 +292,16 @@ function SessionInterviewPanel({
       pendingSubmitActiveContextRef.current = '';
       setPendingSubmitAfterLogin(false);
       setStatus('Saved answers loaded. Select any answers you want to replace.');
+      return true;
     },
+    [drafts],
+  );
+  const ownAnswers = useInterviewSavedAnswers({
+    load: onLoadSavedResponses,
+    contextKey: activeSubmitContextToken,
+    questionIds: [...questions.map((question) => question.id), ...drafts.map((draft) => draft.questionId)],
+    active: authenticatedForSubmit,
+    onLoaded: reviewSavedConflicts,
   });
   const existingResponseSlice = ownAnswers.slice || formResponseSlice;
   const existingResponsesRef = useRef(existingResponseSlice);
@@ -702,6 +708,8 @@ function SessionInterviewPanel({
     if (pendingSubmitBaseContextRef.current !== baseSubmitContextToken) return;
     if (pendingSubmitActiveContextRef.current && pendingSubmitActiveContextRef.current !== activeSubmitContextToken)
       return;
+    // Legacy Workers have no own-answer load, so check the hydrated form state here.
+    if (ownAnswers.legacy && reviewSavedConflicts(existingResponsesRef.current)) return;
     void applyDrafts();
   }, [
     activeSubmitContextToken,
@@ -710,8 +718,10 @@ function SessionInterviewPanel({
     authenticatedForSubmit,
     baseSubmitContextToken,
     isInterviewBusy,
+    ownAnswers.legacy,
     pendingSubmitAfterLogin,
     responseStateReadyForSubmit,
+    reviewSavedConflicts,
   ]);
 
   const copyAgentPrompt = async () => {
