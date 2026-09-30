@@ -3,13 +3,21 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import type { AtlasViewProps } from '../DebateMap/debateMapTypes';
 
-const mockCircles = jest.fn();
+const mockCircles = jest.fn((props: AtlasViewProps) => props);
 jest.mock('../DebateMap/DebateMap', () => ({
   AtlasView: (props: AtlasViewProps) => {
     mockCircles(props);
-    return <div>{props.data.flatMap(group => group.children || []).map(topic => (
-      <button key={topic.id} onClick={() => props.onNodeClick(topic)}>{topic.name}</button>
-    ))}</div>;
+    return (
+      <div>
+        {props.data
+          .flatMap((group) => group.children || [])
+          .map((topic) => (
+            <button key={topic.id} onClick={() => props.onNodeClick(topic)}>
+              {topic.name}
+            </button>
+          ))}
+      </div>
+    );
   },
 }));
 
@@ -23,12 +31,13 @@ it('limits the preview to Reverse Alignment sessions', () => {
 it('uses shared read-only Circles with twelve empty topics and lets participants inspect them', async () => {
   render(<ReverseAlignmentTopicMap />);
   expect(await screen.findAllByRole('button')).toHaveLength(12);
-  const props = mockCircles.mock.calls.at(-1)[0];
+  const props = mockCircles.mock.calls.at(-1)?.[0];
+  if (!props) throw new Error('Atlas preview did not render');
   expect(props).toEqual(expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }));
   expect(props.data).toHaveLength(3);
-  props.data.forEach(group => {
+  props.data.forEach((group) => {
     expect(group.children).toHaveLength(4);
-    [group, ...group.children].forEach(node => {
+    [group, ...(group.children || [])].forEach((node) => {
       expect(node.questions).toEqual([]);
       expect(node.comments).toEqual([]);
       expect(node.votes).toBeUndefined();

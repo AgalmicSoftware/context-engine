@@ -881,11 +881,11 @@ describe('DebateMap', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Topic group' })).toHaveAttribute('tabindex', '0');
-    expect(screen.getByRole('button', { name: 'Topic', exact: true })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('button', { name: 'Topic' })).toHaveAttribute('tabindex', '-1');
     fireEvent.keyDown(screen.getByRole('button', { name: 'Topic group' }), { key: 'Enter' });
     expect(screen.getByRole('button', { name: /up level/i })).toBeVisible();
     expect(onNodeClick).not.toHaveBeenCalled();
-    const topic = screen.getByRole('button', { name: 'Topic', exact: true });
+    const topic = screen.getByRole('button', { name: 'Topic' });
     expect(topic).toHaveAttribute('tabindex', '0');
     fireEvent.keyDown(topic, { key: ' ' });
     expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'topic' }));
