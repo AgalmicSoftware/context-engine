@@ -156,6 +156,8 @@ export default function QuadraticAllocationInput({
   const spent = quadraticCreditsSpent(votes);
   // Keep a fixed, symmetric scale so neutral never moves as other options change.
   const limit = Math.floor(Math.sqrt(budget));
+  // Keep the help example enactable on small budgets.
+  const example = Math.min(7, limit);
   const updateVote = (index: number, requested: number) => {
     if (disabled || !Number.isSafeInteger(requested)) return;
     const available = budget - (spent - votes[index] ** 2);
@@ -216,8 +218,8 @@ export default function QuadraticAllocationInput({
           innerClassName={styles.helpContent}
           popperClassName={styles.helpTooltip}
         >
-          Votes cost their square: +7 or −7 uses 49 credits. Share your {budget} credits across the options. You may
-          leave credits unused.
+          Votes cost their square: +{example} or −{example} uses {example ** 2} credit{example === 1 ? '' : 's'}. Share
+          your {budget} credit{budget === 1 ? '' : 's'} across the options. You may leave credits unused.
         </CETooltip>
         <span className={styles.support}>+ Support</span>
       </div>
