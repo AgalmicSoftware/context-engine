@@ -1,8 +1,5 @@
 /** @file SiteLoadOptions.tsx */
 import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import { fetchSessionState } from '../../actions/sessionStateActions.js';
-import type { RootState } from '../../reducers/index.js';
 
 // CSS and images
 import 'assets/css/contextEngine.scss';
@@ -12,7 +9,6 @@ import styles from './Modals.module.scss';
 import { Card, CardFooter } from 'reactstrap';
 
 // Components
-import GreetingModal from './GreetingModal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWindowClose, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
@@ -24,9 +20,6 @@ const uiLog = createLogger('ui');
 const buildClassName = (classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 type SiteLoadOptionsProps = {
-  fetchSessionState: () => void;
-  account?: string | null;
-  provider?: string | null;
   arrowIndex: number;
   sidebarOpen?: boolean;
   closeSidebarFunction: () => void;
@@ -35,61 +28,18 @@ type SiteLoadOptionsProps = {
 };
 
 type SiteLoadOptionsState = {
-  explainerModalOpen: boolean;
-  sidebarNotClosed: boolean;
-  userOptsOutMetrics: boolean;
   metricsDetailsSelected: boolean;
 };
 
 class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsState> {
   state: SiteLoadOptionsState = {
-    explainerModalOpen: false,
-    sidebarNotClosed: false,
-    userOptsOutMetrics: true,
     metricsDetailsSelected: false,
   };
 
-  componentDidMount() {
-    this.setState({ sidebarNotClosed: true });
-  }
-
-  componentWillUnmount() {}
-
-  componentDidUpdate() {
-    if (this.state.sidebarNotClosed !== this.props.sidebarOpen) {
-      this.setState({ sidebarNotClosed: !!this.props.sidebarOpen });
-    }
-  }
-
-  toggleSidebar = () => {
-    this.setState({ sidebarNotClosed: !this.state.sidebarNotClosed });
-  };
-
-  optOutChanged = () => {
-    uiLog.log('metrics opt-out state changed to: ' + !this.state.userOptsOutMetrics);
-    this.setState({ userOptsOutMetrics: !this.state.userOptsOutMetrics });
-
-    if (!this.state.userOptsOutMetrics) {
-    } else {
-    }
-  };
-
   closeBetaSidebar = () => {
-    this.setState({ sidebarNotClosed: false });
-
     if (this.props.sidebarOpen) {
       this.props.closeSidebarFunction();
     }
-  };
-
-  toggleExplainerModal = (_arrowIndex: number) => {};
-
-  openExplainerModal = () => {
-    this.setState({ explainerModalOpen: true });
-  };
-
-  closeExplainerModal = () => {
-    this.setState({ explainerModalOpen: false });
   };
 
   // If someone clicks question mark next to metrics tracking option,
@@ -101,11 +51,9 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
   render() {
     // If exit button is hit, sidebar disappears
-    const sidebarExited = !this.state.sidebarNotClosed;
+    const sidebarExited = !this.props.sidebarOpen;
 
     const sidebarVisibleClassName = sidebarExited ? styles.isSidebarCollapsed : styles.welcomeSlideSidebar;
-
-    // Explanation modal (only seen on first site-load)
 
     const closeModalIcon = faWindowClose;
 
@@ -122,8 +70,7 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
     const metricsDetailsClassName = this.state.metricsDetailsSelected ? styles.metricsDetailsPanel : styles.isHidden;
 
-    const slideButtonClickHandler =
-      this.props.arrowIndex === 0 ? this.props.clickRightArrow : () => this.toggleExplainerModal(this.props.arrowIndex);
+    const slideButtonClickHandler = this.props.arrowIndex === 0 ? this.props.clickRightArrow : undefined;
 
     const metricsDetailExplainer = (
       <Card className={metricsDetailsClassName}>
@@ -161,7 +108,6 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
     const explainModal = (
       <>
-        <GreetingModal visible={this.state.explainerModalOpen} closeExplainerFunction={this.closeExplainerModal} />
         <div className={styles.welcomeSlideEmbed}>
           <CardFooter className={styles.welcomeSlideFooter}>
             <WelcomeSlideRenderer
@@ -192,9 +138,4 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
   }
 }
 
-const mapStateToProps = (state: RootState) => ({
-  account: state.profile.account,
-  provider: state.profile.provider,
-});
-
-export default connect(mapStateToProps, { fetchSessionState })(SiteLoadOptions);
+export default SiteLoadOptions;

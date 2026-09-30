@@ -3,37 +3,6 @@
 /* --- GreetingModal.tsx --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  .rulesModal {
-    transform: none;
-
-    .rulesModalCard {
-      justify-content: flex-end;
-    }
-
-    .rulesModalCardBody {
-      height: 450px;
-    }
-
-    .optOutMainText {
-      font-size: 0.9em;
-    }
-
-    .optOutDetailText {
-      font-size: 0.75em;
-      opacity: 0.5;
-    }
-
-    .optOutWeb3Text {
-      font-size: 1em;
-    }
-
-    .closeModalIcon {
-      font-size: 2.5em;
-      color: var(--ce-status-info);
-      margin-bottom: 20px;
-    }
-  }
-
   .closeModalIcon {
     font-size: 1.5em;
     color: var(--ce-status-info);
@@ -48,76 +17,11 @@
     width: 100%;
     padding: 0px;
 
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetrics {
-      margin-top: 0px;
-      display: flex;
-      flex-direction: row;
-      padding-left: 5px;
-
-      .optOutLabel {
-        display: inline-flex;
-        color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-      }
-
-      .optOutSelect {
-        align-self: center;
-        margin-top: 0px;
-        transform: scale(0.7);
-        opacity: 0.6;
-      }
-    }
-
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetricsSidebar {
-      .optOutMetrics {
-        margin-top: 0px;
-        display: flex;
-        flex-direction: row;
-        padding-left: 0px;
-        padding-right: 0px;
-
-        .optOutLabel {
-          padding-top: 10px;
-          display: flex;
-          flex-direction: row;
-          color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          width: 100%;
-        }
-
-        .optOutSelect {
-          align-self: center;
-          margin-top: 0px;
-          transform: scale(0.7);
-          opacity: 0.6;
-        }
-      }
-    }
-
-    .optOutMainText {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      align-self: center;
-      justify-self: center;
-      font-family: var(--ce-font-body);
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 0.8em;
-      color: color-mix(in srgb, var(--ce-status-warning) 69%, transparent);
-    }
-
     .metricsInfoIcon {
       align-self: flex-start;
       color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
       font-size: 1.2em;
       padding-left: 2px;
-    }
-
-    .optOutDetailText {
-      display: inline-flex;
-      opacity: 0.5;
-      font-size: 0.75em;
     }
 
     .welcomeSlideSidebar {
@@ -148,11 +52,6 @@
         color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
         font-weight: 600;
         background: transparent;
-
-        .noSpam {
-          display: inline;
-          opacity: 0.35;
-        }
       }
 
       .emailSubjects {
@@ -170,29 +69,6 @@
           font-weight: 600;
         }
       }
-
-      .enterEmail {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        height: 25px;
-        border-style: solid;
-        border-radius: var(--ce-radius-3);
-        border-width: 1px;
-        border-color: transparent;
-        background: var(--ce-color-white);
-        color: var(--ce-document-text);
-        font-size: 1em;
-        margin-bottom: 0px;
-
-        .emailInput {
-          border: none;
-          padding-left: 10px;
-          padding-top: 10px;
-          color: var(--ce-status-info);
-          font-size: 0.6em;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -205,23 +81,6 @@
       background: transparent;
       width: 100%;
       padding: 0px;
-
-      .getUpdates {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        width: 100%;
-        padding-left: 0px;
-        padding-right: 0px;
-        color: var(--ce-text-inverse);
-        padding-top: 5px;
-        padding-bottom: 10px;
-        padding-left: 5px;
-        padding-right: 5px;
-        background: transparent;
-        opacity: 0.6;
-        height: 50%;
-      }
 
       .welcomeSlideMediaButton {
         width: 65%;
@@ -241,47 +100,10 @@
         height: clamp(180px, 40vw, 230px);
       }
     }
-
-    .exitButton {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 10px;
-    }
   }
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  .rulesModal {
-    transform: none;
-
-    .rulesModalCard {
-      justify-content: flex-end;
-    }
-
-    .rulesModalCardBody {
-      height: 500px;
-    }
-
-    .optOutMainText {
-      font-size: 1em;
-    }
-
-    .optOutDetailText {
-      font-size: 0.75em;
-    }
-
-    .optOutWeb3Text {
-      font-size: 1em;
-    }
-
-    .closeModalIcon {
-      font-size: 2.5em;
-      color: var(--ce-text-inverse);
-      opacity: 0.75;
-    }
-  }
-
   .closeModalIcon {
     font-size: 2em;
     color: var(--ce-status-info);
@@ -296,76 +118,11 @@
     width: 100%;
     padding: 0px;
 
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetrics {
-      margin-top: 0px;
-      display: flex;
-      flex-direction: row;
-      padding-left: 5px;
-
-      .optOutLabel {
-        display: inline-flex;
-        color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-      }
-
-      .optOutSelect {
-        align-self: center;
-        margin-top: 0px;
-        transform: scale(0.7);
-        opacity: 0.6;
-      }
-    }
-
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetricsSidebar {
-      .optOutMetrics {
-        margin-top: 0px;
-        display: flex;
-        flex-direction: row;
-        padding-left: 0px;
-        padding-right: 0px;
-
-        .optOutLabel {
-          padding-top: 10px;
-          display: flex;
-          flex-direction: row;
-          color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          width: 100%;
-        }
-
-        .optOutSelect {
-          align-self: center;
-          margin-top: 0px;
-          transform: scale(0.7);
-          opacity: 0.6;
-        }
-      }
-    }
-
-    .optOutMainText {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      align-self: center;
-      justify-self: center;
-      font-family: var(--ce-font-body);
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 0.8em;
-      color: color-mix(in srgb, var(--ce-status-warning) 69%, transparent);
-    }
-
     .metricsInfoIcon {
       align-self: flex-start;
       color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
       font-size: 1.2em;
       padding-left: 2px;
-    }
-
-    .optOutDetailText {
-      display: inline-flex;
-      opacity: 0.5;
-      font-size: 0.75em;
     }
 
     .welcomeSlideSidebar {
@@ -396,11 +153,6 @@
         color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
         font-weight: 600;
         background: transparent;
-
-        .noSpam {
-          display: inline;
-          opacity: 0.35;
-        }
       }
 
       .emailSubjects {
@@ -418,29 +170,6 @@
           font-weight: 600;
         }
       }
-
-      .enterEmail {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        height: 25px;
-        border-style: solid;
-        border-radius: var(--ce-radius-3);
-        border-width: 1px;
-        border-color: transparent;
-        background: var(--ce-color-white);
-        color: var(--ce-document-text);
-        font-size: 1em;
-        margin-bottom: 0px;
-
-        .emailInput {
-          border: none;
-          padding-left: 10px;
-          padding-top: 10px;
-          color: var(--ce-status-info);
-          font-size: 0.75em;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -453,23 +182,6 @@
       background: transparent;
       width: 100%;
       padding: 0px;
-
-      .getUpdates {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        width: 100%;
-        padding-left: 0px;
-        padding-right: 0px;
-        color: var(--ce-text-inverse);
-        padding-top: 10px;
-        padding-bottom: 15px;
-        padding-left: 10px;
-        padding-right: 10px;
-        background: transparent;
-        opacity: 0.6;
-        height: 50%;
-      }
 
       .welcomeSlideMediaButton {
         width: 65%;
@@ -489,47 +201,10 @@
         height: clamp(180px, 40vw, 230px);
       }
     }
-
-    .exitButton {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 10px;
-    }
   }
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  .rulesModal {
-    transform: none;
-
-    .rulesModalCard {
-      justify-content: flex-end;
-    }
-
-    .rulesModalCardBody {
-      height: 575px;
-    }
-
-    .optOutMainText {
-      font-size: 1.15em;
-    }
-
-    .optOutDetailText {
-      font-size: 1em;
-    }
-
-    .optOutWeb3Text {
-      font-size: 1.25em;
-    }
-
-    .closeModalIcon {
-      font-size: 2.5em;
-      color: var(--ce-text-inverse);
-      opacity: 0.75;
-    }
-  }
-
   .closeModalIcon {
     font-size: 2.25em;
     color: var(--ce-status-info);
@@ -544,77 +219,11 @@
     width: 100%;
     padding: 0px;
 
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetrics {
-      margin-top: 0px;
-      display: flex;
-      flex-direction: row;
-      padding-left: 5px;
-
-      .optOutLabel {
-        display: inline-flex;
-        color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-      }
-
-      .optOutSelect {
-        align-self: center;
-        margin-top: 0px;
-        transform: scale(0.7);
-        opacity: 0.6;
-      }
-    }
-
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetricsSidebar {
-      .optOutMetrics {
-        margin-top: 0px;
-        display: flex;
-        flex-direction: row;
-        padding-left: 0px;
-        padding-right: 0px;
-
-        .optOutLabel {
-          padding-top: 10px;
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          width: 100%;
-        }
-
-        .optOutSelect {
-          align-self: center;
-          margin-top: 0px;
-          transform: scale(0.7);
-          opacity: 0.6;
-        }
-      }
-    }
-
-    .optOutMainText {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      align-self: center;
-      justify-self: center;
-      font-family: var(--ce-font-body);
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 1.35em;
-      color: color-mix(in srgb, var(--ce-status-warning) 69%, transparent);
-    }
-
     .metricsInfoIcon {
       align-self: flex-start;
       color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
       font-size: 1.4em;
       padding-left: 4px;
-    }
-
-    .optOutDetailText {
-      display: inline-flex;
-      opacity: 0.5;
-      font-size: 0.75em;
     }
 
     .welcomeSlideSidebar {
@@ -646,11 +255,6 @@
         font-weight: 600;
         background: transparent;
         margin-top: 10px;
-
-        .noSpam {
-          display: inline;
-          opacity: 0.35;
-        }
       }
 
       .emailSubjects {
@@ -668,29 +272,6 @@
           font-weight: 600;
         }
       }
-
-      .enterEmail {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        height: 25px;
-        border-style: solid;
-        border-radius: var(--ce-radius-3);
-        border-width: 1px;
-        border-color: transparent;
-        background: var(--ce-color-white);
-        color: var(--ce-document-text);
-        font-size: 1em;
-        margin-bottom: 0px;
-
-        .emailInput {
-          border: none;
-          padding-left: 10px;
-          padding-top: 10px;
-          color: var(--ce-status-info);
-          font-size: 0.85em;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -704,24 +285,6 @@
       background: transparent;
       width: 100%;
       padding: 0px;
-
-      .getUpdates {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        width: 100%;
-        padding-left: 0px;
-        padding-right: 0px;
-        color: var(--ce-text-inverse);
-        padding-top: 10px;
-        padding-bottom: 15px;
-        padding-left: 15px;
-        padding-right: 15px;
-        background: transparent;
-        opacity: 0.6;
-        height: 50%;
-        font-size: 1.2em;
-      }
 
       .welcomeSlideMediaButton {
         width: 65%;
@@ -741,47 +304,10 @@
         height: clamp(220px, 38vw, 285px);
       }
     }
-
-    .exitButton {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 10px;
-    }
   }
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  .rulesModal {
-    transform: none;
-
-    .rulesModalCard {
-      justify-content: flex-end;
-    }
-
-    .rulesModalCardBody {
-      height: 650px;
-    }
-
-    .optOutMainText {
-      font-size: 1.5em;
-    }
-
-    .optOutDetailText {
-      font-size: 1.25em;
-    }
-
-    .optOutWeb3Text {
-      font-size: 1.5em;
-    }
-
-    .closeModalIcon {
-      font-size: 2.5em;
-      color: var(--ce-text-inverse);
-      opacity: 0.75;
-    }
-  }
-
   .closeModalIcon {
     font-size: 2.5em;
     color: var(--ce-status-info);
@@ -796,78 +322,11 @@
     width: 100%;
     padding: 0px;
 
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetrics {
-      margin-top: 0px;
-      display: flex;
-      flex-direction: row;
-      padding-left: 5px;
-
-      .optOutLabel {
-        display: inline-flex;
-        color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-      }
-
-      .optOutSelect {
-        align-self: center;
-        margin-top: 0px;
-        transform: scale(0.7);
-        opacity: 0.6;
-      }
-    }
-
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetricsSidebar {
-      .optOutMetrics {
-        margin-top: 0px;
-        display: flex;
-        flex-direction: row;
-        padding-left: 10px;
-        padding-right: 0px;
-        padding-top: 10px;
-
-        .optOutLabel {
-          padding-top: 10px;
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          width: 100%;
-        }
-
-        .optOutSelect {
-          align-self: center;
-          margin-top: 0px;
-          transform: scale(0.75);
-          opacity: 0.6;
-        }
-      }
-    }
-
-    .optOutMainText {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      align-self: center;
-      justify-self: center;
-      font-family: var(--ce-font-body);
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 1.5em;
-      color: color-mix(in srgb, var(--ce-status-warning) 69%, transparent);
-    }
-
     .metricsInfoIcon {
       align-self: flex-start;
       color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
       font-size: 1.4em;
       padding-left: 4px;
-    }
-
-    .optOutDetailText {
-      display: inline-flex;
-      opacity: 0.5;
-      font-size: 0.75em;
     }
 
     .welcomeSlideSidebar {
@@ -901,11 +360,6 @@
         font-weight: 600;
         background: transparent;
         margin-top: 10px;
-
-        .noSpam {
-          display: inline;
-          opacity: 0.35;
-        }
       }
 
       .emailSubjects {
@@ -923,29 +377,6 @@
           font-weight: 600;
         }
       }
-
-      .enterEmail {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        height: 35px;
-        border-style: solid;
-        border-radius: var(--ce-radius-3);
-        border-width: 1px;
-        border-color: transparent;
-        background: var(--ce-color-white);
-        color: var(--ce-document-text);
-        font-size: 1em;
-        margin-bottom: 0px;
-
-        .emailInput {
-          border: none;
-          padding-left: 10px;
-          padding-top: 10px;
-          color: var(--ce-status-info);
-          font-size: 0.85em;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -959,24 +390,6 @@
       background: transparent;
       width: 100%;
       padding: 0px;
-
-      .getUpdates {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        width: 100%;
-        padding-left: 0px;
-        padding-right: 0px;
-        color: var(--ce-text-inverse);
-        padding-top: 15px;
-        padding-bottom: 20px;
-        padding-left: 20px;
-        padding-right: 20px;
-        background: transparent;
-        opacity: 0.6;
-        height: 50%;
-        font-size: 1.3em;
-      }
 
       .welcomeSlideMediaButton {
         width: 65%;
@@ -996,47 +409,10 @@
         height: clamp(280px, 31vw, 340px);
       }
     }
-
-    .exitButton {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 10px;
-    }
   }
 }
 
 @media (min-width: 1367px) {
-  .rulesModal {
-    transform: none;
-
-    .rulesModalCard {
-      justify-content: flex-end;
-    }
-
-    .rulesModalCardBody {
-      height: 1000px;
-    }
-
-    .optOutMainText {
-      font-size: 1.75em;
-    }
-
-    .optOutDetailText {
-      font-size: 1.25em;
-    }
-
-    .optOutWeb3Text {
-      font-size: 1.5em;
-    }
-
-    .closeModalIcon {
-      font-size: 3.5em;
-      color: var(--ce-text-inverse);
-      opacity: 0.75;
-    }
-  }
-
   .closeModalIcon {
     font-size: 3em;
     color: var(--ce-status-info);
@@ -1052,76 +428,11 @@
     padding: 0px;
     margin-top: 0px;
 
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetrics {
-      margin-top: 0px;
-      display: flex;
-      flex-direction: row;
-      padding-left: 5px;
-
-      .optOutLabel {
-        display: inline-flex;
-        color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-      }
-
-      .optOutSelect {
-        align-self: center;
-        margin-top: 0px;
-        transform: scale(0.85);
-        opacity: 0.6;
-      }
-    }
-
-    // Used when opt-out option is above the email updates sidebar / explainer button
-    .optOutMetricsSidebar {
-      .optOutMetrics {
-        margin-top: 0px;
-        display: flex;
-        flex-direction: row;
-        padding-left: 15px;
-        padding-top: 15px;
-
-        .optOutLabel {
-          padding-top: 10px;
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          width: 100%;
-        }
-
-        .optOutSelect {
-          align-self: center;
-          margin-top: 0px;
-          opacity: 0.7;
-        }
-      }
-    }
-
-    .optOutMainText {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      align-self: center;
-      justify-self: center;
-      font-family: var(--ce-font-body);
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 1.75em;
-      color: color-mix(in srgb, var(--ce-status-warning) 69%, transparent);
-    }
-
     .metricsInfoIcon {
       align-self: center;
       color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
       font-size: 2.4em;
       padding-left: 9px;
-    }
-
-    .optOutDetailText {
-      display: inline-flex;
-      opacity: 0.5;
-      font-size: 0.75em;
     }
 
     .welcomeSlideSidebar {
@@ -1156,11 +467,6 @@
         font-weight: 600;
         background: transparent;
         margin-top: 10px;
-
-        .noSpam {
-          display: inline;
-          opacity: 0.35;
-        }
       }
 
       .emailSubjects {
@@ -1176,29 +482,6 @@
           color: var(--ce-color-white);
           text-transform: uppercase;
           font-weight: 600;
-        }
-      }
-
-      .enterEmail {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        height: 50px;
-        border-style: solid;
-        border-radius: var(--ce-radius-3);
-        border-width: 1px;
-        border-color: transparent;
-        background: var(--ce-color-white);
-        color: var(--ce-document-text);
-        font-size: 1em;
-        margin-bottom: 0px;
-
-        .emailInput {
-          border: none;
-          padding-left: 10px;
-          padding-top: 10px;
-          color: var(--ce-status-info);
-          font-size: 0.85em;
         }
       }
     }
@@ -1217,24 +500,6 @@
       width: 100%;
       padding: 0px;
 
-      .getUpdates {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        width: 100%;
-        padding-left: 0px;
-        padding-right: 0px;
-        color: var(--ce-text-inverse);
-        padding-top: 15px;
-        padding-bottom: 20px;
-        padding-left: 20px;
-        padding-right: 20px;
-        background: transparent;
-        opacity: 0.6;
-        height: 50%;
-        font-size: 1.4em;
-      }
-
       .welcomeSlideMediaButton {
         width: 70%;
         display: flex;
@@ -1252,183 +517,6 @@
         height: 380px;
       }
     }
-
-    .exitButton {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 10px;
-    }
-  }
-}
-
-.isClosed {
-  display: none;
-}
-
-.rulesModal {
-  width: 95%;
-  height: 100%;
-  display: flex !important;
-  flex-direction: column;
-  justify-content: flex-end;
-
-  .rulesModalCard {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background-color: transparent !important;
-    z-index: 10;
-    padding: 0px;
-    border-radius: var(--ce-radius-0);
-    width: 100%;
-  }
-
-  .rulesModalCardBody {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background-size: contain;
-    background-color: transparent !important;
-    z-index: 10;
-    padding: 0px;
-    border-radius: var(--ce-radius-0);
-    width: 100%;
-  }
-
-  .rulesModalFooter {
-    display: flex;
-    display: flex;
-    flex-direction: row-reverse;
-    justify-content: space-between;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    padding-left: 5px;
-    padding-right: 5px;
-    margin-top: 0px;
-  }
-
-  .optOutMetrics {
-    margin-top: 0px;
-    display: flex;
-    flex-direction: row;
-    padding-left: 10px;
-    padding-top: 25px;
-
-    .optOutLabel {
-      display: inline-flex;
-    }
-
-    .optOutLabelEmbed {
-      display: inline-flex;
-    }
-
-    .optOutSelect {
-      align-self: center;
-      margin-top: 0px;
-    }
-  }
-
-  .optOutMainText {
-    font-family: var(--ce-font-body);
-    display: inline;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding-left: 0.5em;
-  }
-
-  .optOutDetailText {
-    display: inline-flex;
-    opacity: 0.5;
-    font-size: 0.75em;
-  }
-
-  .optOutWeb3Text {
-    display: inline;
-    font-weight: 600;
-    text-transform: uppercase;
-    opacity: 1;
-    color: var(--ce-status-success-bright);
-  }
-}
-
-.updatesPanel {
-  font-family: var(--ce-font-body);
-  display: flex;
-  flex-direction: column;
-  border-style: solid;
-  border-color: var(--ce-status-info);
-  border-width: 1.5px;
-  background-color: var(--ce-overlay-base);
-  border-radius: var(--ce-radius-5);
-  margin-bottom: 10px;
-
-  .emailAndOptOut {
-    display: flex;
-    flex-direction: column;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    padding-left: 5px;
-    padding-right: 5px;
-  }
-
-  .emailFormLabel {
-    align-self: center;
-    font-size: 0.95em;
-    margin: 0;
-    padding-top: 5px;
-    padding-left: 5px;
-    text-transform: uppercase;
-    color: var(--ce-status-info);
-    font-weight: 600;
-    background: transparent;
-
-    .noSpam {
-      display: inline;
-      opacity: 0.35;
-    }
-  }
-
-  .emailSubjects {
-    display: flex;
-    flex-direction: column;
-    padding-left: 10px;
-    padding-bottom: 5px;
-
-    .emailSubject {
-      display: flex;
-      flex-direction: column;
-      font-size: 0.8em;
-      color: var(--ce-text-inverse);
-      text-transform: uppercase;
-      font-weight: 600;
-    }
-  }
-
-  .enterEmail {
-    display: inline;
-    border-style: solid;
-    border-radius: var(--ce-radius-5);
-    border-width: 1px;
-    border-color: var(--ce-status-info);
-    background: var(--ce-color-white) !important;
-    color: var(--ce-overlay-base);
-    font-size: 0.9em;
-    opacity: 1;
-    width: 80%;
-
-    .emailInput {
-      border: none;
-      padding-left: 10px;
-      padding-top: 10px;
-    }
-  }
-
-  .exitButton {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding: 10px;
   }
 }
 
@@ -1528,18 +616,6 @@
     font-weight: 600;
     padding-bottom: 5px;
   }
-}
-
-.isHiddenGetUpdates {
-  display: none;
-}
-
-.isHiddenSubmitEmailButton {
-  display: none;
-}
-
-.closeExplainerModalButton {
-  margin-bottom: 50px;
 }
 
 .closeModalIcon {

@@ -5,7 +5,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SiteLoadOptions from './SiteLoadOptions';
 
-jest.mock('./GreetingModal', () => () => <div data-testid="mock-greeting-modal" />);
 jest.mock('utilities/logging.js', () => ({
   createLogger: () => ({
     log: jest.fn(),
