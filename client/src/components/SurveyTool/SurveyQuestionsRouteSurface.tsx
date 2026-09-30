@@ -1,6 +1,6 @@
 import React from 'react';
 
-import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
+import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsRouteBodySection from './SurveyQuestionsRouteBodySection';
 import SurveyQuestionsTagModalSlot from './SurveyQuestionsTagModalSlot';
@@ -48,8 +48,8 @@ const SurveyQuestionsRouteSurface = ({
         viewingAnswers={viewingAnswers}
       />
 
-      <SurveyQuestionsJsonRouteSection
-        bottomRef={jsonControlsProps.bottomRef}
+      <SurveyQuestionsJsonControls
+        ref={jsonControlsProps.bottomRef}
         copiedQuestionsJson={jsonControlsProps.copiedQuestionsJson}
         copiedResponseJson={jsonControlsProps.copiedResponseJson}
         copiedSurveyJson={jsonControlsProps.copiedSurveyJson}

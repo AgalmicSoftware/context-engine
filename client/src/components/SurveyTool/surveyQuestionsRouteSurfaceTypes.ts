@@ -149,8 +149,6 @@ export type SurveyQuestionsResponseRouteSectionProps = {
   routeViewDisplayState?: Partial<SurveyQuestionsRouteViewDisplayState>;
 };
 
-export type SurveyQuestionsJsonRouteSectionProps = SurveyQuestionsRouteJsonControlsProps;
-
 export type SurveyQuestionsTagModalSlotProps = {
   layoutDisplayState?: Partial<SurveyQuestionsLayoutDisplayState>;
   tagModalProps?: SurveyQuestionsRouteTagModalProps;
