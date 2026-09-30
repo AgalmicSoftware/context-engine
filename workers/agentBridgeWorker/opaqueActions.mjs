@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { stableJson } from './runtimePrimitives.mjs';
+import { bytesToHex, stableJson } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 const ACTION_ID_RE = /^ceab_[a-z0-9]{10,50}$/;
@@ -15,10 +15,6 @@ function stableHash(seed = '') {
 export function buildSubmitIdempotencyKey({ transport, principal, sessionSlug, questionId, answer }) {
   const fingerprint = stableHash(stableJson({ questionId, answer }));
   return `${transport}:${principal}:${sessionSlug}:${fingerprint}`;
-}
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function buildId(prefix, pattern, seed) {
@@ -42,10 +38,7 @@ export function buildTelegramStartId(seed = '') {
   return buildId('cetg_', START_ID_RE, seed);
 }
 
-export function buildRandomTelegramCallbackId({
-  byteLength = 16,
-  cryptoImpl = globalThis.crypto,
-} = {}) {
+export function buildRandomTelegramCallbackId({ byteLength = 16, cryptoImpl = globalThis.crypto } = {}) {
   const length = Math.max(16, Math.min(32, Math.floor(Number(byteLength) || 16)));
   if (!cryptoImpl || typeof cryptoImpl.getRandomValues !== 'function') {
     throw new Error('Secure random source unavailable.');
@@ -59,10 +52,7 @@ export function buildRandomTelegramCallbackId({
   return id;
 }
 
-export function buildRandomTelegramStartId({
-  byteLength = 16,
-  cryptoImpl = globalThis.crypto,
-} = {}) {
+export function buildRandomTelegramStartId({ byteLength = 16, cryptoImpl = globalThis.crypto } = {}) {
   const length = Math.max(16, Math.min(29, Math.floor(Number(byteLength) || 16)));
   if (!cryptoImpl || typeof cryptoImpl.getRandomValues !== 'function') {
     throw new Error('Secure random source unavailable.');
@@ -114,13 +104,10 @@ export function createTelegramCallbackAction(input = {}) {
   };
 }
 
-export function createRandomTelegramCallbackAction({
-  action = '',
-  lane = '',
-  serverContextRef = {},
-  expiresAt = null,
-  createdAt = null,
-} = {}, options = {}) {
+export function createRandomTelegramCallbackAction(
+  { action = '', lane = '', serverContextRef = {}, expiresAt = null, createdAt = null } = {},
+  options = {},
+) {
   const callbackData = buildRandomTelegramCallbackId(options);
   const record = {
     type: 'agent_bridge_opaque_action',
@@ -143,13 +130,10 @@ export function createTelegramStartAction(input = {}) {
   };
 }
 
-export function createRandomTelegramStartAction({
-  action = '',
-  lane = '',
-  serverContextRef = {},
-  expiresAt = null,
-  createdAt = null,
-} = {}, options = {}) {
+export function createRandomTelegramStartAction(
+  { action = '', lane = '', serverContextRef = {}, expiresAt = null, createdAt = null } = {},
+  options = {},
+) {
   const deepLinkPayload = buildRandomTelegramStartId(options);
   const record = {
     type: 'agent_bridge_opaque_action',

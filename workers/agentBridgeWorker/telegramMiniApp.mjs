@@ -15,6 +15,7 @@ import {
   kvKeySafePart,
   envFlagEnabled,
   sanitizeSessionSlug,
+  bytesToHex,
 } from './runtimePrimitives.mjs';
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
 import {
@@ -579,10 +580,6 @@ function html(text, init = {}) {
       ...(init.headers || {}),
     },
   });
-}
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function hmacSha256Bytes(keyBytes, data = '') {

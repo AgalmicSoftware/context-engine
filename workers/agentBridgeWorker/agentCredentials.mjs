@@ -1,4 +1,4 @@
-import { safeString, safeJsonParse, nowIso } from './runtimePrimitives.mjs';
+import { safeString, safeJsonParse, nowIso, sha256Hex } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 import { createOpaqueAgentPrincipalId, normalizeAgentPrincipal, isPreviewPrincipal } from './agentPrincipal.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -55,8 +55,6 @@ export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS = AGENT_CREDENT
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES = AGENT_CREDENTIAL_SCOPES;
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES = AGENT_CREDENTIAL_DEFAULT_SCOPES;
 
-const textEncoder = new TextEncoder();
-
 function normalizeSessionId(value = '') {
   const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
   return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? `0x${normalized}` : '';
@@ -87,15 +85,6 @@ function randomSecret(byteLength = 32) {
   const bytes = new Uint8Array(byteLength);
   globalThis.crypto.getRandomValues(bytes);
   return base64Url(bytes);
-}
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function sha256Hex(input = '') {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
-  return bytesToHex(new Uint8Array(digest));
 }
 
 function tokenKvKey(tokenHash = '') {

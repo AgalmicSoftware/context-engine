@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { safeString } from './runtimePrimitives.mjs';
+import { safeString, sha256Hex } from './runtimePrimitives.mjs';
 
 import { performance } from 'node:perf_hooks';
 
@@ -27,13 +27,28 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     inviteToken: safeString(flags['invite-token'] || env.AGENT_ONLY_LOAD_INVITE_TOKEN),
     adminToken: safeString(flags['admin-token'] || env.AGENT_ONLY_LOAD_ADMIN_TOKEN || env.AGENT_BRIDGE_AGENT_API_TOKEN),
     sessionSlug: safeString(flags['session-slug'] || env.AGENT_ONLY_LOAD_SESSION_SLUG || 'session-wrapped'),
-    principals: Math.max(1, Number(flags.principals || env.AGENT_ONLY_LOAD_PRINCIPALS || DEFAULT_PRINCIPALS) || DEFAULT_PRINCIPALS),
-    concurrency: Math.max(1, Number(flags.concurrency || env.AGENT_ONLY_LOAD_CONCURRENCY || DEFAULT_CONCURRENCY) || DEFAULT_CONCURRENCY),
-    timeoutMs: Math.max(1000, Number(flags['timeout-ms'] || env.AGENT_ONLY_LOAD_TIMEOUT_MS || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS),
+    principals: Math.max(
+      1,
+      Number(flags.principals || env.AGENT_ONLY_LOAD_PRINCIPALS || DEFAULT_PRINCIPALS) || DEFAULT_PRINCIPALS,
+    ),
+    concurrency: Math.max(
+      1,
+      Number(flags.concurrency || env.AGENT_ONLY_LOAD_CONCURRENCY || DEFAULT_CONCURRENCY) || DEFAULT_CONCURRENCY,
+    ),
+    timeoutMs: Math.max(
+      1000,
+      Number(flags['timeout-ms'] || env.AGENT_ONLY_LOAD_TIMEOUT_MS || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS,
+    ),
     userStart: Math.max(1, Number(flags['user-start'] || env.AGENT_ONLY_LOAD_USER_START || 9000000000) || 9000000000),
     requestPrefix: safeString(flags['request-prefix'] || env.AGENT_ONLY_LOAD_REQUEST_PREFIX || `ao-load-${Date.now()}`),
-    statementLimit: Math.max(1, Math.min(50, Number(flags['statement-limit'] || env.AGENT_ONLY_LOAD_STATEMENT_LIMIT || 50) || 50)),
-    replayPercent: Math.max(0, Math.min(100, Number(flags['replay-percent'] || env.AGENT_ONLY_LOAD_REPLAY_PERCENT || 10) || 10)),
+    statementLimit: Math.max(
+      1,
+      Math.min(50, Number(flags['statement-limit'] || env.AGENT_ONLY_LOAD_STATEMENT_LIMIT || 50) || 50),
+    ),
+    replayPercent: Math.max(
+      0,
+      Math.min(100, Number(flags['replay-percent'] || env.AGENT_ONLY_LOAD_REPLAY_PERCENT || 10) || 10),
+    ),
     json: flags.json === 'true' || env.AGENT_ONLY_LOAD_JSON === '1',
   };
 }
@@ -47,18 +62,7 @@ function requireConfig(config) {
   }
 }
 
-async function sha256Hex(text) {
-  const bytes = new TextEncoder().encode(String(text));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function fetchJson(config, path, {
-  method = 'GET',
-  token = '',
-  body = null,
-  expectOk = true,
-} = {}) {
+async function fetchJson(config, path, { method = 'GET', token = '', body = null, expectOk = true } = {}) {
   const url = new URL(path, config.origin);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -145,7 +149,7 @@ function votePayload(statements, mode, principalIndex) {
   const picked = statements.slice(0, mode === 'linear' ? 10 : 4);
   const votes = picked.map((statement, index) => ({
     statement_id: statement.statement_id,
-    votes: (principalIndex + index) % 2 === 0 ? (mode === 'linear' ? 10 : 5) : (mode === 'linear' ? -10 : -5),
+    votes: (principalIndex + index) % 2 === 0 ? (mode === 'linear' ? 10 : 5) : mode === 'linear' ? -10 : -5,
   }));
   return votes.filter((entry) => entry.votes !== 0);
 }
@@ -195,7 +199,9 @@ async function runPrincipal(config, index) {
   let accepted = 0;
   let skips = 0;
   const answerRequests = [];
-  const rows = listed.statements.map((statement, statementIndex) => answerForStatement(statement, index, statementIndex));
+  const rows = listed.statements.map((statement, statementIndex) =>
+    answerForStatement(statement, index, statementIndex),
+  );
   for (const [batchIndex, batch] of chunk(rows, 50).entries()) {
     const body = {
       window_id: listed.windowId,
@@ -295,7 +301,10 @@ function percentile(values, pct) {
 
 async function optionalAdminChecks(config, summary) {
   if (!config.adminToken) return { skipped: true, reason: 'admin token not configured' };
-  const metricsQuery = new URLSearchParams({ sessionSlug: config.sessionSlug, telegramUserId: String(config.userStart) });
+  const metricsQuery = new URLSearchParams({
+    sessionSlug: config.sessionSlug,
+    telegramUserId: String(config.userStart),
+  });
   const metrics = await fetchJson(config, `/telegram/agent/api/admin/metrics?${metricsQuery}`, {
     token: config.adminToken,
   });
@@ -308,7 +317,11 @@ async function optionalAdminChecks(config, summary) {
     token: config.adminToken,
   });
   const text = safeString(exported.body?.raw || '');
-  const rows = text ? text.split(/\n+/).filter(Boolean).length : (Array.isArray(exported.body?.rows) ? exported.body.rows.length : 0);
+  const rows = text
+    ? text.split(/\n+/).filter(Boolean).length
+    : Array.isArray(exported.body?.rows)
+      ? exported.body.rows.length
+      : 0;
   return {
     skipped: false,
     metricsAgentOnly: metrics.body?.agentOnly || null,
@@ -342,19 +355,27 @@ async function main() {
       max: Math.round(Math.max(0, ...latencies)),
     },
     elapsedMs: Math.round(performance.now() - started),
-    runFingerprint: await sha256Hex(`${config.origin}|${config.sessionSlug}|${config.requestPrefix}|${config.principals}`),
+    runFingerprint: await sha256Hex(
+      `${config.origin}|${config.sessionSlug}|${config.requestPrefix}|${config.principals}`,
+    ),
   };
   summary.admin = await optionalAdminChecks(config, summary);
   if (config.json) {
     console.log(JSON.stringify(summary, null, 2));
   } else {
-    console.log(`Agent-only load test complete: ${summary.principals} principals, ${summary.accepted} accepted rows, ${summary.privacySkips} privacy skips.`);
+    console.log(
+      `Agent-only load test complete: ${summary.principals} principals, ${summary.accepted} accepted rows, ${summary.privacySkips} privacy skips.`,
+    );
     console.log(`Windows: ${summary.windows.join(', ')}; statement counts: ${summary.statementCounts.join(', ')}.`);
-    console.log(`Latency ms p50=${summary.latencyMs.p50} p95=${summary.latencyMs.p95} max=${summary.latencyMs.max}; elapsed=${summary.elapsedMs}.`);
+    console.log(
+      `Latency ms p50=${summary.latencyMs.p50} p95=${summary.latencyMs.p95} max=${summary.latencyMs.max}; elapsed=${summary.elapsedMs}.`,
+    );
     if (summary.admin?.skipped) {
       console.log(`Admin export/metrics check skipped: ${summary.admin.reason}.`);
     } else {
-      console.log(`Admin answer export rows=${summary.admin.answerExportRows}; expected accepted at least=${summary.admin.expectedAcceptedAtLeast}.`);
+      console.log(
+        `Admin answer export rows=${summary.admin.answerExportRows}; expected accepted at least=${summary.admin.expectedAcceptedAtLeast}.`,
+      );
     }
   }
 }

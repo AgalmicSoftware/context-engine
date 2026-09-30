@@ -12,7 +12,9 @@ export function lower(value) {
 // bridge's existing lowercase/filter/truncate behavior and does not substitute
 // a default-session sentinel.
 export function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
+  return lower(value)
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 128);
 }
 
 export function safeJsonParse(value, fallback = null) {
@@ -32,9 +34,7 @@ export function safeEnvJsonParse(value, fallback = null) {
   const parsed = safeJsonParse(text, parseFailed);
   if (parsed !== parseFailed) return parsed;
   const dotenvEscaped = text.includes('\\"') ? text.replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
-  return dotenvEscaped && dotenvEscaped !== text
-    ? safeJsonParse(dotenvEscaped, fallback)
-    : fallback;
+  return dotenvEscaped && dotenvEscaped !== text ? safeJsonParse(dotenvEscaped, fallback) : fallback;
 }
 
 export function nowIso(now = null) {
@@ -55,9 +55,10 @@ export function nowIsoOrCurrent(now = null) {
 export function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(',')}}`;
   }
   return JSON.stringify(value ?? null);
 }
@@ -76,7 +77,10 @@ export function stableFingerprint(value = {}) {
 export function kvKeySafePart(value = '') {
   const text = safeString(value);
   if (!text) return '';
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
+  const safe = text
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 56);
   return `${safe || 'ref'}_${stableFingerprint(text)}`;
 }
 
@@ -102,4 +106,14 @@ export function timingSafeEqualString(left = '', right = '') {
 export function operatorPreviewSecretMatches(supplied, env = {}) {
   const expected = safeString(env.AGENT_BRIDGE_PREVIEW_SECRET);
   return Boolean(expected) && timingSafeEqualString(supplied, expected);
+}
+
+export function bytesToHex(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Lowercase hex SHA-256 of UTF-8 text; falsy inputs hash as '' (legacy bridge coercion).
+export async function sha256Hex(input = '') {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(input || '')));
+  return bytesToHex(new Uint8Array(digest));
 }
