@@ -51,6 +51,7 @@ import {
   computeResponseFieldContext,
   computeSaltedCommitments as computeSharedSaltedCommitments,
   deriveKekFromSig,
+  encodePaddedEnvelopePlaintext,
   encodeValueBytes,
   getContextBytes,
   hashIdentifier,
@@ -1317,7 +1318,7 @@ const encryptField = async ({
     kind, // freeform | binary | rating | multichoice | additional (freeform)
     salt: commits.saltHex, // keep inside CEK-encrypted payload only
   };
-  const plaintextBytes = utf8e(JSON.stringify(plaintextObj));
+  const plaintextBytes = encodePaddedEnvelopePlaintext(plaintextObj);
 
   // CEK (256-bit) and content AES-GCM
   const cekRaw = new Uint8Array(32);

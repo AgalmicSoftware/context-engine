@@ -251,3 +251,29 @@ it.each(['answer', 'rating'])('encrypts an edited Only me %s while session encry
   ).resolves.toBe(field === 'rating' ? 7 : 'edited answer');
   expect(wrapWorkerResponseFieldKey).not.toHaveBeenCalled();
 });
+
+it('pads binary votes to the same ciphertext length and preserves their values', async () => {
+  const lengths = new Set<number>();
+  for (const vote of ['Agree', 'Unsure', 'Disagree']) {
+    const result = await cryptoUtils.encryptMultipleAnswers(
+      { answers: { q1: { value: vote, encrypted: true, encryptionAudience: 'self' } } },
+      {
+        ...workerContext,
+        provider: signer(owner),
+        account: owner.address,
+        questionPool: [{ id: 'q1', type: 'binary' }],
+      },
+    );
+    const envelope = result.answers.q1.encryptedPortion as string;
+    lengths.add(JSON.parse(envelope).ciphertext.length);
+    expect((Buffer.from(JSON.parse(envelope).ciphertext, 'base64').length - 16) % 128).toBe(0);
+    await expect(
+      cryptoUtils.decryptEnvelopeValue(envelope, {
+        ...workerContext,
+        providerLike: signer(owner),
+        account: owner.address,
+      }),
+    ).resolves.toBe(vote);
+  }
+  expect(lengths.size).toBe(1);
+});
