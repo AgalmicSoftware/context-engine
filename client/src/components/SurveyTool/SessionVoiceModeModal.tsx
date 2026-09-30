@@ -477,6 +477,7 @@ function SessionInterviewPanel({
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
           importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
+          (id) => String(responseFieldValue(existingResponsesRef.current, 'additionalComments', id) || ''),
         );
         for (const draft of review.drafts) {
           if (!editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
