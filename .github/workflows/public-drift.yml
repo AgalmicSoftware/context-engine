@@ -22,6 +22,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Verify Worker release assets for this commit
+        run: CE_RELEASE_COMMIT="$GITHUB_SHA" npm run -s verify:release-assets
+
       - name: Build stripped public artifact
         run: bash scripts/prepare-public-release.sh --force "$RUNNER_TEMP/release-public"
 
