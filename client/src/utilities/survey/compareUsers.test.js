@@ -1,14 +1,12 @@
 import {
   buildUsersFromCaches,
   computeOverlapMatrix,
-  computeVennEvidence,
   encodeStancesForUser,
   fallbackBullets,
   getCompareSbtKey,
   getCompareSbtLabel,
   isValidAddress,
   normalizeRatingSignedValue,
-  opinionVennTriplet,
   pcaLiteCompass,
   sanitizeCompass,
   sbtNameSets,
@@ -535,79 +533,6 @@ describe('compare user pure helpers', () => {
       [{ has: true }, { has: false }],
       [{ has: true }, { has: true }],
     ]);
-  });
-
-  it('computes sign-aware Venn regions with evidence for overlapping opinions', () => {
-    const venn = opinionVennTriplet([
-      {
-        tokens: new Map([
-          ['a', { sign: 1 }],
-          ['ab', { sign: 1 }],
-          ['ac', { sign: 1 }],
-          ['abc', { sign: 1 }],
-        ]),
-      },
-      {
-        tokens: new Map([
-          ['b', { sign: 1 }],
-          ['ab', { sign: 1 }],
-          ['bc', { sign: 1 }],
-          ['abc', { sign: 1 }],
-        ]),
-      },
-      {
-        tokens: new Map([
-          ['c', { sign: 1 }],
-          ['ac', { sign: 1 }],
-          ['bc', { sign: 1 }],
-          ['abc', { sign: 1 }],
-        ]),
-      },
-    ]);
-    const evidence = computeVennEvidence(opinionUsers.slice(0, 2));
-    const opinionFixtureVenn = opinionVennTriplet(opinionUsers);
-    const opinionFixtureEvidence = computeVennEvidence(opinionUsers);
-
-    expect(venn).toEqual({ a: 1, b: 1, c: 1, ab: 1, ac: 1, bc: 1, abc: 1 });
-    expect(opinionFixtureVenn).toEqual({ a: 2, b: 0, c: 2, ab: 2, ac: 0, bc: 2, abc: 0 });
-    expect(opinionFixtureEvidence.counts).toEqual(opinionFixtureVenn);
-    expect(evidence.counts).toEqual({ a: 2, b: 2, c: 0, ab: 2, ac: 0, bc: 0, abc: 0 });
-    expect(evidence.counts.ab).toBeGreaterThan(0);
-    expect(evidence.evidenceMap.ab.some((entry) => entry.includes('q1'))).toBe(true);
-    expect(computeVennEvidence([opinionUsers[0]]).counts).toEqual({ a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 });
-  });
-
-  it('uses shared signed stance regions for Venn counts and evidence', () => {
-    const signedTokenUsers = [
-      {
-        tokens: new Map([
-          ['a', { sign: 1 }],
-          ['ab', { sign: 1 }],
-          ['ac', { sign: -1 }],
-          ['abc', { sign: -1 }],
-        ]),
-      },
-      {
-        tokens: new Map([
-          ['b', { sign: 1 }],
-          ['ab', { sign: 1 }],
-          ['bc', { sign: 1 }],
-          ['abc', { sign: -1 }],
-        ]),
-      },
-      {
-        tokens: new Map([
-          ['c', { sign: 1 }],
-          ['ac', { sign: -1 }],
-          ['bc', { sign: 1 }],
-          ['abc', { sign: -1 }],
-        ]),
-      },
-    ];
-    const expectedCounts = { a: 1, b: 1, c: 1, ab: 1, ac: 1, bc: 1, abc: 1 };
-
-    expect(opinionVennTriplet(signedTokenUsers)).toEqual(expectedCounts);
-    expect(computeVennEvidence(signedTokenUsers).counts).toEqual(expectedCounts);
   });
 
   it('creates and sanitizes deterministic compass points', () => {

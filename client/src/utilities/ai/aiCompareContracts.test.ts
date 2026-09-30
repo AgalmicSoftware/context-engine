@@ -1,9 +1,4 @@
-import {
-  mergeCompareVennWithEvidence,
-  normalizeCompareBullets,
-  readCompareToolkitTask,
-  resolveCompareToolkitPayload,
-} from './aiCompareContracts';
+import { normalizeCompareBullets, readCompareToolkitTask, resolveCompareToolkitPayload } from './aiCompareContracts';
 
 describe('aiCompareContracts', () => {
   it('normalizes compare bullets with fallback and max-item semantics', () => {
@@ -25,39 +20,6 @@ describe('aiCompareContracts', () => {
       disagreements: ['disagree'],
     });
     expect(normalizeCompareBullets({ agreements: [] }, fallback)).toEqual(fallback);
-  });
-
-  it('keeps deterministic venn counts and evidence while accepting descriptive AI semantics', () => {
-    const fallback = {
-      counts: { a: 1, b: 0, c: 0, ab: 1, ac: 0, bc: 0, abc: 0 },
-      semantics: 'fallback semantics',
-      evidenceMap: {
-        a: ['fallback a'],
-        ab: ['fallback ab'],
-      },
-    };
-
-    expect(
-      mergeCompareVennWithEvidence(
-        {
-          counts: { a: 999, ab: 999 },
-          semantics: 'AI description only',
-          evidenceMap: { a: ['AI-selected membership'] },
-        },
-        fallback,
-      ),
-    ).toEqual({
-      counts: { a: 1, b: 0, c: 0, ab: 1, ac: 0, bc: 0, abc: 0 },
-      semantics: 'AI description only',
-      evidenceMap: {
-        a: ['fallback a'],
-        ab: ['fallback ab'],
-      },
-    });
-  });
-
-  it('rejects venn candidates without a counts record', () => {
-    expect(mergeCompareVennWithEvidence({ evidenceMap: {} }, { counts: {}, evidenceMap: {} })).toBeNull();
   });
 
   it('normalizes compare toolkit tasks and bounds payload users', () => {

@@ -1,19 +1,8 @@
 type UnknownRecord = Record<string, unknown>;
 
-export type CompareVennRegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
-
 export interface CompareBullets {
   agreements: string[];
   disagreements: string[];
-}
-
-export type CompareVennCounts = Partial<Record<CompareVennRegionKey, number>>;
-export type CompareVennEvidenceMap = Partial<Record<CompareVennRegionKey, unknown[]>>;
-
-export interface CompareVennResult {
-  counts: CompareVennCounts;
-  semantics?: string | null;
-  evidenceMap?: CompareVennEvidenceMap;
 }
 
 export interface CompareToolkitPayload {
@@ -39,18 +28,6 @@ export const normalizeCompareBullets = (
   return {
     agreements: agreements.slice(0, maxItems),
     disagreements: disagreements.slice(0, maxItems),
-  };
-};
-
-export const mergeCompareVennWithEvidence = (
-  candidate: unknown,
-  fallback: CompareVennResult,
-): CompareVennResult | null => {
-  if (!isRecord(candidate) || !isRecord(candidate.counts)) return null;
-  return {
-    counts: { ...fallback.counts },
-    semantics: (candidate.semantics as string | null | undefined) || fallback.semantics,
-    evidenceMap: { ...fallback.evidenceMap },
   };
 };
 

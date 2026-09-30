@@ -4,9 +4,9 @@ import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared
  * @file compareUsers.js
  * @module compareUsers
  * @description User comparison algorithms — pure math and deterministic computation helpers
- *              for PCA, clustering, similarity scoring, opinion Venn diagrams, and stance encoding.
+ *              for PCA, clustering, similarity scoring, and stance encoding.
  *
- * Key exports: buildUsersFromCaches, pcaLiteCompass, opinionVennTriplet, computeOverlapMatrix, deriveUserLabels
+ * Key exports: buildUsersFromCaches, pcaLiteCompass, computeOverlapMatrix, deriveUserLabels
  */
 
 // Purpose: centralize compare/computation helpers (pure math + deterministic logic).
@@ -29,10 +29,6 @@ import { RATING_MAX, RATING_MIN } from './ratingValue.js';
 import { hashSeed, mulberry32 } from './seededPrng.js';
 
 type UnknownRecord = Record<string, unknown>;
-type RegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
-type RegionCounts = Record<RegionKey, number>;
-type RegionEvidenceMap = Record<RegionKey, string[]>;
-type RegionSetMap = Record<RegionKey, Set<string>>;
 
 interface CompareSbtEntry extends UnknownRecord {
   name?: string;
@@ -225,98 +221,6 @@ function makeToken(qid: unknown, option: unknown = undefined): string {
   return option != null ? `${q}::${toLower(option)}` : q;
 }
 
-const STANCE_REGION_SEPARATOR = '::__';
-
-function emptyRegionCounts(): RegionCounts {
-  return { a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 };
-}
-
-function emptyRegionEvidenceMap(): RegionEvidenceMap {
-  return { a: [], b: [], c: [], ab: [], ac: [], bc: [], abc: [] };
-}
-
-function emptyRegionSets(): RegionSetMap {
-  return {
-    a: new Set<string>(),
-    b: new Set<string>(),
-    c: new Set<string>(),
-    ab: new Set<string>(),
-    ac: new Set<string>(),
-    bc: new Set<string>(),
-    abc: new Set<string>(),
-  };
-}
-
-function encodeOrReuseStances(user: CompareUser): EncodedStances {
-  return user && user.tokens instanceof Map ? { tokens: user.tokens } : encodeStancesForUser(user);
-}
-
-function stanceRegionKey(token: string, sign: number): string {
-  return `${token}${STANCE_REGION_SEPARATOR}${sign}`;
-}
-
-function stanceSetForEncoded(enc: EncodedStances): Set<string> {
-  const stanceSet = new Set<string>();
-  enc.tokens.forEach(({ sign }, token) => {
-    if (sign !== 0) stanceSet.add(stanceRegionKey(token, sign));
-  });
-  return stanceSet;
-}
-
-function intersectSets(left: Set<string>, right: Set<string>): Set<string> {
-  const out = new Set<string>();
-  left.forEach((value) => {
-    if (right.has(value)) out.add(value);
-  });
-  return out;
-}
-
-function diffSets(left: Set<string>, right: Set<string>): Set<string> {
-  const out = new Set<string>();
-  left.forEach((value) => {
-    if (!right.has(value)) out.add(value);
-  });
-  return out;
-}
-
-function unionSets(left: Set<string>, right: Set<string>): Set<string> {
-  const out = new Set<string>(left);
-  right.forEach((value) => out.add(value));
-  return out;
-}
-
-function buildStanceRegions(pairSets: Set<string>[]): { counts: RegionCounts; sets: RegionSetMap } {
-  const sets = emptyRegionSets();
-  if (pairSets.length === 2) {
-    const [A, B] = pairSets;
-    sets.ab = intersectSets(A, B);
-    sets.a = diffSets(A, sets.ab);
-    sets.b = diffSets(B, sets.ab);
-  } else if (pairSets.length === 3) {
-    const [A, B, C] = pairSets;
-    sets.abc = intersectSets(intersectSets(A, B), C);
-    sets.ab = diffSets(intersectSets(A, B), sets.abc);
-    sets.ac = diffSets(intersectSets(A, C), sets.abc);
-    sets.bc = diffSets(intersectSets(B, C), sets.abc);
-    sets.a = diffSets(A, unionSets(sets.ab, unionSets(sets.ac, sets.abc)));
-    sets.b = diffSets(B, unionSets(sets.ab, unionSets(sets.bc, sets.abc)));
-    sets.c = diffSets(C, unionSets(sets.ac, unionSets(sets.bc, sets.abc)));
-  }
-
-  return {
-    counts: {
-      a: sets.a.size,
-      b: sets.b.size,
-      c: sets.c.size,
-      ab: sets.ab.size,
-      ac: sets.ac.size,
-      bc: sets.bc.size,
-      abc: sets.abc.size,
-    },
-    sets,
-  };
-}
-
 /** encodeStancesForUser(user) → { tokens: Map<token,{sign,weight}> } */
 export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedStances {
   const tokens = new Map<string, StanceToken>();
@@ -380,74 +284,6 @@ export function selectTopOpinionTokens(users: CompareUser[] = [], topN = 20): st
     .sort((a, b) => b.score - a.score || b.cov - a.cov || (a.tok < b.tok ? -1 : 1))
     .slice(0, N)
     .map((x) => x.tok);
-}
-
-/** opinionVennTriplet(users3) → counts per 7 regions (sign-aware) */
-export function opinionVennTriplet(users3: CompareUser[] = []): RegionCounts {
-  const arr = Array.isArray(users3) ? users3.slice(0, 3) : [];
-  if (arr.length !== 3) return emptyRegionCounts();
-  const pairSets = arr.map((user) => stanceSetForEncoded(encodeOrReuseStances(user)));
-  return buildStanceRegions(pairSets).counts;
-}
-
-/** computeVennEvidence(users) → counts+evidenceMap+semantics; supports 2 or 3 users */
-export function computeVennEvidence(users: CompareUser[] = []): {
-  counts: RegionCounts;
-  evidenceMap: RegionEvidenceMap;
-  semantics: string;
-} {
-  const arr = Array.isArray(users) ? users.slice(0, 3) : [];
-  const semantics = 'Counts = opinion-stance overlaps: identical non-zero signs on the same question/token.';
-  if (arr.length < 2 || arr.length > 3) {
-    return {
-      counts: emptyRegionCounts(),
-      evidenceMap: emptyRegionEvidenceMap(),
-      semantics,
-    };
-  }
-  const pairSets = arr.map((user) => stanceSetForEncoded(encodeOrReuseStances(user)));
-  const regions = buildStanceRegions(pairSets);
-
-  // qid -> prompt lookup for compact labels
-  const qMeta = new Map<string, { prompt: string }>();
-  (arr || []).forEach((u) =>
-    (u?.questions || []).forEach((q) => {
-      const id = String(q?.id || q?.questionID || q?.questionId || '').toLowerCase();
-      if (id && !qMeta.has(id)) qMeta.set(id, { prompt: String(q?.prompt || '').trim() });
-    }),
-  );
-  const pretty = (pairStr: string): string => {
-    const last = pairStr.lastIndexOf(STANCE_REGION_SEPARATOR);
-    const token = last >= 0 ? pairStr.slice(0, last) : pairStr;
-    const signStr = last >= 0 ? pairStr.slice(last + STANCE_REGION_SEPARATOR.length) : '1';
-    const sign = signStr === '-1' ? '−' : '+';
-    const idx = token.indexOf('::');
-    const qid = idx === -1 ? token : token.slice(0, idx);
-    const opt = idx === -1 ? '' : token.slice(idx + 2);
-    const promptShort = (qMeta.get(qid)?.prompt || '').slice(0, 28);
-    return opt
-      ? `${qid}::${opt} (${sign})${promptShort ? ' · ' + promptShort : ''}`
-      : `${qid} (${sign})${promptShort ? ' · ' + promptShort : ''}`;
-  };
-  const cap = (S: Set<string>): string[] => Array.from(S).slice(0, 30).map(pretty);
-
-  const evidenceMap: RegionEvidenceMap = {
-    a: cap(regions.sets.a),
-    b: cap(regions.sets.b),
-    c: cap(regions.sets.c),
-    ab: cap(regions.sets.ab),
-    ac: cap(regions.sets.ac),
-    bc: cap(regions.sets.bc),
-    abc: cap(regions.sets.abc),
-  };
-
-  // Guarantee non-empty evidence for regions with positive counts
-  for (const k of Object.keys(regions.counts) as RegionKey[]) {
-    if (regions.counts[k] > 0 && (!Array.isArray(evidenceMap[k]) || evidenceMap[k].length === 0)) {
-      evidenceMap[k] = [`${k.toUpperCase()} region (${regions.counts[k]})`];
-    }
-  }
-  return { counts: regions.counts, evidenceMap, semantics };
 }
 
 /** pcaLiteCompass(users) → deterministic axes+points in [-1,1] */

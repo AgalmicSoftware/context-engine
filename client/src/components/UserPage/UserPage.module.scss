@@ -1376,25 +1376,6 @@ $icon-size-standard: 1.25rem;
   }
 }
 
-/* Venn count hover/focus affordance */
-.vennCount {
-  font:
-    12px system-ui,
-    -apple-system,
-    Segoe UI,
-    Roboto,
-    sans-serif;
-  fill: var(--ce-color-white);
-  /* applied to <text> inside SVG */
-  cursor: pointer;
-  text-decoration: underline dotted color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
-  outline: none;
-  &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-data-series-2) 45%, transparent);
-    outline-offset: 2px;
-  }
-}
-
 /* Muted visual note (used for Matrix suppression + tooltips) */
 .vizNote {
   font-size: 0.95rem;
@@ -1405,38 +1386,6 @@ $icon-size-standard: 1.25rem;
   border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 8px 10px;
-}
-
-/* Dedicated tooltip bubble for Venn counts (accessible;
- color inherits from theme) */
-.vennTooltip {
-  position: absolute;
-  max-width: 420px;
-  max-height: 420px;
-  overflow-y: auto;
-  background: var(--ce-color-tooltip-bg);
-  border: 1px solid var(--ce-color-tooltip-border);
-  border-radius: var(--ce-radius-8);
-  padding: 12px 14px;
-  box-shadow: $card-shadow;
-  color: var(--ce-color-tooltip-text);
-  z-index: 4;
-  pointer-events: auto;
-  ul {
-    margin: 0;
-    padding-left: 18px;
-  }
-
-  li {
-    margin: 8px 0;
-    line-height: 1.4;
-  }
-}
-
-/* Touch up: ensure .vennCount retains accessible focus outline even inside SVG */
-.vennCount {
-  color: inherit;
-  /* explicit for non-SVG fallback renderers */
 }
 
 /* Explicit again for clarity in this block */
