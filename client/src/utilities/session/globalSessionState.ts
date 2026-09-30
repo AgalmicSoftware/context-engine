@@ -1,5 +1,5 @@
 import { normalizeSessionSlug } from './sessionNaming.js';
-import { toStr } from '../shared/primitives.js';
+import { hasOwn, toStr } from '../shared/primitives.js';
 import { CE_SESSION_SCAN_SCOPE, CE_SESSION_SCAN_SLUGS } from '../../variables/appConfig.js';
 
 type GlobalSessionScope = 'all' | 'active' | 'general' | 'list';
@@ -21,7 +21,6 @@ export const GLOBAL_SESSION_SELECTION_UPDATED_EVENT = 'ce:global-session-selecti
 const LEGACY_SCOPE_STORAGE_KEY = 'ce:sessionScanScope';
 const LEGACY_SLUGS_STORAGE_KEY = 'ce:sessionScanSlugs';
 const VALID_SCOPE_MODES = new Set<GlobalSessionScope>(['all', 'active', 'general', 'list']);
-const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
 const isRecord = (value: unknown): value is GlobalSessionSelectionInput => !!value && typeof value === 'object';
 export const DEFAULT_GLOBAL_SESSION_SCOPE: GlobalSessionScope = VALID_SCOPE_MODES.has(
   toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope,

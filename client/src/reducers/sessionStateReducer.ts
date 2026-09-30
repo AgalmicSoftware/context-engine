@@ -23,6 +23,7 @@ import {
   readStoredDemoSurfaceMode,
   readStoredTooltipsEnabled,
 } from '../utilities/session/sessionPreferencesStorage.js';
+import { hasOwn } from '../utilities/shared/primitives.js';
 
 export interface SessionState {
   primarySessionSlug: string;
@@ -95,7 +96,6 @@ const getInitialState = (): SessionState => ({
   tooltipsEnabled: readStoredTooltipsEnabled(),
 });
 
-const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
 const resolvePrimarySessionExplicitInput = (
   state: SessionState,
   payload: SessionSelectionPayload | Record<string, unknown> = {},
