@@ -46,3 +46,14 @@ it('honours cancellations saved per account until an explicit Join clears them',
   expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(false);
   expect(isWorkerGroupAutoJoinCancelled({ ...scope, groupId: 'group-2' })).toBe(true);
 });
+
+it('ignores a malformed legacy entry while honouring another browser cancellation', () => {
+  const legacyKey = (account: string) =>
+    `ce:worker-group-auto-join-cancelled:v1:${JSON.stringify(['https://worker.example', 'alpha', 'group', account])}`;
+  localStorage.setItem(legacyKey('0xaaa'), '{invalid');
+  localStorage.setItem(legacyKey('0xbbb'), JSON.stringify({ cancelled: true, sessionId: '0x1234' }));
+
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(true);
+  clearWorkerGroupAutoJoinCancellation(scope);
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(false);
+});

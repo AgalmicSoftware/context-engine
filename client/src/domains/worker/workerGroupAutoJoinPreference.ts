@@ -18,11 +18,16 @@ const keys = (scope: Scope) => [
 export const isWorkerGroupAutoJoinCancelled = (scope: Scope): boolean => {
   try {
     return keys(scope).some((key) => {
-      const saved = JSON.parse(localStorage.getItem(key) || 'null');
-      return (
-        saved?.cancelled === true &&
-        (!saved.sessionId || !scope.sessionId || saved.sessionId === scope.sessionId.toLowerCase())
-      );
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) || 'null');
+        return (
+          saved?.cancelled === true &&
+          (!saved.sessionId || !scope.sessionId || saved.sessionId === scope.sessionId.toLowerCase())
+        );
+      } catch {
+        // One corrupt legacy entry must not hide another account's cancellation.
+        return false;
+      }
     });
   } catch {
     return false;
