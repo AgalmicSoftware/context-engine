@@ -1228,11 +1228,6 @@ h1 {
   }
 }
 
-.navConnectButton:hover.btn.btn-blue {
-  background-color: var(--ce-color-indigo);
-  background: var(--ce-color-indigo);
-}
-
 .loginPromptText {
   font-weight: 600;
   color: var(--ce-color-white);
@@ -3458,60 +3453,6 @@ h1 {
 
 /// Overrides for wallet-connect modal
 
-#w3a-modal {
-  // Target the main text elements like sign-in, descriptions, and labels
-  .w3ajs-header__title,
-  .w3ajs-header__subtitle,
-  .w3a-group__label,
-  .w3ajs-email-login__info,
-  .w3ajs-footer__text,
-  a {
-    color: var(--ce-color-border) !important;
-  }
-
-  // Target the text inside the social login buttons
-  .w3a-adapter-item button p {
-    color: var(--ce-color-border) !important;
-  }
-
-  // Target the text inside the main continue button
-  .w3ajs-email-login__button span {
-    color: var(--ce-text-muted) !important;
-  }
-}
-
-.p-ml2 {
-  color: var(--ce-color-black);
-}
-
-.p .ml-2 {
-  color: var(--ce-color-black) !important;
-}
-
-.w3a-parent-container {
-  color: var(--ce-color-black) !important;
-}
-
-.w3a-parent-container .ml-2 {
-  color: var(--ce-color-black) !important;
-}
-
-.w3a-parent-container .ml-2 svg {
-  color: var(--ce-color-black) !important;
-  fill: var(--ce-color-black) !important;
-}
-
-#w3a-modal
-  > div
-  > div.w3a-modal__content.w3ajs-content
-  > div.w3ajs-social-logins.w3a-group
-  > ul
-  > li.col-span-6.w3a-adapter-item
-  > button
-  > p {
-  color: var(--ce-color-black) !important;
-}
-
 .accountWarningContainer {
   display: flex;
   flex-direction: column;
@@ -3624,11 +3565,6 @@ h1 {
     display: unset !important;
     padding: 0 !important;
     color: var(--ce-color-black) !important;
-  }
-
-  .w3a-parent-container #w3a-modal {
-    display: unset !important;
-    padding: 0 !important;
   }
 
   .accountWarningContainer {
@@ -3783,15 +3719,6 @@ h1 {
 }
 
 /* Hide provider UI and ephemeral wallet iframe only during silent rehydration */
-body.w3a-silent #w3a-modal,
-body.w3a-silent .w3a-modal__backdrop,
-body.w3a-silent iframe[id^='walletIframe-'],
-body.w3a-silent iframe[class^='walletIframe-'] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
 
 .passkeyButtonContainer {
   margin-top: 25px;

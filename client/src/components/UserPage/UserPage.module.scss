@@ -717,12 +717,6 @@ $icon-size-standard: 1.25rem;
   }
 
   /* NEW: enlarge close 'X' button inside this header only */
-  .btn-close {
-    font-size: 2rem;
-    display: none;
-    /* Intentionally hidden for now — do NOT delete this rule;
- feature retained */
-  }
 }
 
 /* Title + inline refresh button row (prevents overlap with close "X") */
