@@ -140,6 +140,71 @@ describe('surveyToolChangedFieldsController', () => {
   });
 
   describe('orchestrateGetChangedQidsAndFields', () => {
+    it.each([
+      [{ responderName: 'Fixture Responder', includeAiProvenance: false }, {}],
+      [{ includeAiProvenance: true, source: { platform: 'other', modelId: 'fixture-model' } }, {}],
+      [{ includeAiProvenance: false, includePredictionComparison: true }, {}],
+      [
+        { includeAiProvenance: false, includePredictionComparison: false },
+        {
+          responderName: 'Fixture Responder',
+          interviewProvenance: { source: { platform: 'other' }, predictionComparison: { version: 1 } },
+        },
+      ],
+    ])(
+      'tracks consent-only changes through cached diffs and clears them once saved (%j)',
+      (provenance, savedMetadata) => {
+        const baselineSlice = { ...buildEmptySlice(), answers: { q1: { value: 'Agree' } } };
+        const params = {
+          surveyIndex: 0,
+          currentSlice: baselineSlice,
+          isLoggedIn: true,
+          isLoadingResponse: false,
+          scopedIds: new Set(['q1']),
+          userAnswers: { responses: [{ questionID: 'q1', ...savedMetadata }] },
+        };
+        const deps = {
+          resolveDiffBaselineSlice: () => baselineSlice,
+          getIndexedQuestionEntryKeys: (source: Record<string, unknown> | null | undefined) =>
+            buildIndexedQuestionEntryKeys(source, normalizeKey),
+          getDefaultResponseEncryptionAudience: () => 'default',
+          normalizeResponseEncryptionAudience: (audience: unknown) => audience,
+          getDefaultResponseEncryptionAudienceForQid: () => 'default',
+          resolveFieldEncryptionGateId: () => '',
+          normalizeFieldAudienceMode: (mode: unknown) => mode,
+          valuesEqual,
+          buildSurveyResponseSliceSignature,
+          buildRatingEnvelopeQidSetFromUserAnswers: () => new Set<string>(),
+          hasMeaningfulFieldValue,
+          bumpPerfCounter: jest.fn(),
+        };
+        const initial = orchestrateGetChangedQidsAndFields(params, deps, null);
+        expect(initial.result.changedQids.size).toBe(0);
+        const currentSlice = { ...baselineSlice, interviewProvenance: { q1: provenance } };
+        const changed = orchestrateGetChangedQidsAndFields({ ...params, currentSlice }, deps, initial.newCache);
+        expect(changed.result.changedMap).toEqual({ q1: { interviewConsent: 1 } });
+        expect(changed.result.changedQids).toEqual(new Set(['q1']));
+        const saved = orchestrateGetChangedQidsAndFields(
+          {
+            ...params,
+            currentSlice,
+            userAnswers: {
+              responses: [
+                {
+                  questionID: 'q1',
+                  responderName: 'responderName' in provenance ? provenance.responderName : undefined,
+                  interviewProvenance: provenance,
+                },
+              ],
+            },
+          },
+          deps,
+          changed.newCache,
+        );
+        expect(saved.result.changedQids.size).toBe(0);
+      },
+    );
+
     it('derives ids from slices when no scoped ids are provided', () => {
       const baselineSlice = {
         ...buildEmptySlice(),

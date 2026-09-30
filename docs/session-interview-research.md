@@ -282,3 +282,8 @@ for Hosted and chain-authoritative lookup behavior.
 ### Draft review presentation
 
 The voice-mode chooser describes the interview; AI prompt-copy guidance stays inside the interview. Draft prose opens for editing by click, Enter, or Space. Edits update immediately; leaving the editor or pressing Escape returns to the readable answer without a separate Done button. AI confidence and its support meter appear only inside the collapsed Basis disclosure alongside the evidence.
+
+Consent choices count as response edits even when the answer, comment and ratings
+are unchanged. Submitting can add or remove the responder name, AI attribution or
+prediction comparison on the selected responses. Repeating the saved choices
+does not create another pending edit; the recording timestamp alone is ignored.

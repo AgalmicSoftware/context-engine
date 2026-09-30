@@ -1006,7 +1006,12 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(slice.interviewProvenance.q2.originalPrediction.answer).toBe('Original answer');
     expect(slice.interviewProvenance.q2.predictionRevisions).toEqual(revisions);
     await recordInterviewProvenance(engine, selected, null, null, false, false, '', [rejected]);
-    expect(engine.state.surveysResponseState[0].interviewProvenance).toEqual({});
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).toMatchObject({
+      includeAiProvenance: false,
+      includePredictionComparison: false,
+    });
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('source');
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('originalPrediction');
   });
 
   it('accepts unchanged interview answers only when every selected question is already saved', async () => {

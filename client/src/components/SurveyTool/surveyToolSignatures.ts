@@ -132,6 +132,7 @@ export const buildSurveyResponseSliceSignature = (
     buildQuestionMapSignature(safeSlice.additionalComments, { responseField: true, normalizedIdFilter }),
     buildQuestionMapSignature(safeSlice.importance, { normalizedIdFilter }),
     buildQuestionMapSignature(safeSlice.conviction, { normalizedIdFilter }),
+    buildQuestionMapSignature(safeSlice.interviewProvenance, { normalizedIdFilter }),
   ].join('|');
 };
 

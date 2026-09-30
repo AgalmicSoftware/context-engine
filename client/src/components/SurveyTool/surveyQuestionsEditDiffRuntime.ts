@@ -57,6 +57,7 @@ export const createSurveyQuestionsEditDiffRuntime = (
       addKeys(slice.additionalComments);
       addKeys(slice.importance);
       addKeys(slice.conviction);
+      addKeys(slice.interviewProvenance);
     };
     try {
       const surveyIndex: SurveyQuestionsLegacyValue = getActiveSurveyIndex(surveyIndexParam);

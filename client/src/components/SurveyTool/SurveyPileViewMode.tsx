@@ -1,3 +1,4 @@
+import { getChangedInterviewConsentQids } from './sessionInterviewConsent';
 import {
   loadSessionInterviewSavedAnswers,
   mergeInterviewSavedAnswerBaseline,
@@ -1856,10 +1857,6 @@ export const recordInterviewProvenance = (
               selected: boolean;
               original: InterviewDraftResponse;
             });
-          if (!included && !includePredictionComparison && !normalizedResponderName) {
-            delete provenance[draft.questionId];
-            return;
-          }
           const originalDraft = reviewed.original || draft;
           const revisionSource =
             Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
@@ -2666,7 +2663,9 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
     const fieldValue = (entry: unknown) => {
       return entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
     };
+    const consentChanges = getChangedInterviewConsentQids(current?.interviewProvenance, engine.state.userAnswers);
     if (
+      !questionIds.some((id) => consentChanges.has(normalizeQuestionIdKey(id))) &&
       questionIds.every(
         (id) =>
           Object.hasOwn(saved?.answers || {}, id) &&
