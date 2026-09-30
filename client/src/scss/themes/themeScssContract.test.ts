@@ -90,6 +90,15 @@ describe('runtime SCSS theme contract', () => {
     });
   });
 
+  test('frameless controls drop the raised chrome but keep the focus outline', () => {
+    const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
+    const controls = recipes.match(
+      /\[data-ce-control-appearance='frameless'\],\s*\[data-ce-control-appearance='frameless'\]:active\s*\{([^}]*)\}/,
+    )?.[1];
+    expect(controls).toMatch(/appearance:\s*none;[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*none;/);
+    expect(controls).not.toMatch(/outline:\s*none/);
+  });
+
   test('component styles never bundle their own copy of the global stylesheet', () => {
     // The app entry loads it once; a module copy re-applies its element and theme rules late.
     const globalSheetImport = /@(?:use|import|forward)\s+['"][^'"]*contextEngine(?:\.scss)?['"]/;
