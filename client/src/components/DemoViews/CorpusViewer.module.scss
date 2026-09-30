@@ -98,10 +98,6 @@ $text: var(--ce-panel-text);
   display: none;
 }
 
-.sectionIcon {
-  display: none;
-}
-
 .corpusLabel {
   display: none;
 }
@@ -213,70 +209,6 @@ $text: var(--ce-panel-text);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-14);
   padding: 10px 10px 12px;
-}
-
-.policyMapAssistiveText {
-  color: $muted;
-  font-size: 11px;
-  line-height: 1.45;
-  margin-top: 6px;
-}
-
-.policyMapHeader {
-  margin-bottom: 12px;
-}
-
-.policyMapTitle {
-  color: $text;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.policyMapSubtitle {
-  color: $muted;
-  font-size: 13px;
-  line-height: 1.5;
-  margin-top: 6px;
-}
-
-.policyMapLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.policyLegendItem {
-  align-items: center;
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-radius: var(--ce-radius-pill);
-  color: $text;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 600;
-  gap: 6px;
-  padding: 5px 10px;
-}
-
-.policyLegendSwatch {
-  border-radius: var(--ce-radius-pill);
-  display: inline-flex;
-  height: 10px;
-  width: 10px;
-}
-
-.policyLegendSwatchLive {
-  background: color-mix(in srgb, var(--ce-action-accent) 90%, transparent);
-}
-
-.policyLegendSwatchProposed {
-  background: color-mix(in srgb, var(--ce-status-warning) 90%, transparent);
-}
-
-.policyLegendSwatchMixed {
-  background: color-mix(in srgb, var(--ce-status-info-text) 90%, transparent);
 }
 
 .scrollArea {
@@ -401,65 +333,6 @@ $text: var(--ce-panel-text);
   color: var(--ce-document-text);
 }
 
-.metrSourceCard {
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-radius: var(--ce-radius-14);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-}
-
-.metrSourceEyebrow {
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.metrSourceMeta {
-  color: $muted;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.chartBlock {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 12px;
-}
-
-.chartContainer {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 4px;
-  max-height: 120px;
-}
-
-.chartTitle {
-  color: $muted;
-  font-size: 12px;
-  line-height: 1;
-  margin-bottom: 8px;
-}
-
-.barChart {
-  align-items: flex-end;
-  display: flex;
-  gap: 4px;
-  height: 100px;
-}
-
-.chartSlot {
-  align-items: flex-end;
-  display: flex;
-  flex: 1 1 0;
-  min-width: 24px;
-}
-
 .bar {
   background: linear-gradient(
     180deg,
@@ -470,46 +343,6 @@ $text: var(--ce-panel-text);
   min-width: 24px;
   transition: height 0.24s ease;
   width: 100%;
-}
-
-.chartLabels {
-  display: flex;
-  gap: 4px;
-}
-
-.barLabel {
-  color: $muted;
-  flex: 1 1 0;
-  font-size: 10px;
-  line-height: 1.2;
-  min-width: 24px;
-  text-align: center;
-}
-
-.lineChart {
-  height: 100px;
-  width: 100%;
-}
-
-.lineChart svg {
-  display: block;
-  height: 100%;
-  overflow: visible;
-  width: 100%;
-}
-
-.linePath {
-  fill: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  stroke: $accent;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.5;
-}
-
-.linePoint {
-  fill: $accent;
-  stroke: color-mix(in srgb, var(--ce-overlay-base) 95%, transparent);
-  stroke-width: 1.5;
 }
 
 .pill {
@@ -610,11 +443,6 @@ $text: var(--ce-panel-text);
   color: var(--ce-document-text);
   font-size: 15px;
   font-weight: 700;
-}
-
-.tweetSeparator {
-  color: color-mix(in srgb, var(--ce-text-muted) 50%, transparent);
-  font-size: 13px;
 }
 
 .tweetBody {
@@ -799,11 +627,6 @@ $text: var(--ce-panel-text);
 .tweetCard .pillButton:hover {
   background: color-mix(in srgb, var(--ce-status-info) 18%, transparent);
   color: var(--ce-status-info);
-}
-
-.tweetCard .debateMapLabel,
-.tweetCard .debateMapEmpty {
-  color: var(--ce-document-text-muted);
 }
 
 .tweetCard .debateMapIcon {
@@ -1185,12 +1008,6 @@ $text: var(--ce-panel-text);
   margin-right: auto;
 }
 
-.entrySourceRow {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 14px;
-}
-
 .emptyState {
   align-items: center;
   background: $card;
@@ -1223,38 +1040,9 @@ $text: var(--ce-panel-text);
   max-width: 420px;
 }
 
-.debateMapSection {
-  background: color-mix(in srgb, var(--ce-overlay-base) 45%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  border-radius: var(--ce-radius-10);
-  margin-top: 14px;
-  padding: 12px 12px 10px;
-}
-
-.debateMapHeader {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 .debateMapIcon {
   color: $accent;
   font-size: 12px;
-}
-
-.debateMapLabel {
-  color: $text;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.debateMapLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .debateMapFooter {
@@ -1304,12 +1092,6 @@ $text: var(--ce-panel-text);
   cursor: pointer;
   font: inherit;
   text-align: left;
-}
-
-.debateMapEmpty {
-  color: $muted;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .externalLink {
@@ -1723,8 +1505,7 @@ $text: var(--ce-panel-text);
     line-height: 1.16;
   }
 
-  .policyListTitle,
-  .policyMapTitle {
+  .policyListTitle {
     font-size: 16px;
   }
 

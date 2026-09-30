@@ -75,15 +75,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.readonlyInput {
-  background: color-mix(in srgb, var(--ce-overlay-base) 85%, transparent);
-  color: var(--ce-color-white);
-}
-
-.readonlyInput:read-only {
-  color: var(--ce-color-white);
-}
-
 .header {
   display: flex;
   align-items: center;
@@ -406,24 +397,10 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.panelHeaderStatic {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
 .panelBody {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.panelSubcopy {
-  font-size: 13px;
-  line-height: 1.5;
-  color: $muted-text;
-  max-width: 760px;
 }
 
 .panelTitle {
@@ -432,22 +409,6 @@ $muted-text: var(--ce-panel-text-muted);
   letter-spacing: 0.08em;
   margin-bottom: 0;
   color: $muted-text;
-}
-
-.gridTwo {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-}
-
-.chainSelector {
-  max-width: 420px;
-}
-
-.gridThree {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
 }
 
 .gateGrid {
@@ -537,15 +498,6 @@ $muted-text: var(--ce-panel-text-muted);
   margin-bottom: 0;
 }
 
-.compactSessionHeaderField {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  width: 100%;
-  min-width: 0;
-}
-
 .compactSessionHeaderStandalone {
   display: grid;
   gap: 12px;
@@ -564,98 +516,9 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.compactSessionHeaderControlsRow {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-}
-
-.compactSessionHeaderLabelWrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .compactSessionHeaderIcon {
   font-size: 1rem;
   color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
-}
-
-.compactSessionHeaderLabel {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: $muted-text;
-}
-
-.compactSessionHeaderModes {
-  display: flex;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-
-.compactSessionHeaderModeButton {
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
-  border-radius: var(--ce-radius-pill);
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
-    color: $user-page-text-color;
-  }
-}
-
-.compactSessionHeaderUploadButton {
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
-  border-radius: var(--ce-radius-pill);
-  padding: 5px 9px;
-  font-size: 11px;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
-    color: $user-page-text-color;
-  }
-}
-
-.compactSessionHeaderModeButtonActive {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: $user-page-text-color;
-}
-
-.compactSessionHeaderHiddenInput {
-  display: none;
-}
-
-.compactSessionHeaderExpandedRow {
-  width: 100%;
-  display: grid;
-  gap: 12px;
-  margin-top: 2px;
-}
-
-@media (max-width: 640px) {
-  .compactSessionHeaderModes {
-    flex-wrap: wrap;
-  }
 }
 
 .sessionHeaderPreviewSurface {
@@ -674,10 +537,6 @@ $muted-text: var(--ce-panel-text-muted);
     color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   overflow: hidden;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-}
-
-.sessionHeaderPreviewSurfaceCompact {
-  min-height: 220px;
 }
 
 .sessionHeaderPreviewSurfaceFilled {
@@ -771,24 +630,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.generatedSlugNote {
-  margin-top: 8px;
-  display: grid;
-  gap: 2px;
-}
-
-.generatedSlugLabel {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: $muted-text;
-}
-
-.generatedSlugValue {
-  font-size: 13px;
-  color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
-}
-
 .fieldHeader {
   display: flex;
   align-items: center;
@@ -819,17 +660,6 @@ $muted-text: var(--ce-panel-text-muted);
 
 .fieldLabelRow .tooltip {
   margin-left: 0;
-}
-
-.inlineLink {
-  font-size: 12px;
-  color: $clickable-color;
-  text-decoration: none;
-  margin-left: 6px;
-
-  &:hover {
-    text-decoration: underline;
-  }
 }
 
 .inlineLinkButton {
@@ -926,10 +756,6 @@ $muted-text: var(--ce-panel-text-muted);
 
 .checkboxOffset {
   margin-left: 5px !important;
-}
-
-.inlineCheckbox.form-check-input {
-  margin-left: 0 !important;
 }
 
 .lockMeta {
@@ -1159,33 +985,6 @@ $muted-text: var(--ce-panel-text-muted);
   color: var(--ce-panel-text);
 }
 
-.editableControls {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: $muted-text;
-}
-
-.editableToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.editableSelect {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  select,
-  input {
-    min-width: 160px;
-  }
-}
-
 .objectBody {
   display: grid;
   gap: 10px;
@@ -1250,19 +1049,6 @@ $muted-text: var(--ce-panel-text-muted);
   .sessionColorPreviewAction {
     forced-color-adjust: auto;
   }
-}
-
-.subSection {
-  border-top: 1px solid $card-border;
-  padding-top: 12px;
-  display: grid;
-  gap: 12px;
-}
-
-.subSectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .subSectionTitle {
@@ -1772,13 +1558,6 @@ $muted-text: var(--ce-panel-text-muted);
   color: $muted-text;
 }
 
-.workerModeOptions {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
 .workerModePills {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1831,8 +1610,7 @@ $muted-text: var(--ce-panel-text-muted);
   line-height: 1.2;
 }
 
-.workerRadio input,
-.workerRadio .form-check-input {
+.workerRadio input {
   margin: 0 8px 0 0 !important;
   position: static;
 }
@@ -1856,16 +1634,6 @@ $muted-text: var(--ce-panel-text-muted);
     flex: 1 1 auto;
     min-width: 0;
   }
-}
-
-.sessionIdRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sessionIdRow :global(.form-control) {
-  flex: 1 1 auto;
 }
 
 .iconButton {
@@ -1959,29 +1727,6 @@ $muted-text: var(--ce-panel-text-muted);
   color: color-mix(in srgb, var(--ce-control-text) 55%, transparent);
 }
 
-.workerDeployLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--ce-radius-pill);
-  border: 1px solid $card-border;
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  color: $user-page-text-color;
-  text-decoration: none;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-}
-
-.workerDeployLink:hover {
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  color: $clickable-color;
-}
-
 .workerDeployGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
@@ -2037,13 +1782,6 @@ $muted-text: var(--ce-panel-text-muted);
   flex-wrap: wrap;
 }
 
-.resourceToggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
 .resourceFields {
   display: grid;
   gap: 10px;
@@ -2084,18 +1822,6 @@ $muted-text: var(--ce-panel-text-muted);
     flex: 1 1 240px;
     min-width: 0;
   }
-}
-
-.litCompactRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.litCompactField {
-  flex: 1 1 320px;
-  min-width: 240px;
 }
 
 .inlineLabelInput {
@@ -2168,18 +1894,6 @@ $muted-text: var(--ce-panel-text-muted);
   gap: 12px;
 }
 
-.workerSecretsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.workerActions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .workerIntro {
   margin-top: 12px;
   padding: 12px;
@@ -2246,21 +1960,6 @@ $muted-text: var(--ce-panel-text-muted);
 
 .copyStatusError {
   color: var(--ce-status-danger-text);
-}
-
-.gateLabelStatic {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: $muted-text;
-  font-weight: 600;
-}
-
-.adminGateMeta {
-  font-size: 12px;
-  color: $muted-text;
-  display: grid;
-  gap: 4px;
 }
 
 .publishRow {
