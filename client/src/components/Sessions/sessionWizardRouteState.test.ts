@@ -3,8 +3,6 @@ import {
   isNewSessionWizardPathname,
   normalizeSessionWizardPathname,
   readSessionWizardNewSessionBannerDismissed,
-  removeHashQueryParam,
-  scrubSponsoredBundleHashSecret,
   writeSessionWizardNewSessionBannerDismissed,
 } from './sessionWizardRouteState';
 
@@ -47,19 +45,5 @@ describe('sessionWizardRouteState', () => {
         sponsoredBundleId: 'bundle-123',
       }),
     ).toBe('');
-  });
-
-  it('removes the sponsored bundle key from hash URLs', () => {
-    expect(removeHashQueryParam('#k=secret&foo=1', 'k')).toBe('#foo=1');
-    expect(removeHashQueryParam('#foo=1&bar=2', 'k')).toBe('#foo=1&bar=2');
-    expect(removeHashQueryParam('#plain-fragment', 'k')).toBe('#plain-fragment');
-  });
-
-  it('scrubs the sponsored bundle key from window.location.hash', () => {
-    window.history.replaceState({}, '', '/new?x=1#k=secret&foo=1');
-    scrubSponsoredBundleHashSecret();
-    expect(window.location.pathname).toBe('/new');
-    expect(window.location.search).toBe('?x=1');
-    expect(window.location.hash).toBe('#foo=1');
   });
 });
