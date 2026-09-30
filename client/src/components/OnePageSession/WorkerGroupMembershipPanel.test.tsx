@@ -104,12 +104,25 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument();
     await act(async () => {
-      response.resolve(new Response(JSON.stringify({
-        ok: true,
-        sessionId: SESSION_ID,
-        sessionSlug: 'alpha',
-        groups: [{ groupId: 'local', sessionSlug: 'alpha', label: 'Local community', joinMode: 'open', memberVisibility: 'session' }],
-      }), { status: 200, headers: { 'content-type': 'application/json' } }));
+      response.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groups: [
+              {
+                groupId: 'local',
+                sessionSlug: 'alpha',
+                label: 'Local community',
+                joinMode: 'open',
+                memberVisibility: 'session',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
     });
     expect(await screen.findByRole('article', { name: 'Local community' })).toBeInTheDocument();
     fetchImpl.mockRejectedValueOnce(new Error('Unable to load groups.'));

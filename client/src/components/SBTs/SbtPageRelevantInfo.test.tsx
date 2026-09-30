@@ -61,7 +61,9 @@ describe('SbtPageRelevantInfo', () => {
     );
     expect(screen.getByRole('link', { name: 'AI Policy' })).toHaveAttribute('href', '/tag/AI%20Policy');
     expect(screen.queryByText('Tags:')).not.toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Tags' })).toContainElement(screen.getByRole('link', { name: 'AI Policy' }));
+    expect(screen.getByRole('list', { name: 'Tags' })).toContainElement(
+      screen.getByRole('link', { name: 'AI Policy' }),
+    );
   });
 
   it('renders worker-managed document references as public links even when they use a Lit-shaped URL', () => {

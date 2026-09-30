@@ -402,7 +402,12 @@ export default function OnePageSessionStandardShell({
       : requestedResultsViewMode === 'polis' || (showTopicPreview && requestedResultsViewMode === 'debateAtlas')
         ? requestedResultsViewMode
         : 'polis';
-  const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView, generatedViewOptions, showTopicPreview);
+  const resultsViewOptions = buildResultsViewOptions(
+    isDemoSlug,
+    showDemoAnalysisView,
+    generatedViewOptions,
+    showTopicPreview,
+  );
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
   const generatedCanCheckStatus = generatedState.canCheckStatus === true;

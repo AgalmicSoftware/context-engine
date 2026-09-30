@@ -933,16 +933,20 @@ describe('OnePageSession results routing', () => {
       expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
       const nav = screen.getByTestId('ce-session-results-view-nav');
-      expect(within(nav).getAllByRole('button').map(button => button.textContent.trim())).toEqual([
-        '🧾Report', '🗺️Debate Map', 'Raw Results',
-      ]);
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', '🗺️Debate Map', 'Raw Results']);
       expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
       expect(await screen.findByTestId('polis-report')).toBeVisible();
       expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
       fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
       expect(await screen.findByTestId('topic-circles')).toBeVisible();
       expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
-      expect(mockTopicCircles).toHaveBeenLastCalledWith(expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }));
+      expect(mockTopicCircles).toHaveBeenLastCalledWith(
+        expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }),
+      );
       expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
       fireEvent.click(within(nav).getByRole('button', { name: 'Report' }));
       expect(await screen.findByTestId('polis-report')).toBeVisible();

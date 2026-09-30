@@ -3,7 +3,12 @@ import LazyFallback from '../Shared/LazyFallback';
 import type { DebateNode } from '../DebateMap/debateMapTypes';
 import debateStyles from '../DebateMap/DebateMap.module.scss';
 import styles from './ReverseAlignmentTopicMap.module.scss';
-import { hasReverseAlignmentContext, REVERSE_ALIGNMENT_SOURCE, reverseAlignmentBranches, reverseAlignmentTopics } from './reverseAlignmentTopics';
+import {
+  hasReverseAlignmentContext,
+  REVERSE_ALIGNMENT_SOURCE,
+  reverseAlignmentBranches,
+  reverseAlignmentTopics,
+} from './reverseAlignmentTopics';
 
 const Circles = React.lazy(() => import('../DebateMap/DebateMap').then(({ AtlasView }) => ({ default: AtlasView })));
 
@@ -14,14 +19,16 @@ const topicTree: DebateNode[] = reverseAlignmentBranches.map((branch, index) => 
   depth: 0,
   questions: [],
   comments: [],
-  children: reverseAlignmentTopics.filter((topic) => topic.branch === index).map((topic) => ({
-    id: `ra-topic-${topic.id}`,
-    name: topic.label,
-    depth: 1,
-    questions: [],
-    comments: [],
-    children: [],
-  })),
+  children: reverseAlignmentTopics
+    .filter((topic) => topic.branch === index)
+    .map((topic) => ({
+      id: `ra-topic-${topic.id}`,
+      name: topic.label,
+      depth: 1,
+      questions: [],
+      comments: [],
+      children: [],
+    })),
 }));
 
 export const hasReverseAlignmentTopicPreview = hasReverseAlignmentContext;
@@ -41,7 +48,13 @@ export default function ReverseAlignmentTopicMap() {
       </a>
       <div className={`${debateStyles.debateMap} ${styles.canvas}`}>
         <Suspense fallback={<LazyFallback label="Loading topic circles…" minHeight="30vh" />}>
-          <Circles data={topicTree} rootLabel="Reverse Alignment" atlasLayoutMode="packed" readOnly onNodeClick={setSelected} />
+          <Circles
+            data={topicTree}
+            rootLabel="Reverse Alignment"
+            atlasLayoutMode="packed"
+            readOnly
+            onNodeClick={setSelected}
+          />
         </Suspense>
       </div>
       <div className={styles.empty} role="status" aria-live="polite">
