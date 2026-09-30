@@ -1,7 +1,6 @@
 import {
   changeActiveSessionSlug,
   changeFocusedTab,
-  changeMetricsChoice,
   fetchSessionState,
   setDemoSurfaceMode,
   setOnboardingStep,
@@ -14,7 +13,6 @@ import {
 import {
   CHANGE_ACTIVE_SESSION_SLUG,
   CHANGE_FOCUSED_TAB,
-  CHANGE_METRICS_CHOICE,
   FETCH_SESSION_STATE,
   LOGIN_IN_PROGRESS,
   SET_DEMO_SURFACE_MODE,
@@ -110,10 +108,6 @@ describe('sessionStateActions', () => {
       {
         run: (dispatch) => updateLoginInfo({ loginInProgress: true })(dispatch),
         action: { type: LOGIN_IN_PROGRESS, payload: { loginInProgress: true } },
-      },
-      {
-        run: (dispatch) => changeMetricsChoice(true)(dispatch),
-        action: { type: CHANGE_METRICS_CHOICE, payload: true },
       },
       {
         run: (dispatch) => toggleDemoMode({ tools: true })(dispatch),

@@ -1,6 +1,5 @@
 import {
   FETCH_SESSION_STATE,
-  CHANGE_METRICS_CHOICE,
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
@@ -31,7 +30,6 @@ export interface SessionState {
   activeSessionSlug: string;
   selectedSessionScope: string;
   selectedSessionSlugs: string[];
-  metricsOptIn: boolean;
   focusedTab: number;
   loginInProgress: boolean;
   loginComplete: boolean;
@@ -62,7 +60,6 @@ type LoginModalPayload = boolean | { isOpen?: unknown; focus?: unknown };
 type DemoModePayload = boolean | Partial<SessionState['demoMode']>;
 type SessionReducerAction =
   | { type: typeof FETCH_SESSION_STATE; payload?: FetchSessionStatePayload }
-  | { type: typeof CHANGE_METRICS_CHOICE; payload?: SessionState['metricsOptIn'] }
   | { type: typeof CHANGE_FOCUSED_TAB; payload?: SessionState['focusedTab'] }
   | { type: typeof TOGGLE_LOGIN_MODAL; payload?: LoginModalPayload }
   | { type: typeof TOGGLE_TOOLTIPS }
@@ -79,7 +76,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const getInitialState = (): SessionState => ({
   ...readStoredGlobalSessionSelection(),
-  metricsOptIn: false, // Reserved for a persisted analytics preference.
   focusedTab: 4, // Default home tab index (Tools). Keep Welcome opt-in.
   loginInProgress: false, // True while wallet login is being processed.
   loginComplete: false, // True once wallet login state is ready for gated actions.
@@ -143,12 +139,6 @@ export default function sessionStateReducer(
           tooltipsEnabled: readStoredTooltipsEnabled(),
         };
       }
-    case CHANGE_METRICS_CHOICE:
-      if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
-      return {
-        ...state,
-        metricsOptIn: action.payload as SessionState['metricsOptIn'],
-      };
     case CHANGE_FOCUSED_TAB:
       if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
       return {

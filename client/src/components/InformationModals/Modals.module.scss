@@ -17,25 +17,6 @@
     width: 100%;
     padding: 0px;
 
-    .metricsInfoIcon {
-      align-self: flex-start;
-      color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
-      font-size: 1.2em;
-      padding-left: 2px;
-    }
-
-    .welcomeSlideSidebar {
-      width: 45%;
-      display: flex;
-      flex-direction: column;
-      background: color-mix(in srgb, var(--ce-compat-dark) 37%, transparent);
-      border-top-right-radius: var(--ce-radius-5);
-    }
-
-    .isSidebarCollapsed {
-      display: none;
-    }
-
     .welcomeSlideLayout {
       display: flex;
       flex-direction: column;
@@ -118,25 +99,6 @@
     width: 100%;
     padding: 0px;
 
-    .metricsInfoIcon {
-      align-self: flex-start;
-      color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
-      font-size: 1.2em;
-      padding-left: 2px;
-    }
-
-    .welcomeSlideSidebar {
-      width: 45%;
-      display: flex;
-      flex-direction: column;
-      background: color-mix(in srgb, var(--ce-compat-dark) 37%, transparent);
-      border-top-right-radius: var(--ce-radius-5);
-    }
-
-    .isSidebarCollapsed {
-      display: none;
-    }
-
     .welcomeSlideLayout {
       display: flex;
       flex-direction: column;
@@ -218,25 +180,6 @@
     border-radius: var(--ce-radius-0);
     width: 100%;
     padding: 0px;
-
-    .metricsInfoIcon {
-      align-self: flex-start;
-      color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
-      font-size: 1.4em;
-      padding-left: 4px;
-    }
-
-    .welcomeSlideSidebar {
-      width: 40%;
-      display: flex;
-      flex-direction: column;
-      background: color-mix(in srgb, var(--ce-compat-dark) 37%, transparent);
-      border-top-right-radius: var(--ce-radius-5);
-    }
-
-    .isSidebarCollapsed {
-      display: none;
-    }
 
     .welcomeSlideLayout {
       display: flex;
@@ -321,27 +264,6 @@
     border-radius: var(--ce-radius-0);
     width: 100%;
     padding: 0px;
-
-    .metricsInfoIcon {
-      align-self: flex-start;
-      color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
-      font-size: 1.4em;
-      padding-left: 4px;
-    }
-
-    .welcomeSlideSidebar {
-      width: 40%;
-      display: flex;
-      flex-direction: column;
-      align-self: stretch;
-      min-height: clamp(280px, 31vw, 340px);
-      background: color-mix(in srgb, var(--ce-compat-dark) 37%, transparent);
-      border-top-right-radius: var(--ce-radius-5);
-    }
-
-    .isSidebarCollapsed {
-      display: none;
-    }
 
     .welcomeSlideLayout {
       display: flex;
@@ -428,28 +350,6 @@
     padding: 0px;
     margin-top: 0px;
 
-    .metricsInfoIcon {
-      align-self: center;
-      color: color-mix(in srgb, var(--ce-compat-yellow) 38%, transparent);
-      font-size: 2.4em;
-      padding-left: 9px;
-    }
-
-    .welcomeSlideSidebar {
-      width: 40%;
-      display: flex;
-      flex-direction: column;
-      align-self: stretch;
-      min-height: 380px;
-      background: color-mix(in srgb, var(--ce-compat-dark) 37%, transparent);
-      border-top-right-radius: var(--ce-radius-5);
-      font-size: 1.25em;
-    }
-
-    .isSidebarCollapsed {
-      display: none;
-    }
-
     .welcomeSlideLayout {
       display: flex;
       flex-direction: column;
@@ -524,98 +424,8 @@
   display: none;
 }
 
-.metricDetailsButton {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  background-color: transparent;
-  padding: 0px;
-  margin-bottom: 2.5px;
-  border: transparent solid 0px;
-
-  .metricsInfoIcon {
-    color: color-mix(in srgb, var(--ce-text-inverse) 31%, transparent);
-  }
-}
-
 .isHidden {
   display: none;
-}
-
-.metricsDetailsPanel {
-  display: flex;
-  padding: 0px;
-  margin: 0px;
-  background: transparent;
-  border: 1px transparent solid;
-  border-radius: var(--ce-radius-0);
-
-  .metricsDetailsTitle {
-    color: var(--ce-text-inverse);
-    font-size: 1em;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding-left: 10px;
-
-    .emailFormLabel {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin: 0;
-      text-transform: uppercase;
-      color: var(--ce-status-info);
-      font-weight: 600;
-      background: transparent;
-      padding: 5px;
-    }
-
-    .metricsDetailsSubtitle {
-      margin: 0;
-      text-transform: uppercase;
-      color: var(--ce-color-white);
-      font-weight: 600;
-      background: transparent;
-      padding: 5px;
-    }
-  }
-
-  .metricsDetailsPoints {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .emailSubjects {
-      display: flex;
-      flex-direction: column;
-      padding-left: 0px;
-      padding-bottom: 0px;
-      margin-top: 5px;
-      margin-bottom: 5px;
-      color: var(--ce-text-inverse);
-      text-transform: uppercase;
-      font-weight: 600;
-
-      .emailSubject {
-        display: flex;
-        flex-direction: column;
-        color: color-mix(in srgb, var(--ce-text-inverse) 46%, transparent);
-        text-transform: uppercase;
-        font-weight: 500;
-      }
-    }
-
-    .metricsDetailsButtons {
-      padding-top: 5px;
-      padding-bottom: 0px;
-    }
-  }
-
-  .metricsCollectedText {
-    color: var(--ce-text-inverse);
-    text-transform: uppercase;
-    font-weight: 600;
-    padding-bottom: 5px;
-  }
 }
 
 .closeModalIcon {
@@ -1037,11 +847,6 @@ input[type='radio']:checked:after {
     overflow: hidden;
   }
 
-  .welcomeSlideEmbed .welcomeSlideSidebar {
-    height: 100%;
-    min-height: 0;
-  }
-
   .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton,
   .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButtonCentered {
     height: 100% !important;
@@ -1080,11 +885,6 @@ input[type='radio']:checked:after {
     min-height: 0;
     margin-top: 0;
     overflow: hidden;
-  }
-
-  .welcomeSlideEmbed .welcomeSlideSidebar {
-    height: 100%;
-    min-height: 0;
   }
 
   .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton,
