@@ -4,9 +4,12 @@ import path from 'path';
 const readSurveyToolScss = () => fs.readFileSync(path.join(__dirname, 'SurveyTool.module.scss'), 'utf8');
 
 const checks = [
-  /\.pileCard,[\s\S]*?transition-duration: 0\.01ms !important;/,
-  /\.pileFooter\s+\.pileSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/,
-  /\.headerSubmitButton\.submitGlow::before,\s*[\s\S]*?animation:\s*none !important;/,
+  { selector: /\.pileCard(?:\s*,|\s*$)/, declaration: /transition-duration: 0\.01ms !important;/ },
+  {
+    selector: /\.pileFooter\s+\.pileSubmitButton\.submitGlow::before(?:\s*,|\s*$)/,
+    declaration: /animation:\s*none !important;/,
+  },
+  { selector: /\.headerSubmitButton\.submitGlow::before(?:\s*,|\s*$)/, declaration: /animation:\s*none !important;/ },
 ];
 const reducedMotionBodies = (text: string): string[] => {
   const condition = '@media (prefers-reduced-motion: reduce) {';
@@ -24,10 +27,15 @@ const reducedMotionBodies = (text: string): string[] => {
   }
   return bodies;
 };
-const motionGuardPasses = (text: string) =>
-  checks.every((check) => reducedMotionBodies(text).some((body) => check.test(body)));
+const checkRule = (text: string, check: (typeof checks)[number]) =>
+  reducedMotionBodies(text).some((body) =>
+    [...body.matchAll(/([^{}]+)\{([^{}]*)\}/g)].some(
+      ([, selector, declarations]) => check.selector.test(selector) && check.declaration.test(declarations),
+    ),
+  );
+const motionGuardPasses = (text: string) => checks.every((check) => checkRule(text, check));
 it.each(checks)('keeps each pile and submit motion rule inside reduced motion (%s)', (check) => {
-  expect(reducedMotionBodies(readSurveyToolScss()).some((body) => check.test(body))).toBe(true);
+  expect(checkRule(readSurveyToolScss(), check)).toBe(true);
 });
 it('rejects rules moved out of their reduced-motion block', () => {
   const text = readSurveyToolScss();
@@ -35,6 +43,15 @@ it('rejects rules moved out of their reduced-motion block', () => {
   const start = text.lastIndexOf(condition);
   expect(start).toBeGreaterThan(0);
   const mutated = text.slice(0, start) + '@media (min-width: 0) {' + text.slice(start + condition.length);
+  expect(motionGuardPasses(text)).toBe(true);
+  expect(motionGuardPasses(mutated)).toBe(false);
+});
+
+it('rejects selectors moved to a different reduced-motion rule', () => {
+  const text = readSurveyToolScss();
+  const mutated = text
+    .replace('  .pileCard,\n  .pileActions {', '  .pileActions {')
+    .replace('  .pileSubmitSuccessBadge,', '  .pileCard,\n  .pileSubmitSuccessBadge,');
   expect(motionGuardPasses(text)).toBe(true);
   expect(motionGuardPasses(mutated)).toBe(false);
 });

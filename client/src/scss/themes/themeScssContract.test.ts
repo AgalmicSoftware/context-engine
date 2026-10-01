@@ -4,11 +4,20 @@ import * as sass from 'sass';
 
 const framelessOutlineGuardPasses = (text: string) => {
   const controls = text.match(
-    /\[data-ce-control-appearance='frameless'\],\s*\[data-ce-control-appearance='frameless'\]:active\s*\{([^}]*)\}/,
+    /\[data-ce-control-appearance=['"]?frameless['"]?\],\s*\[data-ce-control-appearance=['"]?frameless['"]?\]:active\s*\{([^}]*)\}/,
   )?.[1];
-  const droppingSelectors = [...text.matchAll(/([^{}]*\[data-ce-control-appearance='frameless'\][^{}]*)\{([^}]*)\}/g)]
-    .filter(([, , body]) => /outline:\s*(?:none|0)\b/.test(body))
-    .map(([, selector]) => selector.replace(/\/\/[^\n]*\n/g, '').trim());
+  const droppingSelectors = [
+    ...text.matchAll(/([^{}]*\[data-ce-control-appearance=['"]?frameless['"]?\][^{}]*)\{([^}]*)\}/g),
+  ]
+    .filter(([, , body]) =>
+      /outline(?:-style|-width|-color)?\s*:\s*(?:none|0[a-z%]*|transparent)(?=\s|;|})/i.test(body),
+    )
+    .map(([, selector]) =>
+      selector
+        .replace(/\/\/[^\n]*\n/g, '')
+        .trim()
+        .replace(/\[data-ce-control-appearance=['"]?frameless['"]?\]/g, "[data-ce-control-appearance='frameless']"),
+    );
   return (
     /appearance:\s*none;[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*none;/.test(controls || '') &&
     droppingSelectors.every(
@@ -173,3 +182,17 @@ describe('runtime SCSS theme contract', () => {
     expect(source).toContain('$input-bg: var(--ce-input-bg);');
   });
 });
+
+it.each(['outline: 0px', 'outline-style: none', 'outline-color: transparent'])(
+  'rejects %s on frameless keyboard focus',
+  (declaration) => {
+    const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
+    for (const quote of ["'", '"', '']) {
+      expect(
+        framelessOutlineGuardPasses(
+          recipes + `\n[data-ce-control-appearance=${quote}frameless${quote}]:focus-visible { ${declaration}; }`,
+        ),
+      ).toBe(false);
+    }
+  },
+);
