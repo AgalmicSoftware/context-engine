@@ -1,3 +1,4 @@
+import { parseSiweMessage, validateSiweResources } from './siweMessageValidation.js';
 import { getRouteBaseHeaders } from './routeBaseHeaders.js';
 
 export const dispatchBootstrapArweaveUpload = async ({
@@ -75,6 +76,13 @@ export const dispatchBootstrapArweaveUpload = async ({
       handled: true,
       response: corsContext?.response,
     };
+  }
+
+  const resourcesCheck = validateSiweResources({
+    siwe: parseSiweMessage(body?.message), request, config, targetSlug,
+  });
+  if (!resourcesCheck.ok) {
+    return { handled: true, response: deps?.json?.({ error: resourcesCheck.error }, 403, corsContext.headers) };
   }
 
   const adminCheck = await deps?.verifyAdminSignature?.({

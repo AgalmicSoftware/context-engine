@@ -1,5 +1,6 @@
 import {
   validateBrowserLoginOrigin,
+  validateSiweResources,
 } from './siweMessageValidation.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
@@ -124,32 +125,9 @@ export const resolveAuthLoginRequestAuthority = async ({
     };
   }
 
-  // Resources are signed. Check them before nonce consumption so a relayed
-  // login cannot use a spoofed Origin header to cross Worker/session boundaries.
-  // Older cached clients without Resources remain accepted during rollout.
-  if (siwe.resources !== undefined) {
-    let workerOrigin = '';
-    try {
-      workerOrigin = new URL(request.url).origin;
-    } catch {
-      /* rejected below */
-    }
-    const slug = String(targetSlug || '')
-      .trim()
-      .toLowerCase();
-    const sessionResource = workerCanonical
-      ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}`
-      : `urn:context-engine:session:slug:${encodeURIComponent(slug === 'general' ? '' : slug)}`;
-    const resources = siwe.resources;
-    if (
-      !workerOrigin ||
-      !Array.isArray(resources) ||
-      resources.length !== 2 ||
-      !resources.includes(workerOrigin) ||
-      !resources.includes(sessionResource)
-    ) {
-      return { ok: false, response: deps?.json?.({ error: 'Signed login resources do not match this Worker and session.' }, 403, headers) };
-    }
+  const resourcesCheck = validateSiweResources({ siwe, request, config, targetSlug });
+  if (!resourcesCheck.ok) {
+    return { ok: false, response: deps?.json?.({ error: resourcesCheck.error }, 403, headers) };
   }
 
   const loginOriginCheck = (

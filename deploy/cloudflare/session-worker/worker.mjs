@@ -71645,6 +71645,9 @@ var getCorsContext = ({
   };
 };
 
+// workers/sessionCorsWorker/siweMessageValidation.js
+init_sessionConfigMutation();
+
 // workers/sessionCorsWorker/adminTypedData.mjs
 var resolveEthersCompat = (loadedModule) => {
   const direct = loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule;
@@ -71981,6 +71984,19 @@ var validateSiwe = (siwe, deps) => {
     if (nowMs - issuedMs > maxAgeMs) {
       return { ok: false, error: "SIWE message is too old." };
     }
+  }
+  return { ok: true };
+};
+var validateSiweResources = ({ siwe, request, config, targetSlug } = {}) => {
+  if (siwe?.resources === void 0) return { ok: true };
+  const workerOrigin = normalizeOrigin2(request?.url);
+  const canonical = toStr6(config?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+  const slug = toStr6(targetSlug).trim().toLowerCase();
+  const sessionResource = canonical ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}` : `urn:context-engine:session:slug:${encodeURIComponent(slug === "general" ? "" : slug)}`;
+  const resources = siwe.resources;
+  if (!workerOrigin || canonical && !sessionId || !Array.isArray(resources) || resources.length !== 2 || !resources.includes(workerOrigin) || !resources.includes(sessionResource)) {
+    return { ok: false, error: "Signed login resources do not match this Worker and session." };
   }
   return { ok: true };
 };
@@ -79123,18 +79139,9 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: "Session identity does not match worker session." }, 409, headers)
     };
   }
-  if (siwe.resources !== void 0) {
-    let workerOrigin = "";
-    try {
-      workerOrigin = new URL(request.url).origin;
-    } catch {
-    }
-    const slug = String(targetSlug || "").trim().toLowerCase();
-    const sessionResource = workerCanonical ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}` : `urn:context-engine:session:slug:${encodeURIComponent(slug === "general" ? "" : slug)}`;
-    const resources = siwe.resources;
-    if (!workerOrigin || !Array.isArray(resources) || resources.length !== 2 || !resources.includes(workerOrigin) || !resources.includes(sessionResource)) {
-      return { ok: false, response: deps?.json?.({ error: "Signed login resources do not match this Worker and session." }, 403, headers) };
-    }
+  const resourcesCheck = validateSiweResources({ siwe, request, config, targetSlug });
+  if (!resourcesCheck.ok) {
+    return { ok: false, response: deps?.json?.({ error: resourcesCheck.error }, 403, headers) };
   }
   const loginOriginCheck = (typeof deps?.validateBrowserLoginOrigin === "function" ? deps.validateBrowserLoginOrigin : validateBrowserLoginOrigin)({
     request,
@@ -79546,6 +79553,15 @@ var dispatchBootstrapArweaveUpload = async ({
       handled: true,
       response: corsContext?.response
     };
+  }
+  const resourcesCheck = validateSiweResources({
+    siwe: parseSiweMessage(body?.message),
+    request,
+    config,
+    targetSlug
+  });
+  if (!resourcesCheck.ok) {
+    return { handled: true, response: deps?.json?.({ error: resourcesCheck.error }, 403, corsContext.headers) };
   }
   const adminCheck = await deps?.verifyAdminSignature?.({
     baseHeaders: corsContext.headers,

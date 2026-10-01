@@ -363,3 +363,35 @@ test('dispatchBootstrapArweaveUpload loads existing config and secrets before up
   assert.equal(result.handled, true);
   assert.equal(result.response, uploadResponse);
 });
+
+for (const [label, resources, accepted, mode] of [
+  ['other Worker', ['https://other.example', 'urn:context-engine:session:slug:sample'], false, 'registry'],
+  ['other session', ['https://worker.example', 'urn:context-engine:session:slug:other'], false, 'registry'],
+  ['valid registry', ['https://worker.example', 'urn:context-engine:session:slug:sample'], true, 'registry'],
+  ['valid canonical', ['https://worker.example', 'urn:context-engine:session:id:0x44444444444444444444444444444444'], true, 'worker_canonical'],
+  ['legacy without Resources', null, true, 'registry'],
+]) {
+  test(`bootstrap upload checks ${label} before signature verification consumes a nonce`, async () => {
+    let verified = false;
+    let uploaded = false;
+    const message = ['app.example wants you to sign in with your Ethereum account:', '0x0000000000000000000000000000000000000001',
+      'URI: https://app.example', ...(resources === null ? [] : ['Resources:', ...resources.map((r) => `- ${r}`)])].join('\n');
+    const result = await dispatchBootstrapArweaveUpload({
+      request: new Request('https://worker.example/arweave/upload'), hasAuthorization: false,
+      deps: {
+        corsHeaders: () => ({}),
+        readArweaveBootstrapUploadPayload: async () => ({ ok: true, body: { message }, hasProvidedArweaveJwk: false }),
+        resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: 'sample' }),
+        getSessionConfig: async () => ({ sessionIdHex: '0x44444444444444444444444444444444', sessionModeProfile: { authority: { mode } } }),
+        getCorsContext: async () => ({ ok: true, headers: {} }),
+        verifyAdminSignature: async () => { verified = true; return { ok: true }; },
+        getSessionSecrets: async () => ({}),
+        arweaveUpload: async () => { uploaded = true; return { status: 200 }; },
+        json: (body, status) => ({ body, status }),
+      },
+    });
+    assert.equal(result.response.status, accepted ? 200 : 403);
+    assert.equal(verified, accepted);
+    assert.equal(uploaded, accepted);
+  });
+}

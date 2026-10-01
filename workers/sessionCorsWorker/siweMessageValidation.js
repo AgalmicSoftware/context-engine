@@ -1,3 +1,4 @@
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import {
   ADMIN_ACTION_DOMAIN,
   ADMIN_ACTION_TYPES,
@@ -316,5 +317,24 @@ export const validateSiwe = (siwe, deps) => {
     }
   }
 
+  return { ok: true };
+};
+
+// Check signed destinations before consuming nonces. Keep no-Resources clients
+// compatible during rollout; present Resources must bind both boundaries.
+export const validateSiweResources = ({ siwe, request, config, targetSlug } = {}) => {
+  if (siwe?.resources === undefined) return { ok: true };
+  const workerOrigin = normalizeOrigin(request?.url);
+  const canonical = toStr(config?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical';
+  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+  const slug = toStr(targetSlug).trim().toLowerCase();
+  const sessionResource = canonical
+    ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}`
+    : `urn:context-engine:session:slug:${encodeURIComponent(slug === 'general' ? '' : slug)}`;
+  const resources = siwe.resources;
+  if (!workerOrigin || (canonical && !sessionId) || !Array.isArray(resources) || resources.length !== 2 ||
+      !resources.includes(workerOrigin) || !resources.includes(sessionResource)) {
+    return { ok: false, error: 'Signed login resources do not match this Worker and session.' };
+  }
   return { ok: true };
 };
