@@ -1043,8 +1043,7 @@ async function putSubmittedResult(
     createdAt = '2026-06-01T12:00:00.000Z',
   } = {},
 ) {
-  await seedSubmittedResult(
-    env,
+  await seedSubmittedResult(env,
     key || `telegram:submit-request:${sessionSlug}:${telegramUserId}:${questionId}:${createdAt}`,
     JSON.stringify({
       status: 'direct_submitted',
@@ -1162,10 +1161,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /name:\s+ce-session-wrapped/);
   assert.match(wrapped, /^# Context Engine Session Wrapped Runtime/m);
   assert.match(wrapped, /\*\*Skill version:\*\* 2026-09-28 \(session-wrapped-v1\.2\)/);
-  assert.match(
-    wrapped,
-    /quadratic uses `\{ "value": \[\.\.\.\] \}` with one signed whole-number vote per\s+option in order/,
-  );
+  assert.match(wrapped, /quadratic uses `\{ "value": \[\.\.\.\] \}` with one signed whole-number vote per\s+option in order/);
   assert.match(wrapped, /Use this skill only to run a generic Context Engine session wrapped flow/);
   assert.match(wrapped, /not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
@@ -1428,27 +1424,17 @@ test('Delegated authoring requires a stored allowed group binding, not a claimed
   const request = () =>
     agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&groupChatId=-10042&chatId=-10042', {
       token: issued.token,
-    });
+  });
   const denied = await handleTelegramAgentHandoffRequest({ request: request(), env });
   assert.equal(denied.status, 403);
   assert.equal((await denied.json()).reason, 'telegram_group_binding_required');
-  await env.AGENT_ACTION_KV.put(
-    'telegram:private-session:42',
-    JSON.stringify({
-      sessionSlug: 'alpha',
-      sourceChatId: '-10099',
-      source: 'telegram_group',
-    }),
-  );
+  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
+    sessionSlug: 'alpha', sourceChatId: '-10099', source: 'telegram_group',
+  }));
   assert.equal((await handleTelegramAgentHandoffRequest({ request: request(), env })).status, 403);
-  await env.AGENT_ACTION_KV.put(
-    'telegram:private-session:42',
-    JSON.stringify({
-      sessionSlug: 'alpha',
-      sourceChatId: '-10042',
-      source: 'telegram_group',
-    }),
-  );
+  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
+    sessionSlug: 'alpha', sourceChatId: '-10042', source: 'telegram_group',
+  }));
   assert.equal((await handleTelegramAgentHandoffRequest({ request: request(), env })).status, 200);
 });
 
@@ -2071,9 +2057,7 @@ test('Telegram agent onboarding keeps topic and bucket data opt-in', async () =>
 test('preview identities cannot receive a Bridge credential', async () => {
   const env = baseEnv();
   const result = await issueAgentCredential({
-    env,
-    principal: telegramAgentPrincipal({ telegramUserId: 'preview-user' }),
-    sessionSlug: 'alpha',
+    env, principal: telegramAgentPrincipal({ telegramUserId: 'preview-user' }), sessionSlug: 'alpha',
   });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'preview_credential_forbidden');
@@ -2096,10 +2080,7 @@ test('Mini App onboarding cannot exchange operator preview auth for a credential
   });
   assert.equal(response.status, 401);
   assert.equal((await response.json()).ok, false);
-  assert.equal(
-    [...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)),
-    false,
-  );
+  assert.equal([...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)), false);
 });
 
 test('Mini App onboarding endpoint validates Telegram initData and mints a scoped user token', async () => {
@@ -2229,22 +2210,28 @@ test('Mini App onboarding rejects GET and query-carried initData without echoing
   const rawInitData = 'query_id=do-not-echo&auth_date=1&hash=secret-auth-material';
   const encodedInitData = encodeURIComponent(rawInitData);
   const getResponse = await handleTelegramAgentHandoffRequest({
-    request: new Request(`https://bridge.example/api/agent/miniapp/onboard?initData=${encodedInitData}`, {
-      method: 'GET',
-      headers: { origin: 'https://mini.example' },
-    }),
+    request: new Request(
+      `https://bridge.example/api/agent/miniapp/onboard?initData=${encodedInitData}`,
+      {
+        method: 'GET',
+        headers: { origin: 'https://mini.example' },
+      },
+    ),
     env,
   });
   const getBody = await jsonBody(getResponse);
   const postResponse = await handleTelegramAgentHandoffRequest({
-    request: new Request(`https://bridge.example/api/agent/miniapp/onboard?telegramInitData=${encodedInitData}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        origin: 'https://mini.example',
+    request: new Request(
+      `https://bridge.example/api/agent/miniapp/onboard?telegramInitData=${encodedInitData}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://mini.example',
+        },
+        body: JSON.stringify({ startParam: 'onboard__alpha' }),
       },
-      body: JSON.stringify({ startParam: 'onboard__alpha' }),
-    }),
+    ),
     env,
   });
   const postBody = await jsonBody(postResponse);
@@ -2363,39 +2350,22 @@ for (const proof of ['missing', 'invalid', 'expired', 'different-user']) {
       ]),
     });
     const previous = await createTelegramAgentDelegationToken({
-      env,
-      telegramUserId: '42',
-      sessionSlug: 'alpha',
+      env, telegramUserId: '42', sessionSlug: 'alpha',
       accountAddress: `0x${'12'.repeat(20)}`,
     });
-    await env.AGENT_ACTION_KV.put(
-      'telegram:private-session:42',
-      JSON.stringify({
-        sessionSlug: 'alpha',
-        source: 'telegram_webhook',
-        sourceChatId: '-10042',
-      }),
-    );
+    await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
+      sessionSlug: 'alpha', source: 'telegram_webhook', sourceChatId: '-10042',
+    }));
     const bindingBefore = await env.AGENT_ACTION_KV.get('telegram:private-session:42');
-    const initData =
-      proof === 'missing'
-        ? ''
-        : proof === 'invalid'
-          ? 'invalid-proof'
-          : signInitData(
-              {
-                auth_date: String(Math.floor(Date.now() / 1000) - (proof === 'expired' ? 7200 : 0)),
-                user: JSON.stringify({ id: 43 }),
-              },
-              env.TELEGRAM_BOT_TOKEN,
-            );
+    const initData = proof === 'missing' ? '' : proof === 'invalid' ? 'invalid-proof' : signInitData({
+      auth_date: String(Math.floor(Date.now() / 1000) - (proof === 'expired' ? 7200 : 0)),
+      user: JSON.stringify({ id: 43 }),
+    }, env.TELEGRAM_BOT_TOKEN);
     const response = await handleTelegramAgentHandoffRequest({
       request: new Request('https://bridge.example/api/agent/invite/onboard', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ inviteToken: 'untrusted-identity-invite', telegramUserId: '42', initData }),
-      }),
-      env,
+      }), env,
     });
     assert.equal(response.status, 200);
     const body = await response.json();
@@ -2445,13 +2415,10 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
       body: JSON.stringify({
         contextEngine: { inviteToken: 'geo-invite-secret' },
         telegramUserId: '42',
-        initData: signInitData(
-          {
-            auth_date: String(Math.floor(Date.now() / 1000)),
-            user: JSON.stringify({ id: 42 }),
-          },
-          env.TELEGRAM_BOT_TOKEN,
-        ),
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000)),
+          user: JSON.stringify({ id: 42 }),
+        }, env.TELEGRAM_BOT_TOKEN),
         username: 'participant',
       }),
     }),
@@ -2569,14 +2536,12 @@ test('Invite onboarding preserves replay denial for legacy KV redemption records
   const inviteHash = sha256Hex('legacy-redeemed-invite');
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
-    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
-      {
-        tokenHash: inviteHash,
-        sessionSlug: 'alpha',
-        label: 'Legacy invite',
-        source: 'browser',
-      },
-    ]),
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: inviteHash,
+      sessionSlug: 'alpha',
+      label: 'Legacy invite',
+      source: 'browser',
+    }]),
   });
   await env.AGENT_ACTION_KV.put(
     `agent:invite-redemption:v1:${inviteHash}`,
@@ -2605,21 +2570,18 @@ test('Invite onboarding atomically rejects concurrent redemption attempts', asyn
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
-    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
-      {
-        tokenHash: sha256Hex('concurrent-browser-invite'),
-        sessionSlug: 'alpha',
-        label: 'Concurrent browser invite',
-        source: 'browser',
-      },
-    ]),
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex('concurrent-browser-invite'),
+      sessionSlug: 'alpha',
+      label: 'Concurrent browser invite',
+      source: 'browser',
+    }]),
   });
-  const onboardRequest = () =>
-    new Request('https://bridge.example/api/agent/invite/onboard', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ inviteToken: 'concurrent-browser-invite', label: 'Participant' }),
-    });
+  const onboardRequest = () => new Request('https://bridge.example/api/agent/invite/onboard', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ inviteToken: 'concurrent-browser-invite', label: 'Participant' }),
+  });
 
   const responses = await Promise.all([
     handleTelegramAgentHandoffRequest({ request: onboardRequest(), env }),
@@ -2644,13 +2606,9 @@ test('Invite onboarding keeps reservations after uncertain credential issuance o
       const inviteToken = `uncertain-invite-${failure}`;
       const env = agentHttpOnlyEnv({
         AGENT_BRIDGE_AGENT_API_TOKEN: '',
-        AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
-          {
-            tokenHash: sha256Hex(inviteToken),
-            sessionSlug: 'alpha',
-            source: 'browser',
-          },
-        ]),
+        AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+          tokenHash: sha256Hex(inviteToken), sessionSlug: 'alpha', source: 'browser',
+        }]),
       });
       const kv = env.AGENT_ACTION_KV;
       const put = kv.put.bind(kv);
@@ -2666,33 +2624,29 @@ test('Invite onboarding keeps reservations after uncertain credential issuance o
         }
       };
       if (failure !== 'finalize-only') {
-        kv.delete = async () => {
-          throw new Error('revocation unavailable');
-        };
+        kv.delete = async () => { throw new Error('revocation unavailable'); };
       }
       const namespace = env.AGENT_INVITE_COORDINATOR;
       const getByName = namespace.getByName.bind(namespace);
       let releases = 0;
       namespace.getByName = (name) => {
         const stub = getByName(name);
-        return {
-          fetch: async (input, init) => {
-            const path = new URL(input).pathname;
-            if (path === '/release') releases += 1;
-            if (path === '/finalize') throw new Error('finalization unavailable');
-            return stub.fetch(input, init);
+        return { fetch: async (input, init) => {
+          const path = new URL(input).pathname;
+          if (path === '/release') releases += 1;
+          if (path === '/finalize') throw new Error('finalization unavailable');
+          return stub.fetch(input, init);
           },
-        };
+      };
       };
       const onboard = () =>
         handleTelegramAgentHandoffRequest({
-          env,
-          request: new Request('https://bridge.example/api/agent/invite/onboard', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ inviteToken, label: 'Participant' }),
-          }),
-        });
+        env,
+        request: new Request('https://bridge.example/api/agent/invite/onboard', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ inviteToken, label: 'Participant' }),
+        }),
+      });
       const first = await onboard();
       assert.equal(first.status, failure.startsWith('finalize') ? 503 : 500);
       assert.equal((await first.json()).ok, false);
@@ -2711,26 +2665,20 @@ test('Invite onboarding releases a reservation when credential storage is absent
   const inviteToken = 'pre-issuance-invite';
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
-    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
-      {
-        tokenHash: sha256Hex(inviteToken),
-        sessionSlug: 'alpha',
-        source: 'browser',
-      },
-    ]),
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex(inviteToken), sessionSlug: 'alpha', source: 'browser',
+    }]),
   });
   const kv = env.AGENT_ACTION_KV;
   const put = kv.put;
   kv.put = undefined;
-  const onboard = () =>
-    handleTelegramAgentHandoffRequest({
-      env,
-      request: new Request('https://bridge.example/api/agent/invite/onboard', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ inviteToken, label: 'Participant' }),
-      }),
-    });
+  const onboard = () => handleTelegramAgentHandoffRequest({
+    env,
+    request: new Request('https://bridge.example/api/agent/invite/onboard', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ inviteToken, label: 'Participant' }),
+    }),
+  });
   const first = await onboard();
   assert.equal(first.status, 503);
   assert.equal((await first.json()).reason, 'agent_token_storage_unavailable');
@@ -2742,14 +2690,12 @@ test('Invite onboarding fails closed when the redemption coordinator is unavaila
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
     AGENT_INVITE_COORDINATOR: null,
-    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
-      {
-        tokenHash: sha256Hex('coordinator-missing-invite'),
-        sessionSlug: 'alpha',
-        label: 'Browser invite',
-        source: 'browser',
-      },
-    ]),
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex('coordinator-missing-invite'),
+      sessionSlug: 'alpha',
+      label: 'Browser invite',
+      source: 'browser',
+    }]),
   });
   const response = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/api/agent/invite/onboard', {
@@ -2771,37 +2717,23 @@ test('Invite onboarding fails closed when the redemption coordinator is unavaila
 
 test('registry discovery cannot authorize credentials or managed writes, including GET actions', async () => {
   const env = baseEnv({
-    AGENT_BRIDGE_SESSION_POLICY_JSON: '',
-    DEFAULT_RPC_URL: 'https://read-only-handoff.example',
-    REGISTRY_FETCH: async () => {
-      throw new Error('unexpected registry network access');
-    },
+    AGENT_BRIDGE_SESSION_POLICY_JSON: '', DEFAULT_RPC_URL: 'https://read-only-handoff.example',
+    REGISTRY_FETCH: async () => { throw new Error('unexpected registry network access'); },
   });
   await env.AGENT_ACTION_KV.put(
     'telegram:registry-sessions:v1:11155420:0xdcb1731984e9f75c6a061c38dd8b67d18de4c0c1:50',
     JSON.stringify({ ok: true, sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true }] }),
   );
   for (const [path, method] of [
-    ['/credentials/service', 'POST'],
-    ['/invite/onboard', 'POST'],
-    ['/miniapp/onboard', 'POST'],
-    ['/client-login/exchange', 'POST'],
-    ['/wrapped/member-exchange', 'POST'],
-    ['/preferences', 'POST'],
-    ['/questions/create', 'POST'],
-    ['/questions/pose', 'POST'],
-    ['/question-votes/apply', 'POST'],
-    ['/groups/propose', 'POST'],
-    ['/sessions/child', 'POST'],
-    ['/admin/questions/delete', 'POST'],
-    ['/geo-backlink', 'GET'],
-    ['/onboarding', 'GET'],
+    ['/credentials/service', 'POST'], ['/invite/onboard', 'POST'], ['/miniapp/onboard', 'POST'],
+    ['/client-login/exchange', 'POST'], ['/wrapped/member-exchange', 'POST'],
+    ['/preferences', 'POST'], ['/questions/create', 'POST'], ['/questions/pose', 'POST'],
+    ['/question-votes/apply', 'POST'], ['/groups/propose', 'POST'], ['/sessions/child', 'POST'],
+    ['/admin/questions/delete', 'POST'], ['/geo-backlink', 'GET'], ['/onboarding', 'GET'],
   ]) {
     const response = await handleTelegramAgentHandoffRequest({
-      env,
-      request: agentRequest(`/api/agent${path}?sessionSlug=alpha&telegramUserId=42`, {
-        method,
-        ...(method === 'POST' ? { body: { name: 'Service', sessionSlug: 'alpha' } } : {}),
+      env, request: agentRequest(`/api/agent${path}?sessionSlug=alpha&telegramUserId=42`, {
+        method, ...(method === 'POST' ? { body: { name: 'Service', sessionSlug: 'alpha' } } : {}),
       }),
     });
     assert.equal(response.status, 403, path);
@@ -2810,8 +2742,7 @@ test('registry discovery cannot authorize credentials or managed writes, includi
   assert.equal(env.AGENT_ACTION_KV.store.size, 1);
   for (const method of ['GET', 'POST']) {
     const response = await handleTelegramAgentHandoffRequest({
-      env,
-      request: agentRequest('/api/agent/questions?sessionSlug=alpha&telegramUserId=42', { method }),
+      env, request: agentRequest('/api/agent/questions?sessionSlug=alpha&telegramUserId=42', { method }),
     });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).questions.length, 2);
@@ -2931,13 +2862,10 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
       body: JSON.stringify({
         inviteToken: 'agent-only-invite',
         telegramUserId: '42',
-        initData: signInitData(
-          {
-            auth_date: String(Math.floor(Date.now() / 1000)),
-            user: JSON.stringify({ id: 42 }),
-          },
-          env.TELEGRAM_BOT_TOKEN,
-        ),
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000)),
+          user: JSON.stringify({ id: 42 }),
+        }, env.TELEGRAM_BOT_TOKEN),
         mode: 'agent_only',
       }),
     }),
@@ -2995,13 +2923,10 @@ test('Session Wrapped invite onboarding mints wrapped agent-only credential meta
       body: JSON.stringify({
         inviteToken: 'wrapped-demo-invite',
         telegramUserId: '4242',
-        initData: signInitData(
-          {
-            auth_date: String(Math.floor(Date.now() / 1000)),
-            user: JSON.stringify({ id: 4242 }),
-          },
-          env.TELEGRAM_BOT_TOKEN,
-        ),
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000)),
+          user: JSON.stringify({ id: 4242 }),
+        }, env.TELEGRAM_BOT_TOKEN),
         mode: 'agent_only',
         skill: 'ce-session-wrapped',
         source: 'session-wrapped-forwarded-prompt',
@@ -3597,9 +3522,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       },
     }),
     env,
-    fetchImpl: async () => {
-      throw new Error('Caller cannot select a paid renderer');
-    },
+    fetchImpl: async () => { throw new Error('Caller cannot select a paid renderer'); },
   });
   const wrappedMissingKey = await jsonBody(wrappedMissingKeyResponse);
   assert.equal(wrappedMissingKeyResponse.status, 200);
@@ -6406,8 +6329,7 @@ test('Telegram agent can read and render topic-map results without raw response 
     ['q-privacy', '43', 'Agree'],
   ]) {
     counter += 1;
-    await seedSubmittedResult(
-      env,
+    await seedSubmittedResult(env,
       `telegram:submit-request:${counter}`,
       JSON.stringify({
         status: 'direct_submitted',
@@ -7233,9 +7155,8 @@ test('Telegram agent service token can manage sponsored question queue as sessio
 test('Telegram agent admin group approval endpoint returns in-group guidance without minting bearer actions', async () => {
   const env = baseEnv();
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = await managedAccountAddressForTelegramUser(env, '42');
-  const actionKeysBefore = Array.from(env.AGENT_ACTION_KV.store.keys()).filter((key) =>
-    key.startsWith('telegram:action:'),
-  );
+  const actionKeysBefore = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:action:'));
 
   const adminResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/group-approval-link', {
@@ -7259,9 +7180,8 @@ test('Telegram agent admin group approval endpoint returns in-group guidance wit
     env,
   });
   const nonAdmin = await jsonBody(nonAdminResponse);
-  const actionKeysAfter = Array.from(env.AGENT_ACTION_KV.store.keys()).filter((key) =>
-    key.startsWith('telegram:action:'),
-  );
+  const actionKeysAfter = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:action:'));
 
   assert.equal(adminResponse.status, 409);
   assert.equal(adminBody.ok, false);

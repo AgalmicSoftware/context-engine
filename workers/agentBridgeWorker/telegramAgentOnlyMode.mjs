@@ -185,7 +185,9 @@ function configKvKey(sessionSlug = '') {
 function windowKvKey(sessionSlug = '', windowId = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   const id = safeString(windowId);
-  return slug && /^w-\d{4}-\d{2}-\d{2}$/.test(id) ? `${AGENT_ONLY_WINDOW_KV_PREFIX}${slug}:${id}` : '';
+  return slug && /^w-\d{4}-\d{2}-\d{2}$/.test(id)
+    ? `${AGENT_ONLY_WINDOW_KV_PREFIX}${slug}:${id}`
+    : '';
 }
 
 function answerEventPrefix(sessionSlug = '', windowId = '', userPart = '') {
@@ -241,10 +243,7 @@ function wrappedImagePrefix(sessionSlug = '', windowId = '', telegramUserId = ''
   const slug = sanitizeSessionSlug(sessionSlug);
   const id = safeString(windowId);
   const user = kvKeySafePart(telegramUserId);
-  const imageMode =
-    lower(mode)
-      .replace(/[^a-z0-9_-]+/g, '_')
-      .slice(0, 48) || 'wrapped';
+  const imageMode = lower(mode).replace(/[^a-z0-9_-]+/g, '_').slice(0, 48) || 'wrapped';
   return slug && id && user ? `${AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX}${slug}:${id}:${user}:${imageMode}:` : '';
 }
 
@@ -261,11 +260,11 @@ function runIdFromBody(body = {}) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   return normalizeAgentOnlyRunId(
     source.run_id ||
-      source.runId ||
-      source.request_run_id ||
-      source.requestRunId ||
-      source.agent_run_id ||
-      source.agentRunId,
+    source.runId ||
+    source.request_run_id ||
+    source.requestRunId ||
+    source.agent_run_id ||
+    source.agentRunId,
   );
 }
 
@@ -273,20 +272,13 @@ function wrappedImageRunKey(sessionSlug = '', windowId = '', telegramUserId = ''
   const slug = sanitizeSessionSlug(sessionSlug);
   const id = safeString(windowId);
   const user = kvKeySafePart(telegramUserId);
-  const imageMode =
-    lower(mode)
-      .replace(/[^a-z0-9_-]+/g, '_')
-      .slice(0, 48) || 'wrapped';
+  const imageMode = lower(mode).replace(/[^a-z0-9_-]+/g, '_').slice(0, 48) || 'wrapped';
   const run = normalizeAgentOnlyRunId(runId);
-  return slug && id && user && run
-    ? `${AGENT_ONLY_WRAPPED_IMAGE_RUN_KV_PREFIX}${slug}:${id}:${user}:${imageMode}:${run}`
-    : '';
+  return slug && id && user && run ? `${AGENT_ONLY_WRAPPED_IMAGE_RUN_KV_PREFIX}${slug}:${id}:${user}:${imageMode}:${run}` : '';
 }
 
 function normalizeWrappedImageViewId(value = '') {
-  const id = lower(value)
-    .replace(/[^a-f0-9]/g, '')
-    .slice(0, 32);
+  const id = lower(value).replace(/[^a-f0-9]/g, '').slice(0, 32);
   return /^[a-f0-9]{32}$/.test(id) ? id : '';
 }
 
@@ -303,12 +295,7 @@ function attemptEventPrefix(sessionSlug = '', windowId = '', userPart = '') {
 }
 
 function normalizeAttemptStage(value = '') {
-  return (
-    lower(value)
-      .replace(/[^a-z0-9_-]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 48) || 'unknown'
-  );
+  return lower(value).replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || 'unknown';
 }
 
 function attemptReasonFromResult(result = {}) {
@@ -327,12 +314,8 @@ function attemptCountsFromResult(result = {}) {
     skipsRecorded: Number.isFinite(Number(source.skipsRecorded)) ? Number(source.skipsRecorded) : null,
     budgetUsed: Number.isFinite(Number(source.budgetUsed)) ? Number(source.budgetUsed) : null,
     statementCount: Number.isFinite(Number(source.statement_count)) ? Number(source.statement_count) : null,
-    agentPredictionCount: Number.isFinite(Number(source.agent_prediction_count))
-      ? Number(source.agent_prediction_count)
-      : null,
-    agentResponseCount: Number.isFinite(Number(source.agent_response_count))
-      ? Number(source.agent_response_count)
-      : null,
+    agentPredictionCount: Number.isFinite(Number(source.agent_prediction_count)) ? Number(source.agent_prediction_count) : null,
+    agentResponseCount: Number.isFinite(Number(source.agent_response_count)) ? Number(source.agent_response_count) : null,
     privacySkipCount: Number.isFinite(Number(source.privacy_skip_count)) ? Number(source.privacy_skip_count) : null,
   };
 }
@@ -450,9 +433,7 @@ function normalizeEvalTypes(value = {}, enabledQuestionIds = []) {
   const out = {};
   Object.entries(source).forEach(([rawId, rawType]) => {
     const id = normalizeQuestionId(rawId);
-    const type = lower(rawType)
-      .replace(/[^a-z0-9_-]+/g, '_')
-      .slice(0, 48);
+    const type = lower(rawType).replace(/[^a-z0-9_-]+/g, '_').slice(0, 48);
     if (id && allowedIds.has(id) && AGENT_ONLY_EVAL_TYPES.has(type)) out[id] = type;
   });
   return out;
@@ -460,10 +441,9 @@ function normalizeEvalTypes(value = {}, enabledQuestionIds = []) {
 
 export function normalizeAgentOnlyModeConfigPatch(patch = {}, current = null) {
   const input = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
-  const base =
-    current && typeof current === 'object' && !Array.isArray(current)
-      ? current
-      : defaultAgentOnlyModeConfig(input.sessionSlug);
+  const base = current && typeof current === 'object' && !Array.isArray(current)
+    ? current
+    : defaultAgentOnlyModeConfig(input.sessionSlug);
   const enabledQuestionIds = Object.hasOwn(input, 'enabledQuestionIds')
     ? normalizeQuestionIds(input.enabledQuestionIds)
     : normalizeQuestionIds(base.enabledQuestionIds);
@@ -472,18 +452,18 @@ export function normalizeAgentOnlyModeConfigPatch(patch = {}, current = null) {
     : normalizeEvalTypes(base.evalTypesByQuestionId, enabledQuestionIds);
   const questionSourceMode = Object.hasOwn(input, 'questionSourceMode')
     ? resolveWrappedQuestionSourceMode({ source: 'default', config: { questionSourceMode: input.questionSourceMode } })
-    : Object.hasOwn(input, 'enabledQuestionIds') && enabledQuestionIds.length > 0
-      ? WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS
-      : resolveWrappedQuestionSourceMode({ source: 'default', config: base });
+    : (
+        Object.hasOwn(input, 'enabledQuestionIds') && enabledQuestionIds.length > 0
+          ? WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS
+          : resolveWrappedQuestionSourceMode({ source: 'default', config: base })
+      );
   return {
     questionSourceMode,
     enabledQuestionIds,
     evalTypesByQuestionId,
     windowing: normalizeWindowingConfig({
       ...(base.windowing || {}),
-      ...(input.windowing && typeof input.windowing === 'object' && !Array.isArray(input.windowing)
-        ? input.windowing
-        : {}),
+      ...(input.windowing && typeof input.windowing === 'object' && !Array.isArray(input.windowing) ? input.windowing : {}),
     }),
   };
 }
@@ -628,7 +608,14 @@ function localDateTimeToUtcMs({
   let guess = desired;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const actual = zonedParts(guess, timeZone);
-    const actualAsUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second);
+    const actualAsUtc = Date.UTC(
+      actual.year,
+      actual.month - 1,
+      actual.day,
+      actual.hour,
+      actual.minute,
+      actual.second,
+    );
     const delta = desired - actualAsUtc;
     if (delta === 0) break;
     guess += delta;
@@ -653,17 +640,15 @@ function boundaryFromWindowId(windowId = '', windowingConfig = {}) {
   });
   const launchOpenMs = Date.parse(config.launchOpensAt);
   const launchCloseMs = Date.parse(config.launchClosesAt);
-  const hasLaunchWindow =
-    Number.isFinite(launchOpenMs) && Number.isFinite(launchCloseMs) && launchCloseMs > launchOpenMs;
+  const hasLaunchWindow = Number.isFinite(launchOpenMs) && Number.isFinite(launchCloseMs) && launchCloseMs > launchOpenMs;
   const launchLabel = hasLaunchWindow ? dateLabelForMs(launchOpenMs, config.timezone) : '';
-  const closesMs =
-    hasLaunchWindow && safeString(windowId) === `w-${launchLabel}`
-      ? Date.parse(config.launchClosesAt)
-      : localDateTimeToUtcMs({
-          timeZone: config.timezone,
-          ...localDateAddDays(openDate, 7),
-          hour: config.regularBoundaryHour,
-        });
+  const closesMs = hasLaunchWindow && safeString(windowId) === `w-${launchLabel}`
+    ? Date.parse(config.launchClosesAt)
+    : localDateTimeToUtcMs({
+      timeZone: config.timezone,
+      ...localDateAddDays(openDate, 7),
+      hour: config.regularBoundaryHour,
+    });
   return {
     windowId: safeString(windowId),
     opensAt: new Date(opensMs).toISOString(),
@@ -676,8 +661,7 @@ export function windowBoundariesAround(nowMs = Date.now(), windowingConfig = {})
   const launchOpenMs = Date.parse(config.launchOpensAt);
   const launchCloseMs = Date.parse(config.launchClosesAt);
   if (!Number.isFinite(nowMs)) return null;
-  const hasLaunchWindow =
-    Number.isFinite(launchOpenMs) && Number.isFinite(launchCloseMs) && launchCloseMs > launchOpenMs;
+  const hasLaunchWindow = Number.isFinite(launchOpenMs) && Number.isFinite(launchCloseMs) && launchCloseMs > launchOpenMs;
   if (hasLaunchWindow && nowMs < launchOpenMs) return null;
   const launchWindowId = hasLaunchWindow ? `w-${dateLabelForMs(launchOpenMs, config.timezone)}` : '';
   if (hasLaunchWindow && nowMs < launchCloseMs) {
@@ -745,7 +729,11 @@ function normalizeStartPayloadVisualDefaults(value = {}) {
   };
 }
 
-export function buildAgentOnlyStartPayload({ sessionSlug = '', skillVersion = '', visualDefaults = {} } = {}) {
+export function buildAgentOnlyStartPayload({
+  sessionSlug = '',
+  skillVersion = '',
+  visualDefaults = {},
+} = {}) {
   const payload = {
     ok: true,
     mode: 'agent_only_mode',
@@ -785,9 +773,7 @@ function normalizeQuestionTypeForSnapshot(questionType = '') {
 
 function snapshotStatementFromQuestion(question = {}) {
   const questionId = normalizeQuestionId(question.questionId || question.id);
-  const text = safeString(question.prompt || question.questionText || question.title)
-    .replace(/\s+/g, ' ')
-    .slice(0, 1000);
+  const text = safeString(question.prompt || question.questionText || question.title).replace(/\s+/g, ' ').slice(0, 1000);
   if (!questionId || !text) return null;
   const schema = buildTelegramQuestionAnswerSchema(question);
   return {
@@ -799,14 +785,12 @@ function snapshotStatementFromQuestion(question = {}) {
 }
 
 function syncActiveEvalTypes(existingEvalTypes = {}, configuredEvalTypes = {}, activeQuestionIds = []) {
-  const existing =
-    existingEvalTypes && typeof existingEvalTypes === 'object' && !Array.isArray(existingEvalTypes)
-      ? existingEvalTypes
-      : {};
-  const configured =
-    configuredEvalTypes && typeof configuredEvalTypes === 'object' && !Array.isArray(configuredEvalTypes)
-      ? configuredEvalTypes
-      : {};
+  const existing = existingEvalTypes && typeof existingEvalTypes === 'object' && !Array.isArray(existingEvalTypes)
+    ? existingEvalTypes
+    : {};
+  const configured = configuredEvalTypes && typeof configuredEvalTypes === 'object' && !Array.isArray(configuredEvalTypes)
+    ? configuredEvalTypes
+    : {};
   const out = { ...existing };
   for (const questionId of activeQuestionIds) {
     const id = safeString(questionId);
@@ -826,7 +810,9 @@ function activeEvalTypesChanged(existingEvalTypes = {}, nextEvalTypes = {}, acti
 }
 
 function configEnablesAgentOnlyQuestions(loaded = {}) {
-  const enabledQuestionIds = Array.isArray(loaded.config?.enabledQuestionIds) ? loaded.config.enabledQuestionIds : [];
+  const enabledQuestionIds = Array.isArray(loaded.config?.enabledQuestionIds)
+    ? loaded.config.enabledQuestionIds
+    : [];
   return loaded.source === 'kv' || enabledQuestionIds.length > 0;
 }
 
@@ -847,12 +833,7 @@ function addWrappedSourceStatements(byId = new Map(), questionSource = {}) {
   return byId;
 }
 
-async function loadWrappedQuestionSourceForSync({
-  env = {},
-  sessionSlug = '',
-  loadedConfig = {},
-  knownQuestionIds = [],
-} = {}) {
+async function loadWrappedQuestionSourceForSync({ env = {}, sessionSlug = '', loadedConfig = {}, knownQuestionIds = [] } = {}) {
   const mode = resolveWrappedQuestionSourceMode(loadedConfig);
   const enabledQuestionIds = Array.isArray(loadedConfig.config?.enabledQuestionIds)
     ? loadedConfig.config.enabledQuestionIds
@@ -872,7 +853,12 @@ async function loadWrappedQuestionSourceForSync({
   return loadWrappedQuestionSource({ env, sessionSlug, loadedConfig });
 }
 
-export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', now = null, windowId = '' } = {}) {
+export async function materializeAgentOnlyWindow({
+  env = {},
+  sessionSlug = '',
+  now = null,
+  windowId = '',
+} = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
   const nowMs = Date.parse(nowIso(now));
@@ -909,15 +895,12 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
           addedStatementCount: totalAddedStatementCount,
         };
       }
-      const latestSnapshot =
-        (await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId })) || snapshot;
+      const latestSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || snapshot;
       const latestStatements = Array.isArray(latestSnapshot.statements) ? latestSnapshot.statements : [];
-      const latestById = new Map(
-        latestStatements.map((statement) => [safeString(statement?.statement_id), statement]).filter(([id]) => id),
-      );
-      const latestStatementIds = latestStatements
-        .map((statement) => safeString(statement?.statement_id))
-        .filter(Boolean);
+      const latestById = new Map(latestStatements
+        .map((statement) => [safeString(statement?.statement_id), statement])
+        .filter(([id]) => id));
+      const latestStatementIds = latestStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
       const latestQuestionSource = await loadWrappedQuestionSourceForSync({
         env,
         sessionSlug: slug,
@@ -937,9 +920,7 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
       const targetStatements = wrappedQuestionIds(latestLoaded, latestQuestionSource)
         .map((questionId) => latestById.get(questionId))
         .filter(Boolean);
-      const targetStatementIds = targetStatements
-        .map((statement) => safeString(statement?.statement_id))
-        .filter(Boolean);
+      const targetStatementIds = targetStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
       const targetIdSet = new Set(targetStatementIds);
       const latestIdSet = new Set(latestStatementIds);
       const latestAddCount = targetStatementIds.filter((questionId) => !latestIdSet.has(questionId)).length;
@@ -963,10 +944,8 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
           addedStatementCount: totalAddedStatementCount,
         };
       }
-      if (attempt === maxSyncAttempts - 1)
-        return { ok: false, status: 409, reason: 'agent_only_window_sync_retry_exhausted' };
-      const preWriteSnapshot =
-        (await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId })) || latestSnapshot;
+      if (attempt === maxSyncAttempts - 1) return { ok: false, status: 409, reason: 'agent_only_window_sync_retry_exhausted' };
+      const preWriteSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || latestSnapshot;
       const preWriteStatements = Array.isArray(preWriteSnapshot.statements) ? preWriteSnapshot.statements : [];
       const preWriteLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
       const preWriteActiveBoundary = windowBoundariesAround(nowMs, preWriteLoaded.config.windowing);
@@ -974,9 +953,9 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
         snapshot = preWriteSnapshot;
         continue;
       }
-      const preWriteById = new Map(
-        preWriteStatements.map((statement) => [safeString(statement?.statement_id), statement]).filter(([id]) => id),
-      );
+      const preWriteById = new Map(preWriteStatements
+        .map((statement) => [safeString(statement?.statement_id), statement])
+        .filter(([id]) => id));
       const preWriteQuestionSource = await loadWrappedQuestionSourceForSync({
         env,
         sessionSlug: slug,
@@ -991,9 +970,7 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
       const finalStatements = wrappedQuestionIds(preWriteLoaded, preWriteQuestionSource)
         .map((questionId) => preWriteById.get(questionId))
         .filter(Boolean);
-      const preWriteStatementIds = preWriteStatements
-        .map((statement) => safeString(statement?.statement_id))
-        .filter(Boolean);
+      const preWriteStatementIds = preWriteStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
       const preWriteIdSet = new Set(preWriteStatementIds);
       const finalStatementIds = finalStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
       const finalIdSet = new Set(finalStatementIds);
@@ -1017,10 +994,11 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
         ...preWriteSnapshot,
         statements: finalStatements,
         evalTypesByQuestionId: finalEvalTypesByQuestionId,
-        legacyCursorStatementIds:
+        legacyCursorStatementIds: (
           Array.isArray(preWriteSnapshot.legacyCursorStatementIds) && preWriteSnapshot.legacyCursorStatementIds.length
-            ? normalizeQuestionIds(preWriteSnapshot.legacyCursorStatementIds)
-            : preWriteStatementIds,
+        )
+          ? normalizeQuestionIds(preWriteSnapshot.legacyCursorStatementIds)
+          : preWriteStatementIds,
         sourceConfigUpdatedAt: safeString(preWriteLoaded.config.updatedAt),
         questionSourceMode: preWriteQuestionSource.mode,
         questionSource: preWriteQuestionSource.source,
@@ -1057,16 +1035,13 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
   });
   if (!questionSource.ok) return questionSource;
   const questions = questionSource.questions;
-  const byId = new Map(
-    (Array.isArray(questions) ? questions : [])
-      .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
-      .filter(([id]) => id),
-  );
+  const byId = new Map((Array.isArray(questions) ? questions : [])
+    .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
+    .filter(([id]) => id));
   const statements = [];
-  const sourceQuestionIds =
-    questionSource.mode === WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS
-      ? loaded.config.enabledQuestionIds
-      : [...byId.keys()];
+  const sourceQuestionIds = questionSource.mode === WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS
+    ? loaded.config.enabledQuestionIds
+    : [...byId.keys()];
   for (const questionId of sourceQuestionIds) {
     const statement = snapshotStatementFromQuestion(byId.get(questionId));
     if (statement) statements.push(statement);
@@ -1099,13 +1074,7 @@ export async function materializeAgentOnlyWindow({ env = {}, sessionSlug = '', n
   });
   if (verified.ok && verified.snapshot) {
     const verifiedWindowId = safeString(verified.snapshot.windowId);
-    if (
-      !safeString(windowId) &&
-      verifiedWindowId &&
-      verifiedWindowId !== boundary.windowId &&
-      typeof kv.get === 'function' &&
-      typeof kv.delete === 'function'
-    ) {
+    if (!safeString(windowId) && verifiedWindowId && verifiedWindowId !== boundary.windowId && typeof kv.get === 'function' && typeof kv.delete === 'function') {
       const current = await kv.get(key).catch(() => null);
       if (current === recordJson) await kv.delete(key).catch(() => {});
     }
@@ -1131,8 +1100,7 @@ function statementCursorState(cursor = '') {
     return { seenQuestionIds: normalizeQuestionIds(parsedJson.seen || []) };
   }
   const parsed = Number(decoded);
-  if (Number.isFinite(parsed) && parsed > 0)
-    return { offset: Math.floor(parsed), seenQuestionIds: [], legacyOffset: Math.floor(parsed) };
+  if (Number.isFinite(parsed) && parsed > 0) return { offset: Math.floor(parsed), seenQuestionIds: [], legacyOffset: Math.floor(parsed) };
   return { offset: 0, seenQuestionIds: [] };
 }
 
@@ -1194,32 +1162,30 @@ export async function getAgentOnlyStatementsPage({
   const allStatements = Array.isArray(materialized.snapshot.statements) ? materialized.snapshot.statements : [];
   const cursorState = statementCursorState(cursor);
   const legacyOffset = Number(cursorState.legacyOffset) || 0;
-  const legacyBaselineIds =
-    legacyOffset > 0 ? normalizeQuestionIds(materialized.snapshot.legacyCursorStatementIds || []) : [];
-  const seenQuestionIds =
-    Array.isArray(cursorState.seenQuestionIds) && cursorState.seenQuestionIds.length
-      ? cursorState.seenQuestionIds
-      : legacyBaselineIds.slice(0, legacyOffset);
+  const legacyBaselineIds = legacyOffset > 0
+    ? normalizeQuestionIds(materialized.snapshot.legacyCursorStatementIds || [])
+    : [];
+  const seenQuestionIds = Array.isArray(cursorState.seenQuestionIds) && cursorState.seenQuestionIds.length
+    ? cursorState.seenQuestionIds
+    : legacyBaselineIds.slice(0, legacyOffset);
   const seen = new Set(seenQuestionIds);
-  const offset = seenQuestionIds.length ? 0 : Number(cursorState.offset) || 0;
+  const offset = seenQuestionIds.length ? 0 : (Number(cursorState.offset) || 0);
   const pageSource = seenQuestionIds.length
     ? allStatements.filter((statement) => !seen.has(safeString(statement?.statement_id)))
     : allStatements.slice(offset);
   const rawStatements = pageSource.slice(0, pageLimit);
-  const statements = rawStatements.map((statement, pageIndex) => {
-    if (!compact) return { ...statement, window_id: materialized.snapshot.windowId };
-    const absoluteIndex = allStatements.findIndex(
-      (candidate) => safeString(candidate?.statement_id) === safeString(statement?.statement_id),
-    );
-    return compactAgentOnlyStatement(statement, absoluteIndex >= 0 ? absoluteIndex : offset + pageIndex);
-  });
+  const statements = rawStatements
+    .map((statement, pageIndex) => {
+      if (!compact) return { ...statement, window_id: materialized.snapshot.windowId };
+      const absoluteIndex = allStatements.findIndex((candidate) => (
+        safeString(candidate?.statement_id) === safeString(statement?.statement_id)
+      ));
+      return compactAgentOnlyStatement(statement, absoluteIndex >= 0 ? absoluteIndex : offset + pageIndex);
+    });
   const servedIds = rawStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
   const nextSeenIds = seenQuestionIds.length
     ? [...seenQuestionIds, ...servedIds]
-    : allStatements
-        .slice(0, offset + rawStatements.length)
-        .map((statement) => safeString(statement?.statement_id))
-        .filter(Boolean);
+    : allStatements.slice(0, offset + rawStatements.length).map((statement) => safeString(statement?.statement_id)).filter(Boolean);
   const activeStatementIds = allStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
   const nextCursor = statementCursorForSeenIds(nextSeenIds, activeStatementIds);
   return {
@@ -1232,11 +1198,9 @@ export async function getAgentOnlyStatementsPage({
 }
 
 function statementMap(snapshot = {}) {
-  return new Map(
-    (Array.isArray(snapshot.statements) ? snapshot.statements : [])
-      .map((statement) => [safeString(statement.statement_id), statement])
-      .filter(([id]) => id),
-  );
+  return new Map((Array.isArray(snapshot.statements) ? snapshot.statements : [])
+    .map((statement) => [safeString(statement.statement_id), statement])
+    .filter(([id]) => id));
 }
 
 function normalizeAgentMetadata(value = {}) {
@@ -1289,28 +1253,24 @@ function normalizeDailyTokenUsage(value) {
       if (Array.isArray(entry)) {
         addRow(entry[0], entry[1]);
       } else if (entry && typeof entry === 'object') {
-        const explicitTokens =
-          entry.tokens ??
-          entry.total_tokens ??
-          entry.totalTokens ??
-          entry.total_combined_tokens ??
-          entry.totalCombinedTokens ??
-          entry.combined_tokens ??
-          entry.combinedTokens ??
-          entry.token_count ??
-          entry.tokenCount ??
-          entry.count;
-        const fallbackCombinedTokens =
-          explicitTokens == null
-            ? normalizeTokenCount(entry.raw_network_tokens ?? entry.rawNetworkTokens ?? entry.rawTokens) +
-              normalizeTokenCount(
-                entry.evaluated_cache_read_tokens ??
-                  entry.evaluatedCacheReadTokens ??
-                  entry.cache_read_tokens ??
-                  entry.cacheReadTokens,
-              )
-            : explicitTokens;
-        addRow(entry.date ?? entry.day ?? entry.d, fallbackCombinedTokens);
+        const explicitTokens = entry.tokens
+          ?? entry.total_tokens
+          ?? entry.totalTokens
+          ?? entry.total_combined_tokens
+          ?? entry.totalCombinedTokens
+          ?? entry.combined_tokens
+          ?? entry.combinedTokens
+          ?? entry.token_count
+          ?? entry.tokenCount
+          ?? entry.count;
+        const fallbackCombinedTokens = explicitTokens == null
+          ? normalizeTokenCount(entry.raw_network_tokens ?? entry.rawNetworkTokens ?? entry.rawTokens)
+            + normalizeTokenCount(entry.evaluated_cache_read_tokens ?? entry.evaluatedCacheReadTokens ?? entry.cache_read_tokens ?? entry.cacheReadTokens)
+          : explicitTokens;
+        addRow(
+          entry.date ?? entry.day ?? entry.d,
+          fallbackCombinedTokens,
+        );
       }
     }
   } else if (value && typeof value === 'object') {
@@ -1340,14 +1300,14 @@ function normalizeTokenUsageDates(value) {
 function normalizeAgentTokenUsage(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const currentRunTotalTokens = normalizeTokenCount(
-    source.current_run_total_tokens ??
-      source.currentRunTotalTokens ??
-      source.run_total_tokens ??
-      source.runTotalTokens ??
-      source.current_run ??
-      source.currentRun ??
-      source.total_tokens ??
-      source.totalTokens,
+    source.current_run_total_tokens
+      ?? source.currentRunTotalTokens
+      ?? source.run_total_tokens
+      ?? source.runTotalTokens
+      ?? source.current_run
+      ?? source.currentRun
+      ?? source.total_tokens
+      ?? source.totalTokens,
   );
   const recentSessionsTotalTokens = normalizeTokenCount(
     source.recent_sessions_total_tokens ??
@@ -1366,13 +1326,13 @@ function normalizeAgentTokenUsage(value = {}) {
     source.output_tokens ?? source.outputTokens ?? source.completion_tokens ?? source.completionTokens,
   );
   const dailyUsage30d = normalizeDailyTokenUsage(
-    source.daily_usage_30d ??
-      source.dailyUsage30d ??
-      source.daily_usage ??
-      source.dailyUsage ??
-      source.usage_by_day ??
-      source.usageByDay ??
-      source.days,
+    source.daily_usage_30d
+      ?? source.dailyUsage30d
+      ?? source.daily_usage
+      ?? source.dailyUsage
+      ?? source.usage_by_day
+      ?? source.usageByDay
+      ?? source.days,
   );
   const edgeInPersonDates = normalizeTokenUsageDates(
     source.edge_in_person_dates ??
@@ -1408,23 +1368,21 @@ function normalizeAnswerForSchema(answer = {}, schema = {}) {
   }
   if (schema.kind === 'choice' || schema.kind === 'rating') {
     const raw = Object.hasOwn(source, 'value') ? source.value : (source.answer ?? source.rating);
-    const scaleValues =
-      Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema);
-    const matched = scaleValues.find((value) => String(value) === String(raw));
-    if (matched === undefined)
-      return { ok: false, reason: schema.kind === 'rating' ? 'answer_rating_invalid' : 'answer_choice_invalid' };
+    const scaleValues = Array.isArray(schema.values) && schema.values.length
+      ? schema.values
+      : ratingValuesFromSchema(schema);
+    const matched = scaleValues
+      .find((value) => String(value) === String(raw));
+    if (matched === undefined) return { ok: false, reason: schema.kind === 'rating' ? 'answer_rating_invalid' : 'answer_choice_invalid' };
     return { ok: true, answer: { value: matched } };
   }
   if (schema.kind === 'multichoice') {
-    const singleScalarValue =
-      !Array.isArray(source.value) && Object.hasOwn(source, 'value') ? safeString(source.value) : '';
+    const singleScalarValue = !Array.isArray(source.value) && Object.hasOwn(source, 'value')
+      ? safeString(source.value)
+      : '';
     const rawValues = Array.isArray(source.values)
       ? source.values
-      : Array.isArray(source.value)
-        ? source.value
-        : singleScalarValue
-          ? [singleScalarValue]
-          : [];
+      : (Array.isArray(source.value) ? source.value : (singleScalarValue ? [singleScalarValue] : []));
     const options = (Array.isArray(schema.options) ? schema.options : []).map(safeString).filter(Boolean);
     const values = rawValues.map(safeString).filter(Boolean);
     if (values.some((value) => !options.includes(value))) return { ok: false, reason: 'answer_multichoice_invalid' };
@@ -1509,13 +1467,7 @@ function validateAnswerRows(rows = [], snapshot = {}) {
       errors.push({ index, statement_id: statementId, reason: 'rationale_too_long' });
       return;
     }
-    accepted.push({
-      statementId,
-      answer: normalized.answer,
-      answerSchema: statement.answer_schema || {},
-      confidence,
-      rationale,
-    });
+    accepted.push({ statementId, answer: normalized.answer, answerSchema: statement.answer_schema || {}, confidence, rationale });
   });
   return errors.length ? { ok: false, errors } : { ok: true, accepted };
 }
@@ -1523,16 +1475,16 @@ function validateAnswerRows(rows = [], snapshot = {}) {
 async function loadAnswerState({ env = {}, sessionSlug = '', windowId = '', telegramUserId = '' } = {}) {
   const key = answerStateKey(sessionSlug, windowId, telegramUserId);
   const kv = env?.AGENT_ACTION_KV;
-  const parsed =
-    key && kv && typeof kv.get === 'function' ? safeJsonParse(await kv.get(key).catch(() => null), null) : null;
+  const parsed = key && kv && typeof kv.get === 'function'
+    ? safeJsonParse(await kv.get(key).catch(() => null), null)
+    : null;
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     assertNoSecretShape(parsed, 'Agent-only answer state must not serialize secrets.');
     return {
       ...parsed,
-      byStatement:
-        parsed.byStatement && typeof parsed.byStatement === 'object' && !Array.isArray(parsed.byStatement)
-          ? parsed.byStatement
-          : {},
+      byStatement: parsed.byStatement && typeof parsed.byStatement === 'object' && !Array.isArray(parsed.byStatement)
+        ? parsed.byStatement
+        : {},
       recentRequestIds: Array.isArray(parsed.recentRequestIds) ? parsed.recentRequestIds : [],
     };
   }
@@ -1599,17 +1551,13 @@ async function canonicalRequestId(kind = '', body = {}, supplied = '') {
 }
 
 function findRecentRequest(state = {}, requestId = '') {
-  return (
-    (Array.isArray(state.recentRequestIds) ? state.recentRequestIds : []).find(
-      (entry) => safeString(entry?.requestId) === requestId,
-    ) || null
-  );
+  return (Array.isArray(state.recentRequestIds) ? state.recentRequestIds : [])
+    .find((entry) => safeString(entry?.requestId) === requestId) || null;
 }
 
 function rememberRequest(state = {}, requestId = '', summaryHash = '', at = '') {
-  const recent = (Array.isArray(state.recentRequestIds) ? state.recentRequestIds : []).filter(
-    (entry) => safeString(entry?.requestId) !== requestId,
-  );
+  const recent = (Array.isArray(state.recentRequestIds) ? state.recentRequestIds : [])
+    .filter((entry) => safeString(entry?.requestId) !== requestId);
   recent.push({ requestId, summaryHash, at });
   state.recentRequestIds = recent.slice(-MAX_RECENT_REQUEST_IDS);
 }
@@ -1637,11 +1585,9 @@ export function canonicalAgentOnlyAnswerProjection(answer = {}, schema = {}) {
   if (schemaKind === 'quadratic' || questionType === 'quadratic') return { value: source.value };
   const rawValues = Array.isArray(source.values)
     ? source.values
-    : Array.isArray(source.value)
+    : (Array.isArray(source.value)
       ? source.value
-      : Array.isArray(source.selectedValues)
-        ? source.selectedValues
-        : [];
+      : (Array.isArray(source.selectedValues) ? source.selectedValues : []));
   if (
     schemaKind === 'multichoice' ||
     questionType === 'multichoice' ||
@@ -1653,7 +1599,7 @@ export function canonicalAgentOnlyAnswerProjection(answer = {}, schema = {}) {
       .map(safeString)
       .filter(Boolean)
       .filter((value, index, list) => list.indexOf(value) === index)
-      .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+      .sort((left, right) => (left < right ? -1 : (left > right ? 1 : 0)));
     return { values };
   }
   if (schemaKind === 'text' || questionType === 'freeform' || Object.hasOwn(source, 'text')) {
@@ -1755,30 +1701,29 @@ export async function submitAgentOnlyAnswersBulk({
     await kv.put(key, JSON.stringify(record), {
       metadata: { v: 1, t: 'ao_evt', sg: slug, w: suppliedWindowId, k: isSkip ? 's' : 'a', src: 'agent_autofill' },
     });
-    const current =
-      state.byStatement[row.statementId] && typeof state.byStatement[row.statementId] === 'object'
-        ? state.byStatement[row.statementId]
-        : {};
+    const current = state.byStatement[row.statementId] && typeof state.byStatement[row.statementId] === 'object'
+      ? state.byStatement[row.statementId]
+      : {};
     state.byStatement[row.statementId] = isSkip
       ? {
-          ...current,
-          agent: null,
-          agentSkip: { reason: 'privacy_protective', runId, eventKey: key, updatedAt: createdAt },
-        }
+        ...current,
+        agent: null,
+        agentSkip: { reason: 'privacy_protective', runId, eventKey: key, updatedAt: createdAt },
+      }
       : {
-          ...current,
-          agent: {
-            answer: row.answer,
-            confidence: row.confidence,
-            rationale: safeString(row.rationale),
-            agentMetadata: metadata.value,
-            semanticFingerprint,
-            runId,
-            eventKey: key,
-            updatedAt: createdAt,
-          },
-          agentSkip: null,
-        };
+        ...current,
+        agent: {
+          answer: row.answer,
+          confidence: row.confidence,
+          rationale: safeString(row.rationale),
+          agentMetadata: metadata.value,
+          semanticFingerprint,
+          runId,
+          eventKey: key,
+          updatedAt: createdAt,
+        },
+        agentSkip: null,
+      };
   }
   state.updatedAt = createdAt;
   rememberRequest(state, requestId, summaryHash, createdAt);
@@ -1820,10 +1765,9 @@ function normalizeVoteRows(rows = [], snapshot = {}, mode = '') {
     accepted.push({ statementId, votes });
   });
   if (errors.length) return { ok: false, errors };
-  const budgetUsed =
-    mode === 'quadratic'
-      ? accepted.reduce((sum, row) => sum + row.votes * row.votes, 0)
-      : accepted.reduce((sum, row) => sum + Math.abs(row.votes), 0);
+  const budgetUsed = mode === 'quadratic'
+    ? accepted.reduce((sum, row) => sum + row.votes * row.votes, 0)
+    : accepted.reduce((sum, row) => sum + Math.abs(row.votes), 0);
   if (budgetUsed > 100) {
     return { ok: false, errors: [{ index: -1, reason: 'vote_budget_exceeded', budgetUsed }] };
   }
@@ -1833,8 +1777,9 @@ function normalizeVoteRows(rows = [], snapshot = {}, mode = '') {
 async function loadVoteState({ env = {}, sessionSlug = '', windowId = '', telegramUserId = '', mode = '' } = {}) {
   const key = voteStateKey(sessionSlug, windowId, telegramUserId, mode);
   const kv = env?.AGENT_ACTION_KV;
-  const parsed =
-    key && kv && typeof kv.get === 'function' ? safeJsonParse(await kv.get(key).catch(() => null), null) : null;
+  const parsed = key && kv && typeof kv.get === 'function'
+    ? safeJsonParse(await kv.get(key).catch(() => null), null)
+    : null;
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     assertNoSecretShape(parsed, 'Agent-only vote state must not serialize secrets.');
     return {
@@ -1937,14 +1882,7 @@ export async function submitAgentOnlyTokenVotesBulk({
   };
   assertNoSecretShape(event, 'Agent-only vote events must not serialize secrets.');
   await kv.put(eventKey, JSON.stringify(event), {
-    metadata: {
-      v: 1,
-      t: 'ao_vote_evt',
-      sg: slug,
-      w: suppliedWindowId,
-      m: mode === 'linear' ? 'l' : 'q',
-      u: validated.budgetUsed,
-    },
+    metadata: { v: 1, t: 'ao_vote_evt', sg: slug, w: suppliedWindowId, m: mode === 'linear' ? 'l' : 'q', u: validated.budgetUsed },
   });
   const record = {
     ...state,
@@ -1973,8 +1911,7 @@ export async function submitAgentOnlyTokenVotesBulk({
 function answerLabelForSchema(answer = {}, schema = {}) {
   if (!answer || typeof answer !== 'object') return '';
   if (schema.kind === 'quadratic') return formatQuadraticAllocation(answer.value, schema.options);
-  if (schema.kind === 'multichoice')
-    return (Array.isArray(answer.values) ? answer.values : []).map(safeString).filter(Boolean).join(', ');
+  if (schema.kind === 'multichoice') return (Array.isArray(answer.values) ? answer.values : []).map(safeString).filter(Boolean).join(', ');
   if (schema.kind === 'text') return safeString(answer.text);
   const value = answer.value;
   const text = answerScalarString(value);
@@ -1994,10 +1931,8 @@ function binaryAnswerKindForSchema(answer = {}, schema = {}) {
 
 async function reviewSemanticFingerprint(review = {}, schema = {}) {
   if (!review || typeof review !== 'object') return '';
-  return (
-    safeString(review.semanticFingerprint) ||
-    (review.answer ? await semanticFingerprintForAgentOnlyAnswer(review.answer, schema) : '')
-  );
+  return safeString(review.semanticFingerprint)
+    || (review.answer ? await semanticFingerprintForAgentOnlyAnswer(review.answer, schema) : '');
 }
 
 async function reviewStatusForCurrentAgentAnswer({
@@ -2015,9 +1950,8 @@ async function reviewStatusForCurrentAgentAnswer({
   const snapshot = await snapshotForWindowCached(env, sessionSlug, windowId, cache);
   const statement = statementMap(snapshot || {}).get(safeString(questionId));
   const schema = statement?.answer_schema || {};
-  const agentFingerprint =
-    safeString(entry?.agent?.semanticFingerprint) ||
-    (entry?.agent?.answer ? await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema) : '');
+  const agentFingerprint = safeString(entry?.agent?.semanticFingerprint)
+    || (entry?.agent?.answer ? await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema) : '');
   const humanFingerprint = await reviewSemanticFingerprint(entry.human, schema);
   return agentFingerprint && humanFingerprint === agentFingerprint ? 'confirm' : 'stale_confirm';
 }
@@ -2061,8 +1995,7 @@ export async function loadAgentOnlyPredictionsForPrincipal({
     const statement = schemas.get(questionId);
     if (!statement) continue;
     const schema = statement?.answer_schema || {};
-    const agentFingerprint =
-      entry.agent.semanticFingerprint || (await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema));
+    const agentFingerprint = entry.agent.semanticFingerprint || await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema);
     const humanFingerprint = await reviewSemanticFingerprint(entry.human, schema);
     predictionsByQuestionId[questionId] = {
       valueLabel: answerLabelForSchema(entry.agent.answer, schema),
@@ -2072,9 +2005,7 @@ export async function loadAgentOnlyPredictionsForPrincipal({
       reviewed: Boolean(entry.human),
     };
   }
-  const flaggedQuestionIds = (Array.isArray(snapshot?.statements) ? snapshot.statements : []).map(
-    (statement) => statement.statement_id,
-  );
+  const flaggedQuestionIds = (Array.isArray(snapshot?.statements) ? snapshot.statements : []).map((statement) => statement.statement_id);
   const humanVote = await loadHumanVoteState({ env, sessionSlug, windowId: snapshot.windowId, telegramUserId });
   const activeHumanVote = activeHumanVoteNets(humanVote.nets || {}, new Set(flaggedQuestionIds));
   return {
@@ -2112,24 +2043,19 @@ function normalizeWrappedImageQuality(value = '') {
 }
 
 function normalizeWrappedImageMode(value = '') {
-  const mode = lower(value)
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+  const mode = lower(value).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   if (['political_compass', 'compass', 'political_meme'].includes(mode)) return 'political_compass';
-  if (['wrapped_story', 'story', 'story_video', 'wrapped_video', 'phone_story', 'phone_video', 'video'].includes(mode))
-    return 'wrapped_story';
+  if (['wrapped_story', 'story', 'story_video', 'wrapped_video', 'phone_story', 'phone_video', 'video'].includes(mode)) return 'wrapped_story';
   return 'wrapped';
 }
 
 function allowsExperimentalWrappedSvgStoryboard(body = {}) {
   const mediaKind = lower(body.media_kind || body.mediaKind || body.output_media_kind || body.outputMediaKind);
   const format = lower(body.format);
-  return (
-    mediaKind === 'animated_svg_storyboard' ||
-    body.allow_svg_storyboard === true ||
-    body.allowSvgStoryboard === true ||
-    format === 'svg'
-  );
+  return mediaKind === 'animated_svg_storyboard'
+    || body.allow_svg_storyboard === true
+    || body.allowSvgStoryboard === true
+    || format === 'svg';
 }
 
 function wrappedImageModeMetadata(mode = '') {
@@ -2188,8 +2114,7 @@ function wrappedTokenUsageComparison(value = 0) {
   const pages = Math.max(1, Math.round(count / 750));
   const books = Math.max(1, Math.round(count / 75_000));
   const stackHeight = formatWrappedStackHeight(pages / 250);
-  const pageLabel =
-    pages >= 1000 ? `${(pages / 1000).toFixed(pages >= 10_000 ? 0 : 1).replace(/\.0$/, '')}K pages` : `${pages} pages`;
+  const pageLabel = pages >= 1000 ? `${(pages / 1000).toFixed(pages >= 10_000 ? 0 : 1).replace(/\.0$/, '')}K pages` : `${pages} pages`;
   const bookLabel = books === 1 ? '1 book' : `${books} books`;
   return `roughly ${bookLabel} at ~75K tokens/book, ${pageLabel}${stackHeight ? `, paper stack about ${stackHeight} tall` : ''}`;
 }
@@ -2222,8 +2147,13 @@ function wrappedWeeklyTokenUsageLine(rows = []) {
       .reduce((sum, row) => sum + row.tokens, 0);
     return `${bucket.label}=${formatWrappedTokenCount(total) || '0'}`;
   }).join(', ');
-  const ranges = WRAPPED_TOKEN_WEEK_BUCKETS.map((bucket) => `${bucket.label} ${bucket.range}`).join(', ');
-  return [`weekly usage: ${usageByWeek}`, `week ranges: ${ranges}`].filter(Boolean).join('; ');
+  const ranges = WRAPPED_TOKEN_WEEK_BUCKETS
+    .map((bucket) => `${bucket.label} ${bucket.range}`)
+    .join(', ');
+  return [
+    `weekly usage: ${usageByWeek}`,
+    `week ranges: ${ranges}`,
+  ].filter(Boolean).join('; ');
 }
 
 function wrappedDailyTokenUsageTotal(rows = []) {
@@ -2257,19 +2187,17 @@ function wrappedTokenUsageEvidenceLine(state = {}) {
     });
   }
   candidates.sort((left, right) => safeString(right.updatedAt).localeCompare(safeString(left.updatedAt)));
-  const usage = candidates.find(
-    (candidate) =>
-      candidate.recentSessionsTotalTokens ||
-      candidate.inputTokens ||
-      candidate.outputTokens ||
-      candidate.dailyUsage30d.length,
-  );
+  const usage = candidates.find((candidate) => (
+    candidate.recentSessionsTotalTokens ||
+    candidate.inputTokens ||
+    candidate.outputTokens ||
+    candidate.dailyUsage30d.length
+  ));
   if (!usage) return '';
   const parts = [];
-  const visibleMonthlyTotal =
-    usage.recentSessionsTotalTokens ||
-    usage.dailyUsage30d.reduce((sum, row) => sum + row.tokens, 0) ||
-    usage.inputTokens + usage.outputTokens;
+  const visibleMonthlyTotal = usage.recentSessionsTotalTokens
+    || usage.dailyUsage30d.reduce((sum, row) => sum + row.tokens, 0)
+    || usage.inputTokens + usage.outputTokens;
   if (!visibleMonthlyTotal) return '';
   parts.push(`${formatWrappedTokenCount(visibleMonthlyTotal)} tokens`);
   const comparisonBase = visibleMonthlyTotal;
@@ -2301,11 +2229,9 @@ function answerStateForRun(state = {}, runId = '') {
 
 function agentOnlyResponseCoverage(snapshot = {}, state = {}, { runId = '' } = {}) {
   const scopedRunId = normalizeAgentOnlyRunId(runId);
-  const statementIds = new Set(
-    (Array.isArray(snapshot.statements) ? snapshot.statements : [])
-      .map((statement) => safeString(statement?.statement_id || statement?.questionId))
-      .filter(Boolean),
-  );
+  const statementIds = new Set((Array.isArray(snapshot.statements) ? snapshot.statements : [])
+    .map((statement) => safeString(statement?.statement_id || statement?.questionId))
+    .filter(Boolean));
   let agentPredictionCount = 0;
   let privacySkipCount = 0;
   statementIds.forEach((statementId) => {
@@ -2333,8 +2259,7 @@ function wrappedAnswerFormatForSchema(schema = {}) {
   if (kind === 'multichoice') return 'multichoice selection';
   if (kind === 'quadratic') return 'quadratic allocation';
   if (kind === 'choice' || kind === 'rating') {
-    const rawValues =
-      Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema);
+    const rawValues = Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema);
     const values = rawValues.map((value) => lower(answerScalarString(value)));
     const valueSet = new Set(values);
     if (['agree', 'unsure', 'disagree'].every((value) => valueSet.has(value))) return 'binary choice';
@@ -2353,9 +2278,7 @@ function wrappedAnswerLabelForSchema(answer = {}, schema = {}) {
   if (['agree', 'unsure', 'disagree'].includes(lower(valueText))) return base;
   const numericValue = Number(valueText);
   if (!Number.isFinite(numericValue)) return base;
-  const numericOptions = (
-    Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema)
-  )
+  const numericOptions = (Array.isArray(schema.values) && schema.values.length ? schema.values : ratingValuesFromSchema(schema))
     .map((value) => Number(answerScalarString(value)))
     .filter((value) => Number.isFinite(value));
   if (numericOptions.length < 2) return base;
@@ -2404,29 +2327,25 @@ function predictionLine(row = {}, { questionChars = 240, answerChars = 80 } = {}
 function wrappedAnswerIsUnavailable(value = '') {
   const text = (value === undefined || value === null ? '' : String(value)).trim().toLowerCase();
   if (/(^|[^a-z0-9])n\s*\/?\s*a([^a-z0-9]|$)/i.test(text)) return true;
-  if (/\bnot\s+applicable\b|\bnot\s+enough\b|\binsufficient\b|\bunsupported\b|\bunknown\b|\bunavailable\b/.test(text))
-    return true;
+  if (/\bnot\s+applicable\b|\bnot\s+enough\b|\binsufficient\b|\bunsupported\b|\bunknown\b|\bunavailable\b/.test(text)) return true;
   const normalized = text.replace(/[^a-z0-9]+/g, '');
   if (!normalized) return true;
-  if (
-    [
-      'na',
-      'notsupported',
-      'unsupported',
-      'unknown',
-      'unavailable',
-      'notapplicable',
-      'notenoughcontext',
-      'notenoughevidence',
-      'notenoughinformation',
-      'insufficientcontext',
-      'insufficientevidence',
-      'insufficientdata',
-      'nodata',
-      'noevidence',
-    ].includes(normalized)
-  )
-    return true;
+  if ([
+    'na',
+    'notsupported',
+    'unsupported',
+    'unknown',
+    'unavailable',
+    'notapplicable',
+    'notenoughcontext',
+    'notenoughevidence',
+    'notenoughinformation',
+    'insufficientcontext',
+    'insufficientevidence',
+    'insufficientdata',
+    'nodata',
+    'noevidence',
+  ].includes(normalized)) return true;
   return normalized.startsWith('notenough') || normalized.startsWith('insufficient');
 }
 
@@ -2480,12 +2399,7 @@ async function saveAgentOnlyWrappedImage({
     mediaKind: safeString(mediaKind),
     frameCount: Math.max(0, Math.floor(Number(frameCount) || 0)),
     storyDurationSeconds: Math.max(0, Math.floor(Number(storyDurationSeconds) || 0)),
-    frameKeys: Array.isArray(frameKeys)
-      ? frameKeys
-          .map((key) => safeString(key))
-          .filter(Boolean)
-          .slice(0, WRAPPED_STORY_FRAME_COUNT)
-      : [],
+    frameKeys: Array.isArray(frameKeys) ? frameKeys.map((key) => safeString(key)).filter(Boolean).slice(0, WRAPPED_STORY_FRAME_COUNT) : [],
     imageContentType: safeString(imageContentType) || 'image/png',
     imageBase64: imageText,
     imageByteLengthApprox: Math.floor((imageText.length * 3) / 4),
@@ -2494,13 +2408,10 @@ async function saveAgentOnlyWrappedImage({
     promptHash,
     createdAt,
   };
-  assertNoSecretShape(
-    {
-      ...record,
-      imageBase64: '[image omitted]',
-    },
-    'Agent-only wrapped image metadata must not serialize secrets.',
-  );
+  assertNoSecretShape({
+    ...record,
+    imageBase64: '[image omitted]',
+  }, 'Agent-only wrapped image metadata must not serialize secrets.');
   const viewRecord = {
     type: 'telegram_agent_only_wrapped_image_view',
     version: 1,
@@ -2567,7 +2478,10 @@ async function saveAgentOnlyWrappedImage({
   return { ok: true, imageId, imageViewId, key, viewKey, runKey, createdAt, promptHash };
 }
 
-export async function loadAgentOnlyWrappedImageByViewId({ env = {}, imageViewId = '' } = {}) {
+export async function loadAgentOnlyWrappedImageByViewId({
+  env = {},
+  imageViewId = '',
+} = {}) {
   const kv = env?.AGENT_ACTION_KV;
   const viewKey = wrappedImageViewKey(imageViewId);
   if (!viewKey || !kv || typeof kv.get !== 'function') {
@@ -2591,8 +2505,7 @@ export async function loadAgentOnlyWrappedImageByViewId({ env = {}, imageViewId 
   }
   return {
     ok: true,
-    image_content_type:
-      safeString(imageRecord.imageContentType) || safeString(viewRecord.imageContentType) || 'image/png',
+    image_content_type: safeString(imageRecord.imageContentType) || safeString(viewRecord.imageContentType) || 'image/png',
     image_base64: imageBase64,
     image_id: safeString(imageRecord.imageId) || safeString(imageKey).split(':').pop() || '',
     image_view_id: normalizeWrappedImageViewId(imageViewId),
@@ -2642,15 +2555,13 @@ async function loadAgentOnlyWrappedImageByRun({
 
 function wrappedRowIsGuess(row = {}) {
   const question = safeString(row.question);
-  return (
-    /\bagent guess\b/i.test(question) ||
+  return /\bagent guess\b/i.test(question) ||
     /\bguess (?:this|the) principal'?s\b/i.test(question) ||
     /\b(?:book|movie|film|game|play|music|song|artist|food|ai\s+optimism)\s+guess\b/i.test(question) ||
     /\bai\s+optimism\s+score\b/i.test(question) ||
     /\bp\s*\(?\s*bloom\s*\)?|probability of bloom\b/i.test(question) ||
     /\bfavorite (?:book|movie|film|game|song|album|artist|food)\b/i.test(question) ||
-    /\bwhat (?:movie|film|tv show|game|song|album|artist)\b/i.test(question)
-  );
+    /\bwhat (?:movie|film|tv show|game|song|album|artist)\b/i.test(question);
 }
 
 function wrappedRowIsUnavailableGuess(row = {}) {
@@ -2665,8 +2576,7 @@ function wrappedRowIsAgentAboutUserAnalysis(row = {}) {
   const evalType = lower(row.evalType);
   if (evalType === 'bucket' || evalType === 'wrapped_generation') return true;
   const question = safeString(row.question);
-  return (
-    /\bthis principal\b/i.test(question) ||
+  return /\bthis principal\b/i.test(question) ||
     /\bthe principal'?s\b/i.test(question) ||
     /\bprincipal'?s context\b/i.test(question) ||
     /\bmemeable sentence\b/i.test(question) ||
@@ -2674,35 +2584,28 @@ function wrappedRowIsAgentAboutUserAnalysis(row = {}) {
     /\bhistorical figure\b/i.test(question) ||
     /\bfictional character\b/i.test(question) ||
     /\babstract visual metaphor\b/i.test(question) ||
-    /\bwhat one question should the principal\b/i.test(question)
-  );
+    /\bwhat one question should the principal\b/i.test(question);
 }
 
 function wrappedAnalysisQuestionIdsFromSnapshot(snapshot = {}) {
-  return new Set(
-    Array.isArray(snapshot.statements)
-      ? snapshot.statements
-          .filter((statement) =>
-            wrappedRowIsAgentAboutUserAnalysis({
-              question: statement?.text || '',
-              evalType: snapshot?.evalTypesByQuestionId?.[statement?.statement_id || statement?.questionId] || '',
-            }),
-          )
-          .map((statement) => safeString(statement?.statement_id || statement?.questionId))
-          .filter(Boolean)
-      : [],
-  );
+  return new Set(Array.isArray(snapshot.statements)
+    ? snapshot.statements
+      .filter((statement) => wrappedRowIsAgentAboutUserAnalysis({
+        question: statement?.text || '',
+        evalType: snapshot?.evalTypesByQuestionId?.[statement?.statement_id || statement?.questionId] || '',
+      }))
+      .map((statement) => safeString(statement?.statement_id || statement?.questionId))
+      .filter(Boolean)
+    : []);
 }
 
 function wrappedGuessQuestionIdsFromSnapshot(snapshot = {}) {
-  return new Set(
-    Array.isArray(snapshot.statements)
-      ? snapshot.statements
-          .filter((statement) => wrappedRowIsGuess({ question: statement?.text || '' }))
-          .map((statement) => safeString(statement?.statement_id || statement?.questionId))
-          .filter(Boolean)
-      : [],
-  );
+  return new Set(Array.isArray(snapshot.statements)
+    ? snapshot.statements
+      .filter((statement) => wrappedRowIsGuess({ question: statement?.text || '' }))
+      .map((statement) => safeString(statement?.statement_id || statement?.questionId))
+      .filter(Boolean)
+    : []);
 }
 
 function wrappedAgentAnalysisRows(predictions = []) {
@@ -2717,16 +2620,19 @@ function analysisLine(row = {}) {
   return `Analysis prompt: "${wrappedDisplayText(row.question, 220)}"; prediction: ${wrappedDisplayText(row.answer || 'N/A', 100)}; confidence: ${row.confidence}%`;
 }
 
-function buildWrappedPromptEvidence({ snapshot = {}, state = {}, linearVoteState = {}, quadraticVoteState = {} } = {}) {
+function buildWrappedPromptEvidence({
+  snapshot = {},
+  state = {},
+  linearVoteState = {},
+  quadraticVoteState = {},
+} = {}) {
   const rawPredictions = wrappedPredictionRows(snapshot, state, { includeUnavailableGuesses: true });
   const snapshotGuessQuestionIds = wrappedGuessQuestionIdsFromSnapshot(snapshot);
   const snapshotAnalysisQuestionIds = wrappedAnalysisQuestionIdsFromSnapshot(snapshot);
-  const excludedGuessQuestionIds = new Set(
-    rawPredictions
-      .filter((row) => wrappedRowIsUnavailableGuess(row))
-      .map((row) => row.questionId)
-      .filter(Boolean),
-  );
+  const excludedGuessQuestionIds = new Set(rawPredictions
+    .filter((row) => wrappedRowIsUnavailableGuess(row))
+    .map((row) => row.questionId)
+    .filter(Boolean));
   const guessQuestionIds = new Set([
     ...snapshotGuessQuestionIds,
     ...rawPredictions
@@ -2746,12 +2652,10 @@ function buildWrappedPromptEvidence({ snapshot = {}, state = {}, linearVoteState
     .filter((row) => !guessQuestionIds.has(row.questionId))
     .filter((row) => !analysisQuestionIds.has(row.questionId))
     .filter((row) => !wrappedRowIsUnavailable(row));
-  const unavailableQuestionIds = new Set(
-    predictions
-      .filter((row) => wrappedRowIsUnavailable(row))
-      .map((row) => row.questionId)
-      .filter(Boolean),
-  );
+  const unavailableQuestionIds = new Set(predictions
+    .filter((row) => wrappedRowIsUnavailable(row))
+    .map((row) => row.questionId)
+    .filter(Boolean));
   const highConfidence = [...scoredPredictions]
     .sort((left, right) => right.confidence - left.confidence)
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
@@ -2759,23 +2663,19 @@ function buildWrappedPromptEvidence({ snapshot = {}, state = {}, linearVoteState
     .sort((left, right) => left.confidence - right.confidence)
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
   const hiddenQuestionIds = new Set([...guessQuestionIds, ...analysisQuestionIds, ...unavailableQuestionIds]);
-  const voteImportant = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState], {
-    excludeQuestionIds: hiddenQuestionIds,
-  });
+  const voteImportant = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState], { excludeQuestionIds: hiddenQuestionIds });
   const important = voteImportant.length
     ? voteImportant
     : [...scoredPredictions]
-        .sort((left, right) => right.confidence - left.confidence)
-        .slice(0, WRAPPED_SECTION_ITEM_LIMIT)
-        .map((row) => ({
-          questionId: row.questionId,
-          question: row.question,
-          score: row.confidence,
-        }));
+      .sort((left, right) => right.confidence - left.confidence)
+      .slice(0, WRAPPED_SECTION_ITEM_LIMIT)
+      .map((row) => ({
+        questionId: row.questionId,
+        question: row.question,
+        score: row.confidence,
+      }));
   const importantLines = important.length
-    ? important
-        .map((row, index) => `${index + 1}. Question only: "${wrappedDisplayText(row.question, 220)}"`)
-        .join('\n')
+    ? important.map((row, index) => `${index + 1}. Question only: "${wrappedDisplayText(row.question, 220)}"`).join('\n')
     : 'No visible items; omit this section entirely.';
   const highLines = highConfidence.length
     ? highConfidence.map((row) => `- ${predictionLine(row)}`).join('\n')
@@ -2784,7 +2684,9 @@ function buildWrappedPromptEvidence({ snapshot = {}, state = {}, linearVoteState
     ? cautious.map((row) => `- ${predictionLine(row)}`).join('\n')
     : '- No visible items; omit this section entirely.';
   const allPredictionEvidenceLines = scoredPredictions.length
-    ? scoredPredictions.map((row) => `- ${predictionLine(row, { questionChars: 180, answerChars: 70 })}`).join('\n')
+    ? scoredPredictions
+      .map((row) => `- ${predictionLine(row, { questionChars: 180, answerChars: 70 })}`)
+      .join('\n')
     : '- No eligible predicted-human-answer evidence rows were submitted.';
   const agentAnalysis = wrappedAgentAnalysisRows(predictions);
   const agentAnalysisLines = agentAnalysis.length
@@ -2809,8 +2711,14 @@ export function buildAgentOnlyWrappedStoryFramePrompts({
   quadraticVoteState = {},
   styleHint = '',
 } = {}) {
-  const { importantLines, highLines, cautiousLines, allPredictionEvidenceLines, agentAnalysisLines, tokenUsageLine } =
-    buildWrappedPromptEvidence({ snapshot, state, linearVoteState, quadraticVoteState });
+  const {
+    importantLines,
+    highLines,
+    cautiousLines,
+    allPredictionEvidenceLines,
+    agentAnalysisLines,
+    tokenUsageLine,
+  } = buildWrappedPromptEvidence({ snapshot, state, linearVoteState, quadraticVoteState });
   const styleLine = wrappedDisplayText(styleHint, 240);
   const common = `Create one portrait 9:16 phone story screen for Session Wrapped${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Use the attached Session Lab logo image as wordmark reference: SESSION is bold uppercase sans, LAB is elegant serif. Keep all text large, sparse, and readable on a phone. Use one coherent custom visual identity derived from the evidence, and vary palette/style by inferred principal. Do not mention or imply where the principal lives, is from, currently is, or traveled from. Do not show access credentials, raw Telegram ids, raw confidences beyond requested prediction rows, private memory text, fake UI chrome, or unavailable/N/A content. Prefer a premium shareable story-card look with strong art direction, clean spacing, and no unnecessary borders.`;
   const evidence = `Evidence pool for synthesis only:
@@ -2883,10 +2791,7 @@ Compare the principal to one historical figure or fictional/book character if su
 ${evidence}`,
     },
   ];
-  assertNoSecretShape(
-    { prompts: frames.map((frame) => frame.prompt) },
-    'Agent-only wrapped story prompts must not serialize secrets.',
-  );
+  assertNoSecretShape({ prompts: frames.map((frame) => frame.prompt) }, 'Agent-only wrapped story prompts must not serialize secrets.');
   return frames;
 }
 
@@ -2897,8 +2802,14 @@ export function buildAgentOnlyWrappedStoryboardPrompt({
   quadraticVoteState = {},
   styleHint = '',
 } = {}) {
-  const { importantLines, highLines, cautiousLines, allPredictionEvidenceLines, agentAnalysisLines, tokenUsageLine } =
-    buildWrappedPromptEvidence({ snapshot, state, linearVoteState, quadraticVoteState });
+  const {
+    importantLines,
+    highLines,
+    cautiousLines,
+    allPredictionEvidenceLines,
+    agentAnalysisLines,
+    tokenUsageLine,
+  } = buildWrappedPromptEvidence({ snapshot, state, linearVoteState, quadraticVoteState });
   const styleLine = wrappedDisplayText(styleHint, 240);
   const prompt = `Create one wide five-panel Session Wrapped storyboard image${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
@@ -3027,8 +2938,7 @@ export function buildAgentOnlyWrappedImagePrompt({
       importantLines,
       highLines,
       cautiousLines,
-      agentGuessLines:
-        'Playful guesses are synthesized from prediction themes at image-generation time, not read from stored favorite/book/movie/game question rows.',
+      agentGuessLines: 'Playful guesses are synthesized from prediction themes at image-generation time, not read from stored favorite/book/movie/game question rows.',
       focalQuestion: important[0]?.question || '',
       styleLine,
       safetyRetry,
@@ -3114,32 +3024,23 @@ function buildWrappedStorySvgBase64(frames = []) {
   if (!validFrames.length) return '';
   const frameCount = validFrames.length;
   const durationSeconds = frameCount * WRAPPED_STORY_FRAME_SECONDS;
-  const keyTimes = [
-    ...Array.from({ length: frameCount }, (_, index) =>
-      (index / frameCount).toFixed(4).replace(/0+$/, '').replace(/\.$/, ''),
-    ),
-    '1',
-  ].join(';');
-  const images = validFrames
-    .map((frame, frameIndex) => {
-      const values = [
-        ...Array.from({ length: frameCount }, (_, index) => (index === frameIndex ? '1' : '0')),
-        frameIndex === 0 ? '1' : '0',
-      ].join(';');
-      return `<image id="${frame.key.replace(/[^a-z0-9_-]/gi, '') || `frame_${frameIndex + 1}`}" href="data:image/png;base64,${frame.imageBase64}" width="1080" height="1920" preserveAspectRatio="xMidYMid slice" opacity="${frameIndex === 0 ? '1' : '0'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></image>`;
-    })
-    .join('');
-  const progress = validFrames
-    .map((frame, index) => {
-      const x = 54 + index * (972 / frameCount);
-      const width = 972 / frameCount - 12;
-      const values = [
-        ...Array.from({ length: frameCount }, (_, frameIndex) => (frameIndex === index ? '1' : '0.28')),
-        index === 0 ? '1' : '0.28',
-      ].join(';');
-      return `<rect x="${x.toFixed(1)}" y="36" width="${width.toFixed(1)}" height="8" rx="4" fill="#ffffff" opacity="${index === 0 ? '1' : '0.28'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></rect>`;
-    })
-    .join('');
+  const keyTimes = [...Array.from({ length: frameCount }, (_, index) => (index / frameCount).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')), '1'].join(';');
+  const images = validFrames.map((frame, frameIndex) => {
+    const values = [
+      ...Array.from({ length: frameCount }, (_, index) => (index === frameIndex ? '1' : '0')),
+      frameIndex === 0 ? '1' : '0',
+    ].join(';');
+    return `<image id="${frame.key.replace(/[^a-z0-9_-]/gi, '') || `frame_${frameIndex + 1}`}" href="data:image/png;base64,${frame.imageBase64}" width="1080" height="1920" preserveAspectRatio="xMidYMid slice" opacity="${frameIndex === 0 ? '1' : '0'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></image>`;
+  }).join('');
+  const progress = validFrames.map((frame, index) => {
+    const x = 54 + index * (972 / frameCount);
+    const width = (972 / frameCount) - 12;
+    const values = [
+      ...Array.from({ length: frameCount }, (_, frameIndex) => (frameIndex === index ? '1' : '0.28')),
+      index === 0 ? '1' : '0.28',
+    ].join(';');
+    return `<rect x="${x.toFixed(1)}" y="36" width="${width.toFixed(1)}" height="8" rx="4" fill="#ffffff" opacity="${index === 0 ? '1' : '0.28'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></rect>`;
+  }).join('');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920" role="img" aria-label="Session Wrapped phone story"><title>Session Wrapped phone story</title><rect width="1080" height="1920" fill="#0b140d"/>${images}${progress}</svg>`;
   return base64EncodeText(svg);
 }
@@ -3147,44 +3048,31 @@ function buildWrappedStorySvgBase64(frames = []) {
 function buildWrappedStoryboardSvgBase64(storyboardImageBase64 = '', frameKeys = []) {
   const imageBase64 = safeString(storyboardImageBase64);
   if (!imageBase64) return '';
-  const keys = (
-    Array.isArray(frameKeys) && frameKeys.length
-      ? frameKeys
-      : ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison']
-  )
+  const keys = (Array.isArray(frameKeys) && frameKeys.length ? frameKeys : ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison'])
     .map((key, index) => safeString(key) || `frame_${index + 1}`)
     .slice(0, WRAPPED_STORY_FRAME_COUNT);
   if (!keys.length) return '';
   const frameCount = keys.length;
   const durationSeconds = frameCount * WRAPPED_STORY_FRAME_SECONDS;
-  const keyTimes = [
-    ...Array.from({ length: frameCount }, (_, index) =>
-      (index / frameCount).toFixed(4).replace(/0+$/, '').replace(/\.$/, ''),
-    ),
-    '1',
-  ].join(';');
+  const keyTimes = [...Array.from({ length: frameCount }, (_, index) => (index / frameCount).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')), '1'].join(';');
   const clipId = 'story-frame-clip';
-  const images = keys
-    .map((key, frameIndex) => {
-      const values = [
-        ...Array.from({ length: frameCount }, (_, index) => (index === frameIndex ? '1' : '0')),
-        frameIndex === 0 ? '1' : '0',
-      ].join(';');
-      const id = key.replace(/[^a-z0-9_-]/gi, '') || `frame_${frameIndex + 1}`;
-      return `<g id="${id}" clip-path="url(#${clipId})" opacity="${frameIndex === 0 ? '1' : '0'}"><image href="data:image/png;base64,${imageBase64}" x="${-1080 * frameIndex}" y="0" width="${1080 * frameCount}" height="1920" preserveAspectRatio="none"/><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></g>`;
-    })
-    .join('');
-  const progress = keys
-    .map((key, index) => {
-      const x = 54 + index * (972 / frameCount);
-      const width = 972 / frameCount - 12;
-      const values = [
-        ...Array.from({ length: frameCount }, (_, frameIndex) => (frameIndex === index ? '1' : '0.28')),
-        index === 0 ? '1' : '0.28',
-      ].join(';');
-      return `<rect x="${x.toFixed(1)}" y="36" width="${width.toFixed(1)}" height="8" rx="4" fill="#ffffff" opacity="${index === 0 ? '1' : '0.28'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></rect>`;
-    })
-    .join('');
+  const images = keys.map((key, frameIndex) => {
+    const values = [
+      ...Array.from({ length: frameCount }, (_, index) => (index === frameIndex ? '1' : '0')),
+      frameIndex === 0 ? '1' : '0',
+    ].join(';');
+    const id = key.replace(/[^a-z0-9_-]/gi, '') || `frame_${frameIndex + 1}`;
+    return `<g id="${id}" clip-path="url(#${clipId})" opacity="${frameIndex === 0 ? '1' : '0'}"><image href="data:image/png;base64,${imageBase64}" x="${-1080 * frameIndex}" y="0" width="${1080 * frameCount}" height="1920" preserveAspectRatio="none"/><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></g>`;
+  }).join('');
+  const progress = keys.map((key, index) => {
+    const x = 54 + index * (972 / frameCount);
+    const width = (972 / frameCount) - 12;
+    const values = [
+      ...Array.from({ length: frameCount }, (_, frameIndex) => (frameIndex === index ? '1' : '0.28')),
+      index === 0 ? '1' : '0.28',
+    ].join(';');
+    return `<rect x="${x.toFixed(1)}" y="36" width="${width.toFixed(1)}" height="8" rx="4" fill="#ffffff" opacity="${index === 0 ? '1' : '0.28'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></rect>`;
+  }).join('');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920" role="img" aria-label="Session Wrapped phone story"><title>Session Wrapped phone story</title><defs><clipPath id="${clipId}"><rect width="1080" height="1920"/></clipPath></defs><rect width="1080" height="1920" fill="#0b140d"/>${images}${progress}</svg>`;
   return base64EncodeText(svg);
 }
@@ -3206,20 +3094,17 @@ function buildOpenAiWrappedImageFormData({
   requestBody.append('background', 'opaque');
   requestBody.append('n', '1');
   requestBody.append('image', referenceBlob, SESSION_LAB_LOGO_REFERENCE_FILENAME);
-  assertNoSecretShape(
-    {
-      model,
-      prompt,
-      size,
-      quality,
-      output_format: 'png',
-      background: 'opaque',
-      n: 1,
-      referenceImageFilename: SESSION_LAB_LOGO_REFERENCE_FILENAME,
-      referenceImageBytes: referenceBytes.byteLength,
-    },
-    'OpenAI wrapped image request must not serialize secrets.',
-  );
+  assertNoSecretShape({
+    model,
+    prompt,
+    size,
+    quality,
+    output_format: 'png',
+    background: 'opaque',
+    n: 1,
+    referenceImageFilename: SESSION_LAB_LOGO_REFERENCE_FILENAME,
+    referenceImageBytes: referenceBytes.byteLength,
+  }, 'OpenAI wrapped image request must not serialize secrets.');
   return requestBody;
 }
 
@@ -3255,10 +3140,7 @@ async function requestOpenAiWrappedImage({
       status: 502,
       reason: 'openai_image_generation_failed',
       upstreamStatus: response.status,
-      upstreamReason: wrappedDisplayText(
-        parsed?.error?.message || parsed?.error || responseText || response.statusText,
-        240,
-      ),
+      upstreamReason: wrappedDisplayText(parsed?.error?.message || parsed?.error || responseText || response.statusText, 240),
     };
   }
   const imageBase64 = safeString(parsed?.data?.[0]?.b64_json);
@@ -3291,18 +3173,15 @@ function buildDeterministicWrappedPosterBase64({
   mode = 'wrapped',
 } = {}) {
   const rows = wrappedPredictionRows(snapshot, state, { runId }).slice(0, 5);
-  const rowSvg = rows
-    .map((row, index) => {
-      const y = 260 + index * 112;
-      const question = escapeWrappedPosterXml(row.question);
-      const answer = escapeWrappedPosterXml(row.answer);
-      return `<g transform="translate(112 ${y})"><rect width="1376" height="88" rx="18" fill="#ffffff" fill-opacity="0.08"/><text x="24" y="32" fill="#bfead0" font-family="system-ui,sans-serif" font-size="20">${question}</text><text x="24" y="64" fill="#ffffff" font-family="system-ui,sans-serif" font-size="25" font-weight="700">${answer}</text><text x="1328" y="64" text-anchor="end" fill="#7ee2a8" font-family="system-ui,sans-serif" font-size="20">${Math.max(0, Math.min(100, Number(row.confidence) || 0))}%</text></g>`;
-    })
-    .join('');
-  const title =
-    normalizeWrappedImageMode(mode) === 'political_compass'
-      ? 'Agent Norms Compass'
-      : 'What your agent thinks it knows about you';
+  const rowSvg = rows.map((row, index) => {
+    const y = 260 + index * 112;
+    const question = escapeWrappedPosterXml(row.question);
+    const answer = escapeWrappedPosterXml(row.answer);
+    return `<g transform="translate(112 ${y})"><rect width="1376" height="88" rx="18" fill="#ffffff" fill-opacity="0.08"/><text x="24" y="32" fill="#bfead0" font-family="system-ui,sans-serif" font-size="20">${question}</text><text x="24" y="64" fill="#ffffff" font-family="system-ui,sans-serif" font-size="25" font-weight="700">${answer}</text><text x="1328" y="64" text-anchor="end" fill="#7ee2a8" font-family="system-ui,sans-serif" font-size="20">${Math.max(0, Math.min(100, Number(row.confidence) || 0))}%</text></g>`;
+  }).join('');
+  const title = normalizeWrappedImageMode(mode) === 'political_compass'
+    ? 'Agent Norms Compass'
+    : 'What your agent thinks it knows about you';
   const subtitle = `${sanitizeSessionSlug(sessionSlug)} · ${rows.length} predictions · privacy-first local render`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Session Wrapped poster"><title>Session Wrapped poster</title><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#091d17"/><stop offset="1" stop-color="#17392d"/></linearGradient></defs><rect width="1600" height="900" fill="url(#bg)"/><circle cx="1450" cy="80" r="260" fill="#65d39a" fill-opacity="0.12"/><text x="112" y="98" fill="#7ee2a8" font-family="system-ui,sans-serif" font-size="28" font-weight="800" letter-spacing="3">SESSION LAB</text><text x="112" y="164" fill="#ffffff" font-family="system-ui,sans-serif" font-size="46" font-weight="750">${escapeWrappedPosterXml(title)}</text><text x="112" y="208" fill="#b8cfc4" font-family="system-ui,sans-serif" font-size="22">${escapeWrappedPosterXml(subtitle)}</text>${rowSvg}<text x="112" y="842" fill="#91aa9f" font-family="system-ui,sans-serif" font-size="18">Deterministic local renderer · no external image provider</text></svg>`;
   return base64EncodeText(svg);
@@ -3366,20 +3245,15 @@ async function saveDeterministicWrappedPoster({
     image_base64: imageBase64,
     image_safety_retried: false,
     image_saved: savedImage.ok === true,
-    ...(savedImage.ok
-      ? {
-          image_id: savedImage.imageId,
-          image_view_id: savedImage.imageViewId,
-          image_prompt_hash: savedImage.promptHash,
-        }
-      : {
-          image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
-        }),
+    ...(savedImage.ok ? {
+      image_id: savedImage.imageId,
+      image_view_id: savedImage.imageViewId,
+      image_prompt_hash: savedImage.promptHash,
+    } : {
+      image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
+    }),
   };
-  assertNoSecretShape(
-    { ...payload, image_base64: '[image omitted]' },
-    'Local Wrapped poster response metadata must not serialize secrets.',
-  );
+  assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Local Wrapped poster response metadata must not serialize secrets.');
   return payload;
 }
 
@@ -3425,13 +3299,7 @@ export async function generateAgentOnlyWrappedImage({
     };
   }
   if (!predictions.length) {
-    return {
-      ok: false,
-      status: 409,
-      reason: 'agent_only_wrapped_no_predictions',
-      window_id: snapshot.windowId,
-      run_id: runId,
-    };
+    return { ok: false, status: 409, reason: 'agent_only_wrapped_no_predictions', window_id: snapshot.windowId, run_id: runId };
   }
   const imageMode = normalizeWrappedImageMode(body.mode || body.image_mode || body.imageMode || body.view);
   const cachedImage = await loadAgentOnlyWrappedImageByRun({
@@ -3475,23 +3343,10 @@ export async function generateAgentOnlyWrappedImage({
   if (!openAiKey) {
     return { ok: false, status: 503, reason: 'wrapped_story_openai_key_missing' };
   }
-  const loadedLinearVoteState = await loadVoteState({
-    env,
-    sessionSlug: slug,
-    windowId: snapshot.windowId,
-    telegramUserId,
-    mode: 'linear',
-  });
-  const loadedQuadraticVoteState = await loadVoteState({
-    env,
-    sessionSlug: slug,
-    windowId: snapshot.windowId,
-    telegramUserId,
-    mode: 'quadratic',
-  });
+  const loadedLinearVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'linear' });
+  const loadedQuadraticVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'quadratic' });
   const linearVoteState = normalizeAgentOnlyRunId(loadedLinearVoteState.runId) === runId ? loadedLinearVoteState : null;
-  const quadraticVoteState =
-    normalizeAgentOnlyRunId(loadedQuadraticVoteState.runId) === runId ? loadedQuadraticVoteState : null;
+  const quadraticVoteState = normalizeAgentOnlyRunId(loadedQuadraticVoteState.runId) === runId ? loadedQuadraticVoteState : null;
   const model = safeString(env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_MODEL) || DEFAULT_WRAPPED_IMAGE_MODEL;
   const quality = normalizeWrappedImageQuality(body.quality || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_QUALITY);
   const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_EDIT_URL;
@@ -3502,19 +3357,18 @@ export async function generateAgentOnlyWrappedImage({
         ok: false,
         status: 501,
         reason: 'wrapped_story_mp4_unavailable',
-        message:
-          'Session Wrapped story video is not enabled yet. Generate mode "wrapped" for the poster or mode "political_compass" for the Agent Norms Compass.',
+        message: 'Session Wrapped story video is not enabled yet. Generate mode "wrapped" for the poster or mode "political_compass" for the Agent Norms Compass.',
       };
     }
     const storyboardSize = normalizeWrappedImageSize(
       body.storyboard_size ||
-        body.storyboardSize ||
-        body.frame_size ||
-        body.frameSize ||
-        body.size ||
-        env.AGENT_BRIDGE_AGENT_WRAPPED_STORYBOARD_IMAGE_SIZE ||
-        env.AGENT_BRIDGE_AGENT_WRAPPED_STORY_IMAGE_SIZE ||
-        DEFAULT_WRAPPED_STORYBOARD_IMAGE_SIZE,
+      body.storyboardSize ||
+      body.frame_size ||
+      body.frameSize ||
+      body.size ||
+      env.AGENT_BRIDGE_AGENT_WRAPPED_STORYBOARD_IMAGE_SIZE ||
+      env.AGENT_BRIDGE_AGENT_WRAPPED_STORY_IMAGE_SIZE ||
+      DEFAULT_WRAPPED_STORYBOARD_IMAGE_SIZE,
     );
     const storyboardPrompt = buildAgentOnlyWrappedStoryboardPrompt({
       snapshot,
@@ -3585,20 +3439,15 @@ export async function generateAgentOnlyWrappedImage({
       story_source: 'single_storyboard',
       image_safety_retried: false,
       image_saved: savedImage.ok === true,
-      ...(savedImage.ok
-        ? {
-            image_id: savedImage.imageId,
-            image_view_id: savedImage.imageViewId,
-            image_prompt_hash: savedImage.promptHash,
-          }
-        : {
-            image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
-          }),
+      ...(savedImage.ok ? {
+        image_id: savedImage.imageId,
+        image_view_id: savedImage.imageViewId,
+        image_prompt_hash: savedImage.promptHash,
+      } : {
+        image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
+      }),
     };
-    assertNoSecretShape(
-      { ...payload, image_base64: '[image omitted]' },
-      'Agent-only wrapped story response metadata must not serialize secrets.',
-    );
+    assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped story response metadata must not serialize secrets.');
     return payload;
   }
   let prompt = buildAgentOnlyWrappedImagePrompt({
@@ -3621,7 +3470,11 @@ export async function generateAgentOnlyWrappedImage({
     referenceBytes,
   });
   let imageSafetyRetried = false;
-  if (!imageResult.ok && imageMode === 'political_compass' && shouldRetryWrappedImageWithSaferPrompt(imageResult)) {
+  if (
+    !imageResult.ok &&
+    imageMode === 'political_compass' &&
+    shouldRetryWrappedImageWithSaferPrompt(imageResult)
+  ) {
     prompt = buildAgentOnlyWrappedImagePrompt({
       snapshot,
       state: stateForRun,
@@ -3684,20 +3537,15 @@ export async function generateAgentOnlyWrappedImage({
     image_base64: imageBase64,
     image_safety_retried: imageSafetyRetried,
     image_saved: savedImage.ok === true,
-    ...(savedImage.ok
-      ? {
-          image_id: savedImage.imageId,
-          image_view_id: savedImage.imageViewId,
-          image_prompt_hash: savedImage.promptHash,
-        }
-      : {
-          image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
-        }),
+    ...(savedImage.ok ? {
+      image_id: savedImage.imageId,
+      image_view_id: savedImage.imageViewId,
+      image_prompt_hash: savedImage.promptHash,
+    } : {
+      image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
+    }),
   };
-  assertNoSecretShape(
-    { ...payload, image_base64: '[image omitted]' },
-    'Agent-only wrapped image response metadata must not serialize secrets.',
-  );
+  assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
   return payload;
 }
 
@@ -3715,21 +3563,17 @@ export async function recordAgentOnlyHumanReview({
   const qid = safeString(questionId);
   const reviewKind = kind === 'edit' ? 'edit' : 'confirm';
   const materialized = await materializeAgentOnlyWindow({ env, sessionSlug: slug, windowId, now });
-  if (!materialized.ok)
-    return { ok: false, status: materialized.status || 409, reason: materialized.reason || 'window_snapshot_missing' };
-  const allowed = new Set(
-    (Array.isArray(materialized.snapshot?.statements) ? materialized.snapshot.statements : [])
-      .map((statement) => safeString(statement?.statement_id))
-      .filter(Boolean),
-  );
+  if (!materialized.ok) return { ok: false, status: materialized.status || 409, reason: materialized.reason || 'window_snapshot_missing' };
+  const allowed = new Set((Array.isArray(materialized.snapshot?.statements) ? materialized.snapshot.statements : [])
+    .map((statement) => safeString(statement?.statement_id))
+    .filter(Boolean));
   if (!allowed.has(qid)) return { ok: true, recorded: false, reason: 'agent_statement_not_flagged' };
   const state = await loadAnswerState({ env, sessionSlug: slug, windowId, telegramUserId });
   const entry = state.byStatement[qid];
   if (!entry?.agent) return { ok: true, recorded: false, reason: 'agent_prediction_missing' };
   const createdAt = nowIso(now);
   const source = reviewKind === 'edit' ? 'human_edit_after_agent' : 'human_confirm';
-  const agentFingerprint =
-    safeString(entry.agent.semanticFingerprint) || (await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer));
+  const agentFingerprint = safeString(entry.agent.semanticFingerprint) || await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer);
   const existingHumanFingerprint = await reviewSemanticFingerprint(entry.human);
   if (
     reviewKind === 'confirm' &&
@@ -3742,8 +3586,7 @@ export async function recordAgentOnlyHumanReview({
     return { ok: true, recorded: false, reason: 'already_reviewed' };
   }
   const kv = env?.AGENT_ACTION_KV;
-  if (!kv || typeof kv.put !== 'function')
-    return { ok: false, status: 500, reason: 'agent_only_answer_storage_unavailable' };
+  if (!kv || typeof kv.put !== 'function') return { ok: false, status: 500, reason: 'agent_only_answer_storage_unavailable' };
   const userPart = kvKeySafePart(telegramUserId);
   const key = `${answerEventPrefix(slug, windowId, userPart)}${eventId()}`;
   const record = {
@@ -3767,14 +3610,7 @@ export async function recordAgentOnlyHumanReview({
   };
   assertNoSecretShape(record, 'Agent-only human review events must not serialize secrets.');
   await kv.put(key, JSON.stringify(record), {
-    metadata: {
-      v: 1,
-      t: 'ao_evt',
-      sg: slug,
-      w: safeString(windowId),
-      k: reviewKind === 'edit' ? 'e' : 'c',
-      src: source,
-    },
+    metadata: { v: 1, t: 'ao_evt', sg: slug, w: safeString(windowId), k: reviewKind === 'edit' ? 'e' : 'c', src: source },
   });
   state.byStatement[qid] = {
     ...entry,
@@ -3795,8 +3631,9 @@ export async function recordAgentOnlyHumanReview({
 async function loadHumanVoteState({ env = {}, sessionSlug = '', windowId = '', telegramUserId = '' } = {}) {
   const key = humanVoteStateKey(sessionSlug, windowId, telegramUserId);
   const kv = env?.AGENT_ACTION_KV;
-  const parsed =
-    key && kv && typeof kv.get === 'function' ? safeJsonParse(await kv.get(key).catch(() => null), null) : null;
+  const parsed = key && kv && typeof kv.get === 'function'
+    ? safeJsonParse(await kv.get(key).catch(() => null), null)
+    : null;
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     assertNoSecretShape(parsed, 'Agent-only human vote state must not serialize secrets.');
     return {
@@ -3831,11 +3668,8 @@ export async function submitAgentOnlyHumanVoteTaps({
   const slug = sanitizeSessionSlug(sessionSlug);
   const materialized = await materializeAgentOnlyWindow({ env, sessionSlug: slug, windowId, now });
   const snapshot = materialized.snapshot;
-  const allowed = new Set(
-    (Array.isArray(snapshot?.statements) ? snapshot.statements : []).map((statement) => statement.statement_id),
-  );
-  if (!materialized.ok || !snapshot)
-    return { ok: false, status: materialized.status || 409, reason: materialized.reason || 'window_snapshot_missing' };
+  const allowed = new Set((Array.isArray(snapshot?.statements) ? snapshot.statements : []).map((statement) => statement.statement_id));
+  if (!materialized.ok || !snapshot) return { ok: false, status: materialized.status || 409, reason: materialized.reason || 'window_snapshot_missing' };
   if (!Array.isArray(taps) || taps.length < 1 || taps.length > MAX_BULK_ROWS) {
     return { ok: false, status: 400, reason: 'tap_batch_size_invalid' };
   }
@@ -3849,7 +3683,9 @@ export async function submitAgentOnlyHumanVoteTaps({
     normalizedTaps.push({ questionId, delta });
   }
   const state = await loadHumanVoteState({ env, sessionSlug: slug, windowId, telegramUserId });
-  const previousNets = state.nets && typeof state.nets === 'object' && !Array.isArray(state.nets) ? state.nets : {};
+  const previousNets = state.nets && typeof state.nets === 'object' && !Array.isArray(state.nets)
+    ? state.nets
+    : {};
   const activeState = activeHumanVoteNets(previousNets, allowed);
   const activeNets = { ...activeState.nets };
   for (const tap of normalizedTaps) {
@@ -3858,8 +3694,7 @@ export async function submitAgentOnlyHumanVoteTaps({
     else activeNets[tap.questionId] = next;
   }
   const activeBudgetUsed = Object.values(activeNets).reduce((sum, value) => sum + Math.abs(Number(value) || 0), 0);
-  if (activeBudgetUsed > 100)
-    return { ok: false, status: 400, reason: 'human_vote_budget_exceeded', budgetUsed: activeBudgetUsed };
+  if (activeBudgetUsed > 100) return { ok: false, status: 400, reason: 'human_vote_budget_exceeded', budgetUsed: activeBudgetUsed };
   const preservedNets = {};
   for (const [rawQuestionId, rawValue] of Object.entries(previousNets)) {
     const questionId = safeString(rawQuestionId);
@@ -3870,8 +3705,7 @@ export async function submitAgentOnlyHumanVoteTaps({
   const nets = { ...preservedNets, ...activeNets };
   const budgetUsed = Object.values(nets).reduce((sum, value) => sum + Math.abs(Number(value) || 0), 0);
   const kv = env?.AGENT_ACTION_KV;
-  if (!kv || typeof kv.put !== 'function')
-    return { ok: false, status: 500, reason: 'agent_only_human_vote_storage_unavailable' };
+  if (!kv || typeof kv.put !== 'function') return { ok: false, status: 500, reason: 'agent_only_human_vote_storage_unavailable' };
   const createdAt = nowIso(now);
   const userPart = kvKeySafePart(telegramUserId);
   const eventKey = `${AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX}${slug}:${safeString(windowId)}:${userPart}:${eventId()}`;
@@ -3908,14 +3742,12 @@ async function listKvEntriesByPrefix(env = {}, prefix = '', limit = 100000) {
   const entries = [];
   let cursor = '';
   do {
-    const page = await kv
-      .list({ prefix, limit: Math.min(1000, limit - entries.length), ...(cursor ? { cursor } : {}) })
-      .catch(() => null);
+    const page = await kv.list({ prefix, limit: Math.min(1000, limit - entries.length), ...(cursor ? { cursor } : {}) }).catch(() => null);
     const keys = Array.isArray(page?.keys) ? page.keys : [];
     for (const entry of keys) {
       entries.push({
         key: safeString(entry?.name || entry),
-        metadata: entry && typeof entry === 'object' && !Array.isArray(entry) ? entry.metadata || null : null,
+        metadata: entry && typeof entry === 'object' && !Array.isArray(entry) ? (entry.metadata || null) : null,
       });
       if (entries.length >= limit) return entries;
     }
@@ -3924,22 +3756,23 @@ async function listKvEntriesByPrefix(env = {}, prefix = '', limit = 100000) {
   return entries;
 }
 
-async function listKvEntriesPageByPrefix(env = {}, prefix = '', { limit = 250, cursor = '' } = {}) {
+async function listKvEntriesPageByPrefix(env = {}, prefix = '', {
+  limit = 250,
+  cursor = '',
+} = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!prefix || !kv || typeof kv.list !== 'function') return { entries: [], nextCursor: '' };
   const pageLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit)) || 250));
-  const page = await kv
-    .list({
-      prefix,
-      limit: pageLimit,
-      ...(safeString(cursor) ? { cursor: safeString(cursor) } : {}),
-    })
-    .catch(() => null);
+  const page = await kv.list({
+    prefix,
+    limit: pageLimit,
+    ...(safeString(cursor) ? { cursor: safeString(cursor) } : {}),
+  }).catch(() => null);
   const keys = Array.isArray(page?.keys) ? page.keys : [];
   return {
     entries: keys.map((entry) => ({
       key: safeString(entry?.name || entry),
-      metadata: entry && typeof entry === 'object' && !Array.isArray(entry) ? entry.metadata || null : null,
+      metadata: entry && typeof entry === 'object' && !Array.isArray(entry) ? (entry.metadata || null) : null,
     })),
     nextCursor: page?.list_complete === false ? safeString(page.cursor) : '',
   };
@@ -3991,10 +3824,7 @@ export async function buildAgentOnlyMetrics({
   };
   const principals = new Set();
   const perWindow = new Map();
-  const answerEntries = await listKvEntriesByPrefix(
-    env,
-    scope === 'session' ? answerStatePrefix(slug) : AGENT_ONLY_ANSWER_STATE_KV_PREFIX,
-  );
+  const answerEntries = await listKvEntriesByPrefix(env, scope === 'session' ? answerStatePrefix(slug) : AGENT_ONLY_ANSWER_STATE_KV_PREFIX);
   for (const entry of answerEntries) {
     const meta = entry.metadata || {};
     const entrySlug = sanitizeSessionSlug(meta.sg) || sessionFromKey(entry.key, AGENT_ONLY_ANSWER_STATE_KV_PREFIX);
@@ -4010,10 +3840,7 @@ export async function buildAgentOnlyMetrics({
     bucket.privacySkips += skips;
     bucket.distinctPrincipals += 1;
   }
-  const voteEntries = await listKvEntriesByPrefix(
-    env,
-    scope === 'session' ? voteStatePrefix(slug) : AGENT_ONLY_VOTE_STATE_KV_PREFIX,
-  );
+  const voteEntries = await listKvEntriesByPrefix(env, scope === 'session' ? voteStatePrefix(slug) : AGENT_ONLY_VOTE_STATE_KV_PREFIX);
   for (const entry of voteEntries) {
     const meta = entry.metadata || {};
     const entrySlug = sanitizeSessionSlug(meta.sg) || sessionFromKey(entry.key, AGENT_ONLY_VOTE_STATE_KV_PREFIX);
@@ -4025,10 +3852,7 @@ export async function buildAgentOnlyMetrics({
     bucket.voteAllocations += 1;
     bucket.voteBudgetUsed += budget;
   }
-  const windowEntries = await listKvEntriesByPrefix(
-    env,
-    scope === 'session' ? `${AGENT_ONLY_WINDOW_KV_PREFIX}${slug}:` : AGENT_ONLY_WINDOW_KV_PREFIX,
-  );
+  const windowEntries = await listKvEntriesByPrefix(env, scope === 'session' ? `${AGENT_ONLY_WINDOW_KV_PREFIX}${slug}:` : AGENT_ONLY_WINDOW_KV_PREFIX);
   for (const entry of windowEntries) {
     const meta = entry.metadata || {};
     const entrySlug = sanitizeSessionSlug(meta.sg) || sessionFromKey(entry.key, AGENT_ONLY_WINDOW_KV_PREFIX);
@@ -4062,9 +3886,10 @@ function csvEscape(value) {
 function rowsToCsv(rows = []) {
   if (!rows.length) return '';
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
-  return [columns.join(','), ...rows.map((row) => columns.map((column) => csvEscape(row[column])).join(','))].join(
-    '\n',
-  );
+  return [
+    columns.join(','),
+    ...rows.map((row) => columns.map((column) => csvEscape(row[column])).join(',')),
+  ].join('\n');
 }
 
 function rowsToJsonl(rows = []) {
@@ -4082,13 +3907,7 @@ async function snapshotForWindowCached(env = {}, sessionSlug = '', windowId = ''
   return cache.get(cacheKey);
 }
 
-async function evalTypeForStatement({
-  env = {},
-  sessionSlug = '',
-  windowId = '',
-  questionId = '',
-  cache = new Map(),
-} = {}) {
+async function evalTypeForStatement({ env = {}, sessionSlug = '', windowId = '', questionId = '', cache = new Map() } = {}) {
   const snapshot = await snapshotForWindowCached(env, sessionSlug, windowId, cache);
   return safeString(snapshot?.evalTypesByQuestionId?.[safeString(questionId)]);
 }
@@ -4122,12 +3941,8 @@ async function latestSubmittedAnswerFor({
   beforeIso = '',
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const user = safeString(telegramUserId)
-    .replace(/[^0-9A-Za-z_-]/g, '')
-    .slice(0, 128);
-  const question = safeString(questionId)
-    .replace(/[^0-9A-Za-z._:-]/g, '')
-    .slice(0, 160);
+  const user = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
+  const question = safeString(questionId).replace(/[^0-9A-Za-z._:-]/g, '').slice(0, 160);
   if (!slug || !user || !question) return null;
   const prefix = `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${user}:${question}:`;
   const entries = await listKvEntriesByPrefix(env, prefix);
@@ -4190,10 +4005,9 @@ export async function exportAgentOnlyData({
       for (const entry of stateEntries) {
         const state = await readKvJson(env, entry.key);
         if (!state || (selectedWindow && safeString(state.windowId) !== selectedWindow)) continue;
-        const byStatement =
-          state.byStatement && typeof state.byStatement === 'object' && !Array.isArray(state.byStatement)
-            ? state.byStatement
-            : {};
+        const byStatement = state.byStatement && typeof state.byStatement === 'object' && !Array.isArray(state.byStatement)
+          ? state.byStatement
+          : {};
         for (const [statementId, value] of Object.entries(byStatement)) {
           if (!Number.isFinite(Number(value?.agent?.confidence))) continue;
           const bandStart = Math.floor(Number(value.agent.confidence) / 10) * 10;
@@ -4221,14 +4035,10 @@ export async function exportAgentOnlyData({
           if (reviewStatus === 'edit' || reviewStatus === 'stale_confirm') bucket.edit_count += 1;
         }
       }
-      rows.push(
-        ...[...calibrationBuckets.values()]
-          .map((row) => ({
-            ...row,
-            edit_rate: row.prediction_count ? row.edit_count / row.prediction_count : 0,
-          }))
-          .sort((left, right) => left.confidence_band.localeCompare(right.confidence_band)),
-      );
+      rows.push(...[...calibrationBuckets.values()].map((row) => ({
+        ...row,
+        edit_rate: row.prediction_count ? row.edit_count / row.prediction_count : 0,
+      })).sort((left, right) => left.confidence_band.localeCompare(right.confidence_band)));
       const outputFormat = lower(format) === 'csv' ? 'csv' : 'jsonl';
       return {
         ok: true,
@@ -4261,9 +4071,7 @@ export async function exportAgentOnlyData({
             model: safeString(record.agentMetadata?.model),
             scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
             token_current_run_total: normalizeTokenCount(record.agentMetadata?.tokenUsage?.currentRunTotalTokens),
-            token_recent_sessions_total: normalizeTokenCount(
-              record.agentMetadata?.tokenUsage?.recentSessionsTotalTokens,
-            ),
+            token_recent_sessions_total: normalizeTokenCount(record.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
             token_input: normalizeTokenCount(record.agentMetadata?.tokenUsage?.inputTokens),
             token_output: normalizeTokenCount(record.agentMetadata?.tokenUsage?.outputTokens),
             token_daily_usage_30d: normalizeDailyTokenUsage(record.agentMetadata?.tokenUsage?.dailyUsage30d),
@@ -4294,15 +4102,13 @@ export async function exportAgentOnlyData({
             model: safeString(record.agentMetadata?.model),
             scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
             instructions_version: safeString(record.instructionsVersion),
-            eval_type: compactExport
-              ? ''
-              : await evalTypeForStatement({
-                  env,
-                  sessionSlug: slug,
-                  windowId: record.windowId,
-                  questionId: record.questionId,
-                  cache: snapshotCache,
-                }),
+            eval_type: compactExport ? '' : await evalTypeForStatement({
+              env,
+              sessionSlug: slug,
+              windowId: record.windowId,
+              questionId: record.questionId,
+              cache: snapshotCache,
+            }),
             created_at: safeString(record.createdAt),
           });
         }
@@ -4316,29 +4122,24 @@ export async function exportAgentOnlyData({
         const state = await readKvJson(env, entry.key);
         if (!state || (selectedWindow && safeString(state.windowId) !== selectedWindow)) continue;
         const principalId = await agentOnlyPrincipalId(env, state.telegramUserId);
-        const byStatement =
-          state.byStatement && typeof state.byStatement === 'object' && !Array.isArray(state.byStatement)
-            ? state.byStatement
-            : {};
+        const byStatement = state.byStatement && typeof state.byStatement === 'object' && !Array.isArray(state.byStatement)
+          ? state.byStatement
+          : {};
         for (const [statementId, value] of Object.entries(byStatement)) {
-          const reviewStatus = compactExport
-            ? ''
-            : await reviewStatusForCurrentAgentAnswer({
-                entry: value,
-                env,
-                sessionSlug: slug,
-                windowId: state.windowId,
-                questionId: statementId,
-                cache: snapshotCache,
-              });
-          const normal = compactExport
-            ? null
-            : await latestSubmittedAnswerFor({
-                env,
-                sessionSlug: slug,
-                telegramUserId: state.telegramUserId,
-                questionId: statementId,
-              });
+          const reviewStatus = compactExport ? '' : await reviewStatusForCurrentAgentAnswer({
+            entry: value,
+            env,
+            sessionSlug: slug,
+            windowId: state.windowId,
+            questionId: statementId,
+            cache: snapshotCache,
+          });
+          const normal = compactExport ? null : await latestSubmittedAnswerFor({
+            env,
+            sessionSlug: slug,
+            telegramUserId: state.telegramUserId,
+            questionId: statementId,
+          });
           rows.push({
             principal_id: principalId,
             statement_id: safeString(statementId),
@@ -4348,21 +4149,22 @@ export async function exportAgentOnlyData({
             agent_confidence: value?.agent?.confidence ?? null,
             human_current_answer: normal?.answer || null,
             review_status: reviewStatus ? `human_${reviewStatus}` : '',
-            eval_type: compactExport
-              ? ''
-              : await evalTypeForStatement({
-                  env,
-                  sessionSlug: slug,
-                  windowId: state.windowId,
-                  questionId: statementId,
-                  cache: snapshotCache,
-                }),
+            eval_type: compactExport ? '' : await evalTypeForStatement({
+              env,
+              sessionSlug: slug,
+              windowId: state.windowId,
+              questionId: statementId,
+              cache: snapshotCache,
+            }),
           });
         }
       }
     }
   } else if (view === 'votes') {
-    const prefixes = [`${AGENT_ONLY_VOTE_EVENT_KV_PREFIX}${slug}:`, `${AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX}${slug}:`];
+    const prefixes = [
+      `${AGENT_ONLY_VOTE_EVENT_KV_PREFIX}${slug}:`,
+      `${AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX}${slug}:`,
+    ];
     for (const prefix of prefixes) {
       const entries = await listKvEntriesByPrefix(env, prefix);
       for (const entry of entries) {
@@ -4443,10 +4245,8 @@ export async function exportAgentOnlyData({
       }
       const principal = principalRows.get(principalId);
       principal.attempt_event_count += 1;
-      if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at))
-        principal.first_attempt_at = createdAt;
-      if (createdAt && (!principal.latest_attempt_at || createdAt > principal.latest_attempt_at))
-        principal.latest_attempt_at = createdAt;
+      if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
+      if (createdAt && (!principal.latest_attempt_at || createdAt > principal.latest_attempt_at)) principal.latest_attempt_at = createdAt;
 
       const runId = normalizeAgentOnlyRunId(record.runId) || 'unknown';
       const runKey = `${principalId}\t${runId}`;
@@ -4469,8 +4269,9 @@ export async function exportAgentOnlyData({
       if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
       if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
       const stage = safeString(record.stage);
-      const counts =
-        record.counts && typeof record.counts === 'object' && !Array.isArray(record.counts) ? record.counts : {};
+      const counts = record.counts && typeof record.counts === 'object' && !Array.isArray(record.counts)
+        ? record.counts
+        : {};
       if (stage === 'answers_bulk' && record.ok === true) {
         run.accepted_answer_count += Number(counts.accepted || 0) || 0;
       }
@@ -4479,17 +4280,15 @@ export async function exportAgentOnlyData({
       run.privacy_skip_count = Math.max(run.privacy_skip_count, Number(counts.privacySkipCount || 0) || 0);
       if (stage === 'wrapped_image' && record.ok === true) run.wrapped_image_ok = true;
     }
-    const runs = [...runRows.values()]
-      .map((run) => {
-        const answerTarget = Math.max(Number(run.statement_count || 0), Number(run.agent_response_count || 0));
-        const answerComplete = answerTarget > 0 && Number(run.accepted_answer_count || 0) >= answerTarget;
-        return {
-          ...run,
-          answer_complete: answerComplete,
-          successful: answerComplete || run.wrapped_image_ok,
-        };
-      })
-      .sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
+    const runs = [...runRows.values()].map((run) => {
+      const answerTarget = Math.max(Number(run.statement_count || 0), Number(run.agent_response_count || 0));
+      const answerComplete = answerTarget > 0 && Number(run.accepted_answer_count || 0) >= answerTarget;
+      return {
+        ...run,
+        answer_complete: answerComplete,
+        successful: answerComplete || run.wrapped_image_ok,
+      };
+    }).sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
     for (const run of runs) {
       const principal = principalRows.get(run.principal_id);
       if (!principal) continue;
@@ -4498,9 +4297,8 @@ export async function exportAgentOnlyData({
       if (run.wrapped_image_ok) principal.wrapped_image_run_count += 1;
       if (run.successful) principal.successful_run_count += 1;
     }
-    const principals = [...principalRows.values()].sort((left, right) =>
-      safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)),
-    );
+    const principals = [...principalRows.values()]
+      .sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
     const summary = {
       ok: true,
       session_slug: slug,

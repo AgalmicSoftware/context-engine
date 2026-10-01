@@ -1,5 +1,10 @@
 import { ethers } from 'ethers';
-import { ACCOUNT_MODES, AGENT_BRIDGE_EVENT_TYPES, AGENT_BRIDGE_WORKER_VERSION, RISK_CEILINGS } from './constants.mjs';
+import {
+  ACCOUNT_MODES,
+  AGENT_BRIDGE_EVENT_TYPES,
+  AGENT_BRIDGE_WORKER_VERSION,
+  RISK_CEILINGS,
+} from './constants.mjs';
 import { normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
@@ -17,10 +22,9 @@ export function normalizeDeploymentId(value = '') {
   return String(value || '').trim() || 'local-demo';
 }
 
-export function assertManagedDemoAccountMode(
-  mode = ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO,
-  { action = 'managed_demo_account' } = {},
-) {
+export function assertManagedDemoAccountMode(mode = ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO, {
+  action = 'managed_demo_account',
+} = {}) {
   const normalized = String(mode || ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO).trim();
   if (normalized !== ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO) {
     const reason = FORBIDDEN_REMOTE_SIGNING_MODES.has(normalized)
@@ -31,7 +35,9 @@ export function assertManagedDemoAccountMode(
   return { ok: true, reason: 'managed_demo_account_allowed', action, accountMode: normalized };
 }
 
-export function assertManagedDemoRootSecret(rootSecret = '', { action = 'managed_demo_signing' } = {}) {
+export function assertManagedDemoRootSecret(rootSecret = '', {
+  action = 'managed_demo_signing',
+} = {}) {
   if (!String(rootSecret || '').trim()) {
     return { ok: false, reason: 'managed_demo_root_secret_missing', action };
   }
@@ -50,12 +56,8 @@ export async function deriveManagedDemoAccount({
   const normalizedPrincipal = normalizeAgentPrincipal(principal);
   if (!normalizedPrincipal.principalId) throw new Error('agent_principal_required');
   const normalizedDeploymentId = normalizeDeploymentId(deploymentId);
-  const fingerprint = await sha256Hex(
-    `secret:${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`,
-  );
-  const privateKeyHex = await sha256Hex(
-    `demo-private-key|${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`,
-  );
+  const fingerprint = await sha256Hex(`secret:${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`);
+  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`);
   const accountAddress = ethers.utils.computeAddress(`0x${privateKeyHex}`);
   const account = {
     type: 'managed_demo_account',
@@ -104,39 +106,39 @@ export function evaluateManagedAccountGrant({
     return { ok: false, reason: 'action_not_granted', action };
   }
   const ceiling = String(grant.riskCeiling || RISK_CEILINGS.READ).trim();
-  const requestedRank =
-    {
-      [RISK_CEILINGS.READ]: 0,
-      [RISK_CEILINGS.DRAFT]: 1,
-      [RISK_CEILINGS.SUBMIT]: 2,
-      [RISK_CEILINGS.SPONSORED]: 3,
-      [RISK_CEILINGS.ACCOUNT]: 4,
-      [RISK_CEILINGS.ADMIN]: 5,
-    }[requestedRisk] ?? 0;
-  const ceilingRank =
-    {
-      [RISK_CEILINGS.READ]: 0,
-      [RISK_CEILINGS.DRAFT]: 1,
-      [RISK_CEILINGS.SUBMIT]: 2,
-      [RISK_CEILINGS.SPONSORED]: 3,
-      [RISK_CEILINGS.ACCOUNT]: 4,
-      [RISK_CEILINGS.ADMIN]: 5,
-    }[ceiling] ?? 0;
+  const requestedRank = {
+    [RISK_CEILINGS.READ]: 0,
+    [RISK_CEILINGS.DRAFT]: 1,
+    [RISK_CEILINGS.SUBMIT]: 2,
+    [RISK_CEILINGS.SPONSORED]: 3,
+    [RISK_CEILINGS.ACCOUNT]: 4,
+    [RISK_CEILINGS.ADMIN]: 5,
+  }[requestedRisk] ?? 0;
+  const ceilingRank = {
+    [RISK_CEILINGS.READ]: 0,
+    [RISK_CEILINGS.DRAFT]: 1,
+    [RISK_CEILINGS.SUBMIT]: 2,
+    [RISK_CEILINGS.SPONSORED]: 3,
+    [RISK_CEILINGS.ACCOUNT]: 4,
+    [RISK_CEILINGS.ADMIN]: 5,
+  }[ceiling] ?? 0;
   if (requestedRank > ceilingRank) {
     return { ok: false, reason: 'risk_ceiling_exceeded', action, requestedRisk, riskCeiling: ceiling };
   }
   return { ok: true, reason: 'managed_demo_grant_allowed', action };
 }
 
-export async function deriveDemoPrivateKeyMaterial({ principal = {}, deploymentId = '', rootSecret = '' } = {}) {
+export async function deriveDemoPrivateKeyMaterial({
+  principal = {},
+  deploymentId = '',
+  rootSecret = '',
+} = {}) {
   const secretCheck = assertManagedDemoRootSecret(rootSecret, { action: 'derive_demo_private_key' });
   if (!secretCheck.ok) throw new Error(secretCheck.reason);
   const normalizedPrincipal = normalizeAgentPrincipal(principal);
   if (!normalizedPrincipal.principalId) throw new Error('agent_principal_required');
   const normalizedDeploymentId = normalizeDeploymentId(deploymentId);
-  const privateKeyHex = await sha256Hex(
-    `demo-private-key|${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`,
-  );
+  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`);
   return `0x${privateKeyHex}`;
 }
 
@@ -157,7 +159,9 @@ export async function buildDemoKeyExportRecord({
     const secretCheck = assertManagedDemoRootSecret(rootSecret, { action: 'export_demo_key' });
     if (!secretCheck.ok) return secretCheck;
   }
-  const privateKey = reveal ? await deriveDemoPrivateKeyMaterial({ principal, deploymentId, rootSecret }) : null;
+  const privateKey = reveal
+    ? await deriveDemoPrivateKeyMaterial({ principal, deploymentId, rootSecret })
+    : null;
   return {
     ok: true,
     record: {

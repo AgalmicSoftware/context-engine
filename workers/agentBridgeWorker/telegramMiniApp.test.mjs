@@ -55,44 +55,27 @@ async function handleSignedMiniAppRequest(options) {
   const env = options.env;
   env.AGENT_ACTION_KV ||= new MemoryKv();
   const launch = 'cecb_1234567890';
-  await env.AGENT_ACTION_KV.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionPicker: true },
-    }),
-  );
+  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action', actionId: launch, action: 'view_questions',
+    lane: 'telegram_mini_app', miniAppLaunch: true, serverContextRef: { sessionPicker: true },
+  }));
   const url = new URL(options.request.url);
   url.searchParams.set('launch', launch);
   const headers = new Headers(options.request.headers);
-  headers.set(
-    'X-Telegram-Init-Data',
-    signInitData(
-      {
-        auth_date: String(Math.floor(Date.now() / 1000)),
-        user: JSON.stringify({ id: 42, username: 'participant' }),
-      },
-      options.env.TELEGRAM_BOT_TOKEN,
-    ),
-  );
-  return handleTelegramMiniAppRequest({
-    ...options,
-    request: new Request(new Request(url, options.request), { headers }),
-  });
+  headers.set('X-Telegram-Init-Data', signInitData({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, options.env.TELEGRAM_BOT_TOKEN));
+  return handleTelegramMiniAppRequest({ ...options, request: new Request(new Request(url, options.request), { headers }) });
 }
 
 const __test__telegramMiniApp = Object.freeze({
   ...rawTelegramMiniAppTestApi,
-  buildMiniAppState: (options = {}) =>
-    rawTelegramMiniAppTestApi.buildMiniAppState({
-      ...options,
-      request: withPreviewRequest(options.request),
-      env: withMiniAppTestPreviewAuth(options.env),
-    }),
+  buildMiniAppState: (options = {}) => rawTelegramMiniAppTestApi.buildMiniAppState({
+    ...options,
+    request: withPreviewRequest(options.request),
+    env: withMiniAppTestPreviewAuth(options.env),
+  }),
 });
 
 async function seedSubmitRecord(kv, key, serialized) {
@@ -146,9 +129,11 @@ class StaleVoteListKv extends MemoryKv {
 
 function signInitData(fields = {}, botToken = '') {
   const dataCheckString = Object.entries(fields)
-    .sort(([leftKey, leftValue], [rightKey, rightValue]) =>
-      leftKey === rightKey ? String(leftValue).localeCompare(String(rightValue)) : leftKey.localeCompare(rightKey),
-    )
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => (
+      leftKey === rightKey
+        ? String(leftValue).localeCompare(String(rightValue))
+        : leftKey.localeCompare(rightKey)
+    ))
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
   const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
@@ -177,24 +162,17 @@ async function seedPreviewPrivateSession(env, sessionSlug = 'alpha') {
 test('validateTelegramMiniAppInitData accepts current Telegram HMAC init data', async () => {
   const nowSeconds = 1_800_000_000;
   const botToken = '123456:test-token';
-  const initData = signInitData(
-    {
-      auth_date: String(nowSeconds),
-      query_id: 'mini-query-1',
-      user: JSON.stringify({ id: 42, username: 'participant', first_name: 'Pat' }),
-    },
-    botToken,
-  );
+  const initData = signInitData({
+    auth_date: String(nowSeconds),
+    query_id: 'mini-query-1',
+    user: JSON.stringify({ id: 42, username: 'participant', first_name: 'Pat' }),
+  }, botToken);
 
-  const result = await validateTelegramMiniAppInitData(
-    initData,
-    {
-      TELEGRAM_BOT_TOKEN: botToken,
-    },
-    {
-      nowMs: nowSeconds * 1000,
-    },
-  );
+  const result = await validateTelegramMiniAppInitData(initData, {
+    TELEGRAM_BOT_TOKEN: botToken,
+  }, {
+    nowMs: nowSeconds * 1000,
+  });
 
   assert.equal(result.ok, true);
   assert.equal(result.authMode, 'telegram');
@@ -228,44 +206,30 @@ test('validateTelegramMiniAppInitData fails closed without a bot token unless pr
 test('validateTelegramMiniAppInitData rejects tampered and expired init data', async () => {
   const nowSeconds = 1_800_000_000;
   const botToken = '123456:test-token';
-  const valid = signInitData(
-    {
-      auth_date: String(nowSeconds),
-      user: JSON.stringify({ id: 42, username: 'participant' }),
-    },
-    botToken,
-  );
+  const valid = signInitData({
+    auth_date: String(nowSeconds),
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, botToken);
 
   const tampered = valid.replace('participant', 'attacker');
-  const tamperedResult = await validateTelegramMiniAppInitData(
-    tampered,
-    {
-      TELEGRAM_BOT_TOKEN: botToken,
-    },
-    {
-      nowMs: nowSeconds * 1000,
-    },
-  );
+  const tamperedResult = await validateTelegramMiniAppInitData(tampered, {
+    TELEGRAM_BOT_TOKEN: botToken,
+  }, {
+    nowMs: nowSeconds * 1000,
+  });
 
   assert.equal(tamperedResult.ok, false);
   assert.equal(tamperedResult.reason, 'telegram_init_hash_invalid');
 
-  const expired = signInitData(
-    {
-      auth_date: String(nowSeconds - 90_000),
-      user: JSON.stringify({ id: 42, username: 'participant' }),
-    },
-    botToken,
-  );
-  const expiredResult = await validateTelegramMiniAppInitData(
-    expired,
-    {
-      TELEGRAM_BOT_TOKEN: botToken,
-    },
-    {
-      nowMs: nowSeconds * 1000,
-    },
-  );
+  const expired = signInitData({
+    auth_date: String(nowSeconds - 90_000),
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, botToken);
+  const expiredResult = await validateTelegramMiniAppInitData(expired, {
+    TELEGRAM_BOT_TOKEN: botToken,
+  }, {
+    nowMs: nowSeconds * 1000,
+  });
 
   assert.equal(expiredResult.ok, false);
   assert.equal(expiredResult.reason, 'telegram_init_data_expired');
@@ -274,13 +238,10 @@ test('validateTelegramMiniAppInitData rejects tampered and expired init data', a
 test('Mini App explains how to recover an expired launch', async () => {
   const botToken = '123456:test-token';
   const launch = 'cecb_1234567890';
-  const initData = signInitData(
-    {
-      auth_date: String(Math.floor(Date.now() / 1000)),
-      user: JSON.stringify({ id: 42, username: 'participant' }),
-    },
-    botToken,
-  );
+  const initData = signInitData({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, botToken);
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`, {
       headers: { 'x-telegram-init-data': initData },
@@ -342,10 +303,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /touch-action: auto;/);
   assert.equal(html.includes('<h1>CE Agent</h1>'), false);
   assert.match(html, /class="headerMain"/);
-  assert.match(
-    html,
-    /class="questionHeaderRow"[\s\S]*<div class="meta" id="meta"><span>Questions:<\/span><span class="inlineSpinner" aria-label="Loading questions"><\/span><\/div>[\s\S]*id="showFilter"[\s\S]*id="showAddQuestion"/,
-  );
+  assert.match(html, /class="questionHeaderRow"[\s\S]*<div class="meta" id="meta"><span>Questions:<\/span><span class="inlineSpinner" aria-label="Loading questions"><\/span><\/div>[\s\S]*id="showFilter"[\s\S]*id="showAddQuestion"/);
   assert.match(html, /\.inlineSpinner \{[\s\S]*animation: ceSpin 0\.8s linear infinite;/);
   assert.match(html, /class="loadingProgress"/);
   assert.match(html, /setLoadingProgress/);
@@ -368,18 +326,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(toolMenu, /<span>Settings<\/span>/);
   assert.match(toolMenu, /id="showDrafts"[^>]*aria-label="Drafts"[\s\S]*<span>Drafts<\/span>/);
   assert.match(toolMenu, /id="demoDataResults"[^>]*aria-label="Demo data"[\s\S]*<span>Demo data<\/span>/);
-  assert.match(
-    toolMenu,
-    /id="showAgentResponses"[^>]*aria-label="Agent predictions"[\s\S]*<span>Agent predictions<\/span>/,
-  );
-  assert.match(
-    html,
-    /\.menuButton\.active \{[\s\S]*color: var\(--accent\);[\s\S]*background: rgba\(98, 255, 191, 0\.12\);/,
-  );
-  assert.match(
-    html,
-    /\.toolMenu \.iconButton \{[\s\S]*min-height: 64px;[\s\S]*font-size: 14px;[\s\S]*line-height: 1\.15;/,
-  );
+  assert.match(toolMenu, /id="showAgentResponses"[^>]*aria-label="Agent predictions"[\s\S]*<span>Agent predictions<\/span>/);
+  assert.match(html, /\.menuButton\.active \{[\s\S]*color: var\(--accent\);[\s\S]*background: rgba\(98, 255, 191, 0\.12\);/);
+  assert.match(html, /\.toolMenu \.iconButton \{[\s\S]*min-height: 64px;[\s\S]*font-size: 14px;[\s\S]*line-height: 1\.15;/);
   assert.match(html, /\.toolMenu \.menuCheckbox input \{[\s\S]*accent-color: var\(--results-accent\);/);
   assert.match(html, /function setToolMenuOpen\(open\)/);
   assert.match(html, /function bindPanelClose\(closeButton, panel, button\)/);
@@ -400,10 +349,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="questionTagFilters"/);
   assert.match(html, /questionTagFiltersExpanded: false/);
   assert.match(html, /const QUESTION_TAG_FILTER_COLLAPSED_LIMIT = 5;/);
-  assert.match(
-    html,
-    /visibleTagEntries = state\.questionTagFiltersExpanded[\s\S]*tagEntries\.slice\(0, QUESTION_TAG_FILTER_COLLAPSED_LIMIT\);/,
-  );
+  assert.match(html, /visibleTagEntries = state\.questionTagFiltersExpanded[\s\S]*tagEntries\.slice\(0, QUESTION_TAG_FILTER_COLLAPSED_LIMIT\);/);
   assert.match(html, /state\.questionTagFiltersExpanded = !state\.questionTagFiltersExpanded;/);
   assert.match(html, /id="filterAiSearch"/);
   assert.match(html, /class="filterSubsection collapsed" id="aiSearchFilterSection"/);
@@ -433,10 +379,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('--pile-shadow-light'), false);
   assert.equal(html.includes('-7px -7px 14px'), false);
   assert.match(html, /--question-card-shadow: 7px 7px 14px var\(--pile-shadow-dark\);/);
-  assert.match(
-    html,
-    /\.questionStack \{[\s\S]*gap: 18px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow-x: hidden;[\s\S]*padding: 2px 0 8px;/,
-  );
+  assert.match(html, /\.questionStack \{[\s\S]*gap: 18px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow-x: hidden;[\s\S]*padding: 2px 0 8px;/);
   assert.match(html, /\.loadMoreQuestions/);
   assert.match(html, /\.questionLoadingRow \{[\s\S]*justify-self: center;[\s\S]*display: inline-flex;/);
   assert.match(html, /Loading the next questions\.\.\./);
@@ -451,10 +394,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /const MAX_QUESTION_LIMIT = 500;/);
   assert.match(html, /questionLimit: FAST_INITIAL_QUESTION_LIMIT,/);
   assert.match(html, /\.agentOnlyBadgeRow\.stackedPredictionRow \{[\s\S]*display: block;[\s\S]*width: 100%;/);
-  assert.match(
-    html,
-    /\.agentPredictionBadge\.stackedPrediction \{[\s\S]*display: grid;[\s\S]*width: min\(100%, 560px\);/,
-  );
+  assert.match(html, /\.agentPredictionBadge\.stackedPrediction \{[\s\S]*display: grid;[\s\S]*width: min\(100%, 560px\);/);
   assert.match(html, /row\.className = 'agentOnlyBadgeRow' \+ \(stacked \? ' stackedPredictionRow' : ''\);/);
   assert.match(html, /badge\.className = 'agentPredictionBadge stackedPrediction';/);
   assert.match(html, /loadingMoreQuestions: false,/);
@@ -468,16 +408,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /function backgroundQuestionLoadMessage\(\)/);
   assert.match(html, /async function load\(\{ retry = false, backgroundAuto = false \} = \{\}\)/);
   assert.match(html, /const fastFollowupLimit = FAST_INITIAL_QUESTION_LIMIT \+ FAST_FOLLOWUP_QUESTION_COUNT;/);
-  assert.match(
-    html,
-    /if \(current <= FAST_INITIAL_QUESTION_LIMIT && fastFollowupLimit > current\) return Math\.min\(MAX_QUESTION_LIMIT, fastFollowupLimit\);/,
-  );
+  assert.match(html, /if \(current <= FAST_INITIAL_QUESTION_LIMIT && fastFollowupLimit > current\) return Math\.min\(MAX_QUESTION_LIMIT, fastFollowupLimit\);/);
   assert.match(html, /if \(current < pageSize\) return Math\.min\(MAX_QUESTION_LIMIT, pageSize\);/);
   assert.match(html, /loaded < MAX_QUESTION_LIMIT/);
-  assert.match(
-    html,
-    /return loaded <= FAST_INITIAL_QUESTION_LIMIT \? FAST_FOLLOWUP_DELAY_MS : BACKGROUND_PAGE_DELAY_MS;/,
-  );
+  assert.match(html, /return loaded <= FAST_INITIAL_QUESTION_LIMIT \? FAST_FOLLOWUP_DELAY_MS : BACKGROUND_PAGE_DELAY_MS;/);
   assert.match(html, /state\.questionLimit = current < increment \? increment : current \+ increment;/);
   assert.match(html, /if \(willAutoExpand\) scheduleAutoQuestionLoad\(body\);/);
   assert.match(html, /load\(\{ backgroundAuto: true \}\);/);
@@ -495,23 +429,14 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('loading the first question'), false);
   assert.equal(html.includes('Rendering the first question'), false);
   assert.match(html, /state\.loadingProgressPercent = Math\.min\(Number\(maxPercent\) \|\| 72, current \+ step\);/);
-  assert.match(
-    html,
-    /\.card \{[\s\S]*border-radius: 20px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;[\s\S]*box-shadow: var\(--question-card-shadow\);/,
-  );
+  assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
   assert.match(html, /\.prompt \{[\s\S]*overflow-wrap: anywhere;[\s\S]*word-break: break-word;/);
   assert.match(html, /\.cardBody \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
   assert.match(html, /\.segmented, \.choices, \.ratingTicks \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
   assert.match(html, /\.choice, \.segment \{[\s\S]*min-width: 0;[\s\S]*overflow-wrap: anywhere;/);
   assert.match(html, /input\[type="range"\] \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
-  assert.match(
-    html,
-    /\.card\[data-active="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\), var\(--question-card-shadow\);/,
-  );
-  assert.match(
-    html,
-    /\.card\[data-highlight="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--settings-accent\), var\(--question-card-shadow\);/,
-  );
+  assert.match(html, /\.card\[data-active="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\), var\(--question-card-shadow\);/);
+  assert.match(html, /\.card\[data-highlight="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--settings-accent\), var\(--question-card-shadow\);/);
   assert.match(html, /\.filterButton\.active \{[\s\S]*background: var\(--filter-accent\);/);
   assert.match(html, /\.settingsButton\.active \{[\s\S]*background: var\(--settings-accent\);/);
   assert.match(html, /viewBox="0 0 512 512"/);
@@ -519,10 +444,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="closeSessions"[^>]*aria-label="Close sessions"/);
   assert.match(html, /id="sessionSummary"/);
   assert.match(html, /const fallbackSession = state\.data\?\.session\?\.sessionSlug/);
-  assert.match(
-    html,
-    /const hasPicker = picker\.enabled === true \|\| sessions\.length > 0 \|\| state\.sessionsPanelOpen === true;/,
-  );
+  assert.match(html, /const hasPicker = picker\.enabled === true \|\| sessions\.length > 0 \|\| state\.sessionsPanelOpen === true;/);
   assert.match(html, /Sessions are loading\.\.\./);
   assert.equal(html.includes('id="toggleSessions"'), false);
   assert.match(html, /id="sessionPickerBody"/);
@@ -566,18 +488,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /document_file_too_large/);
   assert.match(html, /id="adminPanel"[^>]*aria-label="Admin actions"/);
   assert.match(html, /id="closeAdmin"[^>]*aria-label="Close admin actions"/);
-  assert.match(
-    html,
-    /el\.showAdmin\.onclick = \(\) => \{[\s\S]*state\.sessionsPanelOpen = false;[\s\S]*renderSessionPicker\(\);[\s\S]*renderAdmin\(\);[\s\S]*setPanelOpen\(el\.adminPanel, el\.showAdmin, true\);/,
-  );
-  assert.match(
-    html,
-    /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*group_link: 'Approve group'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/,
-  );
-  assert.match(
-    html,
-    /const DEFAULT_ADMIN_ACTION_IDS = \['export_all', 'export_access', 'results_settings', 'question_queue', 'group_link'\]/,
-  );
+  assert.match(html, /el\.showAdmin\.onclick = \(\) => \{[\s\S]*state\.sessionsPanelOpen = false;[\s\S]*renderSessionPicker\(\);[\s\S]*renderAdmin\(\);[\s\S]*setPanelOpen\(el\.adminPanel, el\.showAdmin, true\);/);
+  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*group_link: 'Approve group'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
+  assert.match(html, /const DEFAULT_ADMIN_ACTION_IDS = \['export_all', 'export_access', 'results_settings', 'question_queue', 'group_link'\]/);
   assert.match(html, /function normalizeAdminActions\(adminActions = \[\]\)/);
   assert.match(html, /const remappedAccessAction = \['export_allow', 'export_revoke'\]\.includes\(actionId\);/);
   assert.match(html, /function appendAdminActionPanel\(sessionSlug\)/);
@@ -587,20 +500,14 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /typeof action === 'string'/);
   assert.match(html, /button\.dataset\.action = action\.action;/);
   assert.match(html, /button\.textContent = 'Copy export command';/);
-  assert.match(
-    html,
-    /copyAdminCommand\('\/export_all ' \+ sessionSlug, 'Export command copied\. Paste it in the CE bot\.'\)/,
-  );
+  assert.match(html, /copyAdminCommand\('\/export_all ' \+ sessionSlug, 'Export command copied\. Paste it in the CE bot\.'\)/);
   assert.match(html, /button\.textContent = 'Copy in-group approval command';/);
   assert.equal(html.includes('startgroup='), false);
   assert.equal(html.includes('Download response export'), false);
   assert.equal(html.includes("link.download = 'context-engine-'"), false);
   assert.match(html, /function appendAdminAddressList\(panel, title, entries = \[\]\)/);
   assert.match(html, /button\.className = 'adminAddressButton'/);
-  assert.match(
-    html,
-    /heading\.textContent = title \+ ': ' \+ \(values\.length \? 'tap an address to copy\/fill' : 'None'\);/,
-  );
+  assert.match(html, /heading\.textContent = title \+ ': ' \+ \(values\.length \? 'tap an address to copy\/fill' : 'None'\);/);
   assert.match(html, /Bot commands: \/export_allow ' \+ address \+ ' ' \+ sessionSlug/);
   assert.match(toolMenu, /id="showActivity"[^>]*aria-label="Activity"[\s\S]*<span>Activity<\/span>/);
   assert.match(html, /id="activityPanel"[^>]*aria-label="Activity"/);
@@ -614,10 +521,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultsLoadingSpinner"[^>]*aria-label="Loading results"[^>]*hidden/);
   assert.match(html, /\.resultsTitleSession \{[\s\S]*opacity: 0\.5;/);
   assert.match(html, /class="resultsTitleRow"[\s\S]*id="showResultFilters"[^>]*aria-label="Filter results"/);
-  assert.match(
-    html,
-    /el\.showResultFilters\.onclick = \(\) => \{[\s\S]*const open = state\.resultSectionsOpen\.filters !== true;[\s\S]*state\.resultSectionsOpen\.filters = open;[\s\S]*if \(open\) scrollPanelIntoView\(el\.resultFilters\);/,
-  );
+  assert.match(html, /el\.showResultFilters\.onclick = \(\) => \{[\s\S]*const open = state\.resultSectionsOpen\.filters !== true;[\s\S]*state\.resultSectionsOpen\.filters = open;[\s\S]*if \(open\) scrollPanelIntoView\(el\.resultFilters\);/);
   assert.equal(html.includes("state.resultsData.sessionName + ' | ' +"), false);
   assert.match(html, /el\.resultsSummary\.textContent = state\.resultsData\.responseCount \+ ' responses \| ' \+/);
   assert.equal(html.includes('Loading results...'), false);
@@ -634,10 +538,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /class="resultFilterHeader"[\s\S]*id="toggleResultFilters"[\s\S]*id="clearResultFilters"/);
   const resultsBodyStart = html.indexOf('<div class="resultsPanelBody" id="resultsPanelBody">');
   const resultFiltersStart = html.indexOf('<section class="resultFilters', resultsBodyStart);
-  const resultsBodyLead =
-    resultsBodyStart >= 0 && resultFiltersStart > resultsBodyStart
-      ? html.slice(resultsBodyStart, resultFiltersStart)
-      : '';
+  const resultsBodyLead = resultsBodyStart >= 0 && resultFiltersStart > resultsBodyStart
+    ? html.slice(resultsBodyStart, resultFiltersStart)
+    : '';
   assert.equal(resultsBodyLead.includes('Demo data'), false);
   assert.equal(resultsBodyLead.includes('demoDataResults'), false);
   assert.match(html, /id="resultFilterOptions"/);
@@ -680,48 +583,22 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="toggleResultGroupsSection"/);
   assert.match(html, /id="toggleGroupAnalysisSection"/);
   assert.match(html, /id="resultGroupsSection"[\s\S]*id="groupAnalysisSection"/);
-  assert.match(
-    html,
-    /function renderResultGroups\(groups\)[\s\S]*el\.resultClusterControls\.innerHTML = '';[\s\S]*el\.resultGroupChart\.innerHTML = '';[\s\S]*el\.groupAnalysisSection\.hidden = true;/,
-  );
-  assert.match(
-    html,
-    /if \(state\.resultsData\?\.groupView\?\.enabled === false\) \{[\s\S]*el\.resultGroupsSection\.hidden = true;[\s\S]*return;[\s\S]*\}/,
-  );
+  assert.match(html, /function renderResultGroups\(groups\)[\s\S]*el\.resultClusterControls\.innerHTML = '';[\s\S]*el\.resultGroupChart\.innerHTML = '';[\s\S]*el\.groupAnalysisSection\.hidden = true;/);
+  assert.match(html, /if \(state\.resultsData\?\.groupView\?\.enabled === false\) \{[\s\S]*el\.resultGroupsSection\.hidden = true;[\s\S]*return;[\s\S]*\}/);
   assert.match(html, /const RESULT_GROUP_COUNT = 2;/);
-  assert.match(
-    html,
-    /const visibleGroups = groups\.slice\(0, RESULT_GROUP_COUNT\);[\s\S]*if \(!visibleGroups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(visibleGroups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;[\s\S]*visibleGroups\.forEach/,
-  );
+  assert.match(html, /const visibleGroups = groups\.slice\(0, RESULT_GROUP_COUNT\);[\s\S]*if \(!visibleGroups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(visibleGroups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;[\s\S]*visibleGroups\.forEach/);
   assert.match(html, /function appendLoadingResult\(mount, message\)/);
-  assert.match(
-    html,
-    /if \(state\.resultsLoading === true && !topicMap\) \{[\s\S]*appendLoadingResult\(el\.topicMapChart, 'Loading topic map\.\.\.'\);[\s\S]*return;[\s\S]*\}/,
-  );
+  assert.match(html, /if \(state\.resultsLoading === true && !topicMap\) \{[\s\S]*appendLoadingResult\(el\.topicMapChart, 'Loading topic map\.\.\.'\);[\s\S]*return;[\s\S]*\}/);
   assert.match(html, /resultsCache: new Map\(\)/);
-  assert.match(
-    html,
-    /function loadResults\(\{ force = false \} = \{\}\) \{[\s\S]*const cacheKey = currentResultsCacheKey\(\);[\s\S]*state\.resultsCache\.set\(cacheKey, nextData\);/,
-  );
-  assert.match(
-    html,
-    /function setResultsDemoData\(value\) \{[\s\S]*restoreCachedResults\(\);[\s\S]*loadResults\(\{ force: true \}\);/,
-  );
-  assert.equal(
-    html.includes(
-      'function setResultsDemoData(value) {\n      state.resultsDemoData = value === true;\n      writeDemoResults(state.resultsDemoData);\n      resetResultsForSelection();',
-    ),
-    false,
-  );
+  assert.match(html, /function loadResults\(\{ force = false \} = \{\}\) \{[\s\S]*const cacheKey = currentResultsCacheKey\(\);[\s\S]*state\.resultsCache\.set\(cacheKey, nextData\);/);
+  assert.match(html, /function setResultsDemoData\(value\) \{[\s\S]*restoreCachedResults\(\);[\s\S]*loadResults\(\{ force: true \}\);/);
+  assert.equal(html.includes('function setResultsDemoData(value) {\n      state.resultsDemoData = value === true;\n      writeDemoResults(state.resultsDemoData);\n      resetResultsForSelection();'), false);
   assert.match(html, /id="consensusResults"/);
   assert.match(html, /id="divisiveResults"/);
   assert.match(html, /id="resultGroups"/);
   assert.match(html, /Analyze ' \+ group\.label/);
   assert.match(html, /Analyzing ' \+ group\.label \+ '\.\.\. ' \+ elapsedSeconds \+ 's elapsed'/);
-  assert.match(
-    html,
-    /function resultClusterOptionCounts\(\)[\s\S]*state\.resultClusterCount = RESULT_GROUP_COUNT;[\s\S]*return \[\];/,
-  );
+  assert.match(html, /function resultClusterOptionCounts\(\)[\s\S]*state\.resultClusterCount = RESULT_GROUP_COUNT;[\s\S]*return \[\];/);
   assert.equal(html.includes("label.textContent = 'Clusters';"), false);
   assert.match(html, /className = 'resultRow groupAnalysisResult'/);
   assert.match(html, /categoryId === 'contribution_role' && selected\.has\('other'\)/);
@@ -729,10 +606,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /save\.textContent = 'Save'/);
   assert.match(html, /font-size: 14px;/);
   assert.match(html, /function startGroupAnalysisProgressTimer\(\)/);
-  assert.match(
-    html,
-    /state\.resultSectionsOpen\.groups = true;[\s\S]*state\.resultSectionsOpen\.groupAnalysis = true;[\s\S]*renderResults\(\);[\s\S]*scrollPanelIntoView\(el\.groupAnalysisSection\);/,
-  );
+  assert.match(html, /state\.resultSectionsOpen\.groups = true;[\s\S]*state\.resultSectionsOpen\.groupAnalysis = true;[\s\S]*renderResults\(\);[\s\S]*scrollPanelIntoView\(el\.groupAnalysisSection\);/);
   assert.match(html, /\.distributionBar/);
   assert.match(html, /min-height: 16px;/);
   assert.match(html, /\.distributionRow/);
@@ -748,46 +622,22 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="filterTopPopular"/);
   assert.match(html, /Top popular questions/);
   assert.match(html, /class="topPopularInline"[\s\S]*Top popular questions[\s\S]*id="filterTopPopularLimit"/);
-  assert.match(
-    html,
-    /id="filterTopPopularLimit"[^>]*type="number"[^>]*min="2"[^>]*max="50"[^>]*step="2"[^>]*value="10"/,
-  );
+  assert.match(html, /id="filterTopPopularLimit"[^>]*type="number"[^>]*min="2"[^>]*max="50"[^>]*step="2"[^>]*value="10"/);
   assert.match(html, /id="decrementTopPopular"[^>]*aria-label="Show two fewer popular questions"[^>]*>-<\/button>/);
   assert.match(html, /id="incrementTopPopular"[^>]*aria-label="Show two more popular questions"[^>]*>\+<\/button>/);
   assert.equal(html.includes('Top N'), false);
   assert.match(html, /popularQuestionsOnly/);
   assert.match(html, /popularQuestionLimit: POPULAR_QUESTION_LIMIT_DEFAULT/);
   assert.match(html, /const POPULAR_QUESTION_LIMIT_STEP = 2;/);
-  assert.match(
-    html,
-    /function clearQuestionFilters\(\)[\s\S]*state\.popularQuestionLimit = POPULAR_QUESTION_LIMIT_DEFAULT;/,
-  );
-  assert.match(
-    html,
-    /function renderFilters\(\)[\s\S]*el\.filterTopPopularLimit\.value = String\(state\.popularQuestionLimit\);/,
-  );
-  assert.match(
-    html,
-    /entries\.sort\(popularitySort\)\.slice\(0, normalizePopularQuestionLimit\(state\.popularQuestionLimit\)\)/,
-  );
-  assert.match(
-    html,
-    /Temporary linear popularity score; replace with weighted\/decayed scoring once we have enough signal\./,
-  );
+  assert.match(html, /function clearQuestionFilters\(\)[\s\S]*state\.popularQuestionLimit = POPULAR_QUESTION_LIMIT_DEFAULT;/);
+  assert.match(html, /function renderFilters\(\)[\s\S]*el\.filterTopPopularLimit\.value = String\(state\.popularQuestionLimit\);/);
+  assert.match(html, /entries\.sort\(popularitySort\)\.slice\(0, normalizePopularQuestionLimit\(state\.popularQuestionLimit\)\)/);
+  assert.match(html, /Temporary linear popularity score; replace with weighted\/decayed scoring once we have enough signal\./);
   assert.match(html, /return voteSummaryForQuestion\(question\)\.score \+ responseCountForQuestion\(question\);/);
   assert.match(html, /responseCountForQuestion\(right\.question\) - responseCountForQuestion\(left\.question\)/);
-  assert.match(
-    html,
-    /el\.filterTopPopularLimit\.onchange = \(\) => setPopularQuestionLimit\(el\.filterTopPopularLimit\.value, \{ enable: true \}\);/,
-  );
-  assert.match(
-    html,
-    /el\.decrementTopPopular\.onclick = \(\) => setPopularQuestionLimit\(state\.popularQuestionLimit - POPULAR_QUESTION_LIMIT_STEP, \{ enable: true \}\);/,
-  );
-  assert.match(
-    html,
-    /el\.incrementTopPopular\.onclick = \(\) => setPopularQuestionLimit\(state\.popularQuestionLimit \+ POPULAR_QUESTION_LIMIT_STEP, \{ enable: true \}\);/,
-  );
+  assert.match(html, /el\.filterTopPopularLimit\.onchange = \(\) => setPopularQuestionLimit\(el\.filterTopPopularLimit\.value, \{ enable: true \}\);/);
+  assert.match(html, /el\.decrementTopPopular\.onclick = \(\) => setPopularQuestionLimit\(state\.popularQuestionLimit - POPULAR_QUESTION_LIMIT_STEP, \{ enable: true \}\);/);
+  assert.match(html, /el\.incrementTopPopular\.onclick = \(\) => setPopularQuestionLimit\(state\.popularQuestionLimit \+ POPULAR_QUESTION_LIMIT_STEP, \{ enable: true \}\);/);
   assert.equal(html.includes('Top 10 popular questions'), false);
   assert.equal(html.includes('slice(0, 10)'), false);
   assert.match(html, /function submitQuestionVote\(question, vote, triggerButton = null\)/);
@@ -812,21 +662,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /head\.append\(headText, toggle\);/);
   assert.match(html, /voteRow\.className = 'questionVoteRow expandedOnly';/);
   assert.match(html, /voteRow\.appendChild\(renderQuestionVoteControls\(question\)\);/);
-  assert.match(
-    html,
-    /score\.className = 'voteScore' \+ \(summary\.score > 0 \? ' positive' : \(summary\.score < 0 \? ' negative' : ''\)\);/,
-  );
+  assert.match(html, /score\.className = 'voteScore' \+ \(summary\.score > 0 \? ' positive' : \(summary\.score < 0 \? ' negative' : ''\)\);/);
   assert.match(html, /score\.textContent = String\(summary\.score\);/);
-  assert.match(
-    html,
-    /wrap\.append\(makeButton\('down', VOTE_DOWN_ICON, 'Downvote question'\), score, makeButton\('up', VOTE_UP_ICON, 'Upvote question'\)\);/,
-  );
-  assert.equal(
-    html.includes(
-      "wrap.append(makeButton('up', VOTE_UP_ICON, 'Upvote question'), score, makeButton('down', VOTE_DOWN_ICON, 'Downvote question'));",
-    ),
-    false,
-  );
+  assert.match(html, /wrap\.append\(makeButton\('down', VOTE_DOWN_ICON, 'Downvote question'\), score, makeButton\('up', VOTE_UP_ICON, 'Upvote question'\)\);/);
+  assert.equal(html.includes("wrap.append(makeButton('up', VOTE_UP_ICON, 'Upvote question'), score, makeButton('down', VOTE_DOWN_ICON, 'Downvote question'));"), false);
   assert.match(html, /\.voteButton\.active/);
   assert.equal(html.includes("setStatus('Saving vote...');"), false);
   assert.equal(html.includes("setStatus('Vote saved.', 'ok');"), false);
@@ -848,14 +687,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="submit"'), false);
   assert.match(html, /\.cardActions \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(html, /\.cardActions\[hidden\] \{ display: none; \}/);
-  assert.match(
-    html,
-    /\.submitButton \{[\s\S]*border-color: rgba\(255, 255, 255, 0\.82\);[\s\S]*background: transparent;[\s\S]*color: var\(--text\);/,
-  );
-  assert.match(
-    html,
-    /\.submitButton\.submittedCheck \{[\s\S]*border-color: var\(--ok\);[\s\S]*background: transparent;[\s\S]*color: var\(--ok\);/,
-  );
+  assert.match(html, /\.submitButton \{[\s\S]*border-color: rgba\(255, 255, 255, 0\.82\);[\s\S]*background: transparent;[\s\S]*color: var\(--text\);/);
+  assert.match(html, /\.submitButton\.submittedCheck \{[\s\S]*border-color: var\(--ok\);[\s\S]*background: transparent;[\s\S]*color: var\(--ok\);/);
   assert.match(html, /const shouldShowAnswerActions = \(question\) => \{/);
   assert.match(html, /actions\.hidden = !\(shouldShowAnswerActions\(question\) \|\| seriesModeEnabled\(\)\);/);
   assert.match(html, /const questionSeriesState = \(\) => state\.data\?\.questionSeries \|\| \{\};/);
@@ -868,33 +701,20 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /draftAutosaveTimers: new Map\(\)/);
   assert.match(html, /function selectValue\(question, value\)[\s\S]*scheduleDraftAutosave\(question\);/);
   assert.match(html, /function toggleChoice\(question, option, single\)[\s\S]*scheduleDraftAutosave\(question\);/);
-  assert.match(
-    html,
-    /const scheduleDraftAutosave = \(question\) => \{[\s\S]*sendAnswer\(false, question, null, \{[\s\S]*suppressStatus: true,[\s\S]*autoSave: true,[\s\S]*autoSaveVersion: version,/,
-  );
-  assert.match(
-    html,
-    /clearDraftAutosave\(question\);[\s\S]*bumpDraftAutosaveVersion\(question\);[\s\S]*setSubmitBusy\(true, triggerButton, question\);/,
-  );
-  assert.match(
-    html,
-    /if \([\s\S]*autoSave[\s\S]*autoSaveVersion[\s\S]*state\.draftAutosaveVersions\.get\(question\.questionKey\) !== autoSaveVersion[\s\S]*\) \{[\s\S]*return true;/,
-  );
+  assert.match(html, /const scheduleDraftAutosave = \(question\) => \{[\s\S]*sendAnswer\(false, question, null, \{[\s\S]*suppressStatus: true,[\s\S]*autoSave: true,[\s\S]*autoSaveVersion: version,/);
+  assert.match(html, /clearDraftAutosave\(question\);[\s\S]*bumpDraftAutosaveVersion\(question\);[\s\S]*setSubmitBusy\(true, triggerButton, question\);/);
+  assert.match(html, /if \([\s\S]*autoSave[\s\S]*autoSaveVersion[\s\S]*state\.draftAutosaveVersions\.get\(question\.questionKey\) !== autoSaveVersion[\s\S]*\) \{[\s\S]*return true;/);
   assert.match(html, /const syncQuestionCardExpanded = \(question, expanded\) => \{/);
   assert.match(html, /card\.classList\.toggle\('collapsed', !expanded\);/);
   assert.match(html, /if \(!syncQuestionCardExpanded\(question, expanded\)\) renderQuestionStack\(\);/);
   assert.match(html, /\.cardHead \{[\s\S]*border-bottom: 0;/);
   assert.equal(html.includes('.card:not(.collapsed) .cardHead { border-bottom'), false);
-  assert.match(
-    html,
-    /\.commentsSection \{[\s\S]*border-top: 1px solid var\(--line\);[\s\S]*padding-top: 12px;[\s\S]*margin-top: 12px;/,
-  );
+  assert.match(html, /\.commentsSection \{[\s\S]*border-top: 1px solid var\(--line\);[\s\S]*padding-top: 12px;[\s\S]*margin-top: 12px;/);
   assert.match(html, /renderAnswerControls\(question, body, \{ showComments: true \}\);/);
   assert.match(html, /id="savedDrafts"/);
   assert.match(html, /Submitted responses/);
   const settingsStart = html.indexOf('<section class="settingsPanel" id="settingsPanel" aria-label="Agent settings">');
-  const settingsSection =
-    settingsStart >= 0 ? html.slice(settingsStart, html.indexOf('</section>', settingsStart)) : '';
+  const settingsSection = settingsStart >= 0 ? html.slice(settingsStart, html.indexOf('</section>', settingsStart)) : '';
   const draftsStart = html.indexOf('<section class="draftsPanel" id="draftsPanel" aria-label="Drafts">');
   const draftsSection = draftsStart >= 0 ? html.slice(draftsStart, html.indexOf('</section>', draftsStart)) : '';
   assert.equal(settingsSection.includes('id="savedDrafts"'), false);
@@ -912,10 +732,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /state\.submitDraftsMessage = submittedCount[\s\S]*: 'Could not submit drafts';/);
   assert.equal(html.includes("setStatus('Could not submit drafts"), false);
   assert.match(html, /el\.submitDrafts\.onclick = \(\) => submitSavedDrafts\(\);/);
-  assert.match(
-    html,
-    /state\.data\.savedDrafts = drafts[\s\S]*\.filter\(\(draft\) => draft\.questionKey !== question\.questionKey\)[\s\S]*\.concat\(savedDraftEntry\);/,
-  );
+  assert.match(html, /state\.data\.savedDrafts = drafts[\s\S]*\.filter\(\(draft\) => draft\.questionKey !== question\.questionKey\)[\s\S]*\.concat\(savedDraftEntry\);/);
   assert.match(html, /\.agentPredictionChoice \{[\s\S]*min-height: 42px;[\s\S]*font-size: 20px;/);
   assert.match(html, /label\.className = 'agentPredictionLabel';/);
   assert.match(html, /value\.className = 'agentPredictionValue';/);
@@ -932,10 +749,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('disableVerticalSwipes'), false);
   assert.match(html, /--tg-viewport-height/);
   assert.match(html, /body \{[\s\S]*overflow-y: auto;[\s\S]*-webkit-overflow-scrolling: touch;/);
-  assert.match(
-    html,
-    /\.app \{[\s\S]*min-height: var\(--tg-viewport-height, 100dvh\);[\s\S]*grid-template-rows: auto auto;[\s\S]*overflow-y: visible;/,
-  );
+  assert.match(html, /\.app \{[\s\S]*min-height: var\(--tg-viewport-height, 100dvh\);[\s\S]*grid-template-rows: auto auto;[\s\S]*overflow-y: visible;/);
   assert.match(html, /\.layout \{[\s\S]*overflow-y: visible;[\s\S]*touch-action: auto;/);
   assert.equal(html.includes('class="pager"'), false);
   assert.equal(html.includes('id="prev"'), false);
@@ -943,20 +757,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="page"'), false);
   assert.equal(html.includes('state.page'), false);
   assert.equal(html.includes('.slice(state.page'), false);
-  assert.match(
-    html,
-    /<div class="headerMain">[\s\S]*<div class="meta" id="meta"><span>Questions:<\/span><span class="inlineSpinner" aria-label="Loading questions"><\/span><\/div>[\s\S]*id="showResults"[\s\S]*<section class="toolMenu" id="toolMenu" aria-label="Mini App tools">[\s\S]*<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">/,
-  );
-  assert.equal(
-    /<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">[\s\S]*<div class="meta" id="meta">/.test(
-      html,
-    ),
-    false,
-  );
-  assert.match(
-    html,
-    /<section class="layout">\s*<section class="questionStack" id="questionStack" aria-label="Questions"><\/section>\s*<\/section>/,
-  );
+  assert.match(html, /<div class="headerMain">[\s\S]*<div class="meta" id="meta"><span>Questions:<\/span><span class="inlineSpinner" aria-label="Loading questions"><\/span><\/div>[\s\S]*id="showResults"[\s\S]*<section class="toolMenu" id="toolMenu" aria-label="Mini App tools">[\s\S]*<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">/);
+  assert.equal(/<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">[\s\S]*<div class="meta" id="meta">/.test(html), false);
+  assert.match(html, /<section class="layout">\s*<section class="questionStack" id="questionStack" aria-label="Questions"><\/section>\s*<\/section>/);
   assert.match(html, /startCommentDictation/);
   assert.match(html, /startAnswerDictation/);
   assert.match(html, /startSearchDictation/);
@@ -1006,10 +809,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /answerChangeGuardActive\(question\)/);
   assert.match(html, /Review answer before submitting/);
   assert.match(html, /if \(answerChangeGuardActive\(question\)\) return;/);
-  assert.match(
-    html,
-    /markAnswerChanged\(question\);[\s\S]*renderQuestionStack\(\);[\s\S]*scheduleDraftAutosave\(question\);/,
-  );
+  assert.match(html, /markAnswerChanged\(question\);[\s\S]*renderQuestionStack\(\);[\s\S]*scheduleDraftAutosave\(question\);/);
   assert.equal(html.includes('state.savedDraftKeys.has(question?.questionKey)'), false);
   assert.match(html, /id="filterAnsweredOnly"/);
   assert.match(html, /state\.answeredQuestionsOnly && !questionAnswered\(question\)/);
@@ -1025,43 +825,26 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /const questionHasAgentPrediction = \(question\) => \{/);
   assert.match(html, /state\.data\?\.agentOnly\?\.predictions\?\.\[question\.questionKey\]/);
   assert.match(html, /right\.score - left\.score \|\|[\s\S]*predictionPrioritySort\(left, right\)/);
-  assert.match(
-    html,
-    /predictionPrioritySort\(left, right\) \|\|[\s\S]*Number\(questionAnswered\(left\.question\)\) - Number\(questionAnswered\(right\.question\)\)/,
-  );
+  assert.match(html, /predictionPrioritySort\(left, right\) \|\|[\s\S]*Number\(questionAnswered\(left\.question\)\) - Number\(questionAnswered\(right\.question\)\)/);
   assert.match(html, /\/telegram\/mini-app\/api\/search/);
   assert.match(html, /function scheduleAiSearch/);
   assert.match(html, /state\.aiSearchQuery = state\.aiDraftQuery\.trim\(\);[\s\S]*scheduleAiSearch\(\);/);
   assert.match(html, /const answerableCount = questions\.filter\(\(question\) => question\?\.canAnswer\)\.length;/);
-  assert.match(
-    html,
-    /const unavailableCount = questions\.filter\(\(question\) => question\?\.payloadUnavailable === true\)\.length;/,
-  );
+  assert.match(html, /const unavailableCount = questions\.filter\(\(question\) => question\?\.payloadUnavailable === true\)\.length;/);
   assert.match(html, /function questionCountText\(data\)/);
-  assert.match(
-    html,
-    /const total = Number\(data\?\.questionCount \?\? data\?\.availableQuestionCount \?\? 0\) \|\| 0;/,
-  );
-  assert.match(
-    html,
-    /\.questionHeaderRow \.headerIconButton \{[\s\S]*width: 36px;[\s\S]*height: 36px;[\s\S]*min-width: 36px;[\s\S]*min-height: 36px;/,
-  );
+  assert.match(html, /const total = Number\(data\?\.questionCount \?\? data\?\.availableQuestionCount \?\? 0\) \|\| 0;/);
+  assert.match(html, /\.questionHeaderRow \.headerIconButton \{[\s\S]*width: 36px;[\s\S]*height: 36px;[\s\S]*min-width: 36px;[\s\S]*min-height: 36px;/);
   assert.match(html, /\.questionHeaderRow \.headerIconButton svg \{[\s\S]*width: 22px;[\s\S]*height: 22px;/);
-  assert.match(
-    html,
-    /\.questionHeaderRow \.headerIconButton,[\s\S]*\.questionHeaderRow \.headerIconButton\.active,[\s\S]*\.questionHeaderRow \.headerIconButton:active \{[\s\S]*border: 0;[\s\S]*background: transparent;[\s\S]*box-shadow: none;/,
-  );
+  assert.match(html, /\.questionHeaderRow \.headerIconButton,[\s\S]*\.questionHeaderRow \.headerIconButton\.active,[\s\S]*\.questionHeaderRow \.headerIconButton:active \{[\s\S]*border: 0;[\s\S]*background: transparent;[\s\S]*box-shadow: none;/);
   assert.match(html, /answerableCount === 0 && \(/);
   assert.match(html, /unavailableCount > 0/);
-  assert.match(
-    html,
-    /window\.setTimeout\(\(\) => \{[\s\S]*load\(\{ retry: true \}\);[\s\S]*\}, QUESTION_RETRY_DELAY_MS\);/,
-  );
+  assert.match(html, /window\.setTimeout\(\(\) => \{[\s\S]*load\(\{ retry: true \}\);[\s\S]*\}, QUESTION_RETRY_DELAY_MS\);/);
 });
 
 test('Mini App inline scripts remain parseable by browsers', () => {
   const html = __test__telegramMiniApp.telegramMiniAppHtml();
-  const scripts = Array.from(html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)).map((match) => match[1]);
+  const scripts = Array.from(html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi))
+    .map((match) => match[1]);
 
   assert.equal(scripts.length > 0, true);
   for (const script of scripts) {
@@ -1101,12 +884,8 @@ test('Mini App inline boot script reaches control binding without runtime initia
       addEventListener() {},
       scrollIntoView() {},
       focus() {},
-      querySelector() {
-        return null;
-      },
-      querySelectorAll() {
-        return [];
-      },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
       innerHTML: '',
       textContent: '',
       value: '',
@@ -1132,14 +911,10 @@ test('Mini App inline boot script reaches control binding without runtime initia
     window: {
       Telegram: null,
       localStorage: {
-        getItem() {
-          return null;
-        },
+        getItem() { return null; },
         setItem() {},
       },
-      setTimeout() {
-        return 1;
-      },
+      setTimeout() { return 1; },
       clearTimeout() {},
     },
     document,
@@ -1160,9 +935,7 @@ test('Mini App inline boot script reaches control binding without runtime initia
     Blob,
     FormData,
     fetch: () => new Promise(() => {}),
-    setTimeout() {
-      return 1;
-    },
+    setTimeout() { return 1; },
     clearTimeout() {},
     console,
   };
@@ -1230,12 +1003,8 @@ test('Mini App admin menu action opens a visible admin panel above the session p
         this.scrolled = true;
       },
       focus() {},
-      querySelector() {
-        return null;
-      },
-      querySelectorAll() {
-        return [];
-      },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
       textContent: '',
       value: '',
       checked: false,
@@ -1304,9 +1073,7 @@ test('Mini App admin menu action opens a visible admin panel above the session p
     window: {
       Telegram: null,
       localStorage: {
-        getItem() {
-          return null;
-        },
+        getItem() { return null; },
         setItem() {},
       },
       setTimeout(callback) {
@@ -1383,17 +1150,14 @@ test('Mini App loading screen uses the CSS spinner and serves no GIF', async () 
 test('Mini App session picker lists sessions and loads multi-selected questions', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_1234567890';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionPicker: true },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionPicker: true },
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
@@ -1427,10 +1191,7 @@ test('Mini App session picker lists sessions and loads multi-selected questions'
   assert.equal(picker.ok, true);
   assert.equal(picker.sessionPicker.required, true);
   assert.equal(picker.questionCount, 0);
-  assert.deepEqual(
-    picker.sessionPicker.sessions.map((session) => session.sessionSlug),
-    ['alpha', 'beta'],
-  );
+  assert.deepEqual(picker.sessionPicker.sessions.map((session) => session.sessionSlug), ['alpha', 'beta']);
 
   const selected = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha,beta`),
@@ -1440,27 +1201,21 @@ test('Mini App session picker lists sessions and loads multi-selected questions'
   assert.equal(selected.sessionPicker.required, false);
   assert.deepEqual(selected.selectedSessionSlugs, ['alpha', 'beta']);
   assert.equal(selected.questionCount, 2);
-  assert.deepEqual(
-    selected.questions.map((question) => question.sessionSlug),
-    ['alpha', 'beta'],
-  );
+  assert.deepEqual(selected.questions.map((question) => question.sessionSlug), ['alpha', 'beta']);
   assert.equal(selected.session.title, '2 sessions');
 });
 
 test('Mini App question state defaults to 50 questions and supports loading more', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_page1234';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionPicker: true },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionPicker: true },
+  }));
   const questions = Array.from({ length: 55 }, (_, index) => ({
     sessionSlug: 'alpha',
     questionId: `q-${String(index + 1).padStart(2, '0')}`,
@@ -1479,9 +1234,7 @@ test('Mini App question state defaults to 50 questions and supports loading more
   };
 
   const fastInitial = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
     env,
   });
   assert.equal(fastInitial.ok, true);
@@ -1496,7 +1249,8 @@ test('Mini App question state defaults to 50 questions and supports loading more
   assert.equal(fastInitial.questions.length, 1);
   const fastActionCount = Array.from(kv.store.values())
     .map((value) => JSON.parse(value))
-    .filter((record) => record?.miniAppQuestionAction === true).length;
+    .filter((record) => record?.miniAppQuestionAction === true)
+    .length;
   assert.equal(fastActionCount, 1);
 
   const oneQuestionEnv = {
@@ -1504,9 +1258,7 @@ test('Mini App question state defaults to 50 questions and supports loading more
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify(questions.slice(0, 1)),
   };
   const oneQuestionInitial = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
     env: oneQuestionEnv,
   });
   assert.equal(oneQuestionInitial.ok, true);
@@ -1530,9 +1282,7 @@ test('Mini App question state defaults to 50 questions and supports loading more
   assert.equal(initial.questions[0].tags.includes('organizer'), true);
 
   const loadedMore = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=100`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=100`),
     env,
   });
   assert.equal(loadedMore.questionCount, 55);
@@ -1544,17 +1294,14 @@ test('Mini App question state defaults to 50 questions and supports loading more
 test('Mini App first state for Telegram-only Cloudflare sessions reads one question payload and no RPC', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_fastcloudflare';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'alpha' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
   const fetchCalls = [];
   const fetchImpl = async (url, init = {}) => {
     const target = new URL(String(url));
@@ -1578,37 +1325,33 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
       });
     }
     if (target.pathname.endsWith('/storage/list')) {
-      return new Response(
-        JSON.stringify({
-          items: [{ id: 'q-storage-1' }, { id: 'q-storage-2' }, { id: 'q-storage-3' }],
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      return new Response(JSON.stringify({
+        items: [
+          { id: 'q-storage-1' },
+          { id: 'q-storage-2' },
+          { id: 'q-storage-3' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     if (target.pathname.endsWith('/storage/read')) {
       const id = target.searchParams.get('id');
-      return new Response(
-        JSON.stringify({
-          questionId: id,
-          questionType: 'binary',
-          prompt: `Loaded ${id}`,
-          sessionSlug: 'alpha',
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      return new Response(JSON.stringify({
+        questionId: id,
+        questionType: 'binary',
+        prompt: `Loaded ${id}`,
+        sessionSlug: 'alpha',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     throw new Error(`unexpected_url_${target.pathname}`);
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
     env: {
       AGENT_ACTION_KV: kv,
       AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
@@ -1617,18 +1360,16 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'alpha',
-        sessions: [
-          {
-            sessionSlug: 'alpha',
-            sessionName: 'Alpha',
-            telegramBridgeEnabled: true,
-            telegramOnly: true,
-            sessionWorkerUrl: 'https://session.example',
-            workerSessionSlug: 'alpha',
-            questionSource: 'cloudflare_storage',
-            storageProfile: { backend: 'cloudflare' },
-          },
-        ],
+        sessions: [{
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
       }),
       QUESTION_FETCH: fetchImpl,
       REGISTRY_FETCH: async () => {
@@ -1647,10 +1388,7 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
   assert.equal(state.hasMoreQuestions, true);
   assert.equal(state.questionIndexComplete, false);
   assert.deepEqual(state.deferredPanels, ['groups', 'admin']);
-  assert.deepEqual(
-    state.questions.map((question) => question.title),
-    ['Loaded q-storage-1'],
-  );
+  assert.deepEqual(state.questions.map((question) => question.title), ['Loaded q-storage-1']);
   assert.deepEqual(
     fetchCalls
       .filter((call) => new URL(call.url).pathname.endsWith('/storage/read'))
@@ -1662,17 +1400,14 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
 test('Mini App first state reuses inline Cloudflare question payloads without read', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_inlinecloudflare';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'alpha' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
   const fetchCalls = [];
   const fetchImpl = async (url, init = {}) => {
     const target = new URL(String(url));
@@ -1696,24 +1431,21 @@ test('Mini App first state reuses inline Cloudflare question payloads without re
       });
     }
     if (target.pathname.endsWith('/storage/list')) {
-      return new Response(
-        JSON.stringify({
-          items: [
-            {
-              id: 'q-inline-1',
-              questionId: 'q-inline-1',
-              questionType: 'binary',
-              prompt: 'Inline listed question payload.',
-              sessionSlug: 'alpha',
-            },
-            { id: 'q-storage-2' },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      return new Response(JSON.stringify({
+        items: [
+          {
+            id: 'q-inline-1',
+            questionId: 'q-inline-1',
+            questionType: 'binary',
+            prompt: 'Inline listed question payload.',
+            sessionSlug: 'alpha',
+          },
+          { id: 'q-storage-2' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     if (target.pathname.endsWith('/storage/read')) {
       throw new Error('storage_read_should_not_be_called_for_inline_payload');
@@ -1721,9 +1453,7 @@ test('Mini App first state reuses inline Cloudflare question payloads without re
     throw new Error(`unexpected_url_${target.pathname}`);
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
     env: {
       AGENT_ACTION_KV: kv,
       AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
@@ -1732,18 +1462,16 @@ test('Mini App first state reuses inline Cloudflare question payloads without re
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'alpha',
-        sessions: [
-          {
-            sessionSlug: 'alpha',
-            sessionName: 'Alpha',
-            telegramBridgeEnabled: true,
-            telegramOnly: true,
-            sessionWorkerUrl: 'https://session.example',
-            workerSessionSlug: 'alpha',
-            questionSource: 'cloudflare_storage',
-            storageProfile: { backend: 'cloudflare' },
-          },
-        ],
+        sessions: [{
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
       }),
       QUESTION_FETCH: fetchImpl,
       REGISTRY_FETCH: async () => {
@@ -1761,10 +1489,7 @@ test('Mini App first state reuses inline Cloudflare question payloads without re
   assert.equal(state.loadedQuestionLimit, 1);
   assert.equal(state.hasMoreQuestions, true);
   assert.equal(state.questionIndexComplete, false);
-  assert.deepEqual(
-    state.questions.map((question) => question.title),
-    ['Inline listed question payload.'],
-  );
+  assert.deepEqual(state.questions.map((question) => question.title), ['Inline listed question payload.']);
   assert.deepEqual(
     fetchCalls.map((call) => new URL(call.url).pathname),
     ['/auth/nonce', '/auth/login', '/storage/list'],
@@ -1774,17 +1499,14 @@ test('Mini App first state reuses inline Cloudflare question payloads without re
 test('Mini App first state treats Cloudflare storage without explicit onchain mode as worker-backed', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_cloudflarenochain';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'alpha' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
   const fetchCalls = [];
   const fetchImpl = async (url, init = {}) => {
     const target = new URL(String(url));
@@ -1808,36 +1530,31 @@ test('Mini App first state treats Cloudflare storage without explicit onchain mo
       });
     }
     if (target.pathname.endsWith('/storage/list')) {
-      return new Response(
-        JSON.stringify({
-          items: [{ id: 'q-storage-1' }, { id: 'q-storage-2' }],
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      return new Response(JSON.stringify({
+        items: [
+          { id: 'q-storage-1' },
+          { id: 'q-storage-2' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     if (target.pathname.endsWith('/storage/read')) {
-      return new Response(
-        JSON.stringify({
-          questionId: target.searchParams.get('id'),
-          questionType: 'binary',
-          prompt: 'Cloudflare first question without chain mode.',
-          sessionSlug: 'alpha',
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      return new Response(JSON.stringify({
+        questionId: target.searchParams.get('id'),
+        questionType: 'binary',
+        prompt: 'Cloudflare first question without chain mode.',
+        sessionSlug: 'alpha',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     throw new Error(`unexpected_url_${target.pathname}`);
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
     env: {
       AGENT_ACTION_KV: kv,
       AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
@@ -1846,18 +1563,16 @@ test('Mini App first state treats Cloudflare storage without explicit onchain mo
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'alpha',
-        sessions: [
-          {
-            sessionSlug: 'alpha',
-            sessionName: 'Alpha',
-            telegramBridgeEnabled: true,
-            sessionMode: 'telegram_enabled',
-            sessionWorkerUrl: 'https://session.example',
-            workerSessionSlug: 'alpha',
-            questionSource: 'cloudflare_storage',
-            storageProfile: { backend: 'cloudflare' },
-          },
-        ],
+        sessions: [{
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha',
+          telegramBridgeEnabled: true,
+          sessionMode: 'telegram_enabled',
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
       }),
       QUESTION_FETCH: fetchImpl,
       REGISTRY_FETCH: async () => {
@@ -1873,10 +1588,7 @@ test('Mini App first state treats Cloudflare storage without explicit onchain mo
   assert.equal(state.hasMoreQuestions, true);
   assert.equal(state.questionIndexComplete, false);
   assert.deepEqual(state.selectedSessionSlugs, ['alpha']);
-  assert.deepEqual(
-    state.questions.map((question) => question.title),
-    ['Cloudflare first question without chain mode.'],
-  );
+  assert.deepEqual(state.questions.map((question) => question.title), ['Cloudflare first question without chain mode.']);
   assert.deepEqual(
     fetchCalls.map((call) => new URL(call.url).pathname),
     ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read'],
@@ -1886,17 +1598,14 @@ test('Mini App first state treats Cloudflare storage without explicit onchain mo
 test('Mini App session picker honors the Telegram session created-after cutoff', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_cutoff1234';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionPicker: true },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionPicker: true },
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
@@ -1929,12 +1638,7 @@ test('Mini App session picker honors the Telegram session created-after cutoff',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { sessionSlug: 'old-alpha', questionId: 'q-old', questionType: 'freeform', prompt: 'Old prompt' },
       { sessionSlug: 'new-beta', questionId: 'q-new', questionType: 'freeform', prompt: 'New prompt' },
-      {
-        sessionSlug: 'missing-created-at',
-        questionId: 'q-missing',
-        questionType: 'freeform',
-        prompt: 'Missing prompt',
-      },
+      { sessionSlug: 'missing-created-at', questionId: 'q-missing', questionType: 'freeform', prompt: 'Missing prompt' },
     ]),
   };
 
@@ -1946,10 +1650,7 @@ test('Mini App session picker honors the Telegram session created-after cutoff',
   assert.equal(picker.sessionPicker.required, false);
   assert.deepEqual(picker.selectedSessionSlugs, ['new-beta']);
   assert.equal(picker.questionCount, 1);
-  assert.deepEqual(
-    picker.sessionPicker.sessions.map((session) => session.sessionSlug),
-    ['new-beta'],
-  );
+  assert.deepEqual(picker.sessionPicker.sessions.map((session) => session.sessionSlug), ['new-beta']);
 
   const selected = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=new-beta`),
@@ -1965,31 +1666,26 @@ test('Mini App session picker honors the Telegram session created-after cutoff',
 test('Mini App keeps the default Telegram-only session selectable when cutoff is set before it but metadata is missing', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_defaultcutoff';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionPicker: true },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionPicker: true },
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-23T00:00:00.000Z',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'telegram-demo-3',
-      sessions: [
-        {
-          sessionSlug: 'telegram-demo-3',
-          sessionName: 'telegram-demo-3',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'telegram-demo-3',
+        sessionName: 'telegram-demo-3',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { sessionSlug: 'telegram-demo-3', questionId: 'q-demo-3', questionType: 'freeform', prompt: 'Demo 3 prompt' },
@@ -2010,31 +1706,26 @@ test('Mini App keeps the default Telegram-only session selectable when cutoff is
 test('Mini App session picker accepts dotenv-escaped session policy JSON', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_escapedpolicy';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'telegram-demo-4' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'telegram-demo-4' },
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: dotenvEscapedJson({
       defaultSessionSlug: 'telegram-demo-4',
-      sessions: [
-        {
-          sessionSlug: 'telegram-demo-4',
-          sessionName: 'Session Lab Organizers (Demo)',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sessionMode: 'telegram_only',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'telegram-demo-4',
+        sessionName: 'Session Lab Organizers (Demo)',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+      }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -2053,10 +1744,7 @@ test('Mini App session picker accepts dotenv-escaped session policy JSON', async
 
   assert.equal(state.ok, true);
   assert.deepEqual(state.selectedSessionSlugs, ['telegram-demo-4']);
-  assert.deepEqual(
-    state.sessionPicker.sessions.map((session) => session.sessionSlug),
-    ['telegram-demo-4'],
-  );
+  assert.deepEqual(state.sessionPicker.sessions.map((session) => session.sessionSlug), ['telegram-demo-4']);
   assert.equal(state.questionCount, 1);
   assert.equal(state.session.title, 'Session Lab Organizers (Demo)');
 });
@@ -2064,17 +1752,14 @@ test('Mini App session picker accepts dotenv-escaped session policy JSON', async
 test('Mini App keeps multi-select sessions visible after a joined-session launch', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_joinedalpha';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'alpha' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
@@ -2101,13 +1786,10 @@ test('Mini App keeps multi-select sessions visible after a joined-session launch
   assert.equal(joined.sessionPicker.multiSelect, true);
   assert.equal(joined.sessionPicker.initiallyCollapsed, true);
   assert.deepEqual(joined.sessionPicker.selectedSessionSlugs, ['alpha']);
-  assert.deepEqual(
-    joined.sessionPicker.sessions.map((session) => [session.sessionSlug, session.selected]),
-    [
-      ['alpha', true],
-      ['beta', false],
-    ],
-  );
+  assert.deepEqual(joined.sessionPicker.sessions.map((session) => [
+    session.sessionSlug,
+    session.selected,
+  ]), [['alpha', true], ['beta', false]]);
   assert.deepEqual(joined.selectedSessionSlugs, ['alpha']);
   assert.equal(joined.questionCount, 1);
   assert.equal(joined.questions[0].sessionSlug, 'alpha');
@@ -2166,10 +1848,7 @@ test('Mini App exposes admin state only for configured export admin managed wall
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('group_link'), true);
   assert.equal(adminState.admin.actions.find((action) => action.action === 'group_link').label, 'Approve group');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_all').label, 'Export data');
-  assert.equal(
-    adminState.admin.actions.find((action) => action.action === 'export_access').label,
-    'Manage permissions',
-  );
+  assert.equal(adminState.admin.actions.find((action) => action.action === 'export_access').label, 'Manage permissions');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'question_queue').label, 'Question queue');
   assert.equal(guestState.admin.available, false);
   assert.equal(guestState.admin.reason, 'response_export_admin_required');
@@ -2184,14 +1863,11 @@ test('Mini App treats dynamically added response addresses as admin-capable in t
     createdAt,
   });
   const kv = new MemoryKv();
-  await kv.put(
-    'telegram:response-export-allowlist:v1:alpha',
-    JSON.stringify({
-      version: 1,
-      sessionSlug: 'alpha',
-      addresses: [{ address: exporterAccount.accountAddress }],
-    }),
-  );
+  await kv.put('telegram:response-export-allowlist:v1:alpha', JSON.stringify({
+    version: 1,
+    sessionSlug: 'alpha',
+    addresses: [{ address: exporterAccount.accountAddress }],
+  }));
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
     env: {
@@ -2233,22 +1909,16 @@ test('Mini App admin endpoints manage permissions, results settings, queue, and 
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAccount.accountAddress,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        questionId: 'q1',
-        prompt: 'Should alpha start with sponsored questions?',
-        questionType: 'agree_unsure_disagree',
-      },
+      { questionId: 'q1', prompt: 'Should alpha start with sponsored questions?', questionType: 'agree_unsure_disagree' },
       { questionId: 'q2', prompt: 'Should results be visible by default?', questionType: 'agree_unsure_disagree' },
     ]),
   };
@@ -2265,10 +1935,7 @@ test('Mini App admin endpoints manage permissions, results settings, queue, and 
   const accessBody = await accessResponse.json();
   assert.equal(accessResponse.status, 200);
   assert.equal(accessBody.ok, true);
-  assert.equal(
-    accessBody.access.additionalAdmins.some((entry) => entry.address === addedAddress),
-    true,
-  );
+  assert.equal(accessBody.access.additionalAdmins.some((entry) => entry.address === addedAddress), true);
   assert.equal(accessBody.botCommands.exportAllow, `/export_allow ${addedAddress} alpha`);
 
   const settingsResponse = await handleTelegramMiniAppRequest({
@@ -2337,17 +2004,15 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
       defaultSessionSlug: 'alpha',
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
-    AGENT_BRIDGE_DEMO_DOCS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        title: 'Existing brief',
-        name: 'brief.md',
-        fileType: 'md',
-        visibility: 'public',
-        storageProfile: 'cloudflare',
-        contentPreview: 'Existing public summary',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_DOCS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      title: 'Existing brief',
+      name: 'brief.md',
+      fileType: 'md',
+      visibility: 'public',
+      storageProfile: 'cloudflare',
+      contentPreview: 'Existing public summary',
+    }]),
   };
   const beforeResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/documents?sessionSlug=alpha'),
@@ -2395,9 +2060,7 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
   assert.equal(imageUpload.document.previewAvailable, true);
   assert.equal(imageUpload.document.previewKind, 'image');
   const imagePreviewResponse = await handleTelegramMiniAppRequest({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/documents/preview?sessionSlug=alpha&docId=${imageUpload.document.docId}`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/documents/preview?sessionSlug=alpha&docId=${imageUpload.document.docId}`),
     env,
   });
   assert.equal(imagePreviewResponse.status, 200);
@@ -2422,9 +2085,7 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
   assert.equal(pdfUpload.document.previewAvailable, true);
   assert.equal(pdfUpload.document.previewKind, 'pdf');
   const pdfPreviewResponse = await handleTelegramMiniAppRequest({
-    request: new Request(
-      `https://bridge.example/telegram/mini-app/api/documents/preview?sessionSlug=alpha&docId=${pdfUpload.document.docId}`,
-    ),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/documents/preview?sessionSlug=alpha&docId=${pdfUpload.document.docId}`),
     env,
   });
   assert.equal(pdfPreviewResponse.status, 200);
@@ -2454,7 +2115,7 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
 
   const oversizedForm = new FormData();
   oversizedForm.append('visibility', 'session');
-  oversizedForm.append('file', new Blob([new Uint8Array(1024 * 1024 + 1)], { type: 'text/plain' }), 'too-large.txt');
+  oversizedForm.append('file', new Blob([new Uint8Array((1024 * 1024) + 1)], { type: 'text/plain' }), 'too-large.txt');
   const oversizedResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/documents?sessionSlug=alpha', {
       method: 'POST',
@@ -2473,17 +2134,14 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
 test('Mini App auto-selects the lone visible session when launch session is not selectable', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_launchwitholdsession';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'view_questions',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'old-session' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'old-session' },
+  }));
 
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`),
@@ -2507,10 +2165,7 @@ test('Mini App auto-selects the lone visible session when launch session is not 
   assert.equal(state.sessionPicker.required, false);
   assert.equal(state.session.title, 'Alpha');
   assert.deepEqual(state.selectedSessionSlugs, ['alpha']);
-  assert.deepEqual(
-    state.sessionPicker.sessions.map((session) => session.sessionSlug),
-    ['alpha'],
-  );
+  assert.deepEqual(state.sessionPicker.sessions.map((session) => session.sessionSlug), ['alpha']);
   assert.equal(state.questionCount, 1);
   assert.equal(state.questions[0].sessionSlug, 'alpha');
 });
@@ -2574,12 +2229,7 @@ test('Mini App state pre-populates previously saved answers and exposes them in 
     sessionSlug: 'alpha',
     selectedQuestionId: questionId,
     answerLabel: 'Agree',
-    answerValue: JSON.stringify({
-      questionType: 'agree_unsure_disagree',
-      value: 'agree',
-      label: 'Agree',
-      comments: 'Saved context',
-    }),
+    answerValue: JSON.stringify({ questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree', comments: 'Saved context' }),
     controlType: 'agree_unsure_disagree',
     submitLane: 'telegram_mini_app',
     createdAt: '2026-05-08T12:00:00.000Z',
@@ -2595,14 +2245,12 @@ test('Mini App state pre-populates previously saved answers and exposes them in 
         sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
       }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-        {
-          sessionSlug: 'alpha',
-          questionId,
-          questionType: 'agree_unsure_disagree',
-          prompt: 'Should previous answers hydrate?',
-        },
-      ]),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should previous answers hydrate?',
+      }]),
     },
     createdAt: '2026-05-08T12:00:01.000Z',
   });
@@ -2621,26 +2269,23 @@ test('Mini App state pre-populates previously saved answers and exposes them in 
 test('Mini App launch question series applies ordering skips and prefilled drafts', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_series1234';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'submit_response',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: {
-        sessionSlug: 'alpha',
-        questionSeries: {
-          questionIds: ['q-second', 'q-first', 'q-third'],
-          skippedQuestionIds: ['q-first'],
-          draftAnswersByQuestionId: {
-            'q-second': { text: 'Drafted answer from the agent' },
-          },
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'submit_response',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: {
+      sessionSlug: 'alpha',
+      questionSeries: {
+        questionIds: ['q-second', 'q-first', 'q-third'],
+        skippedQuestionIds: ['q-first'],
+        draftAnswersByQuestionId: {
+          'q-second': { text: 'Drafted answer from the agent' },
         },
       },
-    }),
-  );
+    },
+  }));
 
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`),
@@ -2665,10 +2310,7 @@ test('Mini App launch question series applies ordering skips and prefilled draft
   assert.equal(state.questionSeries.enabled, true);
   assert.equal(state.questionSeries.questionCount, 3);
   assert.equal(state.questionSeries.skippedQuestionCount, 1);
-  assert.deepEqual(
-    state.questions.map((question) => question.prompt),
-    ['Second prompt', 'Third prompt'],
-  );
+  assert.deepEqual(state.questions.map((question) => question.prompt), ['Second prompt', 'Third prompt']);
   assert.equal(state.activeQuestionKey, state.questions[0].questionKey);
   assert.deepEqual(state.prefilledDraftAnswersByQuestionKey[state.questions[0].questionKey], {
     text: 'Drafted answer from the agent',
@@ -2689,14 +2331,12 @@ test('Mini App draft save endpoint returns draft metadata and reloads saved draf
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should saved drafts stay visible?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should saved drafts stay visible?',
+    }]),
   };
   const before = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -2752,14 +2392,12 @@ test('Mini App action routes reject a stale question action after the Mini App s
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', sessionModeProfile: enabledProfile }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId: 'q-disabled-mini-app',
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should stale Mini App actions stop working?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-disabled-mini-app',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should stale Mini App actions stop working?',
+    }]),
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -2770,16 +2408,14 @@ test('Mini App action routes reject a stale question action after the Mini App s
 
   env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
     defaultSessionSlug: 'alpha',
-    sessions: [
-      {
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha',
-        sessionModeProfile: {
-          ...enabledProfile,
-          surfaces: { telegram: true, miniApp: false },
-        },
+    sessions: [{
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha',
+      sessionModeProfile: {
+        ...enabledProfile,
+        surfaces: { telegram: true, miniApp: false },
       },
-    ],
+    }],
   });
   const draftResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
@@ -2798,10 +2434,7 @@ test('Mini App action routes reject a stale question action after the Mini App s
 
   assert.equal(draftResponse.status, 403);
   assert.equal(draftBody.error, 'mini_app_disabled');
-  assert.equal(
-    Array.from(kv.store.keys()).some((key) => key.includes('answer-draft')),
-    false,
-  );
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('answer-draft')), false);
 
   const voteResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/question-vote', {
@@ -2816,10 +2449,7 @@ test('Mini App action routes reject a stale question action after the Mini App s
 
   assert.equal(voteResponse.status, 403);
   assert.equal(voteBody.error, 'mini_app_disabled');
-  assert.equal(
-    Array.from(kv.store.keys()).some((key) => key.includes('question-vote')),
-    false,
-  );
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('question-vote')), false);
 
   const clearResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/clear-drafts', {
@@ -2852,21 +2482,21 @@ test('Mini App activity fails closed when no requested session remains enabled',
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'disabled-session',
-      sessions: [
-        {
-          sessionSlug: 'disabled-session',
-          sessionName: 'Disabled session',
-          sessionModeProfile: {
-            authority: { mode: 'worker_canonical' },
-            surfaces: { telegram: true, miniApp: false },
-          },
+      sessions: [{
+        sessionSlug: 'disabled-session',
+        sessionName: 'Disabled session',
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          surfaces: { telegram: true, miniApp: false },
         },
-      ],
+      }],
     }),
   };
 
   const response = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app/api/activity?sessionSlug=disabled-session'),
+    request: new Request(
+      'https://bridge.example/telegram/mini-app/api/activity?sessionSlug=disabled-session',
+    ),
     env,
   });
   const body = await response.json();
@@ -2917,17 +2547,14 @@ test('Mini App settings reject disabled sessions and launch-session mismatches b
   assert.equal((await disabledResponse.json()).error, 'mini_app_disabled');
 
   const launch = 'cecb_settingsalphalaunch';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'edit_agent_settings',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: { sessionSlug: 'alpha' },
-    }),
-  );
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'edit_agent_settings',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
   const mismatchResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/settings', {
       method: 'POST',
@@ -2942,10 +2569,7 @@ test('Mini App settings reject disabled sessions and launch-session mismatches b
   });
   assert.equal(mismatchResponse.status, 403);
   assert.equal((await mismatchResponse.json()).error, 'mini_app_launch_mismatch');
-  assert.equal(
-    Array.from(kv.store.keys()).some((key) => key.includes('agent-settings')),
-    false,
-  );
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('agent-settings')), false);
 });
 
 test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-after-agent events', async () => {
@@ -2971,14 +2595,12 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
     questionType: 'binary',
     createdAt: '2026-06-12T15:00:00.000Z',
   });
-  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([
-    {
-      sessionSlug: 'alpha',
-      questionId: proposed.questionId,
-      questionType: 'agree_unsure_disagree',
-      prompt: proposed.record.prompt,
-    },
-  ]);
+  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([{
+    sessionSlug: 'alpha',
+    questionId: proposed.questionId,
+    questionType: 'agree_unsure_disagree',
+    prompt: proposed.record.prompt,
+  }]);
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
@@ -3000,13 +2622,11 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
       run_id: 'run-mini-agent-answer',
       request_id: 'mini-agent-answer',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
-      answers: [
-        {
-          statement_id: proposed.questionId,
-          answer: { value: 'agree' },
-          confidence: 91,
-        },
-      ],
+      answers: [{
+        statement_id: proposed.questionId,
+        answer: { value: 'agree' },
+        confidence: 91,
+      }],
     },
   });
 
@@ -3197,9 +2817,7 @@ test('Mini App classifies agent-only confirm/edit by answer semantics, not displ
     createdAt: '2026-06-12T15:04:00.000Z',
   });
   const freeformKey = state.questions.find((question) => question.questionId === freeform.questionId)?.questionKey;
-  const multichoiceKey = state.questions.find(
-    (question) => question.questionId === multichoice.questionId,
-  )?.questionKey;
+  const multichoiceKey = state.questions.find((question) => question.questionId === multichoice.questionId)?.questionKey;
   assert.ok(freeformKey);
   assert.ok(multichoiceKey);
 
@@ -3266,14 +2884,12 @@ test('Mini App submit skips agent-only sidecar work when the session is not conf
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId: 'q-not-agent-only',
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should normal sessions avoid agent-only sidecar work?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-not-agent-only',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should normal sessions avoid agent-only sidecar work?',
+    }]),
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -3330,14 +2946,8 @@ test('Mini App submit skips agent-only sidecar work when the session is not conf
   assert.equal(voteBody.error, 'agent_only_window_not_open');
 
   const keys = Array.from(kv.store.keys());
-  assert.equal(
-    keys.some((key) => key.startsWith('telegram:agent-mode-window:v1:')),
-    false,
-  );
-  assert.equal(
-    keys.some((key) => key.startsWith('telegram:agent-only:')),
-    false,
-  );
+  assert.equal(keys.some((key) => key.startsWith('telegram:agent-mode-window:v1:')), false);
+  assert.equal(keys.some((key) => key.startsWith('telegram:agent-only:')), false);
 });
 
 test('Mini App submit contains agent-only review failures after persisting the human submit', async () => {
@@ -3364,14 +2974,12 @@ test('Mini App submit contains agent-only review failures after persisting the h
     questionType: 'binary',
     createdAt: '2026-06-12T15:00:00.000Z',
   });
-  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([
-    {
-      sessionSlug: 'alpha',
-      questionId: proposed.questionId,
-      questionType: 'agree_unsure_disagree',
-      prompt: proposed.record.prompt,
-    },
-  ]);
+  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([{
+    sessionSlug: 'alpha',
+    questionId: proposed.questionId,
+    questionType: 'agree_unsure_disagree',
+    prompt: proposed.record.prompt,
+  }]);
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
@@ -3393,13 +3001,11 @@ test('Mini App submit contains agent-only review failures after persisting the h
       run_id: 'run-contained-review-agent-answer',
       request_id: 'contained-review-agent-answer',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
-      answers: [
-        {
-          statement_id: proposed.questionId,
-          answer: { value: 'agree' },
-          confidence: 87,
-        },
-      ],
+      answers: [{
+        statement_id: proposed.questionId,
+        answer: { value: 'agree' },
+        confidence: 87,
+      }],
     },
   });
   assert.equal(submittedPredictions.ok, true);
@@ -3443,35 +3049,29 @@ test('Mini App stores draft divergence only after explicit opt in', async () => 
   const kv = new MemoryKv();
   const botToken = '123456:test-token';
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const initData = signInitData(
-    {
-      auth_date: String(nowSeconds),
-      query_id: 'mini-divergence-query',
-      user: JSON.stringify({ id: 42, username: 'participant' }),
-    },
-    botToken,
-  );
+  const initData = signInitData({
+    auth_date: String(nowSeconds),
+    query_id: 'mini-divergence-query',
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, botToken);
   const launch = 'cecb_divergence123';
   const questionId = 'q-divergence';
-  await kv.put(
-    `telegram:action:${launch}`,
-    JSON.stringify({
-      type: 'agent_bridge_opaque_action',
-      actionId: launch,
-      action: 'submit_response',
-      lane: 'telegram_mini_app',
-      miniAppLaunch: true,
-      serverContextRef: {
-        sessionSlug: 'alpha',
-        questionSeries: {
-          questionIds: [questionId],
-          draftAnswersByQuestionId: {
-            [questionId]: { text: 'Agent-generated starting draft' },
-          },
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'submit_response',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: {
+      sessionSlug: 'alpha',
+      questionSeries: {
+        questionIds: [questionId],
+        draftAnswersByQuestionId: {
+          [questionId]: { text: 'Agent-generated starting draft' },
         },
       },
-    }),
-  );
+    },
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
@@ -3482,14 +3082,12 @@ test('Mini App stores draft divergence only after explicit opt in', async () => 
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'freeform',
-        prompt: 'What should the agent improve?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'freeform',
+      prompt: 'What should the agent improve?',
+    }]),
   };
   const authHeaders = { 'x-telegram-init-data': initData };
   const state = await __test__telegramMiniApp.buildMiniAppState({
@@ -3523,12 +3121,9 @@ test('Mini App stores draft divergence only after explicit opt in', async () => 
   assert.equal(optOut.body.ok, true);
   assert.equal(optOut.body.draftDivergence.stored, false);
   assert.equal(optOut.body.draftDivergence.reason, 'draft_divergence_opt_out');
-  assert.deepEqual(
-    Array.from(kv.store.keys()).filter((key) =>
-      key.startsWith(__test__telegramMiniApp.MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX),
-    ),
-    [],
-  );
+  assert.deepEqual(Array.from(kv.store.keys()).filter((key) => (
+    key.startsWith(__test__telegramMiniApp.MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX)
+  )), []);
 
   await saveTelegramAgentSettingsPatch({
     env,
@@ -3543,9 +3138,9 @@ test('Mini App stores draft divergence only after explicit opt in', async () => 
   assert.equal(optIn.body.ok, true);
   assert.equal(optIn.body.draftDivergence.stored, true);
   assert.equal(JSON.stringify(optIn.body).includes('telegram:mini-app-draft-divergence'), false);
-  const divergenceKeys = Array.from(kv.store.keys()).filter((key) =>
-    key.startsWith(__test__telegramMiniApp.MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX),
-  );
+  const divergenceKeys = Array.from(kv.store.keys()).filter((key) => (
+    key.startsWith(__test__telegramMiniApp.MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX)
+  ));
   assert.equal(divergenceKeys.length, 1);
   assert.equal(kv.options.get(divergenceKeys[0]), null);
   const record = JSON.parse(await kv.get(divergenceKeys[0]));
@@ -3588,14 +3183,12 @@ test('Mini App clear drafts endpoint deletes saved draft answers for visible que
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should drafts be clearable?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should drafts be clearable?',
+    }]),
   };
   const before = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -3638,21 +3231,17 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
     submitLane: 'telegram_mini_app',
     createdAt: '2026-05-08T12:00:00.000Z',
   });
-  await seedSubmitRecord(
-    kv,
-    `${SUBMIT_REQUEST_KV_PREFIX}submitted-history`,
-    JSON.stringify({
-      version: 1,
-      requestId: 'submitted-history',
-      status: 'direct_submitted',
-      lane: 'telegram_mini_app',
-      telegramUserId: 'preview-user',
-      sessionSlug: 'alpha',
-      questionId,
-      answer: { value: 'agree', label: 'Agree' },
-      createdAt: '2026-05-08T12:00:02.000Z',
-    }),
-  );
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}submitted-history`, JSON.stringify({
+    version: 1,
+    requestId: 'submitted-history',
+    status: 'direct_submitted',
+    lane: 'telegram_mini_app',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: { value: 'agree', label: 'Agree' },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
@@ -3661,14 +3250,12 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should submitted answers survive clear drafts?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should submitted answers survive clear drafts?',
+    }]),
   };
   const before = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -3705,21 +3292,17 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
 test('Mini App state exposes submitted rating answers for hydration', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-rating-history';
-  await seedSubmitRecord(
-    kv,
-    `${SUBMIT_REQUEST_KV_PREFIX}rating-history`,
-    JSON.stringify({
-      version: 1,
-      requestId: 'rating-history',
-      status: 'direct_submitted',
-      lane: 'telegram_mini_app',
-      telegramUserId: 'preview-user',
-      sessionSlug: 'alpha',
-      questionId,
-      answer: { questionType: 'rating', value: 0, comments: 'Lowest score' },
-      createdAt: '2026-05-08T12:00:02.000Z',
-    }),
-  );
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}rating-history`, JSON.stringify({
+    version: 1,
+    requestId: 'rating-history',
+    status: 'direct_submitted',
+    lane: 'telegram_mini_app',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: { questionType: 'rating', value: 0, comments: 'Lowest score' },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
     env: {
@@ -3730,14 +3313,12 @@ test('Mini App state exposes submitted rating answers for hydration', async () =
         sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
       }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-        {
-          sessionSlug: 'alpha',
-          questionId,
-          questionType: 'rating',
-          prompt: 'Rate the Mini App.',
-        },
-      ]),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'rating',
+        prompt: 'Rate the Mini App.',
+      }]),
     },
     createdAt: '2026-05-08T12:00:03.000Z',
   });
@@ -3755,76 +3336,45 @@ test('Mini App state exposes submitted rating answers for hydration', async () =
 });
 
 test('Mini App restores quadratic drafts and history as ordered numeric votes', async () => {
-  for (const value of [
-    [3, -4],
-    [0, 0],
-  ]) {
+  for (const value of [[3, -4], [0, 0]]) {
     for (const submitted of [false, true]) {
       const kv = new MemoryKv();
       const questionId = 'q-quadratic-history';
       const answer = { questionType: 'quadratic', value, comments: 'Saved context' };
       if (submitted) {
-        await seedSubmitRecord(
-          kv,
-          `${SUBMIT_REQUEST_KV_PREFIX}quadratic-history`,
-          JSON.stringify({
-            version: 1,
-            requestId: 'quadratic-history',
-            status: 'direct_submitted',
-            lane: 'telegram_mini_app',
-            telegramUserId: 'preview-user',
-            sessionSlug: 'alpha',
-            questionId,
-            answer,
-            createdAt: '2026-05-08T12:00:02.000Z',
-          }),
-        );
+        await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}quadratic-history`, JSON.stringify({
+          version: 1, requestId: 'quadratic-history', status: 'direct_submitted',
+          lane: 'telegram_mini_app', telegramUserId: 'preview-user', sessionSlug: 'alpha', questionId,
+          answer, createdAt: '2026-05-08T12:00:02.000Z',
+        }));
       } else {
         await persistAnswerDraft({
           env: { AGENT_ACTION_KV: kv },
           normalized: { user: { telegramUserId: 'preview-user' }, chat: { chatId: 'preview-user' } },
-          sessionSlug: 'alpha',
-          selectedQuestionId: questionId,
-          answerLabel: 'Saved allocation',
-          answerValue: JSON.stringify(answer),
-          controlType: 'quadratic_allocation',
-          submitLane: 'telegram_mini_app',
+          sessionSlug: 'alpha', selectedQuestionId: questionId,
+          answerLabel: 'Saved allocation', answerValue: JSON.stringify(answer),
+          controlType: 'quadratic_allocation', submitLane: 'telegram_mini_app',
           createdAt: '2026-05-08T12:00:00.000Z',
         });
       }
       const state = await __test__telegramMiniApp.buildMiniAppState({
         request: new Request('https://bridge.example/telegram/mini-app/api/state'),
         env: {
-          AGENT_ACTION_KV: kv,
-          AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
-          AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
-            defaultSessionSlug: 'alpha',
-            sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true, telegramOnly: true }],
-          }),
+          AGENT_ACTION_KV: kv, AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+          AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({ defaultSessionSlug: 'alpha',
+            sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true, telegramOnly: true }] }),
           AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-          AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-            {
-              sessionSlug: 'alpha',
-              questionId,
-              questionType: 'quadratic',
-              prompt: 'Allocate support',
-              options: ['Parks', 'Transit'],
-              voiceCredits: 25,
-            },
-          ]),
-        },
-        createdAt: '2026-05-08T12:00:03.000Z',
+          AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{ sessionSlug: 'alpha', questionId,
+            questionType: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 }]),
+        }, createdAt: '2026-05-08T12:00:03.000Z',
       });
       assert.equal(state.ok, true);
       const questionKey = state.questions[0].questionKey;
       assert.equal(state.questions[0].voiceCredits, 25);
       const restored = submitted ? state.submittedAnswers[0].answer : state.draftAnswersByQuestionKey[questionKey];
       assert.deepEqual(restored, { value, comments: 'Saved context' });
-      if (submitted)
-        assert.equal(
-          state.submittedAnswers[0].answerLabel,
-          value[0] === 0 ? 'Parks: 0; Transit: 0' : 'Parks: +3; Transit: -4',
-        );
+      if (submitted) assert.equal(state.submittedAnswers[0].answerLabel,
+        value[0] === 0 ? 'Parks: 0; Transit: 0' : 'Parks: +3; Transit: -4');
     }
   }
 });
@@ -3832,28 +3382,24 @@ test('Mini App restores quadratic drafts and history as ordered numeric votes', 
 test('Mini App state hydrates submitted rating answers from serialized values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-rating-serialized-history';
-  await seedSubmitRecord(
-    kv,
-    `${SUBMIT_REQUEST_KV_PREFIX}rating-serialized-history`,
-    JSON.stringify({
-      version: 1,
-      requestId: 'rating-serialized-history',
-      status: 'direct_submitted',
-      lane: 'telegram_agent',
-      telegramUserId: 'preview-user',
-      sessionSlug: 'alpha',
-      questionId,
-      answer: {
-        value: JSON.stringify({
-          questionType: 'rating',
-          value: 7,
-          comments: 'Agent-submitted rating rationale.',
-        }),
-        controlType: 'rating_button',
-      },
-      createdAt: '2026-05-08T12:00:02.000Z',
-    }),
-  );
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}rating-serialized-history`, JSON.stringify({
+    version: 1,
+    requestId: 'rating-serialized-history',
+    status: 'direct_submitted',
+    lane: 'telegram_agent',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: {
+      value: JSON.stringify({
+        questionType: 'rating',
+        value: 7,
+        comments: 'Agent-submitted rating rationale.',
+      }),
+      controlType: 'rating_button',
+    },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
     env: {
@@ -3864,14 +3410,12 @@ test('Mini App state hydrates submitted rating answers from serialized values', 
         sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
       }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-        {
-          sessionSlug: 'alpha',
-          questionId,
-          questionType: 'rating',
-          prompt: 'Rate serialized agent answers.',
-        },
-      ]),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'rating',
+        prompt: 'Rate serialized agent answers.',
+      }]),
     },
     createdAt: '2026-05-08T12:00:03.000Z',
   });
@@ -3890,28 +3434,24 @@ test('Mini App state hydrates submitted rating answers from serialized values', 
 test('Mini App state hydrates submitted multichoice answers from serialized values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-multichoice-history';
-  await seedSubmitRecord(
-    kv,
-    `${SUBMIT_REQUEST_KV_PREFIX}multichoice-history`,
-    JSON.stringify({
-      version: 1,
-      requestId: 'multichoice-history',
-      status: 'direct_submitted',
-      lane: 'telegram_agent',
-      telegramUserId: 'preview-user',
-      sessionSlug: 'alpha',
-      questionId,
-      answer: {
-        label: 'Option B',
-        value: JSON.stringify({
-          questionType: 'multichoice',
-          values: ['Option B'],
-          comments: 'Only if facilitators can intervene transparently.',
-        }),
-      },
-      createdAt: '2026-05-08T12:00:02.000Z',
-    }),
-  );
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}multichoice-history`, JSON.stringify({
+    version: 1,
+    requestId: 'multichoice-history',
+    status: 'direct_submitted',
+    lane: 'telegram_agent',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: {
+      label: 'Option B',
+      value: JSON.stringify({
+        questionType: 'multichoice',
+        values: ['Option B'],
+        comments: 'Only if facilitators can intervene transparently.',
+      }),
+    },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
     env: {
@@ -3922,15 +3462,13 @@ test('Mini App state hydrates submitted multichoice answers from serialized valu
         sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
       }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-        {
-          sessionSlug: 'alpha',
-          questionId,
-          questionType: 'multichoice',
-          prompt: 'Which option should be selected?',
-          options: ['Option A', 'Option B', 'Option C'],
-        },
-      ]),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'multichoice',
+        prompt: 'Which option should be selected?',
+        options: ['Option A', 'Option B', 'Option C'],
+      }]),
     },
     createdAt: '2026-05-08T12:00:03.000Z',
   });
@@ -3949,26 +3487,22 @@ test('Mini App state hydrates submitted multichoice answers from serialized valu
 test('Mini App state hydrates submitted multichoice object values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-multichoice-object-history';
-  await seedSubmitRecord(
-    kv,
-    `${SUBMIT_REQUEST_KV_PREFIX}multichoice-object-history`,
-    JSON.stringify({
-      version: 1,
-      requestId: 'multichoice-object-history',
-      status: 'direct_submitted',
-      lane: 'telegram_agent',
-      telegramUserId: 'preview-user',
-      sessionSlug: 'alpha',
-      questionId,
-      answer: {
-        label: 'Option A, Option C',
-        questionType: 'multichoice',
-        values: [{ label: 'Option A' }, { value: 'Option C' }],
-        comments: 'Native object values should hydrate for review.',
-      },
-      createdAt: '2026-05-08T12:00:02.000Z',
-    }),
-  );
+  await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}multichoice-object-history`, JSON.stringify({
+    version: 1,
+    requestId: 'multichoice-object-history',
+    status: 'direct_submitted',
+    lane: 'telegram_agent',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: {
+      label: 'Option A, Option C',
+      questionType: 'multichoice',
+      values: [{ label: 'Option A' }, { value: 'Option C' }],
+      comments: 'Native object values should hydrate for review.',
+    },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
     env: {
@@ -3979,15 +3513,13 @@ test('Mini App state hydrates submitted multichoice object values', async () => 
         sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
       }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-        {
-          sessionSlug: 'alpha',
-          questionId,
-          questionType: 'multichoice',
-          prompt: 'Which object options should be selected?',
-          options: ['Option A', 'Option B', 'Option C'],
-        },
-      ]),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'multichoice',
+        prompt: 'Which object options should be selected?',
+        options: ['Option A', 'Option B', 'Option C'],
+      }]),
     },
     createdAt: '2026-05-08T12:00:03.000Z',
   });
@@ -4005,19 +3537,16 @@ test('Mini App submitted answer hydration reads per-user indexes when global sub
   const kv = new MemoryKv();
   const questionId = 'q-indexed-history';
   for (let index = 0; index < 1050; index += 1) {
-    await kv.put(
-      `telegram:submit-request:noise-${String(index).padStart(4, '0')}`,
-      JSON.stringify({
-        requestId: `noise-${index}`,
-        status: 'direct_submitted',
-        lane: 'telegram_mini_app',
-        telegramUserId: `other-${index}`,
-        sessionSlug: 'other',
-        questionId: 'q-noise',
-        answer: { value: 'agree', label: 'Agree' },
-        createdAt: `2026-05-08T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
-      }),
-    );
+    await kv.put(`telegram:submit-request:noise-${String(index).padStart(4, '0')}`, JSON.stringify({
+      requestId: `noise-${index}`,
+      status: 'direct_submitted',
+      lane: 'telegram_mini_app',
+      telegramUserId: `other-${index}`,
+      sessionSlug: 'other',
+      questionId: 'q-noise',
+      answer: { value: 'agree', label: 'Agree' },
+      createdAt: `2026-05-08T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
+    }));
   }
   const submitted = {
     version: 1,
@@ -4042,14 +3571,12 @@ test('Mini App submitted answer hydration reads per-user indexes when global sub
         sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
       }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-        {
-          sessionSlug: 'alpha',
-          questionId,
-          questionType: 'freeform',
-          prompt: 'What indexed response should hydrate?',
-        },
-      ]),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'freeform',
+        prompt: 'What indexed response should hydrate?',
+      }]),
     },
     createdAt: '2026-05-08T12:00:03.000Z',
   });
@@ -4071,14 +3598,12 @@ test('Mini App question voting stores one current up/down vote per Telegram user
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should popular questions be surfaced?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should popular questions be surfaced?',
+    }]),
   };
   const before = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -4151,14 +3676,12 @@ test('Mini App question vote response includes the new vote when KV list is stal
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should vote writes be visible immediately?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should vote writes be visible immediately?',
+    }]),
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
@@ -4189,20 +3712,16 @@ test('Mini App state exposes per-question response counts for popularity scoring
     ['r3', 'user-c', 'q-few', 'Disagree'],
   ];
   for (const [requestId, telegramUserId, questionId, label] of records) {
-    await seedSubmitRecord(
-      kv,
-      `${SUBMIT_REQUEST_KV_PREFIX}${requestId}`,
-      JSON.stringify({
-        version: 1,
-        requestId,
-        status: 'direct_submitted',
-        telegramUserId,
-        sessionSlug: 'alpha',
-        questionId,
-        answer: { label, value: label.toLowerCase() },
-        createdAt: `2026-05-08T12:00:0${requestId.slice(1)}.000Z`,
-      }),
-    );
+    await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}${requestId}`, JSON.stringify({
+      version: 1,
+      requestId,
+      status: 'direct_submitted',
+      telegramUserId,
+      sessionSlug: 'alpha',
+      questionId,
+      answer: { label, value: label.toLowerCase() },
+      createdAt: `2026-05-08T12:00:0${requestId.slice(1)}.000Z`,
+    }));
   }
   const env = {
     AGENT_ACTION_KV: kv,
@@ -4245,35 +3764,29 @@ test('Mini App state exposes per-question response counts for popularity scoring
   assert.equal(counts['Should lightly answered questions rank lower?'], 1);
   assert.equal(counts['Should unanswered questions start at zero?'], 0);
 
-  await kv.put(
-    'telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:user-a',
-    JSON.stringify({
-      type: 'telegram_agent_only_answer_state',
-      version: 1,
-      sessionSlug: 'alpha',
-      windowId: 'w-2026-06-12',
-      telegramUserId: 'user-a',
-      byStatement: {
-        'q-many': {
-          agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
-          agentSkip: null,
-          human: null,
-        },
+  await kv.put('telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:user-a', JSON.stringify({
+    type: 'telegram_agent_only_answer_state',
+    version: 1,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: 'user-a',
+    byStatement: {
+      'q-many': {
+        agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
+        agentSkip: null,
+        human: null,
       },
-      counts: { answers: 1, skips: 0 },
-      createdAt: '2026-06-12T15:10:00.000Z',
-      updatedAt: '2026-06-12T15:10:00.000Z',
-    }),
-    { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } },
-  );
+    },
+    counts: { answers: 1, skips: 0 },
+    createdAt: '2026-06-12T15:10:00.000Z',
+    updatedAt: '2026-06-12T15:10:00.000Z',
+  }), { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } });
   const afterSidecar = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request('https://bridge.example/telegram/mini-app/api/state'),
     env,
     createdAt: '2026-05-08T12:00:05.000Z',
   });
-  const afterCounts = Object.fromEntries(
-    afterSidecar.questions.map((question) => [question.prompt, question.responseCount]),
-  );
+  const afterCounts = Object.fromEntries(afterSidecar.questions.map((question) => [question.prompt, question.responseCount]));
   assert.deepEqual(afterCounts, counts);
   assert.equal(JSON.stringify(afterSidecar).includes('agent-only-sidecar-answer'), false);
 });
@@ -4288,36 +3801,30 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
     ['r5', 'user-c', 'q-divisive', { value: 'unsure', label: 'Unsure' }],
   ];
   for (const [id, telegramUserId, questionId, answer] of submitRecords) {
-    await seedSubmitRecord(
-      kv,
-      `${SUBMIT_REQUEST_KV_PREFIX}${id}`,
-      JSON.stringify({
-        version: 1,
-        requestId: id,
-        status: 'direct_submitted',
-        lane: 'telegram_mini_app',
-        telegramUserId,
-        sessionSlug: 'alpha',
-        questionId,
-        answer,
-        createdAt: `2026-05-08T12:00:0${id.slice(1)}.000Z`,
-      }),
-    );
+    await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
+      version: 1,
+      requestId: id,
+      status: 'direct_submitted',
+      lane: 'telegram_mini_app',
+      telegramUserId,
+      sessionSlug: 'alpha',
+      questionId,
+      answer,
+      createdAt: `2026-05-08T12:00:0${id.slice(1)}.000Z`,
+    }));
   }
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          resultsExposure: { anonymizedGroupsEnabled: true },
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        resultsExposure: { anonymizedGroupsEnabled: true },
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -4371,44 +3878,36 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   assert.equal(body.topicMap.topics.length > 0, true);
   assert.equal(body.publicSnapshot.topicMap.enabled, true);
 
-  await kv.put(
-    'telegram:agent-only:answer-event:v1:alpha:w-2026-06-12:user-a:1718192021223-deadbeef',
-    JSON.stringify({
-      type: 'telegram_agent_only_answer_event',
-      version: 1,
-      sessionSlug: 'alpha',
-      windowId: 'w-2026-06-12',
-      telegramUserId: 'user-a',
-      questionId: 'q-consensus',
-      source: 'agent_autofill',
-      eventKind: 'answer',
-      answer: { value: 'agent-only-sidecar-answer' },
-      confidence: 99,
-      createdAt: '2026-06-12T15:10:00.000Z',
-    }),
-    { metadata: { v: 1, t: 'ao_evt', k: 'a', src: 'agent_autofill' } },
-  );
-  await kv.put(
-    'telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:user-a',
-    JSON.stringify({
-      type: 'telegram_agent_only_answer_state',
-      version: 1,
-      sessionSlug: 'alpha',
-      windowId: 'w-2026-06-12',
-      telegramUserId: 'user-a',
-      byStatement: {
-        'q-consensus': {
-          agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
-          agentSkip: null,
-          human: null,
-        },
+  await kv.put('telegram:agent-only:answer-event:v1:alpha:w-2026-06-12:user-a:1718192021223-deadbeef', JSON.stringify({
+    type: 'telegram_agent_only_answer_event',
+    version: 1,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: 'user-a',
+    questionId: 'q-consensus',
+    source: 'agent_autofill',
+    eventKind: 'answer',
+    answer: { value: 'agent-only-sidecar-answer' },
+    confidence: 99,
+    createdAt: '2026-06-12T15:10:00.000Z',
+  }), { metadata: { v: 1, t: 'ao_evt', k: 'a', src: 'agent_autofill' } });
+  await kv.put('telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:user-a', JSON.stringify({
+    type: 'telegram_agent_only_answer_state',
+    version: 1,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: 'user-a',
+    byStatement: {
+      'q-consensus': {
+        agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
+        agentSkip: null,
+        human: null,
       },
-      counts: { answers: 1, skips: 0 },
-      createdAt: '2026-06-12T15:10:00.000Z',
-      updatedAt: '2026-06-12T15:10:00.000Z',
-    }),
-    { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } },
-  );
+    },
+    counts: { answers: 1, skips: 0 },
+    createdAt: '2026-06-12T15:10:00.000Z',
+    updatedAt: '2026-06-12T15:10:00.000Z',
+  }), { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } });
   const afterSidecarResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&clusters=2'),
     env,
@@ -4457,21 +3956,17 @@ test('Mini App results hides level 4 group views unless an admin enables anonymi
     ['r4', 'user-b', 'q-divisive', { value: 'disagree', label: 'Disagree' }],
   ];
   for (const [id, telegramUserId, questionId, answer] of submitRecords) {
-    await seedSubmitRecord(
-      kv,
-      `${SUBMIT_REQUEST_KV_PREFIX}${id}`,
-      JSON.stringify({
-        version: 1,
-        requestId: id,
-        status: 'direct_submitted',
-        lane: 'telegram_mini_app',
-        telegramUserId,
-        sessionSlug: 'alpha',
-        questionId,
-        answer,
-        createdAt: `2026-05-08T12:00:0${id.slice(1)}.000Z`,
-      }),
-    );
+    await seedSubmitRecord(kv, `${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
+      version: 1,
+      requestId: id,
+      status: 'direct_submitted',
+      lane: 'telegram_mini_app',
+      telegramUserId,
+      sessionSlug: 'alpha',
+      questionId,
+      answer,
+      createdAt: `2026-05-08T12:00:0${id.slice(1)}.000Z`,
+    }));
   }
   const env = {
     AGENT_ACTION_KV: kv,
@@ -4549,15 +4044,12 @@ test('Mini App search falls back to semantic food-preference matching when AI is
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: false,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true, telegramOnly: true,
+        sponsoredAiAllowed: false,
+      }],
     }),
   };
   const response = await handleTelegramMiniAppRequest({
@@ -4593,16 +4085,13 @@ test('Mini App search ranks questions through the session worker AI route when a
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true, telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
     }),
   };
   const calls = [];
@@ -4629,17 +4118,14 @@ test('Mini App search ranks questions through the session worker AI route when a
       assert.equal(body.apiKey, 'sk-bridge-openai');
       assert.deepEqual(body.response_format, { type: 'json_object' });
       assert.match(body.messages[1].content, /food preference/);
-      return new Response(
-        JSON.stringify({
-          completion: JSON.stringify({
-            matches: [{ key: 'q-pizza', score: 96, reason: 'pizza preference' }],
-          }),
+      return new Response(JSON.stringify({
+        completion: JSON.stringify({
+          matches: [{ key: 'q-pizza', score: 96, reason: 'pizza preference' }],
         }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -4668,10 +4154,7 @@ test('Mini App search ranks questions through the session worker AI route when a
   assert.equal(body.ok, true);
   assert.equal(body.source, 'ai');
   assert.deepEqual(body.results, [{ key: 'q-pizza', score: 96, rank: 1, reason: 'pizza preference' }]);
-  assert.deepEqual(
-    calls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/ai'],
-  );
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/ai']);
 });
 
 test('Mini App transcribe endpoint uses bridge OpenAI key before session worker auth', async () => {
@@ -4685,27 +4168,22 @@ test('Mini App transcribe endpoint uses bridge OpenAI key before session worker 
     AGENT_BRIDGE_OPENAI_TRANSCRIBE_URL: 'https://api.openai.example/v1/audio/transcriptions',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId,
-        questionType: 'freeform',
-        prompt: 'Should audio comments transcribe?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'freeform',
+      prompt: 'Should audio comments transcribe?',
+    }]),
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true, telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
     }),
   };
   const state = await __test__telegramMiniApp.buildMiniAppState({
@@ -4747,10 +4225,7 @@ test('Mini App transcribe endpoint uses bridge OpenAI key before session worker 
 
   assert.equal(response.status, 200);
   assert.deepEqual(body, { ok: true, text: 'audio note' });
-  assert.deepEqual(
-    calls.map((call) => call.url),
-    ['https://api.openai.example/v1/audio/transcriptions'],
-  );
+  assert.deepEqual(calls.map((call) => call.url), ['https://api.openai.example/v1/audio/transcriptions']);
 });
 
 test('Mini App transcribe endpoint accepts session-scoped AI search dictation without a question key', async () => {
@@ -4763,16 +4238,13 @@ test('Mini App transcribe endpoint accepts session-scoped AI search dictation wi
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true, telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
     }),
   };
   const calls = [];
@@ -4823,10 +4295,7 @@ test('Mini App transcribe endpoint accepts session-scoped AI search dictation wi
 
   assert.equal(response.status, 200);
   assert.deepEqual(body, { ok: true, text: 'office pets' });
-  assert.deepEqual(
-    calls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/transcribe'],
-  );
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/transcribe']);
 });
 
 test('Mini App transcribe endpoint rejects oversized microphone audio before upstream auth', async () => {
@@ -4870,16 +4339,14 @@ test('Mini App transcribe endpoint rate limits repeated microphone requests per 
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
     }),
   };
   env.AGENT_BRIDGE_FETCH = async (url) => {
@@ -4991,29 +4458,14 @@ test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo togg
   assert.match(html, /section\.className = 'groupCategory' \+ \(expanded \? '' : ' collapsed'\);/);
   assert.match(html, /header\.setAttribute\('aria-expanded', expanded \? 'true' : 'false'\);/);
   assert.match(html, /\.groupCategory\.collapsed \.groupOptions \{ display: none; \}/);
-  assert.match(
-    html,
-    /el\.groupsTitleSession\.textContent = currentSession\.sessionName \|\| state\.groupsSessionSlug \|\| '';/,
-  );
-  assert.match(
-    html,
-    /el\.groupsSummary\.textContent = categories\.length \? '' : 'No groups are configured for this session\.';/,
-  );
+  assert.match(html, /el\.groupsTitleSession\.textContent = currentSession\.sessionName \|\| state\.groupsSessionSlug \|\| '';/);
+  assert.match(html, /el\.groupsSummary\.textContent = categories\.length \? '' : 'No groups are configured for this session\.';/);
   assert.match(html, /\/telegram\/mini-app\/api\/groups/);
   assert.match(html, /id="addQuestionPanel"/);
-  assert.match(
-    html,
-    /class="sectionTitle addQuestionTitle"[\s\S]*<span>Add question<\/span>[\s\S]*id="addQuestionTitleSession"/,
-  );
-  assert.match(
-    html,
-    /\.addQuestionTitleSession \{[\s\S]*opacity: 0\.5;[\s\S]*font-size: 12px;[\s\S]*color: var\(--muted\);/,
-  );
+  assert.match(html, /class="sectionTitle addQuestionTitle"[\s\S]*<span>Add question<\/span>[\s\S]*id="addQuestionTitleSession"/);
+  assert.match(html, /\.addQuestionTitleSession \{[\s\S]*opacity: 0\.5;[\s\S]*font-size: 12px;[\s\S]*color: var\(--muted\);/);
   assert.match(html, /addQuestionTitleSession: document\.getElementById\('addQuestionTitleSession'\)/);
-  assert.match(
-    html,
-    /el\.addQuestionTitleSession\.textContent = currentSession\.sessionName \|\| state\.addQuestionSessionSlug \|\| 'No session selected';/,
-  );
+  assert.match(html, /el\.addQuestionTitleSession\.textContent = currentSession\.sessionName \|\| state\.addQuestionSessionSlug \|\| 'No session selected';/);
   assert.equal(html.includes('id="resetAddQuestion"'), false);
   assert.equal(html.includes("resetAddQuestion: document.getElementById('resetAddQuestion')"), false);
   assert.equal(html.includes('function resetAddQuestionForm()'), false);
@@ -5095,32 +4547,26 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          lightweightGroups: [
-            {
-              categoryId: 'demo_track',
-              label: 'Demo track',
-              selectionMode: 'single',
-              options: [{ optionId: 'builder', label: 'Builder' }],
-            },
-          ],
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        lightweightGroups: [{
+          categoryId: 'demo_track',
+          label: 'Demo track',
+          selectionMode: 'single',
+          options: [{ optionId: 'builder', label: 'Builder' }],
+        }],
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId: 'q-group-state',
-        questionType: 'freeform',
-        prompt: 'Which group should review this?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-group-state',
+      questionType: 'freeform',
+      prompt: 'Which group should review this?',
+    }]),
   };
 
   const state = await __test__telegramMiniApp.buildMiniAppState({
@@ -5131,36 +4577,24 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
   assert.equal(state.ok, true);
   assert.equal(state.groups.enabled, true);
   assert.equal(state.groups.sessionSlug, 'alpha');
-  assert.equal(
-    state.groups.categories.some((category) => category.categoryId === 'age_bucket'),
-    true,
-  );
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'age_bucket'), true);
   const attendance = state.groups.categories.find((category) => category.categoryId === 'events_attended');
   assert.equal(attendance.label, 'Attendance');
-  assert.deepEqual(
-    attendance.options.map((option) => option.optionId),
-    ['week_1', 'week_2', 'week_3', 'week_4', 'entire_month', 'attended_previous_edge_events'],
-  );
-  assert.equal(
-    state.groups.categories.some((category) => category.categoryId === 'time_in_crypto'),
-    false,
-  );
-  assert.equal(
-    state.groups.categories.some((category) => category.categoryId === 'primary_focus'),
-    false,
-  );
-  assert.equal(
-    state.groups.categories.some((category) => category.categoryId === 'demo_track'),
-    true,
-  );
-  assert.equal(
-    state.groups.categories.some(
-      (category) =>
-        category.categoryId === 'contribution_role' &&
-        category.options.some((option) => option.optionId === 'investor'),
-    ),
-    true,
-  );
+  assert.deepEqual(attendance.options.map((option) => option.optionId), [
+    'week_1',
+    'week_2',
+    'week_3',
+    'week_4',
+    'entire_month',
+    'attended_previous_edge_events',
+  ]);
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'time_in_crypto'), false);
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'primary_focus'), false);
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'demo_track'), true);
+  assert.equal(state.groups.categories.some((category) => (
+    category.categoryId === 'contribution_role' &&
+    category.options.some((option) => option.optionId === 'investor')
+  )), true);
 
   const saveResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/groups?sessionSlug=alpha', {
@@ -5227,15 +4661,13 @@ test('Mini App add question endpoint persists Telegram-only proposed questions',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sessionContext: 'Edge City lunch planning with founders and attendees.',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sessionContext: 'Edge City lunch planning with founders and attendees.',
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([]),
@@ -5282,17 +4714,15 @@ test('Mini App add question formatter uses session worker AI to shape dictation 
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-          sessionContext: 'Edge City lunch decisions for attendees.',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        sessionContext: 'Edge City lunch decisions for attendees.',
+      }],
     }),
   };
   const calls = [];
@@ -5330,19 +4760,16 @@ test('Mini App add question formatter uses session worker AI to shape dictation 
         sessionContext: 'Edge City lunch decisions for attendees.',
         existingTags: ['food'],
       });
-      return new Response(
-        JSON.stringify({
-          completion: JSON.stringify({
-            prompt: 'What should lunch be?',
-            options: ['Pizza', 'Salad', 'Tacos'],
-            tags: ['food', 'lunch'],
-          }),
+      return new Response(JSON.stringify({
+        completion: JSON.stringify({
+          prompt: 'What should lunch be?',
+          options: ['Pizza', 'Salad', 'Tacos'],
+          tags: ['food', 'lunch'],
         }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -5373,10 +4800,7 @@ test('Mini App add question formatter uses session worker AI to shape dictation 
   assert.deepEqual(body.question.options, ['Pizza', 'Salad', 'Tacos']);
   assert.equal(body.question.tags.includes('food'), true);
   assert.equal(body.question.tags.includes('lunch'), true);
-  assert.deepEqual(
-    calls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/ai'],
-  );
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/ai']);
 });
 
 test('Mini App add question voice formatter can infer multichoice type and options with AI', async () => {
@@ -5389,16 +4813,14 @@ test('Mini App add question voice formatter can infer multichoice type and optio
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
     }),
   };
   env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
@@ -5426,20 +4848,17 @@ test('Mini App add question voice formatter can infer multichoice type and optio
         sessionContext: '',
         existingTags: [],
       });
-      return new Response(
-        JSON.stringify({
-          completion: JSON.stringify({
-            questionType: 'multichoice',
-            prompt: 'What should lunch be?',
-            options: ['Pizza', 'Salad', 'Tacos'],
-            tags: ['food', 'lunch'],
-          }),
+      return new Response(JSON.stringify({
+        completion: JSON.stringify({
+          questionType: 'multichoice',
+          prompt: 'What should lunch be?',
+          options: ['Pizza', 'Salad', 'Tacos'],
+          tags: ['food', 'lunch'],
         }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -5477,14 +4896,12 @@ test('Mini App add question voice formatter locally infers multichoice when AI i
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
     }),
   };
 
@@ -5523,18 +4940,16 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Session Lab Organizers',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          sponsoredAiAllowed: true,
-          sessionWorkerUrl: 'https://session.example',
-          sessionContext: 'Organizers are deciding how to run an session lab experiment and what outcomes matter.',
-          telegramQuestionTags: ['session-topic'],
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Session Lab Organizers',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        sessionContext: 'Organizers are deciding how to run an session lab experiment and what outcomes matter.',
+        telegramQuestionTags: ['session-topic'],
+      }],
     }),
   };
   await seedPreviewPrivateSession(env, 'alpha');
@@ -5543,18 +4958,15 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
     const target = String(url);
     calls.push({ url: target, init });
     if (target === 'https://example.com/source') {
-      return new Response(
-        [
-          '<html><head><title>Session Lab Brief</title></head><body>',
-          'The session lab will explore participant onboarding, agent-mediated sensemaking, organizer workload, privacy, consent, and practical outcomes. ',
-          'Organizers need questions that reveal tradeoffs about how to run the experiment and how success should be evaluated.',
-          '</body></html>',
-        ].join(''),
-        {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        },
-      );
+      return new Response([
+        '<html><head><title>Session Lab Brief</title></head><body>',
+        'The session lab will explore participant onboarding, agent-mediated sensemaking, organizer workload, privacy, consent, and practical outcomes. ',
+        'Organizers need questions that reveal tradeoffs about how to run the experiment and how success should be evaluated.',
+        '</body></html>',
+      ].join(''), {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
     }
     if (target.endsWith('/auth/nonce')) {
       return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
@@ -5578,30 +4990,26 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
       assert.match(aiBody.messages[1].content, /numberOfSeedStatementsOrPrompts: 2/);
       assert.match(aiBody.messages[1].content, /Session Lab Brief/);
       assert.match(aiBody.messages[1].content, /Organizers are deciding how to run an session lab experiment/);
-      return new Response(
-        JSON.stringify({
-          completion: JSON.stringify({
-            surveyTitle: 'Session Lab Brief',
-            questions: [
-              {
-                prompt: 'Session Lab organizers should prioritize onboarding clarity over adding more demo features.',
-                questionType: 'binary',
-                tags: ['onboarding'],
-              },
-              {
-                prompt:
-                  'The experiment should measure whether agent-mediated sensemaking improves organizer decisions.',
-                questionType: 'binary',
-                tags: ['sensemaking'],
-              },
-            ],
-          }),
+      return new Response(JSON.stringify({
+        completion: JSON.stringify({
+          surveyTitle: 'Session Lab Brief',
+          questions: [
+            {
+              prompt: 'Session Lab organizers should prioritize onboarding clarity over adding more demo features.',
+              questionType: 'binary',
+              tags: ['onboarding'],
+            },
+            {
+              prompt: 'The experiment should measure whether agent-mediated sensemaking improves organizer decisions.',
+              questionType: 'binary',
+              tags: ['sensemaking'],
+            },
+          ],
         }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
     return new Response(JSON.stringify({ error: 'unexpected_url' }), {
       status: 500,
@@ -5632,10 +5040,7 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
   assert.equal(body.candidates[0].questionType, 'agree_unsure_disagree');
   assert.equal(body.candidates[0].tags.includes('session-topic'), true);
   assert.equal(body.candidates[0].tags.includes('onboarding'), true);
-  assert.deepEqual(
-    calls.map((call) => new URL(call.url).pathname),
-    ['/source', '/auth/nonce', '/auth/login', '/ai'],
-  );
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/source', '/auth/nonce', '/auth/login', '/ai']);
 });
 
 test('Mini App add question endpoint enforces Telegram-native authoring binding', async () => {
@@ -5644,14 +5049,12 @@ test('Mini App add question endpoint enforces Telegram-native authoring binding'
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
     }),
   };
   const response = await handleTelegramMiniAppRequest({
@@ -5680,14 +5083,12 @@ test('Mini App add question endpoint keeps agree questions binary', async () => 
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([]),
@@ -5723,14 +5124,12 @@ test('Mini App group and image routes enforce Telegram-only and results exposure
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: false,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: false,
+      }],
     }),
   };
   const groupsResponse = await handleTelegramMiniAppRequest({
@@ -5746,27 +5145,23 @@ test('Mini App group and image routes enforce Telegram-only and results exposure
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          resultsExposure: {
-            aggregateResultsEnabled: false,
-          },
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        resultsExposure: {
+          aggregateResultsEnabled: false,
         },
-      ],
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId: 'q-pizza',
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Leftover pizza tastes better cold than reheated.',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-pizza',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Leftover pizza tastes better cold than reheated.',
+    }]),
   };
   const imageResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus'),
@@ -5792,24 +5187,20 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId: 'q-pizza',
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Leftover pizza tastes better cold than reheated.',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-pizza',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Leftover pizza tastes better cold than reheated.',
+    }]),
   };
 
   const summaryResponse = await handleTelegramMiniAppRequest({
@@ -5847,9 +5238,7 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
   assert.match(analysis.analysis.name, /Builders|Stewards|Seekers|cluster/i);
 
   const imageResponse = await handleTelegramMiniAppRequest({
-    request: new Request(
-      'https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&demo=1',
-    ),
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&demo=1'),
     env,
   });
   const bytes = new Uint8Array(await imageResponse.arrayBuffer());
@@ -5859,9 +5248,7 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
   assert.deepEqual(Array.from(bytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
 
   const consensusImageResponse = await handleTelegramMiniAppRequest({
-    request: new Request(
-      'https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&sort=most_consensus&demo=1',
-    ),
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&sort=most_consensus&demo=1'),
     env,
   });
   const consensusBytes = new Uint8Array(await consensusImageResponse.arrayBuffer());
@@ -5871,9 +5258,7 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
   assert.deepEqual(Array.from(consensusBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
 
   const topicImageResponse = await handleTelegramMiniAppRequest({
-    request: new Request(
-      'https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=topic-map&demo=1',
-    ),
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=topic-map&demo=1'),
     env,
   });
   const topicBytes = new Uint8Array(await topicImageResponse.arrayBuffer());
@@ -5890,96 +5275,69 @@ test('Mini App live results can filter by saved lightweight group details', asyn
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [
-        {
-          sessionSlug: 'alpha',
-          sessionName: 'Alpha',
-          telegramBridgeEnabled: true,
-          telegramOnly: true,
-          resultsExposure: { minGroupSize: 2, anonymizedGroupsEnabled: true },
-        },
-      ],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        resultsExposure: { minGroupSize: 2, anonymizedGroupsEnabled: true },
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
-    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      {
-        sessionSlug: 'alpha',
-        questionId: 'q-filter',
-        questionType: 'agree_unsure_disagree',
-        prompt: 'Should filtered results include this?',
-      },
-    ]),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-filter',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should filtered results include this?',
+    }]),
   };
-  await seedSubmitRecord(
-    kv,
-    'telegram:submit-request:one',
-    JSON.stringify({
-      status: 'submit_request_created',
-      sessionSlug: 'alpha',
-      telegramUserId: 'user-a',
-      questionId: 'q-filter',
-      answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
-      createdAt: '2026-05-25T00:00:00.000Z',
-    }),
-  );
-  await seedSubmitRecord(
-    kv,
-    'telegram:submit-request:two',
-    JSON.stringify({
-      status: 'submit_request_created',
-      sessionSlug: 'alpha',
-      telegramUserId: 'user-b',
-      questionId: 'q-filter',
-      answer: { questionType: 'agree_unsure_disagree', value: 'disagree', label: 'Disagree' },
-      createdAt: '2026-05-25T00:01:00.000Z',
-    }),
-  );
-  await seedSubmitRecord(
-    kv,
-    'telegram:submit-request:three',
-    JSON.stringify({
-      status: 'submit_request_created',
-      sessionSlug: 'alpha',
-      telegramUserId: 'user-c',
-      questionId: 'q-filter',
-      answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
-      createdAt: '2026-05-25T00:02:00.000Z',
-    }),
-  );
-  await kv.put(
-    'telegram:lightweight-group-membership:alpha:user-a',
-    JSON.stringify({
-      sessionSlug: 'alpha',
-      telegramUserId: 'user-a',
-      selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
-      details: { country_relationship: { live_in_country: 'United States' } },
-    }),
-  );
-  await kv.put(
-    'telegram:lightweight-group-membership:alpha:user-b',
-    JSON.stringify({
-      sessionSlug: 'alpha',
-      telegramUserId: 'user-b',
-      selections: { age_bucket: ['35_44'], country_relationship: ['live_in'] },
-      details: { country_relationship: { live_in_country: 'Canada' } },
-    }),
-  );
-  await kv.put(
-    'telegram:lightweight-group-membership:alpha:user-c',
-    JSON.stringify({
-      sessionSlug: 'alpha',
-      telegramUserId: 'user-c',
-      selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
-      details: { country_relationship: { live_in_country: 'United States' } },
-    }),
-  );
+  await seedSubmitRecord(kv, 'telegram:submit-request:one', JSON.stringify({
+    status: 'submit_request_created',
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-a',
+    questionId: 'q-filter',
+    answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
+    createdAt: '2026-05-25T00:00:00.000Z',
+  }));
+  await seedSubmitRecord(kv, 'telegram:submit-request:two', JSON.stringify({
+    status: 'submit_request_created',
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-b',
+    questionId: 'q-filter',
+    answer: { questionType: 'agree_unsure_disagree', value: 'disagree', label: 'Disagree' },
+    createdAt: '2026-05-25T00:01:00.000Z',
+  }));
+  await seedSubmitRecord(kv, 'telegram:submit-request:three', JSON.stringify({
+    status: 'submit_request_created',
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-c',
+    questionId: 'q-filter',
+    answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
+    createdAt: '2026-05-25T00:02:00.000Z',
+  }));
+  await kv.put('telegram:lightweight-group-membership:alpha:user-a', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-a',
+    selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'United States' } },
+  }));
+  await kv.put('telegram:lightweight-group-membership:alpha:user-b', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-b',
+    selections: { age_bucket: ['35_44'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'Canada' } },
+  }));
+  await kv.put('telegram:lightweight-group-membership:alpha:user-c', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-c',
+    selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'United States' } },
+  }));
 
-  const filters = encodeURIComponent(
-    JSON.stringify({
-      selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
-      details: { country_relationship: { live_in_country: 'United States' } },
-    }),
-  );
+  const filters = encodeURIComponent(JSON.stringify({
+    selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'United States' } },
+  }));
   const response = await handleTelegramMiniAppRequest({
     request: new Request(`https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&filters=${filters}`),
     env,

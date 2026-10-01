@@ -83,10 +83,9 @@ function normalizeChoiceList(source = {}) {
 export function answerFromStoredDraft(draft = {}) {
   if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return null;
   const parsed = safeJsonParse(draft.answerValue, null);
-  const base =
-    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed
-      : { value: draft.answerValue || draft.answerLabel };
+  const base = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed
+    : { value: draft.answerValue || draft.answerLabel };
   return {
     ...base,
     label: base.label || draft.answerLabel || '',
@@ -97,30 +96,21 @@ export function answerFromStoredDraft(draft = {}) {
 
 export function answerFromAgentInitial(source = {}) {
   const raw = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
-  const initial =
-    raw.initialAnswer ||
-    raw.initialDraft ||
-    raw.suggestedAnswer ||
-    raw.agentDraft ||
-    raw.originalAnswer ||
-    raw.previousAnswer ||
-    raw.draftAnswer ||
-    null;
+  const initial = raw.initialAnswer || raw.initialDraft || raw.suggestedAnswer || raw.agentDraft ||
+    raw.originalAnswer || raw.previousAnswer || raw.draftAnswer || null;
   if (!initial) return null;
   return initial && typeof initial === 'object' && !Array.isArray(initial) ? initial : { value: initial };
 }
 
 function normalizeAnswerForMetric(answer = null, questionType = '') {
   if (!answer) return null;
-  const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : { value: answer };
+  const source = answer && typeof answer === 'object' && !Array.isArray(answer)
+    ? answer
+    : { value: answer };
   const type = normalizeQuestionType(questionType || source.questionType || source.controlType);
-  const comments = safeString(
-    source.comments || source.additionalComments || source.reason || source.rationale || source.comment,
-  );
+  const comments = safeString(source.comments || source.additionalComments || source.reason || source.rationale || source.comment);
   if (type === 'binary') {
-    const value = normalizeBinaryValue(
-      firstValue(source.value, source.answer, source.choice, source.stance, source.label),
-    );
+    const value = normalizeBinaryValue(firstValue(source.value, source.answer, source.choice, source.stance, source.label));
     return value ? { type, value, comments } : { type, comments };
   }
   if (type === 'rating') {
@@ -160,20 +150,15 @@ function buildMultichoiceMetrics(draft = {}, sent = {}) {
     addedCount: added,
     removedCount: removed,
     intersectionCount: intersection,
-    jaccardBucket:
-      jaccard === 1
-        ? '1'
-        : jaccard >= 0.75
-          ? '0.75-0.99'
-          : jaccard >= 0.5
-            ? '0.5-0.74'
-            : jaccard > 0
-              ? '0.01-0.49'
-              : '0',
+    jaccardBucket: jaccard === 1 ? '1' : jaccard >= 0.75 ? '0.75-0.99' : jaccard >= 0.5 ? '0.5-0.74' : jaccard > 0 ? '0.01-0.49' : '0',
   };
 }
 
-export function buildDraftEditMetricSummary({ questionType = '', draftAnswer = null, sentAnswer = null } = {}) {
+export function buildDraftEditMetricSummary({
+  questionType = '',
+  draftAnswer = null,
+  sentAnswer = null,
+} = {}) {
   const type = normalizeQuestionType(questionType);
   const draft = normalizeAnswerForMetric(draftAnswer, type);
   const sent = normalizeAnswerForMetric(sentAnswer, type);
@@ -201,9 +186,7 @@ export function buildDraftEditMetricSummary({ questionType = '', draftAnswer = n
     metrics.answerChanged = metrics.ratingDirection !== 'same';
   } else if (type === 'quadratic') {
     const length = Math.max(draft.values.length, sent.values.length);
-    metrics.changedOptionCount = Array.from({ length }, (_, i) => draft.values[i] !== sent.values[i]).filter(
-      Boolean,
-    ).length;
+    metrics.changedOptionCount = Array.from({ length }, (_, i) => draft.values[i] !== sent.values[i]).filter(Boolean).length;
     metrics.answerChanged = metrics.changedOptionCount > 0;
   } else if (type === 'multichoice') {
     Object.assign(metrics, buildMultichoiceMetrics(draft, sent));
@@ -219,9 +202,7 @@ export function buildDraftEditMetricSummary({ questionType = '', draftAnswer = n
 }
 
 async function participantRef({ env = {}, telegramUserId = '', sessionSlug = '' } = {}) {
-  const rootSecret = safeString(
-    env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || env.MANAGED_ACCOUNT_ROOT_SECRET,
-  );
+  const rootSecret = safeString(env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || env.MANAGED_ACCOUNT_ROOT_SECRET);
   if (!rootSecret || !telegramUserId || !sessionSlug) return '';
   const seed = stableJson({
     purpose: 'telegram_draft_edit_metric_participant',

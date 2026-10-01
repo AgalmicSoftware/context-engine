@@ -619,7 +619,11 @@ async function readMiniAppOnboardInput(request) {
   const url = new URL(request.url);
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   return {
-    initData: safeString(body.initData || body.telegramInitData || request.headers.get('X-Telegram-Init-Data')),
+    initData: safeString(
+      body.initData ||
+        body.telegramInitData ||
+        request.headers.get('X-Telegram-Init-Data'),
+    ),
     startParam: safeString(
       body.startParam ||
         body.startapp ||
@@ -1728,9 +1732,7 @@ async function resolveHandoffContext({
           telegram: {
             userId: legacyTelegramUserId || safeString(input.adapterMetadata?.telegram?.userId),
             username: safeString(input.username || input.adapterMetadata?.telegram?.username),
-            groupChatId: delegation
-              ? ''
-              : safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
+            groupChatId: delegation ? '' : safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
             chatId: delegation ? '' : safeString(input.chatId || input.adapterMetadata?.telegram?.chatId),
           },
         }
@@ -1923,12 +1925,7 @@ function submitRecordAnswerForAgent(record = {}) {
     questionType,
     ...(label ? { label } : {}),
   };
-  if (questionType === 'quadratic')
-    return {
-      ...base,
-      value: structured.value ?? answer.value,
-      comments: safeString(structured.comments || answer.comments),
-    };
+  if (questionType === 'quadratic') return { ...base, value: structured.value ?? answer.value, comments: safeString(structured.comments || answer.comments) };
   if (questionType === 'multichoice') {
     const values = Array.isArray(structured.values)
       ? structured.values.map(safeAnswerString).filter(Boolean)
@@ -2537,15 +2534,8 @@ function normalizeQuestionDraftInputs(input = {}) {
         .replace(/\s+/g, ' ')
         .slice(0, 1000),
       questionType: safeString(entry.questionType || entry.type || input.questionType || 'binary') || 'binary',
-      options: Array.isArray(entry.options)
-        ? entry.options
-            .map(safeString)
-            .filter(Boolean)
-            .slice(0, (entry.questionType || entry.type || input.questionType) === 'quadratic' ? Infinity : 12)
-        : [],
-      ...((entry.questionType || entry.type || input.questionType) === 'quadratic'
-        ? { voiceCredits: entry.voiceCredits ?? input.voiceCredits ?? 99 }
-        : {}),
+      options: Array.isArray(entry.options) ? entry.options.map(safeString).filter(Boolean).slice(0, (entry.questionType || entry.type || input.questionType) === 'quadratic' ? Infinity : 12) : [],
+      ...((entry.questionType || entry.type || input.questionType) === 'quadratic' ? { voiceCredits: entry.voiceCredits ?? input.voiceCredits ?? 99 } : {}),
       tags: normalizeQuestionTags(entry.tags || input.tags),
       sessionContext: safeString(
         entry.sessionContext ||
@@ -5687,11 +5677,7 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
   if (questionType === 'quadratic') {
     const value = source.value ?? source.answer;
     if (validateQuadraticAllocation(value, question)) return null;
-    return {
-      label: formatQuadraticAllocation(value, question.options),
-      value: { questionType, value, comments },
-      controlType: 'quadratic_allocation',
-    };
+    return { label: formatQuadraticAllocation(value, question.options), value: { questionType, value, comments }, controlType: 'quadratic_allocation' };
   }
   if (questionType === 'binary') {
     const raw = lower(firstValue(source.value, source.answer, source.choice, source.stance, source.label));
@@ -6316,8 +6302,7 @@ async function validateOnboardingTelegramIdentity(initData, env) {
   };
   // Credential issuance always requires a real Telegram identity, including in operator previews.
   const validated = await validateTelegramMiniAppInitData(initData, {
-    ...validationEnv,
-    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
+    ...validationEnv, AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
   });
   return validated;
 }
@@ -6335,7 +6320,12 @@ async function handleMiniAppOnboardRequest({ request, env = {}, createdAt = null
   }
   const requestUrl = new URL(request.url);
   if (requestUrl.searchParams.has('initData') || requestUrl.searchParams.has('telegramInitData')) {
-    return jsonMiniAppOnboard(request, env, { ok: false, reason: 'miniapp_initdata_query_forbidden' }, { status: 400 });
+    return jsonMiniAppOnboard(
+      request,
+      env,
+      { ok: false, reason: 'miniapp_initdata_query_forbidden' },
+      { status: 400 },
+    );
   }
 
   const input = await readMiniAppOnboardInput(request);
@@ -6492,8 +6482,9 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     env,
   );
   // An invite proves eligibility, not ownership of a caller-supplied Telegram account.
-  const telegramUserId =
-    identity.ok && identity.authMode === 'telegram' ? safeString(identity.user?.telegramUserId) : '';
+  const telegramUserId = identity.ok && identity.authMode === 'telegram'
+    ? safeString(identity.user?.telegramUserId)
+    : '';
   const policy = await loadSessionPolicy(env);
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || body.defaultSessionSlug || body.slug);
   const invitedSessionSlug = sanitizeSessionSlug(invite.invite.sessionSlug);
@@ -6995,16 +6986,10 @@ async function handleWrappedMemberExchangeRequest({ request, env = {}, fetchImpl
 }
 
 const REGISTRY_READ_ROUTES = new Set([
-  '/api/agent/questions',
-  '/api/agent/tags',
-  '/api/agent/results',
-  '/api/agent/admin/status',
-  '/api/agent/admin/metrics',
-  '/api/agent/session-meta',
-  '/api/agent/skill',
-  '/api/agent/skill-version',
-  '/api/agent/session-wrapped/skill',
-  '/api/agent/session-wrapped/skill-version',
+  '/api/agent/questions', '/api/agent/tags', '/api/agent/results',
+  '/api/agent/admin/status', '/api/agent/admin/metrics',
+  '/api/agent/session-meta', '/api/agent/skill', '/api/agent/skill-version',
+  '/api/agent/session-wrapped/skill', '/api/agent/session-wrapped/skill-version',
 ]);
 
 async function handleTelegramAgentHandoffRequestUnsafe({
@@ -7015,14 +7000,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
 } = {}) {
   const url = new URL(request.url);
   const routePathname = toCanonicalAgentApiPathname(url.pathname);
-  if (
-    routePathname.startsWith('/api/agent/') &&
-    request.method !== 'OPTIONS' &&
-    !REGISTRY_READ_ROUTES.has(routePathname)
-  ) {
+  if (routePathname.startsWith('/api/agent/') && request.method !== 'OPTIONS' && !REGISTRY_READ_ROUTES.has(routePathname)) {
     const policy = await loadSessionPolicy(env, {
-      includeResultsExposureOverrides: false,
-      includeAdminDefaultOverride: false,
+      includeResultsExposureOverrides: false, includeAdminDefaultOverride: false,
     });
     // Some GET routes create grants or perform paid work. Only explicit read
     // routes may use registry discovery; HTTP method alone is not authority.

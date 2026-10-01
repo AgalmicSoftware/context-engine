@@ -10,17 +10,13 @@ const loadModule = async () => {
   return import(moduleUrl);
 };
 
-const cfSuccess = (result = {}) =>
-  new Response(
-    JSON.stringify({
-      success: true,
-      result,
-    }),
-    {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
+const cfSuccess = (result = {}) => new Response(JSON.stringify({
+  success: true,
+  result,
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
 
 const makeFetchSequence = (responses = []) => {
   const queue = [...responses];
@@ -39,27 +35,24 @@ const makeFetchSequence = (responses = []) => {
 
 test('parseArgs accepts required deploy-helper flags and boolean switches', async () => {
   const { parseArgs } = await loadModule();
-  assert.deepEqual(
-    parseArgs([
-      '--worker-name',
-      'ce-helper',
-      '--api-token',
-      'cf-token',
-      '--allowed-origins',
-      'https://app.example.test,http://localhost:3000',
-      '--skip-build',
-    ]),
-    {
-      'worker-name': 'ce-helper',
-      'api-token': 'cf-token',
-      'allowed-origins': 'https://app.example.test,http://localhost:3000',
-      'skip-build': true,
-    },
-  );
+  assert.deepEqual(parseArgs([
+    '--worker-name', 'ce-helper',
+    '--api-token', 'cf-token',
+    '--allowed-origins', 'https://app.example.test,http://localhost:3000',
+    '--skip-build',
+  ]), {
+    'worker-name': 'ce-helper',
+    'api-token': 'cf-token',
+    'allowed-origins': 'https://app.example.test,http://localhost:3000',
+    'skip-build': true,
+  });
 });
 
 test('resolveDeployHelperDeployConfig falls back to the stable hosted/local bootstrap origins', async () => {
-  const { DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS, resolveDeployHelperDeployConfig } = await loadModule();
+  const {
+    DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS,
+    resolveDeployHelperDeployConfig,
+  } = await loadModule();
   const config = resolveDeployHelperDeployConfig({
     flags: {
       'worker-name': 'ce-helper',
@@ -116,10 +109,16 @@ test('resolveDeployHelperDeployConfig normalizes explicit env allowlist values',
 
   assert.equal(config.apiToken, 'cf-token');
   assert.equal(config.workerName, 'ce-helper');
-  assert.deepEqual(config.allowedOrigins, ['https://app.example.test', 'http://localhost:3000']);
+  assert.deepEqual(config.allowedOrigins, [
+    'https://app.example.test',
+    'http://localhost:3000',
+  ]);
   assert.equal(config.workerBundleUrl, DEFAULT_SESSION_WORKER_BUNDLE_URL);
   assert.equal(config.workerBundleManifestUrl, DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL);
-  assert.equal(config.bundlePath, path.resolve('/tmp/context-engine', DEFAULT_DEPLOY_HELPER_BUNDLE_PATH));
+  assert.equal(
+    config.bundlePath,
+    path.resolve('/tmp/context-engine', DEFAULT_DEPLOY_HELPER_BUNDLE_PATH)
+  );
 });
 
 test('buildDeployHelperUploadMetadata writes the expected bindings', async () => {
@@ -144,11 +143,7 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
     },
     { name: 'ALLOWED_ORIGINS', type: 'plain_text', text: 'https://app.example.test,http://localhost:3000' },
     { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: 'https://assets.example.test/sessionCorsWorker.bundle.js' },
-    {
-      name: 'WORKER_BUNDLE_MANIFEST_URL',
-      type: 'plain_text',
-      text: 'https://assets.example.test/worker-release-manifest.json',
-    },
+    { name: 'WORKER_BUNDLE_MANIFEST_URL', type: 'plain_text', text: 'https://assets.example.test/worker-release-manifest.json' },
     { name: 'WORKER_COMPATIBILITY_DATE', type: 'plain_text', text: '2025-02-02' },
     { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: 'alpha' },
   ]);
@@ -162,16 +157,13 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
 
 test('deployDeployHelperWorker retries an already-applied coordinator migration without dropping its binding', async () => {
   const { deployDeployHelperWorker } = await loadModule();
-  const migrationFailure = new Response(
-    JSON.stringify({
-      success: false,
-      errors: [{ message: 'Migration tag precondition failed: tag already applied.' }],
-    }),
-    {
-      status: 412,
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
+  const migrationFailure = new Response(JSON.stringify({
+    success: false,
+    errors: [{ message: 'Migration tag precondition failed: tag already applied.' }],
+  }), {
+    status: 412,
+    headers: { 'Content-Type': 'application/json' },
+  });
   const fetchMock = makeFetchSequence([
     cfSuccess([{ id: 'account-123', name: 'Test Account' }]),
     cfSuccess([{ id: 'kv-123', title: 'ContextEngineDeployHelper:ce-helper' }]),
@@ -191,9 +183,9 @@ test('deployDeployHelperWorker retries an already-applied coordinator migration 
   });
 
   assert.equal(result.ok, true);
-  const uploadCalls = fetchMock.calls.filter(
-    ([url, init]) => String(url).endsWith('/workers/scripts/ce-helper') && init?.method === 'PUT',
-  );
+  const uploadCalls = fetchMock.calls.filter(([url, init]) => (
+    String(url).endsWith('/workers/scripts/ce-helper') && init?.method === 'PUT'
+  ));
   assert.equal(uploadCalls.length, 2);
   const firstMetadata = JSON.parse(await new Response(uploadCalls[0][1].body.get('metadata')).text());
   const retryMetadata = JSON.parse(await new Response(uploadCalls[1][1].body.get('metadata')).text());
@@ -203,28 +195,22 @@ test('deployDeployHelperWorker retries an already-applied coordinator migration 
     new_sqlite_classes: ['SessionWriteCoordinator'],
   });
   assert.equal(Object.hasOwn(retryMetadata, 'migrations'), false);
-  assert.deepEqual(
-    retryMetadata.bindings.find(({ name }) => name === 'CE_SESSION_COORDINATOR'),
-    {
-      name: 'CE_SESSION_COORDINATOR',
-      type: 'durable_object_namespace',
-      class_name: 'SessionWriteCoordinator',
-    },
-  );
+  assert.deepEqual(retryMetadata.bindings.find(({ name }) => name === 'CE_SESSION_COORDINATOR'), {
+    name: 'CE_SESSION_COORDINATOR',
+    type: 'durable_object_namespace',
+    class_name: 'SessionWriteCoordinator',
+  });
 });
 
 test('deployDeployHelperWorker does not mask an unrelated upload precondition failure', async () => {
   const { deployDeployHelperWorker } = await loadModule();
-  const uploadFailure = new Response(
-    JSON.stringify({
-      success: false,
-      errors: [{ message: 'Worker binding precondition failed.' }],
-    }),
-    {
-      status: 412,
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
+  const uploadFailure = new Response(JSON.stringify({
+    success: false,
+    errors: [{ message: 'Worker binding precondition failed.' }],
+  }), {
+    status: 412,
+    headers: { 'Content-Type': 'application/json' },
+  });
   const fetchMock = makeFetchSequence([
     cfSuccess([{ id: 'account-123', name: 'Test Account' }]),
     cfSuccess([{ id: 'kv-123', title: 'ContextEngineDeployHelper:ce-helper' }]),
@@ -311,18 +297,12 @@ test('deployDeployHelperWorker uploads the bundled helper, reuses matching KV, a
     type: 'kv_namespace',
     namespace_id: 'kv-123',
   });
-  assert.deepEqual(
-    metadata.bindings.find(({ name }) => name === 'CE_SESSION_COORDINATOR'),
-    {
-      name: 'CE_SESSION_COORDINATOR',
-      type: 'durable_object_namespace',
-      class_name: 'SessionWriteCoordinator',
-    },
-  );
-  assert.equal(
-    metadata.bindings.some(({ name }) => name === 'ALLOWED_ORIGINS'),
-    true,
-  );
+  assert.deepEqual(metadata.bindings.find(({ name }) => name === 'CE_SESSION_COORDINATOR'), {
+    name: 'CE_SESSION_COORDINATOR',
+    type: 'durable_object_namespace',
+    class_name: 'SessionWriteCoordinator',
+  });
+  assert.equal(metadata.bindings.some(({ name }) => name === 'ALLOWED_ORIGINS'), true);
   assert.deepEqual(metadata.migrations, {
     old_tag: '',
     new_tag: 'ce-session-write-coordinator-v1',

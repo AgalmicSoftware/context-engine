@@ -1,9 +1,4 @@
-import {
-  validateQuadraticAllocation,
-  validateQuadraticQuestion,
-  formatQuadraticAllocation,
-  summarizeQuadraticAllocations,
-} from '../../shared/questions/quadraticAllocation.mjs';
+import { validateQuadraticAllocation, validateQuadraticQuestion, formatQuadraticAllocation, summarizeQuadraticAllocations } from '../../shared/questions/quadraticAllocation.mjs';
 import {
   safeString,
   timingSafeEqualString,
@@ -26,8 +21,15 @@ import {
   TELEGRAM_BRIDGE_ACTIONS,
   TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
-import { buildCanonicalAgentRequest, listAgentApiCapabilities } from './agentApiCatalog.mjs';
-import { listDocumentsForSession, normalizeDocumentRecord, summarizeDocumentForGroup } from './docLibrary.mjs';
+import {
+  buildCanonicalAgentRequest,
+  listAgentApiCapabilities,
+} from './agentApiCatalog.mjs';
+import {
+  listDocumentsForSession,
+  normalizeDocumentRecord,
+  summarizeDocumentForGroup,
+} from './docLibrary.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
   authenticateSessionWorker,
@@ -46,7 +48,10 @@ import {
   buildTelegramPoseQuestionState,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
-import { evaluateSponsoredResourceEligibility, resolveMiniAppSessionInvocation } from './sessionPolicy.mjs';
+import {
+  evaluateSponsoredResourceEligibility,
+  resolveMiniAppSessionInvocation,
+} from './sessionPolicy.mjs';
 import {
   buildQueuedSubmitRecord,
   persistTelegramSubmitRecord,
@@ -91,7 +96,10 @@ import {
   listResponseExportAccess,
   removeResponseExportAllowedAddress,
 } from './telegramResponseExport.mjs';
-import { loadTelegramQuestionQueueConfig, saveTelegramQuestionQueueConfig } from './telegramQuestionQueue.mjs';
+import {
+  loadTelegramQuestionQueueConfig,
+  saveTelegramQuestionQueueConfig,
+} from './telegramQuestionQueue.mjs';
 import {
   analyzeParticipantResultGroup,
   buildDraftProvenance,
@@ -217,7 +225,14 @@ function answerChoiceString(value) {
     return value.map(answerChoiceString).filter(Boolean).join(', ');
   }
   if (typeof value === 'object') {
-    return safeAnswerString(firstAnswerValue(value.label, value.value, value.text, value.answer, value.name, value.id));
+    return safeAnswerString(firstAnswerValue(
+      value.label,
+      value.value,
+      value.text,
+      value.answer,
+      value.name,
+      value.id,
+    ));
   }
   return safeAnswerString(value);
 }
@@ -252,10 +267,9 @@ function normalizeMiniResultClusterCount(value, fallback = MINI_APP_RESULT_GROUP
 }
 
 function miniResultsExposurePolicy(session = {}) {
-  const exposure =
-    session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
-      ? session.resultsExposure
-      : {};
+  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+    ? session.resultsExposure
+    : {};
   return {
     metricsEnabled: exposure.metricsEnabled !== false,
     publishedQuestionsEnabled: exposure.publishedQuestionsEnabled === true,
@@ -276,12 +290,9 @@ function miniResultsLevelState(exposure = {}) {
     ...definition,
     enabled: enabled[definition.key] === true,
     participantVisible: enabled[definition.key] === true,
-    status:
-      enabled[definition.key] === true
-        ? 'available'
-        : definition.key === 'anonymized_groups'
-          ? 'admin_can_enable'
-          : 'admin_disabled',
+    status: enabled[definition.key] === true
+      ? 'available'
+      : (definition.key === 'anonymized_groups' ? 'admin_can_enable' : 'admin_disabled'),
   }));
 }
 
@@ -303,7 +314,9 @@ function pagedMiniAppQuestionEntries(entries = [], limit = DEFAULT_MINI_APP_PAGE
   const boundedLimit = Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Number(limit) || DEFAULT_MINI_APP_PAGE_SIZE));
   const page = source.slice(0, boundedLimit);
   const launchId = lower(launchQuestionId);
-  const launchEntry = launchId ? source.find((entry) => lower(readQuestionId(entry?.question)) === launchId) : null;
+  const launchEntry = launchId
+    ? source.find((entry) => lower(readQuestionId(entry?.question)) === launchId)
+    : null;
   if (launchEntry && !page.some((entry) => lower(readQuestionId(entry?.question)) === launchId)) {
     return [launchEntry, ...page].slice(0, boundedLimit);
   }
@@ -312,7 +325,9 @@ function pagedMiniAppQuestionEntries(entries = [], limit = DEFAULT_MINI_APP_PAGE
 
 function shortAddress(value = '') {
   const address = safeString(value);
-  return /^0x[0-9a-fA-F]{40}$/.test(address) ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+  return /^0x[0-9a-fA-F]{40}$/.test(address)
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : '';
 }
 
 function documentKvPrefix(sessionSlug = '') {
@@ -322,17 +337,13 @@ function documentKvPrefix(sessionSlug = '') {
 
 function documentKvKey({ sessionSlug = '', docId = '' } = {}) {
   const prefix = documentKvPrefix(sessionSlug);
-  const id = safeString(docId)
-    .replace(/[^A-Za-z0-9_-]/g, '')
-    .slice(0, 96);
+  const id = safeString(docId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96);
   return prefix && id ? `${prefix}${id}` : '';
 }
 
 function documentBytesKvKey({ sessionSlug = '', docId = '' } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const id = safeString(docId)
-    .replace(/[^A-Za-z0-9_-]/g, '')
-    .slice(0, 96);
+  const id = safeString(docId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96);
   return slug && id ? `${MINI_APP_DOCUMENT_BYTES_KV_PREFIX}${slug}:${id}` : '';
 }
 
@@ -450,8 +461,8 @@ async function listMiniAppDocuments({ env = {}, session = {} } = {}) {
   const fixtureDocs = listDocumentsForSession(loadMiniAppFixtureDocuments(env), {
     sessionSlug,
     includeGated: true,
-  })
-    .docs.map((doc) => miniAppDocumentSummary({ ...doc, source: 'session_fixture' }))
+  }).docs
+    .map((doc) => miniAppDocumentSummary({ ...doc, source: 'session_fixture' }))
     .filter(Boolean);
   const uploadedDocs = await listMiniAppUploadedDocuments(env, sessionSlug);
   return {
@@ -496,7 +507,12 @@ function miniAppTelegramPrincipal(auth = {}) {
   };
 }
 
-async function buildMiniAppAdminState({ env = {}, auth = {}, session = {}, createdAt = null } = {}) {
+async function buildMiniAppAdminState({
+  env = {},
+  auth = {},
+  session = {},
+  createdAt = null,
+} = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
   if (!sessionSlug) return emptyMiniAppAdminState('', 'session_not_selected');
   const normalized = miniAppTelegramPrincipal(auth);
@@ -529,7 +545,9 @@ async function buildMiniAppAdminState({ env = {}, auth = {}, session = {}, creat
         reason: '',
         accountAddress: safeString(exporter.accountAddress),
         accountAddressShort: shortAddress(exporter.accountAddress),
-        actions: [{ action: 'export_all', label: 'Export data' }],
+        actions: [
+          { action: 'export_all', label: 'Export data' },
+        ],
       };
     }
     return {
@@ -584,10 +602,18 @@ function html(text, init = {}) {
 
 async function hmacSha256Bytes(keyBytes, data = '') {
   if (!globalThis.crypto?.subtle) throw new Error('webcrypto_unavailable');
-  const key = await globalThis.crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
-  ]);
-  return new Uint8Array(await globalThis.crypto.subtle.sign('HMAC', key, new TextEncoder().encode(String(data))));
+  const key = await globalThis.crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return new Uint8Array(await globalThis.crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(String(data))
+  ));
 }
 
 function dataCheckStringFromInitParams(params, { excludeSignature = false } = {}) {
@@ -597,9 +623,9 @@ function dataCheckStringFromInitParams(params, { excludeSignature = false } = {}
     if (excludeSignature && key === 'signature') return;
     entries.push([key, value]);
   });
-  entries.sort(([leftKey, leftValue], [rightKey, rightValue]) =>
-    leftKey === rightKey ? leftValue.localeCompare(rightValue) : leftKey.localeCompare(rightKey),
-  );
+  entries.sort(([leftKey, leftValue], [rightKey, rightValue]) => (
+    leftKey === rightKey ? leftValue.localeCompare(rightValue) : leftKey.localeCompare(rightKey)
+  ));
   return entries.map(([key, value]) => `${key}=${value}`).join('\n');
 }
 
@@ -622,11 +648,10 @@ function parseInitUser(params) {
   }
 }
 
-export async function validateTelegramMiniAppInitData(
-  initData = '',
-  env = {},
-  { nowMs = Date.now(), previewSecret = '' } = {},
-) {
+export async function validateTelegramMiniAppInitData(initData = '', env = {}, {
+  nowMs = Date.now(),
+  previewSecret = '',
+} = {}) {
   const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
   const allowPreviewAuth = envFlagEnabled(env.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH);
   const raw = safeString(initData);
@@ -661,9 +686,9 @@ export async function validateTelegramMiniAppInitData(
     if (params.has('signature')) {
       candidates.push(dataCheckStringFromInitParams(params, { excludeSignature: true }));
     }
-    expectedHashes = await Promise.all(
-      candidates.map(async (candidate) => bytesToHex(await hmacSha256Bytes(secretKey, candidate))),
-    );
+    expectedHashes = await Promise.all(candidates.map(async (candidate) => (
+      bytesToHex(await hmacSha256Bytes(secretKey, candidate))
+    )));
   } catch (error) {
     return {
       ok: false,
@@ -708,7 +733,7 @@ export async function validateTelegramMiniAppInitData(
 function telegramInitDataFromRequest(request) {
   return safeString(
     request.headers.get('X-Telegram-Init-Data') ||
-      request.headers.get('Telegram-Web-App-Init-Data') ||
+    request.headers.get('Telegram-Web-App-Init-Data') ||
       request.headers.get('X-Ce-Telegram-Init-Data'),
   );
 }
@@ -726,9 +751,11 @@ async function resolveLaunchRecord(env = {}, launch = '') {
 }
 
 function normalizeMiniAppQuestionIdList(value = []) {
-  const source = Array.isArray(value) ? value : safeString(value).split(/[\s,;|]+/);
+  const source = Array.isArray(value)
+    ? value
+    : safeString(value).split(/[\s,;|]+/);
   return source
-    .map((entry) => safeString(entry && typeof entry === 'object' ? entry.questionId || entry.id || entry.key : entry))
+    .map((entry) => safeString(entry && typeof entry === 'object' ? (entry.questionId || entry.id || entry.key) : entry))
     .filter(Boolean)
     .filter((entry, index, values) => values.findIndex((candidate) => lower(candidate) === lower(entry)) === index)
     .slice(0, 50);
@@ -779,16 +806,15 @@ function normalizeMiniAppPrefilledDraftsByQuestionId(value = {}) {
 
 function miniAppLaunchSeriesRef(record = {}) {
   const ref = record?.serverContextRef || {};
-  const series =
-    ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
-      ? ref.questionSeries
-      : {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? ref.questionSeries
+    : {};
   const questionIds = normalizeMiniAppQuestionIdList(
     series.questionIds ||
-      series.orderedQuestionIds ||
-      ref.questionIds ||
-      ref.orderedQuestionIds ||
-      ref.questionIdList ||
+    series.orderedQuestionIds ||
+    ref.questionIds ||
+    ref.orderedQuestionIds ||
+    ref.questionIdList ||
       (ref.questionId ? [ref.questionId] : []),
   );
   const skippedQuestionIds = normalizeMiniAppQuestionIdList(
@@ -796,11 +822,11 @@ function miniAppLaunchSeriesRef(record = {}) {
   );
   const draftsByQuestionId = normalizeMiniAppPrefilledDraftsByQuestionId(
     series.draftAnswersByQuestionId ||
-      series.prefilledDraftsByQuestionId ||
-      series.draftsByQuestionId ||
-      ref.draftAnswersByQuestionId ||
-      ref.prefilledDraftsByQuestionId ||
-      ref.draftsByQuestionId ||
+    series.prefilledDraftsByQuestionId ||
+    series.draftsByQuestionId ||
+    ref.draftAnswersByQuestionId ||
+    ref.prefilledDraftsByQuestionId ||
+    ref.draftsByQuestionId ||
       ref.drafts,
   );
   const singleDraft = normalizeMiniAppPrefilledDraftAnswer(ref.prefilledDraft || ref.draftAnswer || ref.draft);
@@ -827,23 +853,12 @@ function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   const launchQuestionIds = miniAppLaunchSeriesRef(launchRecord).questionIds;
   const questionId = safeString(questionRef.questionId);
   if (launchRecord?.miniAppLaunch !== true || launchRecord?.lane !== TELEGRAM_CHAT_LANES.MINI_APP) return false;
-  if (
-    ![TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE].includes(launchRecord.action)
-  ) {
+  if (![TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE].includes(launchRecord.action)) {
     return false;
   }
-  if (
-    launchRef.sessionPicker !== true &&
-    (!launchSessionSlug || !questionSessionSlug || launchSessionSlug !== questionSessionSlug)
-  )
-    return false;
+  if (launchRef.sessionPicker !== true && (!launchSessionSlug || !questionSessionSlug || launchSessionSlug !== questionSessionSlug)) return false;
   if (launchRef.sessionPicker === true && !questionSessionSlug) return false;
-  if (
-    launchQuestionIds.length &&
-    questionId &&
-    !launchQuestionIds.some((candidate) => lower(candidate) === lower(questionId))
-  )
-    return false;
+  if (launchQuestionIds.length && questionId && !launchQuestionIds.some((candidate) => lower(candidate) === lower(questionId))) return false;
   return true;
 }
 
@@ -852,18 +867,15 @@ function isValidMiniAppLaunchRecord(record = {}) {
 }
 
 function miniAppLaunchAllowsAgentWrite(record = {}) {
-  return (
-    isValidMiniAppLaunchRecord(record) &&
-    [
-      TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
-      TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
-      TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
-      TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
-      TELEGRAM_BRIDGE_ACTIONS.UPDATE_AGENT_SETTINGS,
-      TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-      TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
-    ].includes(record.action)
-  );
+  return isValidMiniAppLaunchRecord(record) && [
+    TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+    TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+    TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+    TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
+    TELEGRAM_BRIDGE_ACTIONS.UPDATE_AGENT_SETTINGS,
+    TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+    TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+  ].includes(record.action);
 }
 
 function miniAppLaunchAllowsSession(record = {}, sessionSlug = '') {
@@ -878,7 +890,11 @@ function normalizeAgentSettingsInput(settings = {}) {
   return normalizeTelegramAgentSettingsPatch(settings);
 }
 
-function defaultAgentSettingsState({ sessionSlug = '', settings = {}, createdAt = null } = {}) {
+function defaultAgentSettingsState({
+  sessionSlug = '',
+  settings = {},
+  createdAt = null,
+} = {}) {
   const overview = buildTelegramAgentSettingsOverviewState({
     settings: {
       draftStyle: 'balanced',
@@ -926,25 +942,23 @@ async function persistMiniQuestionAction({
     },
     createdAt,
   });
-  const stored = await persistActionRecord(
-    env,
-    callback.callbackData,
-    {
-      ...callback.record,
-      callbackData: callback.callbackData,
-      miniAppQuestionAction: true,
-    },
-    { ttlSeconds: QUESTION_ACTION_TTL_SECONDS },
-  );
+  const stored = await persistActionRecord(env, callback.callbackData, {
+    ...callback.record,
+    callbackData: callback.callbackData,
+    miniAppQuestionAction: true,
+  }, { ttlSeconds: QUESTION_ACTION_TTL_SECONDS });
   return stored.ok ? callback.callbackData : '';
 }
 
 function formatRequiredSbtSummary(addresses = []) {
-  const list = (Array.isArray(addresses) ? addresses : []).map(safeString).filter(Boolean).slice(0, 4);
+  const list = (Array.isArray(addresses) ? addresses : [])
+    .map(safeString)
+    .filter(Boolean)
+    .slice(0, 4);
   if (!list.length) return '';
-  const short = list.map((address) =>
-    address.length > 14 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address,
-  );
+  const short = list.map((address) => (
+    address.length > 14 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address
+  ));
   return `Required SBT${list.length === 1 ? '' : 's'}: ${short.join(', ')}`;
 }
 
@@ -972,37 +986,30 @@ async function miniQuestionFromRecord({
   const requiredSbtAddresses = Array.isArray(group.requiredSbtAddresses) ? group.requiredSbtAddresses : [];
   const requiredSbtSummary = formatRequiredSbtSummary(requiredSbtAddresses);
   const questionType = safeString(card.questionType || group.questionType || 'freeform');
-  const prompt =
-    locked || payloadUnavailable ? '' : safeString(card.questionText || group.questionText || 'Untitled question');
-  const options = locked || payloadUnavailable ? [] : Array.isArray(card.answerLabels) ? card.answerLabels : [];
+  const prompt = locked || payloadUnavailable ? '' : safeString(card.questionText || group.questionText || 'Untitled question');
+  const options = locked || payloadUnavailable ? [] : (Array.isArray(card.answerLabels) ? card.answerLabels : []);
   const explicitTags = locked || payloadUnavailable ? [] : normalizeQuestionTags(question.tags);
-  const tags =
-    locked || payloadUnavailable
-      ? []
-      : explicitTags.length
-        ? explicitTags
-        : inferQuestionTags({
-            question,
-            prompt,
-            questionType,
-            options,
-            session,
-          });
+  const tags = locked || payloadUnavailable
+    ? []
+    : (explicitTags.length ? explicitTags : inferQuestionTags({
+      question,
+      prompt,
+      questionType,
+      options,
+      session,
+    }));
   const lockMessage = payloadUnavailable
     ? 'Question payload is not available yet. The app will keep retrying.'
     : encrypted
       ? ['This question is encrypted.', requiredSbtSummary].filter(Boolean).join(' ')
       : 'This question is locked in Telegram.';
-  const questionKey =
-    locked || payloadUnavailable
-      ? ''
-      : await persistMiniQuestionAction({
-          env,
-          sessionSlug,
-          question,
-          card,
-          createdAt,
-        });
+  const questionKey = locked || payloadUnavailable ? '' : await persistMiniQuestionAction({
+    env,
+    sessionSlug,
+    question,
+    card,
+    createdAt,
+  });
   const output = {
     index,
     displayIndex: index + 1,
@@ -1016,10 +1023,8 @@ async function miniQuestionFromRecord({
     title: payloadUnavailable
       ? 'Question unavailable'
       : locked
-        ? encrypted
-          ? 'Encrypted question'
-          : 'Locked question'
-        : safeString(card.questionText || group.questionText || 'Untitled question'),
+      ? encrypted ? 'Encrypted question' : 'Locked question'
+      : safeString(card.questionText || group.questionText || 'Untitled question'),
     prompt,
     options,
     tags,
@@ -1032,9 +1037,7 @@ async function miniQuestionFromRecord({
     canAnswer: !locked && !payloadUnavailable && Boolean(questionKey),
     status: payloadUnavailable
       ? 'payload_unavailable'
-      : locked
-        ? safeString(group.status || 'locked_unavailable')
-        : 'answerable',
+      : locked ? safeString(group.status || 'locked_unavailable') : 'answerable',
   };
   Object.defineProperty(output, 'questionId', {
     value: qid,
@@ -1044,14 +1047,12 @@ async function miniQuestionFromRecord({
 }
 
 function launchSessionSlug(record = {}, env = {}) {
-  return (
-    sanitizeSessionSlug(
-      record?.serverContextRef?.sessionSlug ||
-        env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
-        env.DEFAULT_SESSION_SLUG ||
-        'general',
-    ) || 'general'
-  );
+  return sanitizeSessionSlug(
+    record?.serverContextRef?.sessionSlug ||
+    env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
+    env.DEFAULT_SESSION_SLUG ||
+    'general'
+  ) || 'general';
 }
 
 async function readMiniAppPrivateSessionBinding(env = {}, auth = {}) {
@@ -1104,13 +1105,12 @@ function linkedPolicySessions(policy = {}, env = {}) {
         tags: inferQuestionTags({ session, sessionContext }),
       };
     })
-    .filter(
-      (session) =>
-        session.sessionSlug &&
-        session.telegramBridgeEnabled &&
-        session.miniAppEnabled &&
-        sessionUsesWorkerBackedQuestions(session),
-    );
+    .filter((session) => (
+      session.sessionSlug &&
+      session.telegramBridgeEnabled &&
+      session.miniAppEnabled &&
+      sessionUsesWorkerBackedQuestions(session)
+    ));
 }
 
 function buildMiniAppSessionPicker(policy = {}, selectedSessionSlugs = [], env = {}) {
@@ -1170,7 +1170,11 @@ function emptyMiniAppQuestionVoteSummary(userVote = '') {
   };
 }
 
-function miniAppQuestionVoteKey({ sessionSlug = '', questionId = '', telegramUserId = '' } = {}) {
+function miniAppQuestionVoteKey({
+  sessionSlug = '',
+  questionId = '',
+  telegramUserId = '',
+} = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const qid = kvKeySafePart(questionId);
   const user = kvKeySafePart(telegramUserId);
@@ -1187,7 +1191,12 @@ function questionVoteRef(sessionSlug = '', questionId = '') {
   return `${sanitizeSessionSlug(sessionSlug)}:${safeString(questionId)}`;
 }
 
-async function applyMiniAppQuestionVoteSummaries({ env = {}, auth = {}, questions = [], overlayRecords = [] } = {}) {
+async function applyMiniAppQuestionVoteSummaries({
+  env = {},
+  auth = {},
+  questions = [],
+  overlayRecords = [],
+} = {}) {
   const visibleQuestions = Array.isArray(questions) ? questions : [];
   visibleQuestions.forEach((question) => {
     question.voteSummary = emptyMiniAppQuestionVoteSummary();
@@ -1203,13 +1212,9 @@ async function applyMiniAppQuestionVoteSummaries({ env = {}, auth = {}, question
     sessionSlugs.add(sessionSlug);
   });
   if (!questionByRef.size || !sessionSlugs.size) return;
-  const listedRecords = (
-    await Promise.all(
-      [...sessionSlugs].map((sessionSlug) =>
-        listKvRecordsByPrefix(env, miniAppQuestionVoteSessionPrefix(sessionSlug), { limit: 5000 }),
-      ),
-    )
-  ).flat();
+  const listedRecords = (await Promise.all([...sessionSlugs].map((sessionSlug) => (
+    listKvRecordsByPrefix(env, miniAppQuestionVoteSessionPrefix(sessionSlug), { limit: 5000 })
+  )))).flat();
   const recordsByVoter = new Map();
   const rememberRecord = (record = {}, { force = false } = {}) => {
     const ref = questionVoteRef(record.sessionSlug, record.questionId);
@@ -1250,7 +1255,10 @@ async function applyMiniAppQuestionVoteSummaries({ env = {}, auth = {}, question
   });
 }
 
-async function applyMiniAppQuestionResponseCounts({ env = {}, questions = [] } = {}) {
+async function applyMiniAppQuestionResponseCounts({
+  env = {},
+  questions = [],
+} = {}) {
   const visibleQuestions = Array.isArray(questions) ? questions : [];
   visibleQuestions.forEach((question) => {
     question.responseCount = 0;
@@ -1265,12 +1273,10 @@ async function applyMiniAppQuestionResponseCounts({ env = {}, questions = [] } =
     sessionSlugs.add(sessionSlug);
   });
   if (!questionByRef.size || !sessionSlugs.size) return;
-  const recordsBySession = await Promise.all(
-    [...sessionSlugs].map(async (sessionSlug) => ({
-      sessionSlug,
-      records: await loadSubmittedResultRecords(env, sessionSlug),
-    })),
-  );
+  const recordsBySession = await Promise.all([...sessionSlugs].map(async (sessionSlug) => ({
+    sessionSlug,
+    records: await loadSubmittedResultRecords(env, sessionSlug),
+  })));
   recordsBySession.forEach(({ sessionSlug, records }) => {
     records.forEach((record) => {
       const question = questionByRef.get(questionVoteRef(sessionSlug, record.questionId));
@@ -1280,7 +1286,11 @@ async function applyMiniAppQuestionResponseCounts({ env = {}, questions = [] } =
   });
 }
 
-async function loadSubmittedMiniAppAnswers({ env = {}, auth = {}, questions = [] } = {}) {
+async function loadSubmittedMiniAppAnswers({
+  env = {},
+  auth = {},
+  questions = [],
+} = {}) {
   const telegramUserId = safeString(auth.user?.telegramUserId);
   if (!telegramUserId) return { submittedAnswerKeys: [], submittedAnswers: [] };
   const questionByRef = new Map();
@@ -1291,12 +1301,10 @@ async function loadSubmittedMiniAppAnswers({ env = {}, auth = {}, questions = []
   if (!questionByRef.size) return { submittedAnswerKeys: [], submittedAnswers: [] };
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   const sessionSlugs = [...new Set([...questionByRef.keys()].map((ref) => ref.split(':')[0]).filter(Boolean))];
-  const indexedRecordGroups = await Promise.all(
-    sessionSlugs.map((sessionSlug) => {
-      const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
-      return prefix ? listKvRecordsByPrefix(env, prefix, { limit: Infinity }) : [];
-    }),
-  );
+  const indexedRecordGroups = await Promise.all(sessionSlugs.map((sessionSlug) => {
+    const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
+    return prefix ? listKvRecordsByPrefix(env, prefix, { limit: Infinity }) : [];
+  }));
   const records = dedupeRecordsByRequestId(indexedRecordGroups.flat());
   const byQuestionKey = new Map();
   records.forEach((record) => {
@@ -1329,14 +1337,8 @@ async function loadSubmittedMiniAppAnswers({ env = {}, auth = {}, questions = []
 
 function miniSubmittedAnswerLabel(question = {}, answer = {}, record = {}) {
   const type = safeString(question.questionType || record.answer?.questionType || record.controlType);
-  if (type === 'quadratic')
-    return formatQuadraticAllocation(answer.value, question.options) || 'Allocation unavailable';
-  if (
-    type === 'rating' &&
-    answer.value !== undefined &&
-    answer.value !== null &&
-    safeAnswerString(answer.value) !== ''
-  ) {
+  if (type === 'quadratic') return formatQuadraticAllocation(answer.value, question.options) || 'Allocation unavailable';
+  if (type === 'rating' && answer.value !== undefined && answer.value !== null && safeAnswerString(answer.value) !== '') {
     return safeAnswerString(answer.value);
   }
   if (type === 'multichoice' && Array.isArray(answer.values) && answer.values.length) {
@@ -1352,28 +1354,26 @@ function miniSubmittedAnswerLabel(question = {}, answer = {}, record = {}) {
   if (safeAnswerString(answer.value) && !safeAnswerString(answer.value).startsWith('{')) {
     return safeAnswerString(answer.value);
   }
-  return safeAnswerString(
-    firstAnswerValue(record.answer?.label, record.answerLabel, record.answer?.text, record.answerValue),
-  );
+  return safeAnswerString(firstAnswerValue(record.answer?.label, record.answerLabel, record.answer?.text, record.answerValue));
 }
 
 function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
-  const source =
-    record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer) ? record.answer : {};
+  const source = record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer)
+    ? record.answer
+    : {};
   const type = safeString(question.questionType || source.questionType || record.controlType);
   const rawValue = firstAnswerValue(source.value, source.answer, source.text, record.answerValue, record.answerLabel);
   const parsedRawValue = safeJsonParse(safeString(rawValue), null);
-  const parsedSource =
-    parsedRawValue && typeof parsedRawValue === 'object' && !Array.isArray(parsedRawValue) ? parsedRawValue : {};
-  const comments = safeAnswerString(
-    firstAnswerValue(
-      source.comments,
-      source.additionalComments,
-      parsedSource.comments,
-      parsedSource.additionalComments,
-      record.comments,
-    ),
-  );
+  const parsedSource = parsedRawValue && typeof parsedRawValue === 'object' && !Array.isArray(parsedRawValue)
+    ? parsedRawValue
+    : {};
+  const comments = safeAnswerString(firstAnswerValue(
+    source.comments,
+    source.additionalComments,
+    parsedSource.comments,
+    parsedSource.additionalComments,
+    record.comments,
+  ));
   if (type === 'quadratic') {
     return restoreQuadraticMiniAnswer(parsedSource.value ?? parsedRawValue ?? rawValue, question, comments);
   }
@@ -1386,33 +1386,10 @@ function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
     return { values, comments };
   }
   if (type === 'freeform') {
-    return {
-      text: safeAnswerString(
-        firstAnswerValue(
-          source.text,
-          parsedSource.text,
-          source.value,
-          parsedSource.value,
-          source.answer,
-          record.answerValue,
-          record.answerLabel,
-        ),
-      ),
-      comments,
-    };
+    return { text: safeAnswerString(firstAnswerValue(source.text, parsedSource.text, source.value, parsedSource.value, source.answer, record.answerValue, record.answerLabel)), comments };
   }
   if (type === 'rating') {
-    const value = Number(
-      firstAnswerValue(
-        parsedSource.value,
-        parsedSource.rating,
-        source.rating,
-        source.answer,
-        source.value,
-        record.answerValue,
-        record.answerLabel,
-      ),
-    );
+    const value = Number(firstAnswerValue(parsedSource.value, parsedSource.rating, source.rating, source.answer, source.value, record.answerValue, record.answerLabel));
     return { value: Number.isFinite(value) ? value : safeAnswerString(rawValue), comments };
   }
   return { value: lower(firstAnswerValue(parsedSource.value, rawValue)), comments };
@@ -1421,15 +1398,14 @@ function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
 function miniAnswerFromSavedDraft(draft = {}, question = {}) {
   const rawValue = safeString(draft.answerValue || draft.answerLabel);
   const parsed = safeJsonParse(rawValue, null);
-  const source =
-    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed
-      : {
-          questionType: draft.controlType || question.questionType,
-          value: rawValue,
-          text: rawValue,
-          label: draft.answerLabel,
-        };
+  const source = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed
+    : {
+      questionType: draft.controlType || question.questionType,
+      value: rawValue,
+      text: rawValue,
+      label: draft.answerLabel,
+    };
   const comments = safeString(source.comments || source.additionalComments);
   if (question.questionType === 'quadratic' || source.questionType === 'quadratic') {
     return restoreQuadraticMiniAnswer(source.value, question, comments);
@@ -1466,35 +1442,33 @@ async function loadSavedMiniAppDrafts({
 } = {}) {
   const telegramUserId = safeString(auth.user?.telegramUserId);
   if (!telegramUserId) return { savedDrafts: [], draftAnswersByQuestionKey: {} };
-  const submitted = new Set(
-    (Array.isArray(submittedAnswerKeys) ? submittedAnswerKeys : []).map(safeString).filter(Boolean),
-  );
+  const submitted = new Set((Array.isArray(submittedAnswerKeys) ? submittedAnswerKeys : [])
+    .map(safeString)
+    .filter(Boolean));
   const normalized = miniAppTelegramPrincipal(auth);
-  const entries = await Promise.all(
-    questions.map(async (question) => {
-      if (submitted.has(question.questionKey)) return null;
-      const questionSessionSlug = sanitizeSessionSlug(question.sessionSlug || sessionSlug);
-      const draft = await readAnswerDraft({
-        env,
-        normalized,
-        sessionSlug: questionSessionSlug,
-        selectedQuestionId: question.questionId,
-      });
-      if (!draft || safeString(draft.status) !== 'draft_saved') return null;
-      await markAnswerDraftViewed({
-        env,
-        normalized,
-        sessionSlug: questionSessionSlug,
-        selectedQuestionId: question.questionId,
-        viewedAt: createdAt,
-      }).catch(() => null);
-      return {
-        question,
-        draft,
-        answer: miniAnswerFromSavedDraft(draft, question),
-      };
-    }),
-  );
+  const entries = await Promise.all(questions.map(async (question) => {
+    if (submitted.has(question.questionKey)) return null;
+    const questionSessionSlug = sanitizeSessionSlug(question.sessionSlug || sessionSlug);
+    const draft = await readAnswerDraft({
+      env,
+      normalized,
+      sessionSlug: questionSessionSlug,
+      selectedQuestionId: question.questionId,
+    });
+    if (!draft || safeString(draft.status) !== 'draft_saved') return null;
+    await markAnswerDraftViewed({
+      env,
+      normalized,
+      sessionSlug: questionSessionSlug,
+      selectedQuestionId: question.questionId,
+      viewedAt: createdAt,
+    }).catch(() => null);
+    return {
+      question,
+      draft,
+      answer: miniAnswerFromSavedDraft(draft, question),
+    };
+  }));
   const saved = entries.filter(Boolean);
   const draftAnswersByQuestionKey = {};
   for (const entry of saved) {
@@ -1583,7 +1557,10 @@ async function buildMiniAppAgentOnlyState({
   return block;
 }
 
-async function loadMiniAppAgentOnlyConfig({ env = {}, sessionSlug = '' } = {}) {
+async function loadMiniAppAgentOnlyConfig({
+  env = {},
+  sessionSlug = '',
+} = {}) {
   const loadedConfig = await loadAgentOnlyModeConfig({ env, sessionSlug });
   const enabledQuestionIds = Array.isArray(loadedConfig.config?.enabledQuestionIds)
     ? loadedConfig.config.enabledQuestionIds
@@ -1592,7 +1569,12 @@ async function loadMiniAppAgentOnlyConfig({ env = {}, sessionSlug = '' } = {}) {
   return loadedConfig;
 }
 
-async function buildMiniAppState({ request, env = {}, waitUntil = null, createdAt = new Date().toISOString() } = {}) {
+async function buildMiniAppState({
+  request,
+  env = {},
+  waitUntil = null,
+  createdAt = new Date().toISOString(),
+} = {}) {
   const url = new URL(request.url);
   const pageSize = miniAppQuestionPageSize(env);
   const requestedQuestionLimit = miniAppQuestionLimitFromRequest(url, pageSize);
@@ -1602,13 +1584,11 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
     ok: auth.ok === true,
     mode: auth.authMode || 'telegram',
     reason: auth.reason || '',
-    user: auth.user
-      ? {
-          telegramUserId: safeString(auth.user.telegramUserId),
-          username: safeString(auth.user.username),
-          firstName: safeString(auth.user.firstName),
-        }
-      : null,
+    user: auth.user ? {
+      telegramUserId: safeString(auth.user.telegramUserId),
+      username: safeString(auth.user.username),
+      firstName: safeString(auth.user.firstName),
+    } : null,
   };
   if (!auth.ok) {
     return {
@@ -1682,32 +1662,26 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const linkedSessionBySlug = new Map(linkedSessions.map((session) => [session.sessionSlug, session]));
   const linkedSessionLookup = new Set(linkedSessions.map((session) => session.sessionSlug));
   const launchRequestsPicker = sessionPickerEnabled(launchRecord);
-  const pickerSelection = normalizeSessionSlugList(
-    url.searchParams.get('sessions') || url.searchParams.get('sessionSlugs'),
-  );
+  const pickerSelection = normalizeSessionSlugList(url.searchParams.get('sessions') || url.searchParams.get('sessionSlugs'));
   const launchSlug = launchSessionSlug(launchRecord, env);
   const privateBinding = await readMiniAppPrivateSessionBinding(env, auth);
-  const boundSessionSlug =
-    privateBinding?.sessionSlug && linkedSessionLookup.has(privateBinding.sessionSlug)
-      ? privateBinding.sessionSlug
-      : '';
-  const implicitPickerSelection =
-    boundSessionSlug || (linkedSessions.length === 1 ? linkedSessions[0].sessionSlug : '');
+  const boundSessionSlug = privateBinding?.sessionSlug && linkedSessionLookup.has(privateBinding.sessionSlug)
+    ? privateBinding.sessionSlug
+    : '';
+  const implicitPickerSelection = boundSessionSlug || (linkedSessions.length === 1 ? linkedSessions[0].sessionSlug : '');
   const selectedSessionSlugs = (
     pickerSelection.length
       ? pickerSelection
-      : launchRequestsPicker
-        ? [implicitPickerSelection].filter(Boolean)
-        : [launchSlug]
+      : (launchRequestsPicker ? [implicitPickerSelection].filter(Boolean) : [launchSlug])
   ).filter((slug) => linkedSessionLookup.has(slug));
   const launchSlugUnavailable = !launchRequestsPicker && launchSlug && !linkedSessionLookup.has(launchSlug);
-  const fallbackSelectedSessionSlugs =
-    launchSlugUnavailable && selectedSessionSlugs.length === 0
-      ? [implicitPickerSelection].filter(Boolean)
-      : selectedSessionSlugs;
+  const fallbackSelectedSessionSlugs = launchSlugUnavailable && selectedSessionSlugs.length === 0
+    ? [implicitPickerSelection].filter(Boolean)
+    : selectedSessionSlugs;
   const effectivePickerEnabled = linkedSessions.length > 0 || launchRequestsPicker || launchSlugUnavailable;
-  const effectiveSelectedSessionSlugs =
-    launchSlugUnavailable && fallbackSelectedSessionSlugs.length === 0 ? [] : fallbackSelectedSessionSlugs;
+  const effectiveSelectedSessionSlugs = launchSlugUnavailable && fallbackSelectedSessionSlugs.length === 0
+    ? []
+    : fallbackSelectedSessionSlugs;
   const sessionPicker = effectivePickerEnabled
     ? buildMiniAppSessionPicker(policy, effectiveSelectedSessionSlugs, env)
     : { enabled: false, required: false, multiSelect: false, selectedSessionSlugs: [], sessions: [] };
@@ -1750,8 +1724,8 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
       sourceError: '',
       admin: emptyMiniAppAdminState('', 'session_selection_required'),
       agent: {
-        actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true }).map(
-          (capability) => ({
+        actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
+          .map((capability) => ({
             id: capability.id,
             label: capability.label,
             category: capability.category,
@@ -1760,8 +1734,7 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
             handoffStatus: capability.handoffStatus,
             requiredFields: capability.requiredFields,
             miniAppRoutes: capability.miniAppRoutes,
-          }),
-        ),
+          })),
         account: {
           mode: 'managed_telegram_demo',
           createAction: 'agent.account.create',
@@ -1785,17 +1758,15 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const preferredQuestionIds = launchSeries.questionIds.length
     ? launchSeries.questionIds
     : [launchQuestionId].filter(Boolean);
-  const loadedEntries = await Promise.all(
-    effectiveSelectedSessionSlugs.map(async (slug) => ({
-      sessionSlug: slug,
-      session: linkedSessionBySlug.get(slug) || { sessionSlug: slug },
-      loaded: await loadQuestionsForSession(env, slug, {
-        waitUntil,
-        questionLimit: Math.max(requestedQuestionLimit, preferredQuestionIds.length || 0),
-        preferredQuestionIds,
-      }),
-    })),
-  );
+  const loadedEntries = await Promise.all(effectiveSelectedSessionSlugs.map(async (slug) => ({
+    sessionSlug: slug,
+    session: linkedSessionBySlug.get(slug) || { sessionSlug: slug },
+    loaded: await loadQuestionsForSession(env, slug, {
+      waitUntil,
+      questionLimit: Math.max(requestedQuestionLimit, preferredQuestionIds.length || 0),
+      preferredQuestionIds,
+    }),
+  })));
   let questionIndex = 0;
   const sourceQuestionEntries = loadedEntries.flatMap(({ sessionSlug: slug, session, loaded }) => {
     const sourceQuestions = Array.isArray(loaded.questions) ? loaded.questions : [];
@@ -1806,19 +1777,9 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
       index: questionIndex++,
     }));
   });
-  const totalSourceQuestionCount =
-    loadedEntries.reduce(
-      (sum, entry) =>
-        sum +
-        (Number(
-          entry.loaded.discoveredCount ||
-            entry.loaded.indexedQuestionCount ||
-            entry.loaded.questionCount ||
-            entry.loaded.questions?.length ||
-            0,
-        ) || 0),
-      0,
-    ) || sourceQuestionEntries.length;
+  const totalSourceQuestionCount = loadedEntries.reduce((sum, entry) => (
+    sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questionCount || entry.loaded.questions?.length || 0) || 0)
+  ), 0) || sourceQuestionEntries.length;
   const sourceQuestionEntriesById = new Map();
   sourceQuestionEntries.forEach((entry) => {
     const qid = readQuestionId(entry.question);
@@ -1826,32 +1787,29 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   });
   const skippedLaunchQuestionIds = new Set(launchSeries.skippedQuestionIds.map(lower));
   const seriesSourceEntries = launchSeries.enabled
-    ? launchSeries.questionIds.map((questionId) => sourceQuestionEntriesById.get(lower(questionId))).filter(Boolean)
+    ? launchSeries.questionIds
+      .map((questionId) => sourceQuestionEntriesById.get(lower(questionId)))
+      .filter(Boolean)
     : [];
   const allQuestionEntries = seriesSourceEntries.length
     ? seriesSourceEntries.filter((entry) => !skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
     : sourceQuestionEntries;
-  const fastInitialStateLoad =
-    !seriesSourceEntries.length &&
-    requestedQuestionLimit <= DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT &&
-    totalSourceQuestionCount > requestedQuestionLimit &&
-    requestedQuestionLimit < pageSize;
+  const fastInitialStateLoad = !seriesSourceEntries.length
+    && requestedQuestionLimit <= DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT
+    && totalSourceQuestionCount > requestedQuestionLimit
+    && requestedQuestionLimit < pageSize;
   const questionEntries = seriesSourceEntries.length
     ? allQuestionEntries
     : pagedMiniAppQuestionEntries(allQuestionEntries, requestedQuestionLimit, launchQuestionId);
-  const questions = await Promise.all(
-    questionEntries.map(({ sessionSlug: slug, session, question, index }) =>
-      miniQuestionFromRecord({
-        env,
-        sessionSlug: slug,
-        session,
-        question,
-        index,
-        launchQuestionId,
-        createdAt,
-      }),
-    ),
-  );
+  const questions = await Promise.all(questionEntries.map(({ sessionSlug: slug, session, question, index }) => miniQuestionFromRecord({
+    env,
+    sessionSlug: slug,
+    session,
+    question,
+    index,
+    launchQuestionId,
+    createdAt,
+  })));
   const questionsById = new Map();
   questions.forEach((question) => {
     if (question?.questionId) questionsById.set(lower(question.questionId), question);
@@ -1859,19 +1817,12 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const availableQuestionCount = questions.filter((question) => question?.canAnswer).length;
   const unavailableQuestionCount = questions.filter((question) => question?.payloadUnavailable === true).length;
   const lockedQuestionCount = questions.filter((question) => question?.locked === true).length;
-  const discoveredQuestionCount =
-    loadedEntries.reduce(
-      (sum, entry) =>
-        sum +
-        (Number(
-          entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0,
-        ) || 0),
-      0,
-    ) || totalSourceQuestionCount;
-  const activeQuestionKey =
-    (seriesSourceEntries.length
-      ? questions.find((question) => question.canAnswer)?.questionKey || questions[0]?.questionKey
-      : '') ||
+  const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
+    sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
+  ), 0) || totalSourceQuestionCount;
+  const activeQuestionKey = (seriesSourceEntries.length
+    ? questions.find((question) => question.canAnswer)?.questionKey || questions[0]?.questionKey
+    : '') ||
     questions.find((question) => question.activeFromLaunch)?.questionKey ||
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
@@ -1879,10 +1830,10 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const submittedAnswerState = fastInitialStateLoad
     ? { submittedAnswerKeys: [], submittedAnswers: [] }
     : await loadSubmittedMiniAppAnswers({
-        env,
-        auth,
-        questions,
-      });
+      env,
+      auth,
+      questions,
+    });
   if (!fastInitialStateLoad) {
     await applyMiniAppQuestionResponseCounts({
       env,
@@ -1892,13 +1843,13 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const savedDraftState = fastInitialStateLoad
     ? { savedDrafts: [], draftAnswersByQuestionKey: {} }
     : await loadSavedMiniAppDrafts({
-        env,
-        auth,
-        sessionSlug,
-        questions,
-        submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
-        createdAt,
-      });
+      env,
+      auth,
+      sessionSlug,
+      questions,
+      submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
+      createdAt,
+    });
   const prefilledDraftAnswersByQuestionKey = {};
   questions.forEach((question) => {
     const draft = launchSeries.draftsByQuestionId.get(lower(question.questionId));
@@ -1914,10 +1865,10 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const agentSettingsValues = fastInitialStateLoad
     ? {}
     : await loadTelegramAgentSettings({
-        env,
-        sessionSlug,
-        telegramUserId: auth.user?.telegramUserId,
-      });
+      env,
+      sessionSlug,
+      telegramUserId: auth.user?.telegramUserId,
+    });
   const agentSettings = defaultAgentSettingsState({
     sessionSlug,
     settings: agentSettingsValues,
@@ -1926,36 +1877,36 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
   const agentOnly = fastInitialStateLoad
     ? null
     : await buildMiniAppAgentOnlyState({
-        env,
-        auth,
-        sessionSlug,
-        questions,
-        settings: agentSettingsValues,
-        createdAt,
-      });
+      env,
+      auth,
+      sessionSlug,
+      questions,
+      settings: agentSettingsValues,
+      createdAt,
+    });
   const primaryResolved = resolveMiniAppSessionInvocation(policy, sessionSlug);
   const groups = fastInitialStateLoad
     ? emptyMiniAppGroupState(sessionSlug)
-    : primaryResolved.ok
+    : (primaryResolved.ok
       ? await loadTelegramLightweightGroups({
-          env,
-          session: primaryResolved.session,
-          telegramUserId: auth.user?.telegramUserId,
-        })
-      : emptyMiniAppGroupState(sessionSlug);
+        env,
+        session: primaryResolved.session,
+        telegramUserId: auth.user?.telegramUserId,
+      })
+      : emptyMiniAppGroupState(sessionSlug));
   const admin = fastInitialStateLoad
     ? emptyMiniAppAdminState(sessionSlug, 'deferred_fast_initial_load')
-    : primaryResolved.ok
+    : (primaryResolved.ok
       ? await buildMiniAppAdminState({
-          env,
-          auth,
-          session: primaryResolved.session,
-          createdAt,
-        })
-      : emptyMiniAppAdminState(sessionSlug, primaryResolved.reason || 'session_not_available');
-  const selectedSessionTitles = effectiveSelectedSessionSlugs.map(
-    (slug) => linkedSessions.find((session) => session.sessionSlug === slug)?.sessionName || slug,
-  );
+        env,
+        auth,
+        session: primaryResolved.session,
+        createdAt,
+      })
+      : emptyMiniAppAdminState(sessionSlug, primaryResolved.reason || 'session_not_available'));
+  const selectedSessionTitles = effectiveSelectedSessionSlugs.map((slug) => (
+    linkedSessions.find((session) => session.sessionSlug === slug)?.sessionName || slug
+  ));
   const sourceOk = loadedEntries.every((entry) => entry.loaded.ok !== false);
   const sourceReasons = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.reason)).filter(Boolean))];
   const sourceNames = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.source)).filter(Boolean))];
@@ -1975,10 +1926,7 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
     },
     session: {
       sessionSlug,
-      title:
-        selectedSessionTitles.length > 1
-          ? `${selectedSessionTitles.length} sessions`
-          : selectedSessionTitles[0] || sessionSlug,
+      title: selectedSessionTitles.length > 1 ? `${selectedSessionTitles.length} sessions` : (selectedSessionTitles[0] || sessionSlug),
     },
     sessionPicker,
     selectedSessionSlugs: effectiveSelectedSessionSlugs,
@@ -2005,29 +1953,26 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
     questionCount: seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount,
     loadedQuestionCount: questions.length,
     loadedQuestionLimit: requestedQuestionLimit,
-    hasMoreQuestions:
-      (seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount) > questions.length,
+    hasMoreQuestions: (seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount) > questions.length,
     deferredPanels: fastInitialStateLoad ? ['groups', 'admin'] : [],
     availableQuestionCount,
     unavailableQuestionCount,
     lockedQuestionCount,
     discoveredQuestionCount,
-    skippedQuestionCount: loadedEntries.reduce(
-      (sum, entry) =>
-        sum + (Number(entry.loaded.skippedSessionMismatchCount || entry.loaded.scopedOutQuestionCount || 0) || 0),
-      0,
-    ),
+    skippedQuestionCount: loadedEntries.reduce((sum, entry) => (
+      sum + (Number(entry.loaded.skippedSessionMismatchCount || entry.loaded.scopedOutQuestionCount || 0) || 0)
+    ), 0),
     questionIndexComplete: loadedEntries.every((entry) => entry.loaded.complete !== false),
     pageSize,
     questionSource: sourceNames.length === 1 ? sourceNames[0] : 'multi_session_question_cache',
     questionSourceReason: sourceReasons.join(', '),
     sourceOk,
-    sourceError: sourceOk ? '' : sourceReasons.join(', ') || 'question_source_unavailable',
+    sourceError: sourceOk ? '' : (sourceReasons.join(', ') || 'question_source_unavailable'),
     ...(agentOnly ? { agentOnly } : {}),
     admin,
     agent: {
-      actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true }).map(
-        (capability) => ({
+      actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
+        .map((capability) => ({
           id: capability.id,
           label: capability.label,
           category: capability.category,
@@ -2036,8 +1981,7 @@ async function buildMiniAppState({ request, env = {}, waitUntil = null, createdA
           handoffStatus: capability.handoffStatus,
           requiredFields: capability.requiredFields,
           miniAppRoutes: capability.miniAppRoutes,
-        }),
-      ),
+        })),
       account: {
         mode: 'managed_telegram_demo',
         createAction: 'agent.account.create',
@@ -2094,9 +2038,8 @@ function audioFileExtension(file = {}) {
 }
 
 function bridgeOpenAiTranscribeUrl(env = {}) {
-  return (
-    safeString(env.AGENT_BRIDGE_OPENAI_TRANSCRIBE_URL || env.OPENAI_TRANSCRIBE_URL) || DEFAULT_OPENAI_TRANSCRIBE_URL
-  );
+  return safeString(env.AGENT_BRIDGE_OPENAI_TRANSCRIBE_URL || env.OPENAI_TRANSCRIBE_URL) ||
+    DEFAULT_OPENAI_TRANSCRIBE_URL;
 }
 
 async function transcribeMiniAppAudioWithBridgeOpenAi({
@@ -2128,8 +2071,7 @@ async function transcribeMiniAppAudioWithBridgeOpenAi({
   if (!response?.ok) {
     return {
       ok: false,
-      reason:
-        safeString(body?.error?.message || body?.error || body?.message || response?.status) || 'transcription_failed',
+      reason: safeString(body?.error?.message || body?.error || body?.message || response?.status) || 'transcription_failed',
       status: response?.status || 502,
     };
   }
@@ -2143,24 +2085,15 @@ function positiveIntegerEnv(value = '', fallback = 0) {
 }
 
 function miniAppTranscribeMaxBytes(env = {}) {
-  return positiveIntegerEnv(
-    env.AGENT_BRIDGE_TRANSCRIBE_MAX_BYTES || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_MAX_BYTES,
-    DEFAULT_MINI_APP_TRANSCRIBE_MAX_BYTES,
-  );
+  return positiveIntegerEnv(env.AGENT_BRIDGE_TRANSCRIBE_MAX_BYTES || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_MAX_BYTES, DEFAULT_MINI_APP_TRANSCRIBE_MAX_BYTES);
 }
 
 function miniAppTranscribeRateLimit(env = {}) {
-  return positiveIntegerEnv(
-    env.AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_LIMIT,
-    DEFAULT_MINI_APP_TRANSCRIBE_RATE_LIMIT,
-  );
+  return positiveIntegerEnv(env.AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_LIMIT, DEFAULT_MINI_APP_TRANSCRIBE_RATE_LIMIT);
 }
 
 function miniAppTranscribeRateWindowSeconds(env = {}) {
-  return positiveIntegerEnv(
-    env.AGENT_BRIDGE_TRANSCRIBE_RATE_WINDOW_SECONDS || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS,
-    DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS,
-  );
+  return positiveIntegerEnv(env.AGENT_BRIDGE_TRANSCRIBE_RATE_WINDOW_SECONDS || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS, DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS);
 }
 
 function miniAppTranscribeRateKey({
@@ -2169,9 +2102,7 @@ function miniAppTranscribeRateKey({
   createdAt = null,
   windowSeconds = DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS,
 } = {}) {
-  const userId = safeString(telegramUserId)
-    .replace(/[^0-9A-Za-z_-]/g, '')
-    .slice(0, 128);
+  const userId = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
   const slug = sanitizeSessionSlug(sessionSlug || 'unknown');
   const nowMs = createdAt ? Date.parse(createdAt) : Date.now();
   const safeWindowSeconds = Math.max(1, Number(windowSeconds) || DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS);
@@ -2198,26 +2129,20 @@ async function checkMiniAppTranscribeRateLimit({
   if (count >= limit) {
     return { ok: false, status: 429, reason: 'transcribe_rate_limited', retryAfterSeconds: windowSeconds };
   }
-  await kv.put(
-    key,
-    JSON.stringify({
-      version: 1,
-      count: count + 1,
-      limit,
-      windowSeconds,
-      updatedAt: createdAt || new Date().toISOString(),
-    }),
-    { expirationTtl: windowSeconds + 60 },
-  );
+  await kv.put(key, JSON.stringify({
+    version: 1,
+    count: count + 1,
+    limit,
+    windowSeconds,
+    updatedAt: createdAt || new Date().toISOString(),
+  }), { expirationTtl: windowSeconds + 60 });
   return { ok: true, count: count + 1, limit, windowSeconds };
 }
 
 function normalizeChoiceValues(answer = {}) {
   const raw = Array.isArray(answer.values)
     ? answer.values
-    : Array.isArray(answer.selectedValues)
-      ? answer.selectedValues
-      : [answer.value ?? answer.answer];
+    : (Array.isArray(answer.selectedValues) ? answer.selectedValues : [answer.value ?? answer.answer]);
   return raw.map(safeString).filter(Boolean);
 }
 
@@ -2228,12 +2153,7 @@ function normalizeMiniAnswer(answer = {}, questionRef = {}) {
     const value = answer.value;
     const reason = validateQuadraticAllocation(value, questionRef);
     if (reason) return { ok: false, reason };
-    return {
-      ok: true,
-      label: formatQuadraticAllocation(value, questionRef.options),
-      value: JSON.stringify(value),
-      answer: { questionType: type, value, comments },
-    };
+    return { ok: true, label: formatQuadraticAllocation(value, questionRef.options), value: JSON.stringify(value), answer: { questionType: type, value, comments } };
   }
   if (type === 'agree_unsure_disagree') {
     const value = lower(answer.value || answer.answer);
@@ -2300,20 +2220,17 @@ async function persistSubmitRequest({
   }
   const answerFingerprint = stableFingerprint(answer);
   const idempotencyKey = buildSubmitIdempotencyKey({
-    transport: 'telegram_mini_submit',
-    principal: telegramUserId,
-    sessionSlug,
-    questionId: qid,
-    answer,
+    transport: 'telegram_mini_submit', principal: telegramUserId, sessionSlug, questionId: qid, answer,
   });
   const requestId = buildOpaqueActionId(idempotencyKey);
   const kvKey = submitRequestKvKey(requestId);
-  const existing =
-    env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
-      ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
-      : null;
-  const retryExistingDirectFailure =
-    existing && typeof existing === 'object' && !Array.isArray(existing) && existing.status === 'direct_submit_failed';
+  const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
+    : null;
+  const retryExistingDirectFailure = existing &&
+    typeof existing === 'object' &&
+    !Array.isArray(existing) &&
+    existing.status === 'direct_submit_failed';
   if (existing && typeof existing === 'object' && !Array.isArray(existing) && !retryExistingDirectFailure) {
     return {
       ok: true,
@@ -2326,27 +2243,24 @@ async function persistSubmitRequest({
     };
   }
   const submittedAt = safeString(createdAt) || new Date().toISOString();
-  const firstViewedAt = draft
-    ? await readAnswerDraftFirstViewedAt({
-        env,
-        normalized: miniAppTelegramPrincipal(auth),
-        sessionSlug,
-        selectedQuestionId: qid,
-      })
-    : '';
+  const firstViewedAt = draft ? await readAnswerDraftFirstViewedAt({
+    env,
+    normalized: miniAppTelegramPrincipal(auth),
+    sessionSlug,
+    selectedQuestionId: qid,
+  }) : '';
   const draftProvenance = buildDraftProvenance({ draft, submittedAt, firstViewedAt });
-  const emitSubmittedEvent = () =>
-    writeDraftLifecycleEvent(env, {
-      event: 'draft_submitted',
-      sessionSlug,
-      questionId: qid,
-      source: safeString(draft?.source || 'mini_app'),
-      originSource: safeString(draft?.origin?.source),
-      controlType: safeString(draft?.controlType || questionRef.questionType),
-      editCount: Number(draft?.editCount || 0),
-      draftToSubmitMs: draftProvenance?.draftToSubmitMs ?? null,
-      telegramUserId,
-    });
+  const emitSubmittedEvent = () => writeDraftLifecycleEvent(env, {
+    event: 'draft_submitted',
+    sessionSlug,
+    questionId: qid,
+    source: safeString(draft?.source || 'mini_app'),
+    originSource: safeString(draft?.origin?.source),
+    controlType: safeString(draft?.controlType || questionRef.questionType),
+    editCount: Number(draft?.editCount || 0),
+    draftToSubmitMs: draftProvenance?.draftToSubmitMs ?? null,
+    telegramUserId,
+  });
   if (telegramSubmitQueueEnabled(env)) {
     const record = buildQueuedSubmitRecord({
       session,
@@ -2449,25 +2363,25 @@ async function persistSubmitRequest({
     if (directSubmit.ok === true) await emitSubmittedEvent();
     return directSubmit.ok === true
       ? {
-          ok: true,
-          requestId,
-          status: record.status,
-          canonicalApiRequest: record.canonicalApiRequest,
-          idempotencyKey,
-          onChain: directSubmit,
-          replayed: false,
-        }
+        ok: true,
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        onChain: directSubmit,
+        replayed: false,
+      }
       : {
-          ok: false,
-          reason: directSubmit.reason || 'direct_submit_failed',
-          error: directSubmit.error || directSubmit.reason || 'direct_submit_failed',
-          requestId,
-          status: record.status,
-          canonicalApiRequest: record.canonicalApiRequest,
-          idempotencyKey,
-          onChain: directSubmit,
-          replayed: false,
-        };
+        ok: false,
+        reason: directSubmit.reason || 'direct_submit_failed',
+        error: directSubmit.error || directSubmit.reason || 'direct_submit_failed',
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        onChain: directSubmit,
+        replayed: false,
+      };
   }
   const record = {
     version: 1,
@@ -2533,15 +2447,13 @@ async function persistMiniAppDraftDivergence({
     finality,
     createdAt,
   });
-  return metric.ok
-    ? {
-        ok: true,
-        stored: metric.stored === true,
-        changed: metric.metrics?.changed === true,
-        answerChanged: metric.metrics?.answerChanged === true,
-        commentChanged: metric.metrics?.commentChanged === true,
-      }
-    : { ok: false, stored: false, reason: metric.reason || 'draft_divergence_metric_failed' };
+  return metric.ok ? {
+    ok: true,
+    stored: metric.stored === true,
+    changed: metric.metrics?.changed === true,
+    answerChanged: metric.metrics?.answerChanged === true,
+    commentChanged: metric.metrics?.commentChanged === true,
+  } : { ok: false, stored: false, reason: metric.reason || 'draft_divergence_metric_failed' };
 }
 
 async function persistSettingsUpdateRequest({
@@ -2564,10 +2476,9 @@ async function persistSettingsUpdateRequest({
   const idempotencyKey = buildOpaqueActionId(`telegram_mini_settings:${telegramUserId}:${slug}:${patchFingerprint}`);
   const requestId = idempotencyKey;
   const kvKey = `${AGENT_REQUEST_KV_PREFIX}${requestId}`;
-  const existing =
-    env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
-      ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
-      : null;
+  const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
+    : null;
   if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
     assertNoSecretShape(existing, 'Telegram agent settings requests must not serialize secrets.');
     return {
@@ -2620,7 +2531,11 @@ async function persistSettingsUpdateRequest({
   };
 }
 
-async function handleDraftRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleDraftRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
@@ -2630,9 +2545,7 @@ async function handleDraftRequest({ request, env = {}, createdAt = new Date().to
   }
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const questionKey = safeString(body.questionKey);
   const parsed = parseOpaqueActionId(questionKey);
   if (!parsed.ok) {
@@ -2694,32 +2607,28 @@ async function handleDraftRequest({ request, env = {}, createdAt = new Date().to
     return json({ ok: false, error: saved.reason || 'answer_draft_save_failed' }, { status: 503 });
   }
 
-  const submitRequest =
-    body.submit === true
-      ? await persistSubmitRequest({
-          env,
-          auth,
-          session: resolved.session,
-          questionRef,
-          answer: normalizedAnswer.answer,
-          draftKey: saved.key,
-          draft: saved.draft,
-          createdAt,
-        })
-      : null;
+  const submitRequest = body.submit === true
+    ? await persistSubmitRequest({
+      env,
+      auth,
+      session: resolved.session,
+      questionRef,
+      answer: normalizedAnswer.answer,
+      draftKey: saved.key,
+      draft: saved.draft,
+      createdAt,
+    })
+    : null;
   if (submitRequest && !submitRequest.ok) {
     const failure = submitFailureMessage(submitRequest);
-    return json(
-      {
-        ok: false,
-        error: failure.reason,
-        reason: failure.reason,
-        message: failure.message,
-        detail: failure.detail,
-        status: submitRequest.status || '',
-      },
-      { status: 503 },
-    );
+    return json({
+      ok: false,
+      error: failure.reason,
+      reason: failure.reason,
+      message: failure.message,
+      detail: failure.detail,
+      status: submitRequest.status || '',
+    }, { status: 503 });
   }
 
   let draftDivergence = { stored: false, reason: 'draft_divergence_opt_out' };
@@ -2802,7 +2711,10 @@ async function handleDraftRequest({ request, env = {}, createdAt = new Date().to
   });
 }
 
-async function handleClearDraftsRequest({ request, env = {} } = {}) {
+async function handleClearDraftsRequest({
+  request,
+  env = {},
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
@@ -2812,10 +2724,10 @@ async function handleClearDraftsRequest({ request, env = {} } = {}) {
   }
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
-  const questionKeys = Array.isArray(body.questionKeys) ? body.questionKeys.map(safeString).filter(Boolean) : [];
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const questionKeys = Array.isArray(body.questionKeys)
+    ? body.questionKeys.map(safeString).filter(Boolean)
+    : [];
   if (!questionKeys.length) {
     return json({ ok: false, error: 'question_keys_required' }, { status: 400 });
   }
@@ -2864,7 +2776,11 @@ async function handleClearDraftsRequest({ request, env = {} } = {}) {
   });
 }
 
-async function handleQuestionVoteRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleQuestionVoteRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
@@ -2878,9 +2794,7 @@ async function handleQuestionVoteRequest({ request, env = {}, createdAt = new Da
   }
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const vote = normalizeMiniAppQuestionVote(body.vote);
   if (!vote) {
     return json({ ok: false, error: 'question_vote_invalid' }, { status: 400 });
@@ -2906,10 +2820,9 @@ async function handleQuestionVoteRequest({ request, env = {}, createdAt = new Da
   if (!key) {
     return json({ ok: false, error: 'question_vote_ref_incomplete' }, { status: 400 });
   }
-  const previous =
-    typeof env.AGENT_ACTION_KV.get === 'function'
-      ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
-      : null;
+  const previous = typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
+    : null;
   const record = {
     type: 'telegram_mini_app_question_vote',
     version: 1,
@@ -2971,7 +2884,7 @@ async function miniAppQuestionRefForKey({
   if (authMode === 'telegram' && !miniAppLaunchMatchesQuestion(launchRecord, questionRef)) {
     return { ok: false, status: 403, error: 'mini_app_launch_mismatch' };
   }
-  const activePolicy = policy || (await loadSessionPolicy(env));
+  const activePolicy = policy || await loadSessionPolicy(env);
   const resolved = resolveMiniAppSessionInvocation(activePolicy, questionRef.sessionSlug);
   if (!resolved.ok) {
     return {
@@ -2991,16 +2904,18 @@ async function miniAppLaunchForAgentOnlyRequest({ auth = {}, env = {}, launch = 
   return { ok: true, launchRecord };
 }
 
-async function handleAgentOnlyHumanVoteRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleAgentOnlyHumanVoteRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
   const telegramUserId = safeString(auth.user?.telegramUserId);
   if (!telegramUserId) return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const launchResult = await miniAppLaunchForAgentOnlyRequest({ auth, env, launch });
   if (!launchResult.ok) return json({ ok: false, error: launchResult.error }, { status: launchResult.status });
   const taps = Array.isArray(body.taps) ? body.taps : [];
@@ -3041,21 +2956,22 @@ async function handleAgentOnlyHumanVoteRequest({ request, env = {}, createdAt = 
     taps: normalizedTaps,
     now: createdAt,
   });
-  if (!saved.ok)
-    return json({ ok: false, error: saved.reason || 'agent_only_human_vote_failed' }, { status: saved.status || 400 });
+  if (!saved.ok) return json({ ok: false, error: saved.reason || 'agent_only_human_vote_failed' }, { status: saved.status || 400 });
   return json(saved);
 }
 
-async function handleAgentOnlyConfirmRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleAgentOnlyConfirmRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
   const telegramUserId = safeString(auth.user?.telegramUserId);
   if (!telegramUserId) return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const launchResult = await miniAppLaunchForAgentOnlyRequest({ auth, env, launch });
   if (!launchResult.ok) return json({ ok: false, error: launchResult.error }, { status: launchResult.status });
   const questionKey = safeString(body.questionKey);
@@ -3096,19 +3012,15 @@ async function handleAgentOnlyConfirmRequest({ request, env = {}, createdAt = ne
     kind: 'confirm',
     now: createdAt,
   });
-  if (!recorded.ok)
-    return json(
-      { ok: false, error: recorded.reason || 'agent_only_confirm_failed' },
-      { status: recorded.status || 400 },
-    );
-  return json({
-    ok: true,
-    status: recorded.recorded ? 'agent_prediction_confirmed' : 'agent_prediction_confirm_noop',
-    recorded: recorded.recorded === true,
-  });
+  if (!recorded.ok) return json({ ok: false, error: recorded.reason || 'agent_only_confirm_failed' }, { status: recorded.status || 400 });
+  return json({ ok: true, status: recorded.recorded ? 'agent_prediction_confirmed' : 'agent_prediction_confirm_noop', recorded: recorded.recorded === true });
 }
 
-async function handleTranscribeRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleTranscribeRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
@@ -3130,20 +3042,15 @@ async function handleTranscribeRequest({ request, env = {}, createdAt = new Date
     return json({ ok: false, error: 'audio_file_empty' }, { status: 400 });
   }
   if (audioBytes > maxAudioBytes) {
-    return json(
-      {
-        ok: false,
-        error: 'audio_file_too_large',
-        maxBytes: maxAudioBytes,
-      },
-      { status: 413 },
-    );
+    return json({
+      ok: false,
+      error: 'audio_file_too_large',
+      maxBytes: maxAudioBytes,
+    }, { status: 413 });
   }
 
   const url = new URL(request.url);
-  const launch = safeString(
-    form.get('launch') || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(form.get('launch') || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const questionKey = safeString(form.get('questionKey'));
   let questionRef = null;
   let sessionSlugHint = sanitizeSessionSlug(form.get('sessionSlug') || '');
@@ -3201,14 +3108,11 @@ async function handleTranscribeRequest({ request, env = {}, createdAt = new Date
     createdAt,
   });
   if (!rateLimit.ok) {
-    return json(
-      {
-        ok: false,
-        error: rateLimit.reason || 'transcribe_rate_limited',
-        retryAfterSeconds: rateLimit.retryAfterSeconds || undefined,
-      },
-      { status: rateLimit.status || 429 },
-    );
+    return json({
+      ok: false,
+      error: rateLimit.reason || 'transcribe_rate_limited',
+      retryAfterSeconds: rateLimit.retryAfterSeconds || undefined,
+    }, { status: rateLimit.status || 429 });
   }
   const eligibility = evaluateSponsoredResourceEligibility(resolved.session, {
     resource: 'ai',
@@ -3229,13 +3133,10 @@ async function handleTranscribeRequest({ request, env = {}, createdAt = new Date
       fetchImpl,
     });
     if (!bridgeTranscription.ok) {
-      return json(
-        {
-          ok: false,
-          error: bridgeTranscription.reason || 'transcription_failed',
-        },
-        { status: bridgeTranscription.status || 502 },
-      );
+      return json({
+        ok: false,
+        error: bridgeTranscription.reason || 'transcription_failed',
+      }, { status: bridgeTranscription.status || 502 });
     }
     return json({
       ok: true,
@@ -3281,13 +3182,10 @@ async function handleTranscribeRequest({ request, env = {}, createdAt = new Date
   });
   const body = await response.json().catch(() => ({}));
   if (!response?.ok) {
-    return json(
-      {
-        ok: false,
-        error: safeString(body?.error || body?.message || response?.status) || 'transcription_failed',
-      },
-      { status: response?.status || 502 },
-    );
+    return json({
+      ok: false,
+      error: safeString(body?.error || body?.message || response?.status) || 'transcription_failed',
+    }, { status: response?.status || 502 });
   }
   return json({
     ok: true,
@@ -3333,9 +3231,7 @@ function questionSearchText(question = {}) {
     question.sessionName,
     Array.isArray(question.tags) ? question.tags.join(' ') : '',
     Array.isArray(question.options) ? question.options.join(' ') : '',
-  ]
-    .map((value) => safeString(value).toLowerCase())
-    .join(' ');
+  ].map((value) => safeString(value).toLowerCase()).join(' ');
 }
 
 function semanticQuestionSearchScore(question = {}, query = '') {
@@ -3350,7 +3246,10 @@ function semanticQuestionSearchScore(question = {}, query = '') {
   return score;
 }
 
-function fallbackQuestionSearchResults({ query = '', questions = [] } = {}) {
+function fallbackQuestionSearchResults({
+  query = '',
+  questions = [],
+} = {}) {
   return (Array.isArray(questions) ? questions : [])
     .map((question, index) => ({
       key: safeString(question.questionKey || question.key),
@@ -3371,10 +3270,7 @@ function compactSearchQuestion(question = {}, index = 0) {
     prompt: normalizeText(question.prompt || question.title, 600),
     tags: normalizeQuestionTags(question.tags),
     options: Array.isArray(question.options)
-      ? question.options
-          .map((option) => normalizeText(option, 80))
-          .filter(Boolean)
-          .slice(0, 12)
+      ? question.options.map((option) => normalizeText(option, 80)).filter(Boolean).slice(0, 12)
       : [],
   };
 }
@@ -3402,14 +3298,9 @@ function extractAiText(body = {}) {
   const choiceText = safeString(body?.choices?.[0]?.message?.content || body?.choices?.[0]?.text);
   if (choiceText) return choiceText;
   const outputContent = Array.isArray(body?.output)
-    ? body.output.flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+    ? body.output.flatMap((item) => Array.isArray(item?.content) ? item.content : [])
     : [];
-  return safeString(
-    outputContent
-      .map((item) => item?.text || item?.content || '')
-      .filter(Boolean)
-      .join('\n'),
-  );
+  return safeString(outputContent.map((item) => item?.text || item?.content || '').filter(Boolean).join('\n'));
 }
 
 function normalizeAiSearchResults(parsed = {}, fallback = [], allowedKeys = null) {
@@ -3424,7 +3315,7 @@ function normalizeAiSearchResults(parsed = {}, fallback = [], allowedKeys = null
     const score = Number(match?.score);
     out.push({
       key,
-      score: Number.isFinite(score) ? Math.max(1, Math.min(100, Math.round(score))) : byKey.get(key)?.score || 1,
+      score: Number.isFinite(score) ? Math.max(1, Math.min(100, Math.round(score))) : (byKey.get(key)?.score || 1),
       rank: index + 1,
       reason: safeString(match?.reason).slice(0, 120) || 'ai_semantic_match',
     });
@@ -3490,13 +3381,11 @@ function miniDemoAnalysisForGroup(group = {}, index = 0) {
       long: 'They value freeform explanations and want AI summaries to consider qualitative context instead of only button clicks. Their responses are more mixed, but they consistently ask for richer interpretation before publishing results.',
     },
   ];
-  return (
-    analyses[index % analyses.length] || {
-      name: group.label || 'Demo cluster',
-      short: 'This demo cluster shares a visible answer pattern.',
-      long: 'Demo data is synthetic and is only intended to preview the group analysis workflow.',
-    }
-  );
+  return analyses[index % analyses.length] || {
+    name: group.label || 'Demo cluster',
+    short: 'This demo cluster shares a visible answer pattern.',
+    long: 'Demo data is synthetic and is only intended to preview the group analysis workflow.',
+  };
 }
 
 function miniDemoQuestionsForResults() {
@@ -3544,7 +3433,7 @@ function miniDemoResultRecords(questions = []) {
     ['Agree', 'Unsure', 'Disagree', 'Agree', 'Disagree'],
   ];
   const demoQuestions = Array.isArray(questions) && questions.length ? questions : miniDemoQuestionsForResults();
-  return demoQuestions.flatMap((question, questionIndex) =>
+  return demoQuestions.flatMap((question, questionIndex) => (
     (labelsByQuestion[questionIndex] || labelsByQuestion[0]).map((label, participantIndex) => ({
       key: `demo:${question.questionId}:${participantIndex + 1}`,
       createdAt: `demo-${questionIndex + 1}-${participantIndex + 1}`,
@@ -3554,48 +3443,36 @@ function miniDemoResultRecords(questions = []) {
       value: lower(label),
       questionType: 'agree_unsure_disagree',
       text: '',
-      comments:
-        participantIndex % 2 === 0
-          ? [
-              'Demo rationale: this participant wants a low-friction mobile workflow.',
-              'Demo rationale: this participant cares about privacy-preserving summaries.',
-              'Demo rationale: this participant wants agents to help but not bypass approval.',
-            ][participantIndex % 3]
-          : '',
-    })),
-  );
+      comments: participantIndex % 2 === 0 ? [
+        'Demo rationale: this participant wants a low-friction mobile workflow.',
+        'Demo rationale: this participant cares about privacy-preserving summaries.',
+        'Demo rationale: this participant wants agents to help but not bypass approval.',
+      ][participantIndex % 3] : '',
+    }))
+  ));
 }
 
 function resultRowsToBeeswarmRows(rows = []) {
   return rows.slice(0, 3).map((row, index) => ({
     label: `Q${index + 1}`,
     prompt: safeString(row.prompt),
-    answers: Object.entries(row.counts || {}).flatMap(([label, count]) =>
-      new Array(Math.max(0, Number(count || 0))).fill(label),
-    ),
+    answers: Object.entries(row.counts || {}).flatMap(([label, count]) => (
+      new Array(Math.max(0, Number(count || 0))).fill(label)
+    )),
   }));
 }
 
 function normalizeMiniResultGroupFilters(input = {}) {
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
-  const selectionsSource =
-    source.selections && typeof source.selections === 'object' && !Array.isArray(source.selections)
-      ? source.selections
-      : source;
+  const selectionsSource = source.selections && typeof source.selections === 'object' && !Array.isArray(source.selections)
+    ? source.selections
+    : source;
   const selections = {};
   for (const [rawCategoryId, rawValues] of Object.entries(selectionsSource || {})) {
     if (rawCategoryId === 'details') continue;
-    const categoryId = safeString(rawCategoryId)
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, '_')
-      .replace(/^_+|_+$/g, '');
+    const categoryId = safeString(rawCategoryId).toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
     const values = (Array.isArray(rawValues) ? rawValues : [rawValues])
-      .map((value) =>
-        safeString(value)
-          .toLowerCase()
-          .replace(/[^a-z0-9_]+/g, '_')
-          .replace(/^_+|_+$/g, ''),
-      )
+      .map((value) => safeString(value).toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''))
       .filter(Boolean);
     if (categoryId && values.length) selections[categoryId] = Array.from(new Set(values));
   }
@@ -3653,12 +3530,10 @@ async function filterMiniResultRecordsByGroups({
     };
   }
   const memberships = await listTelegramLightweightGroupMemberships({ env, session, limit: 2000 });
-  const matchedUsers = new Set(
-    memberships
-      .filter((membership) => membershipMatchesMiniResultFilters(membership, filters))
-      .map((membership) => safeString(membership.telegramUserId))
-      .filter(Boolean),
-  );
+  const matchedUsers = new Set(memberships
+    .filter((membership) => membershipMatchesMiniResultFilters(membership, filters))
+    .map((membership) => safeString(membership.telegramUserId))
+    .filter(Boolean));
   const filteredRecords = records.filter((record) => matchedUsers.has(safeString(record.telegramUserId)));
   const participants = new Set(filteredRecords.map((record) => safeString(record.telegramUserId)).filter(Boolean));
   const suppressed = participants.size > 0 && participants.size < Math.max(1, Number(minGroupSize || 2));
@@ -3670,23 +3545,25 @@ async function filterMiniResultRecordsByGroups({
   };
 }
 
-async function resolveMiniAppResultsContext({ request, env = {}, body = {} } = {}) {
+async function resolveMiniAppResultsContext({
+  request,
+  env = {},
+  body = {},
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return { ok: false, status: 401, error: auth.reason || 'telegram_init_data_invalid' };
   }
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const policy = await loadSessionPolicy(env);
   const linkedSessions = linkedPolicySessions(policy, env);
   const linkedSessionLookup = new Set(linkedSessions.map((session) => session.sessionSlug));
   const requestedSessionSlugs = normalizeSessionSlugList(
     body.sessionSlug ||
-      body.sessions ||
-      url.searchParams.get('sessionSlug') ||
-      url.searchParams.get('sessions') ||
+    body.sessions ||
+    url.searchParams.get('sessionSlug') ||
+    url.searchParams.get('sessions') ||
       url.searchParams.get('sessionSlugs'),
   );
   let sessionSlug = requestedSessionSlugs[0] || '';
@@ -3713,8 +3590,7 @@ async function resolveMiniAppResultsContext({ request, env = {}, body = {} } = {
     }
   }
   if (!sessionSlug) {
-    sessionSlug =
-      linkedSessions.find((session) => session.default)?.sessionSlug ||
+    sessionSlug = linkedSessions.find((session) => session.default)?.sessionSlug ||
       linkedSessions[0]?.sessionSlug ||
       sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG);
   }
@@ -3738,7 +3614,9 @@ async function resolveMiniAppResultsContext({ request, env = {}, body = {} } = {
 function miniAppPolicySessionForContext(context = {}) {
   const slug = sanitizeSessionSlug(context.session?.sessionSlug);
   const sessions = Array.isArray(context.policy?.sessions) ? context.policy.sessions : [];
-  return sessions.find((session) => sanitizeSessionSlug(session?.sessionSlug) === slug) || context.session || {};
+  return sessions.find((session) => sanitizeSessionSlug(session?.sessionSlug) === slug) ||
+    context.session ||
+    {};
 }
 
 function normalizeMiniAppEthAddress(value = '') {
@@ -3799,20 +3677,20 @@ async function resolveMiniAppAdminContext({
   }));
   const exporter = manager.ok
     ? {
-        ok: true,
-        accountAddress: manager.accountAddress,
-        account: manager.account,
-        rootAdmin: manager.rootAdmin === true,
-      }
+      ok: true,
+      accountAddress: manager.accountAddress,
+      account: manager.account,
+      rootAdmin: manager.rootAdmin === true,
+    }
     : await canExportResponsesForTelegramUser({
-        env,
-        normalized,
-        session: context.session,
-      }).catch((error) => ({
-        ok: false,
-        reason: safeString(error?.message || error) || 'response_export_address_not_allowed',
-        accountAddress: safeString(manager.accountAddress),
-      }));
+      env,
+      normalized,
+      session: context.session,
+    }).catch((error) => ({
+      ok: false,
+      reason: safeString(error?.message || error) || 'response_export_address_not_allowed',
+      accountAddress: safeString(manager.accountAddress),
+    }));
   if (requireManage && !manager.ok) {
     return {
       ok: false,
@@ -3837,7 +3715,12 @@ async function resolveMiniAppAdminContext({
   };
 }
 
-async function miniAppAdminAccessPayload({ env = {}, session = {}, address = '', result = null } = {}) {
+async function miniAppAdminAccessPayload({
+  env = {},
+  session = {},
+  address = '',
+  result = null,
+} = {}) {
   const access = await listResponseExportAccess({ env, session });
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
   return {
@@ -3854,61 +3737,56 @@ async function miniAppAdminAccessPayload({ env = {}, session = {}, address = '',
   };
 }
 
-async function handleAdminAccessRequest({ request, env = {} } = {}) {
+async function handleAdminAccessRequest({
+  request,
+  env = {},
+} = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
-  if (!context.ok)
-    return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
   const url = new URL(request.url);
   const rawAddress = safeString(body.address || url.searchParams.get('address'));
-  const operation = lower(
-    body.operation || body.action || url.searchParams.get('operation') || url.searchParams.get('action'),
-  );
+  const operation = lower(body.operation || body.action || url.searchParams.get('operation') || url.searchParams.get('action'));
   if (request.method === 'GET' || !operation) {
     return json(await miniAppAdminAccessPayload({ env, session: context.session, address: rawAddress }));
   }
   const address = normalizeMiniAppEthAddress(rawAddress);
   if (!address) return json({ ok: false, error: 'response_export_invalid_address' }, { status: 400 });
-  const result =
-    operation === 'remove' || operation === 'revoke'
-      ? await removeResponseExportAllowedAddress({
-          env,
-          normalized: context.normalized,
-          session: context.session,
-          address,
-        })
-      : await addResponseExportAllowedAddress({
-          env,
-          normalized: context.normalized,
-          session: context.session,
-          address,
-        });
-  if (!result.ok)
-    return json({ ok: false, error: result.reason || 'response_export_access_update_failed', result }, { status: 400 });
+  const result = operation === 'remove' || operation === 'revoke'
+    ? await removeResponseExportAllowedAddress({
+      env,
+      normalized: context.normalized,
+      session: context.session,
+      address,
+    })
+    : await addResponseExportAllowedAddress({
+      env,
+      normalized: context.normalized,
+      session: context.session,
+      address,
+    });
+  if (!result.ok) return json({ ok: false, error: result.reason || 'response_export_access_update_failed', result }, { status: 400 });
   return json(await miniAppAdminAccessPayload({ env, session: context.session, address, result }));
 }
 
-async function handleAdminResultsSettingsRequest({ request, env = {} } = {}) {
+async function handleAdminResultsSettingsRequest({
+  request,
+  env = {},
+} = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
-  if (!context.ok)
-    return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
   let result = null;
   if (request.method === 'POST') {
-    const source =
-      body.resultsExposure && typeof body.resultsExposure === 'object' && !Array.isArray(body.resultsExposure)
-        ? body.resultsExposure
-        : body;
+    const source = body.resultsExposure && typeof body.resultsExposure === 'object' && !Array.isArray(body.resultsExposure)
+      ? body.resultsExposure
+      : body;
     const patch = {};
     for (const field of Object.values(MINI_APP_RESULTS_EXPOSURE_FIELDS)) {
-      if (Object.hasOwn(source, field))
-        patch[field] = normalizeResultBoolean(source[field], field === 'aggregateResultsEnabled');
+      if (Object.hasOwn(source, field)) patch[field] = normalizeResultBoolean(source[field], field === 'aggregateResultsEnabled');
     }
     if (Object.hasOwn(source, 'minGroupSize')) {
-      patch.minGroupSize = normalizePositiveInteger(
-        source.minGroupSize,
-        context.session.resultsExposure?.minGroupSize || 2,
-      );
+      patch.minGroupSize = normalizePositiveInteger(source.minGroupSize, context.session.resultsExposure?.minGroupSize || 2);
     }
     if (Object.keys(patch).length) {
       result = await writeResultsExposureOverride({
@@ -3916,8 +3794,7 @@ async function handleAdminResultsSettingsRequest({ request, env = {} } = {}) {
         session: context.session,
         patch,
       });
-      if (!result.ok)
-        return json({ ok: false, error: result.reason || 'results_exposure_update_failed' }, { status: 400 });
+      if (!result.ok) return json({ ok: false, error: result.reason || 'results_exposure_update_failed' }, { status: 400 });
       context.session = {
         ...context.session,
         resultsExposure: {
@@ -3952,16 +3829,17 @@ function miniAppQuestionQueueCandidates(questions = []) {
 }
 
 function resolveMiniAppQuestionQueueIds(value = [], candidates = []) {
-  const tokens = (Array.isArray(value) ? value : safeString(value).split(/[\n,;| ]+/)).map(safeString).filter(Boolean);
+  const tokens = (Array.isArray(value) ? value : safeString(value).split(/[\n,;| ]+/))
+    .map(safeString)
+    .filter(Boolean);
   const ids = [];
   const skipped = [];
   tokens.forEach((token) => {
-    const match = candidates.find(
-      (candidate) =>
-        token === candidate.ref ||
-        lower(token) === lower(candidate.questionId) ||
-        lower(token) === lower(candidate.shortId),
-    );
+    const match = candidates.find((candidate) => (
+      token === candidate.ref ||
+      lower(token) === lower(candidate.questionId) ||
+      lower(token) === lower(candidate.shortId)
+    ));
     if (!match) {
       skipped.push(token);
       return;
@@ -3971,20 +3849,23 @@ function resolveMiniAppQuestionQueueIds(value = [], candidates = []) {
   return { ids, skipped };
 }
 
-async function handleAdminQuestionQueueRequest({ request, env = {} } = {}) {
+async function handleAdminQuestionQueueRequest({
+  request,
+  env = {},
+} = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
-  if (!context.ok)
-    return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug);
   const candidates = miniAppQuestionQueueCandidates(loaded.questions);
   let skipped = [];
   let result = null;
   if (request.method === 'POST') {
     const clear = ['clear', 'reset', 'none'].includes(lower(body.operation || body.action));
-    const requested = clear
-      ? { ids: [], skipped: [] }
-      : resolveMiniAppQuestionQueueIds(body.sponsoredQuestionIds || body.questionIds || body.refs || '', candidates);
+    const requested = clear ? { ids: [], skipped: [] } : resolveMiniAppQuestionQueueIds(
+      body.sponsoredQuestionIds || body.questionIds || body.refs || '',
+      candidates
+    );
     skipped = requested.skipped;
     if (!clear && !requested.ids.length) {
       return json({ ok: false, error: 'question_queue_no_matching_questions', skipped, candidates }, { status: 400 });
@@ -3998,8 +3879,7 @@ async function handleAdminQuestionQueueRequest({ request, env = {} } = {}) {
     });
     if (!result.ok) return json({ ok: false, error: result.reason || 'question_queue_save_failed' }, { status: 400 });
   }
-  const config =
-    result?.config || (await loadTelegramQuestionQueueConfig({ env, sessionSlug: context.session.sessionSlug }));
+  const config = result?.config || await loadTelegramQuestionQueueConfig({ env, sessionSlug: context.session.sessionSlug });
   return json({
     ok: true,
     sessionSlug: context.session.sessionSlug,
@@ -4015,7 +3895,7 @@ async function handleAdminQuestionQueueRequest({ request, env = {} } = {}) {
 
 async function handleAdminExportRequest({ request, env = {} } = {}) {
   const context = await resolveMiniAppAdminContext({
-    request,
+  request,
     env,
     body: {},
     requireManage: false,
@@ -4031,8 +3911,7 @@ async function handleAdminExportRequest({ request, env = {} } = {}) {
     normalized: context.normalized,
     session: context.session,
   });
-  if (!archive.ok)
-    return json({ ok: false, error: archive.reason || 'response_export_failed', archive }, { status: 400 });
+  if (!archive.ok) return json({ ok: false, error: archive.reason || 'response_export_failed', archive }, { status: 400 });
   return new Response(archive.document.bytes, {
     status: 200,
     headers: {
@@ -4045,11 +3924,13 @@ async function handleAdminExportRequest({ request, env = {} } = {}) {
   });
 }
 
-async function handleAdminGroupLinkRequest({ request, env = {} } = {}) {
+async function handleAdminGroupLinkRequest({
+  request,
+  env = {},
+} = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
-  if (!context.ok)
-    return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
   const approval = telegramGroupApprovalGuidance(context.session.sessionSlug);
   return json({
     ok: true,
@@ -4074,7 +3955,10 @@ function miniAppAuthoringPrincipal(context = {}) {
   };
 }
 
-async function evaluateMiniAppQuestionAuthoring({ env = {}, context = {} } = {}) {
+async function evaluateMiniAppQuestionAuthoring({
+  env = {},
+  context = {},
+} = {}) {
   const normalized = miniAppAuthoringPrincipal(context);
   const privateBinding = await readPrivateSessionBinding(env, normalized);
   const permission = evaluateTelegramQuestionAuthoringPermission({
@@ -4088,27 +3972,15 @@ async function evaluateMiniAppQuestionAuthoring({ env = {}, context = {} } = {})
 }
 
 function buildQuadraticResultRows(records = [], questions = []) {
-  return questions
-    .filter(
-      (question) =>
-        (question.questionType || question.type) === 'quadratic' && !question.locked && !question.payloadUnavailable,
-    )
+  return questions.filter((question) => (question.questionType || question.type) === 'quadratic' && !question.locked && !question.payloadUnavailable)
     .map((question) => {
       const latest = new Map();
-      records
-        .filter((record) => record.questionId === readQuestionId(question))
-        .slice()
-        .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)))
+      records.filter((record) => record.questionId === readQuestionId(question))
+        .slice().sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)))
         .forEach((record) => latest.set(record.telegramUserId || record.requestId, record));
       const summary = summarizeQuadraticAllocations([...latest.values()], question);
-      return {
-        questionId: readQuestionId(question),
-        prompt: question.prompt || question.questionText,
-        voiceCredits: question.voiceCredits ?? 99,
-        ...summary,
-      };
-    })
-    .filter((row) => row.totalResponders > 0 || row.excludedResponses > 0);
+      return { questionId: readQuestionId(question), prompt: question.prompt || question.questionText, voiceCredits: question.voiceCredits ?? 99, ...summary };
+    }).filter((row) => row.totalResponders > 0 || row.excludedResponses > 0);
 }
 
 async function buildMiniAppResultsSummary({
@@ -4131,12 +4003,12 @@ async function buildMiniAppResultsSummary({
   const filteredLive = demoData
     ? { records: allLiveRecords, applied: false, matchedParticipants: null, suppressed: false }
     : await filterMiniResultRecordsByGroups({
-        env,
-        session,
-        records: allLiveRecords,
-        filters: normalizedFilters,
-        minGroupSize: exposure.minGroupSize,
-      });
+      env,
+      session,
+      records: allLiveRecords,
+      filters: normalizedFilters,
+      minGroupSize: exposure.minGroupSize,
+    });
   const liveRecords = filteredLive.records;
   const liveConsensusQuestions = consensusQuestionsForResults(loadedQuestionList);
   const questions = demoData ? miniDemoQuestionsForResults() : loadedQuestionList;
@@ -4145,29 +4017,26 @@ async function buildMiniAppResultsSummary({
   const consensusQuestionIds = new Set(consensusQuestions.map(readQuestionId).filter(Boolean));
   const consensusRecords = records.filter((record) => consensusQuestionIds.has(record.questionId));
   const summaries = exposure.aggregateResultsEnabled
-    ? summarizeQuestionResults(consensusRecords, consensusQuestions).filter((summary) => Number(summary.total || 0) > 0)
+    ? summarizeQuestionResults(consensusRecords, consensusQuestions)
+      .filter((summary) => Number(summary.total || 0) > 0)
     : [];
   const divisive = exposure.aggregateResultsEnabled
-    ? summaries
-        .slice()
-        .sort(
-          (left, right) =>
-            right.differenceScore - left.differenceScore ||
-            right.total - left.total ||
-            left.prompt.localeCompare(right.prompt),
-        )
-        .map(miniResultQuestionRow)
+    ? summaries.slice()
+      .sort((left, right) => (
+        right.differenceScore - left.differenceScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      ))
+      .map(miniResultQuestionRow)
     : [];
   const consensus = exposure.aggregateResultsEnabled
-    ? summaries
-        .slice()
-        .sort(
-          (left, right) =>
-            left.differenceScore - right.differenceScore ||
-            right.total - left.total ||
-            left.prompt.localeCompare(right.prompt),
-        )
-        .map(miniResultQuestionRow)
+    ? summaries.slice()
+      .sort((left, right) => (
+        left.differenceScore - right.differenceScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      ))
+      .map(miniResultQuestionRow)
     : [];
   const quadratic = exposure.aggregateResultsEnabled ? buildQuadraticResultRows(records, questions) : [];
   const graph = buildParticipantGraph(records, questions, { clusterCount: resolvedClusterCount });
@@ -4181,28 +4050,23 @@ async function buildMiniAppResultsSummary({
     variantKey: filteredLive.applied ? `filters:${JSON.stringify(normalizedFilters)}` : 'all',
     generatedAt: createdAt,
   });
-  const topicMap =
-    exposure.aggregateResultsEnabled || demoData
-      ? rawTopicMap
-      : {
-          ...rawTopicMap,
-          availability: {
-            ...(rawTopicMap.availability || {}),
-            available: false,
-            reason: 'level_3_aggregate_results_admin_disabled',
-          },
-          topics: [],
-        };
+  const topicMap = exposure.aggregateResultsEnabled || demoData
+    ? rawTopicMap
+    : {
+      ...rawTopicMap,
+      availability: {
+        ...(rawTopicMap.availability || {}),
+        available: false,
+        reason: 'level_3_aggregate_results_admin_disabled',
+      },
+      topics: [],
+    };
   const rawGroups = Array.isArray(graph.groups) ? graph.groups : [];
   const groupViewEnabled = exposure.anonymizedGroupsEnabled || demoData;
   const exposedGroups = groupViewEnabled
     ? rawGroups
-        .filter((group) => Number(group.size || 0) >= exposure.minGroupSize)
-        .map((group, index) =>
-          miniResultGroup(
-            demoData ? { ...group, demo: true, demoAnalysis: miniDemoAnalysisForGroup(group, index) } : group,
-          ),
-        )
+      .filter((group) => Number(group.size || 0) >= exposure.minGroupSize)
+      .map((group, index) => miniResultGroup(demoData ? { ...group, demo: true, demoAnalysis: miniDemoAnalysisForGroup(group, index) } : group))
     : [];
   const counts = {
     questionsSubmitted: questions.length,
@@ -4231,9 +4095,13 @@ async function buildMiniAppResultsSummary({
       mode: session.telegramOnly === true ? 'telegram_only' : safeString(session.sessionMode || 'telegram_enabled'),
     },
     exposure: {
-      participantLevel: groupViewEnabled ? 4 : exposure.aggregateResultsEnabled ? 3 : 1,
+      participantLevel: groupViewEnabled ? 4 : (exposure.aggregateResultsEnabled ? 3 : 1),
       levels: viewLevels,
-      redactions: ['telegram_user_ids', 'wallet_addresses', 'raw_response_records'],
+      redactions: [
+        'telegram_user_ids',
+        'wallet_addresses',
+        'raw_response_records',
+      ],
       minGroupSize: exposure.minGroupSize,
       clusterCount: resolvedClusterCount,
     },
@@ -4280,11 +4148,13 @@ async function buildMiniAppResultsSummary({
     },
     groupView: {
       enabled: groupViewEnabled,
-      status: demoData ? 'demo_preview' : exposure.anonymizedGroupsEnabled ? 'available' : 'admin_can_enable',
+      status: demoData ? 'demo_preview' : (exposure.anonymizedGroupsEnabled ? 'available' : 'admin_can_enable'),
       reason: groupViewEnabled ? '' : 'level_4_anonymized_groups_admin_disabled',
       minGroupSize: exposure.minGroupSize,
       clusterCount: resolvedClusterCount,
-      hiddenGroupCount: groupViewEnabled ? Math.max(0, rawGroups.length - exposedGroups.length) : null,
+      hiddenGroupCount: groupViewEnabled
+        ? Math.max(0, rawGroups.length - exposedGroups.length)
+        : null,
     },
     groups: exposedGroups,
     topicMap,
@@ -4292,7 +4162,11 @@ async function buildMiniAppResultsSummary({
   };
 }
 
-async function handleResultsRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleResultsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const url = new URL(request.url);
   const demo = body.demo === true || ['1', 'true', 'yes', 'on'].includes(lower(url.searchParams.get('demo')));
@@ -4302,14 +4176,7 @@ async function handleResultsRequest({ request, env = {}, createdAt = new Date().
   if (!context.ok) {
     return json({ ok: false, error: context.error || 'results_unavailable' }, { status: context.status || 400 });
   }
-  const summary = await buildMiniAppResultsSummary({
-    env,
-    session: context.session,
-    demo,
-    filters,
-    clusterCount,
-    createdAt,
-  });
+  const summary = await buildMiniAppResultsSummary({ env, session: context.session, demo, filters, clusterCount, createdAt });
   if (request.method !== 'POST' || safeString(body.action || body.mode) !== 'analyze_group') {
     return json(summary);
   }
@@ -4318,33 +4185,28 @@ async function handleResultsRequest({ request, env = {}, createdAt = new Date().
   const graphQuestions = demo ? miniDemoQuestionsForResults() : loadedQuestions;
   const graphRecords = demo
     ? miniDemoResultRecords(graphQuestions)
-    : (
-        await filterMiniResultRecordsByGroups({
-          env,
-          session: context.session,
-          records: await loadSubmittedResultRecords(env, context.session.sessionSlug),
-          filters: normalizeMiniResultGroupFilters(filters),
-          minGroupSize: miniResultsExposurePolicy(context.session).minGroupSize,
-        })
-      ).records;
+    : (await filterMiniResultRecordsByGroups({
+      env,
+      session: context.session,
+      records: await loadSubmittedResultRecords(env, context.session.sessionSlug),
+      filters: normalizeMiniResultGroupFilters(filters),
+      minGroupSize: miniResultsExposurePolicy(context.session).minGroupSize,
+    })).records;
   const liveGraph = buildParticipantGraph(graphRecords, graphQuestions, { clusterCount });
   const graphGroups = demo
     ? (liveGraph.groups || []).map((group, index) => ({
-        ...group,
-        demo: true,
-        demoAnalysis: miniDemoAnalysisForGroup(group, index),
-      }))
-    : liveGraph.groups || [];
+      ...group,
+      demo: true,
+      demoAnalysis: miniDemoAnalysisForGroup(group, index),
+    }))
+    : (liveGraph.groups || []);
   const exposure = miniResultsExposurePolicy(context.session);
   if (exposure.anonymizedGroupsEnabled !== true && !demo) {
-    return json(
-      {
-        ok: false,
-        error: 'level_4_anonymized_groups_admin_disabled',
-        summary,
-      },
-      { status: 403 },
-    );
+    return json({
+      ok: false,
+      error: 'level_4_anonymized_groups_admin_disabled',
+      summary,
+    }, { status: 403 });
   }
   const group = graphGroups
     .filter((item) => Number(item.size || 0) >= exposure.minGroupSize)
@@ -4372,7 +4234,10 @@ async function handleResultsRequest({ request, env = {}, createdAt = new Date().
   });
 }
 
-async function handleActivityRequest({ request, env = {} } = {}) {
+async function handleActivityRequest({
+  request,
+  env = {},
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
@@ -4416,17 +4281,15 @@ async function handleActivityRequest({ request, env = {} } = {}) {
       : linkedSessions.slice(0, 1).map((session) => session.sessionSlug);
   }
   if (!sessionSlugs.length) {
-    const deniedSessionSlug =
-      requestedSessionSlugs[0] || launchSessionSlug(launchRecord, env) || policy.defaultSessionSlug;
+    const deniedSessionSlug = requestedSessionSlugs[0]
+      || launchSessionSlug(launchRecord, env)
+      || policy.defaultSessionSlug;
     const denied = resolveMiniAppSessionInvocation(policy, deniedSessionSlug);
-    return json(
-      {
-        ok: false,
-        error: denied.ok ? 'mini_app_session_unavailable' : denied.reason,
-        sessionSlug: sanitizeSessionSlug(deniedSessionSlug),
-      },
-      { status: denied.reason === 'session_not_linked' ? 404 : 403 },
-    );
+    return json({
+      ok: false,
+      error: denied.ok ? 'mini_app_session_unavailable' : denied.reason,
+      sessionSlug: sanitizeSessionSlug(deniedSessionSlug),
+    }, { status: denied.reason === 'session_not_linked' ? 404 : 403 });
   }
   const actions = await listTelegramAgentActivity({
     env,
@@ -4443,18 +4306,18 @@ async function handleActivityRequest({ request, env = {} } = {}) {
   });
 }
 
-async function handleResultsImageRequest({ request, env = {} } = {}) {
+async function handleResultsImageRequest({
+  request,
+  env = {},
+} = {}) {
   const url = new URL(request.url);
   const modeParam = lower(url.searchParams.get('mode') || url.searchParams.get('view'));
   const mode = ['group', 'topic', 'topic-map', 'topic_map'].includes(modeParam)
-    ? modeParam === 'group'
-      ? 'group'
-      : 'topic-map'
+    ? (modeParam === 'group' ? 'group' : 'topic-map')
     : 'consensus';
-  const resultSort =
-    lower(url.searchParams.get('sort') || url.searchParams.get('variant')) === 'most_consensus'
-      ? 'most_consensus'
-      : 'most_difference';
+  const resultSort = lower(url.searchParams.get('sort') || url.searchParams.get('variant')) === 'most_consensus'
+    ? 'most_consensus'
+    : 'most_difference';
   const demo = ['1', 'true', 'yes', 'on'].includes(lower(url.searchParams.get('demo')));
   const filters = safeJsonParse(url.searchParams.get('filters'), {});
   const context = await resolveMiniAppResultsContext({ request, env });
@@ -4468,12 +4331,12 @@ async function handleResultsImageRequest({ request, env = {} } = {}) {
   const filteredLive = demo
     ? { records: allLiveRecords }
     : await filterMiniResultRecordsByGroups({
-        env,
-        session: context.session,
-        records: allLiveRecords,
-        filters: normalizeMiniResultGroupFilters(filters),
-        minGroupSize: exposure.minGroupSize,
-      });
+      env,
+      session: context.session,
+      records: allLiveRecords,
+      filters: normalizeMiniResultGroupFilters(filters),
+      minGroupSize: exposure.minGroupSize,
+    });
   const liveRecords = filteredLive.records;
   const consensusQuestions = consensusQuestionsForResults(liveQuestions);
   const imageQuestions = demo ? miniDemoQuestionsForResults() : liveQuestions;
@@ -4509,14 +4372,11 @@ async function handleResultsImageRequest({ request, env = {} } = {}) {
       variantKey: Object.keys(filters || {}).length ? `filters:${JSON.stringify(filters)}` : 'all',
     });
     if (!topicMap.availability.available && !demo) {
-      return json(
-        {
-          ok: false,
-          error: topicMap.availability.reason || 'topic_map_not_enough_data',
-          topicMap,
-        },
-        { status: 409 },
-      );
+      return json({
+        ok: false,
+        error: topicMap.availability.reason || 'topic_map_not_enough_data',
+        topicMap,
+      }, { status: 409 });
     }
     image = buildResultsImage({
       mode: 'topic-map',
@@ -4533,14 +4393,13 @@ async function handleResultsImageRequest({ request, env = {} } = {}) {
       binaryQuestions,
     )
       .filter((summary) => Number(summary.total || 0) > 0)
-      .sort(
-        (left, right) =>
-          (resultSort === 'most_consensus'
-            ? left.differenceScore - right.differenceScore
-            : right.differenceScore - left.differenceScore) ||
-          right.total - left.total ||
-          left.prompt.localeCompare(right.prompt),
-      )
+      .sort((left, right) => (
+        (resultSort === 'most_consensus'
+          ? left.differenceScore - right.differenceScore
+          : right.differenceScore - left.differenceScore) ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      ))
       .slice(0, 3)
       .map(miniResultQuestionRow);
     image = buildResultsImage({
@@ -4562,7 +4421,11 @@ async function handleResultsImageRequest({ request, env = {} } = {}) {
   });
 }
 
-async function handleGroupsRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleGroupsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const context = await resolveMiniAppResultsContext({ request, env, body });
   if (!context.ok) {
@@ -4610,10 +4473,12 @@ function miniAppUploadedDocumentRecord({
   previewContentType = '',
   createdAt = null,
 } = {}) {
-  const normalizedVisibility = Object.values(DOC_VISIBILITY).includes(visibility) ? visibility : DOC_VISIBILITY.SESSION;
+  const normalizedVisibility = Object.values(DOC_VISIBILITY).includes(visibility)
+    ? visibility
+    : DOC_VISIBILITY.SESSION;
   const fileName = safeString(file?.name || title);
   const extension = safeString(fileName.split('?')[0].split('#')[0].split('.').pop()).toLowerCase();
-  const fileType = SUPPORTED_DOC_TYPES.includes(extension) ? extension : file?.type || '';
+  const fileType = SUPPORTED_DOC_TYPES.includes(extension) ? extension : (file?.type || '');
   const record = normalizeDocumentRecord({
     sessionSlug,
     title: title || fileName || 'Untitled document',
@@ -4650,7 +4515,12 @@ function miniAppUploadedDocumentRecord({
   };
 }
 
-function miniAppUrlDocumentRecord({ sessionSlug = '', url = '', title = '', createdAt = null } = {}) {
+function miniAppUrlDocumentRecord({
+  sessionSlug = '',
+  url = '',
+  title = '',
+  createdAt = null,
+} = {}) {
   const normalizedUrl = normalizeMiniAppDocumentUrl(url);
   if (!normalizedUrl.ok) return normalizedUrl;
   const record = normalizeDocumentRecord({
@@ -4688,11 +4558,14 @@ function miniAppUrlDocumentRecord({ sessionSlug = '', url = '', title = '', crea
   };
 }
 
-async function handleDocumentsRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
-  const body =
-    request.method === 'POST' && (request.headers.get('content-type') || '').includes('application/json')
-      ? await request.json().catch(() => ({}))
-      : {};
+async function handleDocumentsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const body = request.method === 'POST' && (request.headers.get('content-type') || '').includes('application/json')
+    ? await request.json().catch(() => ({}))
+    : {};
   const context = await resolveMiniAppResultsContext({ request, env, body });
   if (!context.ok) {
     return json({ ok: false, error: context.error || 'documents_unavailable' }, { status: context.status || 400 });
@@ -4718,13 +4591,10 @@ async function handleDocumentsRequest({ request, env = {}, createdAt = new Date(
       createdAt,
     });
     if (!normalized.ok) {
-      return json(
-        {
-          ok: false,
-          error: normalized.reason || 'document_url_invalid',
-        },
-        { status: 400 },
-      );
+      return json({
+        ok: false,
+        error: normalized.reason || 'document_url_invalid',
+      }, { status: 400 });
     }
     const key = documentKvKey({ sessionSlug: context.session.sessionSlug, docId: normalized.record.docId });
     if (!key) return json({ ok: false, error: 'document_key_invalid' }, { status: 400 });
@@ -4747,14 +4617,11 @@ async function handleDocumentsRequest({ request, env = {}, createdAt = new Date(
   const byteLength = Number(file.size || 0) || 0;
   if (byteLength <= 0) return json({ ok: false, error: 'document_file_empty' }, { status: 400 });
   if (byteLength > MINI_APP_DOCUMENT_MAX_BYTES) {
-    return json(
-      {
-        ok: false,
-        error: 'document_file_too_large',
-        maxBytes: MINI_APP_DOCUMENT_MAX_BYTES,
-      },
-      { status: 413 },
-    );
+    return json({
+      ok: false,
+      error: 'document_file_too_large',
+      maxBytes: MINI_APP_DOCUMENT_MAX_BYTES,
+    }, { status: 413 });
   }
   const fileBuffer = await file.arrayBuffer();
   const visibility = safeString(form.get('visibility') || DOC_VISIBILITY.SESSION);
@@ -4772,14 +4639,11 @@ async function handleDocumentsRequest({ request, env = {}, createdAt = new Date(
     createdAt,
   });
   if (!normalized.ok) {
-    return json(
-      {
-        ok: false,
-        error: normalized.reason || 'document_type_unsupported',
-        supportedTypes: normalized.supportedTypes || SUPPORTED_DOC_TYPES,
-      },
-      { status: 400 },
-    );
+    return json({
+      ok: false,
+      error: normalized.reason || 'document_type_unsupported',
+      supportedTypes: normalized.supportedTypes || SUPPORTED_DOC_TYPES,
+    }, { status: 400 });
   }
   const key = documentKvKey({ sessionSlug: context.session.sessionSlug, docId: normalized.record.docId });
   if (!key) return json({ ok: false, error: 'document_key_invalid' }, { status: 400 });
@@ -4788,23 +4652,18 @@ async function handleDocumentsRequest({ request, env = {}, createdAt = new Date(
   if (normalized.record.preview?.available === true) {
     const bytesKey = documentBytesKvKey({ sessionSlug: context.session.sessionSlug, docId: normalized.record.docId });
     if (bytesKey) {
-      await kv.put(
-        bytesKey,
-        JSON.stringify({
-          type: 'telegram_mini_app_document_preview',
-          version: 1,
-          sessionSlug: context.session.sessionSlug,
-          docId: normalized.record.docId,
-          title: normalized.record.title,
-          fileType: normalized.record.fileType,
-          contentType:
-            normalized.record.preview.contentType || documentContentType(normalized.record.fileType, file.type || ''),
-          byteLength,
-          dataBase64: base64FromArrayBuffer(fileBuffer),
-          createdAt,
-        }),
-        { expirationTtl: MINI_APP_DOCUMENT_TTL_SECONDS },
-      );
+      await kv.put(bytesKey, JSON.stringify({
+        type: 'telegram_mini_app_document_preview',
+        version: 1,
+        sessionSlug: context.session.sessionSlug,
+        docId: normalized.record.docId,
+        title: normalized.record.title,
+        fileType: normalized.record.fileType,
+        contentType: normalized.record.preview.contentType || documentContentType(normalized.record.fileType, file.type || ''),
+        byteLength,
+        dataBase64: base64FromArrayBuffer(fileBuffer),
+        createdAt,
+      }), { expirationTtl: MINI_APP_DOCUMENT_TTL_SECONDS });
     }
   }
   return json({
@@ -4814,7 +4673,10 @@ async function handleDocumentsRequest({ request, env = {}, createdAt = new Date(
   });
 }
 
-async function handleDocumentPreviewRequest({ request, env = {} } = {}) {
+async function handleDocumentPreviewRequest({
+  request,
+  env = {},
+} = {}) {
   const context = await resolveMiniAppResultsContext({ request, env });
   if (!context.ok) {
     return json({ ok: false, error: context.error || 'documents_unavailable' }, { status: context.status || 400 });
@@ -4853,12 +4715,10 @@ function normalizeMiniAppQuestionType(value = '') {
 
 function recognizedMiniAppQuestionType(value = '') {
   const type = lower(value).replace(/-/g, '_');
-  if (['agree', 'agree_disagree', 'agree_unsure_disagree', 'binary', 'boolean', 'yes_no'].includes(type))
-    return 'agree_unsure_disagree';
+  if (['agree', 'agree_disagree', 'agree_unsure_disagree', 'binary', 'boolean', 'yes_no'].includes(type)) return 'agree_unsure_disagree';
   if (type === 'quadratic') return 'quadratic';
   if (['rating', 'scale', 'linear_scale'].includes(type)) return 'rating';
-  if (['multichoice', 'multi_choice', 'multiple_choice', 'single_choice', 'choice'].includes(type))
-    return 'multichoice';
+  if (['multichoice', 'multi_choice', 'multiple_choice', 'single_choice', 'choice'].includes(type)) return 'multichoice';
   if (['freeform', 'free_response', 'text'].includes(type)) return 'freeform';
   return '';
 }
@@ -4870,8 +4730,10 @@ function shouldInferMiniAppQuestionType(body = {}) {
 }
 
 function normalizeMiniAppQuestionOptions(value = [], quadratic = false) {
-  const source = Array.isArray(value) ? value : safeString(value).split(/[\n|,;]+/);
-  if (quadratic) return source.map((option) => (typeof option === 'string' ? option.trim() : option));
+  const source = Array.isArray(value)
+    ? value
+    : safeString(value).split(/[\n|,;]+/);
+  if (quadratic) return source.map((option) => typeof option === 'string' ? option.trim() : option);
   return source
     .map((option) => safeString(option).replace(/\s+/g, ' ').slice(0, 80))
     .filter(Boolean)
@@ -4941,31 +4803,24 @@ function inferMiniAppQuestionTypeFromDraft(text = '', parsed = {}) {
 function promptWithoutChoiceSource(text = '', choiceSource = '') {
   const raw = normalizeText(text, 600).replace(/\s+/g, ' ').trim();
   const source = safeString(choiceSource);
-  const withoutSource =
-    source && raw.toLowerCase().endsWith(source.toLowerCase())
-      ? raw.slice(0, Math.max(0, raw.length - source.length)).trim()
-      : raw;
+  const withoutSource = source && raw.toLowerCase().endsWith(source.toLowerCase())
+    ? raw.slice(0, Math.max(0, raw.length - source.length)).trim()
+    : raw;
   return withoutSource
-    .replace(
-      /^(?:please\s+)?(?:ask|create|make|add)\s+(?:a\s+)?(?:(?:multi(?:ple)?[- ]?choice|rating|freeform|agree(?:\/disagree)?|binary)\s+)?(?:question\s+)?(?:that\s+asks?\s+)?/i,
-      '',
-    )
+    .replace(/^(?:please\s+)?(?:ask|create|make|add)\s+(?:a\s+)?(?:(?:multi(?:ple)?[- ]?choice|rating|freeform|agree(?:\/disagree)?|binary)\s+)?(?:question\s+)?(?:that\s+asks?\s+)?/i, '')
     .replace(/\b(?:options?|choices?|answers?)\s*(?:are|include|should be|:|-)\s*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function normalizeFormattedMiniAppQuestionDraft(
-  parsed = {},
-  {
-    questionType = '',
-    fallbackText = '',
-    tags = [],
-    session = {},
-    sessionContext = '',
-    inferQuestionType = false,
-  } = {},
-) {
+function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
+  questionType = '',
+  fallbackText = '',
+  tags = [],
+  session = {},
+  sessionContext = '',
+  inferQuestionType = false,
+} = {}) {
   const type = inferQuestionType
     ? inferMiniAppQuestionTypeFromDraft(fallbackText, parsed)
     : normalizeMiniAppQuestionType(questionType);
@@ -4975,14 +4830,9 @@ function normalizeFormattedMiniAppQuestionDraft(
     .replace(/\s+/g, ' ')
     .trim();
   const prompt = rawPrompt || normalizeText(promptFallback, 600).replace(/\s+/g, ' ').trim();
-  const parsedOptions = normalizeMiniAppQuestionOptions(
-    parsed?.options || parsed?.choices || parsed?.answers,
-    type === 'quadratic',
-  );
+  const parsedOptions = normalizeMiniAppQuestionOptions(parsed?.options || parsed?.choices || parsed?.answers, type === 'quadratic');
   const options = ['multichoice', 'quadratic'].includes(type)
-    ? parsedOptions.length >= 2
-      ? parsedOptions
-      : inferMiniAppQuestionOptionsFromDraft(fallbackText)
+    ? (parsedOptions.length >= 2 ? parsedOptions : inferMiniAppQuestionOptionsFromDraft(fallbackText))
     : [];
   const inferredTags = inferQuestionTags({
     prompt,
@@ -5018,22 +4868,17 @@ function fallbackFormattedMiniAppQuestionDraft({
     .replace(/\s+/g, ' ')
     .replace(/\b(?:options?|choices?|answers?)\s*[:-]\s*.+$/i, '')
     .trim();
-  return normalizeFormattedMiniAppQuestionDraft(
-    {
-      prompt:
-        promptWithoutChoiceSource(cleaned || text, choiceSource) ||
-        normalizeText(text, 600).replace(/\s+/g, ' ').trim(),
-      options: ['multichoice', 'quadratic'].includes(type) ? inferMiniAppQuestionOptionsFromDraft(text) : [],
-    },
-    {
-      questionType: type,
-      fallbackText: text,
-      tags,
-      session,
-      sessionContext,
-      inferQuestionType: false,
-    },
-  );
+  return normalizeFormattedMiniAppQuestionDraft({
+    prompt: promptWithoutChoiceSource(cleaned || text, choiceSource) || normalizeText(text, 600).replace(/\s+/g, ' ').trim(),
+    options: ['multichoice', 'quadratic'].includes(type) ? inferMiniAppQuestionOptionsFromDraft(text) : [],
+  }, {
+    questionType: type,
+    fallbackText: text,
+    tags,
+    session,
+    sessionContext,
+    inferQuestionType: false,
+  });
 }
 
 function miniAppQuestionFormatSystemPrompt() {
@@ -5055,7 +4900,11 @@ function miniAppQuestionFormatSystemPrompt() {
   ].join('\n');
 }
 
-async function handleAddQuestionRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleAddQuestionRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const body = await request.json().catch(() => ({}));
   const context = await resolveMiniAppResultsContext({ request, env, body });
   if (!context.ok) {
@@ -5065,26 +4914,20 @@ async function handleAddQuestionRequest({ request, env = {}, createdAt = new Dat
     return json({ ok: false, error: 'telegram_only_session_required' }, { status: 403 });
   }
   const questionType = normalizeMiniAppQuestionType(body.questionType || body.type);
-  const prompt = safeString(body.prompt || body.question || body.text)
-    .replace(/\s+/g, ' ')
-    .slice(0, 600);
-  const options = ['multichoice', 'quadratic'].includes(questionType)
-    ? normalizeMiniAppQuestionOptions(body.options || body.choices, questionType === 'quadratic')
-    : [];
+  const prompt = safeString(body.prompt || body.question || body.text).replace(/\s+/g, ' ').slice(0, 600);
+  const options = ['multichoice', 'quadratic'].includes(questionType) ? normalizeMiniAppQuestionOptions(body.options || body.choices, questionType === 'quadratic') : [];
   const metadataSession = miniAppPolicySessionForContext(context);
-  const sessionContext = normalizeSessionContext(
-    body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession),
-  );
+  const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
   const explicitTags = normalizeQuestionTags(body.tags);
   const tags = explicitTags.length
     ? explicitTags
     : inferQuestionTags({
-        prompt,
-        questionType,
-        options,
-        session: metadataSession,
-        sessionContext,
-      });
+      prompt,
+      questionType,
+      options,
+      session: metadataSession,
+      sessionContext,
+    });
   if (!prompt) return json({ ok: false, error: 'question_prompt_required' }, { status: 400 });
   if (questionType === 'quadratic') {
     const error = validateQuadraticQuestion({ options, voiceCredits: body.voiceCredits ?? 99 });
@@ -5095,14 +4938,11 @@ async function handleAddQuestionRequest({ request, env = {}, createdAt = new Dat
   }
   const authoring = await evaluateMiniAppQuestionAuthoring({ env, context });
   if (!authoring.ok) {
-    return json(
-      {
-        ok: false,
-        error: authoring.reason || 'question_authoring_not_allowed',
-        mode: authoring.mode || '',
-      },
-      { status: 403 },
-    );
+    return json({
+      ok: false,
+      error: authoring.reason || 'question_authoring_not_allowed',
+      mode: authoring.mode || '',
+    }, { status: 403 });
   }
   const saved = await persistTelegramProposedQuestion({
     env,
@@ -5125,14 +4965,15 @@ async function handleAddQuestionRequest({ request, env = {}, createdAt = new Dat
   });
 }
 
-async function handleFormatQuestionRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleFormatQuestionRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const body = await request.json().catch(() => ({}));
   const context = await resolveMiniAppResultsContext({ request, env, body });
   if (!context.ok) {
-    return json(
-      { ok: false, error: context.error || 'format_question_unavailable' },
-      { status: context.status || 400 },
-    );
+    return json({ ok: false, error: context.error || 'format_question_unavailable' }, { status: context.status || 400 });
   }
   if (context.session?.telegramOnly !== true) {
     return json({ ok: false, error: 'telegram_only_session_required' }, { status: 403 });
@@ -5143,9 +4984,7 @@ async function handleFormatQuestionRequest({ request, env = {}, createdAt = new 
   const inferQuestionType = shouldInferMiniAppQuestionType(body);
   const questionType = inferQuestionType ? 'auto' : normalizeMiniAppQuestionType(body.questionType || body.type);
   const metadataSession = miniAppPolicySessionForContext(context);
-  const sessionContext = normalizeSessionContext(
-    body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession),
-  );
+  const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
   const tags = normalizeQuestionTags(body.tags);
   if (!text) return json({ ok: false, error: 'question_draft_required' }, { status: 400 });
 
@@ -5205,36 +5044,29 @@ async function handleFormatQuestionRequest({ request, env = {}, createdAt = new 
         'content-type': 'application/json',
         Authorization: `Bearer ${sessionAuth.token}`,
       },
-      body: JSON.stringify(
-        withBridgeOpenAiApiKey(
+      body: JSON.stringify(withBridgeOpenAiApiKey({
+        provider: 'openai',
+        model: safeString(env.AGENT_BRIDGE_ADD_QUESTION_FORMAT_MODEL || env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5'),
+        messages: [
           {
-            provider: 'openai',
-            model: safeString(
-              env.AGENT_BRIDGE_ADD_QUESTION_FORMAT_MODEL || env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5',
-            ),
-            messages: [
-              {
-                role: 'system',
-                content: miniAppQuestionFormatSystemPrompt(),
-              },
-              {
-                role: 'user',
-                content: JSON.stringify({
-                  questionType,
-                  inferQuestionType,
-                  draft: text,
-                  sessionContext,
-                  existingTags: tags,
-                }),
-              },
-            ],
-            max_output_tokens: 700,
-            response_format: { type: 'json_object' },
-            temperature: 0,
+            role: 'system',
+            content: miniAppQuestionFormatSystemPrompt(),
           },
-          env,
-        ),
-      ),
+          {
+            role: 'user',
+            content: JSON.stringify({
+              questionType,
+              inferQuestionType,
+              draft: text,
+              sessionContext,
+              existingTags: tags,
+            }),
+          },
+        ],
+        max_output_tokens: 700,
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }, env)),
     });
     const aiBody = await response.json().catch(() => ({}));
     if (!response?.ok) {
@@ -5276,14 +5108,15 @@ function normalizeMiniAppUrlQuestionCount(value = '') {
   return Math.min(MINI_APP_URL_QUESTION_MAX_COUNT, Math.max(1, parsed));
 }
 
-async function handleGenerateQuestionsFromUrlRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleGenerateQuestionsFromUrlRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const body = await request.json().catch(() => ({}));
   const context = await resolveMiniAppResultsContext({ request, env, body });
   if (!context.ok) {
-    return json(
-      { ok: false, error: context.error || 'generate_questions_unavailable' },
-      { status: context.status || 400 },
-    );
+    return json({ ok: false, error: context.error || 'generate_questions_unavailable' }, { status: context.status || 400 });
   }
   if (context.session?.telegramOnly !== true) {
     return json({ ok: false, error: 'telegram_only_session_required' }, { status: 403 });
@@ -5296,46 +5129,38 @@ async function handleGenerateQuestionsFromUrlRequest({ request, env = {}, create
   const previousCandidates = Array.isArray(body.previousCandidates) ? body.previousCandidates : [];
   const authoring = await evaluateMiniAppQuestionAuthoring({ env, context });
   if (!authoring.ok) {
-    return json(
-      {
-        ok: false,
-        error: authoring.reason || 'question_authoring_not_allowed',
-        mode: authoring.mode || '',
-      },
-      { status: 403 },
-    );
+    return json({
+      ok: false,
+      error: authoring.reason || 'question_authoring_not_allowed',
+      mode: authoring.mode || '',
+    }, { status: 403 });
   }
 
   const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
   const source = await fetchUrlQuestionSource({ url: sourceUrl, fetchImpl });
   if (!source.ok) {
-    return json(
-      {
-        ok: false,
-        error: source.reason || 'url_fetch_failed',
-        status: source.status || undefined,
-      },
-      { status: 400 },
-    );
+    return json({
+      ok: false,
+      error: source.reason || 'url_fetch_failed',
+      status: source.status || undefined,
+    }, { status: 400 });
   }
 
   const metadataSession = miniAppPolicySessionForContext(context);
-  const fallbackCandidates = () =>
-    buildLocalUrlQuestionCandidates({
-      source,
-      session: metadataSession,
-      questionType,
-      count,
-    }).slice(0, count);
-  const fallbackResponse = (reason = 'question_generation_empty') =>
-    json({
-      ok: true,
-      source: 'local_fallback',
-      fallbackReason: reason,
-      sourceTitle: safeString(source.title),
-      sourceUrl: source.finalUrl || source.url,
-      candidates: fallbackCandidates(),
-    });
+  const fallbackCandidates = () => buildLocalUrlQuestionCandidates({
+    source,
+    session: metadataSession,
+    questionType,
+    count,
+  }).slice(0, count);
+  const fallbackResponse = (reason = 'question_generation_empty') => json({
+    ok: true,
+    source: 'local_fallback',
+    fallbackReason: reason,
+    sourceTitle: safeString(source.title),
+    sourceUrl: source.finalUrl || source.url,
+    candidates: fallbackCandidates(),
+  });
 
   const eligibility = evaluateSponsoredResourceEligibility(context.session, {
     resource: 'ai',
@@ -5383,9 +5208,7 @@ async function handleGenerateQuestionsFromUrlRequest({ request, env = {}, create
     prompt,
   });
   if (!firstAi.response?.ok) {
-    return fallbackResponse(
-      safeString(firstAi.body?.error || firstAi.response?.status) || 'question_generation_failed',
-    );
+    return fallbackResponse(safeString(firstAi.body?.error || firstAi.response?.status) || 'question_generation_failed');
   }
 
   let parsed = extractJsonObject(extractAiText(firstAi.body));
@@ -5420,16 +5243,18 @@ async function handleGenerateQuestionsFromUrlRequest({ request, env = {}, create
   });
 }
 
-async function handleSearchRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleSearchRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
   }
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const query = normalizeText(body.query, 300);
   const questions = (Array.isArray(body.questions) ? body.questions : [])
     .map(compactSearchQuestion)
@@ -5462,12 +5287,7 @@ async function handleSearchRequest({ request, env = {}, createdAt = new Date().t
   const policy = await loadSessionPolicy(env);
   const resolved = resolveMiniAppSessionInvocation(policy, sessionSlugHint);
   if (!resolved.ok) {
-    return json({
-      ok: true,
-      source: 'semantic_fallback',
-      fallbackReason: resolved.reason || 'session_not_available',
-      results: fallback,
-    });
+    return json({ ok: true, source: 'semantic_fallback', fallbackReason: resolved.reason || 'session_not_available', results: fallback });
   }
   const eligibility = evaluateSponsoredResourceEligibility(resolved.session, {
     resource: 'ai',
@@ -5517,29 +5337,23 @@ async function handleSearchRequest({ request, env = {}, createdAt = new Date().t
         'content-type': 'application/json',
         Authorization: `Bearer ${sessionAuth.token}`,
       },
-      body: JSON.stringify(
-        withBridgeOpenAiApiKey(
+      body: JSON.stringify(withBridgeOpenAiApiKey({
+        provider: 'openai',
+        model: safeString(env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5'),
+        messages: [
           {
-            provider: 'openai',
-            model: safeString(env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5'),
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'Rank the provided survey questions by semantic relevance to the user query. Return only JSON: {"matches":[{"key":"question key","score":1-100,"reason":"short phrase"}]}. Include only genuinely relevant questions.',
-              },
-              {
-                role: 'user',
-                content: JSON.stringify({ query, questions }),
-              },
-            ],
-            max_output_tokens: 700,
-            response_format: { type: 'json_object' },
-            temperature: 0,
+            role: 'system',
+            content: 'Rank the provided survey questions by semantic relevance to the user query. Return only JSON: {"matches":[{"key":"question key","score":1-100,"reason":"short phrase"}]}. Include only genuinely relevant questions.',
           },
-          env,
-        ),
-      ),
+          {
+            role: 'user',
+            content: JSON.stringify({ query, questions }),
+          },
+        ],
+        max_output_tokens: 700,
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }, env)),
     });
     const aiBody = await response.json().catch(() => ({}));
     if (!response?.ok) {
@@ -5566,7 +5380,11 @@ async function handleSearchRequest({ request, env = {}, createdAt = new Date().t
   }
 }
 
-async function handleSettingsRequest({ request, env = {}, createdAt = new Date().toISOString() } = {}) {
+async function handleSettingsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
   const auth = await authorizeMiniAppRequest(request, env);
   if (!auth.ok) {
     return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
@@ -5576,9 +5394,7 @@ async function handleSettingsRequest({ request, env = {}, createdAt = new Date()
   }
   const body = await request.json().catch(() => ({}));
   const url = new URL(request.url);
-  const launch = safeString(
-    body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'),
-  );
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const launchRecord = await resolveLaunchRecord(env, launch);
   const policy = await loadSessionPolicy(env);
   const sessionSlug = sanitizeSessionSlug(
@@ -5599,14 +5415,11 @@ async function handleSettingsRequest({ request, env = {}, createdAt = new Date()
   }
   const resolved = resolveMiniAppSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
-    return json(
-      {
-        ok: false,
-        error: resolved.reason || 'mini_app_session_unavailable',
-        sessionSlug,
-      },
-      { status: resolved.reason === 'session_not_linked' ? 404 : 403 },
-    );
+    return json({
+      ok: false,
+      error: resolved.reason || 'mini_app_session_unavailable',
+      sessionSlug,
+    }, { status: resolved.reason === 'session_not_linked' ? 404 : 403 });
   }
   let normalizedPatch;
   try {

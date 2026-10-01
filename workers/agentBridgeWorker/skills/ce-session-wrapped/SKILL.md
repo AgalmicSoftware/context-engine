@@ -35,19 +35,8 @@ Small fixture question bank for dry-run planning only:
 
 ```json
 [
-  {
-    "statement_id": "fixture-q-1",
-    "type": "choice",
-    "prompt": "Should this session prioritize clear onboarding?",
-    "options": ["agree", "unsure", "disagree"]
-  },
-  {
-    "statement_id": "fixture-q-2",
-    "type": "rating",
-    "prompt": "How useful is a shareable session summary?",
-    "min": 1,
-    "max": 5
-  },
+  { "statement_id": "fixture-q-1", "type": "choice", "prompt": "Should this session prioritize clear onboarding?", "options": ["agree", "unsure", "disagree"] },
+  { "statement_id": "fixture-q-2", "type": "rating", "prompt": "How useful is a shareable session summary?", "min": 1, "max": 5 },
   { "statement_id": "fixture-q-3", "type": "freeform", "prompt": "What should the next session improve?" }
 ]
 ```
@@ -166,10 +155,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
    Python `sqlite3` only if immediately available. Use Unix epoch cutoff
    `int(time.time()) - 2592000`. Sum
    `COALESCE(input_tokens,0) + COALESCE(output_tokens,0) +
-COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)` from
+   COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)` from
    `sessions` where `started_at >= cutoff` and `source = 'telegram'`; group
    daily rows with `date(CAST(started_at AS INTEGER), 'unixepoch',
-'localtime')`. Do not assume a precomputed aggregate column exists; do not
+   'localtime')`. Do not assume a precomputed aggregate column exists; do not
    use SQL datetime string filters against `started_at`. If unavailable or
    unclear, omit `token_usage`. Do not discover files, inspect logs/configs/
    sessions, install tools, or run runtime-insights commands. Never print rows
