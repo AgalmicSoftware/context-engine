@@ -5,7 +5,7 @@ description: Detailed Context Engine Telegram bot, Mini App, admin, and operator
 
 # CE Telegram Bot Reference
 
-**Reference version:** 2026-09-28 (v42)
+**Reference version:** 2026-09-30 (v43)
 
 This is the detailed Telegram bot, Mini App, admin, and operator reference. It
 preserves endpoint details and troubleshooting notes that are too large for the
@@ -274,7 +274,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=43",
     "sessionSlug": "<session-slug>"
   }
 }
@@ -1585,6 +1585,10 @@ show. Never expose "under the hood" token, endpoint, or storage details in the
 onboarding message.
 
 ## Changelog
+
+### 2026-09-30 (v43)
+
+- Updated the install links and reference version to match the bot runtime.
 
 ### 2026-09-28 (v42)
 

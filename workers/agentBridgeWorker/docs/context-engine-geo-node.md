@@ -53,7 +53,7 @@ future agent negotiation.
     "version": "v6-latest-2026-06-09",
     "inviteToken": "<INSERT_TRUSTED_GEO_INVITE_TOKEN>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=43",
     "sessionSlug": "session-wrapped"
   }
 }

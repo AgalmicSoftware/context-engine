@@ -1146,8 +1146,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(reference, /Detailed Context Engine Telegram bot, Mini App, admin, and operator reference/);
   assert.match(reference, /POST \/api\/agent\/mini-app-launch/);
   assert.match(reference, /`quadratic`: `value` is an array with one signed whole-number vote per option/);
-  assert.match(reference, /\*\*Reference version:\*\* 2026-09-28 \(v42\)/);
-  assert.match(reference, /### 2026-09-28 \(v42\)/);
+  assert.match(reference, /\*\*Reference version:\*\* 2026-09-30 \(v43\)/);
+  assert.match(reference, /### 2026-09-30 \(v43\)/);
   assert.match(source, /skillUpdateAvailable/);
   for (const installGuide of [readme, reference]) {
     assert.match(
