@@ -423,12 +423,11 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       continue;
     }
     const answer = validatedAnswer.slice(0, 4000);
-    const additionalComments =
-      valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue))
-        ? ''
-        : valueFromAnswerLike(additionalValue).slice(0, 2000);
+    const additionalLocked = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue));
+    const additionalComments = additionalLocked ? '' : valueFromAnswerLike(additionalValue).slice(0, 2000);
     if (!answer && !additionalComments) {
       excludedCount += 1;
+      if (additionalLocked) lockedCount += 1;
       continue;
     }
     participantDigests.add(digest);

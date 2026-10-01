@@ -39919,9 +39919,11 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const answer = validatedAnswer.slice(0, 4e3);
-        const additionalComments = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue)) ? "" : valueFromAnswerLike(additionalValue).slice(0, 2e3);
+        const additionalLocked = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue));
+        const additionalComments = additionalLocked ? "" : valueFromAnswerLike(additionalValue).slice(0, 2e3);
         if (!answer && !additionalComments) {
           excludedCount += 1;
+          if (additionalLocked) lockedCount += 1;
           continue;
         }
         participantDigests.add(digest);

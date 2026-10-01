@@ -70,9 +70,6 @@ const ROWS = [
 		answer: field('Agree'),
 		additional: field('*', { encrypted: true, encryptionAudience: 'self', encryptedPortion: 'ciphertext' }),
 	},
-	{ id: 'freeform-text-Redacted', questionId: 'qtext', answer: field('Redacted'), additional: field('') },
-	{ id: 'freeform-text-***', questionId: 'qtext', answer: field('***'), additional: field('') },
-	{ id: 'multichoice-option-Locked', questionId: 'qmc', answer: field(['Locked']), additional: field('') },
 	{
 		id: 'encrypted-answer',
 		questionId: 'qtext',
@@ -86,7 +83,7 @@ test('Worker analysis: which stored rows count', async () => {
 	for (const [index, question] of QUESTIONS.entries()) {
 		await putPayload({ kv, resource: 'questions', id: `qm${index}`, payload: { sessionSlug: 'session-a', sessionId, ...question } });
 	}
-	for (const [index, row] of ROWS.filter((row) => row.questionId === 'qbin' || row.id === 'encrypted-answer').entries()) {
+	for (const [index, row] of ROWS.entries()) {
 		await putPayload({
 			kv,
 			resource: 'responses',
@@ -106,6 +103,37 @@ test('Worker analysis: which stored rows count', async () => {
 	const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: kv }, slug: 'session-a', config });
 	assert.equal(source.ok, true);
 	const counted = source.snapshot.responses.map((row) => `${row.questionId}=${row.answer}`).sort();
-	// The client report counts every row except the encrypted answer (see the Jest probe).
+	// Public answers remain usable when only their notes are encrypted.
 	assert.deepEqual(counted, ['qbin=Agree', 'qbin=Agree']);
+});
+
+
+test('Worker analysis counts a row with only a locked note as locked', async () => {
+	const kv = createKv();
+	await putPayload({
+		kv,
+		resource: 'questions',
+		id: 'note-question',
+		payload: { sessionSlug: 'session-a', sessionId, questionId: 'qtext', prompt: 'Say something', type: 'freeform' },
+	});
+	await putPayload({
+		kv,
+		resource: 'responses',
+		id: 'locked-note',
+		metadata: { responder: `0x${'1'.repeat(40)}` },
+		payload: {
+			sessionSlug: 'session-a', sessionId, questionID: 'qtext',
+			answer: field(''),
+			additional: field('*', { encrypted: true, encryptedPortion: 'ciphertext' }),
+		},
+	});
+	const source = await loadWorkerCanonicalResultsAnalysisSource({
+		env: { CE_STORAGE_INDEX_KV: kv },
+		slug: 'session-a',
+		config,
+	});
+	assert.equal(source.ok, true);
+	assert.equal(source.counts.responseCount, 0);
+	assert.equal(source.counts.excludedCount, 1);
+	assert.equal(source.counts.lockedCount, 1);
 });
