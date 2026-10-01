@@ -1026,7 +1026,7 @@ export const createSurveyQuestionsRuntimeMethods = (
               updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             ),
             parsedViewAddressAnswers: null,
-            viewAddressAnswers: null,
+            viewAddressAnswers: '',
           });
 
           // 1. Apply Draft (Anon answers) onto Empty
@@ -1128,7 +1128,7 @@ export const createSurveyQuestionsRuntimeMethods = (
               noResponse: propsRef.current.viewAddress !== prevProps.viewAddress ? false : stateRef.current.noResponse,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             }),
-            viewAddressAnswers: null,
+            viewAddressAnswers: '',
           });
 
           // 1. Rehydrate draft immediately so it exists before fetch returns
