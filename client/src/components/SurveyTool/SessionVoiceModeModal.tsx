@@ -1084,6 +1084,7 @@ function SessionInterviewPanel({
                         includeComparison={comparisonChoice.checked}
                         provenanceMixed={aiChoice.mixed}
                         comparisonMixed={comparisonChoice.mixed}
+                        preserveSavedProvenance={hasSavedAi && consentOverrides.includeAiProvenance === undefined}
                         onProvenanceChange={(included) => {
                           setIncludeProvenance(included);
                           setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));

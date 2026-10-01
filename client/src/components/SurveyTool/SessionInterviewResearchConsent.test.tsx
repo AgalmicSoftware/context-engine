@@ -101,3 +101,9 @@ it('shows mixed saved consent and lets an explicit click choose for all selected
   fireEvent.click(provenance);
   expect(change).toHaveBeenCalledWith(true);
 });
+
+it('explains that saved answers retain attribution until the source choice changes', () => {
+  renderConsent({ preserveSavedProvenance: true });
+  fireEvent.click(screen.getByText('AI prefill metadata', { selector: 'summary' }));
+  expect(screen.getByText(/Saved answers retain their own source metadata/i)).toBeInTheDocument();
+});

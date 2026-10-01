@@ -16,6 +16,7 @@ type Props = {
   includeComparison: boolean;
   provenanceMixed?: boolean;
   comparisonMixed?: boolean;
+  preserveSavedProvenance?: boolean;
   onProvenanceChange: (included: boolean) => void;
   onComparisonChange: (included: boolean) => void;
   coverageDetails: string[];
@@ -32,6 +33,7 @@ export default function SessionInterviewResearchConsent({
   includeComparison,
   provenanceMixed = false,
   comparisonMixed = false,
+  preserveSavedProvenance = false,
   onProvenanceChange,
   onComparisonChange,
   coverageDetails,
@@ -102,6 +104,12 @@ export default function SessionInterviewResearchConsent({
       <details className={styles.metadata} aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}>
         <summary>AI prefill metadata</summary>
         <div className={styles.metadataBody}>
+          {preserveSavedProvenance ? (
+            <p>
+              Saved answers retain their own source metadata. The source below applies to new answers; changing the
+              provenance choice applies it to all selected answers.
+            </p>
+          ) : null}
           {showProvenance && includeProvenance ? (
             <dl>
               <dt>Platform</dt>
