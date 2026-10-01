@@ -107,6 +107,7 @@ const WorkerSessionGroupsPanel = ({
   const targetKey = `${canonicalSessionId}\n${canonicalSessionSlug}\n${workerUrl}\n${normalizedAccount.toLowerCase()}`;
   const [authState, setAuthState] = useState<WorkerGroupsAuthState>(() => emptyAuthState(targetKey));
   const [groupsRevision, setGroupsRevision] = useState(0);
+  const [pendingJoin, setPendingJoin] = useState<{ targetKey: string; groupId: string }>();
   const [preserveSignedOutParticipantDraft, setPreserveSignedOutParticipantDraft] = useState(false);
   const authRequestIdRef = useRef(0);
   const suppressOwnGroupsChangedEventRef = useRef(false);
@@ -216,6 +217,15 @@ const WorkerSessionGroupsPanel = ({
     }
     if (authStatus !== 'loading') void authenticate();
   }, [authStatus, authenticate, normalizedAccount, toggleLoginModal]);
+
+  const requestJoinAuthentication = useCallback(
+    (groupId = '') => {
+      if (groupId) setPendingJoin({ targetKey, groupId });
+      requestActionAuthentication();
+    },
+    [targetKey, requestActionAuthentication],
+  );
+  const clearPendingJoin = useCallback(() => setPendingJoin(undefined), []);
 
   const postSignedRequest = useCallback<PostSignedWorkerGroupRequest>(
     (args = {}) => {
@@ -369,7 +379,7 @@ const WorkerSessionGroupsPanel = ({
           type="button"
           className={styles.telegramPrimaryButton}
           disabled={authStatus === 'loading'}
-          onClick={requestActionAuthentication}
+          onClick={() => requestJoinAuthentication(groupIdFilter)}
         >
           {authStatus === 'loading' ? 'Signing in…' : 'Join'}
         </button>
@@ -441,7 +451,9 @@ const WorkerSessionGroupsPanel = ({
           showLoadingState={showLoadingState}
           membershipsOnly={membershipsOnly}
           participantAddress={normalizedAccount}
-          onSignIn={requestActionAuthentication}
+          onSignIn={requestJoinAuthentication}
+          joinAfterSignInGroupId={pendingJoin?.targetKey === targetKey ? pendingJoin.groupId : ''}
+          onJoinAfterSignInHandled={clearPendingJoin}
           onGroupsChanged={broadcastGroupsChanged}
         />
       ) : null}

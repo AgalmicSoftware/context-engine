@@ -58,7 +58,9 @@ export type WorkerGroupMembershipPanelProps = {
   sessionId?: string;
   sessionSlug?: string;
   allowAnonymousGroupDiscovery?: boolean;
-  onSignIn?: () => void;
+  onSignIn?: (groupId?: string) => void;
+  joinAfterSignInGroupId?: string;
+  onJoinAfterSignInHandled?: () => void;
   onGroupsChanged?: () => void;
   selectedGroupId?: string;
   groupIdFilter?: string;
@@ -542,6 +544,8 @@ const WorkerGroupMembershipPanel = ({
   sessionSlug: sessionSlugProp = '',
   allowAnonymousGroupDiscovery = false,
   onSignIn,
+  joinAfterSignInGroupId = '',
+  onJoinAfterSignInHandled,
   onGroupsChanged,
   selectedGroupId: selectedGroupIdProp = '',
   groupIdFilter: groupIdFilterProp = '',
@@ -563,6 +567,7 @@ const WorkerGroupMembershipPanel = ({
   const inlineGroupId = inlineDetails && inlineSelection.navigationKey === navigationKey ? inlineSelection.groupId : '';
   const selectedGroupId = String(selectedGroupIdProp || '').trim() || inlineGroupId;
   const panelRef = useRef<HTMLElement>(null);
+  const handledSignInJoinRef = useRef('');
   const returnFocusRef = useRef<{ navigationKey: string; groupId: string } | null>(null);
   useEffect(() => {
     setInlineSelection({ navigationKey, groupId: '' });
@@ -794,84 +799,115 @@ const WorkerGroupMembershipPanel = ({
     if (!activeMemberListState.nextCursor || activeMemberListState.status === 'loading') return;
     void loadSelectedGroupMembers({ cursor: activeMemberListState.nextCursor, append: true });
   };
-  const applyConfirmedMembership = ({
-    mutationTargetKey,
-    group,
-    memberCount,
-    isMember,
-    retainGroup,
-  }: {
-    mutationTargetKey: string;
-    group: WorkerGroup;
-    memberCount?: number;
-    isMember: boolean;
-    retainGroup: boolean;
-  }) => {
-    setViewState((current) => {
-      if (current.targetKey !== mutationTargetKey) return current;
-      return {
-        ...current,
-        overview: reconcileConfirmedWorkerGroupMembership({
-          overview: current.overview,
-          group,
-          memberCount,
-          isMember,
-          retainGroup,
-          sessionSlug,
-        }),
-        status: 'ready',
-        error: '',
-      };
-    });
-  };
-  const handleJoin = async (group: WorkerGroup) => {
-    const mutationTargetKey = targetKey;
-    const mutation = beginMembershipMutation(group.groupId, 'join');
-    setMembershipStatusState({ targetKey: mutationTargetKey, status: '' });
-    setViewState((current) => ({
-      ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
-      error: '',
-    }));
-    try {
-      const result = await joinWorkerGroup({
-        workerUrl,
-        credentialToken: workerToken,
-        sessionId,
-        sessionSlug,
-        groupId: group.groupId,
-        fetchImpl,
+  const applyConfirmedMembership = useCallback(
+    ({
+      mutationTargetKey,
+      group,
+      memberCount,
+      isMember,
+      retainGroup,
+    }: {
+      mutationTargetKey: string;
+      group: WorkerGroup;
+      memberCount?: number;
+      isMember: boolean;
+      retainGroup: boolean;
+    }) => {
+      setViewState((current) => {
+        if (current.targetKey !== mutationTargetKey) return current;
+        return {
+          ...current,
+          overview: reconcileConfirmedWorkerGroupMembership({
+            overview: current.overview,
+            group,
+            memberCount,
+            isMember,
+            retainGroup,
+            sessionSlug,
+          }),
+          status: 'ready',
+          error: '',
+        };
       });
-      clearWorkerGroupAutoJoinCancellation({
-        workerUrl,
-        sessionSlug,
-        sessionId,
-        groupId: group.groupId,
-      });
-      if (!isMembershipMutationCurrent(mutation)) return;
-      requestIdRef.current += 1;
-      setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
-      memberListRequestIdRef.current += 1;
-      setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
-      const resultMemberCount = Number.isSafeInteger(result.memberCount) ? Number(result.memberCount) : undefined;
-      applyConfirmedMembership({
-        mutationTargetKey,
-        group: result.group as WorkerGroup,
-        memberCount: resultMemberCount,
-        isMember: true,
-        retainGroup: true,
-      });
-      onGroupsChanged?.();
-    } catch (joinError) {
-      if (!isMembershipMutationCurrent(mutation)) return;
+    },
+    [sessionSlug],
+  );
+  const handleJoin = useCallback(
+    async (group: WorkerGroup) => {
+      const mutationTargetKey = targetKey;
+      const mutation = beginMembershipMutation(group.groupId, 'join');
+      setMembershipStatusState({ targetKey: mutationTargetKey, status: '' });
       setViewState((current) => ({
         ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
-        status: 'error',
-        error: joinError instanceof Error ? joinError.message : 'worker_group_join_failed',
+        error: '',
       }));
-    } finally {
-      finishMembershipMutation(mutation);
-    }
-  };
+      try {
+        const result = await joinWorkerGroup({
+          workerUrl,
+          credentialToken: workerToken,
+          sessionId,
+          sessionSlug,
+          groupId: group.groupId,
+          fetchImpl,
+        });
+        clearWorkerGroupAutoJoinCancellation({
+          workerUrl,
+          sessionSlug,
+          sessionId,
+          groupId: group.groupId,
+        });
+        if (!isMembershipMutationCurrent(mutation)) return;
+        requestIdRef.current += 1;
+        setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
+        memberListRequestIdRef.current += 1;
+        setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
+        const resultMemberCount = Number.isSafeInteger(result.memberCount) ? Number(result.memberCount) : undefined;
+        applyConfirmedMembership({
+          mutationTargetKey,
+          group: result.group as WorkerGroup,
+          memberCount: resultMemberCount,
+          isMember: true,
+          retainGroup: true,
+        });
+        onGroupsChanged?.();
+      } catch (joinError) {
+        if (!isMembershipMutationCurrent(mutation)) return;
+        setViewState((current) => ({
+          ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
+          status: 'error',
+          error: joinError instanceof Error ? joinError.message : 'worker_group_join_failed',
+        }));
+      } finally {
+        finishMembershipMutation(mutation);
+      }
+    },
+    [
+      applyConfirmedMembership,
+      beginMembershipMutation,
+      fetchImpl,
+      finishMembershipMutation,
+      isMembershipMutationCurrent,
+      onGroupsChanged,
+      sessionId,
+      sessionSlug,
+      targetKey,
+      workerToken,
+      workerUrl,
+    ],
+  );
+
+  useEffect(() => {
+    if (!joinAfterSignInGroupId || !workerToken || status !== 'ready') return;
+    const joinKey = `${targetKey}\n${joinAfterSignInGroupId}`;
+    if (handledSignInJoinRef.current === joinKey) return;
+    handledSignInJoinRef.current = joinKey;
+    onJoinAfterSignInHandled?.();
+    // Wait for the authenticated membership read, so existing members are never
+    // joined again and the intent cannot migrate to another account or Worker.
+    const group = availableGroups.find((entry) => entry.groupId === joinAfterSignInGroupId);
+    if (group?.joinMode === 'open' && !groupJoinHasEnded(group)) void handleJoin(group);
+  }, [availableGroups, handleJoin, joinAfterSignInGroupId, onJoinAfterSignInHandled, status, targetKey, workerToken]);
+
   const handleLeave = async (group: WorkerGroup) => {
     const mutationTargetKey = targetKey;
     const mutation = beginMembershipMutation(group.groupId, 'leave');
@@ -985,7 +1021,7 @@ const WorkerGroupMembershipPanel = ({
           type="button"
           className={styles.workerGroupCardPrimaryButton}
           aria-label={`Sign in to join ${group.label}`}
-          onClick={onSignIn}
+          onClick={() => onSignIn?.(group.groupId)}
         >
           Join
         </button>
