@@ -195,3 +195,26 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     expect(result.counts.lockedCount).toBe(1);
   });
 });
+
+it('counts a note-only encrypted response as locked like the Worker', () => {
+  const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+    sessionSlug: 'edge',
+    networkNode: {
+      questions: { q1: { id: 'q1', prompt: 'Question', type: 'text', sessionSlug: 'edge' } },
+      questionResponses: {
+        q1: {
+          first: { answer: { value: 'Visible' }, sessionSlug: 'edge' },
+          second: {
+            answer: { value: '' },
+            additional: { value: '*', encrypted: true, encryptedPortion: 'ciphertext' },
+            sessionSlug: 'edge',
+          },
+        },
+      },
+    },
+  });
+  if (!result.ok) throw new Error(result.reason);
+  expect(result.counts.lockedCount).toBe(1);
+  expect(result.counts.skippedCount).toBe(1);
+  expect(result.snapshot.responses).toHaveLength(1);
+});

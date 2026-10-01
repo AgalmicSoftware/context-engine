@@ -132,6 +132,7 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
         ? additionalValue.map(toText).filter(Boolean).join('; ')
         : additionalValue;
       if (!toText(answer) && !toText(additional)) {
+        if (valueLooksLocked(additionalField)) lockedCount += 1;
         skippedCount += 1;
         return;
       }
