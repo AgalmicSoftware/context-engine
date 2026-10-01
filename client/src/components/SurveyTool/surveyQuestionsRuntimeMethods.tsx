@@ -800,6 +800,16 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
+    if (prevProps.account !== propsRef.current.account) {
+      // Props already identify the next account. Never flush the previous form
+      // through its draft key, including callbacks scheduled before this switch.
+      if (inst._persistTimer) clearTimeout(inst._persistTimer);
+      inst._persistTimer = null;
+      if (inst._jsonPreviewTimer) clearTimeout(inst._jsonPreviewTimer);
+      inst._jsonPreviewTimer = null;
+      inst._draftDirtyQids?.clear();
+      setState({ jsonPreview: null });
+    }
     const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
     const workerTargetChanged =
       resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
@@ -1039,7 +1049,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           if (stateRef.current.userHasResponse && (isViewingOwnResponse || isViewingNoSpecificResponder)) {
             setState(buildEditingResponseModeState());
           }
-        });
+        }, propsRef.current.account === prevProps.account);
       }
 
       if (prevState.questionPool !== stateRef.current.questionPool) {
@@ -1138,7 +1148,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           if (stateRef.current.userHasResponse && (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)) {
             setState(buildEditingResponseModeState());
           }
-        });
+        }, propsRef.current.account === prevProps.account);
       }
     }
 
@@ -1191,7 +1201,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           // but we should also rerun cache/prior-response hydration when auth becomes ready.
           rehydrateDraftForRenderedIds();
           rehydrateLocalCacheAnswersForRenderedIds();
-        });
+        }, propsRef.current.account === prevProps.account);
       }
     }
 
