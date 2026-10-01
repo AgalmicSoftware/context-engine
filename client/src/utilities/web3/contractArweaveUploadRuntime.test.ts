@@ -37,6 +37,9 @@ describe('buildArweaveUploadBootstrapAuth', () => {
       sessionConfig,
     });
 
+    expect(result?.message).toContain(
+      `Resources:\n- https://demo-sh-worker.example.test\n- urn:context-engine:session:id:${sessionId}`,
+    );
     expect(mockedGetCorsProxyUrlOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({ sessionSlug: 'demo-sh', sessionConfig }),
     );

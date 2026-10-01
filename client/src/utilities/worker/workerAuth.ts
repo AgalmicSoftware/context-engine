@@ -121,6 +121,7 @@ type AdminActionAuthOptions = {
   workerUrl?: unknown;
 };
 type BootstrapAdminAuthOptions = {
+  sessionId?: unknown;
   context?: unknown;
   nonce?: unknown;
   slug?: unknown;
@@ -573,6 +574,7 @@ export const buildSignedAdminActionAuth = async ({
 
 export const buildSignedBootstrapAdminAuth = async ({
   slug,
+  sessionId: providedSessionId,
   workerUrl,
   context,
   statement = 'Admin request: bootstrap arweave upload',
@@ -589,13 +591,19 @@ export const buildSignedBootstrapAdminAuth = async ({
   }
 
   const targetSlug = normalizeSessionSlug(slug);
+  let sessionId = toStr(providedSessionId).trim().toLowerCase();
   let nonce = toStr(providedNonce).trim();
   if (!nonce) {
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
       headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
+      body: JSON.stringify({
+        address,
+        sessionSlug: targetSlug,
+        ...(sessionId ? { sessionId } : {}),
+        adminAction: true,
+      }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
     if (!nonceResp.ok) {
@@ -608,11 +616,15 @@ export const buildSignedBootstrapAdminAuth = async ({
       throw new Error('Worker nonce response missing nonce.');
     }
     nonce = toStr(nonceData.nonce).trim();
+    sessionId = sessionId || toStr(nonceData.sessionId).trim().toLowerCase();
   }
 
   const message = buildSiweMessage({
     address,
     nonce,
+    workerUrl: resolvedWorkerUrl,
+    sessionSlug: targetSlug,
+    sessionId,
     chainId: wallet.chainId || 1,
     statement: toStr(statement).trim() || 'Admin request: bootstrap arweave upload',
   });
@@ -627,6 +639,7 @@ export const buildSignedBootstrapAdminAuth = async ({
     message,
     signature,
     sessionSlug: targetSlug,
+    ...(sessionId ? { sessionId } : {}),
   };
 };
 

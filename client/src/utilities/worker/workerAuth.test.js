@@ -1026,6 +1026,7 @@ describe('workerAuth bootstrap admin signing', () => {
       statement: 'Admin request: bootstrap arweave upload',
     });
 
+    expect(auth.message).toContain('Resources:\n- https://worker.example\n- urn:context-engine:session:slug:edge');
     expect(String(global.fetch.mock.calls[0][0])).toBe('https://worker.example/auth/nonce');
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
       address: TEST_ADDRESS,

@@ -64,6 +64,9 @@ export type AdminWorkerAuthModule = WorkerAuthPublishModule & {
 };
 
 export type AdminBuildSiweMessageInput = {
+  workerUrl?: string;
+  sessionSlug?: string;
+  sessionId?: string;
   address: string;
   nonce?: unknown;
   chainId: number;
@@ -187,6 +190,9 @@ export const bindAdminWorkerPorts = ({
           nonce,
           nonceData,
           message: readWorkerAuth().buildSiweMessage({
+            workerUrl,
+            sessionSlug,
+            sessionId,
             address,
             nonce,
             chainId,

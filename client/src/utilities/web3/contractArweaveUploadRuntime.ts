@@ -108,6 +108,9 @@ export const buildArweaveUploadBootstrapAuth = async ({
   const message = buildSiweMessage({
     address: signerAddress,
     nonce: nonceData?.nonce,
+    workerUrl,
+    sessionSlug: slug,
+    sessionId,
     chainId,
     statement: 'Admin request: bootstrap arweave upload',
   });

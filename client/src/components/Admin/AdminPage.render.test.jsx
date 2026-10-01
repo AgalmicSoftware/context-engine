@@ -761,6 +761,9 @@ describe('AdminPage rendered interactions', () => {
       nonce: 'rendered-nonce',
       chainId: 84532,
       statement: 'Sign in to Context Engine.',
+      workerUrl: 'https://worker.example.test',
+      sessionSlug: 'edge',
+      sessionId: '0x55555555555555555555555555555555',
     });
     await waitFor(() => {
       expect(screen.getByText('OK (403 worker_auth_worker_login_failed)')).toBeInTheDocument();

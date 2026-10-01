@@ -177,6 +177,9 @@ describe('admin worker ports', () => {
       nonce: ' nonce-123 ',
       chainId: 84532,
       statement: 'Sign in to Context Engine.',
+      workerUrl: 'https://worker.example.test',
+      sessionSlug: 'edge',
+      sessionId: '0x44444444444444444444444444444444',
     });
   });
 
