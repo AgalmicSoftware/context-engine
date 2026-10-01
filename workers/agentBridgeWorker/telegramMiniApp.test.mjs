@@ -5359,3 +5359,20 @@ test('Mini App live results can filter by saved lightweight group details', asyn
   assert.equal(summary.questions.consensus[0].counts.Agree, 2);
   assert.equal(summary.questions.consensus[0].counts.Disagree, undefined);
 });
+
+
+test('Mini App quadratic help fits the question budget', () => {
+  const html = __test__telegramMiniApp.telegramMiniAppHtml();
+  const start = html.indexOf("const budget = question.voiceCredits ?? 99;");
+  const end = html.indexOf('help.append(helpToggle, helpText);', start);
+  assert.ok(start >= 0 && end > start);
+  // Execute the rendered help branch with the same DOM element contract as the browser.
+  const branch = html.slice(start, end) + '\nhelpText.textContent;';
+  for (const [budget, example] of [[1, 1], [9, 3], [99, 7]]) {
+    const text = vm.runInNewContext(branch, {
+      question: { voiceCredits: budget, options: ['Parks'] }, draft: { value: [] },
+      document: { createElement: () => ({ setAttribute() {} }) },
+    });
+    assert.ok(text.includes(`+${example} or −${example} uses ${example * example} credit${example === 1 ? '' : 's'}.`));
+  }
+});

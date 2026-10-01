@@ -3278,13 +3278,14 @@ export function renderTelegramMiniAppBrowserAsset({
         mount.append(label, input);
       } else if (question.questionType === 'quadratic') {
         const budget = question.voiceCredits ?? 99;
+        const example = Math.min(7, Math.floor(Math.sqrt(budget)));
         const votes = Array.isArray(draft.value) ? draft.value.slice() : question.options.map(() => 0);
         const header = document.createElement('div'); header.className = 'quadraticHeader';
         const status = document.createElement('p'); status.setAttribute('role', 'status');
         const help = document.createElement('details'); help.className = 'quadraticHelp';
         const helpToggle = document.createElement('summary'); helpToggle.textContent = '?'; helpToggle.setAttribute('aria-label', 'How voice credits work');
         const helpText = document.createElement('p');
-        helpText.textContent = 'Votes cost their square: +7 or −7 uses 49 credits. Share your ' + budget + ' credits across the options. You may leave credits unused.';
+        helpText.textContent = 'Votes cost their square: +' + example + ' or −' + example + ' uses ' + (example * example) + ' credit' + (example === 1 ? '' : 's') + '. Share your ' + budget + ' credits across the options. You may leave credits unused.';
         help.append(helpToggle, helpText);
         const spent = () => votes.reduce((total, vote) => total + vote * vote, 0);
         const updateStatus = () => { status.textContent = (budget - spent()) + ' credits left'; };
