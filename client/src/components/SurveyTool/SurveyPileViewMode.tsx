@@ -1209,12 +1209,13 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   });
 
   if (updatePlan.shouldResetContext) {
-    // Persist draft before reset so it survives the login transition
-    try {
-      engine.persistDraft();
-    } catch (e) {
-      surveyLog.warn('SurveyTool: fallback', e);
-    }
+    // Props already name the next identity. Cancel pending writes before resetting
+    // so decrypted fields cannot be persisted under another account's draft key.
+    if (engine._persistTimer) clearTimeout(engine._persistTimer);
+    engine._persistTimer = null;
+    if (engine._jsonPreviewTimer) clearTimeout(engine._jsonPreviewTimer);
+    engine._jsonPreviewTimer = null;
+    engine._draftDirtyQids?.clear();
     engine._lastLoadAndSortResultSignature = '';
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;
