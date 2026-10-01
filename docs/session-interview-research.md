@@ -291,4 +291,6 @@ The voice-mode chooser describes the interview; AI prompt-copy guidance stays in
 Consent choices count as response edits even when the answer, comment and ratings
 are unchanged. Submitting can add or remove the responder name, AI attribution or
 prediction comparison on the selected responses. Repeating the saved choices
-does not create another pending edit; the recording timestamp alone is ignored.
+does not create another pending edit. Changes to research content alone, including
+new predictions, revisions and recording timestamps, are not submitted when
+answers, comments, ratings and consent remain unchanged.
