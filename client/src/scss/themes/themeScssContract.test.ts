@@ -2,6 +2,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as sass from 'sass';
 
+const framelessOutlineGuardPasses = (text: string) => {
+  const controls = text.match(
+    /\[data-ce-control-appearance='frameless'\],\s*\[data-ce-control-appearance='frameless'\]:active\s*\{([^}]*)\}/,
+  )?.[1];
+  const droppingSelectors = [...text.matchAll(/([^{}]*\[data-ce-control-appearance='frameless'\][^{}]*)\{([^}]*)\}/g)]
+    .filter(([, , body]) => /outline:\s*(?:none|0)\b/.test(body))
+    .map(([, selector]) => selector.replace(/\/\/[^\n]*\n/g, '').trim());
+  return (
+    /appearance:\s*none;[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*none;/.test(controls || '') &&
+    droppingSelectors.every(
+      (selector) => selector === "[data-ce-control-appearance='frameless']:focus:not(:focus-visible)",
+    )
+  );
+};
+
 describe('runtime SCSS theme contract', () => {
   const scssDir = path.resolve(__dirname, '..', '..');
   const tokenOnlyStylesheets = [
@@ -92,11 +107,17 @@ describe('runtime SCSS theme contract', () => {
 
   test('frameless controls drop the raised chrome but keep the focus outline', () => {
     const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
-    const controls = recipes.match(
-      /\[data-ce-control-appearance='frameless'\],\s*\[data-ce-control-appearance='frameless'\]:active\s*\{([^}]*)\}/,
-    )?.[1];
-    expect(controls).toMatch(/appearance:\s*none;[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*none;/);
-    expect(controls).not.toMatch(/outline:\s*none/);
+    expect(framelessOutlineGuardPasses(recipes)).toBe(true);
+  });
+
+  test('the outline guard rejects a keyboard-focus regression', () => {
+    const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
+    const mutated = recipes.replace(
+      "[data-ce-control-appearance='frameless']:focus:not(:focus-visible) {",
+      "[data-ce-control-appearance='frameless']:focus-visible { outline: none; }\n[data-ce-control-appearance='frameless']:focus:not(:focus-visible) {",
+    );
+    expect(framelessOutlineGuardPasses(recipes)).toBe(true);
+    expect(framelessOutlineGuardPasses(mutated)).toBe(false);
   });
 
   test('component styles never bundle their own copy of the global stylesheet', () => {
