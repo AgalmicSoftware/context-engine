@@ -2328,7 +2328,11 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     must reuse both that ID and `configRevision`; a definitive terminal response
     or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
-- The helper fetches the pinned bundled Worker asset and configures KV + bindings. The deploy-helper script defaults to `workerReleasePin.json`; `--release-commit <40-character commit>` selects another immutable release. Explicit URL overrides remain available.
+- The helper fetches the pinned bundled Worker asset and configures KV + bindings.
+  The deploy-helper script defaults to `workerReleasePin.json`;
+  `--release-commit <40-character commit>` selects another immutable release,
+  rejects explicit URL flags and ignores URL defaults from the environment.
+  URL overrides require both the Worker bundle and manifest URLs together.
 - Fresh KV namespace seed writes retry only Cloudflare's transient
   `namespace not found` propagation response; unrelated write failures still
   fail immediately, and exhausted retries trigger the normal exact-resource

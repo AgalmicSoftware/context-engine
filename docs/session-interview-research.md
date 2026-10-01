@@ -294,3 +294,15 @@ prediction comparison on the selected responses. Repeating the saved choices
 does not create another pending edit. Changes to research content alone, including
 new predictions, revisions and recording timestamps, are not submitted when
 answers, comments, ratings and consent remain unchanged.
+
+Saved consent is retained separately for each question until the participant
+changes a choice. The review controls show a mixed state when selected questions
+have different saved choices; changing a control applies that choice to the
+selected responses. Saved attribution keeps its own source metadata while the
+control remains untouched. New answers use the current interview source.
+
+Changing included attribution's platform, model, prompt version or question-set
+hash is a pending consent change, even if answer values and research content are
+unchanged. Withdrawing a name or research consent updates the latest submitted
+payload; it does not erase earlier stored response versions or copies already
+exported by other readers.

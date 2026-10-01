@@ -71,6 +71,8 @@ export const printUsage = () => {
     '  --worker-bundle-url <url>     Optional default session worker bundle URL written into WORKER_BUNDLE_URL',
     '  --worker-bundle-manifest-url <url>',
     '                                Expected-digest manifest written into WORKER_BUNDLE_MANIFEST_URL',
+    '                                URL overrides require both bundle and manifest URLs together',
+    '                                --release-commit rejects URL flags and ignores environment URL defaults',
     '  --compatibility-date <date>   Optional helper compatibility date (default from deployHelperCore)',
     '  --worker-compat-date <date>   Optional WORKER_COMPATIBILITY_DATE binding for deployed session workers',
     '  --default-session-slug <slug> Optional DEFAULT_SESSION_SLUG binding for the helper',
