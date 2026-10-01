@@ -1,4 +1,8 @@
-import { buildFieldEncryptionWorkGroups, verifyEncryptionIntegrity } from './surveyToolSubmitPrepController';
+import {
+  buildFieldEncryptionWorkGroups,
+  remaskUnchangedEncryptedFields,
+  verifyEncryptionIntegrity,
+} from './surveyToolSubmitPrepController';
 import type { SubmitPrepDeps } from './surveyToolSubmitPrepController';
 
 type TestFieldState = {
@@ -291,7 +295,7 @@ describe('surveyToolSubmitPrepController', () => {
       expect(result.failures).toHaveLength(0);
     });
 
-    it('passes for encrypted answer with encryptedPortion', () => {
+    it('rejects plaintext beside an existing encryptedPortion', () => {
       const slice = makeSlice({
         answers: {
           q1: { encrypted: true, encryptedPortion: 'abc', value: 'secret' },
@@ -300,8 +304,8 @@ describe('surveyToolSubmitPrepController', () => {
 
       const result = verifyEncryptionIntegrity(slice);
 
-      expect(result.passed).toBe(true);
-      expect(result.failures).toHaveLength(0);
+      expect(result.passed).toBe(false);
+      expect(result.failures).toHaveLength(1);
     });
 
     it('fails for encrypted answer without encryptedPortion', () => {
@@ -435,4 +439,41 @@ it('rejects audience metadata changes which reuse ciphertext for a different pol
       answers: { q1: { encrypted: true, value: '*', encryptedPortion, encryptionAudience: 'session' } },
     }).passed,
   ).toBe(false);
+});
+
+it('rejects a decrypted private comment even when its envelope exists', () => {
+  expect(
+    verifyEncryptionIntegrity({
+      additionalComments: { q1: { value: 'private', encrypted: true, encryptedPortion: 'ciphertext' } },
+    }).passed,
+  ).toBe(false);
+});
+
+describe('remaskUnchangedEncryptedFields', () => {
+  const saved = {
+    value: 'private',
+    encrypted: true,
+    encryptedPortion: 'saved-envelope',
+    hash: 'saved-hash',
+    encryptionAudience: 'self',
+  };
+  it('remasks both saved fields without changing the displayed slice', () => {
+    const slice = { answers: { q1: saved }, additionalComments: { q1: saved } };
+    const result = remaskUnchangedEncryptedFields(slice, slice, new Set(['q1']));
+    expect(result.answers.q1).toEqual({ ...saved, value: '*' });
+    expect(result.additionalComments.q1).toEqual({ ...saved, value: '*' });
+    expect(slice.answers.q1.value).toBe('private');
+  });
+  it.each([{ value: 'edited' }, { encryptionAudience: 'self_admin' }, { encryptedPortion: '' }])(
+    'keeps edits for encryption: %p',
+    (edit) => {
+      const current = { ...saved, ...edit };
+      const result = remaskUnchangedEncryptedFields(
+        { answers: { q1: current } },
+        { answers: { q1: saved } },
+        new Set(['q1']),
+      );
+      expect(result.answers.q1).toEqual(current);
+    },
+  );
 });

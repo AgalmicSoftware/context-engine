@@ -433,3 +433,213 @@ it('P11 legacy Worker: re-sending the same saved name on an unchanged answer is 
   await settle();
   expect(submitResponses).not.toHaveBeenCalled();
 }, 40000);
+
+it('P8 legacy Worker: a consent-only submit of a decrypted encrypted answer passes the upload no-leak guard', async () => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  const { applySessionInterviewAnswer } = require('./SurveyPileViewMode');
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
+  const saved = savedResponse({
+    responderName: undefined,
+    interviewProvenance: undefined,
+    answer: {
+      value: '*',
+      encrypted: true,
+      encryptionAudience: 'self',
+      audienceMode: 'explicit',
+      hash: '0xhash-answer',
+      encryptedPortion: envelope,
+    },
+  });
+  mockCaches(saved);
+  // Legacy Worker: no own-answer listing (loader resolves null).
+  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
+  const { submitResponses, encryptMultipleAnswers } = mockSubmit();
+  const pile = mountPile();
+  await waitFor(() => expect(pile.getEngine()?.state?.pileQuestions?.length).toBe(1), { timeout: 8000 });
+  await settle();
+  const engine = pile.getEngine();
+
+  // "Decrypt" in the pile: the engine's own self-decrypt success transition.
+  await run(
+    () =>
+      new Promise((resolve) =>
+        engine.setState(
+          (prev) =>
+            buildSelfQuestionDecryptSuccessState(
+              prev,
+              {
+                surveyIndex: 0,
+                questionId: 'q1',
+                clearMode: 'both',
+                didUpdate: true,
+                baselineSlice: prev.editBaseline,
+                decryptedStateSlice: { answers: { q1: { value: 'My secret answer' } }, additionalComments: {} },
+              },
+              (value) => JSON.parse(JSON.stringify(value)),
+            ),
+          resolve,
+        ),
+      ),
+  );
+
+  // Interview on a legacy Worker: own answers cannot be listed, the AI draft equals the decrypted answer.
+  expect(await run(() => loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal))).toBeNull();
+  await run(() => applySessionInterviewAnswer(engine, 'q1', 'My secret answer'));
+  await run(() =>
+    recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'My secret answer' }],
+      SOURCE,
+      PACKET,
+      false,
+      false,
+      'Participant',
+    ),
+  );
+  const changedMap = engine.getChangedQidsAndFields(0).changedMap;
+  const result = await run(() => submitSessionInterviewResponses(engine, ['q1']));
+  await settle();
+
+  expect(result).toEqual({ status: 'submitted' });
+  // In the app the upload itself runs the no-leak guard: this is what the user gets instead of "submitted".
+  expect(() => guardUpload(submitResponses.mock.calls[0][2])).not.toThrow();
+}, 40000);
+it('P9 current Worker: stray consent restored after reload + Decrypt in the pile + pile Submit passes the upload no-leak guard', async () => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  const { applySessionInterviewAnswer } = require('./SurveyPileViewMode');
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
+  const saved = savedResponse({
+    responderName: undefined,
+    interviewProvenance: undefined,
+    answer: {
+      value: '*',
+      encrypted: true,
+      encryptionAudience: 'self',
+      audienceMode: 'explicit',
+      hash: '0xhash-answer',
+      encryptedPortion: envelope,
+    },
+  });
+  mockCaches(saved, { q2: { id: 'q2', type: 'binary', prompt: 'Q2' } });
+  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue([saved]);
+  const { submitResponses, encryptMultipleAnswers } = mockSubmit();
+  encryptMultipleAnswers.mockImplementation(async (slice) => ({
+    answers: Object.fromEntries(
+      Object.keys(slice.answers || {}).map((qid) => [
+        qid,
+        { ...slice.answers[qid], value: '*', encrypted: true, encryptedPortion: envelope, hash: '0xnew' },
+      ]),
+    ),
+    additionalComments: {},
+    importance: {},
+  }));
+  const first = mountPile();
+  await waitFor(() => expect(first.getEngine()?.state?.pileQuestions?.length).toBe(2), { timeout: 8000 });
+  await settle();
+  const engine = first.getEngine();
+  // Interview on a current Worker: saved (masked) answer reloaded, AI draft applied, name ticked, submitted.
+  await run(() => loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal));
+  await run(() => applySessionInterviewAnswer(engine, 'q1', 'My secret answer'));
+  await run(() =>
+    recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'My secret answer' }],
+      SOURCE,
+      PACKET,
+      false,
+      false,
+      'Participant',
+    ),
+  );
+  expect(await run(() => submitSessionInterviewResponses(engine, ['q1']))).toEqual({ status: 'submitted' });
+  await settle();
+  expect(JSON.stringify(submitResponses.mock.calls[0][2])).not.toContain('My secret answer');
+  // Ordinary edit to another question, then a same-tab reload.
+  await run(() => new Promise((resolve) => engine.handleAnswerPile('q2', 'Disagree', { afterUpdate: resolve })));
+  await settle();
+  first.view.unmount();
+  const second = mountPile();
+  await waitFor(() => expect(second.getEngine()?.state?.pileQuestions?.length).toBe(2), { timeout: 8000 });
+  await settle();
+  const engine2 = second.getEngine();
+  // "Decrypt" q1 in the pile to read it.
+  await run(
+    () =>
+      new Promise((resolve) =>
+        engine2.setState(
+          (prev) =>
+            buildSelfQuestionDecryptSuccessState(
+              prev,
+              {
+                surveyIndex: 0,
+                questionId: 'q1',
+                clearMode: 'both',
+                didUpdate: true,
+                baselineSlice: prev.editBaseline,
+                decryptedStateSlice: { answers: { q1: { value: 'My secret answer' } }, additionalComments: {} },
+              },
+              (value) => JSON.parse(JSON.stringify(value)),
+            ),
+          resolve,
+        ),
+      ),
+  );
+  const changedMap = engine2.getChangedQidsAndFields(0).changedMap;
+  // The pile's "Submit (2)" button.
+  const result = await run(() => engine2.handlePileSubmitClick());
+  await settle();
+  const uploads = submitResponses.mock.calls.map((call) => call[2]);
+
+  expect(() => guardUpload(uploads[1])).not.toThrow();
+}, 40000);
+it('P12 PRE-EXISTING control (base code paths unchanged): decrypted encrypted answer + plaintext comment edit, pile Submit', async () => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer-ct' });
+  const saved = savedResponse({
+    responderName: undefined,
+    interviewProvenance: undefined,
+    answer: {
+      value: '*',
+      encrypted: true,
+      encryptionAudience: 'self',
+      audienceMode: 'explicit',
+      hash: '0xhash-answer',
+      encryptedPortion: envelope,
+    },
+  });
+  mockCaches(saved);
+  const { submitResponses } = mockSubmit();
+  const pile = mountPile();
+  await waitFor(() => expect(pile.getEngine()?.state?.pileQuestions?.length).toBe(1), { timeout: 8000 });
+  await settle();
+  const engine = pile.getEngine();
+  await run(
+    () =>
+      new Promise((resolve) =>
+        engine.setState(
+          (prev) =>
+            buildSelfQuestionDecryptSuccessState(
+              prev,
+              {
+                surveyIndex: 0,
+                questionId: 'q1',
+                clearMode: 'both',
+                didUpdate: true,
+                baselineSlice: prev.editBaseline,
+                decryptedStateSlice: { answers: { q1: { value: 'My secret answer' } }, additionalComments: {} },
+              },
+              (value) => JSON.parse(JSON.stringify(value)),
+            ),
+          resolve,
+        ),
+      ),
+  );
+  await run(
+    () => new Promise((resolve) => engine.handleAdditionalPile('q1', 'Plain comment', { afterUpdate: resolve })),
+  );
+  const changedMap = engine.getChangedQidsAndFields(0).changedMap;
+  const result = await run(() => engine.handlePileSubmitClick());
+  await settle();
+
+  expect(() => guardUpload(submitResponses.mock.calls[0]?.[2])).not.toThrow();
+}, 40000);

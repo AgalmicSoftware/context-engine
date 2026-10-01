@@ -7,11 +7,12 @@ import type {
   SurveySubmitSuccessStatePatch,
 } from './surveyQuestionsTypes.js';
 import type {
-  SurveyQuestionsSubmitPendingStats,
   SurveyQuestionsSubmitStaleStatePatch,
   SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
+import { remaskUnchangedEncryptedFields } from './surveyToolSubmitPrepController.js';
+import { shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState.js';
 import { captureInterviewPredictionComparisonSubmissions } from './surveyToolResponsePayloadController.js';
 
 export type SurveyQuestionsSubmitRuntime = SurveyQuestionsLegacyRecord;
@@ -33,7 +34,6 @@ export const createSurveyQuestionsSubmitRuntime = (
     getAnsweredQuestionsCount,
     getChangedQidsAndFields,
     getEffectiveRecipientsForField,
-    getPendingEditStats,
     inst,
     invalidateDiffCaches,
     isQuestionLockedForResponse,
@@ -49,7 +49,6 @@ export const createSurveyQuestionsSubmitRuntime = (
     resolveSessionChainId,
     resolveSubmitEffectiveDraftSlug,
     resolveSurveyQuestionsSubmittedResponseUrl,
-    resolveSurveyQuestionsSubmitPendingStats,
     runSurveyQuestionsStaleSubmitController,
     runSurveyQuestionsSubmitFailureController,
     runSurveyQuestionsSubmitStartController,
@@ -319,13 +318,12 @@ export const createSurveyQuestionsSubmitRuntime = (
       }
       activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, changedQids);
 
-      // Only encrypt when there are changed encrypted fields
-      const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({
-        getPendingEditStats: typeof getPendingEditStats === 'function' ? () => getPendingEditStats() : undefined,
-        fallbackTotal: stateRef.current.modifiedCount || 0,
-        fallbackEncrypted: stateRef.current.hasEncryptedChanges ? 1 : 0,
-      });
-      const shouldEncrypt = Number(pendingStats.encrypted || 0) > 0 && changedQids.size > 0;
+      activeSlice = remaskUnchangedEncryptedFields(activeSlice, stateRef.current.editBaseline, changedQids);
+      const shouldEncrypt = Array.from(changedQids as Set<string>).some(
+        (qid) =>
+          shouldEncryptResponseFieldForSubmit(activeSlice.answers?.[qid]) ||
+          shouldEncryptResponseFieldForSubmit(activeSlice.additionalComments?.[qid]),
+      );
 
       if (shouldEncrypt) {
         const { groups: workGroups, missingRecipients }: SurveyQuestionsLegacyValue = buildFieldEncryptionWorkGroups(
@@ -373,7 +371,7 @@ export const createSurveyQuestionsSubmitRuntime = (
           // Merge back (overrides hash with salted Keccak; carries envelope v1 + recipients)
           const newArr: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
           const base: SurveyQuestionsLegacyValue = {
-            ...(newArr[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
+            ...activeSlice,
             // Keep research snapshots captured before encryption replaces plaintext fields.
             interviewProvenance: activeSlice.interviewProvenance,
           };

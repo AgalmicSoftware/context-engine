@@ -131,6 +131,36 @@ export const buildFieldEncryptionWorkGroups = (
   };
 };
 
+// A decrypted baseline keeps the saved envelope. Reuse it only while the value
+// and encryption policy are unchanged; edited private fields still need encryption.
+export const remaskUnchangedEncryptedFields = <T extends SubmitPrepSlice>(
+  slice: T,
+  baseline: SubmitPrepSlice | null | undefined,
+  changedQids: Set<string>,
+): T => {
+  const next = { ...slice };
+  for (const bucket of ['answers', 'additionalComments'] as const) {
+    for (const qid of changedQids) {
+      const field = slice[bucket]?.[qid];
+      const saved = baseline?.[bucket]?.[qid];
+      if (
+        field?.encrypted &&
+        saved?.encrypted &&
+        saved.encryptedPortion &&
+        field.value !== '*' &&
+        JSON.stringify(field.value) === JSON.stringify(saved.value) &&
+        field.encryptedPortion === saved.encryptedPortion &&
+        field.hash === saved.hash &&
+        field.encryptionAudience === saved.encryptionAudience &&
+        field.encryptionGateId === saved.encryptionGateId
+      ) {
+        next[bucket] = { ...next[bucket], [qid]: { ...field, value: '*' } };
+      }
+    }
+  }
+  return next;
+};
+
 export const verifyEncryptionIntegrity = (
   slice: SubmitPrepSlice | null | undefined,
   onlyTheseQids: Set<string> | null = null,
@@ -162,24 +192,20 @@ export const verifyEncryptionIntegrity = (
       }
     }
 
-    if (
-      answer &&
-      answer.encrypted &&
-      !answer.encryptedPortion &&
-      answer.value !== '*' &&
-      hasMeaningfulFieldValue(answer)
-    ) {
-      failures.push(`Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`);
+    if (answer && answer.encrypted && answer.value !== '*' && hasMeaningfulFieldValue(answer)) {
+      failures.push(
+        answer.encryptedPortion
+          ? `Verification failed: Answer for ${qId} marked encrypted but is not masked.`
+          : `Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`,
+      );
       verificationPassed = false;
     }
-    if (
-      additional &&
-      additional.encrypted &&
-      !additional.encryptedPortion &&
-      additional.value !== '*' &&
-      hasMeaningfulFieldValue(additional)
-    ) {
-      failures.push(`Verification failed: Additional for ${qId} marked encrypted but has no encryptedPortion.`);
+    if (additional && additional.encrypted && additional.value !== '*' && hasMeaningfulFieldValue(additional)) {
+      failures.push(
+        additional.encryptedPortion
+          ? `Verification failed: Additional for ${qId} marked encrypted but is not masked.`
+          : `Verification failed: Additional for ${qId} marked encrypted but has no encryptedPortion.`,
+      );
       verificationPassed = false;
     }
   }
