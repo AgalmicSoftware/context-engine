@@ -249,13 +249,14 @@ export const parseSiweMessage = (message) => {
   });
 
   const resourceIndex = lines.indexOf('Resources:');
+  const resourceLines = lines.slice(resourceIndex + 1).filter(Boolean);
   const resources =
     resourceIndex < 0
       ? undefined
-      : lines
-          .slice(resourceIndex + 1)
-          .filter(Boolean)
-          .map((line) => (line.startsWith('- ') ? line.slice(2).trim() : line));
+      : resourceLines.some((line) => !line.startsWith('- '))
+        ? []
+        : resourceLines
+          .map((line) => line.slice(2).trim());
 
   return {
     domain,

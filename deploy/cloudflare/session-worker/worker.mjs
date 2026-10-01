@@ -71936,7 +71936,8 @@ var parseSiweMessage = (message) => {
     if (expirationTime != null) fields.expirationTime = expirationTime;
   });
   const resourceIndex = lines.indexOf("Resources:");
-  const resources = resourceIndex < 0 ? void 0 : lines.slice(resourceIndex + 1).filter(Boolean).map((line) => line.startsWith("- ") ? line.slice(2).trim() : line);
+  const resourceLines = lines.slice(resourceIndex + 1).filter(Boolean);
+  const resources = resourceIndex < 0 ? void 0 : resourceLines.some((line) => !line.startsWith("- ")) ? [] : resourceLines.map((line) => line.slice(2).trim());
   return {
     domain,
     address: address2,
