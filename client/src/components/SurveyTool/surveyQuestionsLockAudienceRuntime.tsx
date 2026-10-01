@@ -106,7 +106,7 @@ export const createSurveyQuestionsLockAudienceRuntime = (
       questionId: qid,
       fieldKey: resolvedFieldKey,
       fieldState,
-      lockDisabled: lockDisabled || (!fieldPolicy.enabled && !fieldState?.encrypted),
+      lockDisabled: lockDisabled || (!fieldPolicy.enabled && !fieldState?.encrypted && !fieldState?.encryptedPortion),
       lockTitle,
       glowAnswer,
       forceAudienceMenu: forceAudienceMenu || fieldPolicy.admin,
@@ -407,7 +407,7 @@ export const createSurveyQuestionsLockAudienceRuntime = (
       showPlaintextOption,
       visualContext,
     });
-    if (!fieldPolicy.enabled && !fieldState?.encrypted && !forcedGate) return null;
+    if (!fieldPolicy.enabled && !fieldState?.encrypted && !fieldState?.encryptedPortion && !forcedGate) return null;
     const handleAudienceSelect: SurveyQuestionsLegacyValue = (
       audience: SurveyQuestionsLegacyValue,
       gateId: SurveyQuestionsLegacyValue = '',
