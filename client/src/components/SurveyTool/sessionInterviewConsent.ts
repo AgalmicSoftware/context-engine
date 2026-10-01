@@ -3,7 +3,7 @@ import { normalizeQuestionIdKey } from './surveyToolSignatures';
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-const consentSignature = (value: unknown, responderName?: unknown): string => {
+export const consentSignature = (value: unknown, responderName?: unknown): string => {
   const record = asRecord(value);
   const source = asRecord(record.source);
   const includeAi = record.includeAiProvenance === true || (record.includeAiProvenance !== false && !!record.source);
@@ -28,7 +28,11 @@ const consentSignature = (value: unknown, responderName?: unknown): string => {
   ]);
 };
 
-export const getChangedInterviewConsentQids = (provenance: unknown, userAnswers: unknown): Set<string> => {
+export const getChangedInterviewConsentQids = (
+  provenance: unknown,
+  userAnswers: unknown,
+  savedConsent: unknown = null,
+): Set<string> => {
   const saved = asRecord(userAnswers);
   const responses = Array.isArray(saved.responses) ? saved.responses : [saved];
   const savedById = new Map(
@@ -40,9 +44,13 @@ export const getChangedInterviewConsentQids = (provenance: unknown, userAnswers:
   const changed = new Set<string>();
   Object.entries(asRecord(provenance)).forEach(([id, record]) => {
     const qid = normalizeQuestionIdKey(id);
-    const response = savedById.get(qid) || {};
-    if (qid && consentSignature(record) !== consentSignature(response.interviewProvenance, response.responderName))
-      changed.add(qid);
+    const response = savedById.get(qid);
+    const baseline = asRecord(savedConsent);
+    if (!response && !Object.hasOwn(baseline, qid)) return;
+    const savedSignature = response
+      ? consentSignature(response.interviewProvenance, response.responderName)
+      : consentSignature(baseline[qid]);
+    if (qid && consentSignature(record) !== savedSignature) changed.add(qid);
   });
   return changed;
 };

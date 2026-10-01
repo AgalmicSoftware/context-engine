@@ -13,8 +13,10 @@ import { hasMeaningfulFieldValue } from './surveyToolDraftState';
 
 type RecordValue = Record<string, unknown>;
 const fields = ['answers', 'additionalComments', 'importance', 'conviction'] as const;
-export type InterviewSavedSlice = Record<(typeof fields)[number], RecordValue>;
-type InputSlice = { [K in keyof InterviewSavedSlice]?: RecordValue | null };
+export type InterviewSavedSlice = Record<(typeof fields)[number], RecordValue> & { interviewProvenance?: RecordValue };
+type InputSlice = { [K in keyof InterviewSavedSlice]?: RecordValue | null } & {
+  interviewProvenance?: RecordValue | null;
+};
 
 export const loadSessionInterviewSavedAnswers = async ({
   questionIds,
@@ -162,5 +164,14 @@ export const mergeInterviewSavedAnswerBaseline = (
       else delete nextBaseline[field][id];
     }
   }
-  return { slice: next, baseline: nextBaseline };
+  return {
+    slice: {
+      ...next,
+      ...(current?.interviewProvenance ? { interviewProvenance: { ...current.interviewProvenance } } : {}),
+    },
+    baseline: {
+      ...nextBaseline,
+      interviewProvenance: { ...baseline?.interviewProvenance, ...saved?.interviewProvenance },
+    },
+  };
 };

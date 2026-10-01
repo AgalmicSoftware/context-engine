@@ -1,3 +1,4 @@
+import { consentSignature } from './sessionInterviewConsent';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
 
@@ -1154,6 +1155,9 @@ export const buildPersistedDraftMapsForAllowedIds = ({
     });
 
     if (answerEntry) {
+      const savedConsent = normalizedBaselineSlice.interviewProvenance?.[qid];
+      if (savedConsent && consentSignature(interviewProvenance) === consentSignature(savedConsent))
+        delete answerEntry.interviewProvenance;
       answersObj[qid] = answerEntry;
     } else if (answersObj[qid]) {
       delete answersObj[qid];
@@ -1182,6 +1186,7 @@ export const buildPersistedDraftMapsForAllowedIds = ({
       additional: bAdd,
       importance: bImp,
       conviction: bConv,
+      interviewProvenance: normalizedBaselineSlice.interviewProvenance?.[qid],
       resolvers,
     });
 

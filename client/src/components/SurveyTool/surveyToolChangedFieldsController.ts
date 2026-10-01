@@ -288,7 +288,11 @@ export const orchestrateGetChangedQidsAndFields = (
   });
   // Consent is explicit only for questions reviewed in the interview. Missing
   // draft metadata must never revoke consent on an ordinary answer edit.
-  for (const qid of getChangedInterviewConsentQids(params.currentSlice.interviewProvenance, params.userAnswers)) {
+  for (const qid of getChangedInterviewConsentQids(
+    params.currentSlice.interviewProvenance,
+    params.userAnswers,
+    baselineSlice.interviewProvenance,
+  )) {
     if (!ids.has(qid)) continue;
     result.changedQids.add(qid);
     result.changedMap[qid] = { ...(result.changedMap[qid] || {}), interviewConsent: 1 };

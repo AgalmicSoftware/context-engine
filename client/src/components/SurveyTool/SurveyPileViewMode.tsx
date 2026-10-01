@@ -2341,12 +2341,18 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   // A zero edit count alone cannot prove that drafts were saved. Check the
   // persisted responses for every selected question before accepting a no-op.
   if (engine.props.loginComplete && !engine.state.isSubmitting && engine.getSubmitCount() === 0 && questionIds.length) {
-    const saved = engine.buildSliceFromUserAnswers(engine.state.userAnswers);
+    const saved = engine.state.userAnswers
+      ? engine.buildSliceFromUserAnswers(engine.state.userAnswers)
+      : engine.state.editBaseline;
     const current = engine.state.surveysResponseState?.[0];
     const fieldValue = (entry: unknown) => {
       return entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
     };
-    const consentChanges = getChangedInterviewConsentQids(current?.interviewProvenance, engine.state.userAnswers);
+    const consentChanges = getChangedInterviewConsentQids(
+      current?.interviewProvenance,
+      engine.state.userAnswers,
+      engine.state.editBaseline?.interviewProvenance,
+    );
     if (
       !questionIds.some((id) => consentChanges.has(normalizeQuestionIdKey(id))) &&
       questionIds.every(

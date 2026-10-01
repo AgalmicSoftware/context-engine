@@ -1,3 +1,4 @@
+import { consentSignature } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 import {
@@ -774,6 +775,17 @@ export const buildDraftHydrationState = ({
 
     const baselineEntry = baseline && typeof baseline === 'object' ? baseline[questionId] : null;
     if (
+      isRecord(baselineEntry) &&
+      isRecord(baselineEntry.interviewProvenance) &&
+      (!isRecord(answerEntry) || !isRecord(answerEntry.interviewProvenance))
+    ) {
+      nextSlice.interviewProvenance = {
+        ...(isRecord(nextSlice.interviewProvenance) ? nextSlice.interviewProvenance : {}),
+        [questionId]: { ...baselineEntry.interviewProvenance },
+      };
+      changed = true;
+    }
+    if (
       baselineEntry &&
       applyDraftEntryToSlice({
         targetSlice: nextBaseline,
@@ -824,6 +836,14 @@ export const buildCacheHydrationSlice = ({
     if (!isRecord(parsedResponse)) return;
     const hydratedResponse = parsedResponse as ParsedCachedResponse;
     if (!hasHydratableCachedResponse(hydratedResponse)) return;
+    slice.interviewProvenance = {
+      ...(isRecord(slice.interviewProvenance) ? slice.interviewProvenance : {}),
+      [questionId]: {
+        ...(isRecord(hydratedResponse.interviewProvenance) ? hydratedResponse.interviewProvenance : {}),
+        responderName: hydratedResponse.responderName || '',
+        consentSavedAt: Number(hydratedResponse.timeStamp) || 0,
+      },
+    };
 
     if (
       applyCachedResponseEntryToSlice({
@@ -867,6 +887,20 @@ export const buildHydratedResponseSlice = ({
     applyResponseHydrationListToSlice(hydrationArgs);
   }
 
+  const consent: UnknownRecord = {};
+  responses.forEach((raw) => {
+    if (!isRecord(raw)) return;
+    const id = normalizeQuestionIdKey(
+      typeof questionIdResolver === 'function' ? questionIdResolver(raw) : raw.questionID || raw.questionId || raw.id,
+    );
+    if (id)
+      consent[id] = {
+        ...(isRecord(raw.interviewProvenance) ? raw.interviewProvenance : {}),
+        responderName: raw.responderName || '',
+        consentSavedAt: Number(raw.timeStamp) || 0,
+      };
+  });
+  if (Object.keys(consent).length) slice.interviewProvenance = consent;
   return slice;
 };
 
@@ -2796,6 +2830,7 @@ export const buildLocalCacheRehydrationState = ({
 }: BuildLocalCacheRehydrationStateArgs = {}) => {
   const normalizedBaseSlice = baseSlice && typeof baseSlice === 'object' ? baseSlice : buildEmptyResponseSlice();
   const nextSlice: ResponseSlice = {
+    ...normalizedBaseSlice,
     answers: { ...((normalizedBaseSlice.answers as Record<string, unknown>) || {}) },
     importance: { ...((normalizedBaseSlice.importance as Record<string, unknown>) || {}) },
     conviction: { ...((normalizedBaseSlice.conviction as Record<string, unknown>) || {}) },
@@ -2821,6 +2856,33 @@ export const buildLocalCacheRehydrationState = ({
     )
       return;
 
+    const cachedConsent = isRecord(cache.interviewProvenance) ? cache.interviewProvenance[questionId] : undefined;
+    if (cachedConsent !== undefined) {
+      const baselineConsent = isRecord(nextBaseline.interviewProvenance) ? nextBaseline.interviewProvenance : {};
+      const previousConsent = isRecord(baselineConsent[questionId]) ? baselineConsent[questionId] : {};
+      const incomingConsent = isRecord(cachedConsent) ? cachedConsent : {};
+      const previousSavedAt = Number(previousConsent.consentSavedAt || previousConsent.appliedAt) || 0;
+      const incomingSavedAt = Number(incomingConsent.consentSavedAt || incomingConsent.appliedAt) || 0;
+      // A successful submit's persisted baseline can be newer than the public cache.
+      if (
+        (!Object.hasOwn(baselineConsent, questionId) || incomingSavedAt >= previousSavedAt) &&
+        (consentSignature(previousConsent) !== consentSignature(cachedConsent) ||
+          !Object.hasOwn(baselineConsent, questionId))
+      ) {
+        nextBaseline.interviewProvenance = { ...baselineConsent, [questionId]: cachedConsent };
+        baselineChanged = true;
+      }
+      const currentConsent = isRecord(nextSlice.interviewProvenance) ? nextSlice.interviewProvenance : {};
+      if (!Object.hasOwn(currentConsent, questionId)) {
+        nextSlice.interviewProvenance = {
+          ...currentConsent,
+          [questionId]: isRecord(nextBaseline.interviewProvenance)
+            ? nextBaseline.interviewProvenance[questionId]
+            : cachedConsent,
+        };
+        changed = true;
+      }
+    }
     const cachedAnswer = cache.answers && typeof cache.answers === 'object' ? cache.answers[questionId] : null;
     const cachedAdditional =
       cache.additionalComments && typeof cache.additionalComments === 'object'
