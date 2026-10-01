@@ -740,3 +740,19 @@ it.each([false, true])(
     );
   },
 );
+
+describe('ordinary saved-answer consent', () => {
+  it.each(['', 'Participant'])('does not invent AI provenance for a saved manual answer with name %j', (name) => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Disagree' } },
+          interviewProvenance: { q1: { responderName: name, consentSavedAt: 42 } },
+        },
+      }),
+    );
+    expect(result.responses![0]).not.toHaveProperty('interviewProvenance');
+    if (name) expect(result.responses![0].responderName).toBe(name);
+  });
+});

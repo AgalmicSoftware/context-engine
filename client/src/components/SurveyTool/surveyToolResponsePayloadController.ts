@@ -1,5 +1,6 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 import { buildSelectedInterviewResearch, buildUnselectedInterviewResearch } from './sessionInterviewResearch';
+import { resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 
 const asRecord = (value: unknown): UnknownRecord =>
@@ -252,8 +253,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
     const interviewSource = asRecord(interviewProvenanceRecord.source);
     const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
-    const includeAiProvenance = interviewProvenanceRecord.includeAiProvenance !== false;
-    const includePredictionComparison = interviewProvenanceRecord.includePredictionComparison === true;
+    // A saved name or timestamp alone is not consent to AI attribution.
+    const { includeAiProvenance, includePredictionComparison } = resolveConsentFlags(interviewProvenanceRecord);
     const originalPrediction = asRecord(interviewProvenanceRecord.originalPrediction);
     const submissionValueSnapshot = asRecord(interviewProvenanceRecord.submissionValueSnapshot);
     const responderName = String(interviewProvenanceRecord.responderName || '')

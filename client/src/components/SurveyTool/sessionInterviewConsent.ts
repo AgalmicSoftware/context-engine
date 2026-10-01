@@ -3,13 +3,22 @@ import { normalizeQuestionIdKey } from './surveyToolSignatures';
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+export const resolveConsentFlags = (value: unknown) => {
+  const record = asRecord(value);
+  return {
+    includeAiProvenance:
+      record.includeAiProvenance === true || (record.includeAiProvenance !== false && !!record.source),
+    includePredictionComparison:
+      record.includePredictionComparison === true ||
+      (record.includePredictionComparison !== false && !!record.predictionComparison),
+  };
+};
+
 export const consentSignature = (value: unknown, responderName?: unknown): string => {
   const record = asRecord(value);
   const source = asRecord(record.source);
-  const includeAi = record.includeAiProvenance === true || (record.includeAiProvenance !== false && !!record.source);
-  const includeComparison =
-    record.includePredictionComparison === true ||
-    (record.includePredictionComparison !== false && !!record.predictionComparison);
+  const { includeAiProvenance: includeAi, includePredictionComparison: includeComparison } =
+    resolveConsentFlags(record);
   return JSON.stringify([
     String(responderName ?? record.responderName ?? '')
       .trim()
