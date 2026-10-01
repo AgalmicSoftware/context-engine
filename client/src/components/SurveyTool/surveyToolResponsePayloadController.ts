@@ -168,6 +168,7 @@ export interface BuildResponsePayloadOptions {
 
   // State slices
   surveyResponseState: ResponseSlice | null;
+  savedInterviewProvenance?: Record<string, unknown> | null;
   questionPool: unknown[];
   pileQuestions: unknown[];
 
@@ -249,7 +250,10 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
-    const rawInterviewProvenance = surveyResponseState.interviewProvenance?.[q.id];
+    // Only explicit edits override the latest saved consent. Hydration never creates an edit.
+    const rawInterviewProvenance = hasOwn(asRecord(surveyResponseState.interviewProvenance), q.id)
+      ? surveyResponseState.interviewProvenance?.[q.id]
+      : opts.savedInterviewProvenance?.[q.id];
     const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
     const interviewSource = asRecord(interviewProvenanceRecord.source);
     const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
@@ -344,8 +348,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
                     verification: 'self_reported',
                     ...(researchCoverage ? { researchCoverage } : {}),
                   },
-                  promptVersion: String(rawInterviewProvenance.promptVersion || '').slice(0, 128),
-                  questionSetHash: String(rawInterviewProvenance.questionSetHash || '').slice(0, 256),
+                  promptVersion: String(interviewProvenanceRecord.promptVersion || '').slice(0, 128),
+                  questionSetHash: String(interviewProvenanceRecord.questionSetHash || '').slice(0, 256),
                 }
               : {}),
             ...(safeOriginalPrediction ? { originalPrediction: safeOriginalPrediction } : {}),
@@ -363,7 +367,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
                   ),
                 }
               : {}),
-            appliedAt: Number(rawInterviewProvenance.appliedAt || 0) || null,
+            appliedAt: Number(interviewProvenanceRecord.appliedAt || 0) || null,
           }
         : null;
 

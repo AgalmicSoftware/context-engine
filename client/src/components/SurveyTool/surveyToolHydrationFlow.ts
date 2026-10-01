@@ -1,4 +1,4 @@
-import { consentSignature } from './sessionInterviewConsent';
+import { buildSavedInterviewConsent, consentSignature } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 import {
@@ -56,11 +56,14 @@ type ApplyResponseHydrationListToSlice = ((args: ResponseHydrationApplyArgs) => 
 type BuildCacheHydrationSliceArgs = {
   renderedQuestionIds?: Iterable<unknown> | unknown[];
   mergedQuestionResponses?: CachedQuestionResponses | null;
+  questionResponsesMeta?: CachedQuestionResponses | null;
   account?: unknown;
   parseResponse?: ((raw: unknown) => unknown) | null;
   applyCachedResponseEntryToSlice?: ((args: CachedResponseApplyArgs) => boolean) | null;
   parseValue?: ((value: unknown) => unknown) | null;
 };
+
+const asHydrationRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
 const hasOwn = (value: UnknownRecord, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
 
@@ -775,17 +778,6 @@ export const buildDraftHydrationState = ({
 
     const baselineEntry = baseline && typeof baseline === 'object' ? baseline[questionId] : null;
     if (
-      isRecord(baselineEntry) &&
-      isRecord(baselineEntry.interviewProvenance) &&
-      (!isRecord(answerEntry) || !isRecord(answerEntry.interviewProvenance))
-    ) {
-      nextSlice.interviewProvenance = {
-        ...(isRecord(nextSlice.interviewProvenance) ? nextSlice.interviewProvenance : {}),
-        [questionId]: { ...baselineEntry.interviewProvenance },
-      };
-      changed = true;
-    }
-    if (
       baselineEntry &&
       applyDraftEntryToSlice({
         targetSlice: nextBaseline,
@@ -809,6 +801,7 @@ export const buildDraftHydrationState = ({
 export const buildCacheHydrationSlice = ({
   renderedQuestionIds = [],
   mergedQuestionResponses = null,
+  questionResponsesMeta = null,
   account = '',
   parseResponse = null,
   applyCachedResponseEntryToSlice = null,
@@ -838,11 +831,10 @@ export const buildCacheHydrationSlice = ({
     if (!hasHydratableCachedResponse(hydratedResponse)) return;
     slice.interviewProvenance = {
       ...(isRecord(slice.interviewProvenance) ? slice.interviewProvenance : {}),
-      [questionId]: {
-        ...(isRecord(hydratedResponse.interviewProvenance) ? hydratedResponse.interviewProvenance : {}),
-        responderName: hydratedResponse.responderName || '',
-        consentSavedAt: Number(hydratedResponse.timeStamp) || 0,
-      },
+      [questionId]: buildSavedInterviewConsent(
+        hydratedResponse,
+        questionResponsesMeta?.[questionId]?.[normalizedAccount],
+      ),
     };
 
     if (
@@ -894,11 +886,7 @@ export const buildHydratedResponseSlice = ({
       typeof questionIdResolver === 'function' ? questionIdResolver(raw) : raw.questionID || raw.questionId || raw.id,
     );
     if (id)
-      consent[id] = {
-        ...(isRecord(raw.interviewProvenance) ? raw.interviewProvenance : {}),
-        responderName: raw.responderName || '',
-        consentSavedAt: Number(raw.timeStamp) || 0,
-      };
+      consent[id] = buildSavedInterviewConsent({ ...raw, timeStamp: raw.timeStamp ?? normalizedAnswers?.timeStamp });
   });
   if (Object.keys(consent).length) slice.interviewProvenance = consent;
   return slice;
@@ -1065,9 +1053,25 @@ export const loadLocalCacheHydrationSlice = ({
   });
   if (Object.keys(mergedQuestionResponses).length === 0) return null;
 
+  const questionResponsesMeta: CachedQuestionResponses = {};
+  for (const slug of Array.isArray(scopeSlugs) ? scopeSlugs : []) {
+    const bucket = asHydrationRecord(readQuestionsCache?.(String(slug)))[netId];
+    const metadata = asHydrationRecord(asHydrationRecord(bucket).questionResponsesMeta);
+    for (const [id, entries] of Object.entries(metadata)) {
+      for (const [account, meta] of Object.entries(asHydrationRecord(entries))) {
+        const responses = asHydrationRecord(asHydrationRecord(bucket).questionResponses);
+        // Keep version metadata paired with the response selected by the cache merge.
+        if (asHydrationRecord(responses[id])[account] === mergedQuestionResponses[id]?.[account]) {
+          questionResponsesMeta[id] = { ...questionResponsesMeta[id], [account]: meta };
+        }
+      }
+    }
+  }
+
   return buildCacheHydrationSlice({
     renderedQuestionIds,
     mergedQuestionResponses,
+    questionResponsesMeta,
     account: acct,
     parseResponse,
     applyCachedResponseEntryToSlice,
@@ -2861,26 +2865,21 @@ export const buildLocalCacheRehydrationState = ({
       const baselineConsent = isRecord(nextBaseline.interviewProvenance) ? nextBaseline.interviewProvenance : {};
       const previousConsent = isRecord(baselineConsent[questionId]) ? baselineConsent[questionId] : {};
       const incomingConsent = isRecord(cachedConsent) ? cachedConsent : {};
-      const previousSavedAt = Number(previousConsent.consentSavedAt || previousConsent.appliedAt) || 0;
-      const incomingSavedAt = Number(incomingConsent.consentSavedAt || incomingConsent.appliedAt) || 0;
-      // A successful submit's persisted baseline can be newer than the public cache.
+      const previousSavedAt = Number(previousConsent.consentSavedAt) || 0;
+      const incomingSavedAt = Number(incomingConsent.consentSavedAt) || 0;
+      const knownOwnResponse = previousConsent.consentReadAuthority === 'own';
+      // An authoritative own-answer read must not be replaced by an unversioned public cache.
+      const canRefresh =
+        !Object.hasOwn(baselineConsent, questionId) ||
+        (incomingSavedAt >= previousSavedAt && (!knownOwnResponse || incomingSavedAt > 0));
       if (
-        (!Object.hasOwn(baselineConsent, questionId) || incomingSavedAt >= previousSavedAt) &&
+        canRefresh &&
         (consentSignature(previousConsent) !== consentSignature(cachedConsent) ||
+          incomingSavedAt !== previousSavedAt ||
           !Object.hasOwn(baselineConsent, questionId))
       ) {
         nextBaseline.interviewProvenance = { ...baselineConsent, [questionId]: cachedConsent };
         baselineChanged = true;
-      }
-      const currentConsent = isRecord(nextSlice.interviewProvenance) ? nextSlice.interviewProvenance : {};
-      if (!Object.hasOwn(currentConsent, questionId)) {
-        nextSlice.interviewProvenance = {
-          ...currentConsent,
-          [questionId]: isRecord(nextBaseline.interviewProvenance)
-            ? nextBaseline.interviewProvenance[questionId]
-            : cachedConsent,
-        };
-        changed = true;
       }
     }
     const cachedAnswer = cache.answers && typeof cache.answers === 'object' ? cache.answers[questionId] : null;

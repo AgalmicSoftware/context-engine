@@ -60,7 +60,13 @@ export const loadSessionInterviewSavedAnswers = async ({
         latest.set(row.questionId, row);
       }
     }
-    return [...latest.values()].map((row) => ({ ...row.response, questionID: row.questionId }));
+    return [...latest.values()].map((row) => ({
+      ...row.response,
+      questionID: row.questionId,
+      _responseTimestamp: row.timestamp,
+      _responseStorageRefId: row.storageRefId,
+      _consentOwnRead: true,
+    }));
   }
   const responses: RecordValue[] = [];
   // Existing strict per-account contract reads also cover chain-authoritative
@@ -79,7 +85,7 @@ export const loadSessionInterviewSavedAnswers = async ({
           forceArweaveFetch: true,
         });
         if (!response) throw new Error('A saved answer could not be read.');
-        return { ...response, questionID: questionId };
+        return { ...response, questionID: questionId, _consentOwnRead: true };
       }),
     );
     for (const response of batch) if (response) responses.push(response);

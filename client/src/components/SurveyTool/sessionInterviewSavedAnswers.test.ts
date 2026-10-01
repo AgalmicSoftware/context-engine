@@ -31,7 +31,7 @@ it('uses strict per-account chain reads, distinguishing missing answers from fai
   jest.mocked(surveyQuestionReadsPort.getResponseHash).mockResolvedValueOnce('hash').mockResolvedValueOnce(null);
   jest.mocked(surveyQuestionReadsPort.getResponse).mockResolvedValue({ answer: { value: 'latest' } });
   await expect(loadSessionInterviewSavedAnswers(base)).resolves.toEqual([
-    { questionID: 'q1', answer: { value: 'latest' } },
+    { questionID: 'q1', answer: { value: 'latest' }, _consentOwnRead: true },
   ]);
   expect(surveyQuestionReadsPort.getResponseHash).toHaveBeenCalledWith(
     undefined,
@@ -63,7 +63,15 @@ it('chooses the latest Hosted edit with stable same-time ordering', async () => 
       ...base,
       sessionConfig: { sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE) },
     }),
-  ).resolves.toEqual([{ answer: 'latest', questionID: 'q1' }]);
+  ).resolves.toEqual([
+    {
+      answer: 'latest',
+      questionID: 'q1',
+      _responseTimestamp: 2,
+      _responseStorageRefId: 'ref-b',
+      _consentOwnRead: true,
+    },
+  ]);
   expect(loadWorkerResponses).toHaveBeenCalledWith(expect.objectContaining({ ownResponses: true, account: '0xabc' }));
 });
 const field = (value: unknown, policy: Record<string, unknown> = {}) => ({

@@ -3,6 +3,20 @@ import { normalizeQuestionIdKey } from './surveyToolSignatures';
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+// Consent recency follows the saved response, never the time of an AI prediction.
+export const buildSavedInterviewConsent = (value: unknown, metadata: unknown = null) => {
+  const record = asRecord(value);
+  const meta = asRecord(metadata);
+  const timestamp = Number(meta.ts ?? meta.timestamp ?? record._responseTimestamp ?? record.timeStamp ?? 0) || 0;
+  return {
+    ...asRecord(record.interviewProvenance),
+    responderName: record.responderName || '',
+    consentSavedAt: timestamp > 0 && timestamp < 1e12 ? timestamp * 1000 : timestamp,
+    consentStorageRefId: String(meta.storageRefId ?? record._responseStorageRefId ?? ''),
+    ...(record._consentOwnRead === true ? { consentReadAuthority: 'own' } : {}),
+  };
+};
+
 export const resolveConsentFlags = (value: unknown) => {
   const record = asRecord(value);
   return {
@@ -56,9 +70,9 @@ export const getChangedInterviewConsentQids = (
     const response = savedById.get(qid);
     const baseline = asRecord(savedConsent);
     if (!response && !Object.hasOwn(baseline, qid)) return;
-    const savedSignature = response
-      ? consentSignature(response.interviewProvenance, response.responderName)
-      : consentSignature(baseline[qid]);
+    const savedSignature = Object.hasOwn(baseline, qid)
+      ? consentSignature(baseline[qid])
+      : consentSignature(response?.interviewProvenance, response?.responderName);
     if (qid && consentSignature(record) !== savedSignature) changed.add(qid);
   });
   return changed;
