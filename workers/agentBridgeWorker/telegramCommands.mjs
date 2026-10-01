@@ -42,6 +42,7 @@ import {
   buildTelegramMyAccountState,
   buildTelegramPoseQuestionState,
   buildTelegramQuestionListState,
+  normalizeTelegramRatingScale,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildResultsImage } from './resultImage.mjs';
@@ -3027,6 +3028,12 @@ async function persistTelegramSubmitRequest({
   if (!telegramUserId || !slug || !qid || draft.status !== 'draft_saved') {
     return { ok: false, reason: 'submit_request_incomplete' };
   }
+  let ratingScale = null;
+  if (['rating', 'rating_button'].includes(draft.controlType)) {
+    const loaded = await loadQuestionsForSession(env, slug, { preferredQuestionIds: [qid] });
+    const question = (loaded.questions || []).find((entry) => questionId(entry) === qid);
+    ratingScale = normalizeTelegramRatingScale(question);
+  }
   const answerFingerprint = answerDraftFingerprint(draft);
   const idempotencyKey = buildSubmitIdempotencyKey({
     transport: 'telegram_bot_submit', principal: telegramUserId, sessionSlug: slug, questionId: qid,
@@ -3098,6 +3105,7 @@ async function persistTelegramSubmitRequest({
           value: safeString(draft.answerValue),
           controlType: safeString(draft.controlType),
         },
+        ratingScale,
         onChainAnswer: onChainAnswerFromDraft(draft),
         answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
         draftProvenance,
@@ -3138,6 +3146,7 @@ async function persistTelegramSubmitRequest({
     questionRef: {
       sessionSlug: slug,
       questionId: qid,
+      ratingScale,
     },
     answer: onChainAnswerFromDraft(draft),
     idempotencyKey,

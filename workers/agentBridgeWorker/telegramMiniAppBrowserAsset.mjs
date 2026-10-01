@@ -3259,13 +3259,14 @@ export function renderTelegramMiniAppBrowserAsset({
       } else if (question.questionType === 'rating') {
         const label = document.createElement('div');
         label.className = 'ratingValue';
-        label.textContent = draft.value ?? 5;
+        const scale = question.ratingScale || { min: 0, max: 10, step: 1 };
+        label.textContent = draft.value ?? scale.min;
         const input = document.createElement('input');
         input.type = 'range';
-        input.min = '0';
-        input.max = '10';
-        input.step = '1';
-        input.value = draft.value ?? 5;
+        input.min = String(scale.min);
+        input.max = String(scale.max);
+        input.step = String(scale.step || 1);
+        input.value = draft.value ?? scale.min;
         input.oninput = () => {
           activate(question);
           draft.value = Number(input.value);

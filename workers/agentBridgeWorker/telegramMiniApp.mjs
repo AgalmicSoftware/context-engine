@@ -46,6 +46,7 @@ import {
   buildTelegramAgentSettingsEditState,
   buildTelegramAgentSettingsOverviewState,
   buildTelegramPoseQuestionState,
+  normalizeTelegramRatingAnswer,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import {
@@ -936,6 +937,7 @@ async function persistMiniQuestionAction({
       sessionSlug: sanitizeSessionSlug(sessionSlug),
       questionId: qid,
       questionType: safeString(card.questionType),
+      ratingScale: card.ratingScale || null,
       selectionMode: safeString(card.selectionMode),
       ...(card.questionType === 'quadratic' ? { voiceCredits: card.voiceCredits ?? 99 } : {}),
       options: Array.isArray(card.answerLabels) ? card.answerLabels : [],
@@ -2166,8 +2168,8 @@ function normalizeMiniAnswer(answer = {}, questionRef = {}) {
     };
   }
   if (type === 'rating') {
-    const value = Number(answer.value ?? answer.rating ?? answer.answer);
-    if (!Number.isInteger(value) || value < 0 || value > 10) {
+    const value = normalizeTelegramRatingAnswer(answer.value ?? answer.rating ?? answer.answer, questionRef);
+    if (value === null) {
       return { ok: false, reason: 'rating_answer_invalid' };
     }
     return {
@@ -2284,6 +2286,7 @@ async function persistSubmitRequest({
         questionId: qid,
         questionIdShort: shortQuestionId(qid),
         answer,
+        ratingScale: questionRef.ratingScale,
         onChainAnswer: answer,
         answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
         draftProvenance,

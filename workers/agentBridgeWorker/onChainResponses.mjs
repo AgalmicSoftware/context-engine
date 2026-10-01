@@ -1,3 +1,4 @@
+import { normalizeTelegramRatingAnswer } from './questionUi.mjs';
 import { validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 import { isPreviewPrincipal } from './agentPrincipal.mjs';
 import {
@@ -652,12 +653,13 @@ export function base64urlToHex(value = '') {
   return `0x${bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function normalizeAnswerForPayload(answer = {}) {
-  const type = lower(answer.questionType || answer.controlType || 'freeform');
+function normalizeAnswerForPayload(answer = {}, questionRef = {}) {
+  const type = lower(questionRef.questionType || answer.questionType || answer.controlType || 'freeform');
   if (type === 'quadratic') return { questionType: 'quadratic', value: answer.value };
   if (type === 'rating' || type === 'rating_button') {
-    const value = Number(answer.value ?? answer.rating ?? answer.answer ?? answer.label);
-    return { questionType: 'rating', value: Number.isFinite(value) ? Math.max(0, Math.min(10, value)) : 0 };
+    const value = normalizeTelegramRatingAnswer(answer.value ?? answer.rating ?? answer.answer ?? answer.label, questionRef);
+    if (value === null) throw new Error('rating_answer_invalid');
+    return { questionType: 'rating', value };
   }
   if (type === 'agree_unsure_disagree' || type === 'binary') {
     const raw = lower(answer.value || answer.answer || answer.label);
@@ -687,7 +689,7 @@ export function buildTelegramResponsePayload({
   accountAddress = '',
   createdAt = null,
 } = {}) {
-  const normalized = normalizeAnswerForPayload(answer);
+  const normalized = normalizeAnswerForPayload(answer, questionRef);
   if (questionRef.questionType === 'quadratic' || normalized.questionType === 'quadratic') {
     const error = validateQuadraticAllocation(normalized.value, questionRef);
     if (error) throw new Error(error);

@@ -306,6 +306,7 @@ export async function processQueuedTelegramSubmitRecord({
     questionRef: {
       sessionSlug: source.sessionSlug,
       questionId: source.questionId,
+      ratingScale: source.ratingScale,
     },
     answer: source.onChainAnswer || source.answer,
     idempotencyKey: source.idempotencyKey,

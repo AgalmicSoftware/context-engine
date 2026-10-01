@@ -139,6 +139,14 @@ export function normalizeTelegramRatingScale(question = {}) {
   return { min, max, step };
 }
 
+export function normalizeTelegramRatingAnswer(value, question = {}) {
+  if (value == null || String(value).trim() === '') return null;
+  const numeric = Number(value);
+  const { min, max, step } = normalizeTelegramRatingScale(question);
+  return Number.isFinite(numeric) && numeric >= min && numeric <= max && Number.isInteger((numeric - min) / step)
+    ? numeric : null;
+}
+
 function ratingButtonValuesForScale(scale = {}) {
   const normalized = normalizeTelegramRatingScale({ ratingScale: scale });
   const values = [];
