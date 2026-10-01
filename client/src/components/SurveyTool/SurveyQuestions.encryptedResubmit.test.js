@@ -1,4 +1,4 @@
-// rev1 probe for d2f5e0995: after "Decrypt & edit", the owner changes only the PUBLIC comment
+// After "Decrypt & edit", the owner changes only the public comment
 // of a question whose answer is encrypted. What does the real submit path upload?
 import { act, waitFor } from '@testing-library/react';
 

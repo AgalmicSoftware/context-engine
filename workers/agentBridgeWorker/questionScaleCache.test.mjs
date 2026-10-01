@@ -40,7 +40,7 @@ const baseEnv = () => ({
 
 test('refresh ignores legacy v5 records missing the stored rating scale', async () => {
   const fresh = await NEW.listCachedSessionQuestionsForBridge({ env: baseEnv(), sessionSlug: 'demo', fetchImpl });
-  console.log(`fresh index (new code): scale=${JSON.stringify(fresh.questions[0]?.scale)} card=${JSON.stringify(buildTelegramQuestionCard(fresh.questions[0]).ratingScale)}`);
+  assert.deepEqual(buildTelegramQuestionCard(fresh.questions[0]).ratingScale, { min: 1, max: 10, step: 1 });
 
   NEW.__test__sessionQuestions.clearCaches();
   const env = baseEnv();
@@ -52,6 +52,5 @@ test('refresh ignores legacy v5 records missing the stored rating scale', async 
   NEW.__test__sessionQuestions.clearCaches();
   const reused = await NEW.listCachedSessionQuestionsForBridge({ env, sessionSlug: 'demo', fetchImpl, forceRefresh: true });
   const card = buildTelegramQuestionCard(reused.questions[0]).ratingScale;
-  console.log(`index written by old code, then forceRefresh with new code: key=${[...env.AGENT_ACTION_KV.store.keys()]} scale=${JSON.stringify(reused.questions[0]?.scale)} card=${JSON.stringify(card)}`);
   assert.deepEqual(card, { min: 1, max: 10, step: 1 });
 });
