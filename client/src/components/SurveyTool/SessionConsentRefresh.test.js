@@ -341,3 +341,24 @@ it('preserves each saved consent until the participant explicitly changes the co
   );
   expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({ q1: { interviewConsent: 1 } });
 }, 40000);
+
+it('keeps an authoritative withdrawal over a conflicting public cache at the same timestamp', async () => {
+  const old = saved('q1', { timeStamp: 1000, responderName: 'Participant A', interviewProvenance: aiProvenance() });
+  const latest = saved('q1', { timeStamp: 1000 });
+  setCache({ q1: { [A]: old } });
+  mockCaches();
+  ownAnswers({ [A]: [latest] });
+  const submitResponses = mockSubmit();
+  const pile = mountPile();
+  const engine = await waitForPile(pile);
+  await run(() => loadSessionInterviewOwnAnswers(engine, ['q1'], new AbortController().signal));
+  await act(async () => pile.view.rerenderSurveyQuestions({ questionResponsesNonce: 3 }));
+  await settle(1200);
+  const current = pile.getEngine();
+  await run(() => new Promise((resolve) => current.handleAnswerPile('q1', 'Disagree', { afterUpdate: resolve })));
+  await run(() => current.handlePileSubmitClick());
+  await settle();
+  const uploaded = submitResponses.mock.calls[0]?.[2]?.[0];
+  expect(uploaded).toBeDefined();
+  expect(uploaded).not.toHaveProperty('responderName');
+}, 40000);
