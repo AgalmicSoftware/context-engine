@@ -164,6 +164,7 @@ export const applyDecryptedQuestionStateToSurveySlice = (
   const decryptedSlice = asRecord(decryptedStateSlice);
   const decryptedAnswers = asRecord(decryptedSlice.answers);
   const decryptedAdditionalComments = asRecord(decryptedSlice.additionalComments);
+  // The plaintext and envelope must come from the same saved response, even in a stale tab.
   const baseline = asRecord(baselineSlice);
   const baselineAnswers = asRecord(baseline.answers);
   const baselineAdditionalComments = asRecord(baseline.additionalComments);
@@ -386,11 +387,14 @@ export const normalizeBulkDecryptedSliceForSurveyState = (
     const prevEncrypted = asRecord(asRecord(previousSlice.answers)[questionId]).encrypted;
     const baselineAnswer = asRecord(asRecord(baseline.answers)[questionId]);
     nextDecryptedSlice.answers[questionId] = {
+      ...baselineAnswer,
       ...nextAnswer,
       encrypted:
-        typeof prevEncrypted === 'boolean'
-          ? prevEncrypted
-          : !!(baselineAnswer.value === '*' && (baselineAnswer.encryptedPortion || baselineAnswer.encrypted)),
+        typeof baselineAnswer.encrypted === 'boolean'
+          ? baselineAnswer.encrypted
+          : typeof prevEncrypted === 'boolean'
+            ? prevEncrypted
+            : !!(baselineAnswer.value === '*' && baselineAnswer.encryptedPortion),
     };
   });
 
@@ -399,14 +403,17 @@ export const normalizeBulkDecryptedSliceForSurveyState = (
     const prevEncrypted = asRecord(asRecord(previousSlice.additionalComments)[questionId]).encrypted;
     const baselineAdditional = asRecord(asRecord(baseline.additionalComments)[questionId]);
     nextDecryptedSlice.additionalComments[questionId] = {
+      ...baselineAdditional,
       ...nextAdditional,
       encrypted:
-        typeof prevEncrypted === 'boolean'
-          ? prevEncrypted
-          : !!(
-              baselineAdditional.value === '*' &&
-              (baselineAdditional.encryptedPortion || baselineAdditional.encrypted)
-            ),
+        typeof baselineAdditional.encrypted === 'boolean'
+          ? baselineAdditional.encrypted
+          : typeof prevEncrypted === 'boolean'
+            ? prevEncrypted
+            : !!(
+                baselineAdditional.value === '*' &&
+                (baselineAdditional.encryptedPortion || baselineAdditional.encrypted)
+              ),
     };
   });
 

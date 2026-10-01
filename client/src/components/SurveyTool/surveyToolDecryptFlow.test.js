@@ -2007,7 +2007,7 @@ describe('surveyToolDecryptFlow', () => {
       ),
     ).toEqual({
       answers: {
-        q1: { value: 'clear answer', zkSalt: 'salt-a', encrypted: true },
+        q1: { value: 'clear answer', zkSalt: 'salt-a', encrypted: true, encryptedPortion: 'ans-env' },
         q2: { value: 'plain answer', encrypted: false },
       },
       additionalComments: {
