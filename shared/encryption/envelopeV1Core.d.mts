@@ -16,7 +16,10 @@ export function utf8d(bytes: BufferSource): string;
 export function safeLower(value: string): string;
 export function safeLower<T>(value: T): T;
 export function stableStringify(value: unknown): string;
-export function encodePaddedEnvelopePlaintext(value: Record<string, unknown>): Uint8Array;
+export function encodePaddedEnvelopePlaintext(
+  value: Record<string, unknown>,
+  question?: Record<string, unknown>,
+): Uint8Array;
 export function getContextBytes(contextHex: string): Uint8Array;
 export function importAesGcmKey(raw32: BufferSource): Promise<CryptoKey>;
 export function aesGcmEncrypt(

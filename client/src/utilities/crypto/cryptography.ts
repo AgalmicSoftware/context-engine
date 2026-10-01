@@ -1318,7 +1318,8 @@ const encryptField = async ({
     kind, // freeform | binary | rating | multichoice | additional (freeform)
     salt: commits.saltHex, // keep inside CEK-encrypted payload only
   };
-  const plaintextBytes = encodePaddedEnvelopePlaintext(plaintextObj);
+  const paddingQuestion = questionPool?.find((question) => safeLower(question.id) === safeLower(qId)) || meta;
+  const plaintextBytes = encodePaddedEnvelopePlaintext(plaintextObj, paddingQuestion);
 
   // CEK (256-bit) and content AES-GCM
   const cekRaw = new Uint8Array(32);

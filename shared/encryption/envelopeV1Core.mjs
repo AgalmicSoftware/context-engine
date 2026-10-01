@@ -6,6 +6,7 @@
 
 import { Buffer } from 'buffer';
 import { ethers } from 'ethers';
+import { getVoiceCredits } from '../questions/quadraticAllocation.mjs';
 
 const { utils } = ethers;
 
@@ -57,10 +58,44 @@ export const stableStringify = (obj) => JSON.stringify(obj);
 
 // Measure encoded JSON bytes, including the pad key, so Unicode values and
 // JSON escapes share the same 128-byte buckets as plain ASCII values.
-export const encodePaddedEnvelopePlaintext = (value) => {
+const longestCategoricalValueBytes = (kind, question) => {
+  if (kind === 'binary') return utf8e(JSON.stringify('Disagree')).length;
+  // All finite JS numbers fit in 25 JSON bytes and the same rating bucket.
+  if (kind === 'rating') return 25;
+  const options = Array.isArray(question.options) ? question.options : [];
+  if (kind === 'multichoice' && options.length) {
+    const choices = question.singleSelect || question.singleChoice || question.oneSelectionOnly
+      ? options.map((option) => [option])
+      : [options];
+    return Math.max(...choices.map((choice) => utf8e(JSON.stringify(choice)).length));
+  }
+  if (kind === 'quadratic' && options.length) {
+    let remaining = getVoiceCredits(question);
+    if (!Number.isSafeInteger(remaining) || remaining < 1) return 0;
+    let length = options.length * 2 + 1; // JSON for an all-zero allocation.
+    let previousCost = 0;
+    // Negative votes are longest. Each extra digit costs more than the prior
+    // digit, so buy the cheapest character upgrades across options first.
+    for (let magnitude = 1; magnitude * magnitude <= remaining + previousCost; magnitude *= 10) {
+      const cost = magnitude * magnitude - previousCost;
+      const count = Math.min(options.length, Math.floor(remaining / cost));
+      length += count;
+      remaining -= count * cost;
+      if (count < options.length) break;
+      previousCost = magnitude * magnitude;
+    }
+    return length;
+  }
+  return 0;
+};
+
+export const encodePaddedEnvelopePlaintext = (value, question = {}) => {
   const padded = { ...value, pad: '' };
   const length = utf8e(JSON.stringify(padded)).length;
-  padded.pad = ' '.repeat((128 - (length % 128)) % 128);
+  const overhead = utf8e(JSON.stringify({ ...padded, value: null })).length - 4;
+  const longest = overhead + longestCategoricalValueBytes(value.kind, question);
+  const target = Math.ceil(Math.max(length, longest) / 128) * 128;
+  padded.pad = ' '.repeat(target - length);
   return utf8e(JSON.stringify(padded));
 };
 
