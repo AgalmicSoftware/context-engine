@@ -2473,7 +2473,7 @@ describe('Interview cancellation and recovery', () => {
     });
     mockedMapInterviewEvidenceToResponses
       .mockResolvedValueOnce([
-        { questionId: 'q1', answer: 'First answer', confidence: 0.6 },
+        { questionId: 'q1', answer: 'First answer', confidence: 0.6, importance: 6, conviction: 8 },
         { questionId: 'q2', answer: 'Keep this', confidence: 0.8 },
       ])
       .mockResolvedValueOnce([
@@ -2507,7 +2507,7 @@ describe('Interview cancellation and recovery', () => {
     expect(mockedMapInterviewEvidenceToResponses.mock.calls.at(-1)?.[0].previousResponses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          prediction: expect.objectContaining({ answer: 'First answer' }),
+          prediction: expect.objectContaining({ answer: 'First answer', importance: 60, conviction: 80 }),
           reviewed: expect.objectContaining({ answer: 'My edit' }),
         }),
       ]),

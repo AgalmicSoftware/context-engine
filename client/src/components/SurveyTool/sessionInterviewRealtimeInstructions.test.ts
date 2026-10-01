@@ -144,3 +144,29 @@ it('does not detach an abbreviated responder turn from its omitted interviewer q
   expect(instructions).toContain('Interviewer: Next?\nResponder: Yes.');
   expect(instructions).toContain('2 earlier turns omitted');
 });
+
+it('sends predicted and participant-edited ratings on the 0–100 AI wire scale', () => {
+  const input = {
+    questions: [question],
+    reviewedResponses: [
+      {
+        prediction: { questionId: 'q1', answer: 90, importance: 5, conviction: 8 },
+        reviewed: {
+          importance: 9,
+          conviction: 0,
+          userEditedFields: ['importance', 'conviction'] as ('importance' | 'conviction')[],
+        },
+      },
+    ],
+  };
+  const before = JSON.stringify(input);
+  const instructions = buildRealtimeInterviewInstructions(input);
+  expect(readPrefill(instructions).predictedResponses[0]).toMatchObject({
+    importance: 50,
+    conviction: 80,
+    participantEditedImportance: 90,
+    participantEditedConviction: 0,
+  });
+  expect(instructions).toContain('Importance and conviction ratings use the 0–100 AI wire scale.');
+  expect(JSON.stringify(input)).toBe(before);
+});
