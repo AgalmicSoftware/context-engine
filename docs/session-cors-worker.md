@@ -1689,6 +1689,12 @@ login, and signed admin request bodies must carry that config's canonical
      `CF-Connecting-IP`; outside that runtime, forwarded IP headers are ignored
      and requests fall back to the bounded `anon:unknown` bucket.
 2. Build a SIWE message client-side and sign with `personal_sign`.
+   Include exactly two `Resources:` URI-list entries with a `- ` prefix: the
+   receiving Worker origin and `urn:context-engine:session:id:<encoded-id>` for
+   Worker-canonical sessions, or `urn:context-engine:session:slug:<encoded-slug>`
+   for registry sessions (`general` uses the empty slug). `/auth/login` checks
+   these signed resources before consuming the nonce. Messages without a
+   Resources section remain accepted for legacy-client compatibility.
 3. `POST /auth/login` body:
    `{ address, message, signature, sessionSlug, sessionId }` for
    `worker_canonical`; registry compatibility may omit `sessionId`.

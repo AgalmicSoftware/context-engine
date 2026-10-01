@@ -173,7 +173,9 @@ grant Netlify access to private planning repositories.
 Deploy Previews prove the static build and browser routes. Worker-backed flows
 also require the exact preview origin in the relevant worker allowlist, so keep
 full production verification on an approved custom domain rather than adding a
-wildcard preview origin.
+wildcard preview origin. Helper-based Worker deployments fail in Deploy
+Previews: the PR commit has no immutable Worker release assets. Test those
+deployments using a client built for an existing verified release.
 
 For a manual fallback, drag `client/build/` into Netlify's deploy UI. Do not
 upload `client/build-vite/` or `client/vite-build/`. Those names are legacy

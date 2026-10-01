@@ -149,7 +149,7 @@ export function QuestionFilterTopQuestionsSection({
                 disabled={countDisabled}
                 id={styles.topQuestionsCountInput}
               />
-              questions (by total conviction)
+              questions (by total importance)
             </Label>
           </FormGroup>
 

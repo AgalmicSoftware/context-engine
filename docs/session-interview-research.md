@@ -132,8 +132,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
         "originalPrediction": {
           "answer": "I expect model evaluations to miss deployment risks.",
           "additionalComments": "The source mentioned monitoring after launch.",
-          "importance": 70,
-          "conviction": 60,
+          "importance": 7,
+          "conviction": 6,
           "confidence": 0.74,
           "evidence": "Grounded in the imported summary."
         },
@@ -143,8 +143,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
             "modelId": "gpt-example",
             "answer": "I expect model evaluations to miss deployment risks.",
             "additionalComments": "The source mentioned monitoring after launch.",
-            "importance": 70,
-            "conviction": 60,
+            "importance": 7,
+            "conviction": 6,
             "confidence": 0.74,
             "evidence": "Grounded in the imported summary."
           }
@@ -152,8 +152,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
         "finalSubmitted": {
           "answer": "I worry that evaluations can miss deployment risks.",
           "additionalComments": "The strongest evidence was about monitoring after launch.",
-          "importance": 80,
-          "conviction": 60
+          "importance": 8,
+          "conviction": 6
         },
         "changedFields": ["answer", "additionalComments", "importance"],
         "userEditedFields": ["answer", "additionalComments", "importance"],
@@ -163,8 +163,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
           "original": {
             "answer": "I expect model evaluations to miss deployment risks.",
             "additionalComments": "The source mentioned monitoring after launch.",
-            "importance": 70,
-            "conviction": 60,
+            "importance": 7,
+            "conviction": 6,
             "confidence": 0.74,
             "evidence": "Grounded in the imported summary."
           },
@@ -174,8 +174,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
               "modelId": "gpt-example",
               "answer": "I expect model evaluations to miss deployment risks.",
               "additionalComments": "The source mentioned monitoring after launch.",
-              "importance": 70,
-              "conviction": 60,
+              "importance": 7,
+              "conviction": 6,
               "confidence": 0.74,
               "evidence": "Grounded in the imported summary."
             }
@@ -183,8 +183,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
           "submitted": {
             "answer": "I worry that evaluations can miss deployment risks.",
             "additionalComments": "The strongest evidence was about monitoring after launch.",
-            "importance": 80,
-            "conviction": 60
+            "importance": 8,
+            "conviction": 6
           },
           "changedFields": ["answer", "additionalComments", "importance"],
           "userEditedFields": ["answer", "additionalComments", "importance"],
