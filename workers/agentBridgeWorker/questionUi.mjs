@@ -1,7 +1,7 @@
-import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
+import { normalizeTelegramRatingScale } from './ratingScale.mjs';
+export { normalizeTelegramRatingScale, normalizeTelegramRatingAnswer } from './ratingScale.mjs';
 import { safeString } from './runtimePrimitives.mjs';
 import {
-  DEFAULT_RATING_SCALE,
   QUESTION_VISIBILITY,
   QUESTION_TYPES,
   SESSION_STORAGE_PROFILES,
@@ -115,45 +115,13 @@ function numberOrFallback(value, fallback) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
-export function normalizeTelegramRatingScale(question = {}) {
-  const record =
-    question?.rating_scale && !question?.ratingScale
-      ? { ...question, ratingScale: question.rating_scale }
-      : question || {};
-  const shared = normalizeRatingScale(record) || {};
-  const stepSource =
-    [record.scale, record.ratingScale].find((value) => value && typeof value === 'object' && !Array.isArray(value)) ||
-    {};
-  let min = Math.floor(numberOrFallback(shared.min, DEFAULT_RATING_SCALE.min));
-  let max = Math.floor(numberOrFallback(shared.max, DEFAULT_RATING_SCALE.max));
-  let step = Math.floor(numberOrFallback(stepSource.step, DEFAULT_RATING_SCALE.step || 1));
-  if (step < 1) step = 1;
-  min = Math.max(-100, Math.min(100, min));
-  max = Math.max(-100, Math.min(100, max));
-  if (max < min) {
-    min = DEFAULT_RATING_SCALE.min;
-    max = DEFAULT_RATING_SCALE.max;
-    step = DEFAULT_RATING_SCALE.step || 1;
-  }
-  while (Math.floor((max - min) / step) + 1 > 21 && step < 10) step += 1;
-  return { min, max, step };
-}
-
-export function normalizeTelegramRatingAnswer(value, question = {}) {
-  if (value == null || String(value).trim() === '') return null;
-  const numeric = Number(value);
-  const { min, max, step } = normalizeTelegramRatingScale(question);
-  return Number.isFinite(numeric) && numeric >= min && numeric <= max && Number.isInteger((numeric - min) / step)
-    ? numeric : null;
-}
-
 function ratingButtonValuesForScale(scale = {}) {
-  const normalized = normalizeTelegramRatingScale({ ratingScale: scale });
-  const values = [];
-  for (let value = normalized.min; value <= normalized.max && values.length < 25; value += normalized.step) {
-    values.push(value);
-  }
-  return values;
+  const { min, max, step } = normalizeTelegramRatingScale({ ratingScale: scale });
+  const lastIndex = Math.floor((max - min) / step + 1e-9);
+  const count = Math.min(lastIndex, 20);
+  // Button sampling limits chat chrome without changing the stored scale or the slider.
+  return Array.from({ length: count + 1 }, (_, index) =>
+    Number((min + (count ? Math.round(index * lastIndex / count) : 0) * step).toPrecision(12)));
 }
 
 function safeOpaqueSeedPart(value = '') {

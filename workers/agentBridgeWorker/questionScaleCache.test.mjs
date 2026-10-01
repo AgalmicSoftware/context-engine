@@ -54,3 +54,22 @@ test('refresh ignores legacy v5 records missing the stored rating scale', async 
   const card = buildTelegramQuestionCard(reused.questions[0]).ratingScale;
   assert.deepEqual(card, { min: 1, max: 10, step: 1 });
 });
+
+test('refresh ignores v6 records that lost the stored step', async () => {
+  const env = baseEnv();
+  const steppedFetch = async (url, init) => {
+    const response = await fetchImpl(url, init);
+    if (!String(url).startsWith('https://ar-io.dev/')) return response;
+    const payload = await response.json(); payload.scale.step = 3;
+    return new Response(JSON.stringify(payload), { status: 200 });
+  };
+  NEW.__test__sessionQuestions.clearCaches();
+  await NEW.listCachedSessionQuestionsForBridge({ env, sessionSlug: 'demo', fetchImpl: steppedFetch });
+  const legacy = JSON.parse([...env.AGENT_ACTION_KV.store.values()][0]);
+  legacy.questions.forEach((question) => { delete question.scale.step; });
+  env.AGENT_ACTION_KV.store.clear();
+  await env.AGENT_ACTION_KV.put('telegram:questions:v6:demo', JSON.stringify(legacy));
+  NEW.__test__sessionQuestions.clearCaches();
+  const refreshed = await NEW.listCachedSessionQuestionsForBridge({ env, sessionSlug: 'demo', fetchImpl: steppedFetch, forceRefresh: true });
+  assert.equal(refreshed.questions[0].scale.step, 3);
+});

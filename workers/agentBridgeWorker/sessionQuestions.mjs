@@ -1,3 +1,4 @@
+import { normalizeTelegramRatingScale } from './ratingScale.mjs';
 import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
 import { safeString, lower, envFlagEnabled } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registrySessions.mjs';
@@ -17,7 +18,7 @@ const DEFAULT_PAYLOAD_CONCURRENCY = 4;
 const DEFAULT_FOREGROUND_CHUNKS = 1;
 const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2_500;
-const QUESTION_CACHE_PREFIX = 'telegram:questions:v6:';
+const QUESTION_CACHE_PREFIX = 'telegram:questions:v7:';
 const questionMemoryCache = new Map();
 const QUESTION_PAYLOAD_SKIP = '__telegramQuestionPayloadSkip';
 const STORAGE_BACKENDS = Object.freeze({
@@ -892,7 +893,8 @@ function normalizeQuestionPayload(payload = {}, {
     ? safeString(root.questionText || root.prompt || root.title || payload.questionText || payload.prompt || payload.title)
     : '';
   const type = normalizeQuestionType(root);
-  const scale = type === 'rating' ? normalizeRatingScale(root) : null;
+  const sharedScale = type === 'rating' ? normalizeRatingScale(root) : null;
+  const scale = sharedScale ? { ...sharedScale, step: normalizeTelegramRatingScale(root).step } : null;
   const normalized = {
     questionId: id,
     id,
