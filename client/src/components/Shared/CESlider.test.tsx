@@ -45,3 +45,17 @@ describe('CESlider', () => {
     expect(onChangeComplete).toHaveBeenCalledWith(6);
   });
 });
+
+it.each<[string, number]>([
+  ['Home', 0],
+  ['End', 100],
+  ['PageUp', 60],
+  ['PageDown', 40],
+])('commits %s keyboard changes', (key, expected) => {
+  const onChange = jest.fn(),
+    onChangeComplete = jest.fn();
+  render(<CESlider min={0} max={100} step={5} value={50} onChange={onChange} onChangeComplete={onChangeComplete} />);
+  fireEvent.keyDown(screen.getByRole('slider'), { key });
+  expect(onChange).toHaveBeenCalledWith(expected, expect.any(Event));
+  expect(onChangeComplete).toHaveBeenCalledWith(expected);
+});

@@ -24,7 +24,7 @@ const toFiniteNumber = (value: SliderNumberLike, fallback: number) => {
 };
 
 const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-const ARROW_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+const RANGE_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
 
 const getKeyboardValue = ({
   key,
@@ -39,6 +39,11 @@ const getKeyboardValue = ({
   max: number;
   step: number;
 }) => {
+  if (key === 'Home') return min;
+  if (key === 'End') return max;
+  const pageStep = Math.max(step, Math.round((max - min) / (10 * step)) * step);
+  if (key === 'PageUp') return Math.min(value + pageStep, max);
+  if (key === 'PageDown') return Math.max(value - pageStep, min);
   if (key === 'ArrowRight' || key === 'ArrowUp') {
     return Math.min(value + step, max);
   }
@@ -93,8 +98,7 @@ function CESlider({
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (disabled) return;
-      const isArrowKey = ARROW_KEYS.includes(event.key);
-      if (!isArrowKey) return;
+      if (!RANGE_KEYS.includes(event.key)) return;
 
       const nextValue = getKeyboardValue({
         key: event.key,
