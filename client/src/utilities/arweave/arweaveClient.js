@@ -1,3 +1,4 @@
+import { retryLazyImport } from '../ui/lazyImportRetry';
 /**
  * @file arweaveClient.js
  * @module arweaveClient
@@ -83,7 +84,7 @@ const log = createLogger('general');
 const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
 // The Arweave SDK is only needed to sign direct uploads and read wallet balances;
 // gateway reads use fetch, so keep the SDK out of the initial page load.
-const loadArweave = async () => (await import('arweave')).default;
+const loadArweave = async () => (await retryLazyImport(() => import('arweave'))).default;
 
 /* ==========================================================================
    Arweave utilities used by the chain gateway.
