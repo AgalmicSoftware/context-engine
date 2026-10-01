@@ -1,3 +1,4 @@
+import { redactInterviewEncryptedRatings } from './sessionInterviewResearch';
 import { responseEnvelopeMatchesAudience } from '../../utilities/crypto/responseEnvelopeAudience';
 import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
 import type { UnknownRecord } from './surveyToolTypes';
@@ -320,6 +321,12 @@ export async function processRatingEnvelopesForSubmit(
     RATING_FIELD_SPECS.forEach(({ fieldKey }) => {
       respObj[fieldKey] = null;
     });
+    if (respObj.interviewProvenance) {
+      const protectedFields = RATING_FIELD_SPECS.filter(({ envelopeKey }) => !!respObj[envelopeKey]).map(
+        ({ fieldKey }) => fieldKey,
+      );
+      respObj.interviewProvenance = redactInterviewEncryptedRatings(respObj.interviewProvenance, qid, protectedFields);
+    }
   }
 
   return {

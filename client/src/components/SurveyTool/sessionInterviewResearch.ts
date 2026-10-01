@@ -150,3 +150,27 @@ export const buildUnselectedInterviewResearch = (
       };
     })
     .filter((draft) => draft.questionId);
+
+// Rating envelopes are resolved after research snapshots are built. Apply their
+// final protection to every snapshot for this question before serialization.
+export const redactInterviewEncryptedRatings = (
+  value: unknown,
+  questionId: string,
+  protectedFields: Array<'importance' | 'conviction'>,
+): unknown => {
+  if (Array.isArray(value))
+    return value.map((entry) => redactInterviewEncryptedRatings(entry, questionId, protectedFields));
+  if (!value || typeof value !== 'object') return value;
+  const source = record(value);
+  if (source.questionId && String(source.questionId).toLowerCase() !== questionId.toLowerCase()) return value;
+  return Object.fromEntries(
+    Object.entries(source).map(([key, entry]) => [
+      key,
+      protectedFields.includes(key as 'importance' | 'conviction')
+        ? redacted()
+        : key === 'redactedFields' && Array.isArray(entry)
+          ? [...new Set([...entry, ...protectedFields])]
+          : redactInterviewEncryptedRatings(entry, questionId, protectedFields),
+    ]),
+  );
+};
