@@ -1507,12 +1507,11 @@ const AdminPageRuntime = ({
 
     const chainId =
       Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    const sessionId = toStr(selectedConfig?.sessionIdHex || selectedConfig?.sessionId).trim();
-    const { message } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
+    const { message, sessionId } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
       workerUrl: baseUrl,
       address: account,
       sessionSlug: slug,
-      sessionId,
+      sessionConfig: selectedConfig,
       chainId,
       statement: 'Sign in to Context Engine.',
     });

@@ -754,7 +754,6 @@ describe('AdminPage rendered interactions', () => {
       message: 'rendered-byte-exact-siwe-message',
       signature: '0xrendered-siwe-signature',
       sessionSlug: 'edge',
-      sessionId: '0x55555555555555555555555555555555',
     });
     expect(mockBuildSiweMessage).toHaveBeenCalledWith({
       address: ADMIN_ADDRESS,
@@ -763,7 +762,7 @@ describe('AdminPage rendered interactions', () => {
       statement: 'Sign in to Context Engine.',
       workerUrl: 'https://worker.example.test',
       sessionSlug: 'edge',
-      sessionId: '0x55555555555555555555555555555555',
+      sessionId: '',
     });
     await waitFor(() => {
       expect(screen.getByText('OK (403 worker_auth_worker_login_failed)')).toBeInTheDocument();
