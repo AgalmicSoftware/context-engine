@@ -1,5 +1,16 @@
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
 
+export type InterviewConsentOverrides = {
+  includeAiProvenance?: boolean;
+  includePredictionComparison?: boolean;
+  includeResponderName?: boolean;
+};
+
+export const summarizeConsentChoice = (values: boolean[], override?: boolean) => ({
+  checked: override ?? (values.length > 0 && values.every(Boolean)),
+  mixed: override === undefined && values.some(Boolean) && values.some((value) => !value),
+});
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 

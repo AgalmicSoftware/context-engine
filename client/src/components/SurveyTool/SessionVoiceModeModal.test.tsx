@@ -352,6 +352,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Agent: A reviewed answer' })]),
+        {},
       ),
     );
   });
@@ -1588,6 +1589,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
   });
@@ -1690,6 +1692,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
@@ -1933,6 +1936,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
   });
@@ -2059,6 +2063,7 @@ describe('SessionVoiceModeModal', () => {
           original: expect.objectContaining({ answer: [3, -4] }),
         }),
       ],
+      {},
     );
   });
 
@@ -2163,6 +2168,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
+        { includePredictionComparison: true },
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
@@ -2194,6 +2200,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
     first.unmount();
@@ -2214,6 +2221,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         'Ada Example',
         expect.any(Array),
+        { includeResponderName: true },
       ),
     );
   });

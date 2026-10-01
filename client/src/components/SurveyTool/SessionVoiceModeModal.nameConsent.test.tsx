@@ -81,3 +81,60 @@ it('the responder-name consent is locked while a submission that already carries
   // ...but the name consent can still be unticked, showing a choice the upload will not honour.
   expect(nameConsent).toBeDisabled();
 });
+
+it('uses saved per-question choices and forwards only explicit consent changes', async () => {
+  const record = jest.fn();
+  render(
+    <SessionVoiceModeModal
+      isOpen
+      mode="interview"
+      onSelectMode={jest.fn()}
+      onClose={jest.fn()}
+      sessionSlug="demo"
+      account="0x0000000000000000000000000000000000000001"
+      loginComplete
+      workerUrl="https://worker.example"
+      questionPool={[
+        { id: 'q1', prompt: 'First?', type: 'binary' },
+        { id: 'q2', prompt: 'Second?', type: 'binary' },
+      ]}
+      existingResponseSlice={{
+        interviewProvenance: {
+          q1: {
+            includeAiProvenance: true,
+            source: { platform: 'claude', modelId: 'saved-model' },
+            responderName: 'Participant A',
+          },
+          q2: { includeAiProvenance: false },
+        },
+      }}
+      prefillPacket={{
+        version: 1,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion: 'ce-interview-brief-v4',
+        source: { platform: 'claude', modelId: 'new-model', verification: 'self_reported' },
+        responderContext: {},
+        responses: [
+          { questionId: 'q1', answer: 'Agree', confidence: 0.8 },
+          { questionId: 'q2', answer: 'Agree', confidence: 0.8 },
+        ],
+      }}
+      onApplyAnswer={jest.fn()}
+      onApplyAdditional={jest.fn()}
+      onApplyImportance={jest.fn()}
+      onApplyConviction={jest.fn()}
+      onRecordProvenance={record}
+      onSubmitResponses={jest.fn(async () => ({ status: 'submitted' as const }))}
+    />,
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  fireEvent.click(screen.getByText('AI submission info'));
+  expect(screen.getByLabelText(/Include platform\/model provenance/i)).toHaveAttribute('aria-checked', 'mixed');
+  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
+  expect(name).toHaveAttribute('aria-checked', 'mixed');
+  fireEvent.click(name);
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(record).toHaveBeenCalledTimes(1));
+  expect(record.mock.calls[0][7]).toEqual({ includeResponderName: true });
+});

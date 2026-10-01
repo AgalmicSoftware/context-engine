@@ -1,4 +1,8 @@
-import { getChangedInterviewConsentQids } from './sessionInterviewConsent';
+import {
+  getChangedInterviewConsentQids,
+  resolveConsentFlags,
+  type InterviewConsentOverrides,
+} from './sessionInterviewConsent';
 import {
   loadSessionInterviewSavedAnswers,
   mergeInterviewSavedAnswerBaseline,
@@ -1513,6 +1517,7 @@ export const recordInterviewProvenance = (
   includePredictionComparison = false,
   responderName = '',
   review: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
+  consentOverrides?: InterviewConsentOverrides,
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
@@ -1546,18 +1551,38 @@ export const recordInterviewProvenance = (
             Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
               ? originalDraft.revisions[0]
               : originalDraft;
+          // An untouched control preserves this question's saved choice and source, including withdrawals.
+          const savedConsent = prev.editBaseline?.interviewProvenance?.[draft.questionId];
+          const saved =
+            savedConsent && typeof savedConsent === 'object' ? (savedConsent as Record<string, unknown>) : null;
+          const flags = resolveConsentFlags(saved);
+          const ai =
+            consentOverrides?.includeAiProvenance ?? (consentOverrides && saved ? flags.includeAiProvenance : included);
+          const comparison =
+            consentOverrides?.includePredictionComparison ??
+            (consentOverrides && saved ? flags.includePredictionComparison : includePredictionComparison);
+          const name =
+            consentOverrides && saved && consentOverrides.includeResponderName === undefined
+              ? String(saved.responderName || '')
+              : consentOverrides?.includeResponderName === false
+                ? ''
+                : normalizedResponderName ||
+                  (consentOverrides?.includeResponderName ? String(saved?.responderName || '') : '');
+          const preserveSource = consentOverrides && saved && consentOverrides.includeAiProvenance === undefined;
           provenance[draft.questionId] = {
             version: 1,
-            includeAiProvenance: included,
-            includePredictionComparison,
-            ...(included
+            includeAiProvenance: ai,
+            includePredictionComparison: comparison,
+            ...(ai
               ? {
-                  source: normalizedSource,
-                  promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
-                  questionSetHash: packet?.questionSetHash || '',
+                  source: preserveSource ? saved.source : normalizedSource,
+                  promptVersion: preserveSource
+                    ? saved.promptVersion
+                    : packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
+                  questionSetHash: preserveSource ? saved.questionSetHash : packet?.questionSetHash || '',
                 }
               : {}),
-            ...(includePredictionComparison
+            ...(comparison
               ? {
                   questionId: draft.questionId,
                   selection: 'selected',
@@ -1573,12 +1598,12 @@ export const recordInterviewProvenance = (
                   userEditedFields: reviewed.userEditedFields || [],
                 }
               : {}),
-            ...(includePredictionComparison && draft === researchAnchor
+            ...(comparison && draft === researchAnchor
               ? {
                   unselectedDrafts: review.filter((entry) => !entry.selected),
                 }
               : {}),
-            ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
+            ...(name ? { responderName: name } : {}),
             appliedAt: Date.now(),
           };
         });

@@ -298,3 +298,46 @@ describe('E7/E8 saved consent changed elsewhere (another device or tab)', () => 
     expect(engine.getSubmitCount()).toBe(0);
   }, 40000);
 });
+
+it('preserves each saved consent until the participant explicitly changes the controls', async () => {
+  const named = saved('q1', { responderName: 'Participant A', interviewProvenance: aiProvenance() });
+  const optedOut = saved('q2');
+  setCache(
+    { q1: { [A]: named }, q2: { [A]: optedOut } },
+    {
+      q1: { id: 'q1', type: 'binary', prompt: 'Q1' },
+      q2: { id: 'q2', type: 'binary', prompt: 'Q2' },
+    },
+  );
+  mockCaches();
+  ownAnswers({ [A]: [named, optedOut] });
+  const engine = await waitForPile(mountPile(), 2);
+  await run(() => loadSessionInterviewOwnAnswers(engine, ['q1', 'q2'], new AbortController().signal));
+  const drafts = [
+    { questionId: 'q1', answer: 'Agree' },
+    { questionId: 'q2', answer: 'Agree' },
+  ];
+  await run(() =>
+    recordInterviewProvenance(
+      engine,
+      drafts,
+      { ...SOURCE, modelId: 'different-model' },
+      PACKET,
+      true,
+      false,
+      '',
+      [],
+      {},
+    ),
+  );
+  expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({});
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1.responderName).toBe('Participant A');
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q2.includeAiProvenance).toBe(false);
+  await run(() =>
+    recordInterviewProvenance(engine, drafts, SOURCE, PACKET, false, false, '', [], {
+      includeAiProvenance: false,
+      includeResponderName: false,
+    }),
+  );
+  expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({ q1: { interviewConsent: 1 } });
+}, 40000);

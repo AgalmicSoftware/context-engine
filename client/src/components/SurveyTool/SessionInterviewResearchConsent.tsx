@@ -14,6 +14,8 @@ type Props = {
   revisionCount?: number;
   includeProvenance: boolean;
   includeComparison: boolean;
+  provenanceMixed?: boolean;
+  comparisonMixed?: boolean;
   onProvenanceChange: (included: boolean) => void;
   onComparisonChange: (included: boolean) => void;
   coverageDetails: string[];
@@ -28,6 +30,8 @@ export default function SessionInterviewResearchConsent({
   revisionCount = 0,
   includeProvenance,
   includeComparison,
+  provenanceMixed = false,
+  comparisonMixed = false,
   onProvenanceChange,
   onComparisonChange,
   coverageDetails,
@@ -44,23 +48,31 @@ export default function SessionInterviewResearchConsent({
           <Label check className={styles.provenanceOption}>
             <Input
               type="checkbox"
-              checked={includeProvenance}
+              checked={provenanceMixed ? false : includeProvenance}
+              aria-checked={provenanceMixed ? 'mixed' : includeProvenance}
+              innerRef={(element: HTMLInputElement | null) => {
+                if (element) element.indeterminate = provenanceMixed;
+              }}
               disabled={disabled}
               onChange={(event) => onProvenanceChange(event.target.checked)}
             />{' '}
-            <span>Include platform/model provenance</span>
+            <span>Include platform/model provenance{provenanceMixed ? ' (mixed saved choices)' : ''}</span>
           </Label>
         )}
         <div className={styles.researchConsent}>
           <Label check className={styles.provenanceOption}>
             <Input
               type="checkbox"
-              checked={includeComparison}
+              checked={comparisonMixed ? false : includeComparison}
+              aria-checked={comparisonMixed ? 'mixed' : includeComparison}
+              innerRef={(element: HTMLInputElement | null) => {
+                if (element) element.indeterminate = comparisonMixed;
+              }}
               disabled={disabled}
               onChange={(event) => onComparisonChange(event.target.checked)}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
             />{' '}
-            <span>Share AI draft changes for research</span>
+            <span>Share AI draft changes for research{comparisonMixed ? ' (mixed saved choices)' : ''}</span>
           </Label>
           <button
             type="button"
