@@ -1,14 +1,6 @@
 /* @file Modals.module.scss */
 
-/* --- GreetingModal.tsx --- */
-
 @media (min-width: 0px) and (max-width: 319px) {
-  .closeModalIcon {
-    font-size: 1.5em;
-    color: var(--ce-status-info);
-    margin-bottom: 5px;
-  }
-
   .welcomeSlideEmbed {
     display: flex;
     flex-direction: column;
@@ -24,32 +16,6 @@
       padding-bottom: 5px;
       padding-left: 5px;
       padding-right: 5px;
-
-      .emailFormLabel {
-        align-self: flex-start;
-        font-size: 0.95em;
-        margin: 0;
-        text-transform: uppercase;
-        color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
-        font-weight: 600;
-        background: transparent;
-      }
-
-      .emailSubjects {
-        display: flex;
-        flex-direction: column;
-        padding-left: 3px;
-        padding-bottom: 5px;
-
-        .emailSubject {
-          display: flex;
-          flex-direction: column;
-          font-size: 0.75em;
-          color: var(--ce-color-white);
-          text-transform: uppercase;
-          font-weight: 600;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -85,12 +51,6 @@
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  .closeModalIcon {
-    font-size: 2em;
-    color: var(--ce-status-info);
-    margin-bottom: 10px;
-  }
-
   .welcomeSlideEmbed {
     display: flex;
     flex-direction: column;
@@ -106,32 +66,6 @@
       padding-bottom: 5px;
       padding-left: 5px;
       padding-right: 5px;
-
-      .emailFormLabel {
-        align-self: flex-start;
-        font-size: 0.95em;
-        margin: 0;
-        text-transform: uppercase;
-        color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
-        font-weight: 600;
-        background: transparent;
-      }
-
-      .emailSubjects {
-        display: flex;
-        flex-direction: column;
-        padding-left: 3px;
-        padding-bottom: 5px;
-
-        .emailSubject {
-          display: flex;
-          flex-direction: column;
-          font-size: 0.75em;
-          color: var(--ce-color-white);
-          text-transform: uppercase;
-          font-weight: 600;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -167,12 +101,6 @@
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  .closeModalIcon {
-    font-size: 2.25em;
-    color: var(--ce-status-info);
-    margin-bottom: 10px;
-  }
-
   .welcomeSlideEmbed {
     display: flex;
     flex-direction: column;
@@ -188,33 +116,6 @@
       padding-bottom: 5px;
       padding-left: 5px;
       padding-right: 5px;
-
-      .emailFormLabel {
-        align-self: flex-start;
-        font-size: 0.95em;
-        margin: 0;
-        text-transform: uppercase;
-        color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
-        font-weight: 600;
-        background: transparent;
-        margin-top: 10px;
-      }
-
-      .emailSubjects {
-        display: flex;
-        flex-direction: column;
-        padding-left: 3px;
-        padding-bottom: 5px;
-
-        .emailSubject {
-          display: flex;
-          flex-direction: column;
-          font-size: 0.75em;
-          color: var(--ce-color-white);
-          text-transform: uppercase;
-          font-weight: 600;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -251,12 +152,6 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  .closeModalIcon {
-    font-size: 2.5em;
-    color: var(--ce-status-info);
-    margin-bottom: 15px;
-  }
-
   .welcomeSlideEmbed {
     display: flex;
     flex-direction: column;
@@ -272,33 +167,6 @@
       padding-bottom: 5px;
       padding-left: 5px;
       padding-right: 5px;
-
-      .emailFormLabel {
-        align-self: flex-start;
-        font-size: 0.95em;
-        margin: 0;
-        text-transform: uppercase;
-        color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
-        font-weight: 600;
-        background: transparent;
-        margin-top: 10px;
-      }
-
-      .emailSubjects {
-        display: flex;
-        flex-direction: column;
-        padding-left: 3px;
-        padding-bottom: 5px;
-
-        .emailSubject {
-          display: flex;
-          flex-direction: column;
-          font-size: 0.75em;
-          color: var(--ce-color-white);
-          text-transform: uppercase;
-          font-weight: 600;
-        }
-      }
     }
 
     .welcomeSlideLayout {
@@ -335,12 +203,6 @@
 }
 
 @media (min-width: 1367px) {
-  .closeModalIcon {
-    font-size: 3em;
-    color: var(--ce-status-info);
-    margin-bottom: 15px;
-  }
-
   .welcomeSlideEmbed {
     display: flex;
     flex-direction: column;
@@ -357,33 +219,6 @@
       padding-bottom: 5px;
       padding-left: 5px;
       padding-right: 5px;
-
-      .emailFormLabel {
-        align-self: flex-start;
-        font-size: 0.95em;
-        margin: 0;
-        text-transform: uppercase;
-        color: color-mix(in srgb, var(--ce-status-info) 68%, transparent);
-        font-weight: 600;
-        background: transparent;
-        margin-top: 10px;
-      }
-
-      .emailSubjects {
-        display: flex;
-        flex-direction: column;
-        padding-left: 3px;
-        padding-bottom: 5px;
-
-        .emailSubject {
-          display: flex;
-          flex-direction: column;
-          font-size: 0.75em;
-          color: var(--ce-color-white);
-          text-transform: uppercase;
-          font-weight: 600;
-        }
-      }
     }
 
     .welcomeSlideLayoutImageRight {
@@ -418,19 +253,6 @@
       }
     }
   }
-}
-
-.isHidden {
-  display: none;
-}
-
-.isHidden {
-  display: none;
-}
-
-.closeModalIcon {
-  color: var(--ce-text-inverse);
-  padding-bottom: 5px;
 }
 
 /* --- Checkbox Styles --- */
@@ -737,14 +559,6 @@ input[type='radio']:checked:after {
   mix-blend-mode: multiply;
 }
 
-.emailFormLabel {
-  margin-top: 0px !important;
-  color: var(--ce-data-series-1) !important;
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-}
-
 .twitterUpdatesLogo {
   color: var(--ce-text-inverse);
   font-size: 1.5em;
@@ -793,11 +607,6 @@ input[type='radio']:checked:after {
 
 .welcomeSlideMediaText {
   font-size: 50px;
-  color: var(--ce-color-white);
-}
-
-.bulletPoint {
-  font-size: 40px;
   color: var(--ce-color-white);
 }
 

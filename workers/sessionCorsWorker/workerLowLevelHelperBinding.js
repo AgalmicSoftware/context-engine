@@ -131,7 +131,6 @@ export const createWorkerLowLevelHelpersWithWorkerDeps = ({
     formatEther: ethersPrimitiveHelpers.formatEther,
     toRegistrySessionSlug: registryFaucetRpcHelpers.toRegistrySessionSlug,
     resolveRegistryRpcUrls: registryFaucetRpcHelpers.resolveRegistryRpcUrls,
-    resolveRegistryRpcUrl: registryFaucetRpcHelpers.resolveRegistryRpcUrl,
     resolveRpcUrlListForGate: registryFaucetRpcHelpers.resolveRpcUrlListForGate,
     resolveFaucetRpcUrls: registryFaucetRpcHelpers.resolveFaucetRpcUrls,
     isBytes32Hex: registryFaucetRpcHelpers.isBytes32Hex,

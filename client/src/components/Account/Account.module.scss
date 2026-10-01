@@ -3543,12 +3543,6 @@ h1 {
 
 /* Narrow breakpoint: tighten paddings/fonts and scale icons down to prevent horizontal scroll */
 @media (max-width: 480px) {
-  #w3a-container {
-    display: unset !important;
-    padding: 0 !important;
-    color: var(--ce-color-black) !important;
-  }
-
   .accountWarningContainer {
     padding: 12px;
     max-width: 90vw;
@@ -3562,13 +3556,7 @@ h1 {
   }
 }
 
-// For phone-view, we want this to display differently
-
 /* Wallet modal fixes: readable label and mobile centering */
-
-@media (max-width: 480px) {
-  /* Center the wallet modal on small screens */
-}
 
 /* --- Modal Overlap Fix (z-index) --- */
 /* Keep LoginAndSettingsModal above banners */

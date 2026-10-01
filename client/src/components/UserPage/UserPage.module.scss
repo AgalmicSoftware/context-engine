@@ -1443,11 +1443,6 @@ $icon-size-standard: 1.25rem;
   }
 }
 
-/* Ensure Venn diagram never looks clipped at the bottom */
-.visualCol svg[aria-label='3-set Venn'] {
-  margin-bottom: 6px;
-}
-
 @media (max-width: 600px) {
   .header {
     background: transparent !important;

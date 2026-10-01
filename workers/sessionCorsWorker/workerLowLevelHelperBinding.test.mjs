@@ -53,6 +53,7 @@ test('createWorkerLowLevelHelpersWithWorkerDeps returns the expected low-level h
     },
   });
 
+  assert.equal(Object.hasOwn(helpers, 'resolveRegistryRpcUrl'), false);
   assert.deepEqual(helpers, {
     isBlockedOutboundUrl: 'isBlockedOutboundUrl',
     safeFetch: 'safeFetch',
@@ -67,7 +68,6 @@ test('createWorkerLowLevelHelpersWithWorkerDeps returns the expected low-level h
     formatEther: 'formatEther',
     toRegistrySessionSlug: 'toRegistrySessionSlug',
     resolveRegistryRpcUrls: 'resolveRegistryRpcUrls',
-    resolveRegistryRpcUrl: 'resolveRegistryRpcUrl',
     resolveRpcUrlListForGate: 'resolveRpcUrlListForGate',
     resolveFaucetRpcUrls: 'resolveFaucetRpcUrls',
     isBytes32Hex: 'isBytes32Hex',
