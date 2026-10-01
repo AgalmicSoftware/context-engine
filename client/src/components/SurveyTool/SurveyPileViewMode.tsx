@@ -2622,6 +2622,7 @@ const renderPileResponseInput = (
       const ratingScale = normalizeRatingScale(question);
       const ratingValue = getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max);
       const unanswered = answer.value == null || answer.value === '';
+      let changedDuringInteraction = false;
       return (
         <div className={styles.ratingContainer}>
           <CESlider
@@ -2629,15 +2630,17 @@ const renderPileResponseInput = (
             max={ratingScale.max}
             step={1}
             value={ratingValue}
-            onChange={(val: any, event: any) =>
-              onAnswerChange
-                ? onAnswerChange(val)
-                : engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event))
-            }
-            onChangeComplete={(val: number) => {
-              if (!unanswered) return engine.flushDraftPersistAfterSliderChange();
+            onChange={(val: any, event: any) => {
+              changedDuringInteraction = true;
               if (onAnswerChange) onAnswerChange(val);
-              else engine.handleAnswerPile(question.id, val);
+              else engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event));
+            }}
+            onChangeComplete={(val: number) => {
+              if (unanswered && !changedDuringInteraction) {
+                if (onAnswerChange) onAnswerChange(val);
+                else engine.handleAnswerPile(question.id, val);
+              }
+              engine.flushDraftPersistAfterSliderChange();
             }}
             disabled={engine.state.isSubmitting}
             className={styles.ratingSlider}
