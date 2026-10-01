@@ -161,6 +161,7 @@ const WorkerSessionGroupsPanel = ({
       });
     } catch (error) {
       if (authRequestIdRef.current !== requestId) return;
+      setPendingJoin(undefined);
       setAuthState({
         targetKey: requestTargetKey,
         token: '',
