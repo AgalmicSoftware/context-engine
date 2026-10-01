@@ -338,3 +338,42 @@ test('helper defaults and release-commit override select immutable matching asse
     /release commit/i,
   );
 });
+
+
+test('explicit release selects both URLs despite stale ambient URL overrides', async () => {
+  const { resolveDeployHelperDeployConfig } = await loadModule();
+  const commit = 'b'.repeat(40);
+  const base = `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-${commit}`;
+  const config = resolveDeployHelperDeployConfig({
+    flags: { 'worker-name': 'fixture-helper', 'api-token': 'fixture-token', 'release-commit': commit },
+    env: { WORKER_BUNDLE_URL: 'https://assets.example.test/old.js' },
+  });
+  assert.equal(config.workerBundleUrl, `${base}/sessionCorsWorker.bundle.js`);
+  assert.equal(config.workerBundleManifestUrl, `${base}/worker-release-manifest.json`);
+});
+
+test('URL overrides require a pair and cannot conflict with an explicit release', async () => {
+  const { resolveDeployHelperDeployConfig } = await loadModule();
+  const flags = { 'worker-name': 'fixture-helper', 'api-token': 'fixture-token' };
+  for (const key of ['worker-bundle-url', 'worker-bundle-manifest-url']) {
+    assert.throws(
+      () => resolveDeployHelperDeployConfig({ flags: { ...flags, [key]: 'https://assets.example.test/asset' }, env: {} }),
+      /both.*URL/i,
+    );
+  }
+  for (const key of ['WORKER_BUNDLE_URL', 'WORKER_BUNDLE_MANIFEST_URL']) {
+    assert.throws(
+      () => resolveDeployHelperDeployConfig({ flags, env: { [key]: 'https://assets.example.test/asset' } }),
+      /both.*URL/i,
+    );
+  }
+  const pair = {
+    'worker-bundle-url': 'https://assets.example.test/worker.js',
+    'worker-bundle-manifest-url': 'https://assets.example.test/manifest.json',
+  };
+  assert.equal(resolveDeployHelperDeployConfig({ flags: { ...flags, ...pair }, env: {} }).workerBundleUrl, pair['worker-bundle-url']);
+  assert.throws(
+    () => resolveDeployHelperDeployConfig({ flags: { ...flags, ...pair, 'release-commit': 'b'.repeat(40) }, env: {} }),
+    /release.*URL/i,
+  );
+});

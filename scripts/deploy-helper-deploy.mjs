@@ -105,18 +105,24 @@ export const resolveDeployHelperDeployConfig = ({
     .toLowerCase();
   if (!/^[a-f0-9]{40}$/.test(releaseCommit)) throw new Error('Invalid release commit: use a full 40-character SHA.');
   const releaseBaseUrl = workerReleaseBaseUrl(releaseCommit);
-  const workerBundleUrl = toStr(
-    flags['worker-bundle-url'] ||
-    env.DEPLOY_HELPER_WORKER_BUNDLE_URL ||
-    env.WORKER_BUNDLE_URL ||
-      `${releaseBaseUrl}/sessionCorsWorker.bundle.js`,
-  ).trim();
-  const workerBundleManifestUrl = toStr(
-    flags['worker-bundle-manifest-url'] ||
-    env.DEPLOY_HELPER_WORKER_BUNDLE_MANIFEST_URL ||
-    env.WORKER_BUNDLE_MANIFEST_URL ||
-      `${releaseBaseUrl}/worker-release-manifest.json`,
-  ).trim();
+  const explicitRelease = Boolean(flags['release-commit']);
+  const bundleFlag = toStr(flags['worker-bundle-url']).trim();
+  const manifestFlag = toStr(flags['worker-bundle-manifest-url']).trim();
+  if (explicitRelease && (bundleFlag || manifestFlag)) {
+    throw new Error('An explicit release commit cannot be combined with URL overrides.');
+  }
+  // An explicit commit supersedes stale URL defaults in the operator's environment.
+  const bundleOverride = bundleFlag || (!explicitRelease
+    ? toStr(env.DEPLOY_HELPER_WORKER_BUNDLE_URL || env.WORKER_BUNDLE_URL).trim()
+    : '');
+  const manifestOverride = manifestFlag || (!explicitRelease
+    ? toStr(env.DEPLOY_HELPER_WORKER_BUNDLE_MANIFEST_URL || env.WORKER_BUNDLE_MANIFEST_URL).trim()
+    : '');
+  if (Boolean(bundleOverride) !== Boolean(manifestOverride)) {
+    throw new Error('Override both the Worker bundle and manifest URLs together.');
+  }
+  const workerBundleUrl = bundleOverride || `${releaseBaseUrl}/sessionCorsWorker.bundle.js`;
+  const workerBundleManifestUrl = manifestOverride || `${releaseBaseUrl}/worker-release-manifest.json`;
   const compatibilityDate = toStr(
     flags['compatibility-date'] ||
     env.DEPLOY_HELPER_COMPATIBILITY_DATE ||
