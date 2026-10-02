@@ -2303,6 +2303,9 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
     engine.showNoPendingPileSubmitFeedback(pileSubmitLabel);
     return { status: 'failed' as const, message: 'No new or changed responses to submit.' };
   }
+  if (!engine.getSessionInterviewResponseReadinessToken(buildSessionInterviewSubmitContextToken(engine.props))) {
+    return { status: 'pending' as const, message: 'Loading your saved answers…' };
+  }
   return engine.encryptAndUpload();
 };
 
