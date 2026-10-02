@@ -412,3 +412,22 @@ describe('quadratic submission boundary', () => {
     expect(context.submitSurveyResponse).toHaveBeenCalled();
   });
 });
+
+it('ranks submitted consent using the Worker receipt instead of the browser clock', async () => {
+  const context = createContext();
+  context.prepareJsonAndHash.mockReturnValue({
+    timeStamp: 9999999999,
+    responses: [{ questionID: 'q1', responderName: 'Participant' }],
+  });
+  context.submitSurveyResponse.mockResolvedValue({
+    questionResponseRefs: [
+      { questionId: 'q1', storageRef: { id: 'server-ref', createdAt: '2026-10-02T10:00:00.000Z' } },
+    ],
+  });
+  await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+  const { editBaseline } = context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0];
+  expect(editBaseline.interviewProvenance.q1).toMatchObject({
+    consentSavedAt: Date.parse('2026-10-02T10:00:00.000Z'),
+    consentStorageRefId: 'server-ref',
+  });
+});

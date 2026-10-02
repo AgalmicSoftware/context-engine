@@ -362,3 +362,36 @@ it('keeps an authoritative withdrawal over a conflicting public cache at the sam
   expect(uploaded).toBeDefined();
   expect(uploaded).not.toHaveProperty('responderName');
 }, 40000);
+
+it('keeps unsubmitted consent eligible for a newer withdrawal after submitting another answer', async () => {
+  const named = (qid) =>
+    saved(qid, { responderName: 'Participant A', interviewProvenance: aiProvenance(), timeStamp: 1000 });
+  const qs = { q1: { id: 'q1', type: 'binary', prompt: 'Q1' }, q2: { id: 'q2', type: 'binary', prompt: 'Q2' } };
+  setCache({ q1: { [A]: named('q1') }, q2: { [A]: named('q2') } }, qs);
+  mockCaches();
+  const submitResponses = mockSubmit();
+  const pile = mountPile();
+  const engine = await waitForPile(pile, 2);
+  const oldConsent = { ...engine.state.editBaseline.interviewProvenance.q2 };
+  await run(() => new Promise((resolve) => engine.handleAnswerPile('q1', 'Disagree', { afterUpdate: resolve })));
+  await run(() => engine.handlePileSubmitClick());
+  await settle();
+  expect(submitResponses.mock.calls[0][2].map((response) => response.questionID)).toEqual(['q1']);
+  expect(engine.state.editBaseline.interviewProvenance.q2).toEqual(oldConsent);
+  setCache(
+    {
+      q1: { [A]: { ...submitResponses.mock.calls[0][2][0], timeStamp: Date.now() / 1000 } },
+      q2: { [A]: saved('q2', { timeStamp: Date.now() / 1000 - 30 }) },
+    },
+    qs,
+  );
+  await act(async () => pile.view.rerenderSurveyQuestions({ questionResponsesNonce: 3, questionsCacheNonce: 3 }));
+  await settle(1500);
+  await run(() => new Promise((resolve) => engine.handleAnswerPile('q2', 'Disagree', { afterUpdate: resolve })));
+  await run(() => engine.handlePileSubmitClick());
+  await settle();
+  const uploaded = submitResponses.mock.calls[1][2].find((response) => response.questionID === 'q2');
+  expect(uploaded).toBeDefined();
+  expect(uploaded).not.toHaveProperty('responderName');
+  expect(uploaded).not.toHaveProperty('interviewProvenance');
+}, 40000);

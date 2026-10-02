@@ -1,4 +1,5 @@
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
+import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type {
   SurveyQuestionsLegacyRecord,
@@ -465,12 +466,13 @@ export const createSurveyQuestionsSubmitRuntime = (
       nextBaseline.interviewProvenance = {
         ...stateRef.current.editBaseline?.interviewProvenance,
         ...Object.fromEntries(
-          (optimisticUserAnswers.responses || (optimisticUserAnswers.questionID ? [optimisticUserAnswers] : [])).map(
-            (response: SurveyQuestionsLegacyValue) => [
+          (optimisticUserAnswers.responses || (optimisticUserAnswers.questionID ? [optimisticUserAnswers] : []))
+            // Only an uploaded question acquires a new saved-consent version.
+            .filter((response: SurveyQuestionsLegacyValue) => changedQids.has(response.questionID))
+            .map((response: SurveyQuestionsLegacyValue) => [
               response.questionID,
-              buildSavedInterviewConsent({ ...response, timeStamp: optimisticUserAnswers.timeStamp }),
-            ],
-          ),
+              buildSavedInterviewConsent(response, getSubmittedWorkerResponseRecency(receipt, response.questionID)),
+            ]),
         ),
       };
       delete finalSlice.interviewProvenance;
