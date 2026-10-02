@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5] - 2026-10-03
+
+### Client — available when the site deploys
+
+- Keep group details inside session pages, simplify interview review controls,
+  and improve help controls, documentation contrast and mobile atlas layout.
+  Results now separates Report, Debate Map and Raw Results for RxC sessions.
+- Make the pile and editing-card decrypt buttons open saved locked fields.
+  Preserve audience changes made before or during decryption, and retain the
+  latest encrypted importance and conviction ratings on later submissions.
+- Wait for saved responses to load before uploading changes from a new device.
+  Keep completed submissions readable and preserve untouched answers, comments
+  and ratings across sittings.
+- Make interview name and AI-attribution choices agree with the uploaded record
+  after a failed submission, reopening or reload. Show the name actually being
+  sent, retain consent per question, and keep withdrawals when moving between
+  pile and full-survey editing.
+- Preserve valid group joins through same-content configuration refreshes, while
+  cancelling joins when their destination changes or authentication fails.
+- Keep decrypted drafts with their owning account, mask retained locked values
+  in uploads, and pad encrypted choices to avoid revealing their selected length.
+- Bind sign-in messages to the intended Worker and session, improve rating
+  keyboard controls, and reduce unused code and eager imports.
+
+### Worker — requires a session Worker update
+
+- Reject sign-ins and upload authorizations bound to another Worker or session,
+  and validate signed destination Resources before accepting uploads.
+- Count public answers with locked notes accurately in Results, while keeping
+  encrypted ratings and note contents out of public analysis.
+- Pin downloaded Worker packages to the client build's release. Updating the
+  client does not automatically update an existing session Worker.
+
 ## [0.6.4] - 2026-09-28
 
 ### Client — available when the site deploys
