@@ -3236,7 +3236,13 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                     ? engine.state.allQuestionsForFilter
                     : fallbackQuestionPool
                 }
-                existingResponseSlice={engine.state.surveysResponseState?.[0] || null}
+                existingResponseSlice={{
+                  ...engine.state.surveysResponseState?.[0],
+                  interviewProvenance: {
+                    ...engine.state.editBaseline?.interviewProvenance,
+                    ...readPlainRecord(engine.state.surveysResponseState?.[0]?.interviewProvenance),
+                  },
+                }}
                 prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
                 initialError={String(interviewPrefillError || '')}
                 onApplyAnswer={(questionId: string, answer: unknown) =>
