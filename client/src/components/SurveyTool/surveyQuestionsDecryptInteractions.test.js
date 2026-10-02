@@ -311,3 +311,59 @@ describe('rendered field decrypt controls', () => {
     15000,
   );
 });
+
+const mountMode = (mode, cached, latest, decryptGate = null) =>
+  mode === 'pile'
+    ? mountPile({ cached, latestPerQuestion: latest, decryptGate })
+    : mountFull({
+        hydrate: { responses: [cached] },
+        latest: { responses: [latest] },
+        latestPerQuestion: latest,
+        decryptGate,
+      });
+
+it.each(['full', 'pile'].flatMap((mode) => ['before', 'during'].map((timing) => [mode, timing])))(
+  'keeps a narrower audience chosen %s/%s decrypt through the encrypted upload',
+  async (mode, timing) => {
+    let release;
+    const gate = {
+      promise: new Promise((resolve) => {
+        release = resolve;
+      }),
+    };
+    const response = qResponse({ env: E1_ADMIN, hash: '0xh1', audience: 'self_admin' });
+    const h = await mountMode(mode, response, response, timing === 'during' ? gate : null);
+    let pending;
+    if (timing === 'during') {
+      await act(async () => {
+        pending = h.engine().handleDecryptQuestionAnswer('q1', 'answer');
+      });
+      await waitFor(() => expect(h.decryptSingleField).toHaveBeenCalled());
+    }
+    await act(async () => h.engine().applyAnswerEncryptionAudience(0, 'q1', 'self'));
+    await act(async () => {
+      if (pending) {
+        release();
+        await pending;
+      } else await h.engine().handleDecryptQuestionAnswer('q1', 'answer');
+    });
+    expect(h.engine().state.surveysResponseState[0].answers.q1.encryptionAudience).toBe('self');
+    expect(h.engine().state.editBaseline.answers.q1.encryptionAudience).toBe('self_admin');
+    await act(async () => h.engine().handleAdditional(0, 'q1', 'Updated public comment'));
+    await act(async () => (mode === 'pile' ? h.engine().handlePileSubmitClick() : h.engine().encryptAndUpload()));
+    expect(h.submitResponses).toHaveBeenCalledTimes(1);
+    const uploaded = h.submitResponses.mock.calls[0][2][0].answer;
+    expect(uploaded).toMatchObject({ value: '*', encryptionAudience: 'self', encryptedPortion: FRESH });
+    expect(JSON.parse(uploaded.encryptedPortion).recipients).toEqual([{ type: 'self-eip712-v1' }]);
+  },
+  15000,
+);
+
+it.each(['full', 'pile'])('updates an unchanged stale audience in %s', async (mode) => {
+  const cached = qResponse({ env: E0_ADMIN, hash: '0xh0', audience: 'self_admin' });
+  const latest = qResponse({ env: E1, hash: '0xh1' });
+  const h = await mountMode(mode, cached, latest);
+  await act(async () => h.engine().handleDecryptQuestionAnswer('q1', 'answer'));
+  expect(h.engine().state.surveysResponseState[0].answers.q1.encryptionAudience).toBe('self');
+  expect(h.engine().state.editBaseline.answers.q1.encryptionAudience).toBe('self');
+});

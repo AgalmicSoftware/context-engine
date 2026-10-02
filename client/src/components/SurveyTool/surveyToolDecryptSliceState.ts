@@ -249,7 +249,7 @@ export const buildSelfQuestionDecryptSuccessState = (
 ) => {
   const previous = asRecord(prevState);
   const surveysResponseStateCopy = [...((previous.surveysResponseState as unknown[]) || [])];
-  const targetStateSlice = applyDecryptedQuestionStateToSurveySlice(
+  const savedStateSlice = applyDecryptedQuestionStateToSurveySlice(
     surveysResponseStateCopy[surveyIndex] || buildEmptyQuestionDecryptSlice(),
     {
       questionId,
@@ -260,6 +260,31 @@ export const buildSelfQuestionDecryptSuccessState = (
     },
   );
 
+  const targetStateSlice = { ...asRecord(savedStateSlice) };
+  const qid = normalizeQuestionKey(questionId);
+  const currentSlice = asRecord(surveysResponseStateCopy[surveyIndex]);
+  const policyKeys = ['encryptionAudience', 'encryptionGateId', 'audienceMode'];
+  for (const fieldKey of ['answers', 'additionalComments']) {
+    if (!isObjectLike(asRecord(asRecord(decryptedStateSlice)[fieldKey])[qid])) continue;
+    const currentField = asRecord(asRecord(currentSlice[fieldKey])[qid]);
+    const previousField = asRecord(asRecord(previous.editBaseline)[fieldKey])[qid];
+    // A changed policy is an unsaved user choice, including one made during the wallet prompt.
+    // Keep it editable, but retain the saved policy in the baseline so submit re-encrypts it.
+    if (
+      isObjectLike(previousField) &&
+      policyKeys.some(
+        (key) => Object.prototype.hasOwnProperty.call(currentField, key) && currentField[key] !== previousField[key],
+      )
+    ) {
+      targetStateSlice[fieldKey] = {
+        ...asRecord(targetStateSlice[fieldKey]),
+        [qid]: {
+          ...asRecord(asRecord(targetStateSlice[fieldKey])[qid]),
+          ...Object.fromEntries(policyKeys.map((key) => [key, currentField[key]])),
+        },
+      };
+    }
+  }
   surveysResponseStateCopy[surveyIndex] = targetStateSlice;
 
   return {
@@ -272,7 +297,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     editBaseline: syncDecryptedQuestionIntoBaseline(
       previous.editBaseline,
       baselineSlice,
-      targetStateSlice,
+      savedStateSlice,
       {
         questionId,
         decryptedStateSlice,
