@@ -183,6 +183,9 @@ const WorkerSessionGroupsPanel = ({
 
   useEffect(() => {
     setGroupsRevision(0);
+    // A Join belongs to the authentication it started. A new account or
+    // refreshed config must not replay it after a superseded wallet prompt.
+    setPendingJoin(undefined);
     authRequestIdRef.current += 1;
     if (shouldAuthenticateOnRender) {
       void authenticate();
