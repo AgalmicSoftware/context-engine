@@ -306,6 +306,10 @@ After an upload fails, a pending consent choice takes precedence over the saved
 response in both the review controls and the next submission. This also applies
 after restoring a local draft and when the Worker reloads the saved answers.
 
+An untouched name control lists the saved names that will be submitted. When an
+import provides a different name, changing the control explicitly selects or
+removes that imported name; its label updates to match.
+
 Changing included attribution's platform, model, prompt version or question-set
 hash is a pending consent change, even if answer values and research content are
 unchanged. Withdrawing a name or research consent updates the latest submitted

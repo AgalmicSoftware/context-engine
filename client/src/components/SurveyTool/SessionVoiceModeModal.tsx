@@ -788,6 +788,10 @@ function SessionInterviewPanel({
     : '';
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
+  const displayedResponderNames =
+    hasSavedName && (consentOverrides.includeResponderName === undefined || !importedResponderName)
+      ? [...new Set(consentDrafts.map((draft) => savedConsent[draft.questionId]?.responderName).filter(Boolean))]
+      : [importedResponderName];
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
@@ -1121,9 +1125,7 @@ function SessionInterviewPanel({
                           }}
                           data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
                         />{' '}
-                        {importedResponderName
-                          ? `Include “${importedResponderName}” as the responder name with submitted responses`
-                          : 'Include saved responder names'}
+                        {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
                         {nameChoice.mixed ? ' (mixed saved choices)' : ''}
                       </Label>
                     ) : null}

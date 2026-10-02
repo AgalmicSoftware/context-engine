@@ -226,25 +226,31 @@ it('shows saved consent from the pile baseline when own-answer loading is unavai
   });
 }, 40000);
 
-it('preserves the saved name choice when the packet names a different participant', async () => {
-  mockCaches();
-  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
-  const submitResponses = mockSubmit();
-  const getEngine = await mountPileEngine();
-  await renderModal(getEngine, packet({ name: 'Fixture Responder' }, 'Disagree'));
-  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  await settle();
-  selectDraft();
-  const controls = consentControls();
-  const uploaded = await submitAndCapture(submitResponses);
-  expect(controls.nameChecked).toBe(true);
-  expect(uploaded.responderName).toBe('Participant A');
-  expect(uploaded.interviewProvenance).toMatchObject({
-    source: { modelId: 'new-model' },
-    promptVersion: 'ce-interview-brief-v5',
-    questionSetHash: 'a'.repeat(64),
-  });
-}, 40000);
+it.each([false, true])(
+  'labels the saved name when the packet names someone else (own listing: %s)',
+  async (available) => {
+    mockCaches();
+    mockOwnAnswerListing(available);
+    const submitResponses = mockSubmit();
+    const getEngine = await mountPileEngine();
+    await renderModal(getEngine, packet({ name: 'Fixture Responder' }, 'Disagree'));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    await settle();
+    selectDraft();
+    const controls = consentControls();
+    const uploaded = await submitAndCapture(submitResponses);
+    expect(controls.nameChecked).toBe(true);
+    expect(controls.nameLabel).toContain('“Participant A”');
+    expect(controls.nameLabel).not.toContain('Fixture Responder');
+    expect(uploaded.responderName).toBe('Participant A');
+    expect(uploaded.interviewProvenance).toMatchObject({
+      source: { modelId: 'new-model' },
+      promptVersion: 'ce-interview-brief-v5',
+      questionSetHash: 'a'.repeat(64),
+    });
+  },
+  40000,
+);
 
 const mockOwnAnswerListing = (available) => {
   if (!available) {
@@ -352,6 +358,31 @@ it.each([false, true])(
     const uploaded = await submitAndCapture(submitResponses);
     expect(uploaded).not.toHaveProperty('responderName');
     expect(uploaded).not.toHaveProperty('interviewProvenance');
+  },
+  40000,
+);
+
+it.each([false, true])(
+  'labels and submits the imported name after an explicit change (own listing: %s)',
+  async (available) => {
+    mockCaches();
+    mockOwnAnswerListing(available);
+    const submitResponses = mockSubmit();
+    const getEngine = await mountPileEngine();
+    await renderModal(getEngine, packet({ name: 'Fixture Responder' }, 'Disagree'));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    await settle();
+    selectDraft();
+    consentControls();
+    const checkbox = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox.closest('label')).toHaveTextContent('“Fixture Responder”');
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    expect(checkbox.closest('label')).toHaveTextContent('“Fixture Responder”');
+    const uploaded = await submitAndCapture(submitResponses);
+    expect(uploaded.responderName).toBe('Fixture Responder');
   },
   40000,
 );
