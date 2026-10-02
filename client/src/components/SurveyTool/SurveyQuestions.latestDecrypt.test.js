@@ -358,3 +358,66 @@ it.each([false, true])(
   },
   40000,
 );
+
+const consentSource = { platform: 'claude', modelId: 'example-model', verification: 'self_reported' };
+const savedAi = {
+  version: 1,
+  source: consentSource,
+  promptVersion: 'ce-interview-brief-v5',
+  questionSetHash: 'a'.repeat(64),
+  appliedAt: 1,
+};
+
+it.each(['decrypt', 'exit'])(
+  'keeps saved consent through full-view %s and a manual edit',
+  async (action) => {
+    const response = { ...questionResponse(E1, '0xh1'), responderName: 'Participant A', interviewProvenance: savedAi };
+    const h = await mountFull({
+      hydrate: { responses: [response] },
+      latest: { responses: [response] },
+      latestPerQuestion: response,
+    });
+    const consent = h.engine().state.editBaseline.interviewProvenance;
+    expect(consent.q1.responderName).toBe('Participant A');
+    if (action === 'exit') {
+      await run(() => h.engine().handleExitEditing());
+      expect(h.engine().state.editBaseline.interviewProvenance).toEqual(consent);
+    }
+    await run(() => h.engine().handleDecryptEdit());
+    expect(h.engine().state.editBaseline.interviewProvenance).toEqual(consent);
+    expect(h.engine().state.surveysResponseState[0].interviewProvenance).toBeUndefined();
+    await act(async () => h.engine().handleAdditional(0, 'q1', 'new public comment'));
+    await submit(() => h.engine().encryptAndUpload());
+    const responseUploaded = h.submitResponses.mock.calls[0]?.[2]?.[0];
+    expect(responseUploaded?.responderName).toBe('Participant A');
+    expect(responseUploaded?.interviewProvenance?.source).toEqual(consentSource);
+  },
+  40000,
+);
+
+it('uses the latest saved withdrawal when decrypting in a stale full view', async () => {
+  const cached = {
+    ...questionResponse(E0, '0xh0'),
+    responderName: 'Participant A',
+    interviewProvenance: savedAi,
+    timeStamp: 1000,
+  };
+  const latest = { ...questionResponse(E1, '0xh1'), timeStamp: 2000 };
+  const h = await mountFull({
+    hydrate: { responses: [cached] },
+    latest: { responses: [latest] },
+    latestPerQuestion: latest,
+  });
+  await run(() => h.engine().handleDecryptEdit());
+  expect(h.engine().state.editBaseline.interviewProvenance.q1).toEqual({
+    responderName: '',
+    consentSavedAt: 2000000,
+    consentStorageRefId: '',
+  });
+  await act(async () => h.engine().handleAdditional(0, 'q1', 'new public comment'));
+  await submit(() => h.engine().encryptAndUpload());
+  const responseUploaded = h.submitResponses.mock.calls[0]?.[2]?.[0];
+  expect(responseUploaded).toBeDefined();
+  expect(responseUploaded).not.toHaveProperty('responderName');
+  expect(responseUploaded).not.toHaveProperty('interviewProvenance');
+}, 40000);

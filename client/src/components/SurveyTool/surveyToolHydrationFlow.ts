@@ -1472,7 +1472,12 @@ export const buildExitEditingStatePatch = ({
     isEditing: false,
     displayAnswerMode: true,
     startFresh: false,
-    editBaseline: clone(nextSlice),
+    editBaseline: clone({
+      ...nextSlice,
+      ...(normalizedBaselineSlice.interviewProvenance
+        ? { interviewProvenance: normalizedBaselineSlice.interviewProvenance }
+        : {}),
+    }),
     isDirty: false,
     modifiedCount: 0,
     hasEncryptedChanges: false,

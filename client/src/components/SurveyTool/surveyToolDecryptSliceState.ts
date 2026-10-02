@@ -292,11 +292,13 @@ export const buildSurveyDecryptSuccessState = (
     decryptedSlice = {},
     decryptedImportanceFromEnv = {},
     decryptedConvictionFromEnv = {},
+    baselineSlice = null,
   }: {
     surveyIndex?: number;
     decryptedSlice?: unknown;
     decryptedImportanceFromEnv?: unknown;
     decryptedConvictionFromEnv?: unknown;
+    baselineSlice?: unknown;
   } = {},
   deepClone: (value: unknown) => unknown = (value) => value,
 ) => {
@@ -306,6 +308,9 @@ export const buildSurveyDecryptSuccessState = (
   const slice = asRecord(decryptedSlice);
   const sliceAnswers = asRecord(slice.answers);
   const sliceAdditionalComments = asRecord(slice.additionalComments);
+  const savedConsent = asRecord(
+    asRecord(baselineSlice).interviewProvenance ?? asRecord(previous.editBaseline).interviewProvenance,
+  );
   const nextSlice = {
     answers: {
       ...asRecord(previousSlice.answers),
@@ -365,7 +370,10 @@ export const buildSurveyDecryptSuccessState = (
     isEditing: true,
     isDecrypting: false,
     suppressPrefill: true,
-    editBaseline: deepClone(nextSlice),
+    editBaseline: deepClone({
+      ...nextSlice,
+      ...(Object.keys(savedConsent).length ? { interviewProvenance: savedConsent } : {}),
+    }),
     isDirty: false,
     modifiedCount: 0,
   };

@@ -1646,6 +1646,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         (prevState: SurveyQuestionsLegacyValue) => ({
           ...buildSurveyDecryptSuccessState(prevState, {
             surveyIndex,
+            baselineSlice: sourceSlice,
             decryptedSlice: normalizedDecryptedSlice,
             decryptedImportanceFromEnv,
             decryptedConvictionFromEnv,
