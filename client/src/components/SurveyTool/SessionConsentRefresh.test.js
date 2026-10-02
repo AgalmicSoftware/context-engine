@@ -330,8 +330,9 @@ it('preserves each saved consent until the participant explicitly changes the co
       {},
     ),
   );
-  expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({});
+  expect(engine.getChangedQidsAndFields(0).changedMap).toEqual({ q1: { interviewConsent: 1 } });
   expect(engine.state.surveysResponseState[0].interviewProvenance.q1.responderName).toBe('Participant A');
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1.source.modelId).toBe('different-model');
   expect(engine.state.surveysResponseState[0].interviewProvenance.q2.includeAiProvenance).toBe(false);
   await run(() =>
     recordInterviewProvenance(engine, drafts, SOURCE, PACKET, false, false, '', [], {

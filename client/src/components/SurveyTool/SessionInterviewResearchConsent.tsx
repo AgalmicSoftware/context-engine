@@ -106,8 +106,8 @@ export default function SessionInterviewResearchConsent({
         <div className={styles.metadataBody}>
           {preserveSavedProvenance ? (
             <p>
-              Saved answers retain their own source metadata. The source below applies to new answers; changing the
-              provenance choice applies it to all selected answers.
+              Saved consent choices are retained. Selected AI drafts use this interview’s source metadata when
+              provenance is included.
             </p>
           ) : null}
           {showProvenance && includeProvenance ? (

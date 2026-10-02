@@ -197,6 +197,11 @@ it('shows the saved name when own answers load', async () => {
   const uploaded = await submitAndCapture(submitResponses);
   expect(controls.nameShown && controls.nameChecked).toBe(true);
   expect(uploaded.responderName).toBe('Participant A');
+  expect(uploaded.interviewProvenance).toMatchObject({
+    source: { modelId: 'new-model' },
+    promptVersion: 'ce-interview-brief-v5',
+    questionSetHash: 'a'.repeat(64),
+  });
 }, 40000);
 
 it('shows saved consent from the pile baseline when own-answer loading is unavailable', async () => {
@@ -213,6 +218,11 @@ it('shows saved consent from the pile baseline when own-answer loading is unavai
   // A name may only be submitted when the modal shows a ticked (or mixed) name control.
   expect(controls.nameShown && controls.nameChecked).toBe(true);
   expect(uploaded.responderName).toBe('Participant A');
+  expect(uploaded.interviewProvenance).toMatchObject({
+    source: { modelId: 'new-model' },
+    promptVersion: 'ce-interview-brief-v5',
+    questionSetHash: 'a'.repeat(64),
+  });
 }, 40000);
 
 it('preserves the saved name choice when the packet names a different participant', async () => {
@@ -228,4 +238,9 @@ it('preserves the saved name choice when the packet names a different participan
   const uploaded = await submitAndCapture(submitResponses);
   expect(controls.nameChecked).toBe(true);
   expect(uploaded.responderName).toBe('Participant A');
+  expect(uploaded.interviewProvenance).toMatchObject({
+    source: { modelId: 'new-model' },
+    promptVersion: 'ce-interview-brief-v5',
+    questionSetHash: 'a'.repeat(64),
+  });
 }, 40000);

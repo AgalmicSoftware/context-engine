@@ -298,8 +298,9 @@ answers, comments, ratings and consent remain unchanged.
 Saved consent is retained separately for each question until the participant
 changes a choice. The review controls show a mixed state when selected questions
 have different saved choices; changing a control applies that choice to the
-selected responses. Saved attribution keeps its own source metadata while the
-control remains untouched. New answers use the current interview source.
+selected responses. Selected AI drafts use the current interview’s model, prompt
+version and question-set hash whenever provenance is included. Unchanged consent
+does not attach an earlier interview’s source to a replacement draft.
 
 Changing included attribution's platform, model, prompt version or question-set
 hash is a pending consent change, even if answer values and research content are

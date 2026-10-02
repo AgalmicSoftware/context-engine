@@ -1551,7 +1551,7 @@ export const recordInterviewProvenance = (
             Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
               ? originalDraft.revisions[0]
               : originalDraft;
-          // An untouched control preserves this question's saved choice and source, including withdrawals.
+          // An untouched control preserves consent, including withdrawals; this draft supplies its own source.
           const savedConsent = prev.editBaseline?.interviewProvenance?.[draft.questionId];
           const saved =
             savedConsent && typeof savedConsent === 'object' ? (savedConsent as Record<string, unknown>) : null;
@@ -1568,18 +1568,15 @@ export const recordInterviewProvenance = (
                 ? ''
                 : normalizedResponderName ||
                   (consentOverrides?.includeResponderName ? String(saved?.responderName || '') : '');
-          const preserveSource = consentOverrides && saved && consentOverrides.includeAiProvenance === undefined;
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: ai,
             includePredictionComparison: comparison,
             ...(ai
               ? {
-                  source: preserveSource ? saved.source : normalizedSource,
-                  promptVersion: preserveSource
-                    ? saved.promptVersion
-                    : packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
-                  questionSetHash: preserveSource ? saved.questionSetHash : packet?.questionSetHash || '',
+                  source: normalizedSource,
+                  promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
+                  questionSetHash: packet?.questionSetHash || '',
                 }
               : {}),
             ...(comparison
