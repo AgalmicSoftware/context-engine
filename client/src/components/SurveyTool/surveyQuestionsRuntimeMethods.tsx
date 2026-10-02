@@ -1590,18 +1590,25 @@ export const createSurveyQuestionsRuntimeMethods = (
     });
 
     try {
-      const { sourceSlice, ratingEnvelopesByQid, chainId, lit, opts, poolForDecrypt }: SurveyQuestionsLegacyValue =
-        await prepareSurveyDecryptAttempt({
-          singleQuestionMode: decryptContext.singleQuestionMode,
-          questionId: decryptContext.questionID,
-          account: decryptContext.account,
-          providerLike: decryptContext.provider,
-          slug,
-          surveyId: decryptContext.surveyId,
-          fallbackUserAnswers,
-          fallbackSourceSlice,
-          previousStateSlice,
-        });
+      const {
+        latest,
+        sourceSlice,
+        ratingEnvelopesByQid,
+        chainId,
+        lit,
+        opts,
+        poolForDecrypt,
+      }: SurveyQuestionsLegacyValue = await prepareSurveyDecryptAttempt({
+        singleQuestionMode: decryptContext.singleQuestionMode,
+        questionId: decryptContext.questionID,
+        account: decryptContext.account,
+        providerLike: decryptContext.provider,
+        slug,
+        surveyId: decryptContext.surveyId,
+        fallbackUserAnswers,
+        fallbackSourceSlice,
+        previousStateSlice,
+      });
       if (
         (applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
           host: engine,
@@ -1636,13 +1643,17 @@ export const createSurveyQuestionsRuntimeMethods = (
 
       finishSurveyDecryptAttempt(decryptAttemptId);
       setState(
-        (prevState: SurveyQuestionsLegacyValue) =>
-          buildSurveyDecryptSuccessState(prevState, {
+        (prevState: SurveyQuestionsLegacyValue) => ({
+          ...buildSurveyDecryptSuccessState(prevState, {
             surveyIndex,
             decryptedSlice: normalizedDecryptedSlice,
             decryptedImportanceFromEnv,
             decryptedConvictionFromEnv,
           }),
+          // Rating resubmission reads saved envelopes from userAnswers.
+          // Keep that source aligned with the response just decrypted.
+          ...(latest ? { userAnswers: deepClone(latest) } : {}),
+        }),
         () => {
           const jsonPreview: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex);
           setState(buildJsonPreviewState(jsonPreview));

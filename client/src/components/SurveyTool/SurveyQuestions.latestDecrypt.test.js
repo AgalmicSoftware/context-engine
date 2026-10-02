@@ -314,3 +314,47 @@ describe.each(['full', 'pile'])('%s own-comment decrypt', (mode) => {
     }
   }, 40000);
 });
+
+it.each([false, true])(
+  'resubmits the decrypted rating envelopes (stale tab: %s)',
+  async (stale) => {
+    const oldImportance = envelope('importance-3');
+    const latestImportance = envelope('importance-9');
+    const oldConviction = envelope('conviction-2');
+    const latestConviction = envelope('conviction-8');
+    const latest = {
+      ...questionResponse(E1, '0xh1'),
+      importanceEncrypted: latestImportance,
+      convictionEncrypted: latestConviction,
+    };
+    const cached = stale
+      ? { ...questionResponse(E0, '0xh0'), importanceEncrypted: oldImportance, convictionEncrypted: oldConviction }
+      : latest;
+    const h = await mountFull({
+      hydrate: { responses: [cached] },
+      latest: { responses: [latest] },
+      latestPerQuestion: latest,
+    });
+    const ratings = { [oldImportance]: 3, [latestImportance]: 9, [oldConviction]: 2, [latestConviction]: 8 };
+    jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockImplementation(async (value) => ratings[value]);
+    const encryptRating = jest
+      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
+      .mockImplementation(async (value) => envelope(`new-rating-${value}`));
+    await run(() => h.engine().handleDecryptEdit());
+    expect(h.engine().state.surveysResponseState[0]).toMatchObject({ importance: { q1: 9 }, conviction: { q1: 8 } });
+    await act(async () => h.engine().handleAdditional(0, 'q1', 'new public comment'));
+    await submit(() => h.engine().encryptAndUpload());
+    const uploaded = h.submitResponses.mock.calls[0];
+    expect(uploaded).toBeDefined();
+    const survey = typeof uploaded[4] === 'string' ? JSON.parse(uploaded[4]) : uploaded[4];
+    for (const response of [uploaded[2][0], survey.responses[0]]) {
+      expect(response.importanceEncrypted).toBe(latestImportance);
+      expect(response.convictionEncrypted).toBe(latestConviction);
+      expect(response.importance).toBeNull();
+      expect(response.conviction).toBeNull();
+    }
+    expect(encryptRating).not.toHaveBeenCalled();
+    expect(guard(uploaded)).toBe('passed');
+  },
+  40000,
+);
