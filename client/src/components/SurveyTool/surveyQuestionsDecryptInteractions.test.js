@@ -367,3 +367,26 @@ it.each(['full', 'pile'])('updates an unchanged stale audience in %s', async (mo
   expect(h.engine().state.surveysResponseState[0].answers.q1.encryptionAudience).toBe('self');
   expect(h.engine().state.editBaseline.answers.q1.encryptionAudience).toBe('self');
 });
+
+it.each(['full', 'pile'].flatMap((mode) => [true, false].map((stale) => [mode, stale])))(
+  'resubmits the rating envelopes decrypted by the %s button (stale=%s)',
+  async (mode, stale) => {
+    const latest = qResponse({ env: E1, hash: '0xh1', imp: I1, conv: V1 });
+    const cached = stale ? qResponse({ env: E0, hash: '0xh0', imp: I0, conv: V0 }) : latest;
+    const h = await mountMode(mode, cached, latest);
+    fireEvent.click(await screen.findByRole('button', { name: 'Decrypt Answer' }));
+    await waitFor(() => expect(h.engine().state.surveysResponseState[0].importance.q1).toBe(9));
+    expect(h.engine().state.surveysResponseState[0].conviction.q1).toBe(8);
+    await act(async () => h.engine().handleAdditional(0, 'q1', 'Updated public comment'));
+    await act(async () => (mode === 'pile' ? h.engine().handlePileSubmitClick() : h.engine().encryptAndUpload()));
+    expect(h.submitResponses).toHaveBeenCalledTimes(1);
+    expect(h.submitResponses.mock.calls[0][2][0]).toMatchObject({
+      importance: null,
+      conviction: null,
+      importanceEncrypted: I1,
+      convictionEncrypted: V1,
+    });
+    expect(h.encryptEnvelopeValue).not.toHaveBeenCalled();
+  },
+  15000,
+);

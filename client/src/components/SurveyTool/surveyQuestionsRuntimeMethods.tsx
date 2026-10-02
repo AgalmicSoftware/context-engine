@@ -1913,6 +1913,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           decryptedStateSlice,
           decryptedImportance,
           decryptedConviction,
+          ratingEnvelopes: latestRatingEnvs,
         },
         onSuccessStateApplied: () => {
           updateJsonPreview && updateJsonPreview();

@@ -232,6 +232,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     clearMode = 'both',
     didUpdate = false,
     baselineSlice = null,
+    ratingEnvelopes = null,
     decryptedStateSlice,
     decryptedImportance = null,
     decryptedConviction = null,
@@ -241,6 +242,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     clearMode?: unknown;
     didUpdate?: boolean;
     baselineSlice?: unknown;
+    ratingEnvelopes?: unknown;
     decryptedStateSlice?: unknown;
     decryptedImportance?: unknown;
     decryptedConviction?: unknown;
@@ -287,7 +289,30 @@ export const buildSelfQuestionDecryptSuccessState = (
   }
   surveysResponseStateCopy[surveyIndex] = targetStateSlice;
 
+  const userAnswers = asRecord(previous.userAnswers);
+  const responses = Array.isArray(userAnswers.responses)
+    ? userAnswers.responses
+    : userAnswers.questionID || userAnswers.questionId
+      ? [userAnswers]
+      : [];
+  const matchesQuestion = (response: unknown) =>
+    normalizeQuestionKey(asRecord(response).questionID || asRecord(response).questionId) === qid;
+  const latestRatingResponse = {
+    ...asRecord(responses.find(matchesQuestion)),
+    questionID: qid,
+    ...asRecord(ratingEnvelopes),
+  };
+
   return {
+    // Successful per-field decrypts must advance the rating source too; stale attempts never reach this state update.
+    ...(ratingEnvelopes
+      ? {
+          userAnswers: {
+            ...userAnswers,
+            responses: [...responses.filter((response) => !matchesQuestion(response)), latestRatingResponse],
+          },
+        }
+      : {}),
     surveysResponseState: surveysResponseStateCopy,
     isEditing: true,
     displayAnswerMode: false,
