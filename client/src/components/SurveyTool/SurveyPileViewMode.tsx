@@ -1552,7 +1552,8 @@ export const recordInterviewProvenance = (
               ? originalDraft.revisions[0]
               : originalDraft;
           // An untouched control preserves consent, including withdrawals; this draft supplies its own source.
-          const savedConsent = prev.editBaseline?.interviewProvenance?.[draft.questionId];
+          const savedConsent =
+            provenance[draft.questionId] ?? prev.editBaseline?.interviewProvenance?.[draft.questionId];
           const saved =
             savedConsent && typeof savedConsent === 'object' ? (savedConsent as Record<string, unknown>) : null;
           const flags = resolveConsentFlags(saved);
@@ -3240,6 +3241,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                     ...readPlainRecord(engine.state.surveysResponseState?.[0]?.interviewProvenance),
                   },
                 }}
+                pendingInterviewProvenance={readPlainRecord(
+                  engine.state.surveysResponseState?.[0]?.interviewProvenance,
+                )}
                 prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
                 initialError={String(interviewPrefillError || '')}
                 onApplyAnswer={(questionId: string, answer: unknown) =>

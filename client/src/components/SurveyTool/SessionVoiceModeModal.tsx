@@ -92,6 +92,7 @@ type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   context?: unknown;
   workerUrl?: string;
   existingResponseSlice?: UnknownRecord | null;
+  pendingInterviewProvenance?: UnknownRecord;
   onLoadSavedResponses?: InterviewSavedAnswerLoader;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
@@ -125,6 +126,7 @@ function SessionInterviewPanel({
   context,
   workerUrl = '',
   existingResponseSlice: formResponseSlice = null,
+  pendingInterviewProvenance,
   onLoadSavedResponses,
   prefillPacket = null,
   initialError = '',
@@ -310,7 +312,10 @@ function SessionInterviewPanel({
   useEffect(() => {
     setConsentOverrides({});
   }, [activeSubmitContextToken]);
-  const savedConsent = (existingResponseSlice?.interviewProvenance || {}) as Record<string, UnknownRecord>;
+  const savedConsent = {
+    ...((existingResponseSlice?.interviewProvenance || {}) as Record<string, UnknownRecord>),
+    ...pendingInterviewProvenance,
+  } as Record<string, UnknownRecord>;
   const selectedDrafts = drafts.filter((draft) => selected[draft.questionId]);
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const aiChoice = summarizeConsentChoice(

@@ -302,6 +302,10 @@ selected responses. Selected AI drafts use the current interview’s model, prom
 version and question-set hash whenever provenance is included. Unchanged consent
 does not attach an earlier interview’s source to a replacement draft.
 
+After an upload fails, a pending consent choice takes precedence over the saved
+response in both the review controls and the next submission. This also applies
+after restoring a local draft and when the Worker reloads the saved answers.
+
 Changing included attribution's platform, model, prompt version or question-set
 hash is a pending consent change, even if answer values and research content are
 unchanged. Withdrawing a name or research consent updates the latest submitted

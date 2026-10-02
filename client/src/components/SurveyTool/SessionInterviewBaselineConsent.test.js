@@ -5,7 +5,7 @@ import * as workerHydration from '../../utilities/survey/workerResponseHydration
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import { createPileViewRuntimeStrategy, recordInterviewProvenance } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
@@ -120,8 +120,9 @@ const mountPileEngine = async () => {
     engine = current;
     return renderPile(current);
   };
-  renderSurveyPileViewMode({
+  const view = renderSurveyPileViewMode({
     minifiedMode: 'pile',
+    isStandalone: true,
     network: { id: 84532 },
     networkChainId: 84532,
     account: A,
@@ -140,7 +141,7 @@ const mountPileEngine = async () => {
   });
   await waitFor(() => expect(engine?.state?.pileQuestions?.length).toBe(1), { timeout: 8000 });
   await settle();
-  return () => engine;
+  return Object.assign(() => engine, { view });
 };
 
 const renderModal = async (getEngine, prefillPacket) => {
@@ -244,3 +245,113 @@ it('preserves the saved name choice when the packet names a different participan
     questionSetHash: 'a'.repeat(64),
   });
 }, 40000);
+
+const mockOwnAnswerListing = (available) => {
+  if (!available) {
+    jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
+    return;
+  }
+  jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
+  jest
+    .spyOn(workerHydration, 'loadWorkerResponses')
+    .mockResolvedValue([
+      { questionId: 'q1', responder: A, timestamp: 1000, storageRefId: 'ref-a', response: savedNamedAi },
+    ]);
+};
+const openReplacementDraft = async (getEngine, answer) => {
+  await renderModal(getEngine, packet({}, answer));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  await settle();
+  selectDraft();
+  consentControls();
+};
+
+it.each([
+  [false, 'name', false],
+  [true, 'name', false],
+  [false, 'AI attribution', false],
+  [true, 'AI attribution', false],
+  [false, 'name', true],
+  [true, 'AI attribution', true],
+])(
+  'keeps a pending withdrawal with own listing %s for %s after a rejected apply (reload: %s)',
+  async (listingAvailable, choice, reload) => {
+    mockCaches();
+    mockOwnAnswerListing(listingAvailable);
+    const submitResponses = mockSubmit();
+    let getEngine = await mountPileEngine();
+    await openReplacementDraft(getEngine, 'Disagree');
+    const checkbox =
+      choice === 'name'
+        ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
+        : screen.getByLabelText(/Include platform\/model provenance/i);
+    expect(checkbox).toBeChecked();
+    fireEvent.click(checkbox);
+    submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
+    await settle();
+    if (reload) {
+      getEngine.view.unmount();
+      getEngine = await mountPileEngine();
+    } else {
+      await act(async () => getEngine().closeSessionVoiceModeModal());
+      await settle(300);
+    }
+    await openReplacementDraft(getEngine, 'Unsure');
+    if (choice === 'name') {
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByLabelText(/Include platform\/model provenance/i)).not.toBeChecked();
+    }
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(2));
+    await settle();
+    const uploaded = submitResponses.mock.calls[1][2][0];
+    expect(uploaded.answer.value).toBe('Unsure');
+    if (choice === 'name') {
+      expect(uploaded).not.toHaveProperty('responderName');
+      expect(uploaded.interviewProvenance).toMatchObject({
+        source: { modelId: 'new-model' },
+        promptVersion: 'ce-interview-brief-v5',
+        questionSetHash: 'a'.repeat(64),
+      });
+    } else {
+      expect(uploaded).not.toHaveProperty('interviewProvenance');
+      expect(uploaded.responderName).toBe('Participant A');
+    }
+  },
+  40000,
+);
+
+it.each([false, true])(
+  'uses a directly recorded pending withdrawal with own listing %s',
+  async (available) => {
+    mockCaches();
+    mockOwnAnswerListing(available);
+    const submitResponses = mockSubmit();
+    const getEngine = await mountPileEngine();
+    let recorded;
+    await act(async () => {
+      recorded = recordInterviewProvenance(
+        getEngine(),
+        [{ questionId: 'q1', answer: 'Agree' }],
+        SAVED_SOURCE,
+        packet({}),
+        false,
+        false,
+        '',
+        [],
+        { includeAiProvenance: false, includeResponderName: false },
+      );
+    });
+    await act(async () => recorded);
+    await openReplacementDraft(getEngine, 'Disagree');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Include platform\/model provenance/i)).not.toBeChecked();
+    const uploaded = await submitAndCapture(submitResponses);
+    expect(uploaded).not.toHaveProperty('responderName');
+    expect(uploaded).not.toHaveProperty('interviewProvenance');
+  },
+  40000,
+);
