@@ -572,6 +572,11 @@ export const createSurveyQuestionsRuntimeMethods = (
     handleAnswer,
     handleBookmarkToggle,
     handleConviction,
+    handleDecryptQuestionAnswer: (
+      questionId: SurveyQuestionsLegacyValue,
+      fieldToDecrypt?: SurveyQuestionsLegacyValue,
+      responseOverride?: SurveyQuestionsLegacyValue,
+    ) => handleDecryptQuestionAnswer(questionId, fieldToDecrypt, responseOverride),
     handleImportance,
     handleReloadMaskedPrompt,
     isQuestionFieldBusy,
