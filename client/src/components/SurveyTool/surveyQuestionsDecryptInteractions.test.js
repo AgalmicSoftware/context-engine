@@ -390,3 +390,20 @@ it.each(['full', 'pile'].flatMap((mode) => [true, false].map((stale) => [mode, s
   },
   15000,
 );
+
+it('preserves saved encrypted ratings in a later standalone sitting without decrypting', async () => {
+  const saved = qResponse({ env: E1, hash: '0xh1', imp: I1, conv: V1 });
+  const h = await mountPile({ cached: saved, latestPerQuestion: saved });
+  expect(h.engine().state.userAnswers).toBeFalsy();
+  await act(async () => h.engine().handleAdditionalPile('q1', 'Second sitting comment'));
+  await act(async () => h.engine().handlePileSubmitClick());
+  expect(h.submitResponses).toHaveBeenCalledTimes(1);
+  expect(h.submitResponses.mock.calls[0][2][0]).toMatchObject({
+    importance: null,
+    conviction: null,
+    importanceEncrypted: I1,
+    convictionEncrypted: V1,
+    additional: expect.objectContaining({ value: 'Second sitting comment' }),
+  });
+  expect(h.encryptEnvelopeValue).not.toHaveBeenCalled();
+});

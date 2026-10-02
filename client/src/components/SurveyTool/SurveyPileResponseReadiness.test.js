@@ -18,6 +18,7 @@ import {
   resolveWorkerResponseHydrationRun,
 } from '../../utilities/survey/workerResponseHydrationRuntime';
 import { loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
+import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads';
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
@@ -292,3 +293,62 @@ it.each(['submit-first', 'sync-first-comment', 'sync-first-answer'])(
     });
   },
 );
+
+it('keeps saved Worker rating envelopes on a comment-only resubmit from a new device', async () => {
+  const store = createWorkerStore();
+  const firstSitting = await mountWhileResponsesLoad(store, true);
+  const envelope = (tag) =>
+    JSON.stringify({
+      v: 1,
+      aad: { context: `0x${'aa'.repeat(32)}` },
+      recipients: [{ type: 'self-eip712-v1' }],
+      ciphertext: tag,
+    });
+  jest.spyOn(cryptoUtils, 'encryptEnvelopeValue').mockImplementation(async (value) => envelope(`rating-${value}`));
+  jest.spyOn(cryptoUtils, 'encryptMultipleAnswers').mockImplementation(async (slice) => ({
+    answers: Object.fromEntries(
+      Object.entries(slice.answers).map(([id, field]) => [
+        id,
+        { ...field, value: '*', encrypted: true, encryptedPortion: envelope('answer'), hash: '0xfresh' },
+      ]),
+    ),
+    additionalComments: {},
+    importance: {},
+  }));
+  await act(async () => firstSitting.engine().toggleAnswerEncryption(0, QUESTION_ID, true));
+  await act(async () => firstSitting.engine().applyAnswerEncryptionAudience(0, QUESTION_ID, 'self'));
+  await act(async () => firstSitting.engine().handleAnswerPile(QUESTION_ID, 'Private answer'));
+  await act(async () => firstSitting.engine().handleImportance(0, QUESTION_ID, 9));
+  await act(async () => firstSitting.engine().handleConviction(0, QUESTION_ID, 8));
+  expect(await submit(firstSitting)).toEqual({ status: 'submitted' });
+  const saved = await newestResponse(store);
+  expect(saved.importanceEncrypted).toBe(envelope('rating-9'));
+  expect(saved.convictionEncrypted).toBe(envelope('rating-8'));
+  firstSitting.view.unmount();
+  jest.restoreAllMocks();
+  for (const namespace of ['questionsCache', 'surveysCache', 'userCache']) {
+    await cacheScripts.removeCache(namespace, SLUG);
+  }
+  sessionStorage.clear();
+  localStorage.clear();
+  await syncMetadata(store);
+  await syncResponses(store);
+  const secondSitting = await mountWhileResponsesLoad(store, true);
+  await waitFor(() =>
+    expect(secondSitting.engine().state.surveysResponseState[0].answers[QUESTION_ID].value).toBe('*'),
+  );
+  await act(async () => secondSitting.engine().handleAdditionalPile(QUESTION_ID, 'Later public comment'));
+  expect(await submit(secondSitting)).toEqual({ status: 'submitted' });
+  expect(secondSitting.submitResponses).toHaveBeenCalledTimes(1);
+  const latest = await newestResponse(store);
+  expect(latest).toMatchObject({
+    answer: { value: '*', encrypted: true, encryptedPortion: saved.answer.encryptedPortion },
+    additional: { value: 'Later public comment' },
+    importance: null,
+    conviction: null,
+    importanceEncrypted: saved.importanceEncrypted,
+    convictionEncrypted: saved.convictionEncrypted,
+  });
+  expect(() => validateNoLockedPlaintextInPayload(latest, { family: 'question_response_payload' })).not.toThrow();
+  expect(JSON.stringify(latest)).not.toContain('Private answer');
+});

@@ -24,6 +24,8 @@ import { createSurveyQuestionsRenderedHydrationRuntime } from './surveyQuestions
 import { createSurveyQuestionsRouteRuntime } from './surveyQuestionsRouteRuntime.js';
 import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRuntime.js';
 import { createSurveyQuestionsRuntimeStateRuntime } from './surveyQuestionsRuntimeStateRuntime.js';
+import { readQuestionsCache } from './surveyToolCacheState.js';
+import { resolveQuestionReadCacheContext } from './surveyToolScope.js';
 
 export type SurveyQuestionsRuntimeMethods = SurveyQuestionsLegacyRecord;
 
@@ -2134,6 +2136,29 @@ export const createSurveyQuestionsRuntimeMethods = (
     // - When the response is encrypted (or rating already encrypted), ensure ratings are stored in envelopes
     //   and remove plaintext copies from the uploaded payload.
     try {
+      const savedSource = stateRef.current.userAnswers;
+      const savedResponses: SurveyQuestionsLegacyValue[] = Array.isArray(savedSource?.responses)
+        ? savedSource.responses
+        : savedSource
+          ? [savedSource]
+          : [];
+      const savedIds = new Set(
+        savedResponses.map((response) => normalizeQuestionIdKey(response.questionID || response.questionId)),
+      );
+      const cacheScope = resolveQuestionReadCacheContext(context.props || propsRef.current, submissionGroupKey);
+      const cachedResponses =
+        readQuestionsCache(submissionGroupKey)?.[cacheScope.networkIdStr]?.questionResponses || {};
+      const cachedRatingSources = questionResponses.flatMap((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
+        if (savedIds.has(qid)) return [];
+        const raw = cachedResponses[qid]?.[String(context.account || '').toLowerCase()];
+        try {
+          const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          return saved && typeof saved === 'object' ? [{ ...saved, questionID: qid }] : [];
+        } catch (_) {
+          return [];
+        }
+      });
       await processRatingEnvelopesForSubmit(
         {
           sliceForSubmit:
@@ -2145,7 +2170,8 @@ export const createSurveyQuestionsRuntimeMethods = (
                   conviction: {},
                   additionalComments: {},
                 },
-          userAnswersSource: stateRef.current.userAnswers,
+          // A standalone pile may hydrate fields without populating userAnswers.
+          userAnswersSource: { responses: [...savedResponses, ...cachedRatingSources] },
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {
