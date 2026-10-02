@@ -450,6 +450,9 @@ function telegramButtonLabel(value = '', fallback = 'Question') {
 }
 
 function onChainAnswerFromDraft(draft = {}) {
+  // Agent preferences store the normalized typed answer as JSON, including
+  // comments. Ordinary chat drafts still store the button's plain value.
+  if (draft.source === 'agent_handoff') return answerFromStoredDraft(draft);
   const controlType = safeString(draft.controlType);
   if (controlType === 'rating_button') {
     return {
