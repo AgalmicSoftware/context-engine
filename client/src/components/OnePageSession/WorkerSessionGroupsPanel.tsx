@@ -160,8 +160,8 @@ const WorkerSessionGroupsPanel = ({
         error: '',
       });
     } catch (error) {
+      setPendingJoin((pending) => (pending?.targetKey === requestTargetKey ? undefined : pending));
       if (authRequestIdRef.current !== requestId) return;
-      setPendingJoin(undefined);
       setAuthState({
         targetKey: requestTargetKey,
         token: '',
@@ -182,10 +182,13 @@ const WorkerSessionGroupsPanel = ({
   ]);
 
   useEffect(() => {
-    setGroupsRevision(0);
-    // A Join belongs to the authentication it started. A new account or
-    // refreshed config must not replay it after a superseded wallet prompt.
+    // Config objects can refresh during the same wallet prompt; only a new
+    // session, Worker, or account invalidates the user's explicit Join.
     setPendingJoin(undefined);
+  }, [targetKey]);
+
+  useEffect(() => {
+    setGroupsRevision(0);
     authRequestIdRef.current += 1;
     if (shouldAuthenticateOnRender) {
       void authenticate();

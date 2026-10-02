@@ -161,7 +161,7 @@ it('cancels the pending Join when switching accounts before a rejected sign-in',
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
 
-it('cancels the pending Join when refreshed session config restarts authentication', async () => {
+it('cancels the pending Join when a superseded same-target sign-in is rejected', async () => {
   const joinSignIn = deferred();
   const autoSignIn = deferred();
   jest
@@ -183,4 +183,50 @@ it('cancels the pending Join when refreshed session config restarts authenticati
   });
   await tick(150);
   expect(joinWorkerGroup).not.toHaveBeenCalled();
+});
+
+it.each([true, false])('joins once after a same-content config refresh (shared prompt: %s)', async (sharedPrompt) => {
+  const joinSignIn = deferred();
+  const refreshedSignIn = sharedPrompt ? joinSignIn : deferred();
+  jest
+    .mocked(getWorkerSessionToken)
+    .mockRejectedValueOnce(new Error('Auth on render rejected'))
+    .mockImplementationOnce(() => joinSignIn.promise)
+    // workerAuth normally de-duplicates same-target calls onto the open wallet prompt.
+    .mockImplementationOnce(() => refreshedSignIn.promise);
+  const sessionConfig = configFor(true);
+  const props = panelProps({ sessionConfig });
+  const view = render(<WorkerSessionGroupsPanel {...props} account={A} />);
+  await screen.findByText('Auth on render rejected');
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' }));
+  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(2));
+  view.rerender(<WorkerSessionGroupsPanel {...props} sessionConfig={{ ...sessionConfig }} account={A} />);
+  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3));
+  await act(async () => joinSignIn.resolve('token-a'));
+  if (!sharedPrompt) {
+    expect(joinWorkerGroup).not.toHaveBeenCalled();
+    await act(async () => refreshedSignIn.resolve('token-a'));
+  }
+  await waitFor(() => expect(joinTokens()).toEqual(['token-a']));
+  expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
+});
+
+it('keeps the explicit Join when the parent rerenders with a fresh config object', async () => {
+  const joinSignIn = deferred();
+  jest
+    .mocked(getWorkerSessionToken)
+    .mockRejectedValueOnce(new Error('Auth on render rejected'))
+    .mockImplementation(() => joinSignIn.promise);
+  const sessionConfig = configFor(true);
+  const props = panelProps({ sessionConfig });
+  const Parent = () => <WorkerSessionGroupsPanel {...props} sessionConfig={{ ...sessionConfig }} account={A} />;
+  const view = render(<Parent />);
+  await screen.findByText('Auth on render rejected');
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' }));
+  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(2));
+  view.rerender(<Parent />);
+  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3));
+  await act(async () => joinSignIn.resolve('token-a'));
+  await waitFor(() => expect(joinTokens()).toEqual(['token-a']));
+  expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
 });
