@@ -351,7 +351,7 @@ describe('SurveyTool module', () => {
         },
       ),
     ).toEqual({
-      answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+      answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
       additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
       importance: { q1: 7 },
       conviction: { q1: 9 },

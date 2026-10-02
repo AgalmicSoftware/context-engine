@@ -164,6 +164,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     runDedupedDecryptTask,
   } = createSurveyQuestionsDecryptRuntime({
     ...context,
+    deepClone: (value: SurveyQuestionsLegacyValue) => deepClone(value),
     buildSliceFromUserAnswers: (
       userAnswers: SurveyQuestionsLegacyValue,
       prevSlice: SurveyQuestionsLegacyValue = null,
@@ -1838,20 +1839,17 @@ export const createSurveyQuestionsRuntimeMethods = (
         return await handleDecryptViewedResponseField(qid, fieldToDecrypt, effectiveResponseOverride);
       }
 
-      const {
-        baselineSlice,
-        baselineForDecrypt,
-        ratingEnvelopes: latestRatingEnvs,
-      }: SurveyQuestionsLegacyValue = await prepareSelfQuestionDecryptState({
-        surveyIndex,
-        questionId: qid,
-        fieldToDecrypt,
-        responseOverride: effectiveResponseOverride,
-        userAnswers: stateRef.current.userAnswers,
-        account: context.account,
-        sessionSlug: context.sessionSlug || '',
-        networkID: context.networkID,
-      });
+      const { baselineForDecrypt, ratingEnvelopes: latestRatingEnvs }: SurveyQuestionsLegacyValue =
+        await prepareSelfQuestionDecryptState({
+          surveyIndex,
+          questionId: qid,
+          fieldToDecrypt,
+          responseOverride: effectiveResponseOverride,
+          userAnswers: stateRef.current.userAnswers,
+          account: context.account,
+          sessionSlug: context.sessionSlug || '',
+          networkID: context.networkID,
+        });
       if (!isDecryptContextCurrent(context)) {
         return false;
       }
@@ -1894,7 +1892,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           questionId: qid,
           clearMode: attemptStatus.clearMode,
           didUpdate,
-          baselineSlice,
+          baselineSlice: baselineForDecrypt,
           decryptedStateSlice,
           decryptedImportance,
           decryptedConviction,

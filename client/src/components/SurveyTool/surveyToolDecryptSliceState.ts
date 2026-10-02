@@ -178,6 +178,7 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     nextTargetStateSlice.answers = { ...currentAnswers };
     asRecord(nextTargetStateSlice.answers)[qid] = {
       ...currentAnswer,
+      ...baselineAnswer,
       value: incoming.value,
       encrypted:
         typeof prevEncrypted === 'boolean'
@@ -198,6 +199,7 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     };
     asRecord(nextTargetStateSlice.additionalComments)[qid] = {
       ...currentAdditional,
+      ...baselineAdditional,
       value: incoming.value,
       encrypted:
         typeof prevEncrypted === 'boolean'
@@ -488,6 +490,7 @@ export const mergeLatestEncryptedQuestionFields = (
     nextResponseSlice.answers = { ...currentAnswers };
     asRecord(nextResponseSlice.answers)[qid] = {
       ...(isObjectLike(currentAnswers[qid]) ? currentAnswer : { value: '*', encrypted: true, hash: '' }),
+      ...latestAnswer,
       encrypted: !!(latestAnswer.encrypted || currentAnswer.encrypted),
       hash: latestAnswer.hash || currentAnswer.hash || '',
       encryptedPortion: latestAnswer.encryptedPortion,
@@ -500,6 +503,7 @@ export const mergeLatestEncryptedQuestionFields = (
     nextResponseSlice.additionalComments = { ...currentAdditionalComments };
     asRecord(nextResponseSlice.additionalComments)[qid] = {
       ...(isObjectLike(currentAdditionalComments[qid]) ? currentAdditional : { value: '*', encrypted: true, hash: '' }),
+      ...latestAdditional,
       encrypted: !!(latestAdditional.encrypted || currentAdditional.encrypted),
       hash: latestAdditional.hash || currentAdditional.hash || '',
       encryptedPortion: latestAdditional.encryptedPortion,

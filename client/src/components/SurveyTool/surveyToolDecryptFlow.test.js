@@ -1907,7 +1907,7 @@ describe('surveyToolDecryptFlow', () => {
     ).toEqual({
       surveysResponseState: [
         {
-          answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+          answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
           importance: { q1: 7 },
           conviction: { q1: 9 },
           additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
@@ -1919,7 +1919,7 @@ describe('surveyToolDecryptFlow', () => {
       suppressPrefill: true,
       decryptingByKey: { 'q1:answer': false, 'q1:additional': false },
       editBaseline: {
-        answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+        answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
         additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
         importance: { q1: 7 },
         conviction: { q1: 9 },
@@ -2132,7 +2132,7 @@ describe('surveyToolDecryptFlow', () => {
     );
 
     expect(nextTargetStateSlice).toEqual({
-      answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+      answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
       additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
       importance: { q1: 7 },
       conviction: { q1: 9 },
@@ -2152,7 +2152,7 @@ describe('surveyToolDecryptFlow', () => {
         deepClone,
       ),
     ).toEqual({
-      answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+      answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
       additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
       importance: { q1: 7 },
       conviction: { q1: 9 },
