@@ -73,11 +73,11 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const mockCommon = ({ latestPerQuestion }) => {
+const mockCommon = ({ latestPerQuestion, cachedPerQuestion }) => {
   const cache = {
     84532: {
       questions: { q1: { id: 'q1', type: 'freeform', prompt: 'Question one' } },
-      questionResponses: {},
+      questionResponses: cachedPerQuestion ? { q1: { [OWNER]: JSON.stringify(cachedPerQuestion) } } : {},
       pendingQuestionMetadata: {},
     },
   };
@@ -137,12 +137,12 @@ const mockCommon = ({ latestPerQuestion }) => {
   return { getResponse, decryptSingleField, encryptMultipleAnswers, submitResponses };
 };
 
-const mountFull = async ({ hydrate, latest, latestPerQuestion }) => {
+const mountFull = async ({ hydrate, latest, latestPerQuestion, cachedPerQuestion }) => {
   let current = hydrate;
   jest
     .spyOn(surveyQuestionReadsPort, 'getSurveyResponse')
     .mockImplementation(async (_p, responder) => (String(responder).toLowerCase() === OWNER ? current : null));
-  const mocks = mockCommon({ latestPerQuestion });
+  const mocks = mockCommon({ latestPerQuestion, cachedPerQuestion });
   let engine = null;
   renderSurveyQuestions({
     account: OWNER,
@@ -151,6 +151,12 @@ const mountFull = async ({ hydrate, latest, latestPerQuestion }) => {
     surveyId: SURVEY_ID,
     isQuestionCacheReady: true,
     questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+    ...(cachedPerQuestion
+      ? {
+          surveys: [{ id: SURVEY_ID, surveyID: SURVEY_ID, questionIDs: ['q1'], title: 'Survey' }],
+          isResponsesCacheReady: true,
+        }
+      : {}),
     toggleLoginModal: () => {},
     sessionConfig: SESSION_CONFIG,
     sessionSlug: 'edge',
@@ -376,6 +382,7 @@ it.each(['decrypt', 'exit'])(
       hydrate: { responses: [response] },
       latest: { responses: [response] },
       latestPerQuestion: response,
+      cachedPerQuestion: response,
     });
     const consent = h.engine().state.editBaseline.interviewProvenance;
     expect(consent.q1.responderName).toBe('Participant A');
@@ -407,6 +414,7 @@ it('uses the latest saved withdrawal when decrypting in a stale full view', asyn
     hydrate: { responses: [cached] },
     latest: { responses: [latest] },
     latestPerQuestion: latest,
+    cachedPerQuestion: latest,
   });
   await run(() => h.engine().handleDecryptEdit());
   expect(h.engine().state.editBaseline.interviewProvenance.q1).toEqual({

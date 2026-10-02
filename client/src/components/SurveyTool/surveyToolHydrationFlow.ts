@@ -208,6 +208,7 @@ type BuildRevertPendingStatePatchArgs = {
 
 type ResolveExitEditingBaselineSliceArgs = {
   responderAddress?: unknown;
+  prevBaseline?: ResponseSlice | null;
   parsedViewAddressAnswers?: unknown;
   userAnswers?: unknown;
   buildSliceFromUserAnswers?: ((sourceAnswers: unknown) => ResponseSlice | null | undefined) | null;
@@ -1415,6 +1416,7 @@ export const buildRevertPendingStatePatch = ({
 
 export const resolveExitEditingBaselineSlice = ({
   responderAddress = '',
+  prevBaseline = null,
   parsedViewAddressAnswers = null,
   userAnswers = null,
   buildSliceFromUserAnswers = null,
@@ -1423,7 +1425,11 @@ export const resolveExitEditingBaselineSlice = ({
   const sourceAnswers = responderAddress ? parsedViewAddressAnswers : userAnswers;
   if (sourceAnswers && typeof buildSliceFromUserAnswers === 'function') {
     const nextSlice = buildSliceFromUserAnswers(sourceAnswers);
-    if (nextSlice && typeof nextSlice === 'object') return nextSlice;
+    if (nextSlice && typeof nextSlice === 'object') {
+      return isRecord(sourceAnswers) && Array.isArray(sourceAnswers.responses)
+        ? { ...nextSlice, interviewProvenance: prevBaseline?.interviewProvenance }
+        : nextSlice;
+    }
   }
   if (typeof buildSliceFromLocalCache === 'function') {
     const cachedSlice = buildSliceFromLocalCache();
@@ -2673,10 +2679,10 @@ export const buildPrefilledSurveyState = ({
     typeof buildSliceFromUserAnswers === 'function'
       ? buildSliceFromUserAnswers({ responses }, prevEditBaseline || currentSlice)
       : null;
-
   return {
     nextSurveysResponseState,
-    nextBaseline: baseline,
+    // A pile withdrawal updates the question response without rewriting the survey payload.
+    nextBaseline: baseline ? { ...baseline, interviewProvenance: prevEditBaseline?.interviewProvenance } : baseline,
     shouldWriteBaseline: !submissionComplete,
   };
 };

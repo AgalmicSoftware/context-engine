@@ -310,6 +310,11 @@ An untouched name control lists the saved names that will be submitted. When an
 import provides a different name, changing the control explicitly selects or
 removes that imported name; its label updates to match.
 
+The survey view retains consent from the saved per-question responses. A later
+pile withdrawal therefore overrides an earlier survey payload, including after
+Decrypt & edit or Exit Editing. Editing one question does not change another
+question’s consent timestamp.
+
 Changing included attribution's platform, model, prompt version or question-set
 hash is a pending consent change, even if answer values and research content are
 unchanged. Withdrawing a name or research consent updates the latest submitted
