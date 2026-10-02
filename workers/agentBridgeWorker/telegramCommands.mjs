@@ -2913,6 +2913,7 @@ async function persistAnswerDraft({
   answerLabel = '',
   answerValue = '',
   controlType = '',
+  ratingScale = null,
   submitLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
   metadata = null,
   agentMetadata = null,
@@ -2936,6 +2937,7 @@ async function persistAnswerDraft({
     answerLabel: safeString(answerLabel),
     answerValue: safeString(answerValue || answerLabel),
     controlType: safeString(controlType),
+    ...(ratingScale ? { ratingScale } : {}),
     status: 'draft_saved',
     submitLane: safeString(submitLane) || TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     selectedAt: savedAt,
@@ -3030,9 +3032,15 @@ async function persistTelegramSubmitRequest({
   }
   let ratingScale = null;
   if (['rating', 'rating_button'].includes(draft.controlType)) {
-    const loaded = await loadQuestionsForSession(env, slug, { preferredQuestionIds: [qid] });
-    const question = (loaded.questions || []).find((entry) => questionId(entry) === qid);
-    ratingScale = normalizeTelegramRatingScale(question);
+    if (Number.isFinite(draft.ratingScale?.min) && Number.isFinite(draft.ratingScale?.max)) {
+      ratingScale = normalizeTelegramRatingScale({ ratingScale: draft.ratingScale });
+    } else {
+      const loaded = await loadQuestionsForSession(env, slug, { preferredQuestionIds: [qid] });
+      const question = (loaded.questions || []).find((entry) => questionId(entry) === qid);
+      // A cache miss is not evidence that this question uses the default scale.
+      if (!question) return { ok: false, reason: 'rating_scale_unavailable', retryable: true };
+      ratingScale = normalizeTelegramRatingScale(question);
+    }
   }
   const answerFingerprint = answerDraftFingerprint(draft);
   const idempotencyKey = buildSubmitIdempotencyKey({
@@ -4105,6 +4113,8 @@ async function makeAnswerButton({
       answerLabel: label,
       answerValue: safeString(control.value || label),
       controlType: safeString(control.controlType),
+      ...(control.controlType === 'rating_button'
+        ? { ratingScale: { min: control.min, max: control.max, step: control.step } } : {}),
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     },
     seed: seed || `answer|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}|${safeString(control.controlType)}|${label}`,
@@ -8866,6 +8876,7 @@ async function buildAnswerDraftResponse({
     answerLabel,
     answerValue,
     controlType,
+    ratingScale: ref.ratingScale,
     createdAt,
   });
   const userSessionBinding = saved.ok

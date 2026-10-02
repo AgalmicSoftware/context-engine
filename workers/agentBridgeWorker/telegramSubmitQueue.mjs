@@ -12,6 +12,7 @@ import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { submitTelegramResponseOnChain } from './onChainResponses.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
+import { normalizeTelegramRatingScale } from './ratingScale.mjs';
 
 export const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
 export const SUBMIT_REQUEST_SESSION_KV_PREFIX = 'telegram:submit-request-by-session:v1:';
@@ -285,6 +286,19 @@ export async function processQueuedTelegramSubmitRecord({
     return { ok: true, requestId, replayed: true, status: 'direct_submitted' };
   }
   const source = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : record;
+  const answer = source.onChainAnswer || source.answer;
+  let ratingScale = source.ratingScale;
+  if (answer?.questionType === 'rating' &&
+      !(Number.isFinite(ratingScale?.min) && Number.isFinite(ratingScale?.max))) {
+    // Reuse the chat's canonical lookup without a module-initialization cycle.
+    const { loadQuestionsForSession } = await import('./telegramCommands.mjs');
+    const loaded = await loadQuestionsForSession(env, source.sessionSlug, { preferredQuestionIds: [source.questionId] });
+    const question = (loaded.questions || []).find((entry) =>
+      safeString(entry.questionId || entry.id) === source.questionId);
+    // Leave the queued request pending so the batch retries after lookup recovery.
+    if (!question) throw new Error('rating_scale_unavailable');
+    ratingScale = normalizeTelegramRatingScale(question);
+  }
   const session = source.sessionSnapshot || { sessionSlug: source.sessionSlug };
   const principal = normalizeTelegramPrincipal({
     telegramUserId: source.telegramUserId,
@@ -306,9 +320,9 @@ export async function processQueuedTelegramSubmitRecord({
     questionRef: {
       sessionSlug: source.sessionSlug,
       questionId: source.questionId,
-      ratingScale: source.ratingScale,
+      ratingScale,
     },
-    answer: source.onChainAnswer || source.answer,
+    answer,
     idempotencyKey: source.idempotencyKey,
     createdAt: createdAt || source.createdAt || null,
     contractFactory,
