@@ -10,15 +10,22 @@ All notable changes to this project will be documented in this file.
   and improve help controls, documentation contrast and mobile atlas layout.
   Results now separates Report, Debate Map and Raw Results for RxC sessions.
 - Make the pile and editing-card decrypt buttons open saved locked fields.
-  Preserve audience changes made before or during decryption, and retain the
-  latest encrypted importance and conviction ratings on later submissions.
+  Preserve audience changes made before or during decryption. Decrypt saved
+  ratings with the answer so audience changes re-encrypt all three, and retain
+  encrypted importance and conviction across successive locked edits.
 - Wait for saved responses to load before uploading changes from a new device.
+  Show loading and retry feedback, recover after a failed refresh, and read the
+  participant's own saved answers when a complete public listing is unavailable.
   Keep completed submissions readable and preserve untouched answers, comments
   and ratings across sittings.
 - Make interview name and AI-attribution choices agree with the uploaded record
   after a failed submission, reopening or reload. Show the name actually being
   sent, retain consent per question, and keep withdrawals when moving between
   pile and full-survey editing.
+- Let interview Apply finish after its own-answer read while public results
+  are still loading, and clear read failures after a successful retry.
+- Avoid repeated session initialization when the live URL changes before router
+  props catch up.
 - Preserve valid group joins through same-content configuration refreshes, while
   cancelling joins when their destination changes or authentication fails.
 - Keep decrypted drafts with their owning account, mask retained locked values
@@ -34,6 +41,15 @@ All notable changes to this project will be documented in this file.
   encrypted ratings and note contents out of public analysis.
 - Pin downloaded Worker packages to the client build's release. Updating the
   client does not automatically update an existing session Worker.
+
+### Known issues
+
+- In full-survey editing, saved per-question name and AI-attribution choices
+  arriving after the editor mounts can be omitted from a later edit.
+- Production SBT detail pages can lack the current block number because the
+  subscription depends on a component name changed by minification.
+- Simultaneous consent changes with equal timestamps and reloads against a
+  lagging response cache still need stronger conflict-resolution guarantees.
 
 ## [0.6.4] - 2026-09-28
 
