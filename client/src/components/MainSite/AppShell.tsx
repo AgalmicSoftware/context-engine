@@ -921,6 +921,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),
   });
   _lastGroupChainId: number | null = null;
+  _lastDidUpdatePathRaw: string | null = null;
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _sessionRegistryCacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
@@ -2864,8 +2865,11 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this.handleNetworkChange();
     }
 
-    const prevPathRaw = prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+    // A redirect can change the URL before the router updates the path prop.
+    // Record it before dispatching so nested updates do not repeat the transition.
     const currPathRaw = this.getCurrentPathname();
+    const prevPathRaw = this._lastDidUpdatePathRaw ?? (prevProps.path || currPathRaw);
+    this._lastDidUpdatePathRaw = currPathRaw;
     const prevPath = this.getEffectiveRoutePath(prevPathRaw);
     const currPath = this.getEffectiveRoutePath(currPathRaw);
     const currSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';

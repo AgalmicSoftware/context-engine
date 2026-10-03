@@ -4431,6 +4431,116 @@ describe('AppShell route render smoke', () => {
   });
 });
 
+describe('AppShell live pathname updates', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    window.history.replaceState({}, '', '/entry');
+    // Keep React's actual componentDidUpdate and setState feedback. Isolate route
+    // rendering and mount-time services; this regression needs no wallet or RPC.
+    jest.spyOn(AppShell.prototype, 'render').mockReturnValue(null);
+    jest.spyOn(AppShell.prototype, 'componentDidMount').mockImplementation(function () {
+      this._mounted = true;
+      for (const method of [
+        'handleNetworkChange',
+        'syncSessionFallbackRedirectConsumption',
+        'manageAutoHashPersistence',
+        'syncLitHooks',
+        'refreshSessionInfo',
+        'refreshSessionMetaFields',
+        'refreshGroupCredentials',
+        'handleDeepLinkScan',
+        'preloadAboutDemoSessionData',
+        'checkAllCachesReady',
+        'removeSbtRealtimeListenersForGroup',
+      ])
+        this[method] = jest.fn();
+      this.getInitializableSessionNetwork = jest.fn(() => null);
+      this.getSessionChainId = jest.fn(() => null);
+      this.resolveSessionSlugFromPathToken = jest.fn((token) => token);
+    });
+    jest.spyOn(AppShell.prototype, 'componentWillUnmount').mockImplementation(function () {
+      this._mounted = false;
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    window.history.replaceState({}, '', '/');
+    localStorage.clear();
+  });
+
+  const mountShell = () => {
+    const shell = React.createRef();
+    const dispatch = jest.fn();
+    const props = buildProps({ demoSurfaceMode: false });
+    class SessionStore extends React.Component {
+      state = { primarySessionSlug: '', primarySessionExplicit: true };
+      changeActiveSessionSlug = (slug) => {
+        dispatch(slug);
+        // Like the session reducer, even an identical slug creates a new state.
+        this.setState({ primarySessionSlug: slug });
+      };
+      render() {
+        return (
+          <AppShell
+            {...props}
+            ref={shell}
+            path={this.props.path}
+            wagmiBalance={this.props.revision}
+            activeSessionSlug={this.state.primarySessionSlug}
+            sessionState={this.state}
+            changeActiveSessionSlug={this.changeActiveSessionSlug}
+          />
+        );
+      }
+    }
+    const view = render(<SessionStore path="/entry" revision={0} />);
+    const commit = (path, revision = 1) => view.rerender(<SessionStore path={path} revision={revision} />);
+    return { shell, dispatch, commit, unmount: view.unmount };
+  };
+
+  it('settles a redirect before the router path prop catches up', () => {
+    const h = mountShell();
+    window.history.replaceState({}, '', '/session/route-alpha');
+    expect(() => h.commit('/entry')).not.toThrow();
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha']]);
+    expect(h.shell.current.state.isQuestionCacheReady).toBe(true);
+    expect(h.shell.current.state.isSurveyCacheReady).toBe(true);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+
+    h.commit('/entry', 2);
+    h.commit('/session/route-alpha', 3);
+    window.history.replaceState({}, '', '/session/route-alpha?mode=interview');
+    h.commit('/session/route-alpha', 4);
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('still initializes a route when the router prop arrives immediately', () => {
+    const h = mountShell();
+    window.history.replaceState({}, '', '/session/route-alpha');
+    h.commit('/session/route-alpha');
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha']]);
+    expect(h.shell.current.state.isQuestionCacheReady).toBe(true);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('initializes each transition when leaving and returning to a session', () => {
+    const h = mountShell();
+    for (const slug of ['route-alpha', 'route-beta', 'route-alpha']) {
+      window.history.replaceState({}, '', `/session/${slug}`);
+      h.commit(`/session/${slug}`);
+      expect(h.shell.current.props.sessionState.primarySessionSlug).toBe(slug);
+    }
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha'], ['route-beta'], ['route-alpha']]);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(3);
+    h.unmount();
+  });
+});
+
 describe('AppShell single-SBT counts checkpoints', () => {
   beforeEach(() => {
     jest.clearAllMocks();
