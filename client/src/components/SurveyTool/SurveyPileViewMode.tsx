@@ -2314,8 +2314,9 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
   return engine.encryptAndUpload();
 };
 
-const handleManualPileSubmitClick = async (engine: PileViewModeEngine) => {
-  if (engine._pileOwnAnswersSubmitController) return;
+const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
+  if (engine._pileOwnAnswersSubmitController)
+    return { status: 'pending' as const, message: 'Your saved answers are already being loaded.' };
   const baseToken = buildSessionInterviewSubmitContextToken(engine.props);
   if (
     !engine.props.loginComplete ||
@@ -2349,23 +2350,19 @@ const handleManualPileSubmitClick = async (engine: PileViewModeEngine) => {
     // A capped public listing cannot prove that a blank answer is new. The
     // existing strict own read covers all submitted fields and preserves edits.
     const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, controller.signal);
-    if (!isCurrent()) return;
+    if (!isCurrent()) return { status: 'stale' as const };
     if (saved === null || answerIds().some((id) => !questionIds.includes(id))) {
-      engine.setState({
-        pileSubmitTempText: '',
-        submissionError: 'Your saved answers are still loading. Try Submit again when the sync completes.',
-      });
-      return;
+      const message = 'Your saved answers are still loading. Try Submit again when the sync completes.';
+      engine.setState({ pileSubmitTempText: '', submissionError: message });
+      return { status: 'pending' as const, message };
     }
     engine.setState({ pileSubmitTempText: '' });
     return await engine.encryptAndUpload();
   } catch {
-    if (isCurrent()) {
-      engine.setState({
-        pileSubmitTempText: '',
-        submissionError: 'Could not load your saved answers. Try Submit again to retry.',
-      });
-    }
+    if (!isCurrent()) return { status: 'stale' as const };
+    const message = 'Could not load your saved answers. Try Submit again to retry.';
+    engine.setState({ pileSubmitTempText: '', submissionError: message });
+    return { status: 'failed' as const, message };
   } finally {
     if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
   }
@@ -2455,7 +2452,9 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
       return { status: 'already-saved' as const };
     }
   }
-  const result = await engine.handlePileSubmitClick();
+  // Use the same complete own-answer baseline as manual Submit while the
+  // public listing is pending or capped; never bypass the saved-answer read.
+  const result = await handlePileSubmitWithOwnAnswers(engine);
   if (result && typeof result === 'object' && 'status' in result) return result;
   if (!engine.props.loginComplete) return { status: 'login-required' as const };
   return { status: 'failed' as const, message: 'Submission did not complete.' };
@@ -3251,7 +3250,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             pileSubmitResponderHref,
             showSuccessBadgeStatus,
             showSubmitButton,
-            handlePileSubmitClick: () => handleManualPileSubmitClick(engine),
+            handlePileSubmitClick: () => handlePileSubmitWithOwnAnswers(engine),
             hasPendingPileChanges,
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
