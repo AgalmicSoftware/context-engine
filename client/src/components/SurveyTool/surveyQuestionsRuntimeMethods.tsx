@@ -2143,7 +2143,16 @@ export const createSurveyQuestionsRuntimeMethods = (
           ? [savedSource]
           : [];
       const savedIds = new Set(
-        savedResponses.map((response) => normalizeQuestionIdKey(response.questionID || response.questionId)),
+        // Optimistic answer rows may omit ratings; they must not shadow the saved envelopes.
+        savedResponses
+          .filter(
+            (response) =>
+              (typeof response.importanceEncrypted === 'string' && response.importanceEncrypted) ||
+              (typeof response.convictionEncrypted === 'string' && response.convictionEncrypted) ||
+              getImportanceFromResponse(response) !== null ||
+              getConvictionFromResponse(response) !== null,
+          )
+          .map((response) => normalizeQuestionIdKey(response.questionID || response.questionId)),
       );
       const cacheScope = resolveQuestionReadCacheContext(context.props || propsRef.current, submissionGroupKey);
       const cachedResponses =

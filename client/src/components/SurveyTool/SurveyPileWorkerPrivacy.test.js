@@ -443,3 +443,41 @@ describe('saved Worker audience changes', () => {
     60000,
   );
 });
+
+it('preserves both encrypted ratings on the second locked edit in one sitting', async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await lockAndAnswer(h, 1, 'self', 'secret one', [9, 8]);
+  await lockAndAnswer(h, 2, 'self_admin', 'secret two', [6, 5]);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const saved = h.uploads[0].questionResponses;
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  for (const [n, text, ratings] of [
+    [1, 'secret one edited', [9, 8]],
+    [2, 'secret two edited', [6, 5]],
+  ]) {
+    await goTo(h, n);
+    expect(await clickDecrypt()).toEqual([]);
+    await act(async () => h.engine().handleAnswerPile(qid(n), text));
+    expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+    const upload = h.uploads.at(-1);
+    const row = upload.questionResponses.find((response) => response.questionID === qid(n));
+    const prior = saved.find((response) => response.questionID === qid(n));
+    expect(row.importanceEncrypted).toBe(prior.importanceEncrypted);
+    expect(row.convictionEncrypted).toBe(prior.convictionEncrypted);
+    expect(registry.get(row.importanceEncrypted)).toBe(ratings[0]);
+    expect(registry.get(row.convictionEncrypted)).toBe(ratings[1]);
+    expect(row.importance == null).toBe(true);
+    expect(row.conviction == null).toBe(true);
+    expect(registry.get(row.answer.encryptedPortion)).toBe(text);
+    expect(guard(upload)).toBe('passed');
+  }
+  expect(h.uploads).toHaveLength(2);
+  expect(plaintextLeak(h.uploads)).toBe(false);
+}, 60000);
