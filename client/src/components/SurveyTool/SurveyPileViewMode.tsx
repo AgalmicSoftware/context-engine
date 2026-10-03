@@ -1224,6 +1224,8 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;
     engine._sessionInterviewResponseReadyToken = '';
+    engine._pileOwnAnswersSubmitController?.abort();
+    engine._pileOwnAnswersSubmitController = null;
 
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
@@ -1290,6 +1292,8 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
 };
 
 const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
+  engine._pileOwnAnswersSubmitController?.abort();
+  engine._pileOwnAnswersSubmitController = null;
   try {
     if (typeof engine.props.onPileSubmitRailVisibilityChange === 'function') {
       engine.props.onPileSubmitRailVisibilityChange(false);
@@ -2304,9 +2308,67 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
     return { status: 'failed' as const, message: 'No new or changed responses to submit.' };
   }
   if (!engine.getSessionInterviewResponseReadinessToken(buildSessionInterviewSubmitContextToken(engine.props))) {
+    engine.setState({ pileSubmitTempText: 'Loading your saved answers…' });
     return { status: 'pending' as const, message: 'Loading your saved answers…' };
   }
   return engine.encryptAndUpload();
+};
+
+const handleManualPileSubmitClick = async (engine: PileViewModeEngine) => {
+  if (engine._pileOwnAnswersSubmitController) return;
+  const baseToken = buildSessionInterviewSubmitContextToken(engine.props);
+  if (
+    !engine.props.loginComplete ||
+    engine.state.isSubmitting ||
+    engine.getSubmitCount() === 0 ||
+    engine.getSessionInterviewResponseReadinessToken(baseToken)
+  ) {
+    return engine.handlePileSubmitClick();
+  }
+  const token = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
+  const controller = new AbortController();
+  engine._pileOwnAnswersSubmitController = controller;
+  const isCurrent = () =>
+    engine._isMounted &&
+    !controller.signal.aborted &&
+    token ===
+      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const answerIds = () => {
+    const slice = engine.state.surveysResponseState?.[0] || {};
+    return [
+      ...new Set(
+        ['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
+          Object.keys(slice[key] || {}),
+        ),
+      ),
+    ];
+  };
+  const questionIds = answerIds();
+  engine.setState({ pileSubmitTempText: 'Loading your saved answers…', submissionError: null });
+  try {
+    // A capped public listing cannot prove that a blank answer is new. The
+    // existing strict own read covers all submitted fields and preserves edits.
+    const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, controller.signal);
+    if (!isCurrent()) return;
+    if (saved === null || answerIds().some((id) => !questionIds.includes(id))) {
+      engine.setState({
+        pileSubmitTempText: '',
+        submissionError: 'Your saved answers are still loading. Try Submit again when the sync completes.',
+      });
+      return;
+    }
+    engine.setState({ pileSubmitTempText: '' });
+    return await engine.encryptAndUpload();
+  } catch {
+    if (isCurrent()) {
+      engine.setState({
+        pileSubmitTempText: '',
+        submissionError: 'Could not load your saved answers. Try Submit again to retry.',
+      });
+    }
+  } finally {
+    if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
+  }
 };
 
 export const loadSessionInterviewOwnAnswers = async (
@@ -3189,7 +3251,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             pileSubmitResponderHref,
             showSuccessBadgeStatus,
             showSubmitButton,
-            handlePileSubmitClick: engine.handlePileSubmitClick,
+            handlePileSubmitClick: () => handleManualPileSubmitClick(engine),
             hasPendingPileChanges,
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
