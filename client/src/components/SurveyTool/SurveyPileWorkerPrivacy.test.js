@@ -481,3 +481,56 @@ it('preserves both encrypted ratings on the second locked edit in one sitting', 
   expect(h.uploads).toHaveLength(2);
   expect(plaintextLeak(h.uploads)).toBe(false);
 }, 60000);
+
+it.each(['first', 'after another submit', 'with an answer edit', 'with a comment'])(
+  'decrypts and re-encrypts cached Worker ratings for a self-only audience: %s',
+  async (order) => {
+    const store = createWorkerStore();
+    seedWorkerCatalog(store);
+    await syncWorkerMetadata(store);
+    let h = await mountPile(store);
+    await lockAndAnswer(h, 2, 'self_admin', 'secret two', [6, 5]);
+    expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+    const prior = h.uploads[0].questionResponses.find((row) => row.questionID === qid(2));
+    h.view.unmount();
+    jest.restoreAllMocks();
+    sessionStorage.clear();
+    await reloadFromWorker(store, true);
+    h = await mountPile(store, { nonce: 9 });
+    if (order === 'after another submit') {
+      await act(async () => h.engine().handleAnswerPile(qid(1), 'public one'));
+      expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+    }
+    await goTo(h, 2);
+    await act(async () => h.engine().applyAnswerEncryptionAudience(0, qid(2), 'self'));
+    expect(await clickDecrypt()).toEqual([]);
+    expect(h.engine().state.surveysResponseState[0].importance[qid(2)]).toBe(6);
+    expect(h.engine().state.surveysResponseState[0].conviction[qid(2)]).toBe(5);
+    if (order === 'with an answer edit') {
+      await act(async () => h.engine().handleAnswerPile(qid(2), 'secret two edited'));
+    }
+    if (order === 'with a comment') {
+      await act(async () => h.engine().handleAdditionalPile(qid(2), 'public comment'));
+    }
+    expect(h.engine().getSubmitCount()).toBe(1);
+    expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+    const upload = h.uploads.at(-1);
+    const row = upload.questionResponses.find((response) => response.questionID === qid(2));
+    expect(row.answer.encryptionAudience).toBe('self');
+    expect(registry.get(row.answer.encryptedPortion)).toBe(
+      order === 'with an answer edit' ? 'secret two edited' : 'secret two',
+    );
+    expect(row.importanceEncrypted).not.toBe(prior.importanceEncrypted);
+    expect(row.convictionEncrypted).not.toBe(prior.convictionEncrypted);
+    expect(registry.get(row.importanceEncrypted)).toBe(6);
+    expect(registry.get(row.convictionEncrypted)).toBe(5);
+    for (const envelope of [row.answer.encryptedPortion, row.importanceEncrypted, row.convictionEncrypted]) {
+      expect(JSON.parse(envelope).recipients).toEqual([{ type: 'self-eip712-v1' }]);
+    }
+    expect(row.importance == null).toBe(true);
+    expect(row.conviction == null).toBe(true);
+    expect(guard(upload)).toBe('passed');
+    expect(plaintextLeak(h.uploads)).toBe(false);
+  },
+  60000,
+);
