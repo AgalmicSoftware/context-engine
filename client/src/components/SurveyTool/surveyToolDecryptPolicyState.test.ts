@@ -72,3 +72,25 @@ it.each([null, {}, { answers: {}, additionalComments: {} }])(
     });
   },
 );
+
+it.each(['answers', 'additionalComments'])(
+  'keeps saved %s policy when a Worker decrypt starts from the edited slice',
+  (field) => {
+    const edited = { [field]: { q1: { ...saved, encryptionAudience: 'self' } } };
+    const next = buildSelfQuestionDecryptSuccessState(
+      { surveysResponseState: [edited], editBaseline: { [field]: { q1: saved } } },
+      {
+        questionId: 'q1',
+        didUpdate: true,
+        baselineSlice: edited,
+        decryptedStateSlice: { [field]: { q1: { value: 'decrypted' } } },
+      },
+    );
+    expect(next.surveysResponseState[0]).toMatchObject({
+      [field]: { q1: { value: 'decrypted', encryptionAudience: 'self' } },
+    });
+    expect(next.editBaseline).toMatchObject({
+      [field]: { q1: { value: 'decrypted', encryptionAudience: 'self_admin' } },
+    });
+  },
+);

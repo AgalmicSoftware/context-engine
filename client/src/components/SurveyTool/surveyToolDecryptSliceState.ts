@@ -251,15 +251,17 @@ export const buildSelfQuestionDecryptSuccessState = (
 ) => {
   const previous = asRecord(prevState);
   const surveysResponseStateCopy = [...((previous.surveysResponseState as unknown[]) || [])];
-  const savedStateSlice = applyDecryptedQuestionStateToSurveySlice(
-    surveysResponseStateCopy[surveyIndex] || buildEmptyQuestionDecryptSlice(),
-    {
-      questionId,
-      decryptedStateSlice,
-      baselineSlice,
-      decryptedImportance,
-      decryptedConviction,
-    },
+  const savedStateSlice = asRecord(
+    applyDecryptedQuestionStateToSurveySlice(
+      surveysResponseStateCopy[surveyIndex] || buildEmptyQuestionDecryptSlice(),
+      {
+        questionId,
+        decryptedStateSlice,
+        baselineSlice,
+        decryptedImportance,
+        decryptedConviction,
+      },
+    ),
   );
 
   const targetStateSlice = { ...asRecord(savedStateSlice) };
@@ -283,6 +285,15 @@ export const buildSelfQuestionDecryptSuccessState = (
         [qid]: {
           ...asRecord(asRecord(targetStateSlice[fieldKey])[qid]),
           ...Object.fromEntries(policyKeys.map((key) => [key, currentField[key]])),
+        },
+      };
+      // Worker sessions have no latest chain response: their decrypt source can be the edited slice.
+      // Preserve the saved policy separately so an audience-only change remains pending after decrypt.
+      savedStateSlice[fieldKey] = {
+        ...asRecord(savedStateSlice[fieldKey]),
+        [qid]: {
+          ...asRecord(asRecord(savedStateSlice[fieldKey])[qid]),
+          ...Object.fromEntries(policyKeys.map((key) => [key, previousField[key]])),
         },
       };
     }
