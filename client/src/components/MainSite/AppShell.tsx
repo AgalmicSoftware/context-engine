@@ -2883,7 +2883,13 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       ? this.resolveSessionSlugFromPathToken(currSessionToken, { allowAsyncResolve: true })
       : '';
     const sessionSlugChanged = prevSlugFromPath !== currSlugFromPath;
-    const sessionSlugNeedsSync = !!currSessionToken && this.getSessionSlugFromState() !== currSlugFromPath;
+    // A stale session path overrides the store in the normal slug resolver.
+    // Compare the updated store while the router catches up to avoid redispatching.
+    const routerPathCurrent = this.normalizeRoutePath(this.props.path || '') === this.normalizeRoutePath(currPathRaw);
+    const syncedSessionSlug = routerPathCurrent
+      ? this.getSessionSlugFromState()
+      : normalizeSessionSlug(this.props.activeSessionSlug || '');
+    const sessionSlugNeedsSync = !!currSessionToken && syncedSessionSlug !== currSlugFromPath;
 
     if (currPath.startsWith('/session/') && (sessionSlugChanged || sessionSlugNeedsSync)) {
       const prevActiveSlug = this.getSessionSlugFromProps(prevProps) || prevSlugFromPath;
