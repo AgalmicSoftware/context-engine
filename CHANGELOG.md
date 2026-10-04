@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.6.5] - 2026-10-03
+## [0.6.5] - 2026-10-04
 
 ### Client — available when the site deploys
 
@@ -18,14 +18,17 @@ All notable changes to this project will be documented in this file.
   participant's own saved answers when a complete public listing is unavailable.
   Keep completed submissions readable and preserve untouched answers, comments
   and ratings across sittings.
+- Keep locks chosen on blank answers and comments while saved answers load.
+  Allow navigation during that read, clear stale loading feedback after account
+  changes, and let a completed sync supersede a stalled read on the next Submit.
 - Make interview name and AI-attribution choices agree with the uploaded record
   after a failed submission, reopening or reload. Show the name actually being
   sent, retain consent per question, and keep withdrawals when moving between
   pile and full-survey editing.
 - Let interview Apply finish after its own-answer read while public results
   are still loading, and clear read failures after a successful retry.
-- Avoid repeated session initialization when the live URL changes before router
-  props catch up.
+- Avoid repeated session initialization when the live URL changes between
+  sessions before router props catch up.
 - Preserve valid group joins through same-content configuration refreshes, while
   cancelling joins when their destination changes or authentication fails.
 - Keep decrypted drafts with their owning account, mask retained locked values
@@ -50,6 +53,12 @@ All notable changes to this project will be documented in this file.
   subscription depends on a component name changed by minification.
 - Simultaneous consent changes with equal timestamps and reloads against a
   lagging response cache still need stronger conflict-resolution guarantees.
+- On a new device, leaving a question while saved answers load can leave its
+  saved answer blank in the editor. A later comment-only submission can then
+  overwrite that saved answer with an empty value.
+- If the response listing lags immediately after a submission, loading saved
+  answers can briefly revert a just-saved answer in the editor.
+- On a new device, an interview prefill can clear a previously saved comment.
 
 ## [0.6.4] - 2026-09-28
 
