@@ -2315,9 +2315,16 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
 };
 
 const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
-  if (engine._pileOwnAnswersSubmitController)
-    return { status: 'pending' as const, message: 'Your saved answers are already being loaded.' };
   const baseToken = buildSessionInterviewSubmitContextToken(engine.props);
+  if (engine._pileOwnAnswersSubmitController) {
+    if (!engine.getSessionInterviewResponseReadinessToken(baseToken))
+      return { status: 'pending' as const, message: 'Your saved answers are already being loaded.' };
+    // Complete readiness makes an older own read redundant, even if its
+    // transport never settles. Abort before taking the normal submit path.
+    engine._pileOwnAnswersSubmitController.abort();
+    engine._pileOwnAnswersSubmitController = null;
+    if (engine.state.pileSubmitTempText === 'Loading your saved answers…') engine.setState({ pileSubmitTempText: '' });
+  }
   if (
     !engine.props.loginComplete ||
     engine.state.isSubmitting ||
@@ -2337,11 +2344,15 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
   const answerIds = () => {
     const slice = engine.state.surveysResponseState?.[0] || {};
     return [
-      ...new Set(
-        ['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
+      ...new Set([
+        // Navigation can initialize another card while the read is in flight.
+        ...engine.state.pileQuestions
+          .map((question: { id: string }) => normalizeQuestionIdKey(question.id))
+          .filter(Boolean),
+        ...['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
           Object.keys(slice[key] || {}),
         ),
-      ),
+      ]),
     ];
   };
   const questionIds = answerIds();
@@ -2365,6 +2376,14 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
     return { status: 'failed' as const, message };
   } finally {
     if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
+    // A context reset may have cleared this controller; a later request still
+    // owns its loading label and must not be cleared by this stale completion.
+    if (
+      !engine._pileOwnAnswersSubmitController &&
+      engine._isMounted &&
+      engine.state.pileSubmitTempText === 'Loading your saved answers…'
+    )
+      engine.setState({ pileSubmitTempText: '' });
   }
 };
 

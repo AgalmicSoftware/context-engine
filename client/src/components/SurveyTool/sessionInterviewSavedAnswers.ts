@@ -163,8 +163,29 @@ export const mergeInterviewSavedAnswerBaseline = (
     for (const id of questionIds) {
       // Loading a baseline must not discard a local edit made while it was in flight.
       if (!Object.hasOwn(next[field], id) || !isLocalEdit(field, id)) {
-        if (Object.hasOwn(saved?.[field] || {}, id)) next[field][id] = saved?.[field]?.[id];
-        else delete next[field][id];
+        if (Object.hasOwn(saved?.[field] || {}, id)) {
+          const currentField = next[field][id] as RecordValue | undefined;
+          const savedField = saved?.[field]?.[id] as RecordValue | undefined;
+          // A saved empty public field is not a reason to revoke a lock chosen
+          // before typing. The saved baseline below still reflects storage.
+          const keepBlankLock =
+            (field === 'answers' || field === 'additionalComments') &&
+            currentField?.value === '' &&
+            currentField.encrypted === true &&
+            currentField.audienceMode === 'explicit' &&
+            !currentField.encryptedPortion &&
+            savedField?.value === '' &&
+            !savedField.encrypted &&
+            !savedField.encryptedPortion;
+          if (!keepBlankLock) next[field][id] = saved?.[field]?.[id];
+        }
+        // Blank text fields can carry a lock chosen before typing. Removing
+        // stale values must not erase that policy on an unsubmitted question.
+        else if (
+          (field !== 'answers' && field !== 'additionalComments') ||
+          hasMeaningfulFieldValue(next[field][id] as RecordValue)
+        )
+          delete next[field][id];
       }
       if (Object.hasOwn(saved?.[field] || {}, id)) nextBaseline[field][id] = saved?.[field]?.[id];
       else delete nextBaseline[field][id];

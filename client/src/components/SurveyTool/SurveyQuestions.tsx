@@ -865,9 +865,23 @@ const SurveyQuestionsInner = (
     const targetImportance = targetSlice.importance as Record<string, unknown>;
     const targetConviction = targetSlice.conviction as Record<string, unknown>;
     let changed = false;
+    // An empty public cache field cannot revoke a lock selected before typing.
+    // Saved text and envelopes must still hydrate, including decrypted-empty drafts.
+    const keepBlankLock = (
+      current: SurveyQuestionsResponseFieldState | undefined,
+      cached: SurveyQuestionsResponseFieldState,
+    ) =>
+      current?.value === '' &&
+      current.encrypted === true &&
+      current.audienceMode === 'explicit' &&
+      !current.encryptedPortion &&
+      cached.value === '' &&
+      !cached.encrypted &&
+      !cached.encryptedPortion;
 
     if (
       cachedAnswer &&
+      !keepBlankLock(targetAnswers?.[questionId], cachedAnswer) &&
       (allowMaskedAnswerDraftEmpty ||
         targetAnswers?.[questionId]?.value === undefined ||
         (targetAnswers?.[questionId]?.value === '' && !targetAnswers?.[questionId]?.encryptedPortion))
@@ -887,6 +901,7 @@ const SurveyQuestionsInner = (
 
     if (
       cachedAdditional &&
+      !keepBlankLock(targetAdditional?.[questionId], cachedAdditional) &&
       (allowMaskedAdditionalDraftEmpty ||
         targetAdditional?.[questionId]?.value === undefined ||
         (targetAdditional?.[questionId]?.value === '' && !targetAdditional?.[questionId]?.encryptedPortion))

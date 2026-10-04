@@ -185,3 +185,58 @@ it('requests the public-cache fallback only for the verified legacy listing', as
     .mockRejectedValueOnce(new Error('This Worker could not verify your complete saved answers.'));
   await expect(loadSessionInterviewSavedAnswers(options)).rejects.toThrow('complete saved answers');
 });
+
+it.each(['answers', 'additionalComments'] as const)(
+  'keeps a blank %s encryption policy when no saved row exists',
+  (key) => {
+    const blankLocked = field('', { encrypted: true });
+    const merged = mergeInterviewSavedAnswerBaseline(
+      slice({ [key]: { q1: blankLocked } }),
+      slice({ [key]: { q1: field('') } }),
+      slice(),
+      ['q1'],
+      diff,
+    );
+    expect(merged.slice[key].q1).toEqual(blankLocked);
+    expect(merged.baseline[key]).toEqual({});
+  },
+);
+
+it('removes untouched values and numeric ratings when the refreshed saved row is absent', () => {
+  const previous = slice({
+    answers: { q1: field('Old answer') },
+    additionalComments: { q1: field('Old comment') },
+    importance: { q1: 7, q2: 0 },
+    conviction: { q1: 0, q2: 5 },
+  });
+  const merged = mergeInterviewSavedAnswerBaseline(previous, previous, slice(), ['q1', 'q2'], diff);
+  expect(merged.slice).toEqual(slice());
+  expect(merged.baseline).toEqual({ ...slice(), interviewProvenance: {} });
+});
+
+it.each(['answers', 'additionalComments'] as const)(
+  'keeps an explicit blank %s lock against a saved empty public field',
+  (key) => {
+    const locked = field('', { encrypted: true });
+    const publicBlank = field('');
+    const merge = (savedField: ReturnType<typeof field>, current = locked) =>
+      mergeInterviewSavedAnswerBaseline(
+        slice({ [key]: { q1: current } }),
+        slice({ [key]: { q1: publicBlank } }),
+        slice({ [key]: { q1: savedField } }),
+        ['q1'],
+        diff,
+      );
+    const blank = merge(publicBlank);
+    expect(blank.slice[key].q1).toEqual(locked);
+    expect(blank.baseline[key].q1).toEqual(publicBlank);
+    for (const savedField of [field('Saved text'), field('*', { encrypted: true, encryptedPortion: 'saved-cipher' })]) {
+      const result = merge(savedField);
+      expect(result.slice[key].q1).toEqual(savedField);
+      expect(result.baseline[key].q1).toEqual(savedField);
+    }
+    expect(merge(publicBlank, field('', { encrypted: true, audienceMode: 'inherited' })).slice[key].q1).toEqual(
+      publicBlank,
+    );
+  },
+);
