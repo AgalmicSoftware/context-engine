@@ -870,10 +870,12 @@ const SurveyQuestionsInner = (
     const keepBlankLock = (
       current: SurveyQuestionsResponseFieldState | undefined,
       cached: SurveyQuestionsResponseFieldState,
+      isAdditional = false,
     ) =>
       current?.value === '' &&
       current.encrypted === true &&
-      current.audienceMode === 'explicit' &&
+      // Match Answer applies only to comments; answer policies stay explicit.
+      (current.audienceMode === 'explicit' || (isAdditional && current.audienceMode === 'inherit')) &&
       !current.encryptedPortion &&
       cached.value === '' &&
       !cached.encrypted &&
@@ -901,7 +903,7 @@ const SurveyQuestionsInner = (
 
     if (
       cachedAdditional &&
-      !keepBlankLock(targetAdditional?.[questionId], cachedAdditional) &&
+      !keepBlankLock(targetAdditional?.[questionId], cachedAdditional, true) &&
       (allowMaskedAdditionalDraftEmpty ||
         targetAdditional?.[questionId]?.value === undefined ||
         (targetAdditional?.[questionId]?.value === '' && !targetAdditional?.[questionId]?.encryptedPortion))

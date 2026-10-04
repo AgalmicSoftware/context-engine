@@ -172,7 +172,9 @@ export const mergeInterviewSavedAnswerBaseline = (
             (field === 'answers' || field === 'additionalComments') &&
             currentField?.value === '' &&
             currentField.encrypted === true &&
-            currentField.audienceMode === 'explicit' &&
+            // Match Answer stores the comment's chosen lock as an inherited policy.
+            (currentField.audienceMode === 'explicit' ||
+              (field === 'additionalComments' && currentField.audienceMode === 'inherit')) &&
             !currentField.encryptedPortion &&
             savedField?.value === '' &&
             !savedField.encrypted &&

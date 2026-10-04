@@ -133,7 +133,12 @@ const fixture = async () => {
     const envelope = JSON.stringify({
       v: 1,
       ciphertext: `cipher-${envelopes.size}`,
-      recipients: [{ type: 'self-eip712-v1' }],
+      recipients: [
+        { type: 'self-eip712-v1' },
+        ...(audience === 'self_admin'
+          ? [{ type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }]
+          : []),
+      ],
     });
     envelopes.set(envelope, { value, audience });
     return envelope;
@@ -280,6 +285,7 @@ const fixture = async () => {
     hooks,
     globalGate,
     envelopes,
+    encrypt,
     engine: () => engine,
     view: () => view,
   };
@@ -508,7 +514,7 @@ it('keeps a blank comment lock after submitting its public answer and completing
 });
 
 it.each(['answers', 'additionalComments'])(
-  'preserves only an explicit blank %s lock when hydrating another empty public field',
+  'preserves blank %s lock intent when hydrating another empty public field',
   async (field) => {
     const h = await setup();
     const locked = {
@@ -557,6 +563,9 @@ it.each(['answers', 'additionalComments'])(
         { value: '*', encrypted: true, encryptedPortion: 'saved-cipher' },
       ),
     ).toMatchObject({ value: '', encryptedPortion: 'saved-cipher' });
+    expect(apply({ ...locked, audienceMode: 'inherit' }, { value: '', encrypted: false })).toMatchObject({
+      encrypted: field === 'additionalComments',
+    });
     expect(apply({ ...locked, audienceMode: 'inherited' }, { value: '', encrypted: false })).toMatchObject({
       encrypted: false,
     });
@@ -596,3 +605,118 @@ it('keeps a new blank comment lock over a previously saved public answer during 
   });
   expect(JSON.stringify(h.submitResponses.mock.calls)).not.toContain('Private comment after own read');
 });
+
+const seedBlankMatchResponse = (h, audience) => {
+  if (!audience) return;
+  const admin = audience === 'self_admin';
+  h.add('responses', {
+    ...SAVED,
+    questionID: BLANK_QID,
+    answer: admin
+      ? {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: h.encrypt('Saved locked answer', audience),
+          encryptionAudience: audience,
+          audienceMode: 'explicit',
+          hash: '0x01',
+        }
+      : { value: '', encrypted: false },
+    additional: { value: '', encrypted: false, audienceMode: 'explicit' },
+    importance: admin ? null : 5,
+    conviction: admin ? null : 4,
+    ...(admin ? { importanceEncrypted: h.encrypt(5, audience), convictionEncrypted: h.encrypt(4, audience) } : {}),
+  });
+};
+const openComments = async (id) => {
+  if (
+    screen
+      .queryAllByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT)
+      .some((input) => input.getAttribute('data-ce-question-id') === id)
+  )
+    return;
+  const toggle = screen
+    .getAllByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE)
+    .find((button) => button.getAttribute('data-ce-question-id') === id);
+  await act(async () => fireEvent.click(toggle));
+};
+const expectRenderedMatchLock = () => {
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK).querySelector('svg')).toHaveAttribute('data-icon', 'lock');
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')).toHaveAttribute(
+    'data-icon',
+    'lock',
+  );
+};
+const expectPrivateMatchUpload = (h, audience, text) => {
+  const row = h.submitResponses.mock.calls[1][2].find((entry) => entry.questionID === BLANK_QID);
+  expect(row.additional).toMatchObject({ value: '*', encrypted: true, encryptionAudience: audience });
+  expect(h.envelopes.get(row.additional.encryptedPortion)).toEqual({ value: text, audience });
+  expect(JSON.stringify(h.submitResponses.mock.calls)).not.toContain(text);
+};
+
+it('keeps the rendered Match Answer selection on a saved blank comment through submit and later typing', async () => {
+  const h = await setup();
+  seedBlankMatchResponse(h, 'self');
+  await goTo(h, BLANK_QID);
+  await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK)));
+  await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF)));
+  await openComments(BLANK_QID);
+  await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK)));
+  const follow = screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW);
+  expect(follow).toHaveTextContent('Match Answer');
+  await act(async () => fireEvent.click(follow));
+  expect(slice(h).additionalComments[BLANK_QID]).toMatchObject({ value: '', encrypted: true, audienceMode: 'inherit' });
+  expectRenderedMatchLock();
+  await goTo(h, QID);
+  await editComment(h);
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  expect(h.submitResponses.mock.calls[0][1]).toEqual([QID]);
+  await goTo(h, BLANK_QID);
+  await openComments(BLANK_QID);
+  expectRenderedMatchLock();
+  const input = screen
+    .getAllByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT)
+    .find((entry) => entry.getAttribute('data-ce-question-id') === BLANK_QID);
+  await act(async () => fireEvent.change(input, { target: { value: 'Private menu comment' } }));
+  await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toBeEnabled());
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
+  expectPrivateMatchUpload(h, 'self', 'Private menu comment');
+});
+
+it.each([
+  ['no saved row', false, false, 'self'],
+  ['no saved row', false, true, 'self'],
+  ['saved blank row', true, false, 'self'],
+  ['saved blank row', true, true, 'self'],
+  ['saved admin answer', true, false, 'self_admin'],
+])(
+  'keeps Match Answer for %s (saved=%s, sync complete=%s, audience=%s)',
+  async (_label, saved, syncComplete, audience) => {
+    const h = await setup();
+    if (saved) seedBlankMatchResponse(h, audience);
+    await lockBlank(h, 'answers');
+    await act(async () => h.engine().applyAnswerEncryptionAudience(0, BLANK_QID, audience));
+    await act(async () => h.engine().applyAdditionalEncryptionAudience(0, BLANK_QID, 'follow'));
+    expect(slice(h).additionalComments[BLANK_QID]).toMatchObject({
+      value: '',
+      encrypted: true,
+      audienceMode: 'inherit',
+    });
+    await goTo(h, QID);
+    await editComment(h);
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+    expect(h.submitResponses.mock.calls[0][1]).toEqual([QID]);
+    if (syncComplete) await completeSync(h);
+    await goTo(h, BLANK_QID);
+    await openComments(BLANK_QID);
+    expectRenderedMatchLock();
+    expect(slice(h).additionalComments[BLANK_QID]).toMatchObject({ encrypted: true, audienceMode: 'inherit' });
+    await act(async () => h.engine().handleAdditionalPile(BLANK_QID, 'Private inherited comment'));
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
+    expectPrivateMatchUpload(h, audience, 'Private inherited comment');
+  },
+);

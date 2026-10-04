@@ -240,3 +240,20 @@ it.each(['answers', 'additionalComments'] as const)(
     );
   },
 );
+
+it.each(['answers', 'additionalComments'] as const)(
+  'recognizes inherit as a blank lock only for comments when merging %s',
+  (key) => {
+    const inherited = field('', { encrypted: true, audienceMode: 'inherit' });
+    const publicBlank = field('');
+    const merged = mergeInterviewSavedAnswerBaseline(
+      slice({ [key]: { q1: inherited } }),
+      slice({ [key]: { q1: publicBlank } }),
+      slice({ [key]: { q1: publicBlank } }),
+      ['q1'],
+      diff,
+    );
+    expect(merged.slice[key].q1).toEqual(key === 'additionalComments' ? inherited : publicBlank);
+    expect(merged.baseline[key].q1).toEqual(publicBlank);
+  },
+);
