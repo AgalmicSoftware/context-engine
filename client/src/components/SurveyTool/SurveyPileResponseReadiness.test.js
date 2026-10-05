@@ -24,6 +24,10 @@ jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () 
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionVoiceModeModal', () => ({ __esModule: true, default: () => null }));
 
+// Every scenario mounts two sittings and waits for real UI/cache timers. Allow
+// hosted coverage instrumentation time without changing the readiness assertions.
+jest.setTimeout(15_000);
+
 const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
 const SLUG = 'response-readiness';
 const OWNER = `0x${'33'.repeat(20)}`;
