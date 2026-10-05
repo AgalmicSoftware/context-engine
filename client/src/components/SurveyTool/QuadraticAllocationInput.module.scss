@@ -65,7 +65,6 @@
 .meter {
   display: flex;
   flex-shrink: 0;
-  gap: 2px;
   height: 8px;
   margin: 0 6px 0.4rem;
   overflow: hidden;
@@ -73,8 +72,12 @@
   background: color-mix(in srgb, var(--ce-panel-text) 16%, transparent);
   span {
     flex: 0 0 auto;
+    box-sizing: border-box;
     background: var(--ce-response-agree-text);
     transition: width 0.15s ease-out;
+    & + span {
+      box-shadow: inset 1px 0 var(--ce-panel-text);
+    }
     &[data-direction='negative'] {
       background: var(--ce-response-disagree-text);
     }
@@ -271,8 +274,8 @@
     justify-content: center;
   }
   .solidSquare {
-    width: calc(var(--votes) * var(--unit));
-    height: calc(var(--votes) * var(--unit));
+    width: min(36px, calc(var(--votes) * var(--unit)));
+    height: min(36px, calc(var(--votes) * var(--unit)));
   }
 }
 

@@ -166,8 +166,8 @@ export default function QuadraticAllocationInput({
   // Keep the help example enactable on small budgets.
   const example = Math.min(7, limit);
   // Cost squares: one small square per credit, n×n for n votes. The unit keeps
-  // the largest affordable square inside a fixed 36px box for any budget.
-  const squareUnit = Math.max(1, Math.floor(36 / Math.max(limit, 1)));
+  // blocks through 12 votes inside a fixed 36px box for any budget.
+  const squareUnit = Math.floor(36 / Math.min(limit, 12));
   const formatVote = (vote: number) => (vote > 0 ? `+${vote}` : vote < 0 ? `−${Math.abs(vote)}` : '0');
   const credits = (count: number) => `${count} credit${count === 1 ? '' : 's'}`;
   const canStep = (index: number, step: number) => {
@@ -195,7 +195,7 @@ export default function QuadraticAllocationInput({
       <div className={styles.header}>
         <div className={styles.budget}>
           <p role="status" data-testid="ce-quadratic-budget">
-            <strong>{budget - spent}</strong> credits left
+            <strong>{budget - spent}</strong> credit{budget - spent === 1 ? '' : 's'} left
           </p>
           <span className={styles.rule} aria-hidden="true">
             Votes cost their square
@@ -331,11 +331,11 @@ export default function QuadraticAllocationInput({
                   className={styles.squares}
                   aria-hidden="true"
                   data-testid={`ce-quadratic-squares-${index}`}
-                  data-solid={squareUnit < 3 ? '' : undefined}
+                  data-solid={Math.abs(vote) > 12 ? '' : undefined}
                   style={{ '--votes': Math.abs(vote), '--unit': `${squareUnit}px` } as React.CSSProperties}
                 >
                   {vote !== 0 &&
-                    (squareUnit >= 3 ? (
+                    (Math.abs(vote) <= 12 ? (
                       Array.from({ length: vote ** 2 }, (_, cell) => <i key={cell} />)
                     ) : (
                       <i className={styles.solidSquare} />
