@@ -1,6 +1,13 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronUp, faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
+import {
+  faChevronDown,
+  faChevronUp,
+  faMinus,
+  faPlus,
+  faQuestionCircle,
+  faUndo,
+} from '@fortawesome/free-solid-svg-icons';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -66,7 +73,7 @@ export default function QuadraticAllocationInput({
         return;
       }
       const top = list.getBoundingClientRect().top;
-      const peeks = Array.from(list.querySelectorAll('label')).map((label) => {
+      const peeks = Array.from(list.querySelectorAll('[data-quadratic-option-label]')).map((label) => {
         const rect = label.getBoundingClientRect();
         return rect.top - top + list.scrollTop + rect.height / 2;
       });
@@ -158,6 +165,15 @@ export default function QuadraticAllocationInput({
   const limit = Math.floor(Math.sqrt(budget));
   // Keep the help example enactable on small budgets.
   const example = Math.min(7, limit);
+  // Cost squares: one small square per credit, n×n for n votes. The unit keeps
+  // the largest affordable square inside a fixed 36px box for any budget.
+  const squareUnit = Math.max(1, Math.floor(36 / Math.max(limit, 1)));
+  const formatVote = (vote: number) => (vote > 0 ? `+${vote}` : vote < 0 ? `−${Math.abs(vote)}` : '0');
+  const credits = (count: number) => `${count} credit${count === 1 ? '' : 's'}`;
+  const canStep = (index: number, step: number) => {
+    const next = votes[index] + step;
+    return Math.abs(next) <= limit && spent - votes[index] ** 2 + next ** 2 <= budget;
+  };
   const updateVote = (index: number, requested: number) => {
     if (disabled || !Number.isSafeInteger(requested)) return;
     const available = budget - (spent - votes[index] ** 2);
@@ -177,11 +193,13 @@ export default function QuadraticAllocationInput({
     <fieldset className={styles.allocation} data-testid="ce-quadratic-allocation" data-question-id={questionId}>
       <legend className={styles.srOnly}>Quadratic allocation</legend>
       <div className={styles.header}>
-        <span className={styles.oppose}>− Oppose</span>
         <div className={styles.budget}>
           <p role="status" data-testid="ce-quadratic-budget">
             <strong>{budget - spent}</strong> credits left
           </p>
+          <span className={styles.rule} aria-hidden="true">
+            Votes cost their square
+          </span>
           <button
             type="button"
             id={helpId}
@@ -219,63 +237,113 @@ export default function QuadraticAllocationInput({
           popperClassName={styles.helpTooltip}
         >
           Votes cost their square: +{example} or −{example} uses {example ** 2} credit{example === 1 ? '' : 's'}. Share
-          your {budget} credit{budget === 1 ? '' : 's'} across the options. You may leave credits unused.
+          your {budget} credit{budget === 1 ? '' : 's'} across the options. You may leave credits unused. Use + to
+          support an option and − to oppose it.
         </CETooltip>
-        <span className={styles.support}>+ Support</span>
+      </div>
+      <div className={styles.meter} aria-hidden="true" data-testid="ce-quadratic-meter">
+        {votes.map((vote, index) =>
+          vote === 0 ? null : (
+            <span
+              key={index}
+              data-direction={vote > 0 ? 'positive' : 'negative'}
+              style={{ width: `${(vote ** 2 / budget) * 100}%` }}
+            />
+          ),
+        )}
       </div>
       <div className={styles.optionsViewport} ref={viewportRef}>
         <div id={optionsId} className={styles.options} ref={optionsRef} style={{ height: optionsHeight }}>
           {options.map((option, index) => {
             const vote = votes[index];
             const inputId = `quadratic-${instanceId}-${index}`;
-            const position = 50 + (vote / limit) * 50;
             return (
               <div
                 className={styles.option}
                 key={index}
                 data-direction={vote > 0 ? 'positive' : vote < 0 ? 'negative' : 'neutral'}
               >
-                <div className={styles.optionHeading}>
-                  <label htmlFor={inputId}>{String(option)}</label>
+                <label htmlFor={inputId} className={styles.optionLabel} data-quadratic-option-label>
+                  {String(option)}
+                </label>
+                <div className={styles.stepper}>
+                  {/* Pointer shortcuts; the range input below is the keyboard and assistive control. */}
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className={styles.step}
+                    data-step="down"
+                    data-ce-control-appearance="frameless"
+                    disabled={disabled || !canStep(index, -1)}
+                    title={`${formatVote(vote - 1)} (${credits((vote - 1) ** 2)})`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => updateVote(index, vote - 1)}
+                    data-testid={`ce-quadratic-decrease-${index}`}
+                  >
+                    <FontAwesomeIcon icon={faMinus} />
+                  </button>
                   <span className={styles.vote} aria-hidden="true">
-                    {vote > 0 ? '+' : ''}
-                    {vote}
+                    {formatVote(vote)}
                   </span>
-                  <span className={styles.cost} data-testid={`ce-quadratic-cost-${index}`}>
-                    {vote === 0 ? '' : `${vote ** 2} credits`}
-                  </span>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className={styles.step}
+                    data-step="up"
+                    data-ce-control-appearance="frameless"
+                    disabled={disabled || !canStep(index, 1)}
+                    title={`${formatVote(vote + 1)} (${credits((vote + 1) ** 2)})`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => updateVote(index, vote + 1)}
+                    data-testid={`ce-quadratic-increase-${index}`}
+                  >
+                    <FontAwesomeIcon icon={faPlus} />
+                  </button>
+                  <input
+                    id={inputId}
+                    className={styles.voteInput}
+                    type="range"
+                    min={-limit}
+                    max={limit}
+                    step={1}
+                    value={vote}
+                    disabled={disabled}
+                    aria-valuetext={`${vote > 0 ? '+' : ''}${vote} vote${Math.abs(vote) === 1 ? '' : 's'}, ${credits(vote ** 2)}${vote === 0 ? ', neutral' : vote > 0 ? ', support' : ', oppose'}`}
+                    onPointerDown={() => {
+                      if (deferDragUpdates && !disabled) {
+                        dragSourceRef.current = sourceKey;
+                        draggedOptionRef.current = index;
+                      }
+                    }}
+                    onBlur={() => {
+                      // A new slider's pointerdown precedes the old slider's blur.
+                      // Only blur on the dragged option may end the new interaction.
+                      if (draggedOptionRef.current === index) finishDrag();
+                    }}
+                    onKeyDown={finishDrag}
+                    onChange={(event) => updateVote(index, Number(event.target.value))}
+                    data-testid={`ce-quadratic-vote-${index}`}
+                  />
                 </div>
-                <input
-                  id={inputId}
-                  className={styles.slider}
-                  type="range"
-                  min={-limit}
-                  max={limit}
-                  step={1}
-                  value={vote}
-                  disabled={disabled}
-                  aria-valuetext={`${vote > 0 ? '+' : ''}${vote} votes, ${vote ** 2} credits${vote === 0 ? ', neutral' : vote > 0 ? ', support' : ', oppose'}`}
-                  style={
-                    {
-                      '--vote-start': `${Math.min(position, 50)}%`,
-                      '--vote-end': `${Math.max(position, 50)}%`,
-                    } as React.CSSProperties
-                  }
-                  onPointerDown={() => {
-                    if (deferDragUpdates && !disabled) {
-                      dragSourceRef.current = sourceKey;
-                      draggedOptionRef.current = index;
-                    }
-                  }}
-                  onBlur={() => {
-                    // A new slider's pointerdown precedes the old slider's blur.
-                    // Only blur on the dragged option may end the new interaction.
-                    if (draggedOptionRef.current === index) finishDrag();
-                  }}
-                  onKeyDown={finishDrag}
-                  onChange={(event) => updateVote(index, Number(event.target.value))}
-                  data-testid={`ce-quadratic-vote-${index}`}
-                />
+                <span
+                  className={styles.squares}
+                  aria-hidden="true"
+                  data-testid={`ce-quadratic-squares-${index}`}
+                  data-solid={squareUnit < 3 ? '' : undefined}
+                  style={{ '--votes': Math.abs(vote), '--unit': `${squareUnit}px` } as React.CSSProperties}
+                >
+                  {vote !== 0 &&
+                    (squareUnit >= 3 ? (
+                      Array.from({ length: vote ** 2 }, (_, cell) => <i key={cell} />)
+                    ) : (
+                      <i className={styles.solidSquare} />
+                    ))}
+                </span>
+                <span className={styles.cost} data-testid={`ce-quadratic-cost-${index}`}>
+                  {vote === 0 ? '' : credits(vote ** 2)}
+                </span>
               </div>
             );
           })}

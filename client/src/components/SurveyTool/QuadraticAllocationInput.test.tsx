@@ -64,6 +64,8 @@ it('respects disabled state and excludes encrypted or invalid results', () => {
   const onChange = jest.fn();
   render(<QuadraticAllocationInput questionId="q" {...question} value={[0, 0]} disabled onChange={onChange} />);
   expect(screen.getByLabelText('Parks')).toBeDisabled();
+  expect(screen.getByTestId('ce-quadratic-increase-0')).toBeDisabled();
+  expect(screen.getByTestId('ce-quadratic-decrease-0')).toBeDisabled();
   render(
     <QuadraticAllocationResults
       question={question}
@@ -152,4 +154,46 @@ it('can undo a neutral draft back to saved votes without writing another answer'
   expect(screen.getByLabelText('Parks')).toHaveValue('3');
   expect(screen.getByLabelText('Transit')).toHaveValue('-4');
   expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+});
+
+it('steps votes with − and + buttons, draws n×n cost squares, and disables steps the budget cannot cover', () => {
+  function Form() {
+    const [value, setValue] = useState([0, 0]);
+    return (
+      <QuadraticAllocationInput questionId="q" {...question} voiceCredits={25} value={value} onChange={setValue} />
+    );
+  }
+  render(<Form />);
+  const parksUp = screen.getByTestId('ce-quadratic-increase-0');
+  const transitDown = screen.getByTestId('ce-quadratic-decrease-1');
+  // The buttons are pointer shortcuts; the labelled range input stays the accessible control.
+  expect(parksUp).toHaveAttribute('aria-hidden', 'true');
+  expect(parksUp).toHaveAttribute('tabindex', '-1');
+  expect(parksUp).toHaveAttribute('title', '+1 (1 credit)');
+  for (let step = 0; step < 3; step += 1) fireEvent.click(parksUp);
+  expect(screen.getByRole('slider', { name: 'Parks' })).toHaveValue('3');
+  expect(screen.getByTestId('ce-quadratic-cost-0')).toHaveTextContent('9 credits');
+  expect(screen.getByTestId('ce-quadratic-squares-0').children).toHaveLength(9);
+  expect(screen.getByRole('status')).toHaveTextContent('16 credits left');
+  for (let step = 0; step < 5; step += 1) fireEvent.click(transitDown);
+  expect(screen.getByRole('slider', { name: 'Transit' })).toHaveValue('-4');
+  expect(screen.getByTestId('ce-quadratic-squares-1').children).toHaveLength(16);
+  expect(screen.getByRole('status')).toHaveTextContent('0 credits left');
+  expect(screen.getByTestId('ce-quadratic-meter').children).toHaveLength(2);
+  expect(parksUp).toBeDisabled();
+  expect(transitDown).toBeDisabled();
+  const parksDown = screen.getByTestId('ce-quadratic-decrease-0');
+  expect(parksDown).toBeEnabled();
+  expect(parksDown).toHaveAttribute('title', '+2 (4 credits)');
+  fireEvent.click(parksDown);
+  expect(screen.getByRole('status')).toHaveTextContent('5 credits left');
+  expect(screen.getByTestId('ce-quadratic-squares-0').children).toHaveLength(4);
+});
+
+it('draws one solid cost square when a large budget leaves no room for unit squares', () => {
+  render(<QuadraticAllocationInput questionId="q" {...question} voiceCredits={400} value={[12, -3]} />);
+  const squares = screen.getByTestId('ce-quadratic-squares-0');
+  expect(squares).toHaveAttribute('data-solid');
+  expect(squares.children).toHaveLength(1);
+  expect(screen.getByTestId('ce-quadratic-cost-0')).toHaveTextContent('144 credits');
 });

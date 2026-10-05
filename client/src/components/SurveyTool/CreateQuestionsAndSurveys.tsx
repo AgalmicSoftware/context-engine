@@ -3222,14 +3222,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           >
             <div className={styles.typeTitle}>Quadratic allocation</div>
             <div className={styles.quadraticPreview} aria-hidden="true">
-              <span className={styles.quadraticPreviewNegative}>−</span>
-              <span className={styles.quadraticPreviewChart}>
-                <span className={styles.quadraticPreviewNegativeBar} />
-                <span className={styles.quadraticPreviewPositiveBar} />
+              <span className={styles.quadraticPreviewStep} data-step="down">
+                −
               </span>
-              <span className={styles.quadraticPreviewPositive}>+</span>
+              <span className={styles.quadraticPreviewVote}>+2</span>
+              <span className={styles.quadraticPreviewStep} data-step="up">
+                +
+              </span>
+              <span className={styles.quadraticPreviewSquares}>
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
             </div>
-            <div className={styles.quadraticPreviewCaption}>99 voice credits per question</div>
           </button>
 
           <button

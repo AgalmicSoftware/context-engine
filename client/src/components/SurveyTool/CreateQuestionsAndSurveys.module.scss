@@ -919,57 +919,51 @@ $user-page-background: var(--ce-surface-sunken);
 }
 
 .quadraticPreview {
-  display: grid;
-  grid-template-columns: auto minmax(64px, 1fr) auto;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  width: min(100%, 220px);
+  justify-content: center;
+  gap: 6px;
   margin-inline: auto;
-  font-size: 1rem;
+  font-size: 0.7rem;
   font-weight: 700;
   line-height: 1;
 }
-.quadraticPreviewNegative {
-  color: var(--ce-response-disagree-text);
-}
-.quadraticPreviewPositive {
-  color: var(--ce-response-agree-text);
-}
-.quadraticPreviewChart {
-  position: relative;
-  height: 28px;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0 auto 0 50%;
-    width: 1px;
-    background: var(--ce-authoring-control-text);
-    opacity: 0.5;
+.quadraticPreviewStep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--ce-radius-round);
+  &[data-step='down'] {
+    color: var(--ce-response-disagree-text);
+    background: var(--ce-response-disagree-bg);
+    box-shadow: inset 0 0 0 1px var(--ce-response-disagree-text);
+  }
+  &[data-step='up'] {
+    color: var(--ce-response-agree-text);
+    background: var(--ce-response-agree-bg);
+    box-shadow: inset 0 0 0 1px var(--ce-response-agree-text);
   }
 }
-.quadraticPreviewNegativeBar,
-.quadraticPreviewPositiveBar {
-  position: absolute;
-  height: 8px;
-  border-radius: 2px;
+.quadraticPreviewVote {
+  min-width: 1.6em;
+  text-align: center;
+  color: var(--ce-response-agree-text);
 }
-.quadraticPreviewNegativeBar {
-  right: 50%;
-  top: 16px;
-  width: 30%;
-  background: var(--ce-response-disagree-text);
-}
-.quadraticPreviewPositiveBar {
-  left: 50%;
-  top: 4px;
-  width: 42%;
-  background: var(--ce-response-agree-text);
-}
-.quadraticPreviewCaption {
-  color: var(--ce-authoring-control-text);
-  font-size: 0.68rem;
-  line-height: 1.25;
+// +2 votes cost 2×2 = 4 credits.
+.quadraticPreviewSquares {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 6px);
+  gap: 1px;
+  margin-left: 2px;
+  i {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--ce-response-agree-text);
+  }
 }
 
 /* ============================
