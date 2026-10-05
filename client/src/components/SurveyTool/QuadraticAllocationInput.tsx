@@ -202,9 +202,6 @@ export default function QuadraticAllocationInput({
           <p role="status" data-testid="ce-quadratic-budget">
             <strong>{budget - spent}</strong> credit{budget - spent === 1 ? '' : 's'} left
           </p>
-          <span className={styles.rule} aria-hidden="true">
-            Votes cost their square
-          </span>
           <button
             type="button"
             id={helpId}

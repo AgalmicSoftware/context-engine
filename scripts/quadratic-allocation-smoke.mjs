@@ -72,6 +72,7 @@ export async function probeQuadraticAllocation(page) {
   const parks = page.getByTestId('ce-quadratic-vote-0');
   const transit = page.getByTestId('ce-quadratic-vote-1');
   const budget = page.getByTestId('ce-quadratic-budget');
+  assert.equal(await page.getByText('Votes cost their square', { exact: true }).count(), 0, 'Squared-cost explanation stays in the help tooltip');
   await page.getByRole('button', { name: 'How voice credits work' }).press('Tab');
   assert.equal(await parks.evaluate(el => el === document.activeElement && el.matches(':focus-visible')), true);
   assert.match(await parks.evaluate(el => getComputedStyle(el.parentElement).outlineStyle), /dotted/);
@@ -86,8 +87,9 @@ export async function probeQuadraticAllocation(page) {
   assert.equal(await page.getByTestId('ce-quadratic-decrease-1').getAttribute('data-active'), 'true');
   assert.equal(await page.getByTestId('ce-quadratic-increase-0').isEnabled(), false);
   await checkStepperLayout(page);
-  await page.getByRole('button', { name: 'How voice credits work' }).click();
-  assert.match(await page.getByRole('tooltip').textContent(), /49 credits/);
+  await page.getByRole('button', { name: 'How voice credits work' }).hover();
+  await page.getByRole('tooltip').waitFor();
+  assert.match(await page.getByRole('tooltip').textContent(), /Votes cost their square:.*49 credits/);
   await page.getByRole('button', { name: 'How voice credits work' }).press('Tab');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   assert.equal(await page.getByTestId('ce-quadratic-saved').textContent(), '[7,-7,0]');

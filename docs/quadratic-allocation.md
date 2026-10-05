@@ -26,8 +26,8 @@ the label above the controls. Options
 scroll vertically while the remaining-credit budget stays visible, with part of
 the next label showing when there are more options. A down-arrow button advances
 to the next options. An up arrow appears below the top; only up remains at the bottom.
-Remaining credits, the squared-cost explanation, help and reset share the header;
-the explanation is hidden in narrow containers while the help remains available.
+Remaining credits, help and reset share the header. Hover or focus the help
+button for the squared-cost explanation.
 Reset is inactive when the
 answer matches the saved baseline, including when both are unanswered, so it cannot
 create an accidental draft. An edited neutral allocation can still be reset to a
@@ -130,7 +130,8 @@ For nonzero votes, an n×n block of small squares shows the n² credit cost besi
 its text label (for example, **7**, highlighted +, a 7×7 block, **49 credits**).
 Above 12 votes, the block becomes one solid square. Cost text can wrap in narrow
 containers and disappears at zero. The header reads **99 credits left** (or
-**1 credit left**) and **Votes cost their square**. A bar beneath it shows one
+**1 credit left**). The help tooltip explains **Votes cost their square** on hover
+or keyboard focus. A bar beneath the header shows one
 segment for each nonzero option, green for support and red for opposition;
 the grey remainder represents unused credits. Colour-vision mode uses the
 theme's alternative support and opposition palette.

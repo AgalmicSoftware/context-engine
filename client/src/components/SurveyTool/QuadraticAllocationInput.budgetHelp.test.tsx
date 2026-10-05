@@ -20,11 +20,13 @@ it.each([
   expect(tip).not.toHaveTextContent('+7 or −7 uses 49 credits');
 });
 
-it('control: the default 99-credit budget can enact the +/-7 example', async () => {
+it('shows the squared-cost explanation only in the hovered help tooltip', async () => {
   render(<QuadraticAllocationInput questionId="q" options={['Parks', 'Transit']} value={[0, 0]} />);
+  expect(screen.queryByText(/Votes cost their square/)).not.toBeInTheDocument();
   expect(screen.getByRole('slider', { name: 'Parks' })).toHaveAttribute('max', '9');
-  const tip = await openHelp();
-  expect(tip).toHaveTextContent('+7 or −7 uses 49 credits');
+  fireEvent.mouseOver(screen.getByRole('button', { name: 'How voice credits work' }));
+  const tip = await screen.findByRole('tooltip');
+  expect(tip).toHaveTextContent('Votes cost their square: +7 or −7 uses 49 credits');
 });
 
 it('P2 (batch-1 check) full-view Reset on an untouched saved answer stays disabled', () => {

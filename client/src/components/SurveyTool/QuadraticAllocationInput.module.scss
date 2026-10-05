@@ -52,13 +52,8 @@
   gap: 0.25rem;
   min-width: 0;
 }
-.rule {
+.header .help {
   margin-left: auto;
-  padding-right: 0.25rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--ce-panel-text-muted);
-  font-size: 0.75rem;
 }
 
 // Spent credits, one segment per option in option order.
@@ -142,12 +137,6 @@
   }
   .header strong {
     font-size: 0.9rem;
-  }
-  .rule {
-    display: none;
-  }
-  .header .help {
-    margin-left: auto;
   }
 }
 
