@@ -289,10 +289,14 @@
 @container (max-width: 360px) {
   .option {
     grid-template-columns: auto 36px minmax(0, 1fr);
+    column-gap: 0.35rem;
     row-gap: 0.15rem;
   }
   .optionLabel {
     grid-column: 1 / -1;
+  }
+  .cost {
+    white-space: normal;
   }
 }
 
