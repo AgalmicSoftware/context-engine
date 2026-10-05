@@ -167,7 +167,7 @@
 .option {
   --vote-color: var(--ce-panel-text);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(36px, 0.5fr) 4.75rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(36px, 0.5fr) 6rem;
   column-gap: 0.6rem;
   align-items: center;
   min-height: 44px;
@@ -296,7 +296,9 @@
 
 .cost {
   text-align: right;
-  font-size: 0.8rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
