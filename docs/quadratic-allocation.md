@@ -6,8 +6,9 @@ use **Credits: 99** beside **Add Option** to reveal the custom-budget slider.
 The default is 99 credits per respondent for each question, independently of every
 other question. The slider selects whole numbers from 1 to 999; existing larger
 budgets extend that range. Click the credits control again to hide the slider.
-The question-type picker previews negative and positive votes with horizontal
-bars around zero. Existing drafts and generated questions retain custom budgets.
+The question-type picker previews a compact − / 2 / + stepper with the + button
+highlighted and a 2×2 block showing its four-credit cost. Existing drafts and
+generated questions retain custom budgets.
 
 Respondents assign signed whole-number votes to each option. Positive votes
 support an option; negative votes oppose it; zero is neutral. An option costs the
@@ -20,11 +21,14 @@ For example, `[7, -7]` costs 98 credits and is valid under the default budget.
 `[8, -6]` costs 100 and is rejected. With a 25-credit budget, `[3, -4]` is valid.
 
 The pile editor keeps the same fixed card height as other question types. Labels
-and sliders share a row where space permits; narrow cards stack them. Options
+and steppers share a row where space permits; containers at most 360px wide put
+the label above the controls. Options
 scroll vertically while the remaining-credit budget stays visible, with part of
 the next label showing when there are more options. A down-arrow button advances
-to the next options. An up arrow appears below the top; only up remains at the bottom. Oppose, remaining credits,
-Support, and reset share one row above the options. Reset is inactive when the
+to the next options. An up arrow appears below the top; only up remains at the bottom.
+Remaining credits, the squared-cost explanation, help and reset share the header;
+the explanation is hidden in narrow containers while the help remains available.
+Reset is inactive when the
 answer matches the saved baseline, including when both are unanswered, so it cannot
 create an accidental draft. An edited neutral allocation can still be reset to a
 previously saved nonzero answer.
@@ -93,7 +97,7 @@ participant-filter settings.
 
 AI-generated custom budgets remain editable in the authoring form.
 Interview prediction accepts budget-valid signed vote arrays, including neutral
-allocations. Review uses the same allocation sliders as the question pile and
+allocations. Review uses the same allocation steppers as the question pile and
 preserves numeric votes and the original prediction when the respondent edits and
 submits. When interview question suggestions are enabled, the model can propose
 quadratic questions for competing priorities, with distinct options, tags, and a
@@ -115,28 +119,51 @@ operator-local harness described there.
 
 ### Respondent controls
 
-Each option uses a slider with a solid circular handle and a fixed zero midpoint: negative votes oppose, positive votes support.
-The scale emphasizes Oppose in red and Support in green, with larger, bold labels.
-The option row shows signed votes and, for nonzero votes, credits used (for example, **+7 · 49 credits**).
-The cost is hidden again when the vote returns to zero. A shared counter shows only the credits
-remaining (for example, **99 credits left**); the tooltip explains the full budget. Sliders stop at the largest affordable
-whole-number vote without an inline limit notice or changes to other options; moving toward zero releases credits. The help
-control gives one squared-cost example, the shared budget, and the option to leave credits unused.
-On standalone question pages, votes and remaining credits update locally during a drag;
-the completed allocation reaches the page's normal edit and draft-save handler on release
-or loss of focus. Keyboard changes update the answer immediately.
+Each option has aligned − and + buttons around a bold, unsigned vote count.
+The highlighted button shows the current direction: − for opposition, + for
+support; neither is highlighted at zero. A selected direction stays highlighted
+even when its next step is disabled. All rows share a count-column width sized
+for the question's largest possible vote (including existing larger budgets); larger
+option labels wrap as needed, and the button symbols stay centered.
+
+For nonzero votes, an n×n block of small squares shows the n² credit cost beside
+its text label (for example, **7**, highlighted +, a 7×7 block, **49 credits**).
+Above 12 votes, the block becomes one solid square. Cost text can wrap in narrow
+containers and disappears at zero. The header reads **99 credits left** (or
+**1 credit left**) and **Votes cost their square**. A bar beneath it shows one
+segment for each nonzero option, green for support and red for opposition;
+the grey remainder represents unused credits. Colour-vision mode uses the
+theme's alternative support and opposition palette.
+
+Buttons disable when the next signed vote would exceed the shared budget or
+the question's limit. Moving toward zero releases credits. The help control
+explains the squared cost, shared budget and permission to leave credits unused.
+
+The native range input remains invisible but labelled and keyboard-accessible.
+Tab reaches each option; arrow keys adjust signed votes and show a focus ring
+around its stepper. Screen readers receive the option name and a value such as
+“+3 votes, 9 credits, support.” The pointer buttons are excluded from the tab order
+and accessibility tree. The stored answer remains signed even though its visible
+count is unsigned. Keyboard and button changes update the answer immediately.
 In pile cards and full question views, the Reset undo-arrow restores the saved answer, or clears the pending answer when none was saved.
 In interview draft editors it restores the AI's drafted allocation, including an all-neutral one, and clears that answer's edited marker.
 Reset stays disabled until the allocation differs from its undo target, so an untouched answer never gains a pending change.
-Surfaces without an undo target, such as the Telegram mini-app, keep a separate "Reset all votes to neutral" action. It uses 50% opacity,
-with full opacity on hover or keyboard focus. Pile cards keep a fixed height and scroll their options; progress
+Surfaces without an undo target keep a separate "Reset all votes to neutral" action.
+Pile cards keep a fixed height and scroll their options; progress
 and submission remain in the pile's shared controls outside the question card.
 If signing or saving fails, the pile shows the error beneath the question
 and keeps the pending allocation available for retry.
 
-The main client, Telegram mini-app, and companion browser use this interaction. Both Cloudflare
-and smart-contract storage modes use the same ordered numeric arrays, definition validation,
+The main React client, including its Telegram pile, uses these steppers. The
+separate AgentBridge Telegram mini-app and companion browser retain their own
+slider UI. Both Cloudflare and smart-contract storage modes use the same ordered numeric arrays, definition validation,
 per-question budget, encryption encoding, and signed vote analysis. No Solidity interface change
 is required: question metadata and response payloads carry the new type through existing storage.
 
 The overflow scroll arrow sits below the options viewport in a yellow button, keeping it visible while the options scroll.
+
+Run the local respondent smoke with a client dev server and
+`BASE_URL=http://127.0.0.1:3000 npm run test:e2e:quadratic`. It exercises both
+themes at wide and narrow viewports, keyboard and pointer controls, alignment,
+direction highlighting, undo, many-option scrolling, 999-credit budgets and
+existing budgets above the current authoring slider's range.

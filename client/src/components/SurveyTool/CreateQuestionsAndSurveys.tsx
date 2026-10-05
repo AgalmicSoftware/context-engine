@@ -3225,8 +3225,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               <span className={styles.quadraticPreviewStep} data-step="down">
                 −
               </span>
-              <span className={styles.quadraticPreviewVote}>+2</span>
-              <span className={styles.quadraticPreviewStep} data-step="up">
+              <span className={styles.quadraticPreviewVote}>2</span>
+              <span className={styles.quadraticPreviewStep} data-step="up" data-active="true">
                 +
               </span>
               <span className={styles.quadraticPreviewSquares}>

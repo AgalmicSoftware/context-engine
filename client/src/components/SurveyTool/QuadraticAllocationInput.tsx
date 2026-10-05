@@ -190,7 +190,12 @@ export default function QuadraticAllocationInput({
     }
   };
   return (
-    <fieldset className={styles.allocation} data-testid="ce-quadratic-allocation" data-question-id={questionId}>
+    <fieldset
+      className={styles.allocation}
+      data-testid="ce-quadratic-allocation"
+      data-question-id={questionId}
+      style={{ '--vote-digits': String(limit).length } as React.CSSProperties}
+    >
       <legend className={styles.srOnly}>Quadratic allocation</legend>
       <div className={styles.header}>
         <div className={styles.budget}>
@@ -274,6 +279,7 @@ export default function QuadraticAllocationInput({
                     aria-hidden="true"
                     className={styles.step}
                     data-step="down"
+                    data-active={vote < 0}
                     data-ce-control-appearance="frameless"
                     disabled={disabled || !canStep(index, -1)}
                     title={`${formatVote(vote - 1)} (${credits((vote - 1) ** 2)})`}
@@ -284,7 +290,7 @@ export default function QuadraticAllocationInput({
                     <FontAwesomeIcon icon={faMinus} />
                   </button>
                   <span className={styles.vote} aria-hidden="true">
-                    {formatVote(vote)}
+                    {Math.abs(vote)}
                   </span>
                   <button
                     type="button"
@@ -292,6 +298,7 @@ export default function QuadraticAllocationInput({
                     aria-hidden="true"
                     className={styles.step}
                     data-step="up"
+                    data-active={vote > 0}
                     data-ce-control-appearance="frameless"
                     disabled={disabled || !canStep(index, 1)}
                     title={`${formatVote(vote + 1)} (${credits((vote + 1) ** 2)})`}

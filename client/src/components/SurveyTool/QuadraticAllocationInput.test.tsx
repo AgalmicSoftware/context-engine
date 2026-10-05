@@ -205,6 +205,33 @@ it('keeps unit squares through 12 votes even with a large budget, then uses a so
   expect(screen.getByTestId('ce-quadratic-cost-0')).toHaveTextContent('169 credits');
 });
 
+it('shows unsigned counts and highlights the vote direction even when its next step is disabled', () => {
+  const { rerender } = render(
+    <QuadraticAllocationInput questionId="q" {...question} voiceCredits={25} value={[3, -4]} />,
+  );
+  const parksUp = screen.getByTestId('ce-quadratic-increase-0');
+  const parksDown = screen.getByTestId('ce-quadratic-decrease-0');
+  const transitDown = screen.getByTestId('ce-quadratic-decrease-1');
+  expect(parksUp.parentElement).toHaveTextContent(/^3$/);
+  expect(transitDown.parentElement).toHaveTextContent(/^4$/);
+  expect(parksUp).toHaveAttribute('data-active', 'true');
+  expect(parksDown).toHaveAttribute('data-active', 'false');
+  expect(transitDown).toHaveAttribute('data-active', 'true');
+  expect(parksUp).toBeDisabled();
+  expect(transitDown).toBeDisabled();
+  expect(screen.getByRole('slider', { name: 'Transit' })).toHaveAttribute(
+    'aria-valuetext',
+    '-4 votes, 16 credits, oppose',
+  );
+  rerender(<QuadraticAllocationInput questionId="q" {...question} value={[-3, 0]} />);
+  expect(parksUp.parentElement).toHaveTextContent(/^3$/);
+  expect(parksUp).toHaveAttribute('data-active', 'false');
+  expect(parksDown).toHaveAttribute('data-active', 'true');
+  expect(transitDown.parentElement).toHaveTextContent(/^0$/);
+  expect(transitDown).toHaveAttribute('data-active', 'false');
+  expect(screen.getByTestId('ce-quadratic-increase-1')).toHaveAttribute('data-active', 'false');
+});
+
 it('uses singular credit and vote labels for one credit and one vote', () => {
   function Form() {
     const [value, setValue] = useState([0, 0]);
