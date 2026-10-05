@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Update the legacy Axios dependency to fix inherited request-method and form-data option handling.
 - Make quadratic allocation easier to answer: each option has − and + buttons, a block of squares showing what its votes cost, and a bar showing where your credits have gone. The question-type tile shows a matching compact preview.
 - Keep group details inside session pages, simplify interview review controls,
   and improve help controls, documentation contrast and mobile atlas layout.
