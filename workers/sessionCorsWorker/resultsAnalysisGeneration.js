@@ -1,3 +1,4 @@
+import { toStr } from './stringCoercion.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import { applyResultsAnalysisExposurePolicy, normalizeResultsAnalysisArtifact } from './resultsAnalysisArtifactValidation.js';
 import {
@@ -63,7 +64,6 @@ const DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1000;
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(
@@ -141,17 +141,8 @@ const valueFromAnswerLike = (value) => {
 const rowLooksLocked = (row) => {
   if (!isObj(row)) return true;
   if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
-  const encryptedEnvelope = [
-    row.answer,
-    row.additional,
-    row.additionalComments,
-    row.comment,
-    row.comments,
-    row.response,
-    row.value,
-  ].some((entry) => valueLooksEncrypted(entry));
-  if (encryptedEnvelope || valueLooksEncrypted(row)) return true;
-  const answer = row.answer;
+  const answer = hasOwn(row, 'answer') ? row.answer : hasOwn(row, 'value') ? row.value : row.response;
+  if (valueLooksEncrypted(answer)) return true;
   const value = isObj(answer) && hasOwn(answer, 'value') ? answer.value : answer;
   const text = trim(value);
   return text === '*' || /^\*+$/.test(text) || /^\[?(encrypted|locked|redacted)\]?$/i.test(text);
@@ -432,9 +423,11 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       continue;
     }
     const answer = validatedAnswer.slice(0, 4000);
-    const additionalComments = valueFromAnswerLike(additionalValue).slice(0, 2000);
+    const additionalLocked = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue));
+    const additionalComments = additionalLocked ? '' : valueFromAnswerLike(additionalValue).slice(0, 2000);
     if (!answer && !additionalComments) {
       excludedCount += 1;
+      if (additionalLocked) lockedCount += 1;
       continue;
     }
     participantDigests.add(digest);
@@ -445,8 +438,8 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       participantKey: digest,
       answer,
       additionalComments,
-      importance: safeNumber(row.importance),
-      conviction: safeNumber(row.conviction),
+      importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : safeNumber(row.importance),
+      conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : safeNumber(row.conviction),
       submittedAt: normalizeSubmittedAt(row.submittedAt || row.createdAt || row.timestamp),
       questionPrompt: knownQuestion.prompt || '',
       questionType: knownQuestion.type || 'text',
@@ -725,11 +718,7 @@ export const resolveAnalysisAiPayload = ({ config, prompt }) => {
   const providers = isObj(ai.providers) ? ai.providers : {};
   const { provider, model } = resolveAiTaskEntry(ai, 'thinking');
   const reasoningEffort = trim(
-    ai?.taskReasoningEffort?.analysis ||
-    ai?.taskReasoningEffort?.generate ||
-    ai.reasoningEffort ||
-    ai.reasoning_effort ||
-    'low'
+    ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || 'low',
   );
   const providerEntry = isObj(providers[provider]) ? providers[provider] : {};
   return {

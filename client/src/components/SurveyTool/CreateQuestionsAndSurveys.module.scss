@@ -324,99 +324,6 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.addQuestionContainer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
-.questionTypeSelect,
-#newQuestionSelect {
-  flex-grow: 1;
-  margin-right: 10px;
-  font-size: 1.5em;
-  font-weight: 600;
-  padding: 5px;
-  background: $input-bg;
-  color: var(--ce-color-white);
-  border: 1px solid $input-border;
-}
-
-.addQuestionButton,
-#addQuestionButton {
-  color: var(--ce-color-white);
-  font-size: 1.5em;
-  font-weight: 600;
-  padding: 10px;
-  text-transform: uppercase;
-  background-color: transparent;
-  border: none;
-}
-
-.surveyIdPreview,
-#createSurveyIDPreview {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  color: var(--ce-color-white) !important;
-  font-size: 1em;
-  font-weight: 600;
-  margin-top: 10px;
-  font-family: var(--ce-font-mono);
-  background-color: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
-  padding: 10px;
-  border-radius: var(--ce-radius-5);
-}
-
-.surveySubmittedContainer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px;
-}
-
-.surveyActions {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: 20px;
-}
-
-.copySurveyLinkButton,
-.viewSurveyLink {
-  flex: 1;
-  margin: 0 5px;
-  text-align: center;
-  padding: 10px;
-  border-radius: var(--ce-radius-5);
-  text-decoration: none;
-  color: var(--ce-color-white);
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-  width: 25%;
-}
-
-.copySurveyLinkButton {
-  background-color: var(--ce-status-success);
-  border: none;
-  margin-right: 10px;
-  &:hover {
-    background-color: var(--ce-status-success);
-  }
-}
-
-.viewSurveyLink {
-  background-color: var(--ce-status-info);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  &:hover {
-    background-color: var(--ce-data-series-8);
-    color: var(--ce-color-white);
-    text-decoration: none;
-  }
-}
-
 .createSurveyButton,
 #submitNewSurveyButton {
   @include finalSubmitCta.final-submit-cta-shell(
@@ -480,19 +387,6 @@ $user-page-background: var(--ce-surface-sunken);
   color: var(--ce-color-white) !important;
 }
 
-.progressBarContainer {
-  margin-top: 20px;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  border-radius: var(--ce-radius-8);
-  overflow: hidden;
-}
-
-.progressBar {
-  height: 10px;
-  background-color: var(--ce-status-success);
-  transition: width 0.5s ease;
-}
-
 .jsonDisplayWrapper {
   position: relative;
   margin-top: 12px;
@@ -542,62 +436,6 @@ $user-page-background: var(--ce-surface-sunken);
   margin-left: 5px;
   height: 100%;
   font-weight: 600;
-}
-
-.generateTagsButton {
-  display: inline;
-  margin-left: 5px;
-  height: 100%;
-  font-weight: 600;
-  color: $clickable-color;
-  border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
-  &:hover {
-    background-color: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
-    border-color: $clickable-color;
-  }
-}
-
-.questionId {
-  font-size: 0.65rem;
-  opacity: 0.65;
-  font-weight: 600;
-  margin-top: 5px;
-  margin-bottom: 5px;
-}
-
-.associatedSurveyContainer {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  width: 100%;
-}
-
-.associatedSurveyLabel {
-  display: flex;
-  align-items: center;
-  margin-right: 10px;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent) !important;
-}
-
-.addCurrentLink {
-  margin-left: 5px;
-  color: $clickable-color;
-  text-decoration: underline;
-  cursor: pointer;
-  &:hover {
-    color: color-mix(in srgb, var(--ce-action-accent) 90%, var(--ce-text-inverse));
-  }
-}
-
-.associatedSurveyInput {
-  flex-grow: 1;
-  color: var(--ce-color-white) !important;
-  font-size: 1em;
-  padding: 2px 5px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
-  border-radius: var(--ce-radius-3);
-  background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
 }
 
 .toggleLabel {
@@ -721,28 +559,10 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.submissionStatusBox .responseUrlBox {
-  text-align: center;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  padding: 15px;
-  margin-top: 10px;
-  border-radius: var(--ce-radius-5);
-}
-
-.responseUrlBox {
-  font-size: 1.25em;
-  color: var(--ce-color-white) !important;
-}
-
 #miniCreateSurveyLabel {
   font-weight: 600;
   font-size: 1.5em;
   color: var(--ce-color-white) !important;
-}
-
-.tagsInput {
-  color: var(--ce-color-white) !important;
-  margin-bottom: 5px;
 }
 
 .errorButton {
@@ -776,16 +596,7 @@ $user-page-background: var(--ce-surface-sunken);
 }
 
 /* NEW STYLES FOR TAGS + QUICK UI */
-.aiTagsToggle {
-  margin: 15px 0 10px;
-}
-.checkboxLabel {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-weight: normal;
-  margin-bottom: 0;
-}
+
 .tagsContainer {
   display: flex;
   flex-wrap: wrap;
@@ -942,17 +753,6 @@ $user-page-background: var(--ce-surface-sunken);
   svg {
     color: var(--ce-color-accent);
   }
-}
-
-.surveyIdACtions {
-  display: flex !important;
-  flex-direction: row;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  word-break: break-all;
 }
 
 /* ============================
@@ -1117,67 +917,57 @@ $user-page-background: var(--ce-surface-sunken);
   pointer-events: none;
   z-index: 1;
 }
-.ratingPreviewTick {
-  position: absolute;
-  right: 6px;
-  top: -22px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--ce-color-white);
-}
 
 .quadraticPreview {
-  display: grid;
-  grid-template-columns: auto minmax(64px, 1fr) auto;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  width: min(100%, 220px);
+  justify-content: center;
+  gap: 6px;
   margin-inline: auto;
-  font-size: 1rem;
+  font-size: 0.7rem;
   font-weight: 700;
   line-height: 1;
 }
-.quadraticPreviewNegative {
-  color: var(--ce-response-disagree-text);
-}
-.quadraticPreviewPositive {
-  color: var(--ce-response-agree-text);
-}
-.quadraticPreviewChart {
-  position: relative;
-  height: 28px;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0 auto 0 50%;
-    width: 1px;
-    background: var(--ce-authoring-control-text);
-    opacity: 0.5;
+.quadraticPreviewStep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--ce-radius-round);
+  &[data-step='down'] {
+    color: var(--ce-response-disagree-text);
+    background: var(--ce-response-disagree-bg);
+    box-shadow: inset 0 0 0 1px var(--ce-response-disagree-text);
+  }
+  &[data-step='up'] {
+    color: var(--ce-response-agree-text);
+    background: var(--ce-response-agree-bg);
+    box-shadow: inset 0 0 0 1px var(--ce-response-agree-text);
+    &[data-active='true'] {
+      background: var(--ce-response-agree-text);
+      color: var(--ce-surface);
+    }
   }
 }
-.quadraticPreviewNegativeBar,
-.quadraticPreviewPositiveBar {
-  position: absolute;
-  height: 8px;
-  border-radius: 2px;
+.quadraticPreviewVote {
+  min-width: 1.6em;
+  text-align: center;
+  color: var(--ce-panel-text);
 }
-.quadraticPreviewNegativeBar {
-  right: 50%;
-  top: 16px;
-  width: 30%;
-  background: var(--ce-response-disagree-text);
-}
-.quadraticPreviewPositiveBar {
-  left: 50%;
-  top: 4px;
-  width: 42%;
-  background: var(--ce-response-agree-text);
-}
-.quadraticPreviewCaption {
-  color: var(--ce-authoring-control-text);
-  font-size: 0.68rem;
-  line-height: 1.25;
+// +2 votes cost 2×2 = 4 credits.
+.quadraticPreviewSquares {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 6px);
+  gap: 1px;
+  margin-left: 2px;
+  i {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--ce-response-agree-text);
+  }
 }
 
 /* ============================
@@ -1241,18 +1031,6 @@ $user-page-background: var(--ce-surface-sunken);
   color: $clickable-color;
   font-weight: 800;
 }
-.aiPromptCopy {
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  color: var(--ce-color-white);
-  border-radius: var(--ce-radius-6);
-  padding: 6px 10px;
-  font-weight: 700;
-  cursor: pointer;
-  &:hover {
-    background-color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-  }
-}
 
 /* NEW: corner copy button for the AI prompt panel */
 .aiPromptCopyCorner {
@@ -1308,109 +1086,6 @@ $user-page-background: var(--ce-surface-sunken);
     margin-bottom: 0;
     /* Override default input margin */
   }
-}
-
-.encryptionSection {
-  margin-bottom: 20px;
-  padding: 14px 16px;
-  background: $card-bg;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-12);
-  box-shadow: $card-shadow;
-}
-
-.encryptionHeader {
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: $user-page-text-color;
-}
-
-.encryptionOptions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-}
-
-.encryptionOptionsRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: var(--ce-radius-8);
-    border: 1px solid $input-border;
-    background: $input-bg;
-    color: $user-page-text-color;
-    font-weight: 600;
-    cursor: pointer;
-    transition:
-      border-color 0.2s ease,
-      background 0.2s ease;
-
-    &:hover {
-      border-color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
-      background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-    }
-
-    input[type='checkbox'] {
-      accent-color: $clickable-color;
-      width: 18px;
-      height: 18px;
-    }
-  }
-}
-
-.encryptionGate {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: var(--ce-radius-10);
-  border: 1px solid $card-border;
-  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
-}
-
-.encryptionGateRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-end;
-  > :first-child {
-    flex: 1 1 320px;
-    min-width: 240px;
-  }
-}
-
-.encryptionGateMode {
-  min-width: 180px;
-  margin-bottom: 0;
-  flex: 0 0 180px;
-
-  select {
-    background: $input-bg;
-    border: 1px solid $input-border;
-    color: $user-page-text-color;
-    border-radius: var(--ce-radius-6);
-  }
-}
-
-.encryptionNote {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
-}
-
-.encryptionWarning {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  color: var(--ce-status-danger-text);
 }
 
 .addDocUrlButton {

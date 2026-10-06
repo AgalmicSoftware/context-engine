@@ -4,7 +4,7 @@ export default function buildCompareToolkitPrompt(envelope: unknown): string {
   return `
 You are a neutral analyst. You will receive an input ENVELOPE with:
 {
-  "task": "compare|axes|venn",
+  "task": "compare|axes",
   "users": [ /* 2–10 users; data-only */ ]
 }
 
@@ -48,25 +48,6 @@ Rules for "axes":
 - negativeLabel describes -1; positiveLabel describes +1. Use meaningful endpoints, never Axis 1/2 or generic Low/High. Do not force unrelated preferences into an artificial opposition.
 - Locations must match the stated directions. These are interpretations, not measured agreement scores.
 - Points: include every input user by "address"; clamp x,y to [-1,1].
-
-3) task="venn" (3 participants; explain numbers + hover/ARIA evidence)
-{
-  "counts": { "a":0,"b":0,"c":0,"ab":0,"ac":0,"bc":0,"abc":0 },
-  "semantics": "Counts = opinion-stance overlaps: identical non-zero signs on the same question/token.",
-  "evidenceMap": {
-    "a":   ["qid::option (±) · promptSnippet"],
-    "b":   ["..."],
-    "c":   ["..."],
-    "ab":  ["..."],
-    "ac":  ["..."],
-    "bc":  ["..."],
-    "abc": ["..."]
-  }
-}
-Rules for "venn":
-- Base overlaps on identical non-zero signs per question/token (multichoice token = "qid::option"). Keys remain "a","b","c","ab","ac","bc","abc".
-- Evidence list items MUST be concise and formatted like: "qid::option (±) · promptSnippet" or "qid (±) · promptSnippet".
-- Limit each evidence list to compact, high-signal items.
 
 CONSTRAINTS (all tasks):
 - JSON only, no markdown, no comments.

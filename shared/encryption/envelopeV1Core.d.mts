@@ -1,6 +1,4 @@
-export type EnvelopePoseidonHasher = (
-  inputs: bigint[],
-) => string | number | bigint | Promise<string | number | bigint>;
+export type EnvelopePoseidonHasher = (inputs: bigint[]) => string | number | bigint | Promise<string | number | bigint>;
 
 export type EnvelopeContextInput = {
   chainId?: unknown;
@@ -18,6 +16,10 @@ export function utf8d(bytes: BufferSource): string;
 export function safeLower(value: string): string;
 export function safeLower<T>(value: T): T;
 export function stableStringify(value: unknown): string;
+export function encodePaddedEnvelopePlaintext(
+  value: Record<string, unknown>,
+  question?: Record<string, unknown>,
+): Uint8Array;
 export function getContextBytes(contextHex: string): Uint8Array;
 export function importAesGcmKey(raw32: BufferSource): Promise<CryptoKey>;
 export function aesGcmEncrypt(
@@ -45,24 +47,20 @@ export function buildEip712KeyWrap(
 };
 export function computeContext(input: EnvelopeContextInput): string;
 export function computeResponseFieldContext(input: EnvelopeContextInput): string;
-export function buildResponseFieldAAD(
-  input: EnvelopeContextInput & { contextHex: string },
-): Record<string, unknown>;
+export function buildResponseFieldAAD(input: EnvelopeContextInput & { contextHex: string }): Record<string, unknown>;
 export function hashIdentifier(identifier: unknown): string;
-export function encodeValueBytes(
-  kind: unknown,
-  value: unknown,
-  options?: { options?: unknown[] },
-): Uint8Array;
+export function encodeValueBytes(kind: unknown, value: unknown, options?: { options?: unknown[] }): Uint8Array;
 export function toField(bytes: Uint8Array): bigint;
 export function normalizePoseidonHashOutput(value: string | number | bigint): string;
 export function buildCommitDomainBytes(input: EnvelopeContextInput): Uint8Array;
-export function computeSaltedCommitments(input: EnvelopeContextInput & {
-  kind: unknown;
-  value: unknown;
-  optionsForKind?: unknown[];
-  hasher?: EnvelopePoseidonHasher | null;
-}): Promise<{ salt: string; keccak256: string; poseidon: string | null }>;
+export function computeSaltedCommitments(
+  input: EnvelopeContextInput & {
+    kind: unknown;
+    value: unknown;
+    optionsForKind?: unknown[];
+    hasher?: EnvelopePoseidonHasher | null;
+  },
+): Promise<{ salt: string; keccak256: string; poseidon: string | null }>;
 export function buildEnvelopeObject(input: {
   iv: Uint8Array;
   ciphertextBytes: Uint8Array;

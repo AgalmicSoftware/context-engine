@@ -8,6 +8,7 @@ import {
   sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { normalizeQuestionType } from './sessionQuestions.mjs';
 
 export const TELEGRAM_QUESTION_QUEUE_CONFIG_KV_PREFIX = 'telegram:question-queue-config:v1:';
 export const TELEGRAM_QUESTION_QUEUE_STATE_KV_PREFIX = 'telegram:question-queue-state:v1:';
@@ -51,11 +52,12 @@ function normalizeTags(value = []) {
 }
 
 function canonicalQuestionType(value = '') {
-  const type = lower(value).replace(/[^a-z0-9_ -]+/g, '').replace(/\s+/g, '_');
-  if (['agree_unsure_disagree', 'agree_disagree', 'yes_no', 'binary'].includes(type)) return 'binary';
-  if (['multi_choice', 'multiple_choice', 'multiselect', 'multi_select'].includes(type)) return 'multichoice';
-  if (['number', 'numeric', 'scale'].includes(type)) return 'rating';
-  return type || 'freeform';
+  const type = lower(value)
+    .replace(/[^a-z0-9_ -]+/g, '')
+    .replace(/\s+/g, '_');
+  if (type === 'multiselect') return 'multichoice';
+  if (['number', 'numeric'].includes(type)) return 'rating';
+  return normalizeQuestionType({ type }, type || 'freeform');
 }
 
 function normalizeQuestionTypes(value = []) {
@@ -167,19 +169,17 @@ export function normalizeQuestionQueueCriteria(input = {}) {
     preferences.tags ||
     preferences.tagIds ||
     preferences.interests ||
-    input.interests
+      input.interests,
   );
   const questionTypes = normalizeQuestionTypes(
     input.questionTypes ||
     input.questionType ||
     criteria.questionTypes ||
     criteria.questionType ||
-    preferences.questionTypes
+      preferences.questionTypes,
   );
   const excludeQuestionIds = normalizeQuestionIds(
-    input.excludeQuestionIds ||
-    criteria.excludeQuestionIds ||
-    preferences.excludeQuestionIds
+    input.excludeQuestionIds || criteria.excludeQuestionIds || preferences.excludeQuestionIds,
   );
   const includeSponsored = normalizeBoolean(input.includeSponsored ?? criteria.includeSponsored, true);
   const sponsoredFirst = normalizeBoolean(input.sponsoredFirst ?? criteria.sponsoredFirst, true);

@@ -26,13 +26,7 @@ import {
   SbtListSectionTitle,
 } from './SbtListSectionChrome';
 import { ethers } from 'ethers';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  removeCache,
-  writeCache,
-} from '../../utilities/cache/cacheScripts.js';
+import { listNamespaceEntriesSync, peekCacheSync, readCache, removeCache } from '../../utilities/cache/cacheScripts.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT, sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
@@ -141,7 +135,6 @@ import type {
   SBTsListProps,
   SbtListBooleanBySlug,
   SbtListBySlug,
-  SbtListChipProgressMeta,
   SbtListChipProgressMetaBySlug,
   SbtListFetchRunBySlug,
   SbtListFetchSBTs,
@@ -156,11 +149,9 @@ import type {
   SbtPassiveLatestLookupInFlightBySlug,
   SbtPassiveLatestLookupStateBySlug,
   SbtListScopedEntryOptions,
-  SbtSessionChipStateBySlug,
   SbtSessionDisplayConfig,
   SbtSessionLoadingOptions,
   SbtSessionLoadingStatus,
-  SbtSessionLoadingStatusBySlug,
   SbtSessionProgressSnapshot,
   SbtSessionUniverseSnapshot,
   UnknownRecord,

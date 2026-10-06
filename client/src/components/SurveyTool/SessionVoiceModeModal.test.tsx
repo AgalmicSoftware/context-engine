@@ -352,6 +352,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Agent: A reviewed answer' })]),
+        {},
       ),
     );
   });
@@ -1148,7 +1149,10 @@ describe('SessionVoiceModeModal', () => {
   it('offers the two large requested voice-mode choices', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
-      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
+      'Talk with an AI interviewer to answer the session’s questions, then review your responses.',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveTextContent(
+      'Record a group discussion and generate questions and context from it.',
     );
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
@@ -1585,6 +1589,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
   });
@@ -1687,6 +1692,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
@@ -1901,18 +1907,20 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
     expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
     await expectReadableDraftText('Draft answer for What matters?', 'A cautious prediction');
-    expect(screen.getByLabelText('AI-estimated confidence: 22%')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'AI-estimated confidence for What matters?' })).toHaveAttribute(
-      'aria-valuenow',
-      '22',
-    );
-    expect(screen.getByText('22% AI-estimated confidence')).toBeInTheDocument();
+    expect(screen.queryByLabelText('AI-estimated confidence: 22%')).not.toBeInTheDocument();
     expect(screen.queryByText(/Weak inference/)).not.toBeInTheDocument();
     expect(screen.queryByText(/related but indirect statement/i)).not.toBeInTheDocument();
     const basisToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE);
     expect(basisToggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(basisToggle);
     expect(basisToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('AI-estimated confidence: 22%')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'AI-estimated confidence for What matters?' })).toHaveAttribute(
+      'aria-valuenow',
+      '22',
+    );
+    expect(screen.getByText('22% AI-estimated confidence')).toBeInTheDocument();
+
     expect(screen.getByText('AI-estimated support: Weak inference')).toBeInTheDocument();
     expect(screen.getByText(/related but indirect statement/i)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
@@ -1928,6 +1936,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
   });
@@ -2054,6 +2063,7 @@ describe('SessionVoiceModeModal', () => {
           original: expect.objectContaining({ answer: [3, -4] }),
         }),
       ],
+      {},
     );
   });
 
@@ -2158,6 +2168,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
+        { includePredictionComparison: true },
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
@@ -2189,6 +2200,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.any(Array),
+        {},
       ),
     );
     first.unmount();
@@ -2209,6 +2221,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         'Ada Example',
         expect.any(Array),
+        { includeResponderName: true },
       ),
     );
   });
@@ -2468,7 +2481,7 @@ describe('Interview cancellation and recovery', () => {
     });
     mockedMapInterviewEvidenceToResponses
       .mockResolvedValueOnce([
-        { questionId: 'q1', answer: 'First answer', confidence: 0.6 },
+        { questionId: 'q1', answer: 'First answer', confidence: 0.6, importance: 6, conviction: 8 },
         { questionId: 'q2', answer: 'Keep this', confidence: 0.8 },
       ])
       .mockResolvedValueOnce([
@@ -2502,7 +2515,7 @@ describe('Interview cancellation and recovery', () => {
     expect(mockedMapInterviewEvidenceToResponses.mock.calls.at(-1)?.[0].previousResponses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          prediction: expect.objectContaining({ answer: 'First answer' }),
+          prediction: expect.objectContaining({ answer: 'First answer', importance: 60, conviction: 80 }),
           reviewed: expect.objectContaining({ answer: 'My edit' }),
         }),
       ]),

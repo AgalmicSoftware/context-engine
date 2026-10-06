@@ -505,6 +505,7 @@ export const createSessionResponseHydrationController = (
 ): SessionResponseHydrationControllerRuntime => {
   let _responseInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _responseInitPending: Record<string, ResponseInitOptions | undefined> = {};
+  const completedWorkerRuns = new Set<string>();
   let _destroyed: boolean = false;
   let _continuationTimers: ReturnType<typeof setTimeout>[] = [];
 
@@ -646,6 +647,7 @@ export const createSessionResponseHydrationController = (
       }
     };
     if (workerRun) {
+      let wasReady = false;
       const hydrationRun = hydrateWorkerCanonicalResponses({
         sessionSlug: slug,
         sessionConfig: sessionConfig as CacheRecord,
@@ -655,8 +657,13 @@ export const createSessionResponseHydrationController = (
         getAccount,
         getProviderLike,
         shouldAbort: () => _destroyed || !isMounted(),
-        markLoading: () => setResponseState({ isResponsesCacheReady: false }),
+        markLoading: () =>
+          setResponseState((prev) => {
+            wasReady = prev.isResponsesCacheReady === true && completedWorkerRuns.has(workerRun.key);
+            return { isResponsesCacheReady: false };
+          }),
         markReady: (partial = false) => {
+          if (!partial) completedWorkerRuns.add(workerRun.key);
           setState((prev) => ({
             partialWorkerResponseRuns: {
               ...((prev.partialWorkerResponseRuns as Record<string, boolean>) || {}),
@@ -676,7 +683,27 @@ export const createSessionResponseHydrationController = (
           host.updateUserCacheAtomic(slug, (current) => updater(current) as UserCache),
         createPersistenceError: (message) => new ResponseCachePersistenceError(message),
       });
-      return trackResponseInitRun(hydrationRun);
+      return trackResponseInitRun(
+        hydrationRun.catch((error: unknown) => {
+          // A failed first load proves nothing about missing answers. Only restore
+          // readiness that this exact target had before its refresh started.
+          setResponseState(() => {
+            const currentRun = resolveWorkerResponseHydrationRun({
+              sessionConfig: getSessionCfg(slug),
+              sessionSlug: slug,
+            });
+            if (
+              _destroyed ||
+              !wasReady ||
+              currentRun?.key !== workerRun.key ||
+              normalizeSessionSlug(getActiveSessionSlug()) !== slug
+            )
+              return null;
+            return { isResponsesCacheReady: true };
+          });
+          throw error;
+        }),
+      );
     }
     if (
       scanScopeNoop(slug, 'fetchQuestionResponsesChunkedForGroup', () => {

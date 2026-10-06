@@ -1,3 +1,4 @@
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds';
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
@@ -88,4 +89,21 @@ describe('SessionInterviewResearchConsent', () => {
       /\.researchHelp\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?cursor:\s*help;/,
     );
   });
+});
+
+it('shows mixed saved consent and lets an explicit click choose for all selected questions', () => {
+  const change = jest.fn();
+  renderConsent({ provenanceMixed: true, comparisonMixed: true, onProvenanceChange: change });
+  const provenance = screen.getByLabelText(/Include platform\/model provenance/i);
+  const comparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(provenance).toHaveAttribute('aria-checked', 'mixed');
+  expect(comparison).toHaveAttribute('aria-checked', 'mixed');
+  fireEvent.click(provenance);
+  expect(change).toHaveBeenCalledWith(true);
+});
+
+it('explains that current drafts use current attribution while preserving consent', () => {
+  renderConsent({ preserveSavedProvenance: true });
+  fireEvent.click(screen.getByText('AI prefill metadata', { selector: 'summary' }));
+  expect(screen.getByText(/Selected AI drafts use this interview’s source metadata/i)).toBeInTheDocument();
 });

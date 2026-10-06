@@ -150,12 +150,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   gap: 8px;
 }
 
-.sessionChipRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-}
-
 .sessionUniverseShowMoreRow {
   margin-top: 10px;
 }
@@ -192,169 +186,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
 .sessionUniverseShowMoreSpinner {
   font-size: 0.75rem;
-}
-
-.sessionChip {
-  background: color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-  color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
-  padding: 6px 12px;
-  border-radius: var(--ce-radius-6);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 6px;
-  font-family: var(--ce-font-mono);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-  margin: 0;
-  min-width: 170px;
-}
-
-.sessionChip:hover {
-  background: color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
-  transform: translateY(-1px);
-}
-
-.sessionChipActive {
-  background: color-mix(in srgb, var(--ce-status-success) 20%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-success) 60%, transparent);
-  color: var(--ce-color-white);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-status-success) 25%, transparent);
-}
-
-.sessionChipSelected {
-  border-color: color-mix(in srgb, var(--ce-status-success) 55%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-status-success) 20%, transparent);
-  color: var(--ce-color-white);
-}
-
-.sessionChipLoaded {
-  background: color-mix(in srgb, var(--ce-compat-dark) 48%, transparent);
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 34%, transparent);
-}
-
-.sessionChipUnloaded {
-  opacity: 0.72;
-  border-style: dotted;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 45%, transparent);
-  background: color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
-}
-
-.sessionChipContent {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.sessionChipTopRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-}
-
-.sessionChipCheck {
-  color: var(--ce-action-accent);
-  font-size: 0.8rem;
-  line-height: 1;
-}
-
-.sessionChipGeneral {
-  background: color-mix(in srgb, var(--ce-status-info) 22%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-info) 70%, transparent);
-  color: var(--ce-status-info-text);
-}
-
-.sessionChipExternalLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: 0;
-  background: transparent;
-  color: color-mix(in srgb, var(--ce-status-info-text) 50%, transparent);
-  opacity: 0.5;
-  margin-left: 0;
-  flex-shrink: 0;
-  transition:
-    opacity 0.2s ease,
-    color 0.2s ease;
-
-  &:hover {
-    color: color-mix(in srgb, var(--ce-status-info-text) 78%, transparent);
-    opacity: 0.78;
-  }
-
-  &:focus-visible {
-    outline: none;
-    color: color-mix(in srgb, var(--ce-status-info-text) 92%, transparent);
-    opacity: 0.92;
-  }
-}
-
-.sessionChipExternalIcon {
-  font-size: 0.72rem;
-}
-
-.sessionChipProgressWrap {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sessionChipProgressTrack {
-  flex: 0 1 68%;
-  min-width: 92px;
-  max-width: 170px;
-  height: 8px;
-  border-radius: var(--ce-radius-pill);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  overflow: hidden;
-}
-
-.sessionChipProgressFill {
-  display: block;
-  width: var(--ce-chip-progress-width, 6%);
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--ce-status-success) 95%, transparent),
-    color-mix(in srgb, var(--ce-status-info) 90%, transparent)
-  );
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) inset;
-  transition: width 0.28s ease;
-}
-
-.sessionChipProgressFillIndeterminate {
-  width: 34%;
-  animation: sessionChipIndeterminateSlide 1.05s linear infinite;
-}
-
-.sessionChipProgressText {
-  font-size: 0.62rem;
-  line-height: 1.1;
-  letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--ce-text-inverse) 78%, transparent);
-  text-align: right;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 72px;
-  max-width: 110px;
 }
 
 @keyframes sessionChipIndeterminateSlide {
@@ -1188,12 +1019,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
     }
   }
 
-  .loadingSection {
-    display: flex;
-    justify-content: center;
-    padding: 20px;
-  }
-
   @media (max-width: 768px) {
     padding: 10px;
 
@@ -1372,11 +1197,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
       .sbtDescription {
         display: none;
       }
-      .sbtNetMinted {
-        font-size: 0.9em;
-        color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
-        margin-top: 5px;
-      }
     }
     .lockIcon {
       margin-left: 5px;
@@ -1534,16 +1354,7 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
     width: 100%;
   }
 
-  .groupFilterRow {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-  }
-
-  .filterLabelToggle,
-  .groupFilterLabel {
+  .filterLabelToggle {
     background: $filter-pill-bg;
     border: 1px solid $filter-pill-border;
     border-radius: var(--ce-radius-6);
@@ -1560,11 +1371,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
       margin-right: 8px;
       accent-color: var(--ce-action-accent);
     }
-  }
-
-  .groupFilterLabel {
-    font-weight: 600;
-    letter-spacing: 0.02em;
   }
 
   .filterLabelActive {
@@ -1589,27 +1395,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 
     .sessionUniverseHeader {
       font-size: 0.7rem;
-    }
-
-    .sessionChip {
-      font-size: 0.8rem;
-      padding: 5px 10px;
-      min-width: 145px;
-    }
-
-    .sessionChipTopRow {
-      gap: 8px;
-    }
-
-    .sessionChipProgressText {
-      font-size: 0.58rem;
-      min-width: 62px;
-      max-width: 92px;
-    }
-
-    .sessionChipProgressTrack {
-      flex-basis: 62%;
-      min-width: 74px;
     }
 
     .sbtGrid {
@@ -1686,13 +1471,4 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   .filterContainer {
     color: var(--ce-color-white);
   }
-}
-
-/* Optional spinner style */
-.spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  color: $text-color;
 }

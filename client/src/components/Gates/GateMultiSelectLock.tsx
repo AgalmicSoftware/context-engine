@@ -1,5 +1,5 @@
 /** @file GateMultiSelectLock.tsx */
-import React, { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faExternalLinkAlt, faLock, faLockOpen } from '@fortawesome/free-solid-svg-icons';
 import styles from './GateMultiSelectLock.module.scss';

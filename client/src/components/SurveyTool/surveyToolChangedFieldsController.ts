@@ -1,3 +1,4 @@
+import { getChangedInterviewConsentQids } from './sessionInterviewConsent';
 import type { UnknownRecord } from './surveyToolTypes';
 
 export type ResponseFieldState = UnknownRecord & {
@@ -9,6 +10,7 @@ export type ResponseFieldState = UnknownRecord & {
 };
 
 export type ResponseSlice = {
+  interviewProvenance?: Record<string, unknown>;
   answers: Record<string, ResponseFieldState>;
   importance: Record<string, unknown>;
   conviction: Record<string, unknown>;
@@ -28,6 +30,7 @@ export interface ChangedFieldsOrchestrationParams {
 }
 
 export interface ChangedFieldsDiffCache {
+  userAnswers?: unknown;
   surveyIndex: number;
   currentSlice: ResponseSlice;
   baselineSlice: ResponseSlice;
@@ -180,7 +183,8 @@ export const orchestrateGetChangedQidsAndFields = (
     existingCache.allowLocalCache === allowLocalCache &&
     existingCache.idsScopeMode === 'scope' &&
     existingCache.idsScopeKey === idsScopeKey &&
-    existingCache.result
+    existingCache.result &&
+    (existingCache.userAnswers ?? null) === (params.userAnswers ?? null)
   ) {
     if (existingCache.currentSlice === params.currentSlice && existingCache.baselineSlice === baselineSlice) {
       deps.bumpPerfCounter('noopSkipCount');
@@ -202,7 +206,8 @@ export const orchestrateGetChangedQidsAndFields = (
     existingCache.idsScopeMode === 'slice' &&
     existingCache.result &&
     existingCache.currentSlice === params.currentSlice &&
-    existingCache.baselineSlice === baselineSlice
+    existingCache.baselineSlice === baselineSlice &&
+    (existingCache.userAnswers ?? null) === (params.userAnswers ?? null)
   ) {
     deps.bumpPerfCounter('noopSkipCount');
     return { result: existingCache.result, newCache: existingCache };
@@ -225,6 +230,7 @@ export const orchestrateGetChangedQidsAndFields = (
     addNormalizedIds(params.currentSlice.importance);
     addNormalizedIds(baselineSlice.conviction);
     addNormalizedIds(params.currentSlice.conviction);
+    addNormalizedIds(params.currentSlice.interviewProvenance);
     ids = idsFromSlices;
     idsScopeKey = `slice:${Array.from(idsFromSlices).sort().join('|')}`;
     idsScopeMode = 'slice';
@@ -234,7 +240,8 @@ export const orchestrateGetChangedQidsAndFields = (
       existingCache.allowLocalCache === allowLocalCache &&
       existingCache.idsScopeMode === idsScopeMode &&
       existingCache.idsScopeKey === idsScopeKey &&
-      existingCache.result
+      existingCache.result &&
+      (existingCache.userAnswers ?? null) === (params.userAnswers ?? null)
     ) {
       if (existingCache.currentSlice === params.currentSlice && existingCache.baselineSlice === baselineSlice) {
         deps.bumpPerfCounter('noopSkipCount');
@@ -279,11 +286,23 @@ export const orchestrateGetChangedQidsAndFields = (
     hasMeaningfulFieldValue: deps.hasMeaningfulFieldValue,
     ...buildChangedFieldResolvers(deps),
   });
+  // Consent is explicit only for questions reviewed in the interview. Missing
+  // draft metadata must never revoke consent on an ordinary answer edit.
+  for (const qid of getChangedInterviewConsentQids(
+    params.currentSlice.interviewProvenance,
+    params.userAnswers,
+    baselineSlice.interviewProvenance,
+  )) {
+    if (!ids.has(qid)) continue;
+    result.changedQids.add(qid);
+    result.changedMap[qid] = { ...(result.changedMap[qid] || {}), interviewConsent: 1 };
+  }
   const normalizedIdFilter = ids.size > 0 ? ids : null;
   const { currentSliceSignature, baselineSliceSignature } = getSliceSignatures(normalizedIdFilter);
   return {
     result,
     newCache: {
+      userAnswers: params.userAnswers,
       surveyIndex: params.surveyIndex,
       currentSlice: params.currentSlice,
       baselineSlice,

@@ -53,6 +53,83 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText('Loading access groups…')).not.toBeInTheDocument();
   });
 
+  it('can hide an empty local collection while keeping load failures visible', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groups: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    const props = {
+      allowAnonymousGroupDiscovery: true,
+      canReadGroups: true,
+      workerUrl: envelope.workerUrl,
+      sessionId: SESSION_ID,
+      sessionSlug: 'alpha',
+      fetchImpl: fetchImpl as typeof fetch,
+    };
+    const { rerender } = render(<WorkerGroupMembershipPanel {...props} showEmptyState={false} />);
+    await waitFor(() => expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument());
+    expect(screen.queryByText('No visible Groups are configured.')).not.toBeInTheDocument();
+    rerender(<WorkerGroupMembershipPanel {...props} />);
+    expect(screen.getByText('No visible Groups are configured.')).toBeInTheDocument();
+
+    rerender(<WorkerGroupMembershipPanel {...props} showEmptyState={false} />);
+    fetchImpl.mockRejectedValueOnce(new Error('Unable to load groups.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh groups' }));
+    await screen.findByText('Unable to load groups.');
+    expect(screen.queryByText('No visible Groups are configured.')).not.toBeInTheDocument();
+  });
+
+  it('can suppress a duplicate loading notice while still loading local groups and showing errors', async () => {
+    const response = createResponseDeferred();
+    const fetchImpl = jest.fn(() => response.promise);
+    render(
+      <WorkerGroupMembershipPanel
+        allowAnonymousGroupDiscovery
+        canReadGroups
+        workerUrl={envelope.workerUrl}
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        showLoadingState={false}
+        fetchImpl={fetchImpl as typeof fetch}
+      />,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument();
+    await act(async () => {
+      response.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groups: [
+              {
+                groupId: 'local',
+                sessionSlug: 'alpha',
+                label: 'Local community',
+                joinMode: 'open',
+                memberVisibility: 'session',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+    });
+    expect(await screen.findByRole('article', { name: 'Local community' })).toBeInTheDocument();
+    fetchImpl.mockRejectedValueOnce(new Error('Unable to load groups.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh groups' }));
+    expect(await screen.findByText('Unable to load groups.')).toBeInTheDocument();
+  });
+
   it('formats active, expired, and unlimited join windows without depending on wall-clock time', () => {
     expect(resolveWorkerGroupJoinWindowDisplay({ nowMs: Date.parse('2026-01-01T00:00:00.000Z') })).toEqual({
       status: 'never',
@@ -154,6 +231,85 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['anonymous', 'signed-in', 'member'] as const)(
+    'opens and closes linked group details inline for a %s participant',
+    async (participant) => {
+      const groups = ['community', 'other-membership', 'other-open-group'].map((groupId) => ({
+        groupId,
+        sessionSlug: 'alpha',
+        label: groupId,
+        joinMode: 'open',
+        memberVisibility: 'session',
+      }));
+      const memberships = groups
+        .filter(
+          (group) =>
+            group.groupId === 'other-membership' || (participant === 'member' && group.groupId === 'community'),
+        )
+        .map((group) => ({ group, member: { groupId: group.groupId, sessionSlug: 'alpha' } }));
+      const fetchImpl = jest.fn(
+        async (input: RequestInfo | URL) =>
+          new Response(
+            JSON.stringify({
+              ok: true,
+              sessionId: SESSION_ID,
+              sessionSlug: 'alpha',
+              ...(new URL(String(input)).pathname.endsWith('/groups/my-memberships') ? { memberships } : { groups }),
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+      );
+      const props = {
+        inlineDetails: true,
+        canReadGroups: true,
+        allowAnonymousGroupDiscovery: true,
+        workerUrl: envelope.workerUrl,
+        workerToken: participant === 'anonymous' ? '' : envelope.workerCredential?.token,
+        sessionId: SESSION_ID,
+        sessionSlug: 'alpha',
+        fetchImpl: fetchImpl as typeof fetch,
+      };
+      const { rerender } = render(<WorkerGroupMembershipPanel {...props} groupIdFilter="community" />);
+
+      await screen.findByRole('article', { name: 'community' });
+      expect(screen.getAllByRole('article')).toHaveLength(1);
+      expect(screen.getByRole('article', { name: 'community' })).toHaveClass('workerGroupCard');
+      expect(screen.queryByTestId('ce-worker-group-detail')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Back to Groups/ })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name:
+            participant === 'member'
+              ? 'Leave community'
+              : participant === 'anonymous'
+                ? 'Sign in to join community'
+                : 'Join community',
+        }),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Open group details for community' }));
+      const backButton = await screen.findByRole('button', { name: /Back to Groups/ });
+      expect(screen.getByTestId('ce-worker-group-detail')).toBeInTheDocument();
+      expect(backButton).toHaveFocus();
+      expect(window.open).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/session/alpha');
+      fireEvent.click(backButton);
+      expect(screen.queryByTestId('ce-worker-group-detail')).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Open group details for community' })).toHaveFocus(),
+      );
+      expect(
+        fetchImpl.mock.calls.some(([input]) => /\/groups\/(join|leave)$/.test(new URL(String(input)).pathname)),
+      ).toBe(false);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open group details for community' }));
+      await screen.findByTestId('ce-worker-group-detail');
+      rerender(<WorkerGroupMembershipPanel {...props} groupIdFilter="missing-group" />);
+      expect(screen.queryByRole('article')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Back to Groups/ })).not.toBeInTheDocument();
+      await screen.findByText('This group is not visible or no longer exists.');
+    },
+  );
+
   it('renders a selected worker group in the normal full-detail layout', async () => {
     const fetchImpl = jest.fn(
       async () =>
@@ -203,14 +359,28 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByText('Member limit:')).toBeInTheDocument();
     expect(screen.queryByText('Members:')).not.toBeInTheDocument();
     expect(screen.getByText('Joining ends:')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'ACTIONS' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Group actions' })).toContainElement(
+      screen.getByRole('heading', { name: 'ACTIONS' }),
+    );
     expect(screen.getByRole('heading', { name: 'MORE' })).toBeInTheDocument();
     expect(screen.getByText('Document URLs:')).toBeInTheDocument();
-    expect(screen.getByText('Tags:')).toBeInTheDocument();
+    expect(screen.queryByText('Tags:')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'research' })).toHaveAttribute('href', '/tag/research');
     expect(screen.getByRole('link', { name: 'reviewers' })).toHaveAttribute('href', '/tag/reviewers');
     expect(screen.getByText('25')).toBeInTheDocument();
-    expect(screen.getByText('0x00000000000000000000000000000000000000aa')).toBeInTheDocument();
+    const adminLink = screen.getByRole('link', {
+      name: 'View admin profile 0x00000000000000000000000000000000000000aa',
+    });
+    expect(adminLink).toHaveTextContent('0x000...00aa');
+    expect(adminLink).toHaveAttribute('href', '/u/0x00000000000000000000000000000000000000aa');
+    expect(adminLink).toHaveAttribute('title', '0x00000000000000000000000000000000000000aa');
+    expect(adminLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByText('Relevant documents and tags for this group.')).not.toBeInTheDocument();
+    const moreInfo = screen.getByRole('button', { name: 'About group documents and tags' });
+    expect(moreInfo.parentElement).toContainElement(screen.getByRole('heading', { name: 'MORE' }));
+    fireEvent.click(moreInfo);
+    await waitFor(() => expect(moreInfo).toHaveFocus());
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Relevant documents and tags for this group.');
     expect(screen.getByRole('link', { name: 'https://docs.example.test/brief' })).toHaveAttribute(
       'href',
       'https://docs.example.test/brief',

@@ -1,5 +1,6 @@
 import {
   buildInterviewChangedFields,
+  redactInterviewEncryptedRatings,
   buildSelectedInterviewResearch,
   buildUnselectedInterviewResearch,
 } from './sessionInterviewResearch';
@@ -57,7 +58,7 @@ describe('selected interview research', () => {
       originalPrediction: { answer: { redacted: true }, additionalComments: { redacted: true }, evidence: '' },
       predictionRevisions: [{ answer: { redacted: true }, additionalComments: { redacted: true }, evidence: '' }],
       finalSubmitted: { answer: { redacted: true }, additionalComments: { redacted: true } },
-      redactedFields: ['answer', 'additionalComments'],
+      redactedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
     });
     expect(JSON.stringify(result)).not.toMatch(/Private|Sensitive|Revision private|Revision evidence/);
   });
@@ -115,7 +116,7 @@ describe('unselected interview research', () => {
       original: { answer: { redacted: true }, additionalComments: { redacted: true }, evidence: '' },
       reviewed: { answer: { redacted: true }, additionalComments: { redacted: true } },
       submitted: { answer: { redacted: true } },
-      redactedFields: ['answer', 'additionalComments'],
+      redactedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
     });
     expect(JSON.stringify(result)).not.toMatch(
       /Revised prediction|Original prediction|Edited but rejected|Final private answer|Original note|Edited note|Basis/,
@@ -139,4 +140,29 @@ describe('unselected interview research', () => {
       changedFields: [],
     });
   });
+});
+
+it('redacts only ratings with final envelopes, including historical snapshots', () => {
+  const research = {
+    originalPrediction: { importance: 7, conviction: 3, answer: 'public' },
+    predictionRevisions: [{ importance: 8, conviction: 4 }],
+    finalSubmitted: { importance: 9, conviction: 5 },
+    redactedFields: [],
+    unselectedPredictions: [
+      { questionId: 'q1', reviewed: { importance: 2, conviction: 1 } },
+      { questionId: 'q2', reviewed: { importance: 6 } },
+    ],
+  };
+  const output = redactInterviewEncryptedRatings(research, 'q1', ['importance']);
+  expect(output).toMatchObject({
+    originalPrediction: { importance: { redacted: true }, conviction: 3, answer: 'public' },
+    predictionRevisions: [{ importance: { redacted: true }, conviction: 4 }],
+    finalSubmitted: { importance: { redacted: true }, conviction: 5 },
+    redactedFields: ['importance'],
+    unselectedPredictions: [
+      { reviewed: { importance: { redacted: true }, conviction: 1 } },
+      { reviewed: { importance: 6 } },
+    ],
+  });
+  expect(research.originalPrediction.importance).toBe(7);
 });

@@ -22,10 +22,9 @@ export interface WagmiInjectedProps {
   openAccountModal: ReturnType<typeof useAccountModal>['openAccountModal'];
   openChainModal: ReturnType<typeof useChainModal>['openChainModal'];
   examplePropFunc: (args: unknown) => void;
-  urlExtension?: string;
 }
 
-type WagmiManagedPropKeys = Exclude<keyof WagmiInjectedProps, 'urlExtension'>;
+type WagmiManagedPropKeys = keyof WagmiInjectedProps;
 
 type WagmiBridgeRuntimeProps = {
   __ceRequireWagmiBlockNumber?: boolean;
@@ -262,7 +261,6 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       openAccountModal,
       openChainModal,
       examplePropFunc,
-      urlExtension: (props as { urlExtension?: unknown }).urlExtension as string | undefined,
     } satisfies WagmiInjectedProps;
 
     const componentProps = { ...props, ...injectedProps } as P;

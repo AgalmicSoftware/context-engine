@@ -6,8 +6,8 @@ import {
 } from './sessionSlugResolution.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
+import { toStr } from './stringCoercion.js';
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 

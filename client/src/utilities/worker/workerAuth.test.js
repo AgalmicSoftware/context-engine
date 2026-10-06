@@ -1,4 +1,5 @@
 import {
+  buildSiweMessage,
   buildSignedAdminActionAuth,
   buildSignedBootstrapAdminAuth,
   clearAllWorkerSessionTokens,
@@ -380,6 +381,10 @@ describe('workerAuth canonical session resolution', () => {
     });
 
     expect(token).toBe('token-1');
+    const signedLogin = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/auth/login'));
+    expect(JSON.parse(signedLogin[1].body).message).toContain(
+      '\nResources:\n- https://worker.example\n- urn:context-engine:session:',
+    );
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith({
       sessionSlug: '',
       sessionConfig: { slug: 'general', corsWorkerUrl: 'https://worker.example' },
@@ -1021,6 +1026,7 @@ describe('workerAuth bootstrap admin signing', () => {
       statement: 'Admin request: bootstrap arweave upload',
     });
 
+    expect(auth.message).toContain('Resources:\n- https://worker.example\n- urn:context-engine:session:slug:edge');
     expect(String(global.fetch.mock.calls[0][0])).toBe('https://worker.example/auth/nonce');
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
       address: TEST_ADDRESS,
@@ -1938,5 +1944,24 @@ describe('workerAuth fetchWorkerWithAuth', () => {
 
     const authedHeaders = new Headers(global.fetch.mock.calls[4][1].headers);
     expect(authedHeaders.get('Authorization')).toBe('Bearer token-2');
+  });
+});
+
+describe('SIWE signed Worker resources', () => {
+  it.each([
+    [{ sessionId: CANONICAL_SESSION_ID, sessionSlug: 'edge' }, `urn:context-engine:session:id:${CANONICAL_SESSION_ID}`],
+    [{ sessionSlug: 'edge' }, 'urn:context-engine:session:slug:edge'],
+    [{ sessionSlug: 'general' }, 'urn:context-engine:session:slug:'],
+  ])('binds the Worker origin and resolved session %j', (identity, resource) => {
+    const message = buildSiweMessage({
+      address: TEST_ADDRESS,
+      nonce: 'fixture-nonce',
+      domain: 'app.example',
+      uri: 'https://app.example',
+      workerUrl: 'https://worker.example/custom-prefix/',
+      ...identity,
+    });
+    expect(message).toContain(`\nResources:\n- https://worker.example\n- ${resource}`);
+    expect(message).toContain('URI: https://app.example');
   });
 });

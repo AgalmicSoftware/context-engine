@@ -212,6 +212,10 @@ describe('WorkerSessionGroupsPanel', () => {
         sessionSlug="demo-sh"
         showCreate={false}
         refreshNonce={4}
+        groupIdFilter="community"
+        inlineDetails
+        showEmptyState={false}
+        showLoadingState={false}
         showGroupDescriptions={false}
         showMembershipListHeader={false}
       />,
@@ -221,6 +225,11 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(mockMembershipPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         refreshNonce: 4,
+        groupIdFilter: 'community',
+        inlineDetails: true,
+        showEmptyState: false,
+        showLoadingState: false,
+        selectedGroupId: '',
         showDescriptions: false,
         showListHeader: false,
       }),
@@ -235,6 +244,7 @@ describe('WorkerSessionGroupsPanel', () => {
         sessionSlug="demo-sh"
         showCreate={false}
         refreshNonce={5}
+        groupIdFilter="community"
         showGroupDescriptions={false}
         showMembershipListHeader={false}
       />,
@@ -243,6 +253,7 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(mockMembershipPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         refreshNonce: 5,
+        groupIdFilter: 'community',
         showDescriptions: false,
         showListHeader: false,
       }),

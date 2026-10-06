@@ -24,12 +24,11 @@ import type { WagmiInjectedProps } from '../HooksHOC/withWagmiBridge';
 import '../../assets/css/contextEngine.scss';
 import styles from './Account.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWindowClose, faQuestionCircle, faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { faWindowClose } from '@fortawesome/free-solid-svg-icons';
 
 // Reactstrap components
 import { Button, Card, CardHeader, CardFooter, Modal } from 'reactstrap';
 
-import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';

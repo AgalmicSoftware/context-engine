@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { safeString } from './runtimePrimitives.mjs';
+import { safeString, sha256Hex } from './runtimePrimitives.mjs';
 
 import { performance } from 'node:perf_hooks';
 
@@ -47,18 +47,7 @@ function requireConfig(config) {
   }
 }
 
-async function sha256Hex(text) {
-  const bytes = new TextEncoder().encode(String(text));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function fetchJson(config, path, {
-  method = 'GET',
-  token = '',
-  body = null,
-  expectOk = true,
-} = {}) {
+async function fetchJson(config, path, { method = 'GET', token = '', body = null, expectOk = true } = {}) {
   const url = new URL(path, config.origin);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);

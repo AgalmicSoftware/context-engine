@@ -10,6 +10,7 @@ import {
   kvKeySafePart,
   envFlagEnabled,
   sanitizeSessionSlug,
+  bytesToHex,
 } from './runtimePrimitives.mjs';
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
 import {
@@ -45,6 +46,7 @@ import {
   buildTelegramAgentSettingsEditState,
   buildTelegramAgentSettingsOverviewState,
   buildTelegramPoseQuestionState,
+  normalizeTelegramRatingAnswer,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import {
@@ -135,12 +137,6 @@ import { loadSessionPolicy, writeResultsExposureOverride } from './sessionPolicy
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 import { renderTelegramMiniAppBrowserAsset } from './telegramMiniAppBrowserAsset.mjs';
 import {
-  TELEGRAM_MINI_APP_LOADING_GIF_BASE64,
-  TELEGRAM_MINI_APP_LOADING_GIF_HEIGHT,
-  TELEGRAM_MINI_APP_LOADING_GIF_SOURCE,
-  TELEGRAM_MINI_APP_LOADING_GIF_WIDTH,
-} from './telegramMiniAppLoadingAsset.mjs';
-import {
   loadAgentOnlyModeConfig,
   loadAgentOnlyPredictionsForPrincipal,
   recordAgentOnlyHumanReview,
@@ -172,9 +168,8 @@ const DEFAULT_OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcrip
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
 const MINI_APP_RESULT_GROUP_COUNT = 2;
-const MINI_APP_LOADING_VISUAL_SPINNER = 'spinner';
-const MINI_APP_LOADING_VISUAL_GIF = 'gif';
-const MINI_APP_LAUNCH_RECOVERY_MESSAGE = 'This Mini App launch expired or Telegram reopened an old view. Close this screen, open the Context Engine bot, and send /start to get a fresh Mini App button.';
+const MINI_APP_LAUNCH_RECOVERY_MESSAGE =
+  'This Mini App launch expired or Telegram reopened an old view. Close this screen, open the Context Engine bot, and send /start to get a fresh Mini App button.';
 const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
   published_questions: 'publishedQuestionsEnabled',
   aggregate_results: 'aggregateResultsEnabled',
@@ -215,22 +210,6 @@ const RESULT_VIEW_LEVELS = Object.freeze([
     description: 'Group clusters and AI summaries without user identifiers.',
   },
 ]);
-
-function normalizeMiniAppLoadingVisual(value = MINI_APP_LOADING_VISUAL_GIF) {
-  const normalized = lower(value);
-  if (['spinner', 'css', 'loader'].includes(normalized)) return MINI_APP_LOADING_VISUAL_SPINNER;
-  return MINI_APP_LOADING_VISUAL_GIF;
-}
-
-function miniAppLoadingVisualMode({ url = null, env = {} } = {}) {
-  const requested = url?.searchParams?.get('loadingVisual') ||
-    url?.searchParams?.get('loading') ||
-    url?.searchParams?.get('loadingAsset') ||
-    env.AGENT_BRIDGE_MINI_APP_LOADING_VISUAL ||
-    env.AGENT_BRIDGE_MINI_APP_LOADING_ASSET ||
-    '';
-  return normalizeMiniAppLoadingVisual(requested);
-}
 
 function safeAnswerString(value) {
   if (value === undefined || value === null) return '';
@@ -622,10 +601,6 @@ function html(text, init = {}) {
   });
 }
 
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 async function hmacSha256Bytes(keyBytes, data = '') {
   if (!globalThis.crypto?.subtle) throw new Error('webcrypto_unavailable');
   const key = await globalThis.crypto.subtle.importKey(
@@ -731,7 +706,7 @@ export async function validateTelegramMiniAppInitData(initData = '', env = {}, {
   const authDate = Number(params.get('auth_date'));
   const maxAgeSeconds = normalizePositiveInteger(
     env.AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS,
-    DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS
+    DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS,
   );
   const nowSeconds = Math.floor(Number(nowMs || Date.now()) / 1000);
   if (!Number.isFinite(authDate) || authDate <= 0) {
@@ -760,7 +735,7 @@ function telegramInitDataFromRequest(request) {
   return safeString(
     request.headers.get('X-Telegram-Init-Data') ||
     request.headers.get('Telegram-Web-App-Init-Data') ||
-    request.headers.get('X-Ce-Telegram-Init-Data')
+      request.headers.get('X-Ce-Telegram-Init-Data'),
   );
 }
 
@@ -841,13 +816,10 @@ function miniAppLaunchSeriesRef(record = {}) {
     ref.questionIds ||
     ref.orderedQuestionIds ||
     ref.questionIdList ||
-    (ref.questionId ? [ref.questionId] : [])
+      (ref.questionId ? [ref.questionId] : []),
   );
   const skippedQuestionIds = normalizeMiniAppQuestionIdList(
-    series.skippedQuestionIds ||
-    series.skipQuestionIds ||
-    ref.skippedQuestionIds ||
-    ref.skipQuestionIds
+    series.skippedQuestionIds || series.skipQuestionIds || ref.skippedQuestionIds || ref.skipQuestionIds,
   );
   const draftsByQuestionId = normalizeMiniAppPrefilledDraftsByQuestionId(
     series.draftAnswersByQuestionId ||
@@ -856,7 +828,7 @@ function miniAppLaunchSeriesRef(record = {}) {
     ref.draftAnswersByQuestionId ||
     ref.prefilledDraftsByQuestionId ||
     ref.draftsByQuestionId ||
-    ref.drafts
+      ref.drafts,
   );
   const singleDraft = normalizeMiniAppPrefilledDraftAnswer(ref.prefilledDraft || ref.draftAnswer || ref.draft);
   if (singleDraft && ref.questionId) draftsByQuestionId.set(lower(ref.questionId), singleDraft);
@@ -867,7 +839,7 @@ function miniAppLaunchSeriesRef(record = {}) {
       Array.isArray(ref.questionIds) ||
       Array.isArray(ref.orderedQuestionIds) ||
       Array.isArray(series.questionIds) ||
-      Array.isArray(series.orderedQuestionIds)
+      Array.isArray(series.orderedQuestionIds),
     ),
     questionIds,
     skippedQuestionIds,
@@ -965,6 +937,7 @@ async function persistMiniQuestionAction({
       sessionSlug: sanitizeSessionSlug(sessionSlug),
       questionId: qid,
       questionType: safeString(card.questionType),
+      ratingScale: card.ratingScale || null,
       selectionMode: safeString(card.selectionMode),
       ...(card.questionType === 'quadratic' ? { voiceCredits: card.voiceCredits ?? 99 } : {}),
       options: Array.isArray(card.answerLabels) ? card.answerLabels : [],
@@ -2195,8 +2168,8 @@ function normalizeMiniAnswer(answer = {}, questionRef = {}) {
     };
   }
   if (type === 'rating') {
-    const value = Number(answer.value ?? answer.rating ?? answer.answer);
-    if (!Number.isInteger(value) || value < 0 || value > 10) {
+    const value = normalizeTelegramRatingAnswer(answer.value ?? answer.rating ?? answer.answer, questionRef);
+    if (value === null) {
       return { ok: false, reason: 'rating_answer_invalid' };
     }
     return {
@@ -2313,6 +2286,7 @@ async function persistSubmitRequest({
         questionId: qid,
         questionIdShort: shortQuestionId(qid),
         answer,
+        ratingScale: questionRef.ratingScale,
         onChainAnswer: answer,
         answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
         draftProvenance,
@@ -2726,7 +2700,7 @@ async function handleDraftRequest({
 
   return json({
     ok: true,
-    status: submitRequest?.ok ? (submitRequest.status || 'submit_request_created') : 'draft_saved',
+    status: submitRequest?.ok ? submitRequest.status || 'submit_request_created' : 'draft_saved',
     draft: {
       status: 'draft_saved',
       questionIdShort: shortQuestionId(questionRef.questionId),
@@ -3593,7 +3567,7 @@ async function resolveMiniAppResultsContext({
     body.sessions ||
     url.searchParams.get('sessionSlug') ||
     url.searchParams.get('sessions') ||
-    url.searchParams.get('sessionSlugs')
+      url.searchParams.get('sessionSlugs'),
   );
   let sessionSlug = requestedSessionSlugs[0] || '';
   let launchRecord = null;
@@ -3922,12 +3896,19 @@ async function handleAdminQuestionQueueRequest({
   });
 }
 
-async function handleAdminExportRequest({
+async function handleAdminExportRequest({ request, env = {} } = {}) {
+  const context = await resolveMiniAppAdminContext({
   request,
-  env = {},
-} = {}) {
-  const context = await resolveMiniAppAdminContext({ request, env, body: {}, requireManage: false, requireExport: true });
-  if (!context.ok) return json({ ok: false, error: context.error || 'response_export_access_denied' }, { status: context.status || 403 });
+    env,
+    body: {},
+    requireManage: false,
+    requireExport: true,
+  });
+  if (!context.ok)
+    return json(
+      { ok: false, error: context.error || 'response_export_access_denied' },
+      { status: context.status || 403 },
+    );
   const archive = await buildTelegramResponseExportArchive({
     env,
     normalized: context.normalized,
@@ -4270,9 +4251,7 @@ async function handleActivityRequest({
   const linkedSessions = linkedPolicySessions(policy, env);
   const linkedSessionLookup = new Set(linkedSessions.map((session) => session.sessionSlug));
   const requestedSessionSlugs = normalizeSessionSlugList(
-    url.searchParams.get('sessionSlug') ||
-    url.searchParams.get('sessions') ||
-    url.searchParams.get('sessionSlugs')
+    url.searchParams.get('sessionSlug') || url.searchParams.get('sessions') || url.searchParams.get('sessionSlugs'),
   );
   let launchRecord = null;
   if (auth.authMode === 'telegram') {
@@ -4414,7 +4393,7 @@ async function handleResultsImageRequest({
     const binaryIds = new Set(binaryQuestions.map(readQuestionId).filter(Boolean));
     const rows = summarizeQuestionResults(
       imageRecords.filter((record) => binaryIds.has(record.questionId)),
-      binaryQuestions
+      binaryQuestions,
     )
       .filter((summary) => Number(summary.total || 0) > 0)
       .sort((left, right) => (
@@ -4783,7 +4762,7 @@ function normalizeQuestionChoiceSource(source = '') {
   return normalizeMiniAppQuestionOptions(
     safeString(source)
       .replace(/\s+(?:or|and)\s+/gi, ',')
-      .replace(/\s*\/\s*/g, ',')
+      .replace(/\s*\/\s*/g, ','),
   );
 }
 
@@ -5422,7 +5401,7 @@ async function handleSettingsRequest({
   const launchRecord = await resolveLaunchRecord(env, launch);
   const policy = await loadSessionPolicy(env);
   const sessionSlug = sanitizeSessionSlug(
-    body.sessionSlug || (launchRecord ? launchSessionSlug(launchRecord, env) : policy.defaultSessionSlug)
+    body.sessionSlug || (launchRecord ? launchSessionSlug(launchRecord, env) : policy.defaultSessionSlug),
   );
   if (auth.authMode === 'telegram') {
     if (!launchRecord) {
@@ -5483,9 +5462,8 @@ async function handleSettingsRequest({
   });
 }
 
-function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {}) {
+function telegramMiniAppHtml() {
   return renderTelegramMiniAppBrowserAsset({
-    loadingVisual,
     launchRecoveryMessage: MINI_APP_LAUNCH_RECOVERY_MESSAGE,
     fastInitialQuestionLimit: DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT,
     fastFollowupQuestionCount: DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT,
@@ -5495,36 +5473,10 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
   });
 }
 
-function telegramMiniAppLoadingGifResponse() {
-  const binary = atob(TELEGRAM_MINI_APP_LOADING_GIF_BASE64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Response(bytes, {
-    headers: {
-      'content-type': 'image/gif',
-      'cache-control': 'public, max-age=3600',
-      'x-ce-asset-source': TELEGRAM_MINI_APP_LOADING_GIF_SOURCE,
-      'x-ce-asset-size': `${TELEGRAM_MINI_APP_LOADING_GIF_WIDTH}x${TELEGRAM_MINI_APP_LOADING_GIF_HEIGHT}`,
-    },
-  });
-}
-
-export async function handleTelegramMiniAppRequest({
-  request,
-  env = {},
-  waitUntil = null,
-  createdAt = null,
-} = {}) {
+export async function handleTelegramMiniAppRequest({ request, env = {}, waitUntil = null, createdAt = null } = {}) {
   const url = new URL(request.url);
   if (url.pathname === '/telegram/mini-app' && request.method === 'GET') {
-    return html(telegramMiniAppHtml({
-      loadingVisual: miniAppLoadingVisualMode({ url, env }),
-    }));
-  }
-  if (url.pathname === '/telegram/mini-app/loading.gif' && request.method === 'GET') {
-    return telegramMiniAppLoadingGifResponse();
+    return html(telegramMiniAppHtml());
   }
   if (url.pathname === '/telegram/mini-app/api/state' && request.method === 'GET') {
     const state = await buildMiniAppState({

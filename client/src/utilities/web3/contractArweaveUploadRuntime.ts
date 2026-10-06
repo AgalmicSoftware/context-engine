@@ -9,6 +9,7 @@
 import { ethers } from 'ethers';
 import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
+import { resolveWorkerAuthSessionId } from '../worker/workerAuthSessionIdentity';
 import { buildSiweMessage } from '../worker/workerAuth.js';
 import { normalizeSessionSlug } from './sessionConfigResolvers.js';
 
@@ -71,7 +72,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
   if (!signerLike) return null;
   const sessionConfigFields = asSessionConfigFields(sessionConfig);
   const slug = normalizeSessionSlug(sessionSlug || sessionConfigFields.slug || '');
-  const sessionId = String(sessionConfigFields.sessionIdHex || sessionConfigFields.sessionId || '').trim();
+  const sessionId = resolveWorkerAuthSessionId(sessionConfig);
   let signerAddress = '';
   try {
     signerAddress = await signerLike.getAddress();
@@ -108,6 +109,9 @@ export const buildArweaveUploadBootstrapAuth = async ({
   const message = buildSiweMessage({
     address: signerAddress,
     nonce: nonceData?.nonce,
+    workerUrl,
+    sessionSlug: slug,
+    sessionId,
     chainId,
     statement: 'Admin request: bootstrap arweave upload',
   });

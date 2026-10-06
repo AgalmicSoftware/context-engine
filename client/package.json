@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -125,7 +125,7 @@
     "asn1.js": {
       "bn.js": "4.12.3"
     },
-    "axios": "0.33.0",
+    "axios": "0.34.0",
     "elliptic": {
       "bn.js": "4.12.3"
     },

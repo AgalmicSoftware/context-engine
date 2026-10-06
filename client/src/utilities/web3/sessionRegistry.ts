@@ -9,11 +9,7 @@
  */
 import { ethers } from 'ethers';
 import SESSION_REGISTRY_ABI from '../../contractsABI/SESSION_REGISTRY_ABI.json';
-import {
-  DEFAULT_SESSION_SLUG,
-  DEFAULT_SESSION_SLUG_ALIAS,
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
+import { DEFAULT_SESSION_SLUG_ALIAS, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import rpcDefaults from '../../variables/rpcDefaults.js';
 import {
   getChainById,

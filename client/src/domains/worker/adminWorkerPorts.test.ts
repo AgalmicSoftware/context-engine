@@ -1,3 +1,4 @@
+import { buildSiweMessage as buildRealSiweMessage } from '../../utilities/worker/workerAuth';
 import {
   bindAdminWorkerPorts,
   type AdminWorkerAuthModule,
@@ -177,6 +178,9 @@ describe('admin worker ports', () => {
       nonce: ' nonce-123 ',
       chainId: 84532,
       statement: 'Sign in to Context Engine.',
+      workerUrl: 'https://worker.example.test',
+      sessionSlug: 'edge',
+      sessionId: '0x44444444444444444444444444444444',
     });
   });
 
@@ -218,3 +222,36 @@ describe('admin worker ports', () => {
     expect(buildSiweMessage).not.toHaveBeenCalled();
   });
 });
+
+for (const mode of ['registry', 'worker_canonical']) {
+  it(`binds Admin sign-in to the ${mode} authority`, async () => {
+    const sessionId = '0x44444444444444444444444444444444';
+    const fetchImpl = jest.fn(async (_url: string, _options?: RequestInit) => ({
+      ok: true,
+      json: async () => ({ nonce: 'nonce-123' }),
+    }));
+    const ports = bindAdminWorkerPorts({
+      corsProxy: () => ({ resolveCorsProxyUrl: jest.fn() }),
+      corsOrigins: () => ({ buildWorkerAllowOrigins: jest.fn() }),
+      workerAuth: () => ({
+        normalizeWorkerUrl: jest.fn(),
+        buildSignedBootstrapAdminAuth: jest.fn(),
+        buildSignedAdminActionAuth: jest.fn(),
+        buildSiweMessage: buildRealSiweMessage,
+        fetchWorkerWithAuth: jest.fn(),
+      }),
+      fetchImpl: () => fetchImpl,
+    });
+    const result = await ports.siweLogin.prepareSiweLogin({
+      workerUrl: 'https://worker.example.test',
+      address: '0x00000000000000000000000000000000000000aa',
+      sessionSlug: 'edge',
+      sessionId,
+      chainId: 11155420,
+      ...{ sessionConfig: { sessionIdHex: sessionId, sessionModeProfile: { authority: { mode } } } },
+    });
+    const expectedId = mode === 'worker_canonical' ? sessionId : '';
+    expect(result.message).toContain(`urn:context-engine:session:${expectedId ? `id:${expectedId}` : 'slug:edge'}`);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body)).sessionId || '').toBe(expectedId);
+  });
+}

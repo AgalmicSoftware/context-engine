@@ -1,3 +1,5 @@
+import { normalizeTelegramRatingScale } from './ratingScale.mjs';
+import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
 import { safeString, lower, envFlagEnabled } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registrySessions.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -16,7 +18,7 @@ const DEFAULT_PAYLOAD_CONCURRENCY = 4;
 const DEFAULT_FOREGROUND_CHUNKS = 1;
 const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2_500;
-const QUESTION_CACHE_PREFIX = 'telegram:questions:v5:';
+const QUESTION_CACHE_PREFIX = 'telegram:questions:v7:';
 const questionMemoryCache = new Map();
 const QUESTION_PAYLOAD_SKIP = '__telegramQuestionPayloadSkip';
 const STORAGE_BACKENDS = Object.freeze({
@@ -74,7 +76,7 @@ function resolveQuestionStorageBackend(session = {}, env = {}) {
     profile.questionBackend ||
     profile.backend ||
     metadata.questionStorageBackend ||
-    metadata.storageBackend
+      metadata.storageBackend,
   );
 }
 
@@ -99,9 +101,7 @@ function storageRefForPointer(pointerId = '', resource = 'questions', backend = 
 
 function loginOriginForWorker(env = {}) {
   const configured = safeString(
-    env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN ||
-    env.LOCAL_AUTH_ORIGIN ||
-    env.AGENT_BRIDGE_PUBLIC_URL
+    env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN || env.LOCAL_AUTH_ORIGIN || env.AGENT_BRIDGE_PUBLIC_URL,
   );
   try {
     return new URL(configured || 'http://localhost:7391').origin;
@@ -553,7 +553,7 @@ async function fetchSessionConfigForQuestions({
       metadata.workerUrl ||
       metadata.corsWorkerUrl ||
       metadata.CE_SESSION_WORKER_BASE_URL ||
-      session.sessionWorkerUrl
+        session.sessionWorkerUrl,
     );
   }
   if (session.blockLimits.start == null && envStart == null) {
@@ -699,13 +699,12 @@ function normalizeQuestionVisibility(payload = {}) {
   const encryption = payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
     ? payload.encryption
     : null;
-  const hasEncryptedField = (
+  const hasEncryptedField =
     payload.litEncrypted === true ||
     payload.encrypted === true ||
     payload.promptEncrypted ||
     payload.optionsEncrypted ||
-    payload.tagsEncrypted
-  );
+    payload.tagsEncrypted;
   const encryptionGateCandidates = [
     ...(Array.isArray(encryption?.gates) ? encryption.gates : []),
     encryption?.gate,
@@ -766,11 +765,9 @@ function normalizeQuestionEncryption(payload = {}, visibility = 'public') {
   const root = normalizeQuestionPayloadRoot(payload) || {};
   const encryption = root.encryption && typeof root.encryption === 'object' && !Array.isArray(root.encryption)
     ? root.encryption
-    : (
-        payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
+      : payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
           ? payload.encryption
-          : {}
-      );
+        : {};
   const gateCandidates = [
     ...(Array.isArray(encryption.gates) ? encryption.gates : []),
     encryption.gate,
@@ -848,22 +845,18 @@ function normalizeOptions(payload = {}) {
     .slice(0, (payload.questionType || payload.type) === 'quadratic' ? Infinity : 20);
 }
 
-function normalizeQuestionType(payload = {}) {
+export function normalizeQuestionType(payload = {}, fallback = 'freeform') {
   const raw = lower(payload.questionType || payload.type || payload.kind || payload.responseType || 'freeform')
     .replace(/\s+/g, '_')
     .replace(/-/g, '_');
   if (['binary', 'boolean', 'yes_no', 'agree_disagree', 'agree_unsure_disagree'].includes(raw)) return 'binary';
   if (raw === 'quadratic') return 'quadratic';
   if (['rating', 'scale', 'linear_scale'].includes(raw)) return 'rating';
-  if ([
-    'multichoice',
-    'multi_choice',
-    'multiple_choice',
-    'multi_select',
-    'single_choice',
-    'single_select',
-  ].includes(raw)) return 'multichoice';
-  return 'freeform';
+  if (
+    ['multichoice', 'multi_choice', 'multiple_choice', 'multi_select', 'single_choice', 'single_select'].includes(raw)
+  )
+    return 'multichoice';
+  return fallback;
 }
 
 function normalizeQuestionPayloadRoot(payload = {}) {
@@ -900,12 +893,15 @@ function normalizeQuestionPayload(payload = {}, {
     ? safeString(root.questionText || root.prompt || root.title || payload.questionText || payload.prompt || payload.title)
     : '';
   const type = normalizeQuestionType(root);
+  const sharedScale = type === 'rating' ? normalizeRatingScale(root) : null;
+  const scale = sharedScale ? { ...sharedScale, step: normalizeTelegramRatingScale(root).step } : null;
   const normalized = {
     questionId: id,
     id,
     questionType: type,
     type,
     ...(type === 'quadratic' ? { voiceCredits: root.voiceCredits ?? 99 } : {}),
+    ...(scale ? { scale } : {}),
     prompt: publicPrompt,
     questionText: publicPrompt,
     title: publicPrompt || (visibility === 'public' ? 'Untitled question' : 'Locked question'),
@@ -1011,14 +1007,15 @@ async function fetchQuestionPayload({
   if (!payloadSessionSlug && requestedSessionSlug && !shouldStampUnscopedPayload) {
     return skippedQuestionPayload('session_slug_missing');
   }
-  return normalizeQuestionPayload(payload, {
+  return (
+    normalizeQuestionPayload(payload, {
     questionId: id,
     pointerId,
     pointerBackend,
     sessionSlug,
     fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
-  }) ||
-    lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug });
+    }) || lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug })
+  );
 }
 
 function cacheTtlSeconds(env = {}) {
@@ -1040,8 +1037,10 @@ function normalizeOptionalPositiveInteger(value) {
 }
 
 function foregroundPayloadBatchSize(env = {}, questionLimit = 0) {
-  return normalizeOptionalPositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_PAYLOADS) ||
-    normalizeOptionalPositiveInteger(questionLimit);
+  return (
+    normalizeOptionalPositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_PAYLOADS) ||
+    normalizeOptionalPositiveInteger(questionLimit)
+  );
 }
 
 function cacheKey(sessionSlug = '') {
@@ -1316,10 +1315,11 @@ async function scanQuestionRange({
     const firstAvailableBatchSize = stopAfterFirstAvailable
       ? foregroundPayloadBatchSize(env, foregroundPayloadLimit)
       : 0;
-    const payloadBatches = firstAvailableBatchSize > 0
-      ? Array.from({ length: Math.ceil(chunkIds.length / firstAvailableBatchSize) }, (_, index) => (
-          chunkIds.slice(index * firstAvailableBatchSize, (index + 1) * firstAvailableBatchSize)
-        ))
+    const payloadBatches =
+      firstAvailableBatchSize > 0
+        ? Array.from({ length: Math.ceil(chunkIds.length / firstAvailableBatchSize) }, (_, index) =>
+            chunkIds.slice(index * firstAvailableBatchSize, (index + 1) * firstAvailableBatchSize),
+          )
       : [chunkIds];
     let stoppedWithinChunk = false;
     for (let batchIndex = 0; batchIndex < payloadBatches.length; batchIndex += 1) {
@@ -1341,9 +1341,7 @@ async function scanQuestionRange({
       questions.push(...payloads.questions);
       if (stopAfterFirstAvailable && questions.length > 0) {
         stoppedWithinChunk = batchIndex < payloadBatches.length - 1;
-        nextScanToBlock = stoppedWithinChunk
-          ? to
-          : (from - 1 >= fromBlock ? from - 1 : null);
+        nextScanToBlock = stoppedWithinChunk ? to : from - 1 >= fromBlock ? from - 1 : null;
         break;
       }
     }
@@ -1585,14 +1583,18 @@ async function refreshSessionQuestionIndex({
   const hadReadFailures = Number(aggregateScan.chunksFailed || 0) > 0 || payloadFailureCount > 0;
   const ok = questions.length > 0 || !hadReadFailures;
   const reason = questions.length
-    ? (complete ? 'live_questions_indexed' : 'live_questions_index_partial')
-    : (!complete && !hadReadFailures
+    ? complete
+      ? 'live_questions_indexed'
+      : 'live_questions_index_partial'
+    : !complete && !hadReadFailures
         ? 'live_questions_indexing'
         : Number(aggregateScan.chunksAttempted || 0) > 0 && Number(aggregateScan.chunksSucceeded || 0) === 0
         ? 'question_log_scan_failed'
         : Number(aggregateScan.chunksFailed || 0) > 0
         ? 'question_log_scan_partial_failed'
-        : (payloadFailureCount > 0 ? 'question_payload_load_failed' : 'live_questions_empty'));
+          : payloadFailureCount > 0
+            ? 'question_payload_load_failed'
+            : 'live_questions_empty';
   const result = {
     ok,
     reason,

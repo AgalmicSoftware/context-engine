@@ -1,4 +1,4 @@
-const toStr = (val) => (typeof val === 'string' ? val : val == null ? '' : String(val));
+import { toStr } from './stringCoercion.js';
 
 export const INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, numbers, "_" or "-".';
 export const SLUG_MISMATCH_ERROR = 'sessionSlug does not match worker session.';

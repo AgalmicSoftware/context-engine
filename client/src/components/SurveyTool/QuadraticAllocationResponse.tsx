@@ -1,4 +1,3 @@
-import React from 'react';
 import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import styles from './QuadraticAllocationResponse.module.scss';
 

@@ -1,5 +1,6 @@
 import {
   validateBrowserLoginOrigin,
+  validateSiweResources,
 } from './siweMessageValidation.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
@@ -122,6 +123,11 @@ export const resolveAuthLoginRequestAuthority = async ({
       ok: false,
       response: deps?.json?.({ error: 'Session identity does not match worker session.' }, 409, headers),
     };
+  }
+
+  const resourcesCheck = validateSiweResources({ siwe, request, config, targetSlug });
+  if (!resourcesCheck.ok) {
+    return { ok: false, response: deps?.json?.({ error: resourcesCheck.error }, 403, headers) };
   }
 
   const loginOriginCheck = (

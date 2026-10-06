@@ -63,26 +63,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .surveySelector {
   // width: 100%;
   margin-bottom: 20px;
-  .dropdown-toggle {
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ce-color-white);
-    background: var(--ce-color-surface);
-    border-color: var(--ce-color-white);
-    &:hover {
-      background: var(--ce-color-surface-alt);
-    }
-  }
-
-  .dropdown-menu {
-    background: var(--ce-color-surface);
-    .dropdown-item {
-      color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
-      &:hover {
-        background: var(--ce-color-surface-alt);
-      }
-    }
-  }
 }
 
 #dropdownToggle {
@@ -170,19 +150,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow:
       -7px 7px 14px var(--ce-surface-sunken),
       7px -7px 14px var(--ce-color-surface-alt);
-    .card-body {
-      h5 {
-        color: var(--ce-color-white);
-        font-weight: 600;
-        margin-bottom: 10px;
-      }
-
-      label {
-        color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
-        font-weight: 600;
-        margin-bottom: 10px;
-      }
-    }
   }
 
   .binaryChoice {
@@ -196,14 +163,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .slider {
     margin-top: 20px;
     max-width: 200px;
-    .rangeslider__fill {
-      background: var(--ce-color-success);
-    }
-
-    .rangeslider__handle {
-      background: var(--ce-color-surface);
-      border: 2px solid var(--ce-color-success);
-    }
   }
 
   .spectrum {
@@ -1800,51 +1759,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 /* Styles for the question filtering modal trigger/display (kept as it's related to the Filter button in SurveySelector) */
-.questionsDashboard .modal-content {
-  background-color: var(--ce-color-white) !important;
-  color: var(--ce-color-black) !important;
-  font-size: 1.25em;
-}
-
-.questionsDashboard .modal-header,
-.questionsDashboard .modal-footer {
-  border: none;
-}
-
-.questionsDashboard .modal-header .modal-title {
-  font-weight: bold;
-}
-
-.questionsDashboard .form-group label,
-.questionsDashboard .mb-3 label {
-  font-size: 1.25em;
-}
-
-.questionsDashboard .form-check-label {
-  font-size: 1.25em;
-  color: var(--ce-color-black) !important;
-  font-weight: 600;
-}
-
-.questionsDashboard .form-check-input {
-  width: 1.5em;
-  height: 1.5em;
-  font-size: 1.25em;
-  color: var(--ce-color-black) !important;
-  font-weight: 600;
-}
-
-.questionsDashboard .modal-footer .btn {
-  font-size: 1.25em;
-  font-size: 1.25em;
-  color: var(--ce-color-black) !important;
-  font-weight: 600;
-}
-
-.questionsDashboard .modal-body {
-  max-height: 60vh;
-  overflow-y: auto;
-}
 
 /* Surveys row responsiveness */
 @media (min-width: 466px) and (max-width: 768px) {
@@ -1920,7 +1834,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   opacity: 0.7;
   transition: opacity 0.2s ease;
   &:hover,
-  &.active,
   &:global(.active),
   &:global(.dropdown-item.active) {
     opacity: 1 !important;
@@ -1931,16 +1844,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &.questionsItem {
     background-color: $questions-item-bg !important;
     font-style: italic;
-    &:hover,
-    &.active {
+    &:hover {
       background-color: $questions-item-bg-hover !important;
     }
   }
 
   &.surveyItem {
     background-color: $survey-item-bg !important;
-    &:hover,
-    &.active {
+    &:hover {
       background-color: $survey-item-bg-hover !important;
     }
   }
@@ -2112,10 +2023,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 10px;
   color: var(--ce-color-white);
   font-weight: bold;
-}
-
-.importanceSlider .rangeslider__fill {
-  background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
 }
 
 /* JSON Preview Copy Button (General Utility) */
@@ -6551,11 +6458,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   .ratingSlider {
     margin-block: 0 !important;
-  }
-  .rangeslider {
-    flex: 0 1 260px;
-    width: 260px;
-    max-width: 70vw;
   }
 }
 

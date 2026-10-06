@@ -1,7 +1,6 @@
 {
   "sessionRegistryAddresses": {
-    "11155420": "0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1",
-    "8453": ""
+    "11155420": "0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1"
   },
   "sessionContractsByChain": {
     "11155420": {

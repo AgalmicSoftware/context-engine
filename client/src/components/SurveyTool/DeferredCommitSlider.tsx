@@ -39,11 +39,15 @@ export type DeferredCommitSliderProps = {
   tooltip?: boolean;
   className?: string;
   style?: CSSProperties;
+  // Commit even when the value equals the prop, e.g. picking the shown minimum of an unanswered rating.
+  commitUnchanged?: boolean;
   onCommit?: (value: number) => void;
   children: (args: { value: number; sliderProps: DeferredCommitSliderRenderProps }) => ReactNode;
 };
 
 export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSliderProps, DeferredCommitSliderState> {
+  private keyboardCompletionPending = false;
+
   constructor(props: DeferredCommitSliderProps) {
     super(props);
     this.state = buildDeferredCommitSliderInitialState(this.normalizeValue(props.value));
@@ -61,6 +65,7 @@ export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSlid
   normalizeValue = (value: unknown): number => clampSliderValue(value, this.props.min, this.props.max);
 
   handleChangeStart = (): void => {
+    this.keyboardCompletionPending = false;
     if (this.state.isInteracting) return;
     this.setState(buildDeferredCommitSliderInteractingPatch(true));
   };
@@ -71,7 +76,7 @@ export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSlid
     if (this.state.isInteracting) {
       this.setState(buildDeferredCommitSliderInteractingPatch(false));
     }
-    if (committedValue === propValue) return;
+    if (committedValue === propValue && !this.props.commitUnchanged) return;
     if (typeof this.props.onCommit === 'function') {
       this.props.onCommit(committedValue);
     }
@@ -80,6 +85,7 @@ export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSlid
   handleChange = (nextValue: unknown, event?: SliderEventLike): void => {
     const normalizedValue = this.normalizeValue(nextValue);
     const isKeyboardEvent = event?.type === 'keydown';
+    this.keyboardCompletionPending = isKeyboardEvent;
     const nextState = buildDeferredCommitSliderChangeStatePatch({
       liveValue: this.state.liveValue,
       normalizedValue,
@@ -101,6 +107,12 @@ export class DeferredCommitSlider extends React.PureComponent<DeferredCommitSlid
   };
 
   handleChangeComplete = (): void => {
+    // CESlider completes keyboard changes synchronously, before React flushes
+    // the live-value update. The change callback already commits that key press.
+    if (this.keyboardCompletionPending) {
+      this.keyboardCompletionPending = false;
+      return;
+    }
     this.commitValue(this.state.liveValue);
   };
 

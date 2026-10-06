@@ -2,7 +2,7 @@
 
 Imported and voice-assisted session interviews can optionally attach AI provenance and draft-comparison metadata to the submitted response JSON. The metadata is meant to answer practical research questions such as: which AI draft was shown, which final value was submitted, which fields changed by the time of submission, whether answer/comment text had to be redacted, and which platform/model the workflow self-reported.
 
-The ordinary submitted answer remains the normal response fields: `answer`, `additional`, `importance`, `conviction`, question id, responder, and timestamps/storage metadata. Interview research is a sidecar on that submitted response, not a second answer. A final submitted snapshot in `interviewProvenance` should be read as a copy of the ordinary submitted values after review, with answer/comment text redacted when field encryption requires it.
+The ordinary submitted answer remains the normal response fields: `answer`, `additional`, `importance`, `conviction`, question id, responder, and timestamps/storage metadata. Interview research is a sidecar on that submitted response, not a second answer. A final submitted snapshot in `interviewProvenance` should be read as a copy of the ordinary submitted values after review, with protected answer/comment text and locked ratings redacted when field encryption requires it.
 
 Final research ratings include the ordinary response's legacy fallback from missing importance to conviction. This can mark importance as changed even when the reviewer never touched its control; it does not imply an explicit importance choice. Older exports can contain a null research importance beside a non-null ordinary response importance; use the ordinary submitted field to resolve that historical discrepancy.
 
@@ -59,7 +59,7 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 | `finalSubmitted` | Draft-comparison sharing is included | Redacted-safe final values submitted for the selected question. |
 | `changedFields` | Draft-comparison sharing is included | Net fields whose final submitted value differs from the original AI prediction. Possible values are `answer`, `additionalComments`, `importance`, and `conviction`. |
 | `userEditedFields` | Draft-comparison sharing is included and instrumented review interactions were captured | Fields touched through the review modal instrumentation, even when the final value was restored to the original. It is not a keystroke log or a complete edit history. |
-| `redactedFields` | Draft-comparison sharing is included | Text fields withheld from research snapshots because the submitted answer/comment field was encrypted or followed an encrypted answer. |
+| `redactedFields`          | Draft-comparison sharing is included                                                    | Fields withheld from research snapshots because the submitted answer/comment field was encrypted or followed an encrypted answer; this includes importance and conviction when ratings are protected.                                                                                                                                                               |
 | `predictionComparison` | Draft-comparison sharing is included | Nested versioned copy of original, revisions, submitted values, changed fields, touched fields, and redaction fields for downstream consumers that prefer a single comparison object. |
 | `unselectedPredictions` | Draft-comparison sharing is included and there were excluded drafts | Up to 100 excluded draft records attached under the selected anchor response. They include selection status, original/reviewed/submitted snapshots where applicable, changed/touched fields, and redaction fields. They are metadata, not submitted answers. This is a submitted-record cap, not a promise that every possible excluded draft was retained forever. |
 | `appliedAt` | AI provenance or draft-comparison sharing is included | Timestamp from when drafts are applied to the response draft state during submission preparation, or `null` when unavailable. |
@@ -80,7 +80,10 @@ older v1–v5 imports keep their original fingerprints. V5 binds selection mode 
 the question hash; v4 does not and its generation contract allows only one
 choice string. A missing v4 draft may reflect an unrepresentable multiple-choice
 answer, not lack of evidence. Ratings follow each question's scale; importance
-and conviction remain separate 0–100 fields. See [the interview contract](session-listening-mode.md).
+and conviction are separate 0–100 fields in AI requests and imported packets.
+The client converts them once into 0–10 review and stored response values, and
+converts local predictions back to 0–100 when continuing an AI interview.
+Existing stored responses are not migrated. See [the interview contract](session-listening-mode.md).
 
 Voice context can omit whole question/history/background/review rows to fit the
 realtime request limit. This does not truncate the full local transcript used
@@ -89,9 +92,9 @@ does not make draft revisions a complete record of what the voice model saw.
 
 ## Redaction, Identifiers, and Visibility
 
-When answer text is encrypted, the research snapshot writes `{ "redacted": true, "reason": "encrypted_field" }` instead of plaintext answer text. When additional comments are encrypted, or when comments follow an encrypted answer rather than an explicit plaintext audience, the comment text is redacted too. Evidence/basis strings are removed whenever answer or comment text is redacted, because evidence can repeat or reveal the protected text.
+When answer text is encrypted, the research snapshot writes `{ "redacted": true, "reason": "encrypted_field" }` instead of plaintext answer text. When additional comments are encrypted, or when comments follow an encrypted answer rather than an explicit plaintext audience, the comment text is redacted too. Importance and conviction are redacted in original, revision, reviewed, and submitted snapshots whenever either response field is protected or the submitted rating remains encrypted in a rating envelope. Evidence/basis strings are removed whenever answer or comment text is redacted, because evidence can repeat or reveal the protected text.
 
-Redaction does not remove the whole record. Field names, changed/touched indicators, confidence, importance, conviction, revision numbers, model IDs, and timestamps can remain. The ordinary submitted response still carries its normal question and responder identifiers, including the responder wallet field written by the response payload. Interview research follows the response's normal session storage and visibility path; it is not automatically anonymous and does not create a separate private research backend.
+Redaction does not remove the whole record. Field names, changed/touched indicators, confidence, unencrypted importance and conviction, revision numbers, model IDs, and timestamps can remain. The ordinary submitted response still carries its normal question and responder identifiers, including the responder wallet field written by the response payload. Interview research follows the response's normal session storage and visibility path; it is not automatically anonymous and does not create a separate private research backend.
 
 The full interview transcript, imported conversation history, keystrokes, cursor history, edit timing, time-to-review, and semantic agreement score are not attached to this record. Unencrypted draft answers, comments, and evidence can still quote or summarize transcript-derived or import-derived content because those fields are the AI-generated draft and reviewed response content. Confidence, evidence, platform/model identity, and provenance details are reported by the workflow/model path; they are not independently validated research truth.
 
@@ -105,7 +108,7 @@ The most direct read-only procedure for Cloudflare response storage is:
 
 Access depends on the session's storage and results policy. Public-result sessions may allow anonymous reads. In nonpublic Worker-canonical sessions, authentication alone does not grant access to other participants' raw responses: ownership, current admin authority, or a dedicated delegated grant is required, and per-item conditions still apply. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
 
-The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Questions + Responses`, `JSON: Questions`, and `JSON: Questions + Responses`. The CSV response export intentionally flattens response rows to question id, prompt, type, options, responder address, importance, answer value/hash, additional value/hash, encryption flags, timestamp, and voice credits; it does not include `interviewProvenance`. The JSON questions-and-responses export includes the filtered response rows as held by the results view. Depending on the view and hydration path, each row's raw `response` can be an object or a JSON string; inspect and parse that nested `response` value, then check either `response.interviewProvenance` or `response.responses[].interviewProvenance`. For full-fidelity research review, use the raw storage read path above.
+The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Questions + Responses`, `JSON: Questions`, and `JSON: Questions + Responses`. The CSV response export intentionally flattens response rows to question id, prompt, type, options, responder address, importance, answer value/hash, additional value/hash, encryption flags, timestamp, voice credits, and a raw conviction column after voice credits; it does not include `interviewProvenance`. The JSON questions-and-responses export includes the filtered response rows as held by the results view. Depending on the view and hydration path, each row's raw `response` can be an object or a JSON string; inspect and parse that nested `response` value, then check either `response.interviewProvenance` or `response.responses[].interviewProvenance`. For full-fidelity research review, use the raw storage read path above.
 
 In browser CSV exports, `options` cells contain JSON arrays, and array-valued `answer` cells contain JSON arrays too (multi-select labels or quadratic vote numbers). Parse the CSV first, then JSON-parse these cells; do not split them on semicolons or commas. For example, the decoded cell `["Transit; buses","Parks"]` represents two exact option names. CSV quoting escapes the JSON quotes, while JSON preserves punctuation and newlines inside labels. Scalar answers remain scalar text; tags retain their existing semicolon-separated representation.
 
@@ -129,8 +132,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
         "originalPrediction": {
           "answer": "I expect model evaluations to miss deployment risks.",
           "additionalComments": "The source mentioned monitoring after launch.",
-          "importance": 70,
-          "conviction": 60,
+          "importance": 7,
+          "conviction": 6,
           "confidence": 0.74,
           "evidence": "Grounded in the imported summary."
         },
@@ -140,8 +143,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
             "modelId": "gpt-example",
             "answer": "I expect model evaluations to miss deployment risks.",
             "additionalComments": "The source mentioned monitoring after launch.",
-            "importance": 70,
-            "conviction": 60,
+            "importance": 7,
+            "conviction": 6,
             "confidence": 0.74,
             "evidence": "Grounded in the imported summary."
           }
@@ -149,8 +152,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
         "finalSubmitted": {
           "answer": "I worry that evaluations can miss deployment risks.",
           "additionalComments": "The strongest evidence was about monitoring after launch.",
-          "importance": 80,
-          "conviction": 60
+          "importance": 8,
+          "conviction": 6
         },
         "changedFields": ["answer", "additionalComments", "importance"],
         "userEditedFields": ["answer", "additionalComments", "importance"],
@@ -160,8 +163,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
           "original": {
             "answer": "I expect model evaluations to miss deployment risks.",
             "additionalComments": "The source mentioned monitoring after launch.",
-            "importance": 70,
-            "conviction": 60,
+            "importance": 7,
+            "conviction": 6,
             "confidence": 0.74,
             "evidence": "Grounded in the imported summary."
           },
@@ -171,8 +174,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
               "modelId": "gpt-example",
               "answer": "I expect model evaluations to miss deployment risks.",
               "additionalComments": "The source mentioned monitoring after launch.",
-              "importance": 70,
-              "conviction": 60,
+              "importance": 7,
+              "conviction": 6,
               "confidence": 0.74,
               "evidence": "Grounded in the imported summary."
             }
@@ -180,8 +183,8 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
           "submitted": {
             "answer": "I worry that evaluations can miss deployment risks.",
             "additionalComments": "The strongest evidence was about monitoring after launch.",
-            "importance": 80,
-            "conviction": 60
+            "importance": 8,
+            "conviction": 6
           },
           "changedFields": ["answer", "additionalComments", "importance"],
           "userEditedFields": ["answer", "additionalComments", "importance"],
@@ -280,3 +283,40 @@ blocked on incomplete or failed saved-answer reads and offers a retry. Existing
 answers discovered during a queued submission are deselected for explicit review;
 local draft edits are retained. See [the Worker guide](session-cors-worker.md#interview-saved-answer-readiness)
 for Hosted and chain-authoritative lookup behavior.
+
+### Draft review presentation
+
+The voice-mode chooser describes the interview; AI prompt-copy guidance stays inside the interview. Draft prose opens for editing by click, Enter, or Space. Edits update immediately; leaving the editor or pressing Escape returns to the readable answer without a separate Done button. AI confidence and its support meter appear only inside the collapsed Basis disclosure alongside the evidence.
+
+Consent choices count as response edits even when the answer, comment and ratings
+are unchanged. Submitting can add or remove the responder name, AI attribution or
+prediction comparison on the selected responses. Repeating the saved choices
+does not create another pending edit. Changes to research content alone, including
+new predictions, revisions and recording timestamps, are not submitted when
+answers, comments, ratings and consent remain unchanged.
+
+Saved consent is retained separately for each question until the participant
+changes a choice. The review controls show a mixed state when selected questions
+have different saved choices; changing a control applies that choice to the
+selected responses. Selected AI drafts use the current interview’s model, prompt
+version and question-set hash whenever provenance is included. Unchanged consent
+does not attach an earlier interview’s source to a replacement draft.
+
+After an upload fails, a pending consent choice takes precedence over the saved
+response in both the review controls and the next submission. This also applies
+after restoring a local draft and when the Worker reloads the saved answers.
+
+An untouched name control lists the saved names that will be submitted. When an
+import provides a different name, changing the control explicitly selects or
+removes that imported name; its label updates to match.
+
+The survey view retains consent from the saved per-question responses. A later
+pile withdrawal therefore overrides an earlier survey payload, including after
+Decrypt & edit or Exit Editing. Editing one question does not change another
+question’s consent timestamp.
+
+Changing included attribution's platform, model, prompt version or question-set
+hash is a pending consent change, even if answer values and research content are
+unchanged. Withdrawing a name or research consent updates the latest submitted
+payload; it does not erase earlier stored response versions or copies already
+exported by other readers.

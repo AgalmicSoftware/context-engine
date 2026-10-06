@@ -1,3 +1,4 @@
+import { resolveWorkerAuthSessionId } from '../../utilities/worker/workerAuthSessionIdentity';
 import { corsProxyUtils as defaultCorsProxyUtils } from '../../utilities/worker/corsProxy.js';
 import * as defaultWorkerCorsOrigins from '../../utilities/worker/workerCorsOrigins.js';
 import * as defaultWorkerAuth from '../../utilities/worker/workerAuth.js';
@@ -64,6 +65,9 @@ export type AdminWorkerAuthModule = WorkerAuthPublishModule & {
 };
 
 export type AdminBuildSiweMessageInput = {
+  workerUrl?: string;
+  sessionSlug?: string;
+  sessionId?: string;
   address: string;
   nonce?: unknown;
   chainId: number;
@@ -77,12 +81,14 @@ export type AdminPrepareSiweLoginInput = {
   sessionId?: string;
   chainId: number;
   statement?: string;
+  sessionConfig?: unknown;
 };
 
 export type AdminPrepareSiweLoginResult = {
   nonce: string;
   nonceData: AdminWorkerRecord;
   message: string;
+  sessionId?: string;
 };
 
 export type AdminWorkerUrlPort = {
@@ -169,10 +175,12 @@ export const bindAdminWorkerPorts = ({
         workerUrl,
         address,
         sessionSlug,
-        sessionId,
+        sessionId: suppliedSessionId,
+        sessionConfig,
         chainId,
         statement = 'Sign in to Context Engine.',
       }) => {
+        const sessionId = sessionConfig === undefined ? suppliedSessionId : resolveWorkerAuthSessionId(sessionConfig);
         const nonceResp = await fetchImpl()(`${workerUrl}/auth/nonce`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -186,7 +194,11 @@ export const bindAdminWorkerPorts = ({
         return {
           nonce,
           nonceData,
+          ...(sessionConfig === undefined ? {} : { sessionId }),
           message: readWorkerAuth().buildSiweMessage({
+            workerUrl,
+            sessionSlug,
+            sessionId,
             address,
             nonce,
             chainId,

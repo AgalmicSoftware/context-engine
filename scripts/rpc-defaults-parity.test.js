@@ -37,16 +37,14 @@ const loadTypescriptRpcDefaults = () => {
 };
 
 const normalizeMap = (value) =>
-  Object.fromEntries(Object.entries(value || {}).map(([key, entry]) => [String(key), Array.isArray(entry) ? [...entry] : entry]));
+  Object.fromEntries(
+    Object.entries(value || {}).map(([key, entry]) => [String(key), Array.isArray(entry) ? [...entry] : entry]),
+  );
 
 const collectChainIds = (...modules) => {
   const ids = new Set();
   modules.forEach((mod) => {
-    [
-      mod.publicRpcUrlsByChainId,
-      mod.pathRpcUrlsByChainId,
-      mod.faucetFallbackRpcUrlsByChainId,
-    ].forEach((map) => {
+    [mod.publicRpcUrlsByChainId, mod.pathRpcUrlsByChainId, mod.faucetFallbackRpcUrlsByChainId].forEach((map) => {
       Object.keys(map || {}).forEach((key) => ids.add(Number(key)));
     });
   });

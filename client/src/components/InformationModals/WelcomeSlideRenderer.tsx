@@ -9,7 +9,6 @@ import styles from './Modals.module.scss';
 type WelcomeSlideRendererProps = {
   slideIndex?: number;
   onSlideClick?: (() => void) | null;
-  leadingContent?: React.ReactNode;
   className?: string;
 };
 
@@ -37,12 +36,7 @@ const IMAGE_CLASS_BY_VARIANT: Record<WelcomeSlideImageVariant, string> = {
   collaborators: buildClassName([styles.welcomeSlideImage, styles.welcomeSlideImageCollaborators]),
 };
 
-const WelcomeSlideRenderer = ({
-  slideIndex = 0,
-  onSlideClick = null,
-  leadingContent = null,
-  className = '',
-}: WelcomeSlideRendererProps) => {
+const WelcomeSlideRenderer = ({ slideIndex = 0, onSlideClick = null, className = '' }: WelcomeSlideRendererProps) => {
   const currentSlide = getWelcomeSlide(slideIndex);
 
   if (!currentSlide) {
@@ -64,8 +58,6 @@ const WelcomeSlideRenderer = ({
 
   return (
     <div className={containerClassName}>
-      {leadingContent}
-
       <button
         type="button"
         className={mediaButtonClassName}

@@ -1,5 +1,5 @@
 import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faSpinner } from '@fortawesome/free-solid-svg-icons';
@@ -354,7 +354,7 @@ export function SessionInterviewRecommendedGroups({
         ) {
           return;
         }
-        clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId, account: requestAccount });
+        clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId });
         const joined = membershipGroupIds(overview, sessionSlug).has(groupId);
         if (joined) {
           setJoinedGroupState((current) => ({

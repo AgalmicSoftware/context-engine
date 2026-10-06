@@ -1070,6 +1070,61 @@ describe('surveyToolDecryptFlow', () => {
     expect(getLatestQuestionResponse).toHaveBeenCalledWith('0xdef', 'q1', '84532', { cached: true });
   });
 
+  it.each(['object', 'string', 'initial-wins', 'latest-wins', 'wrong-owner', 'wrong-network', 'malformed'])(
+    'hydrates cached rating envelopes for the selected response: %s',
+    async (scenario) => {
+      const cached = {
+        questionID: 'q1',
+        importanceEncrypted: 'cached-importance',
+        convictionEncrypted: 'cached-conviction',
+      };
+      const initial = scenario === 'initial-wins' ? { importanceEncrypted: 'initial-importance' } : null;
+      const latest =
+        scenario === 'latest-wins' || scenario === 'malformed'
+          ? { importanceEncrypted: 'latest-importance', convictionEncrypted: 'latest-conviction' }
+          : null;
+      const response = scenario === 'string' ? JSON.stringify(cached) : scenario === 'malformed' ? '{invalid' : cached;
+      const readQuestionsCache = jest.fn(() => ({
+        [scenario === 'wrong-network' ? 'other-network' : 'worker']: {
+          questionResponses: { q1: { [scenario === 'wrong-owner' ? '0xother' : '0xviewed']: response } },
+        },
+      }));
+      const getLatestQuestionResponse = jest.fn().mockResolvedValue(latest);
+      const baseline = { answers: { q1: { value: '*', encrypted: true } } };
+      const result = await hydrateLatestQuestionDecryptState(
+        {
+          questionId: 'q1',
+          fieldToDecrypt: 'answer',
+          baselineForDecrypt: baseline,
+          initialRatingEnvelopes: initial,
+          account: '0xself',
+          responderForLatest: '0xVIEWED',
+          sessionSlug: 'selected-session',
+          networkID: 'worker',
+        },
+        {
+          getQuestionFieldDecryptSelection,
+          readQuestionsCache,
+          getLatestQuestionResponse,
+          mergeLatestEncryptedQuestionFields,
+          mergeQuestionRatingEnvelopeState,
+        },
+      );
+      expect(readQuestionsCache).toHaveBeenCalledWith('selected-session');
+      expect(getLatestQuestionResponse).toHaveBeenCalledTimes(1);
+      expect(result.baselineForDecrypt).toEqual(baseline);
+      expect(result.ratingEnvelopes).toEqual(
+        latest ||
+          (['wrong-owner', 'wrong-network'].includes(scenario)
+            ? null
+            : {
+                importanceEncrypted: initial?.importanceEncrypted || 'cached-importance',
+                convictionEncrypted: 'cached-conviction',
+              }),
+      );
+    },
+  );
+
   it('prepares viewed decrypt state from the route payload and latest envelope hydration', async () => {
     const buildViewedResponseDecryptBaseline = jest.fn(() => ({
       answers: { q1: { value: '*', encrypted: true } },
@@ -1907,7 +1962,7 @@ describe('surveyToolDecryptFlow', () => {
     ).toEqual({
       surveysResponseState: [
         {
-          answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+          answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
           importance: { q1: 7 },
           conviction: { q1: 9 },
           additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
@@ -1919,7 +1974,7 @@ describe('surveyToolDecryptFlow', () => {
       suppressPrefill: true,
       decryptingByKey: { 'q1:answer': false, 'q1:additional': false },
       editBaseline: {
-        answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+        answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
         additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
         importance: { q1: 7 },
         conviction: { q1: 9 },
@@ -2007,7 +2062,7 @@ describe('surveyToolDecryptFlow', () => {
       ),
     ).toEqual({
       answers: {
-        q1: { value: 'clear answer', zkSalt: 'salt-a', encrypted: true },
+        q1: { value: 'clear answer', zkSalt: 'salt-a', encrypted: true, encryptedPortion: 'ans-env' },
         q2: { value: 'plain answer', encrypted: false },
       },
       additionalComments: {
@@ -2132,7 +2187,7 @@ describe('surveyToolDecryptFlow', () => {
     );
 
     expect(nextTargetStateSlice).toEqual({
-      answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+      answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
       additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
       importance: { q1: 7 },
       conviction: { q1: 9 },
@@ -2152,7 +2207,7 @@ describe('surveyToolDecryptFlow', () => {
         deepClone,
       ),
     ).toEqual({
-      answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+      answers: { q1: { value: 'clear answer', encrypted: true, encryptedPortion: 'ans-env', zkSalt: 'salt-a' } },
       additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
       importance: { q1: 7 },
       conviction: { q1: 9 },

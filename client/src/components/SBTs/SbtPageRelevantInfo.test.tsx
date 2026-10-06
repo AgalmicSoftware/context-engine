@@ -51,6 +51,21 @@ describe('SbtPageRelevantInfo', () => {
     expect(onOpenEncryptedDoc).toHaveBeenCalledWith(encryptedUrl);
   });
 
+  it('keeps document and tag links in compact group details without a repeated intro alert', () => {
+    render(<SbtPageRelevantInfo {...createProps({ compact: true, introText: null })} />);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://doc.example.test/public' })).toHaveAttribute(
+      'href',
+      'https://doc.example.test/public',
+    );
+    expect(screen.getByRole('link', { name: 'AI Policy' })).toHaveAttribute('href', '/tag/AI%20Policy');
+    expect(screen.queryByText('Tags:')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Tags' })).toContainElement(
+      screen.getByRole('link', { name: 'AI Policy' }),
+    );
+  });
+
   it('renders worker-managed document references as public links even when they use a Lit-shaped URL', () => {
     const encryptedUrl = 'lit://arweave/example-tx';
     render(

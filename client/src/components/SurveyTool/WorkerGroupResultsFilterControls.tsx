@@ -1,4 +1,3 @@
-import React from 'react';
 import { faUsers } from '@fortawesome/free-solid-svg-icons';
 import { QuestionFilterCollapsibleSection } from './QuestionFilterSections';
 import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';

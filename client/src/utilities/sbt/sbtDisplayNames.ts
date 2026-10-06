@@ -10,7 +10,6 @@ import contractScripts, { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDe
 import {
   listNamespaceEntriesSync,
   peekCacheSync,
-  readCache,
   subscribeCacheUpdates,
   updateCacheAtomic,
 } from '../cache/cacheScripts.js';

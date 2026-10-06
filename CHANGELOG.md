@@ -2,7 +2,67 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.6.4] - 2026-09-24
+## [0.6.5] - 2026-10-04
+
+### Client — available when the site deploys
+
+- Update the legacy Axios dependency to fix inherited request-method and form-data option handling.
+- Make quadratic allocation easier to answer: each option has − and + buttons, a block of squares showing what its votes cost, and a bar showing where your credits have gone. The question-type tile shows a matching compact preview.
+- Keep group details inside session pages, simplify interview review controls,
+  and improve help controls, documentation contrast and mobile atlas layout.
+  Results now separates Report, Debate Map and Raw Results for RxC sessions.
+- Make the pile and editing-card decrypt buttons open saved locked fields.
+  Preserve audience changes made before or during decryption. Decrypt saved
+  ratings with the answer so audience changes re-encrypt all three, and retain
+  encrypted importance and conviction across successive locked edits.
+- Wait for saved responses to load before uploading changes from a new device.
+  Show loading and retry feedback, recover after a failed refresh, and read the
+  participant's own saved answers when a complete public listing is unavailable.
+  Keep completed submissions readable and preserve untouched answers, comments
+  and ratings across sittings.
+- Keep locks chosen on blank answers and comments while saved answers load.
+  Allow navigation during that read, clear stale loading feedback after account
+  changes, and let a completed sync supersede a stalled read on the next Submit.
+- Make interview name and AI-attribution choices agree with the uploaded record
+  after a failed submission, reopening or reload. Show the name actually being
+  sent, retain consent per question, and keep withdrawals when moving between
+  pile and full-survey editing.
+- Let interview Apply finish after its own-answer read while public results
+  are still loading, and clear read failures after a successful retry.
+- Avoid repeated session initialization when the live URL changes between
+  sessions before router props catch up.
+- Preserve valid group joins through same-content configuration refreshes, while
+  cancelling joins when their destination changes or authentication fails.
+- Keep decrypted drafts with their owning account, mask retained locked values
+  in uploads, and pad encrypted choices to avoid revealing their selected length.
+- Bind sign-in messages to the intended Worker and session, improve rating
+  keyboard controls, and reduce unused code and eager imports.
+
+### Worker — requires a session Worker update
+
+- Reject sign-ins and upload authorizations bound to another Worker or session,
+  and validate signed destination Resources before accepting uploads.
+- Count public answers with locked notes accurately in Results, while keeping
+  encrypted ratings and note contents out of public analysis.
+- Pin downloaded Worker packages to the client build's release. Updating the
+  client does not automatically update an existing session Worker.
+
+### Known issues
+
+- In full-survey editing, saved per-question name and AI-attribution choices
+  arriving after the editor mounts can be omitted from a later edit.
+- Production SBT detail pages can lack the current block number because the
+  subscription depends on a component name changed by minification.
+- Simultaneous consent changes with equal timestamps and reloads against a
+  lagging response cache still need stronger conflict-resolution guarantees.
+- On a new device, leaving a question while saved answers load can leave its
+  saved answer blank in the editor. A later comment-only submission can then
+  overwrite that saved answer with an empty value.
+- If the response listing lags immediately after a submission, loading saved
+  answers can briefly revert a just-saved answer in the editor.
+- On a new device, an interview prefill can clear a previously saved comment.
+
+## [0.6.4] - 2026-09-28
 
 ### Client — available when the site deploys
 
@@ -10,7 +70,7 @@ All notable changes to this project will be documented in this file.
   search, related topics, and mobile navigation for the RxC sessions. Keep the
   unpopulated topic map in Results labelled "Waiting for more data".
 - Discover both RxC test sessions from their clean URLs on a fresh visit.
-- Display linked community groups from their verified owning session, preserving
+- Display linked community groups from their configured owning session, preserving
   existing memberships and logos without creating duplicate groups.
 - Put compact AI submission choices beside Submit responses, strengthen the
   review heading, and remove the duplicate imported-context title.

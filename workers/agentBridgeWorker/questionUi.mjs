@@ -1,6 +1,7 @@
+import { normalizeTelegramRatingScale } from './ratingScale.mjs';
+export { normalizeTelegramRatingScale, normalizeTelegramRatingAnswer } from './ratingScale.mjs';
 import { safeString } from './runtimePrimitives.mjs';
 import {
-  DEFAULT_RATING_SCALE,
   QUESTION_VISIBILITY,
   QUESTION_TYPES,
   SESSION_STORAGE_PROFILES,
@@ -114,36 +115,13 @@ function numberOrFallback(value, fallback) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
-export function normalizeTelegramRatingScale(question = {}) {
-  const source = question?.ratingScale && typeof question.ratingScale === 'object' && !Array.isArray(question.ratingScale)
-    ? question.ratingScale
-    : (
-      question?.rating_scale && typeof question.rating_scale === 'object' && !Array.isArray(question.rating_scale)
-        ? question.rating_scale
-        : {}
-    );
-  let min = Math.floor(numberOrFallback(source.min, DEFAULT_RATING_SCALE.min));
-  let max = Math.floor(numberOrFallback(source.max, DEFAULT_RATING_SCALE.max));
-  let step = Math.floor(numberOrFallback(source.step, DEFAULT_RATING_SCALE.step || 1));
-  if (step < 1) step = 1;
-  min = Math.max(-100, Math.min(100, min));
-  max = Math.max(-100, Math.min(100, max));
-  if (max < min) {
-    min = DEFAULT_RATING_SCALE.min;
-    max = DEFAULT_RATING_SCALE.max;
-    step = DEFAULT_RATING_SCALE.step || 1;
-  }
-  while (Math.floor((max - min) / step) + 1 > 21 && step < 10) step += 1;
-  return { min, max, step };
-}
-
 function ratingButtonValuesForScale(scale = {}) {
-  const normalized = normalizeTelegramRatingScale({ ratingScale: scale });
-  const values = [];
-  for (let value = normalized.min; value <= normalized.max && values.length < 25; value += normalized.step) {
-    values.push(value);
-  }
-  return values;
+  const { min, max, step } = normalizeTelegramRatingScale({ ratingScale: scale });
+  const lastIndex = Math.floor((max - min) / step + 1e-9);
+  const count = Math.min(lastIndex, 20);
+  // Button sampling limits chat chrome without changing the stored scale or the slider.
+  return Array.from({ length: count + 1 }, (_, index) =>
+    Number((min + (count ? Math.round(index * lastIndex / count) : 0) * step).toPrecision(12)));
 }
 
 function safeOpaqueSeedPart(value = '') {

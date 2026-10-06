@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {

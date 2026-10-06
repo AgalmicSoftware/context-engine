@@ -1,4 +1,3 @@
-import React from 'react';
 import { Input, Label, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -15,6 +14,9 @@ type Props = {
   revisionCount?: number;
   includeProvenance: boolean;
   includeComparison: boolean;
+  provenanceMixed?: boolean;
+  comparisonMixed?: boolean;
+  preserveSavedProvenance?: boolean;
   onProvenanceChange: (included: boolean) => void;
   onComparisonChange: (included: boolean) => void;
   coverageDetails: string[];
@@ -29,6 +31,9 @@ export default function SessionInterviewResearchConsent({
   revisionCount = 0,
   includeProvenance,
   includeComparison,
+  provenanceMixed = false,
+  comparisonMixed = false,
+  preserveSavedProvenance = false,
   onProvenanceChange,
   onComparisonChange,
   coverageDetails,
@@ -45,28 +50,37 @@ export default function SessionInterviewResearchConsent({
           <Label check className={styles.provenanceOption}>
             <Input
               type="checkbox"
-              checked={includeProvenance}
+              checked={provenanceMixed ? false : includeProvenance}
+              aria-checked={provenanceMixed ? 'mixed' : includeProvenance}
+              innerRef={(element: HTMLInputElement | null) => {
+                if (element) element.indeterminate = provenanceMixed;
+              }}
               disabled={disabled}
               onChange={(event) => onProvenanceChange(event.target.checked)}
             />{' '}
-            <span>Include platform/model provenance</span>
+            <span>Include platform/model provenance{provenanceMixed ? ' (mixed saved choices)' : ''}</span>
           </Label>
         )}
         <div className={styles.researchConsent}>
           <Label check className={styles.provenanceOption}>
             <Input
               type="checkbox"
-              checked={includeComparison}
+              checked={comparisonMixed ? false : includeComparison}
+              aria-checked={comparisonMixed ? 'mixed' : includeComparison}
+              innerRef={(element: HTMLInputElement | null) => {
+                if (element) element.indeterminate = comparisonMixed;
+              }}
               disabled={disabled}
               onChange={(event) => onComparisonChange(event.target.checked)}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
             />{' '}
-            <span>Share AI draft changes for research</span>
+            <span>Share AI draft changes for research{comparisonMixed ? ' (mixed saved choices)' : ''}</span>
           </Label>
           <button
             type="button"
             id="ce-interview-research-help"
             className={styles.researchHelp}
+            data-ce-control-appearance="frameless"
             aria-label="About research metadata"
             aria-describedby="ce-interview-research-description"
           >
@@ -90,6 +104,12 @@ export default function SessionInterviewResearchConsent({
       <details className={styles.metadata} aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}>
         <summary>AI prefill metadata</summary>
         <div className={styles.metadataBody}>
+          {preserveSavedProvenance ? (
+            <p>
+              Saved consent choices are retained. Selected AI drafts use this interview’s source metadata when
+              provenance is included.
+            </p>
+          ) : null}
           {showProvenance && includeProvenance ? (
             <dl>
               <dt>Platform</dt>

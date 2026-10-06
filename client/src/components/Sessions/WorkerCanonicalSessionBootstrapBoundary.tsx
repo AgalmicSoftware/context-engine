@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';

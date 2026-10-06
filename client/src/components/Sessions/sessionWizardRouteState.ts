@@ -46,23 +46,3 @@ export const buildSessionWizardNewSessionBannerDismissalContextKey = ({
   }
   return `${normalizedPathname}::plain`;
 };
-
-export const removeHashQueryParam = (hashValue = '', key = ''): string => {
-  const normalizedKey = toStr(key).trim();
-  const rawHash = toStr(hashValue).replace(/^#/, '').trim();
-  if (!normalizedKey || !rawHash) return toStr(hashValue).trim();
-  if (!/[=&]/.test(rawHash)) return toStr(hashValue).trim();
-  const params = new URLSearchParams(rawHash);
-  params.delete(normalizedKey);
-  const nextHash = params.toString();
-  return nextHash ? `#${nextHash}` : '';
-};
-
-export const scrubSponsoredBundleHashSecret = (): void => {
-  if (typeof window === 'undefined' || !window.location || !window.history?.replaceState) return;
-  const nextHash = removeHashQueryParam(window.location.hash || '', 'k');
-  const nextUrl = `${window.location.pathname || ''}${window.location.search || ''}${nextHash}`;
-  const currentUrl = `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
-  if (nextUrl === currentUrl) return;
-  window.history.replaceState({}, '', nextUrl);
-};

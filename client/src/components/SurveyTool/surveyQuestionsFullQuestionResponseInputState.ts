@@ -33,8 +33,8 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
       questionId: string;
       ratingValue: number;
       ratingScale: RatingScale;
+      answered: boolean;
       disabled: boolean;
-      useDeferredRating: boolean;
     }
   | {
       kind: 'binary';
@@ -64,15 +64,6 @@ export type SurveyQuestionsFullQuestionResponseInputActionDescriptor =
       event?: unknown;
     }
   | {
-      kind: 'rating-change';
-      questionId: string;
-      responseKey: 'answer';
-      disabled: boolean;
-      nextValue: number;
-      event?: unknown;
-      persistStrategy: 'event-sensitive';
-    }
-  | {
       kind: 'rating-commit';
       questionId: string;
       responseKey: 'answer';
@@ -80,13 +71,6 @@ export type SurveyQuestionsFullQuestionResponseInputActionDescriptor =
       nextValue: number;
       persistDraft: false;
       flushAfterUpdate: true;
-    }
-  | {
-      kind: 'rating-change-complete';
-      questionId: string;
-      responseKey: 'answer';
-      disabled: boolean;
-      event?: unknown;
     }
   | {
       kind: 'answer-encryption-toggle';
@@ -137,9 +121,8 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         questionId: question.id,
         ratingValue: getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max),
         ratingScale,
+        answered: !(answer.value == null || answer.value === ''),
         disabled,
-        // Regression guard: keep pointer-drag ticks local; parent updates rebuild the full question list.
-        useDeferredRating: true,
       };
     }
     case 'binary':
@@ -187,14 +170,6 @@ export const buildSurveyQuestionsFullQuestionResponseInputActionDescriptor = ({
   };
 
   switch (kind) {
-    case 'rating-change':
-      return {
-        ...base,
-        kind,
-        nextValue: Number(nextValue),
-        event,
-        persistStrategy: 'event-sensitive',
-      };
     case 'rating-commit':
       return {
         ...base,
@@ -202,12 +177,6 @@ export const buildSurveyQuestionsFullQuestionResponseInputActionDescriptor = ({
         nextValue: Number(nextValue),
         persistDraft: false,
         flushAfterUpdate: true,
-      };
-    case 'rating-change-complete':
-      return {
-        ...base,
-        kind,
-        event,
       };
     case 'answer-encryption-toggle':
       return {

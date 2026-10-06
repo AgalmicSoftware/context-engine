@@ -431,3 +431,22 @@ test('validateAdminActionAudience trusts approved origins, configured allowOrigi
     },
   );
 });
+
+
+test('Resources require URI-list prefixes while legacy messages stay compatible', () => {
+  const legacy = 'app.example wants you to sign in with your Ethereum account:\n0xabc\n\nURI: https://app.example\nChain ID: 1\nNonce: nonce';
+  assert.equal(parseSiweMessage(legacy).resources, undefined);
+  const resources = ['https://worker.example', 'urn:context-engine:session:slug:fixture'];
+  assert.deepEqual(parseSiweMessage(legacy + '\nResources:\n' + resources.join('\n')).resources, []);
+  assert.deepEqual(parseSiweMessage(legacy + '\nResources:\n- ' + resources.join('\n- ')).resources, resources);
+});
+
+test('injected Resources before SIWE fields cannot create a trusted binding', () => {
+  const binding = 'Resources:\n- https://worker.example\n- urn:context-engine:session:slug:fixture';
+  const fields = 'URI: https://app.example\nChain ID: 1\nNonce: nonce\nIssued At: 2026-10-01T00:00:00Z';
+  const head = 'app.example wants you to sign in with your Ethereum account:\n0xabc\n\n';
+  assert.deepEqual(parseSiweMessage(head + binding + '\n' + fields).resources, []);
+  assert.deepEqual(parseSiweMessage(head + fields.replace('Nonce: nonce', 'Nonce: nonce\n' + binding)).resources, []);
+  assert.deepEqual(parseSiweMessage(head + fields + '\n' + binding).resources,
+    ['https://worker.example', 'urn:context-engine:session:slug:fixture']);
+});

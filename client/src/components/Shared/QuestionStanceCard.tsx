@@ -1,5 +1,3 @@
-import React from 'react';
-
 import styles from './QuestionStanceCard.module.scss';
 
 export type QuestionStanceVote = -1 | 0 | 1;

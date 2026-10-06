@@ -21,11 +21,6 @@ test('createWorkerRouteRuntimeWithWorkerDeps returns the expected runtime contra
         readSbtFaucetValidationState: 'readSbtFaucetValidationState',
         validateSbtPasswordForFaucet: 'validateSbtPasswordForFaucet',
       }),
-      createAnonymousRegistrySupportAdaptersWithWorkerDeps: () => ({
-        resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
-        evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
-        resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
-      }),
       createAuthCorsAdminAdaptersWithWorkerDeps: () => ({
         getCorsContext: 'getCorsContext',
         resolveExistingSessionCors: 'resolveExistingSessionCors',
@@ -51,11 +46,9 @@ test('createWorkerRouteRuntimeWithWorkerDeps returns the expected runtime contra
     },
   });
 
-  assert.deepEqual(runtime.workerAuthGateUtils, {
-    computeScopesForLogin: 'computeScopesForLogin',
-    evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
-    resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
-  });
+  assert.equal(runtime.workerAuthGateUtils.computeScopesForLogin, 'computeScopesForLogin');
+  assert.equal(typeof runtime.workerAuthGateUtils.evaluateAnonymousRouteAccess, 'function');
+  assert.equal(typeof runtime.workerAuthGateUtils.resolveAnonymousRateIdentity, 'function');
   assert.equal(runtime.fetch, 'fetch');
 });
 
@@ -126,33 +119,6 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           findSessionGateForSbt: 'findSessionGateForSbt',
           readSbtFaucetValidationState: 'readSbtFaucetValidationState',
           validateSbtPasswordForFaucet: 'validateSbtPasswordForFaucet',
-        };
-      },
-      createAnonymousRegistrySupportAdaptersWithWorkerDeps: (value) => {
-        calls.push('anonymous');
-        assert.deepEqual(value, {
-          deps: {
-            resolveWorkerRequestSlugContext: 'resolveWorkerRequestSlugContext',
-            toStr: 'toStr',
-            isAddress: 'isAddress',
-            resolveRegistryRpcUrls: 'resolveRegistryRpcUrls',
-            toRegistrySessionSlug: 'toRegistrySessionSlug',
-            maskRpcUrl: 'maskRpcUrl',
-            readSessionExistsOnChain: 'readSessionExistsOnChain',
-            readResourceGateOnChain: 'readResourceGateOnChain',
-          },
-          constants: {
-            anonymousGateUnavailableError: 'anonymousGateUnavailableError',
-            anonymousRouteDeniedError: 'anonymousRouteDeniedError',
-            anonymousScopeDisabledError: 'anonymousScopeDisabledError',
-            anonymousRateIdHeader: 'X-Anonymous-Client-Id',
-            anonymousUnknownIdentity: 'anon:unknown',
-          },
-        });
-        return {
-          resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
-          evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
-          resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
         };
       },
       createAuthCorsAdminAdaptersWithWorkerDeps: (value) => {
@@ -322,12 +288,12 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           putSessionConfig: 'putSessionConfig',
           normalizeSecretValue: 'normalizeSecretValue',
           putSessionSecrets: 'putSessionSecrets',
-          resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
-          resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
+          resolveRequestSlugWithoutToken: value.deps.resolveRequestSlugWithoutToken,
+          resolveAnonymousRateIdentity: value.deps.resolveAnonymousRateIdentity,
           checkRateLimit: 'checkRateLimit',
           dispatchAnonymousRoute: 'dispatchAnonymousRoute',
           readTranscribeRequestPayload: 'readTranscribeRequestPayload',
-          evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
+          evaluateAnonymousRouteAccess: value.deps.evaluateAnonymousRouteAccess,
           transcribe: 'transcribe',
           readAiRequestPayload: 'readAiRequestPayload',
           validateAnonymousAiRequest: 'validateAnonymousAiRequest',
@@ -482,20 +448,17 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
     },
   });
 
-  assert.deepEqual(runtime.workerAuthGateUtils, {
-    computeScopesForLogin: 'computeScopesForLogin',
-    evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
-    resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
-  });
+  assert.equal(runtime.workerAuthGateUtils.computeScopesForLogin, 'computeScopesForLogin');
+  assert.equal(
+    runtime.workerAuthGateUtils.resolveAnonymousRateIdentity(
+      new Request('https://worker.example/ai', {
+        headers: { 'X-Anonymous-Client-Id': 'Client_Abc12345' },
+      }),
+    ),
+    'anon:cid:client_abc12345',
+  );
   assert.equal(runtime.fetch, 'fetch');
-  assert.deepEqual(calls, [
-    'registry',
-    'rateLimit',
-    'anonymous',
-    'authCorsAdmin',
-    'execution',
-    'routeShell',
-  ]);
+  assert.deepEqual(calls, ['registry', 'rateLimit', 'authCorsAdmin', 'execution', 'routeShell']);
 });
 
 
@@ -601,14 +564,6 @@ const createResultsAnalysisRuntime = ({ authorizeOk = true, deniedResources = []
         }),
         createRateLimitFaucetSupportWithWorkerDeps: () => ({ checkRateLimit: async () => true }),
       },
-    }),
-    createAnonymousRegistrySupportAdaptersWithWorkerDeps: () => ({
-      resolveRequestSlugWithoutToken: ({ request }) => {
-        const slug = request.headers.get('x-session-slug') || '';
-        return { ok: true, slug, explicitSlugProvided: !!slug };
-      },
-      evaluateAnonymousRouteAccess: async () => ({ ok: true }),
-      resolveAnonymousRateIdentity: () => 'anon:test',
     }),
     createAuthCorsAdminAdaptersWithWorkerDeps: () => ({
       getCorsContext: async ({ baseHeaders }) => ({ ok: true, headers: { ...(baseHeaders || {}), 'X-Cors': 'ok' } }),

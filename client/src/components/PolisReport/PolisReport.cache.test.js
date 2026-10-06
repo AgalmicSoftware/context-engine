@@ -1903,3 +1903,20 @@ it.each([
     expect(stat.querySelector('.statValue').textContent).toBe(expected[index]);
   });
 });
+
+it('ranks top questions by importance before conviction', () => {
+  const row = (responder, questionID, importance, conviction) => ({
+    responder,
+    response: JSON.stringify({ questionID, answer: { value: 5 }, importance, conviction }),
+  });
+  const out = applyFilterStateToAggregator(
+    {
+      highImportance: [row('0x1111111111111111111111111111111111111111', 'highImportance', 9, 1)],
+      highConviction: [row('0x2222222222222222222222222222222222222222', 'highConviction', 1, 9)],
+    },
+    { id: 84532 },
+    { topQuestions: { count: 1, by: 'importance' } },
+    '',
+  );
+  expect(Object.keys(out)).toEqual(['highImportance']);
+});

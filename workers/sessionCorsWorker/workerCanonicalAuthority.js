@@ -1,7 +1,7 @@
 import { isWorkerGroupMember as isWorkerGroupMemberBoundary } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+import { toStr } from './stringCoercion.js';
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);

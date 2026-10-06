@@ -124,6 +124,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       account: responderAddress || propsRef.current.account,
       surveyIndex,
       surveyResponseState,
+      savedInterviewProvenance: stateRef.current.editBaseline?.interviewProvenance,
       questionPool: Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : [],
       pileQuestions: Array.isArray(stateRef.current.pileQuestions) ? stateRef.current.pileQuestions : [],
       resolveFieldEncryptionAudience: (

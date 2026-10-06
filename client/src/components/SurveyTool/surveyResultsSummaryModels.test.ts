@@ -180,4 +180,27 @@ describe('surveyResultsSummaryModels', () => {
       { key: 'gamma', label: 'Gamma', count: 0 },
     ]);
   });
+
+  it('derives fallback options only from public, unmasked answers', () => {
+    const answers = [
+      { value: '*', encrypted: true },
+      { value: '*' },
+      { value: ['Private option'], encrypted: true },
+      { value: ['Alpha'] },
+    ];
+    const summary = buildSurveyResultsMultichoiceSummaryModel(
+      answers.map((answer, index) => ({ responder: `responder-${index}`, response: { answer } })),
+    );
+    expect(summary.options).toEqual([{ key: 'alpha', label: 'Alpha', count: 1 }]);
+    expect(summary.totalResponders).toBe(1);
+  });
+
+  it('retains configured options when every answer is encrypted', () => {
+    const summary = buildSurveyResultsMultichoiceSummaryModel(
+      [{ responder: 'responder-1', response: { answer: { value: '*', encrypted: true } } }],
+      { options: ['Alpha'] },
+    );
+    expect(summary.options).toEqual([{ key: 'alpha', label: 'Alpha', count: 0 }]);
+    expect(summary.totalResponders).toBe(0);
+  });
 });

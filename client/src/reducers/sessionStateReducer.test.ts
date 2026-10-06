@@ -3,7 +3,6 @@ import { readStoredGlobalSessionSelection } from '../utilities/session/globalSes
 import {
   CHANGE_ACTIVE_SESSION_SLUG,
   CHANGE_FOCUSED_TAB,
-  CHANGE_METRICS_CHOICE,
   FETCH_SESSION_STATE,
   LOGIN_IN_PROGRESS,
   SET_DEMO_SURFACE_MODE,
@@ -55,7 +54,6 @@ describe('sessionStateReducer', () => {
     const reloadedReducer = loadReducerWithDemoSurfaceModeDefault();
 
     expect(reloadedReducer(undefined, { type: '@@INIT' })).toEqual({
-      metricsOptIn: false,
       focusedTab: 4,
       loginInProgress: false,
       loginComplete: false,
@@ -200,14 +198,8 @@ describe('sessionStateReducer', () => {
     expect(JSON.parse(localStorage.getItem('ce:demoSurfaceMode') || 'null')).toBe(false);
   });
 
-  it('updates tab, metrics choice, and demo mode independently', () => {
-    const withMetrics = reducer(undefined, {
-      type: CHANGE_METRICS_CHOICE,
-      payload: true,
-    });
-    expect(withMetrics.metricsOptIn).toBe(true);
-
-    const withTab = reducer(withMetrics, {
+  it('updates tab and demo mode independently', () => {
+    const withTab = reducer(undefined, {
       type: CHANGE_FOCUSED_TAB,
       payload: 3,
     });

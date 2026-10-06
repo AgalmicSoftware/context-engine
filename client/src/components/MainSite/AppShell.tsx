@@ -1,7 +1,7 @@
 import WorkerResponseHydrationNotice from './WorkerResponseHydrationNotice';
 /** @file AppShell.tsx */
 
-import React, { Component, Suspense } from 'react';
+import React, { Component } from 'react';
 import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoinHost';
 import { connect } from 'react-redux';
 import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
@@ -30,12 +30,10 @@ import {
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
 import { chainScanReadsPort } from '../../domains/chain/chainScanReadsPort.js';
-import { profileScanPort } from '../../domains/profiles/profileScanPort.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
-import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
@@ -45,16 +43,11 @@ import {
   DEFAULT_SESSION_SLUG,
   DEFAULT_SESSION_SLUG_ALIAS,
 } from '../../variables/appConfig.js';
-import { getChainById, getSessionRegistryChainIds } from '../../variables/chains.js';
+import { getChainById } from '../../variables/chains.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
-import {
-  createInitialProfileScanReport,
-  createProfileScanFanoutPlan,
-  resolveProfileScanAttemptedCoverageSlugs,
-} from '../../utilities/session/profileScanReportHelpers.js';
 import {
   createSessionMetaRefreshController,
   type SessionMetaRefreshController,
@@ -92,7 +85,6 @@ import {
 } from '../../utilities/survey/sessionResponseHydrationController.js';
 import { isResponseRecencyAtLeast, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
-import { t } from '../../utilities/ui/terminology.js';
 import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { createMainSiteDgStorage, type MainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
 import {
@@ -131,7 +123,6 @@ import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionP
 
 import { createLogger } from 'utilities/logging.js';
 import {
-  buildQuestionRoutePath,
   isKnownOrGeneralSessionSlug,
   shouldRetryMaskedQuestionRefresh,
 } from '../../utilities/survey/questionRouting.js';
@@ -141,15 +132,12 @@ import {
   getSessionNetwork as _getSessionNetwork,
   type MainSiteSessionConfigLike,
 } from '../../utilities/session/mainSiteSessionConfig.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   resolveMainSiteExplicitSessionSlugFromPath,
   resolveMainSiteGlobalPrimarySessionSlug,
-  resolveMainSiteQuestionRouteSessionContext,
   resolveMainSiteRenderActiveSessionSlug,
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
-  resolveMainSiteSessionRouteContext,
   resolveMainSiteSessionRouteSourceSlug,
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
@@ -168,10 +156,7 @@ import {
   findGroupSlugForSurvey as findGroupSlugForSurveyFn,
   resolveGroupSlugForSbtAddress as resolveGroupSlugForSbtAddressFn,
 } from './groupSlugLookup.js';
-import {
-  hasAutoFlag as hasAutoFlagFn,
-  manageAutoHashPersistence as manageAutoHashPersistenceFn,
-} from './autoHashPersistence';
+import { manageAutoHashPersistence as manageAutoHashPersistenceFn } from './autoHashPersistence';
 import {
   prepareSurveyMetadataCacheEntry as prepareSurveyMetadataCacheEntryFn,
   prepareQuestionMetadataCacheEntry as prepareQuestionMetadataCacheEntryFn,
@@ -182,26 +167,13 @@ import {
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,
 } from '../../utilities/cache/sessionCacheConstants.js';
-import {
-  buildMainSiteCacheManagerReadyStatePatch,
-  isRouteResponderAddress,
-} from '../../utilities/session/mainSiteUtils.js';
-import {
-  composeMainSiteAuthViewProps,
-  composeMainSiteLoginViewProps,
-  composeMainSiteQuestionCacheViewProps,
-  composeMainSiteSessionCacheViewProps,
-  composeMainSiteSurveyCacheViewProps,
-  composeMainSiteWalletViewProps,
-} from './mainSiteViewProps.js';
+import { buildMainSiteCacheManagerReadyStatePatch } from '../../utilities/session/mainSiteUtils.js';
 import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
   SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
-import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE, isStaticNonCacheRoute } from './routeConfig.js';
-import { resolveMainSiteRouteMatch } from './routeTable.js';
-import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
+import { isStaticNonCacheRoute } from './routeConfig.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
 import {
@@ -211,12 +183,7 @@ import {
   resolveMainSiteDisplaySessionConfig,
   resolveMainSiteDisplaySessionNetwork,
 } from './mainSiteCapabilityHostRuntime';
-import {
-  buildPublicRoute,
-  buildPublicUrl,
-  replaceRouteResponderQueryParam,
-  stripConfiguredPublicBasePath,
-} from './urlUtils.js';
+import { buildPublicUrl, stripConfiguredPublicBasePath } from './urlUtils.js';
 import {
   getEffectiveRoutePath as getEffectiveRoutePathFn,
   isGeneralRoutePath as isGeneralRoutePathFn,
@@ -253,34 +220,6 @@ import {
   getUserAddressFromPath as getUserAddressFromPathFn,
 } from './sbtRoutePathHelpers';
 import { reloadWindowLocation as reloadWindowLocationFn } from './reloadWindowLocation.js';
-import {
-  AboutPage as AboutPageRaw,
-  AdminPage as AdminPageRaw,
-  AgentPage as AgentPageRaw,
-  DebateMap as DebateMapRaw,
-  BookmarksPage as BookmarksPageRaw,
-  CompareAddresses as CompareAddressesRaw,
-  DocsPage as DocsPageRaw,
-  DemosIndex as DemosIndexRaw,
-  OnePageSession as OnePageSessionRaw,
-  RiskMatrixDemo as RiskMatrixDemoRaw,
-  SBTPage as SBTPageRaw,
-  SBTsPage as SBTsPageRaw,
-  SessionDocumentsPage as SessionDocumentsPageRaw,
-  SessionWizard as SessionWizardRaw,
-  SimulatedUserPage as SimulatedUserPageRaw,
-  SponsorPage as SponsorPageRaw,
-  SurveyPage as SurveyPageRaw,
-  SurveyTool as SurveyToolRaw,
-  TagPage as TagPageRaw,
-  UserPage as UserPageRaw,
-} from './routeLazyComponents.js';
-import {
-  buildQuestionReadyStatePatch,
-  shouldClearQuestionProgressInFinalize,
-  shouldCommitThrottledProgress,
-  shouldFlushCoalescedRun,
-} from '../../utilities/session/mainSiteProgressHelpers.js';
 
 type SurveyGroupScanQueueOptions = {
   hintedSlug?: unknown;
@@ -297,7 +236,6 @@ export {
   mergeSbtLiveProgressEntry,
   buildQuestionReadyStatePatch,
   shouldClearQuestionProgressInFinalize,
-  shouldEnableSessionRegistryRefresh,
   SBT_PROGRESS_MIN_INTERVAL_MS,
   SBT_PROGRESS_FINAL_TAIL_BLOCKS,
   SBT_LIGHT_DISCOVERY_SCAN_UNITS,
@@ -310,11 +248,6 @@ const mainSiteLog = createLogger('mainSite');
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-type MainSiteProfileMetaResult<T> = {
-  data: T;
-  hadError: boolean;
-  error?: string;
-};
 const styles = stylesRaw as Record<string, string>;
 const WagmiHooksHOC = WagmiHooksHOCRaw;
 const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
@@ -329,55 +262,6 @@ const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
 const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const SessionLoadingSkeleton = asMainSiteRouteComponent(SessionLoadingSkeletonRaw);
-const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
-const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
-const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
-const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
-const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
-const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
-const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
-const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
-const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
-const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
-
-const isMainSiteProfileMetaResult = <T,>(value: unknown): value is MainSiteProfileMetaResult<T> =>
-  !!value &&
-  typeof value === 'object' &&
-  (Object.prototype.hasOwnProperty.call(value, 'hadError') || Object.prototype.hasOwnProperty.call(value, 'data'));
-const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
-const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
-const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
-const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
-const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
-const SponsorPage = asMainSiteRouteComponent(SponsorPageRaw);
-const SurveyPage = asMainSiteRouteComponent(SurveyPageRaw);
-const SurveyTool = asMainSiteRouteComponent(SurveyToolRaw);
-const TagPage = asMainSiteRouteComponent(TagPageRaw);
-const UserPage = asMainSiteRouteComponent(UserPageRaw);
-
-interface RouteRenderCtx {
-  fullPath: string;
-  searchStr: string;
-  hashStr: string;
-  searchParams: URLSearchParams;
-  pathWithoutQuery: string;
-  pathSegments: string[];
-  firstPathSegment: string;
-  routeDemoMode: boolean;
-  requestedSessionId: string;
-  requestedChainId: number | null;
-  requestedSponsoredBundleId: string;
-  requestedSponsoredBundleKey: string | null;
-  defaultSlug: string;
-  defaultSessionCfg: MainSiteSessionConfigLike | null;
-  defaultSessionChainId: number | null;
-  defaultSessionNetwork: ReturnType<typeof _getSessionNetwork>;
-  cacheInitializationError: boolean;
-  surveyIDFromPath: string | null;
-  autoOpenResults: boolean;
-  parsedFilterStateFromUrl: Record<string, unknown>;
-  isResultsRoute: boolean;
-}
 
 type RefreshSurveyResponsesByIDFn = (surveyID: string) => Promise<void>;
 type RefreshQuestionResponsesFn = (
@@ -1037,6 +921,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),
   });
   _lastGroupChainId: number | null = null;
+  _lastDidUpdatePathRaw: string | null = null;
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _sessionRegistryCacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
@@ -2033,9 +1918,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     ...args
   ) => this._profileScanController.ensureRegistryHydratedForProfileScan(...args);
 
-  isOnchainSessionRegistryEnabled: SessionProfileScanController['isOnchainSessionRegistryEnabled'] = (...args) =>
-    this._profileScanController.isOnchainSessionRegistryEnabled(...args);
-
   refreshSessionUniverseRegistryCache: SessionProfileScanController['refreshSessionUniverseRegistryCache'] = (
     ...args
   ) => this._profileScanController.refreshSessionUniverseRegistryCache(...args);
@@ -2100,7 +1982,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     // Query-hinted survey URLs should resolve in that exact session context first.
     // This avoids long cross-session scans and matches shared-link intent.
     if (hintedSlug) {
-      if (!this.getSessionChainId(hintedSlug) && this.isOnchainSessionRegistryEnabled()) {
+      if (!this.getSessionChainId(hintedSlug)) {
         try {
           await this.ensureRegistryHydratedForProfileScan();
           allSlugs =
@@ -2524,8 +2406,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
     this.props.fetchSessionState();
 
-    mainSiteLog.log('this.props.urlExtension:', this.props.urlExtension);
-
     // Prioritize user load (deep search) if on a user profile
     const targetUser = this.getUserAddressFromPath(bootstrapPath);
     if (targetUser) {
@@ -2805,9 +2685,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     } catch (e) {
       mainSiteLog.warn('MainSite: cleanup', e);
     }
-    if (this.props.socket !== undefined) {
-    }
-
     try {
       if (typeof this._cacheUpdateUnsubscribe === 'function') {
         this._cacheUpdateUnsubscribe();
@@ -2988,8 +2865,11 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this.handleNetworkChange();
     }
 
-    const prevPathRaw = prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+    // A redirect can change the URL before the router updates the path prop.
+    // Record it before dispatching so nested updates do not repeat the transition.
     const currPathRaw = this.getCurrentPathname();
+    const prevPathRaw = this._lastDidUpdatePathRaw ?? (prevProps.path || currPathRaw);
+    this._lastDidUpdatePathRaw = currPathRaw;
     const prevPath = this.getEffectiveRoutePath(prevPathRaw);
     const currPath = this.getEffectiveRoutePath(currPathRaw);
     const currSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
@@ -3003,7 +2883,13 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       ? this.resolveSessionSlugFromPathToken(currSessionToken, { allowAsyncResolve: true })
       : '';
     const sessionSlugChanged = prevSlugFromPath !== currSlugFromPath;
-    const sessionSlugNeedsSync = !!currSessionToken && this.getSessionSlugFromState() !== currSlugFromPath;
+    // A stale session path overrides the store in the normal slug resolver.
+    // Compare the updated store while the router catches up to avoid redispatching.
+    const routerPathCurrent = this.normalizeRoutePath(this.props.path || '') === this.normalizeRoutePath(currPathRaw);
+    const syncedSessionSlug = routerPathCurrent
+      ? this.getSessionSlugFromState()
+      : normalizeSessionSlug(this.props.activeSessionSlug || '');
+    const sessionSlugNeedsSync = !!currSessionToken && syncedSessionSlug !== currSlugFromPath;
 
     if (currPath.startsWith('/session/') && (sessionSlugChanged || sessionSlugNeedsSync)) {
       const prevActiveSlug = this.getSessionSlugFromProps(prevProps) || prevSlugFromPath;

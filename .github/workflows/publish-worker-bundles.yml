@@ -2,6 +2,7 @@ name: Publish Worker Bundles
 
 on:
   workflow_run:
+    branches: [main, master]
     workflows:
       - CI
     types:

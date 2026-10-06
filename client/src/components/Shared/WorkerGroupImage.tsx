@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usesPublicReadCloudflareStorage } from '../../utilities/storage/sessionStorageConfig';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';

@@ -1,21 +1,11 @@
-import {
-  createAnonymousRegistrySupportAdaptersWithWorkerDeps as createAnonymousRegistrySupportAdaptersWithWorkerDepsBoundary,
-} from './anonymousRegistrySupportBinding.js';
-import {
-  createAuthCorsAdminAdaptersWithWorkerDeps as createAuthCorsAdminAdaptersWithWorkerDepsBoundary,
-} from './authCorsAdminBinding.js';
-import {
-  createRateLimitFaucetSupportWithWorkerDeps as createRateLimitFaucetSupportWithWorkerDepsBoundary,
-} from './rateLimitFaucetSupportBinding.js';
-import {
-  createRegistryLoginBootstrapAdaptersWithWorkerDeps as createRegistryLoginBootstrapAdaptersWithWorkerDepsBoundary,
-} from './registryLoginBootstrapBinding.js';
-import {
-  createWorkerExecutionServicesWithWorkerDeps as createWorkerExecutionServicesWithWorkerDepsBoundary,
-} from './workerExecutionServiceBinding.js';
-import {
-  createWorkerRouteShellWithWorkerDeps as createWorkerRouteShellWithWorkerDepsBoundary,
-} from './workerRouteShellBinding.js';
+import { resolveAnonymousRequestSlug } from './anonymousRequestSlugResolution.js';
+import { evaluateAnonymousRouteAccess as evaluateAnonymousRouteAccessBoundary } from './anonymousRouteAccessValidation.js';
+import { resolveAnonymousRateIdentity as resolveAnonymousRateIdentityBoundary } from './anonymousRateIdentityNormalization.js';
+import { createAuthCorsAdminAdaptersWithWorkerDeps as createAuthCorsAdminAdaptersWithWorkerDepsBoundary } from './authCorsAdminBinding.js';
+import { createRateLimitFaucetSupportWithWorkerDeps as createRateLimitFaucetSupportWithWorkerDepsBoundary } from './rateLimitFaucetSupportBinding.js';
+import { createRegistryLoginBootstrapAdaptersWithWorkerDeps as createRegistryLoginBootstrapAdaptersWithWorkerDepsBoundary } from './registryLoginBootstrapBinding.js';
+import { createWorkerExecutionServicesWithWorkerDeps as createWorkerExecutionServicesWithWorkerDepsBoundary } from './workerExecutionServiceBinding.js';
+import { createWorkerRouteShellWithWorkerDeps as createWorkerRouteShellWithWorkerDepsBoundary } from './workerRouteShellBinding.js';
 
 export const createWorkerRouteRuntimeWithWorkerDeps = ({
   deps,
@@ -73,12 +63,16 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
     },
   });
 
-  const anonymousRegistrySupport = (
-    deps?.createAnonymousRegistrySupportAdaptersWithWorkerDeps ||
-    createAnonymousRegistrySupportAdaptersWithWorkerDepsBoundary
-  )({
+  const anonymousRegistrySupport = {
+    resolveRequestSlugWithoutToken: (value = {}) =>
+      resolveAnonymousRequestSlug({
+        ...value,
+        deps: { resolveWorkerRequestSlugContext: deps?.resolveWorkerRequestSlugContext },
+      }),
+    evaluateAnonymousRouteAccess: async (value = {}) =>
+      evaluateAnonymousRouteAccessBoundary({
+        ...value,
     deps: {
-      resolveWorkerRequestSlugContext: deps?.resolveWorkerRequestSlugContext,
       toStr: deps?.toStr,
       isAddress: deps?.isAddress,
       resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
@@ -86,15 +80,24 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       maskRpcUrl: deps?.maskRpcUrl,
       readSessionExistsOnChain: registryLoginBootstrapAdapters.readSessionExistsOnChain,
       readResourceGateOnChain: registryLoginBootstrapAdapters.readResourceGateOnChain,
+          warn: console.warn,
     },
     constants: {
       anonymousGateUnavailableError: constants?.anonymousGateUnavailableError,
       anonymousRouteDeniedError: constants?.anonymousRouteDeniedError,
       anonymousScopeDisabledError: constants?.anonymousScopeDisabledError,
+        },
+      }),
+    resolveAnonymousRateIdentity: (request) =>
+      resolveAnonymousRateIdentityBoundary({
+        request,
+        deps: { toStr: deps?.toStr },
+        constants: {
       anonymousRateIdHeader: constants?.anonymousRateIdHeader,
       anonymousUnknownIdentity: constants?.anonymousUnknownIdentity,
     },
-  });
+      }),
+  };
 
   const authCorsAdminAdapters = (
     deps?.createAuthCorsAdminAdaptersWithWorkerDeps ||

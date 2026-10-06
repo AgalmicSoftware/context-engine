@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminWorkerGroupsPanel from '../Admin/AdminWorkerGroupsPanel';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
@@ -32,9 +32,14 @@ export type WorkerSessionGroupsPanelProps = {
   createOnly?: boolean;
   refreshNonce?: number;
   selectedGroupId?: string;
+  groupIdFilter?: string;
+  inlineDetails?: boolean;
   showGroupDescriptions?: boolean;
   showMembershipListHeader?: boolean;
+  showEmptyState?: boolean;
+  showLoadingState?: boolean;
   membershipsOnly?: boolean;
+  authenticateOnRender?: boolean;
   toggleLoginModal?: (open: boolean) => void;
 };
 
@@ -64,10 +69,15 @@ const WorkerSessionGroupsPanel = ({
   sessionName,
   showCreate,
   createOnly = false,
+  authenticateOnRender = true,
   refreshNonce = 0,
   selectedGroupId = '',
+  groupIdFilter = '',
+  inlineDetails = false,
   showGroupDescriptions = true,
   showMembershipListHeader = true,
+  showEmptyState = true,
+  showLoadingState = true,
   membershipsOnly = false,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
@@ -97,6 +107,7 @@ const WorkerSessionGroupsPanel = ({
   const targetKey = `${canonicalSessionId}\n${canonicalSessionSlug}\n${workerUrl}\n${normalizedAccount.toLowerCase()}`;
   const [authState, setAuthState] = useState<WorkerGroupsAuthState>(() => emptyAuthState(targetKey));
   const [groupsRevision, setGroupsRevision] = useState(0);
+  const [pendingJoin, setPendingJoin] = useState<{ targetKey: string; groupId: string }>();
   const [preserveSignedOutParticipantDraft, setPreserveSignedOutParticipantDraft] = useState(false);
   const authRequestIdRef = useRef(0);
   const suppressOwnGroupsChangedEventRef = useRef(false);
@@ -113,9 +124,10 @@ const WorkerSessionGroupsPanel = ({
   // Public discovery is anonymous only for signed-out visitors. Once an
   // account is available, authenticate so every route projects that account's
   // durable Worker memberships instead of reverting joined cards to "Join".
-  const shouldAuthenticateOnRender = !allowAnonymousGroupDiscovery || !!normalizedAccount;
+  const shouldAuthenticateOnRender = authenticateOnRender && (!allowAnonymousGroupDiscovery || !!normalizedAccount);
   const canRenderMemberships =
     !!workerToken ||
+    (!authenticateOnRender && !membershipsOnly && allowAnonymousGroupDiscovery) ||
     (!normalizedAccount && !membershipsOnly && allowAnonymousGroupDiscovery) ||
     (!!normalizedAccount && authStatus === 'error' && !membershipsOnly && allowAnonymousGroupDiscovery);
 
@@ -148,6 +160,7 @@ const WorkerSessionGroupsPanel = ({
         error: '',
       });
     } catch (error) {
+      setPendingJoin((pending) => (pending?.targetKey === requestTargetKey ? undefined : pending));
       if (authRequestIdRef.current !== requestId) return;
       setAuthState({
         targetKey: requestTargetKey,
@@ -167,6 +180,12 @@ const WorkerSessionGroupsPanel = ({
     targetKey,
     workerUrl,
   ]);
+
+  useEffect(() => {
+    // Config objects can refresh during the same wallet prompt; only a new
+    // session, Worker, or account invalidates the user's explicit Join.
+    setPendingJoin(undefined);
+  }, [targetKey]);
 
   useEffect(() => {
     setGroupsRevision(0);
@@ -205,6 +224,15 @@ const WorkerSessionGroupsPanel = ({
     }
     if (authStatus !== 'loading') void authenticate();
   }, [authStatus, authenticate, normalizedAccount, toggleLoginModal]);
+
+  const requestJoinAuthentication = useCallback(
+    (groupId = '') => {
+      if (groupId) setPendingJoin({ targetKey, groupId });
+      requestActionAuthentication();
+    },
+    [targetKey, requestActionAuthentication],
+  );
+  const clearPendingJoin = useCallback(() => setPendingJoin(undefined), []);
 
   const postSignedRequest = useCallback<PostSignedWorkerGroupRequest>(
     (args = {}) => {
@@ -350,6 +378,22 @@ const WorkerSessionGroupsPanel = ({
     );
   };
 
+  if (!authenticateOnRender && !workerToken && !allowAnonymousGroupDiscovery) {
+    return (
+      <div className={styles.workerGroupNotice}>
+        <span>{authError || 'Join to sign in and view this linked group.'}</span>
+        <button
+          type="button"
+          className={styles.telegramPrimaryButton}
+          disabled={authStatus === 'loading'}
+          onClick={() => requestJoinAuthentication(groupIdFilter)}
+        >
+          {authStatus === 'loading' ? 'Signing in…' : 'Join'}
+        </button>
+      </div>
+    );
+  }
+
   if (!normalizedAccount && !allowAnonymousGroupDiscovery) {
     if (createOnly) return <div data-testid="ce-session-worker-groups-native">{renderCreatePanel()}</div>;
     return (
@@ -406,11 +450,17 @@ const WorkerSessionGroupsPanel = ({
           sessionSlug={canonicalSessionSlug}
           refreshNonce={groupsRevision + refreshNonce}
           selectedGroupId={selectedGroupId}
+          groupIdFilter={groupIdFilter}
+          inlineDetails={inlineDetails}
           showDescriptions={showGroupDescriptions}
           showListHeader={showMembershipListHeader}
+          showEmptyState={showEmptyState}
+          showLoadingState={showLoadingState}
           membershipsOnly={membershipsOnly}
           participantAddress={normalizedAccount}
-          onSignIn={requestActionAuthentication}
+          onSignIn={requestJoinAuthentication}
+          joinAfterSignInGroupId={pendingJoin?.targetKey === targetKey ? pendingJoin.groupId : ''}
+          onJoinAfterSignInHandled={clearPendingJoin}
           onGroupsChanged={broadcastGroupsChanged}
         />
       ) : null}

@@ -26,6 +26,7 @@ const mockPolisReport = jest.fn();
 let mockRenderRealPolisReport = false;
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
+const mockTopicCircles = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
@@ -106,6 +107,10 @@ jest.mock('../PolisReport/PolisReport', () => (props) => {
 });
 jest.mock('../DebateMap/DebateMap', () => ({
   __esModule: true,
+  AtlasView: (props) => {
+    mockTopicCircles(props);
+    return <div data-testid="topic-circles" />;
+  },
   default: (props) => {
     mockDebateMap(props);
     return (
@@ -912,7 +917,7 @@ describe('OnePageSession results routing', () => {
   });
 
   it.each(['rxc-test', 'rxc-ra-test'])(
-    'shows the atlas in %s Context and the empty topic preview in Results',
+    'keeps the %s topic Circles in Debate Map, separate from Report and Raw Results',
     async (slug) => {
       const props = buildProps();
       render(
@@ -927,10 +932,30 @@ describe('OnePageSession results routing', () => {
       expect(await screen.findByTestId('ce-rxc-context-atlas')).toBeVisible();
       expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-      expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
-      expect(screen.getAllByText('0 assigned')).toHaveLength(12);
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      const nav = screen.getByTestId('ce-session-results-view-nav');
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', '🗺️Debate Map', 'Raw Results']);
+      expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
       expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+      fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
+      expect(await screen.findByTestId('topic-circles')).toBeVisible();
+      expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
+      expect(mockTopicCircles).toHaveBeenLastCalledWith(
+        expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }),
+      );
+      expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
+      fireEvent.click(within(nav).getByRole('button', { name: 'Report' }));
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
+      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+      fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
+      expect(await screen.findByTestId('survey-page-full')).toBeVisible();
+      await waitFor(() => {
+        expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+      });
     },
   );
 

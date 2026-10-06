@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -148,6 +148,7 @@ export default function SessionInterviewMemoryKickoffCard({
               type="button"
               id="ce-interview-agent-prompt-help"
               className={styles.sessionInterviewHeaderButton}
+              data-ce-control-appearance="frameless"
               aria-label="About the interview prompt"
             >
               <FontAwesomeIcon icon={faQuestionCircle} />

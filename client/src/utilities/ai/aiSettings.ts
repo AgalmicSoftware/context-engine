@@ -8,7 +8,6 @@ import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../../../shared/aiDefaul
  */
 // Central AI settings resolver (session defaults + local overrides).
 
-import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import store from '../../store.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { toStr } from '../shared/primitives.js';

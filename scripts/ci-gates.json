@@ -43,14 +43,6 @@
           ]
         },
         {
-          "label": "Verify AI Discourse Bench Results sync",
-          "command": "npm",
-          "args": [
-            "run",
-            "check:ai-discourse-bench-results-sync"
-          ]
-        },
-        {
           "label": "Verify AI Discourse Bench publication artifact",
           "command": "npm",
           "args": [

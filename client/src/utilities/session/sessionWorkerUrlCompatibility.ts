@@ -1,6 +1,5 @@
 import type { SessionConfigLike } from './sessionTypes.js';
-
-const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
+import { hasOwn } from '../shared/primitives.js';
 
 export const SESSION_WORKER_URL_COMPATIBILITY_KEYS = Object.freeze([
   'corsWorkerURL',

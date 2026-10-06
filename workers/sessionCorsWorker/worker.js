@@ -224,7 +224,6 @@ export const createWorkerRuntime = (env, overrides = {}) => {
       evaluateResultsAnalysisViewerEligibility: resolvedDeps.evaluateResultsAnalysisViewerEligibility,
       readCoordinatedResultsAnalysisStatus: resolvedDeps.readCoordinatedResultsAnalysisStatus,
       dispatchResultsAnalysisArtifactRequest: resolvedDeps.dispatchResultsAnalysisArtifactRequest,
-      createAnonymousRegistrySupportAdaptersWithWorkerDeps: resolvedDeps.createAnonymousRegistrySupportAdaptersWithWorkerDeps,
       createAuthCorsAdminAdaptersWithWorkerDeps: resolvedDeps.createAuthCorsAdminAdaptersWithWorkerDeps,
       waitUntil: resolvedDeps.waitUntil,
     },

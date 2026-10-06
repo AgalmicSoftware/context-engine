@@ -194,9 +194,14 @@ export const buildSurveyDecryptSourceState = (
   const baseSourceSlice = latestResponse
     ? buildSliceFromUserAnswers(latestResponse)
     : toDecryptResponseSlice(fallbackSourceSlice || buildEmptyQuestionDecryptSlice());
+  const sourceSlice = carryForwardSurveyQuestionRatings(baseSourceSlice, previousStateSlice);
+  // Survey payload consent can predate a per-question withdrawal made in the pile.
+  if (Array.isArray(asRecord(latestResponse).responses)) {
+    delete asRecord(sourceSlice).interviewProvenance;
+  }
 
   return {
-    sourceSlice: carryForwardSurveyQuestionRatings(baseSourceSlice, previousStateSlice),
+    sourceSlice,
     ratingEnvelopesByQid: collectQuestionRatingEnvelopesByQid(latestResponse),
   };
 };

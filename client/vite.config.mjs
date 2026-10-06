@@ -124,6 +124,8 @@ const manualChunkGroups = [
     patterns: [
       '/node_modules/arweave/',
       '/node_modules/arbundles/',
+      // Only arweave imports bignumber.js; keep it lazy with the SDK.
+      '/node_modules/bignumber.js/',
     ],
   },
   {
@@ -148,7 +150,6 @@ const manualChunkGroups = [
     patterns: [
       '/node_modules/aes-js/',
       '/node_modules/bech32/',
-      '/node_modules/bignumber.js/',
       '/node_modules/hash.js/',
       '/node_modules/inherits/',
       '/node_modules/js-sha3/',
@@ -264,9 +265,7 @@ const resolvePostsAssetPath = (requestUrl) => {
 const readClientEnv = (mode) => {
   const loadedEnv = loadEnv(mode, __dirname, ['REACT_APP_', 'NEXT_PUBLIC_', 'PUBLIC_URL']);
   const reactAppEnv = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => (
-      key.startsWith('REACT_APP_') || key.startsWith('NEXT_PUBLIC_')
-    ))
+    Object.entries(process.env).filter(([key]) => key.startsWith('REACT_APP_') || key.startsWith('NEXT_PUBLIC_')),
   );
   const publicUrl = process.env.PUBLIC_URL ?? loadedEnv.PUBLIC_URL ?? '/';
   return {
@@ -369,7 +368,7 @@ const litContractsSubpathShim = () => ({
       'access-control-conditions',
       'node_modules',
       '@lit-protocol',
-      'contracts'
+      'contracts',
     );
     const rootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
     const base = fs.existsSync(path.join(nestedBase, 'dist')) ? nestedBase : rootBase;

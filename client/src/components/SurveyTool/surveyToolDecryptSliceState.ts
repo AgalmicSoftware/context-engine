@@ -164,6 +164,7 @@ export const applyDecryptedQuestionStateToSurveySlice = (
   const decryptedSlice = asRecord(decryptedStateSlice);
   const decryptedAnswers = asRecord(decryptedSlice.answers);
   const decryptedAdditionalComments = asRecord(decryptedSlice.additionalComments);
+  // The plaintext and envelope must come from the same saved response, even in a stale tab.
   const baseline = asRecord(baselineSlice);
   const baselineAnswers = asRecord(baseline.answers);
   const baselineAdditionalComments = asRecord(baseline.additionalComments);
@@ -177,6 +178,7 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     nextTargetStateSlice.answers = { ...currentAnswers };
     asRecord(nextTargetStateSlice.answers)[qid] = {
       ...currentAnswer,
+      ...baselineAnswer,
       value: incoming.value,
       encrypted:
         typeof prevEncrypted === 'boolean'
@@ -197,6 +199,7 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     };
     asRecord(nextTargetStateSlice.additionalComments)[qid] = {
       ...currentAdditional,
+      ...baselineAdditional,
       value: incoming.value,
       encrypted:
         typeof prevEncrypted === 'boolean'
@@ -229,6 +232,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     clearMode = 'both',
     didUpdate = false,
     baselineSlice = null,
+    ratingEnvelopes = null,
     decryptedStateSlice,
     decryptedImportance = null,
     decryptedConviction = null,
@@ -238,6 +242,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     clearMode?: unknown;
     didUpdate?: boolean;
     baselineSlice?: unknown;
+    ratingEnvelopes?: unknown;
     decryptedStateSlice?: unknown;
     decryptedImportance?: unknown;
     decryptedConviction?: unknown;
@@ -246,20 +251,79 @@ export const buildSelfQuestionDecryptSuccessState = (
 ) => {
   const previous = asRecord(prevState);
   const surveysResponseStateCopy = [...((previous.surveysResponseState as unknown[]) || [])];
-  const targetStateSlice = applyDecryptedQuestionStateToSurveySlice(
-    surveysResponseStateCopy[surveyIndex] || buildEmptyQuestionDecryptSlice(),
-    {
-      questionId,
-      decryptedStateSlice,
-      baselineSlice,
-      decryptedImportance,
-      decryptedConviction,
-    },
+  const savedStateSlice = asRecord(
+    applyDecryptedQuestionStateToSurveySlice(
+      surveysResponseStateCopy[surveyIndex] || buildEmptyQuestionDecryptSlice(),
+      {
+        questionId,
+        decryptedStateSlice,
+        baselineSlice,
+        decryptedImportance,
+        decryptedConviction,
+      },
+    ),
   );
 
+  const targetStateSlice = { ...asRecord(savedStateSlice) };
+  const qid = normalizeQuestionKey(questionId);
+  const currentSlice = asRecord(surveysResponseStateCopy[surveyIndex]);
+  const policyKeys = ['encryptionAudience', 'encryptionGateId', 'audienceMode'];
+  for (const fieldKey of ['answers', 'additionalComments']) {
+    if (!isObjectLike(asRecord(asRecord(decryptedStateSlice)[fieldKey])[qid])) continue;
+    const currentField = asRecord(asRecord(currentSlice[fieldKey])[qid]);
+    const previousField = asRecord(asRecord(previous.editBaseline)[fieldKey])[qid];
+    // A changed policy is an unsaved user choice, including one made during the wallet prompt.
+    // Keep it editable, but retain the saved policy in the baseline so submit re-encrypts it.
+    if (
+      isObjectLike(previousField) &&
+      policyKeys.some(
+        (key) => Object.prototype.hasOwnProperty.call(currentField, key) && currentField[key] !== previousField[key],
+      )
+    ) {
+      targetStateSlice[fieldKey] = {
+        ...asRecord(targetStateSlice[fieldKey]),
+        [qid]: {
+          ...asRecord(asRecord(targetStateSlice[fieldKey])[qid]),
+          ...Object.fromEntries(policyKeys.map((key) => [key, currentField[key]])),
+        },
+      };
+      // Worker sessions have no latest chain response: their decrypt source can be the edited slice.
+      // Preserve the saved policy separately so an audience-only change remains pending after decrypt.
+      savedStateSlice[fieldKey] = {
+        ...asRecord(savedStateSlice[fieldKey]),
+        [qid]: {
+          ...asRecord(asRecord(savedStateSlice[fieldKey])[qid]),
+          ...Object.fromEntries(policyKeys.map((key) => [key, previousField[key]])),
+        },
+      };
+    }
+  }
   surveysResponseStateCopy[surveyIndex] = targetStateSlice;
 
+  const userAnswers = asRecord(previous.userAnswers);
+  const responses = Array.isArray(userAnswers.responses)
+    ? userAnswers.responses
+    : userAnswers.questionID || userAnswers.questionId
+      ? [userAnswers]
+      : [];
+  const matchesQuestion = (response: unknown) =>
+    normalizeQuestionKey(asRecord(response).questionID || asRecord(response).questionId) === qid;
+  const latestRatingResponse = {
+    ...asRecord(responses.find(matchesQuestion)),
+    questionID: qid,
+    ...asRecord(ratingEnvelopes),
+  };
+
   return {
+    // Successful per-field decrypts must advance the rating source too; stale attempts never reach this state update.
+    ...(ratingEnvelopes
+      ? {
+          userAnswers: {
+            ...userAnswers,
+            responses: [...responses.filter((response) => !matchesQuestion(response)), latestRatingResponse],
+          },
+        }
+      : {}),
     surveysResponseState: surveysResponseStateCopy,
     isEditing: true,
     displayAnswerMode: false,
@@ -269,7 +333,7 @@ export const buildSelfQuestionDecryptSuccessState = (
     editBaseline: syncDecryptedQuestionIntoBaseline(
       previous.editBaseline,
       baselineSlice,
-      targetStateSlice,
+      savedStateSlice,
       {
         questionId,
         decryptedStateSlice,
@@ -289,11 +353,13 @@ export const buildSurveyDecryptSuccessState = (
     decryptedSlice = {},
     decryptedImportanceFromEnv = {},
     decryptedConvictionFromEnv = {},
+    baselineSlice = null,
   }: {
     surveyIndex?: number;
     decryptedSlice?: unknown;
     decryptedImportanceFromEnv?: unknown;
     decryptedConvictionFromEnv?: unknown;
+    baselineSlice?: unknown;
   } = {},
   deepClone: (value: unknown) => unknown = (value) => value,
 ) => {
@@ -303,10 +369,18 @@ export const buildSurveyDecryptSuccessState = (
   const slice = asRecord(decryptedSlice);
   const sliceAnswers = asRecord(slice.answers);
   const sliceAdditionalComments = asRecord(slice.additionalComments);
+  const savedConsent = asRecord(
+    asRecord(baselineSlice).interviewProvenance ?? asRecord(previous.editBaseline).interviewProvenance,
+  );
   const nextSlice = {
     answers: {
       ...asRecord(previousSlice.answers),
-      ...sliceAnswers,
+      ...Object.fromEntries(
+        Object.entries(sliceAnswers).map(([qid, field]) => [
+          qid,
+          { ...asRecord(asRecord(previousSlice.answers)[qid]), ...asRecord(field) },
+        ]),
+      ),
     },
     importance: {
       ...asRecord(previousSlice.importance),
@@ -319,7 +393,12 @@ export const buildSurveyDecryptSuccessState = (
     },
     additionalComments: {
       ...asRecord(previousSlice.additionalComments),
-      ...sliceAdditionalComments,
+      ...Object.fromEntries(
+        Object.entries(sliceAdditionalComments).map(([qid, field]) => [
+          qid,
+          { ...asRecord(asRecord(previousSlice.additionalComments)[qid]), ...asRecord(field) },
+        ]),
+      ),
     },
   };
 
@@ -352,7 +431,10 @@ export const buildSurveyDecryptSuccessState = (
     isEditing: true,
     isDecrypting: false,
     suppressPrefill: true,
-    editBaseline: deepClone(nextSlice),
+    editBaseline: deepClone({
+      ...nextSlice,
+      ...(Object.keys(savedConsent).length ? { interviewProvenance: savedConsent } : {}),
+    }),
     isDirty: false,
     modifiedCount: 0,
   };
@@ -376,11 +458,14 @@ export const normalizeBulkDecryptedSliceForSurveyState = (
     const prevEncrypted = asRecord(asRecord(previousSlice.answers)[questionId]).encrypted;
     const baselineAnswer = asRecord(asRecord(baseline.answers)[questionId]);
     nextDecryptedSlice.answers[questionId] = {
+      ...baselineAnswer,
       ...nextAnswer,
       encrypted:
-        typeof prevEncrypted === 'boolean'
-          ? prevEncrypted
-          : !!(baselineAnswer.value === '*' && (baselineAnswer.encryptedPortion || baselineAnswer.encrypted)),
+        typeof baselineAnswer.encrypted === 'boolean'
+          ? baselineAnswer.encrypted
+          : typeof prevEncrypted === 'boolean'
+            ? prevEncrypted
+            : !!(baselineAnswer.value === '*' && baselineAnswer.encryptedPortion),
     };
   });
 
@@ -389,14 +474,17 @@ export const normalizeBulkDecryptedSliceForSurveyState = (
     const prevEncrypted = asRecord(asRecord(previousSlice.additionalComments)[questionId]).encrypted;
     const baselineAdditional = asRecord(asRecord(baseline.additionalComments)[questionId]);
     nextDecryptedSlice.additionalComments[questionId] = {
+      ...baselineAdditional,
       ...nextAdditional,
       encrypted:
-        typeof prevEncrypted === 'boolean'
-          ? prevEncrypted
-          : !!(
-              baselineAdditional.value === '*' &&
-              (baselineAdditional.encryptedPortion || baselineAdditional.encrypted)
-            ),
+        typeof baselineAdditional.encrypted === 'boolean'
+          ? baselineAdditional.encrypted
+          : typeof prevEncrypted === 'boolean'
+            ? prevEncrypted
+            : !!(
+                baselineAdditional.value === '*' &&
+                (baselineAdditional.encryptedPortion || baselineAdditional.encrypted)
+              ),
     };
   });
 
@@ -471,6 +559,7 @@ export const mergeLatestEncryptedQuestionFields = (
     nextResponseSlice.answers = { ...currentAnswers };
     asRecord(nextResponseSlice.answers)[qid] = {
       ...(isObjectLike(currentAnswers[qid]) ? currentAnswer : { value: '*', encrypted: true, hash: '' }),
+      ...latestAnswer,
       encrypted: !!(latestAnswer.encrypted || currentAnswer.encrypted),
       hash: latestAnswer.hash || currentAnswer.hash || '',
       encryptedPortion: latestAnswer.encryptedPortion,
@@ -483,6 +572,7 @@ export const mergeLatestEncryptedQuestionFields = (
     nextResponseSlice.additionalComments = { ...currentAdditionalComments };
     asRecord(nextResponseSlice.additionalComments)[qid] = {
       ...(isObjectLike(currentAdditionalComments[qid]) ? currentAdditional : { value: '*', encrypted: true, hash: '' }),
+      ...latestAdditional,
       encrypted: !!(latestAdditional.encrypted || currentAdditional.encrypted),
       hash: latestAdditional.hash || currentAdditional.hash || '',
       encryptedPortion: latestAdditional.encryptedPortion,

@@ -1,6 +1,25 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
+import type { AtlasViewProps } from '../DebateMap/debateMapTypes';
+
+const mockCircles = jest.fn((props: AtlasViewProps) => props);
+jest.mock('../DebateMap/DebateMap', () => ({
+  AtlasView: (props: AtlasViewProps) => {
+    mockCircles(props);
+    return (
+      <div>
+        {props.data
+          .flatMap((group) => group.children || [])
+          .map((topic) => (
+            <button key={topic.id} onClick={() => props.onNodeClick(topic)}>
+              {topic.name}
+            </button>
+          ))}
+      </div>
+    );
+  },
+}));
 
 it('limits the preview to Reverse Alignment sessions', () => {
   expect(hasReverseAlignmentTopicPreview('rxc-test')).toBe(true);
@@ -9,14 +28,24 @@ it('limits the preview to Reverse Alignment sessions', () => {
   expect(hasReverseAlignmentTopicPreview('demo')).toBe(false);
 });
 
-it('shows twelve empty topics and lets participants inspect them without assigning responses', () => {
+it('uses shared read-only Circles with twelve empty topics and lets participants inspect them', async () => {
   render(<ReverseAlignmentTopicMap />);
-  expect(screen.getAllByRole('button')).toHaveLength(12);
-  expect(screen.getAllByText('0 assigned')).toHaveLength(12);
-  expect(screen.getByText('Preview')).toBeVisible();
+  expect(await screen.findAllByRole('button')).toHaveLength(12);
+  const props = mockCircles.mock.calls.at(-1)?.[0];
+  if (!props) throw new Error('Atlas preview did not render');
+  expect(props).toEqual(expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }));
+  expect(props.data).toHaveLength(3);
+  props.data.forEach((group) => {
+    expect(group.children).toHaveLength(4);
+    [group, ...(group.children || [])].forEach((node) => {
+      expect(node.questions).toEqual([]);
+      expect(node.comments).toEqual([]);
+      expect(node.votes).toBeUndefined();
+    });
+  });
+  expect(screen.getByText('Circles · Preview')).toBeVisible();
   expect(screen.getByText('Waiting for more data')).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Law and liberties 0 assigned' }));
-  expect(screen.getByRole('button', { name: 'Law and liberties 0 assigned' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Law and liberties' }));
   expect(within(screen.getByRole('status')).getByText('Law and liberties')).toBeVisible();
   expect(within(screen.getByRole('status')).getByText('No questions or responses assigned yet.')).toBeVisible();
   expect(screen.queryByRole('button', { name: /generate|process/i })).not.toBeInTheDocument();

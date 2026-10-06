@@ -34,6 +34,7 @@ export default function SessionInterviewModalHeader({
           type="button"
           id="ce-interview-help"
           className={styles.sessionInterviewHeaderButton}
+          data-ce-control-appearance="frameless"
           aria-label="About Interview"
         >
           <FontAwesomeIcon icon={faQuestionCircle} />

@@ -1,4 +1,3 @@
-import React from 'react';
 import type { ReactElement } from 'react';
 import styles from './SurveyTool.module.scss';
 import type { SliderMode } from './surveyToolSliderState.js';

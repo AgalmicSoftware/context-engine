@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy, faSync } from '@fortawesome/free-solid-svg-icons';
 import { deserializeFilterState, serializeFilterState } from '../../utilities/survey/filterStateUtils.js';

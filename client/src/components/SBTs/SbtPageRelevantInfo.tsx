@@ -9,6 +9,7 @@ import { resolveSbtPageMutedInfoIconStyle } from './sbtPageHelpers';
 import styles from './SBTPage.module.scss';
 
 type SbtPageRelevantInfoProps = {
+  compact?: boolean;
   documentIDHashes: string[];
   documentURLs: string[];
   documentUrlsArePublic?: boolean;
@@ -21,6 +22,7 @@ type SbtPageRelevantInfoProps = {
 };
 
 const SbtPageRelevantInfo = ({
+  compact = false,
   documentIDHashes,
   documentURLs,
   documentUrlsArePublic = false,
@@ -31,11 +33,13 @@ const SbtPageRelevantInfo = ({
   shouldRenderTags,
   tags,
 }: SbtPageRelevantInfoProps): React.ReactElement => (
-  <div className={styles.relevantInfo}>
-    <Alert color="info" fade={false}>
-      <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()} />
-      {introText}
-    </Alert>
+  <div className={`${styles.relevantInfo}${compact ? ` ${styles.compactRelevantInfo}` : ''}`}>
+    {introText != null && (
+      <Alert color="info" fade={false}>
+        <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()} />
+        {introText}
+      </Alert>
+    )}
     {shouldRenderDocumentUrls && (
       <div className={styles.docUrlsSection}>
         <h4>Document URLs:</h4>
@@ -80,8 +84,8 @@ const SbtPageRelevantInfo = ({
     )}
     {shouldRenderTags && (
       <div className={styles.tagsSection}>
-        <h4>Tags:</h4>
-        <ul className={styles.tagList}>
+        {!compact && <h4>Tags:</h4>}
+        <ul className={styles.tagList} aria-label="Tags">
           {tags.map((tag, index) => {
             const tagEnc = encodeURIComponent(tag);
             return (

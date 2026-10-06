@@ -1,4 +1,9 @@
 import {
+  getChangedInterviewConsentQids,
+  resolveConsentFlags,
+  type InterviewConsentOverrides,
+} from './sessionInterviewConsent';
+import {
   loadSessionInterviewSavedAnswers,
   mergeInterviewSavedAnswerBaseline,
   type InterviewSavedSlice,
@@ -7,51 +12,14 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
-import {
-  Dropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
-  FormGroup,
-  Label,
-  Input,
-  InputGroup,
-  InputGroupText,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from 'reactstrap';
-import { Link } from 'react-router-dom';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
 
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faLock,
-  faUnlock,
-  faCaretUp,
-  faArrowLeft,
-  faArrowRight,
-  faExternalLinkAlt,
-  faExclamationCircle,
-  faMicrophone,
-} from '@fortawesome/free-solid-svg-icons';
-
 import QuestionFilter from './QuestionFilter';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import SingleQuestionResponse from './SingleQuestionResponse';
-import TagModal from '../TagPage/TagModal';
 import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionFooterIcons from './FullQuestionFooterIcons';
-import FullQuestionHeader from './FullQuestionHeader';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import GatedPromptNotice from './GatedPromptNotice';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
-import QuestionDecryptControl from './QuestionDecryptControl';
-import QuestionCardLinks from './QuestionCardLinks';
 import { extractSingleQuestionOptionsFromCandidate } from './singleQuestionResponseHelpers.js';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -159,288 +127,48 @@ import {
   resolveConfiguredSessionWorkerUrlFromConfig,
 } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
-import {
-  applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
-  applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
-  applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
-  buildAutoDecryptMaskedFieldSignature as buildAutoDecryptMaskedFieldSignatureHelper,
-  buildDecryptTaskKey as buildDecryptTaskKeyHelper,
-  buildFieldDecryptState as buildFieldDecryptStateHelper,
-  buildQuestionDecryptExecutionContext as buildQuestionDecryptExecutionContextHelper,
-  buildQuestionDecryptFailureState as buildQuestionDecryptFailureStateHelper,
-  buildQuestionFieldDisplayState as buildQuestionFieldDisplayStateHelper,
-  buildQuestionDecryptStartState as buildQuestionDecryptStartStateHelper,
-  buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
-  buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
-  buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
-  buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
-  buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
-  buildEmptyQuestionDecryptSlice as buildEmptyQuestionDecryptSliceHelper,
-  buildSelfQuestionDecryptBaseline as buildSelfQuestionDecryptBaselineHelper,
-  buildSelfQuestionDecryptSuccessState as buildSelfQuestionDecryptSuccessStateHelper,
-  clearQuestionFieldBusyMap as clearQuestionFieldBusyMapHelper,
-  collectQuestionRatingEnvelopesByQid as collectQuestionRatingEnvelopesByQidHelper,
-  buildViewedResponseDecryptSuccessState as buildViewedResponseDecryptSuccessStateHelper,
-  buildViewedResponseDecryptBaseline as buildViewedResponseDecryptBaselineHelper,
-  decryptQuestionRatingEnvelopeMap as decryptQuestionRatingEnvelopeMapHelper,
-  decryptQuestionRatingEnvelopes as decryptQuestionRatingEnvelopesHelper,
-  ensureQuestionDecryptSliceShape as ensureQuestionDecryptSliceShapeHelper,
-  finalizeSurveyDecryptAttempt as finalizeSurveyDecryptAttemptHelper,
-  finalizeQuestionDecryptAttempt as finalizeQuestionDecryptAttemptHelper,
-  getViewedResponseOverrideForQuestion as getViewedResponseOverrideForQuestionHelper,
-  getQuestionFieldDecryptSelection as getQuestionFieldDecryptSelectionHelper,
-  getQuestionFieldTaskKey as getQuestionFieldTaskKeyHelper,
-  getQuestionFieldTaskKeys as getQuestionFieldTaskKeysHelper,
-  getQuestionRatingEnvelopes as getQuestionRatingEnvelopesHelper,
-  hydrateLatestQuestionDecryptState as hydrateLatestQuestionDecryptStateHelper,
-  markQuestionFieldBusyMap as markQuestionFieldBusyMapHelper,
-  mergeLatestEncryptedQuestionFields as mergeLatestEncryptedQuestionFieldsHelper,
-  mergeQuestionRatingEnvelopeState as mergeQuestionRatingEnvelopeStateHelper,
-  mergeQuestionResponseOverrideIntoDecryptSlice as mergeQuestionResponseOverrideIntoDecryptSliceHelper,
-  carryForwardSurveyQuestionRatings as carryForwardSurveyQuestionRatingsHelper,
-  normalizeBulkDecryptedSliceForSurveyState as normalizeBulkDecryptedSliceForSurveyStateHelper,
-  normalizeSingleQuestionViewedResponse as normalizeSingleQuestionViewedResponseHelper,
-  parseEncryptedEnvelope as parseEncryptedEnvelopeHelper,
-  prepareQuestionDecryptAttempt as prepareQuestionDecryptAttemptHelper,
-  prepareSurveyDecryptAttempt as prepareSurveyDecryptAttemptHelper,
-  prepareSelfQuestionDecryptState as prepareSelfQuestionDecryptStateHelper,
-  prepareViewedQuestionDecryptState as prepareViewedQuestionDecryptStateHelper,
-  resolveQuestionDecryptHandlingMode as resolveQuestionDecryptHandlingModeHelper,
-  resolveLatestSurveyDecryptResponse as resolveLatestSurveyDecryptResponseHelper,
-  resolveDecryptSurveyId as resolveDecryptSurveyIdHelper,
-  runDedupedDecryptTask as runDedupedDecryptTaskHelper,
-  syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
-} from './surveyToolDecryptFlow.js';
-import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 
 // Crypto and contract utilities
-import contractScripts, {
-  getAllSessionSlugs,
-  getSessionConfigBySlug as getStrictSessionConfigBySlug,
-  getSessionSlugByName,
-} from '../../utilities/web3/chainGateway.js';
-import { ethers, utils } from 'ethers';
+import { utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { createLogger } from 'utilities/logging.js';
-import { notify } from '../../utilities/ui/notify.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import {
   SPONSORED_GATE_STATES,
-  checkSponsoredAccess,
   getGateSbtAddresses,
   resolveSponsoredGateStateForResource,
 } from '../../utilities/web3/sponsoredAccess.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
-import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
-import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
-import {
-  buildQuestionRoutePath,
-  isMaskedQuestionPayload,
-  parseQuestionSessionIdFromSearch,
-  parseQuestionSessionSlugFromSearch,
-  pickBetterQuestionPayload,
-  shouldRetryMaskedQuestionRefresh,
-} from '../../utilities/survey/questionRouting.js';
-import {
-  sanitizeQuestionPromptForResponsePayload,
-  sanitizeSurveyTitleForResponsePayload,
-} from '../../utilities/arweave/noLeakPayloads.js';
-import {
-  normalizeSessionSlug,
-  resolveSessionAliases,
-  resolveSessionContractRef,
-  resolveSessionSlugFromPathname,
-} from '../../utilities/session/sessionNaming.js';
-import {
-  resolveSurveyToolDecryptHydrationContext,
-  resolveSurveyToolDraftSessionContext,
-  resolveSurveyToolDraftStorageContext,
-  resolveSurveyToolEffectiveSlug,
-  resolveSurveyToolEnsureQuestionCachedContext,
-  resolveSurveyToolExplicitSessionContext,
-  resolveSurveyToolIdLookupContext,
-  resolveSurveyToolLockAudienceSessionNameContext,
-  resolveSurveyToolQuestionConfigContext,
-  resolveSurveyToolQuestionCountContext,
-  resolveSurveyToolQuestionPayloadCacheWriteContext,
-  resolveSurveyToolQuestionsDashboardLoadContext,
-  resolveSurveyToolPileFilterContext,
-  resolveSurveyToolPileLoadContext,
-  resolveSurveyToolPileWarmSeedContext,
-  resolveSurveyToolPileResponseReadContext,
-  resolveSurveyToolQuestionReadCacheContext,
-  resolveSurveyToolQuestionBootstrapContext,
-  resolveSurveyToolResponseJsonContext,
-  resolveSurveyToolResponseHydrationContext,
-  resolveSurveyToolResponseGateSessionContext,
-  resolveSurveyToolSubmittedCacheWriteContext,
-  resolveSurveyToolSurveyReadContext,
-  resolveSurveyToolUpdateCacheContext,
-} from './surveyToolSessionResolution.js';
-import {
-  buildAnswerLockDisplayState,
-  buildGatedPromptNoticeState,
-  buildLockAudienceButtonAction,
-  buildLockAudienceDisplayState,
-} from './surveyToolViewState.js';
-import {
-  buildCanDecryptOtherResponsesSnapshot,
-  buildResponseGateConfigSignature,
-  resolveCanDecryptOtherResponsesVerdict,
-} from './surveyToolResponseAccess';
-import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  updateCacheAtomic,
-  writeCache,
-  writeCacheOptimistic,
-} from '../../utilities/cache/cacheScripts.js';
-import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import {
-  isTargetedSbtMetadataLookupEnabled,
-  resolveSbtDisplayLabel,
-  warmSbtDisplayNamesTargeted,
-} from '../../utilities/sbt/sbtDisplayNames.js';
+import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 import { resolvePayloadStorageRef } from '../../utilities/storage/storageRefs.js';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue.js';
 
 import {
-  EMPTY_QUESTION_POOL,
-  DEBUG_PREFILL,
-  GATE_SBT_HYDRATION_RETRY_MS,
-  QUESTION_TAG_DROPDOWN_ROW_STYLE,
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
-  areEnvelopesEquivalent,
-  areQuestionPayloadsEquivalent,
-  buildQuestionCountScopeContextKey,
-  buildQuestionDashboardLoadContextSignature,
   buildQuestionFilterStorageKeyPrefix,
-  buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
-  buildDraftAnswersByQuestionId,
-  loadDraftAnswersByQuestionIdSafely,
-  buildDraftHydrationPatchForQuestion,
-  shouldSkipDraftHydrationRun,
-  buildDraftHydrationSeedContext,
-  buildDraftHydrationRunPlan,
-  resolveLocalCacheSliceLookup,
-  buildCacheHydrationSlice,
-  buildDraftHydrationUpdatePlan,
-  buildDraftAwareCacheHydrationState,
-  buildDraftHydrationState,
-  buildExitEditingStatePatch,
-  buildHydratedResponseSlice,
-  buildInitializedSurveyResponseState,
-  buildLocalCacheRehydrationUpdatePlan,
-  loadLocalCacheHydrationSlice,
-  prepareLocalCacheRehydrateRun,
-  buildRevertPendingStatePatch,
-  buildResetFormStatePatch,
-  buildPrefilledSingleQuestionUpdatePlan,
-  buildPrefilledSurveyUpdatePlan,
-  applyPriorResponseFetchSuccessEffects,
-  buildPriorResponseFetchPlan,
-  clearPriorResponseAttemptedKeys,
-  executePriorResponseFetchPlan,
-  buildGroupedRenderedResponseScopePlan,
-  resolveLocalCacheHydrationSignatureLookup,
-  loadMissingResponseIdsForScope,
-  loadGroupedMissingResponseRequests,
-  trackPriorResponseAttemptedKeys,
-  buildMissingRenderedResponseResult,
-  loadMissingRenderedResponseInfo,
-  resolveMissingRenderedResponseLookup,
-  buildNormalizedRenderedQuestionIds,
-  resolveQuestionSlugMapLookup,
-  resolveExitEditingBaselineSlice,
   resolveRevertPendingAnswerValue,
-  shouldBackfillPriorResponses,
-  buildStartFreshSurveyState,
-  buildLocalCacheHydrationMemoKey,
-  prepareLocalCacheSliceBuild,
-  buildMergedSurveyResponseState,
-  buildMergedHydrationQuestionResponses,
-  buildLocalCacheRehydrationState,
-  buildPrefilledSingleQuestionState,
-  buildPrefilledSurveyState,
-  buildQuestionSlugMapForIds,
-  applyResetFormStateEffects,
-  applyRevertPendingEffects,
-  applyStartFreshEffects,
-  applyDraftHydrationEffects,
-  applyPrefillUpdatePlan,
-  applyLocalCacheRehydrateUpdatePlan,
-  applyLocalCacheRehydrateMissEffects,
-  runPriorResponseBackfillAttempt,
-  buildRevertedResponseSlice,
-  buildSubmissionGroupContext,
-  buildSurveyResponseStateArray,
-  buildPersistedDraftQuestionRemovalPlan,
-  buildPersistedDraftTrackingAfterLoad,
-  buildPersistedDraftTrackingAfterScopedDelete,
-  buildPersistedDraftTrackingAfterWrite,
-  buildPersistedDraftTrackingClearedState,
-  buildPersistedDraftTrackingOnKeyChange,
-  buildPersistedDraftWritePlan,
-  buildPersistDraftAllowedQuestionIds,
-  buildQuestionCacheHydrationPatch,
-  buildQuestionResponseHydrationPatch,
-  loadPreviousPersistedDraftSnapshot,
-  parsePersistedDraftStorageValue,
-  buildPersistedDraftPayload,
-  buildPersistedDraftMapsForAllowedIds,
   buildRatingEnvelopeQidSetFromUserAnswers,
-  buildSurveyDraftLoadPlan,
-  buildSurveyDraftCompatScope,
-  buildSurveyDraftStorageKey,
-  buildSurveyDraftStorageVariantKeys,
-  buildSliderModeStatePatch,
   buildSliderPersistOptions,
-  buildRenderedIdsSignature,
-  buildPersistedDraftQuestionEntry,
   buildSliceToken,
-  buildSurveyDraftSemanticSignature,
-  buildSurveyResponseSliceSignature,
-  canUseRecentQuestionPayloadForAccount,
-  clampSliderValue,
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
   ensureQuestionsNet,
-  ensureSurveysNet,
   formatQuestionScanBlockCount,
   getActiveSessionSlugFromProps,
   getBlockedQuestionIdsSet,
-  getConvictionFromSlice,
-  getConvictionFromSliceStrict,
   getExtraQuestionReadSlugs,
   getHighlightedQuestionIdsSet,
-  getImportanceFromSlice,
   getNormalizedUiRatingValue,
-  getPendingStatsSnapshotFromState,
-  getQuestionConvictionSliderValue,
-  getQuestionImportanceSliderValue,
-  getQuestionSliderMode,
-  getSessionSlugHintFromProps,
-  getSessionSlugPinnedFromProps,
   hasCacheHydratedFlag,
-  hasConvictionOrImportanceValueForQuestion,
-  hasMeaningfulFieldValue,
-  isIncomingResponseMetaNewer,
   isSingleSelectMultichoice,
   isSurveyToolFilterStateActive,
-  mergeDecryptedViewedResponse,
   mergeQuestionResponses,
-  mergeSurveyResponsePayloads,
   normalizeMultichoiceValue,
   normalizeQuestionIdKey,
   normalizeQuestionProgressSlug,
@@ -449,60 +177,19 @@ import {
   readQuestionsCache,
   readQuestionsCacheAsync,
   readQuestionsCacheRef,
-  readRecentQuestionPayload,
-  readSurveysCache,
-  readSurveysCacheAsync,
-  readSurveysCacheRef,
-  resolveCurrentTagSessionSlug,
-  resolveDecryptHydrationContext,
-  resolveDraftSessionContext,
-  resolveDraftStorageContext,
   resolveEffectiveSlug,
-  resolveEnsureQuestionCachedContext,
-  resolveExplicitSessionContext,
-  resolveLockAudienceSessionNameContext,
   resolvePileFilterContext,
   resolvePileLoadContext,
   resolvePileResponseReadContext,
   resolvePileWarmSeedContext,
-  resolveQuestionBootstrapContext,
-  resolveQuestionCountContext,
-  resolveQuestionPayloadCacheWriteContext,
-  resolveQuestionReadCacheContext,
-  resolveQuestionsDashboardLoadContext,
-  resolveResponseHydrationContext,
-  resolveResponseJsonContext,
-  resolveSlugForIds,
-  resolveSubmittedCacheWriteContext,
-  resolveSurveyReadContext,
-  resolveUpdateCacheContext,
-  scheduleMicrotask,
   serializeSurveyToolFilterState,
-  shouldAutoEncryptAdditionalOnAudienceChange,
-  shouldEncryptResponseFieldForSubmit,
-  shouldForceOverwriteDraftValues,
-  shouldHandleStartFresh,
-  shouldRenderInlineSubmitButton,
-  shouldRenderSubmittedIndicator,
   shouldShowPileFullLoadingState,
-  shouldShowSingleQuestionResponseLookupSpinner,
-  stampResponsePayloadWithMeta,
   surveyLog,
-  toNumberOrNull,
-  toResponseRecencyMeta,
-  writeQuestionsCache,
-  writeSurveysCache,
   bumpSurveyPerfCounter,
 } from './surveyToolUtils';
 
-import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
   buildAutoDecryptDisabledState,
-  buildBookmarkedQuestionsState,
-  buildCanDecryptOtherResponsesState,
-  buildClearedSurveyQuestionPoolState,
-  buildInitialSurveyQuestionsState,
-  buildSurveyQuestionPoolLoadState,
   isSurveyQuestionsMaskedPromptText,
   type SurveyQuestionsRuntimeEngine,
   type SurveyQuestionsRuntimeStrategy,
@@ -1526,16 +1213,19 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   });
 
   if (updatePlan.shouldResetContext) {
-    // Persist draft before reset so it survives the login transition
-    try {
-      engine.persistDraft();
-    } catch (e) {
-      surveyLog.warn('SurveyTool: fallback', e);
-    }
+    // Props already name the next identity. Cancel pending writes before resetting
+    // so decrypted fields cannot be persisted under another account's draft key.
+    if (engine._persistTimer) clearTimeout(engine._persistTimer);
+    engine._persistTimer = null;
+    if (engine._jsonPreviewTimer) clearTimeout(engine._jsonPreviewTimer);
+    engine._jsonPreviewTimer = null;
+    engine._draftDirtyQids?.clear();
     engine._lastLoadAndSortResultSignature = '';
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;
     engine._sessionInterviewResponseReadyToken = '';
+    engine._pileOwnAnswersSubmitController?.abort();
+    engine._pileOwnAnswersSubmitController = null;
 
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
@@ -1602,6 +1292,8 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
 };
 
 const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
+  engine._pileOwnAnswersSubmitController?.abort();
+  engine._pileOwnAnswersSubmitController = null;
   try {
     if (typeof engine.props.onPileSubmitRailVisibilityChange === 'function') {
       engine.props.onPileSubmitRailVisibilityChange(false);
@@ -1829,6 +1521,7 @@ export const recordInterviewProvenance = (
   includePredictionComparison = false,
   responderName = '',
   review: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
+  consentOverrides?: InterviewConsentOverrides,
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
@@ -1857,27 +1550,41 @@ export const recordInterviewProvenance = (
               selected: boolean;
               original: InterviewDraftResponse;
             });
-          if (!included && !includePredictionComparison && !normalizedResponderName) {
-            delete provenance[draft.questionId];
-            return;
-          }
           const originalDraft = reviewed.original || draft;
           const revisionSource =
             Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
               ? originalDraft.revisions[0]
               : originalDraft;
+          // An untouched control preserves consent, including withdrawals; this draft supplies its own source.
+          const savedConsent =
+            provenance[draft.questionId] ?? prev.editBaseline?.interviewProvenance?.[draft.questionId];
+          const saved =
+            savedConsent && typeof savedConsent === 'object' ? (savedConsent as Record<string, unknown>) : null;
+          const flags = resolveConsentFlags(saved);
+          const ai =
+            consentOverrides?.includeAiProvenance ?? (consentOverrides && saved ? flags.includeAiProvenance : included);
+          const comparison =
+            consentOverrides?.includePredictionComparison ??
+            (consentOverrides && saved ? flags.includePredictionComparison : includePredictionComparison);
+          const name =
+            consentOverrides && saved && consentOverrides.includeResponderName === undefined
+              ? String(saved.responderName || '')
+              : consentOverrides?.includeResponderName === false
+                ? ''
+                : normalizedResponderName ||
+                  (consentOverrides?.includeResponderName ? String(saved?.responderName || '') : '');
           provenance[draft.questionId] = {
             version: 1,
-            includeAiProvenance: included,
-            includePredictionComparison,
-            ...(included
+            includeAiProvenance: ai,
+            includePredictionComparison: comparison,
+            ...(ai
               ? {
                   source: normalizedSource,
                   promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
                   questionSetHash: packet?.questionSetHash || '',
                 }
               : {}),
-            ...(includePredictionComparison
+            ...(comparison
               ? {
                   questionId: draft.questionId,
                   selection: 'selected',
@@ -1893,12 +1600,12 @@ export const recordInterviewProvenance = (
                   userEditedFields: reviewed.userEditedFields || [],
                 }
               : {}),
-            ...(includePredictionComparison && draft === researchAnchor
+            ...(comparison && draft === researchAnchor
               ? {
                   unselectedDrafts: review.filter((entry) => !entry.selected),
                 }
               : {}),
-            ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
+            ...(name ? { responderName: name } : {}),
             appliedAt: Date.now(),
           };
         });
@@ -2600,7 +2307,84 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
     engine.showNoPendingPileSubmitFeedback(pileSubmitLabel);
     return { status: 'failed' as const, message: 'No new or changed responses to submit.' };
   }
+  if (!engine.getSessionInterviewResponseReadinessToken(buildSessionInterviewSubmitContextToken(engine.props))) {
+    engine.setState({ pileSubmitTempText: 'Loading your saved answers…' });
+    return { status: 'pending' as const, message: 'Loading your saved answers…' };
+  }
   return engine.encryptAndUpload();
+};
+
+const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
+  const baseToken = buildSessionInterviewSubmitContextToken(engine.props);
+  if (engine._pileOwnAnswersSubmitController) {
+    if (!engine.getSessionInterviewResponseReadinessToken(baseToken))
+      return { status: 'pending' as const, message: 'Your saved answers are already being loaded.' };
+    // Complete readiness makes an older own read redundant, even if its
+    // transport never settles. Abort before taking the normal submit path.
+    engine._pileOwnAnswersSubmitController.abort();
+    engine._pileOwnAnswersSubmitController = null;
+    if (engine.state.pileSubmitTempText === 'Loading your saved answers…') engine.setState({ pileSubmitTempText: '' });
+  }
+  if (
+    !engine.props.loginComplete ||
+    engine.state.isSubmitting ||
+    engine.getSubmitCount() === 0 ||
+    engine.getSessionInterviewResponseReadinessToken(baseToken)
+  ) {
+    return engine.handlePileSubmitClick();
+  }
+  const token = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
+  const controller = new AbortController();
+  engine._pileOwnAnswersSubmitController = controller;
+  const isCurrent = () =>
+    engine._isMounted &&
+    !controller.signal.aborted &&
+    token ===
+      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const answerIds = () => {
+    const slice = engine.state.surveysResponseState?.[0] || {};
+    return [
+      ...new Set([
+        // Navigation can initialize another card while the read is in flight.
+        ...engine.state.pileQuestions
+          .map((question: { id: string }) => normalizeQuestionIdKey(question.id))
+          .filter(Boolean),
+        ...['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
+          Object.keys(slice[key] || {}),
+        ),
+      ]),
+    ];
+  };
+  const questionIds = answerIds();
+  engine.setState({ pileSubmitTempText: 'Loading your saved answers…', submissionError: null });
+  try {
+    // A capped public listing cannot prove that a blank answer is new. The
+    // existing strict own read covers all submitted fields and preserves edits.
+    const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, controller.signal);
+    if (!isCurrent()) return { status: 'stale' as const };
+    if (saved === null || answerIds().some((id) => !questionIds.includes(id))) {
+      const message = 'Your saved answers are still loading. Try Submit again when the sync completes.';
+      engine.setState({ pileSubmitTempText: '', submissionError: message });
+      return { status: 'pending' as const, message };
+    }
+    engine.setState({ pileSubmitTempText: '' });
+    return await engine.encryptAndUpload();
+  } catch {
+    if (!isCurrent()) return { status: 'stale' as const };
+    const message = 'Could not load your saved answers. Try Submit again to retry.';
+    engine.setState({ pileSubmitTempText: '', submissionError: message });
+    return { status: 'failed' as const, message };
+  } finally {
+    if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
+    // A context reset may have cleared this controller; a later request still
+    // owns its loading label and must not be cleared by this stale completion.
+    if (
+      !engine._pileOwnAnswersSubmitController &&
+      engine._isMounted &&
+      engine.state.pileSubmitTempText === 'Loading your saved answers…'
+    )
+      engine.setState({ pileSubmitTempText: '' });
+  }
 };
 
 export const loadSessionInterviewOwnAnswers = async (
@@ -2662,12 +2446,20 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   // A zero edit count alone cannot prove that drafts were saved. Check the
   // persisted responses for every selected question before accepting a no-op.
   if (engine.props.loginComplete && !engine.state.isSubmitting && engine.getSubmitCount() === 0 && questionIds.length) {
-    const saved = engine.buildSliceFromUserAnswers(engine.state.userAnswers);
+    const saved = engine.state.userAnswers
+      ? engine.buildSliceFromUserAnswers(engine.state.userAnswers)
+      : engine.state.editBaseline;
     const current = engine.state.surveysResponseState?.[0];
     const fieldValue = (entry: unknown) => {
       return entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
     };
+    const consentChanges = getChangedInterviewConsentQids(
+      current?.interviewProvenance,
+      engine.state.userAnswers,
+      engine.state.editBaseline?.interviewProvenance,
+    );
     if (
+      !questionIds.some((id) => consentChanges.has(normalizeQuestionIdKey(id))) &&
       questionIds.every(
         (id) =>
           Object.hasOwn(saved?.answers || {}, id) &&
@@ -2679,7 +2471,9 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
       return { status: 'already-saved' as const };
     }
   }
-  const result = await engine.handlePileSubmitClick();
+  // Use the same complete own-answer baseline as manual Submit while the
+  // public listing is pending or capped; never bypass the saved-answer read.
+  const result = await handlePileSubmitWithOwnAnswers(engine);
   if (result && typeof result === 'object' && 'status' in result) return result;
   if (!engine.props.loginComplete) return { status: 'login-required' as const };
   return { status: 'failed' as const, message: 'Submission did not complete.' };
@@ -2934,6 +2728,8 @@ const renderPileResponseInput = (
     case 'rating': {
       const ratingScale = normalizeRatingScale(question);
       const ratingValue = getNormalizedUiRatingValue(answer.value, ratingScale.min, ratingScale.max);
+      const unanswered = answer.value == null || answer.value === '';
+      let changedDuringInteraction = false;
       return (
         <div className={styles.ratingContainer}>
           <CESlider
@@ -2941,17 +2737,23 @@ const renderPileResponseInput = (
             max={ratingScale.max}
             step={1}
             value={ratingValue}
-            onChange={(val: any, event: any) =>
-              onAnswerChange
-                ? onAnswerChange(val)
-                : engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event))
-            }
-            onChangeComplete={engine.flushDraftPersistAfterSliderChange}
+            onChange={(val: any, event: any) => {
+              changedDuringInteraction = true;
+              if (onAnswerChange) onAnswerChange(val);
+              else engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event));
+            }}
+            onChangeComplete={(val: number) => {
+              if (unanswered && !changedDuringInteraction) {
+                if (onAnswerChange) onAnswerChange(val);
+                else engine.handleAnswerPile(question.id, val);
+              }
+              engine.flushDraftPersistAfterSliderChange();
+            }}
             disabled={engine.state.isSubmitting}
             className={styles.ratingSlider}
           />
           <span className={styles.ratingValueDisplay}>
-            <span aria-label="Current rating">{answer.value == null || answer.value === '' ? '–' : ratingValue}</span>
+            <span aria-label="Current rating">{unanswered ? '–' : ratingValue}</span>
           </span>
         </div>
       );
@@ -3467,7 +3269,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             pileSubmitResponderHref,
             showSuccessBadgeStatus,
             showSubmitButton,
-            handlePileSubmitClick: engine.handlePileSubmitClick,
+            handlePileSubmitClick: () => handlePileSubmitWithOwnAnswers(engine),
             hasPendingPileChanges,
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
@@ -3515,7 +3317,16 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                     ? engine.state.allQuestionsForFilter
                     : fallbackQuestionPool
                 }
-                existingResponseSlice={engine.state.surveysResponseState?.[0] || null}
+                existingResponseSlice={{
+                  ...engine.state.surveysResponseState?.[0],
+                  interviewProvenance: {
+                    ...engine.state.editBaseline?.interviewProvenance,
+                    ...readPlainRecord(engine.state.surveysResponseState?.[0]?.interviewProvenance),
+                  },
+                }}
+                pendingInterviewProvenance={readPlainRecord(
+                  engine.state.surveysResponseState?.[0]?.interviewProvenance,
+                )}
                 prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
                 initialError={String(interviewPrefillError || '')}
                 onApplyAnswer={(questionId: string, answer: unknown) =>

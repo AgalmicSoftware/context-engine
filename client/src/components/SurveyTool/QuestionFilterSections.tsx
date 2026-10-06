@@ -14,11 +14,11 @@ import {
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 
-import GateTooltip from '../Gates/GateTooltip';
-import SBTFilter from '../SBTs/SBTFilter';
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import CETooltip from '../Shared/CETooltip';
+import LazyFallback from '../Shared/LazyFallback';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -37,6 +37,9 @@ import {
 } from './questionFilterDisplayHelpers';
 
 import styles from './QuestionFilter.module.scss';
+
+// Only on-chain SBT sessions render this (shouldEnableQuestionFilterSbt), so Hosted pages skip its SBT code.
+const SBTFilter = lazyWithRetry(() => import('../SBTs/SBTFilter'));
 
 type FilterSummaryItem = {
   label: string;
@@ -146,7 +149,7 @@ export function QuestionFilterTopQuestionsSection({
                 disabled={countDisabled}
                 id={styles.topQuestionsCountInput}
               />
-              questions (by total conviction)
+              questions (by total importance)
             </Label>
           </FormGroup>
 
@@ -475,25 +478,27 @@ export function QuestionFilterSbtSection({
         disabled ? (
           <p className={styles.disabledText}>{disabledReason}</p>
         ) : (
-          <SBTFilter
-            items={items}
-            provider={provider}
-            network={network}
-            mode={creatorAndResponderMode ? 'creatorAndResponder' : 'creator'}
-            onFilter={onFilter}
-            setFilterLoading={setFilterLoading}
-            autoExpand={true}
-            externalSBTFilterState={sbtFilterLocalState}
-            defaultFeaturedSBTs={defaultFeaturedSBTs}
-            isQuestionCacheReady={isQuestionCacheReady}
-            isSurveyCacheReady={isSurveyCacheReady}
-            isSBTCacheReady={isSBTCacheReady}
-            sbtCacheRevision={sbtCacheRevision}
-            sessionSlug={sessionSlug}
-            activeSessionSlug={sessionSlug}
-            sessionConfig={sessionConfig}
-            ensureLightSbtUniverse={ensureLightSbtUniverse}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading groups..." minHeight="160px" />}>
+            <SBTFilter
+              items={items}
+              provider={provider}
+              network={network}
+              mode={creatorAndResponderMode ? 'creatorAndResponder' : 'creator'}
+              onFilter={onFilter}
+              setFilterLoading={setFilterLoading}
+              autoExpand={true}
+              externalSBTFilterState={sbtFilterLocalState}
+              defaultFeaturedSBTs={defaultFeaturedSBTs}
+              isQuestionCacheReady={isQuestionCacheReady}
+              isSurveyCacheReady={isSurveyCacheReady}
+              isSBTCacheReady={isSBTCacheReady}
+              sbtCacheRevision={sbtCacheRevision}
+              sessionSlug={sessionSlug}
+              activeSessionSlug={sessionSlug}
+              sessionConfig={sessionConfig}
+              ensureLightSbtUniverse={ensureLightSbtUniverse}
+            />
+          </React.Suspense>
         )
       }
     />

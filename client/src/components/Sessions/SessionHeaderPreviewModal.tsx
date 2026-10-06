@@ -1,4 +1,3 @@
-import React from 'react';
 import { Modal, ModalBody } from 'reactstrap';
 
 import styles from './SessionWizard.module.scss';

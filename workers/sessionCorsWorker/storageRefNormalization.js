@@ -1,3 +1,4 @@
+import { toStr } from './stringCoercion.js';
 const STORAGE_BACKENDS = Object.freeze({
   ARWEAVE: 'arweave',
   LIT_ARWEAVE: 'lit-arweave',
@@ -7,7 +8,6 @@ const STORAGE_BACKENDS = Object.freeze({
 const CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
 const CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const trim = (value) => toStr(value).trim();
 

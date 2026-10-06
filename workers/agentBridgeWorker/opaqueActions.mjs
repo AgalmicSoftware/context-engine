@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { stableJson } from './runtimePrimitives.mjs';
+import { bytesToHex, stableJson } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 const ACTION_ID_RE = /^ceab_[a-z0-9]{10,50}$/;
@@ -15,10 +15,6 @@ function stableHash(seed = '') {
 export function buildSubmitIdempotencyKey({ transport, principal, sessionSlug, questionId, answer }) {
   const fingerprint = stableHash(stableJson({ questionId, answer }));
   return `${transport}:${principal}:${sessionSlug}:${fingerprint}`;
-}
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function buildId(prefix, pattern, seed) {

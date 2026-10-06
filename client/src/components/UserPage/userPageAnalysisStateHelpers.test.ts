@@ -228,5 +228,6 @@ describe('userPageAnalysisStateHelpers', () => {
     ).toBe('extra context');
     expect(extractUserPageAnalysisImportance({ meta: { importance: 2 } })).toBe(2);
     expect(extractUserPageAnalysisImportance({ answer: { conviction: { encrypted: true } } })).toBeUndefined();
+    expect(extractUserPageAnalysisImportance({ importance: 3, conviction: 8 })).toBe(3);
   });
 });

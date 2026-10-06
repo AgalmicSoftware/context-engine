@@ -5,7 +5,6 @@ import {
   mergeSbtLiveProgressEntry,
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
-  shouldEnableSessionRegistryRefresh,
   shouldFlushCoalescedRun,
 } from './mainSiteProgressHelpers.js';
 
@@ -163,9 +162,5 @@ describe('mainSiteProgressHelpers', () => {
         questionScanProgress: { phase: 'hydrate', discoveredQuestions: 5, hydratedQuestions: 5 },
       }),
     ).toBe(true);
-  });
-
-  it('always enables session registry refresh', () => {
-    expect(shouldEnableSessionRegistryRefresh()).toBe(true);
   });
 });

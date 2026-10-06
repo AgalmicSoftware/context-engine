@@ -29,7 +29,9 @@ beforeEach(() => {
 });
 it('uses the verified owning session for membership and authentication without auto-joining', async () => {
   render(<LinkedWorkerGroup reference={reference} account="" provider={null} networkChainId={null} />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading groups…');
   await screen.findByText('Original group memberships');
+  expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument();
   expect(fetchWorkerCanonicalSessionBootstrap).toHaveBeenCalledWith(
     expect.objectContaining({ sessionSlug: 'source', workerQueryValue: reference.workerUrl }),
   );
@@ -37,10 +39,12 @@ it('uses the verified owning session for membership and authentication without a
     expect.objectContaining({
       sessionConfig: config,
       sessionSlug: 'source',
-      selectedGroupId: 'community',
+      groupIdFilter: 'community',
+      inlineDetails: true,
       showCreate: false,
     }),
   );
+  expect(mockPanel.mock.calls.at(-1)?.[0].selectedGroupId).toBeUndefined();
 });
 it('fails closed on an identity mismatch', async () => {
   jest.mocked(fetchWorkerCanonicalSessionBootstrap).mockResolvedValue({

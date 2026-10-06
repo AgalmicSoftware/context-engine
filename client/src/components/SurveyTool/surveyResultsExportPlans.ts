@@ -339,11 +339,13 @@ const getResponseQuestionPromptForCsv = (response: SurveyResultsRecord, question
 const getResponseQuestionTypeForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
   response.type || questionData.type || '';
 
-const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => {
-  if (response.conviction !== undefined && response.conviction !== null) return response.conviction;
+const getImportanceValueForCsv = (response: SurveyResultsRecord): unknown => {
   if (response.importance !== undefined && response.importance !== null) return response.importance;
+  if (response.conviction !== undefined && response.conviction !== null) return response.conviction;
   return '';
 };
+
+const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => response.conviction ?? '';
 
 const getResponseFieldValueForCsv = (
   response: SurveyResultsRecord,
@@ -401,7 +403,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
 
   if (viewMode === 'survey' && surveyViewMode === 'individuals') {
     const header =
-      'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits\n';
+      'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits,conviction\n';
     const latest = new Map<string, SurveyResultsCsvLatestEntry>();
     const passthroughRows: string[] = [];
     const rows = Array.isArray(filteredResponses) ? filteredResponses : [];
@@ -424,7 +426,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseQuestionPromptForCsv(answer, questionData),
           getResponseQuestionTypeForCsv(answer, questionData),
           optionsString,
-          getConvictionValueForCsv(answer),
+          getImportanceValueForCsv(answer),
           getResponseFieldValueForCsv(answer, 'answer', 'value'),
           getResponseFieldValueForCsv(answer, 'answer', 'hash'),
           getResponseFieldValueForCsv(answer, 'additional', 'value'),
@@ -433,6 +435,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseFieldValueForCsv(answer, 'additional', 'hash'),
           formatTsForCsv(ms),
           questionData.type === 'quadratic' ? (questionData.voiceCredits ?? 99) : '',
+          getConvictionValueForCsv(answer),
         ]
           .map(quoteResponseCsvCell)
           .join(',');
@@ -455,7 +458,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
   }
 
   const header =
-    'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits\n';
+    'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp,voiceCredits,conviction\n';
   const latest = new Map<string, SurveyResultsCsvLatestEntry>();
   const passthroughRows: string[] = [];
 
@@ -478,7 +481,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseQuestionTypeForCsv(parsedValue, questionData),
           optionsString,
           responderAddress,
-          getConvictionValueForCsv(parsedValue),
+          getImportanceValueForCsv(parsedValue),
           getResponseFieldValueForCsv(parsedValue, 'answer', 'value'),
           getResponseFieldValueForCsv(parsedValue, 'answer', 'hash'),
           getResponseFieldValueForCsv(parsedValue, 'additional', 'value'),
@@ -487,6 +490,7 @@ export const buildSurveyResultsResponsesCsvExport = ({
           getResponseFieldValueForCsv(parsedValue, 'additional', 'hash'),
           formatTsForCsv(ms),
           questionData.type === 'quadratic' ? (questionData.voiceCredits ?? 99) : '',
+          getConvictionValueForCsv(parsedValue),
         ]
           .map(quoteResponseCsvCell)
           .join(',');

@@ -83,12 +83,6 @@ export {
   resolveCompareUnsureHeaderStyle,
   resolveCompareUnsureMoreStyle,
   resolveCompareUnsurePanelStyle,
-  resolveCompareVennNoteStyle,
-  resolveCompareVennSbtImageStyle,
-  resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipListStyle,
-  resolveCompareVennTooltipStyle,
-  resolveCompareVennWrapStyle,
   resolveCompareVisualSectionStyle,
 } from './compareAddressStyles';
 

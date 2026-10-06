@@ -4431,6 +4431,183 @@ describe('AppShell route render smoke', () => {
   });
 });
 
+describe('AppShell live pathname updates', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    window.history.replaceState({}, '', '/entry');
+    // Keep React's actual componentDidUpdate and setState feedback. Isolate route
+    // rendering and mount-time services; this regression needs no wallet or RPC.
+    jest.spyOn(AppShell.prototype, 'render').mockReturnValue(null);
+    jest.spyOn(AppShell.prototype, 'componentDidMount').mockImplementation(function () {
+      this._mounted = true;
+      for (const method of [
+        'handleNetworkChange',
+        'syncSessionFallbackRedirectConsumption',
+        'manageAutoHashPersistence',
+        'syncLitHooks',
+        'refreshSessionInfo',
+        'refreshSessionMetaFields',
+        'refreshGroupCredentials',
+        'handleDeepLinkScan',
+        'preloadAboutDemoSessionData',
+        'checkAllCachesReady',
+        'removeSbtRealtimeListenersForGroup',
+      ])
+        this[method] = jest.fn();
+      this.getInitializableSessionNetwork = jest.fn(() => null);
+      this.getSessionChainId = jest.fn(() => null);
+      this.resolveSessionSlugFromPathToken = jest.fn((token) => token);
+    });
+    jest.spyOn(AppShell.prototype, 'componentWillUnmount').mockImplementation(function () {
+      this._mounted = false;
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    window.history.replaceState({}, '', '/');
+    localStorage.clear();
+  });
+
+  const mountShell = () => {
+    const shell = React.createRef();
+    const store = React.createRef();
+    const dispatch = jest.fn();
+    const props = buildProps({ demoSurfaceMode: false });
+    class SessionStore extends React.Component {
+      state = { primarySessionSlug: '', primarySessionExplicit: true };
+      changeActiveSessionSlug = (slug) => {
+        dispatch(slug);
+        // Like the session reducer, even an identical slug creates a new state.
+        this.setState({ primarySessionSlug: slug });
+      };
+      render() {
+        return (
+          <AppShell
+            {...props}
+            ref={shell}
+            path={this.props.path}
+            wagmiBalance={this.props.revision}
+            activeSessionSlug={this.state.primarySessionSlug}
+            sessionState={this.state}
+            changeActiveSessionSlug={this.changeActiveSessionSlug}
+          />
+        );
+      }
+    }
+    const view = render(<SessionStore ref={store} path="/entry" revision={0} />);
+    const commit = (path, revision = 1) => view.rerender(<SessionStore ref={store} path={path} revision={revision} />);
+    const commitStore = () => act(() => store.current.setState((state) => ({ ...state })));
+    return { shell, dispatch, commit, commitStore, unmount: view.unmount };
+  };
+
+  it('settles a redirect before the router path prop catches up', () => {
+    const h = mountShell();
+    window.history.replaceState({}, '', '/session/route-alpha');
+    expect(() => h.commit('/entry')).not.toThrow();
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha']]);
+    expect(h.shell.current.state.isQuestionCacheReady).toBe(true);
+    expect(h.shell.current.state.isSurveyCacheReady).toBe(true);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+
+    h.commit('/entry', 2);
+    h.commit('/session/route-alpha', 3);
+    window.history.replaceState({}, '', '/session/route-alpha?mode=interview');
+    h.commit('/session/route-alpha', 4);
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('still initializes a route when the router prop arrives immediately', () => {
+    const h = mountShell();
+    window.history.replaceState({}, '', '/session/route-alpha');
+    h.commit('/session/route-alpha');
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha']]);
+    expect(h.shell.current.state.isQuestionCacheReady).toBe(true);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('initializes each transition when leaving and returning to a session', () => {
+    const h = mountShell();
+    for (const slug of ['route-alpha', 'route-beta', 'route-alpha']) {
+      window.history.replaceState({}, '', `/session/${slug}`);
+      h.commit(`/session/${slug}`);
+      expect(h.shell.current.props.sessionState.primarySessionSlug).toBe(slug);
+    }
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha'], ['route-beta'], ['route-alpha']]);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(3);
+    h.unmount();
+  });
+
+  it.each([0, 1, 2])(
+    'settles back and forward navigation with %i store commits before the router catches up',
+    async (lag) => {
+      const h = mountShell();
+      const settleRoute = (slug) => {
+        for (let i = 0; i < lag; i += 1) h.commitStore();
+        h.commit(`/session/${slug}`);
+        expect(h.shell.current.props.activeSessionSlug).toBe(slug);
+        expect(h.shell.current.state.isQuestionCacheReady).toBe(true);
+        expect(h.shell.current.state.isSurveyCacheReady).toBe(true);
+      };
+      const traverseHistory = async (direction) => {
+        await act(
+          async () =>
+            new Promise((resolve) => {
+              window.addEventListener('popstate', resolve, { once: true });
+              window.history[direction]();
+            }),
+        );
+      };
+      window.history.pushState({}, '', '/session/route-alpha');
+      h.commit('/session/route-alpha');
+      window.history.pushState({}, '', '/session/route-beta');
+      expect(() => settleRoute('route-beta')).not.toThrow();
+      await traverseHistory('back');
+      expect(window.location.pathname).toBe('/session/route-alpha');
+      expect(() => settleRoute('route-alpha')).not.toThrow();
+      await traverseHistory('forward');
+      expect(window.location.pathname).toBe('/session/route-beta');
+      expect(() => settleRoute('route-beta')).not.toThrow();
+      expect(h.dispatch.mock.calls).toEqual([['route-alpha'], ['route-beta'], ['route-alpha'], ['route-beta']]);
+      expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(4);
+      h.unmount();
+    },
+  );
+
+  it('settles a bare-link redirect while the router still names the previous session', () => {
+    const h = mountShell();
+    window.history.replaceState({}, '', '/session/route-alpha');
+    h.commit('/session/route-alpha');
+    window.history.pushState({}, '', '/route-beta?group=group-a');
+    h.commitStore();
+    window.history.replaceState({}, '', '/session/route-beta?group=group-a&mode=interview');
+    expect(() => h.commitStore()).not.toThrow();
+    h.commitStore();
+    h.commit('/session/route-beta');
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha'], ['route-beta']]);
+    expect(h.shell.current.props.activeSessionSlug).toBe('route-beta');
+    h.unmount();
+  });
+
+  it('keeps query and interview-mode changes from reinitializing the same session', () => {
+    const h = mountShell();
+    window.history.replaceState({}, '', '/session/route-alpha');
+    h.commit('/session/route-alpha');
+    for (const query of ['?group=group-a', '?group=group-a&mode=interview', '?group=group-b', '']) {
+      window.history.replaceState({}, '', `/session/route-alpha${query}`);
+      h.commitStore();
+      h.commit(`/session/route-alpha${query}`);
+    }
+    expect(h.dispatch.mock.calls).toEqual([['route-alpha']]);
+    expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+});
+
 describe('AppShell single-SBT counts checkpoints', () => {
   beforeEach(() => {
     jest.clearAllMocks();

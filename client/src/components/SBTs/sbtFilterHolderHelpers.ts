@@ -1,5 +1,4 @@
 import { asSelectedSbtEntry } from './sbtFilterSelectionHelpers';
-import type { SbtFilterSelectedSbtEntry } from './sbtFilterSelectionHelpers';
 
 type UnknownRecord = Record<string, unknown>;
 

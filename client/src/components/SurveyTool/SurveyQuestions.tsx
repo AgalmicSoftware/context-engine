@@ -53,11 +53,7 @@ import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
 import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
 import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
-import {
-  processRatingEnvelopesForSubmit,
-  type RatingEnvelopeDeps,
-  type RatingEnvelopeContext,
-} from './surveyToolRatingEnvelopeSubmitController';
+import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import { writeSubmittedResponsesToLocalCaches as writeSubmittedResponsesToLocalCachesHelper } from './surveyToolPostSubmitCacheController';
 import {
   ensureIdentifierHash,
@@ -190,7 +186,6 @@ import {
   buildQuestionPromptDecryptDisplayState,
   isQuestionPromptMasked as isQuestionPromptMaskedHelper,
 } from './surveyToolViewState.js';
-import { buildResponseGateConfigSignature } from './surveyToolResponseAccess';
 import { decideAutoDecryptBlocked, decideAutomaticPromptDecryptByKind } from './surveyQuestionsDecryptEligibility.js';
 import {
   buildDecryptContextKeyFromContext,
@@ -472,9 +467,6 @@ import {
   runSurveyQuestionsStaleSubmitController,
   runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
-  type SurveyQuestionsSubmitPendingStats,
-  type SurveyQuestionsSubmitStaleStatePatch,
-  type SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import {
   applySurveyQuestionsRuntimeInitialState,
@@ -485,16 +477,13 @@ import {
 import {
   createSurveyQuestionsInstanceFields,
   type SurveyQuestionsBootstrapRetryArgs,
-  type SurveyQuestionsCacheQuestion,
   type SurveyQuestionsCachedResponseEntryArgs,
   type SurveyQuestionsDraftHydrationEntryArgs,
   type SurveyQuestionsDraftTrackingState,
   type SurveyQuestionsHydrationPatch,
   type SurveyQuestionsInstanceFields,
   type SurveyQuestionsLocalCacheHydrationEntryArgs,
-  type SurveyQuestionsPendingStatsInput,
   type SurveyQuestionsQuestionIdResolver,
-  type SurveyQuestionsRecord,
   type SurveyQuestionsResponseFieldState,
   type SurveyQuestionsResponseHydrationEntryArgs,
   type SurveyQuestionsResponseHydrationListArgs,
@@ -582,23 +571,10 @@ import {
   buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
   publishSurveyQuestionPoolIfCurrent,
-  type SurveyQuestionsAuthoringPanelDisplayState,
-  type SurveyQuestionsAuthoringRouteReadinessDescriptor,
-  type SurveyQuestionsFullLoadingProgressState,
-  type SurveyQuestionsJsonPanelDisplayState,
   type SurveyQuestionsLegacyValue,
   type SurveyQuestionsProps,
-  type SurveyQuestionsPrimarySubmitPlan,
-  type SurveyQuestionsRenderReadinessDescriptor,
-  type SurveyQuestionsRouteViewDisplayState,
   type SurveyQuestionsRuntimeStrategy,
   type SurveyQuestionsState,
-  type SurveyQuestionsSubmitFooterDisplayState,
-  type SurveyQuestionsSubmitReadinessDescriptor,
-  type SurveyQuestionsMaskedQuestionVisibilityState,
-  type SurveySubmitFailureStatePatch,
-  type SurveySubmitStartStatePatch,
-  type SurveySubmitSuccessStatePatch,
 } from './surveyQuestionsTypes.js';
 import { createSurveyQuestionsRuntimeMethods } from './surveyQuestionsRuntimeMethods';
 
@@ -889,9 +865,25 @@ const SurveyQuestionsInner = (
     const targetImportance = targetSlice.importance as Record<string, unknown>;
     const targetConviction = targetSlice.conviction as Record<string, unknown>;
     let changed = false;
+    // An empty public cache field cannot revoke a lock selected before typing.
+    // Saved text and envelopes must still hydrate, including decrypted-empty drafts.
+    const keepBlankLock = (
+      current: SurveyQuestionsResponseFieldState | undefined,
+      cached: SurveyQuestionsResponseFieldState,
+      isAdditional = false,
+    ) =>
+      current?.value === '' &&
+      current.encrypted === true &&
+      // Match Answer applies only to comments; answer policies stay explicit.
+      (current.audienceMode === 'explicit' || (isAdditional && current.audienceMode === 'inherit')) &&
+      !current.encryptedPortion &&
+      cached.value === '' &&
+      !cached.encrypted &&
+      !cached.encryptedPortion;
 
     if (
       cachedAnswer &&
+      !keepBlankLock(targetAnswers?.[questionId], cachedAnswer) &&
       (allowMaskedAnswerDraftEmpty ||
         targetAnswers?.[questionId]?.value === undefined ||
         (targetAnswers?.[questionId]?.value === '' && !targetAnswers?.[questionId]?.encryptedPortion))
@@ -911,6 +903,7 @@ const SurveyQuestionsInner = (
 
     if (
       cachedAdditional &&
+      !keepBlankLock(targetAdditional?.[questionId], cachedAdditional, true) &&
       (allowMaskedAdditionalDraftEmpty ||
         targetAdditional?.[questionId]?.value === undefined ||
         (targetAdditional?.[questionId]?.value === '' && !targetAdditional?.[questionId]?.encryptedPortion))

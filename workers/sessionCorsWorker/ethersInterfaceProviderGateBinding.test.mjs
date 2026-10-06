@@ -12,8 +12,6 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps returns the expecte
   assert.equal(typeof helpers.getSbtAdminInterface, 'function');
   assert.equal(typeof helpers.getHatsInterface, 'function');
   assert.equal(typeof helpers.getFaucetSbtGateInterface, 'function');
-  assert.equal(typeof helpers.getJsonRpcProvider, 'function');
-  assert.equal(typeof helpers.getRegistryContract, 'function');
   assert.equal(typeof helpers.isPositiveBalance, 'function');
   assert.equal(typeof helpers.checkSbtGate, 'function');
 });
@@ -61,96 +59,6 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves interface
   assert.deepEqual(sbtAdmin.abi, ['sbtAdmin']);
   assert.deepEqual(hats.abi, ['hats']);
   assert.deepEqual(faucet.abi, ['faucet']);
-});
-
-test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves provider selection and registry contract creation', () => {
-  const providers = [];
-  const contracts = [];
-
-  class StaticJsonRpcProvider {
-    constructor(rpcUrl, network) {
-      providers.push(['static', rpcUrl, network]);
-      this.rpcUrl = rpcUrl;
-      this.network = network;
-    }
-  }
-
-  class JsonRpcProvider {
-    constructor(rpcUrl, network) {
-      providers.push(['json', rpcUrl, network]);
-      this.rpcUrl = rpcUrl;
-      this.network = network;
-    }
-  }
-
-  class ContractStub {
-    constructor(address, abi, provider) {
-      contracts.push([address, abi, provider]);
-      this.address = address;
-      this.abi = abi;
-      this.provider = provider;
-    }
-  }
-
-  const helpers = createEthersInterfaceProviderGateHelpersWithWorkerDeps({
-    deps: {
-      ethers: {
-        providers: {
-          StaticJsonRpcProvider,
-          JsonRpcProvider,
-        },
-        Contract: ContractStub,
-      },
-      toChainId: (value) => Number(value) || 0,
-      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
-      isAddress: (value) => /^0x[0-9a-fA-F]{40}$/.test(String(value).trim()),
-      resolveRegistryRpcUrl: (config) => config.rpcUrl || '',
-    },
-    constants: {
-      sessionRegistryAbi: ['registry'],
-    },
-  });
-
-  const staticProvider = helpers.getJsonRpcProvider('https://rpc-a.example', 84532);
-  const jsonProvider = helpers.getJsonRpcProvider('https://rpc-b.example', 0);
-
-  assert.equal(staticProvider.network.chainId, 84532);
-  assert.equal(jsonProvider.network, undefined);
-
-  const contract = helpers.getRegistryContract({
-    registryAddress: '0x0000000000000000000000000000000000000001',
-    rpcUrl: 'https://rpc-c.example',
-    registryChainId: 84532,
-  });
-
-  assert.equal(contract.address, '0x0000000000000000000000000000000000000001');
-  assert.deepEqual(providers, [
-    ['static', 'https://rpc-a.example', { chainId: 84532, name: 'chain-84532' }],
-    ['json', 'https://rpc-b.example', undefined],
-    ['static', 'https://rpc-c.example', { chainId: 84532, name: 'chain-84532' }],
-  ]);
-  assert.deepEqual(contracts, [[
-    '0x0000000000000000000000000000000000000001',
-    ['registry'],
-    contract.provider,
-  ]]);
-
-  assert.equal(
-    helpers.getRegistryContract({
-      registryAddress: 'not-an-address',
-      rpcUrl: 'https://rpc.example',
-      registryChainId: 84532,
-    }),
-    null,
-  );
-  assert.equal(
-    helpers.getRegistryContract({
-      registryAddress: '0x0000000000000000000000000000000000000001',
-      rpcUrl: '',
-      registryChainId: 84532,
-    }),
-    null,
-  );
 });
 
 test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves positive-balance coercion', () => {
@@ -249,9 +157,11 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
         status: 502,
         code: -32000,
         error: 'SBT balance check failed.',
-      }],
     },
-  ]]);
+        ],
+      },
+    ],
+  ]);
 
   assert.equal(
     await helpers.checkSbtGate({

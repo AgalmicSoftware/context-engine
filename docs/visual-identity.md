@@ -287,7 +287,13 @@ Use grid when two columns need equal visual weight, then collapse to one column 
 
 ### Shared behavior
 
-- Hover/focus on links and icons: switch to `#4dffa4`
+- Hover/focus on links and icons on dark panels: switch to `#4dffa4`.
+  On document cards, including Docs Quickstart, use `--ce-document-text` for
+  readable links in every state; emphasize hover with a thicker underline and
+  keyboard focus with a matching outline.
+- Icon-only question-mark help buttons use `data-ce-control-appearance="frameless"`
+  to remove theme borders and shadows. Use color for pointer hover feedback and
+  retain a visible keyboard focus indicator.
 - Hover on buttons/cards: slight lift with `translateY(-1px)` or `translateY(-2px)`
 - Final submit/create CTAs use the shared `#2a63ca` surface, indigo hover, uppercase body-font labels, and the same lift-on-hover motion.
 - Focus: visible outline, usually `2px solid rgba(99, 102, 241, 0.45)`

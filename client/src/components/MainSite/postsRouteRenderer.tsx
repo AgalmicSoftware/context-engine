@@ -1,4 +1,3 @@
-import React from 'react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import InitialRouteBoundary from '../ErrorBoundary/InitialRouteBoundary';
 import LazyFallback from '../Shared/LazyFallback';

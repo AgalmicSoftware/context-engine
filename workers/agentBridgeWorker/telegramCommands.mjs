@@ -42,6 +42,7 @@ import {
   buildTelegramMyAccountState,
   buildTelegramPoseQuestionState,
   buildTelegramQuestionListState,
+  normalizeTelegramRatingScale,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildResultsImage } from './resultImage.mjs';
@@ -160,7 +161,7 @@ const DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=43';
 const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine/tree/main';
 const CONTEXT_ENGINE_WORKER_SKILL_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
@@ -287,10 +288,7 @@ function base64ToBytes(value = '') {
 
 export function bridgeOpenAiApiKey(env = {}) {
   return safeString(
-    env.AGENT_BRIDGE_OPENAI_API_KEY ||
-    env.AGENT_BRIDGE_OPENAI_KEY ||
-    env.OPENAI_API_KEY ||
-    env.E2E_OPENAI_KEY
+    env.AGENT_BRIDGE_OPENAI_API_KEY || env.AGENT_BRIDGE_OPENAI_KEY || env.OPENAI_API_KEY || env.E2E_OPENAI_KEY,
   );
 }
 
@@ -452,6 +450,9 @@ function telegramButtonLabel(value = '', fallback = 'Question') {
 }
 
 function onChainAnswerFromDraft(draft = {}) {
+  // Agent preferences store the normalized typed answer as JSON, including
+  // comments. Ordinary chat drafts still store the button's plain value.
+  if (draft.source === 'agent_handoff') return answerFromStoredDraft(draft);
   const controlType = safeString(draft.controlType);
   if (controlType === 'rating_button') {
     return {
@@ -577,7 +578,7 @@ function normalizePreloadedQuestionRecord(entry = {}, {
     entry.questionId ||
     entry.id ||
     storageRef?.id ||
-    `telegram-only-${sessionSlug || 'session'}-${index + 1}`
+      `telegram-only-${sessionSlug || 'session'}-${index + 1}`,
   );
   if (!id) return null;
   const visibility = lower(root.visibility || root.accessMode || entry.visibility || 'public') || 'public';
@@ -926,7 +927,7 @@ function sessionUsesCloudflareQuestionStorage(session = {}) {
     storageProfile.defaultBackend ||
     storage.defaultBackend ||
     session.questionStorageBackend ||
-    session.storageBackend
+      session.storageBackend,
   );
   const source = lower(session.questionSource || session.telegramQuestionSource);
   const artifactTypes = Array.isArray(cloudflareProfile.artifactTypes)
@@ -1057,7 +1058,7 @@ async function fetchTelegramOnlyCloudflareJson({
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(new Error('Telegram-only Cloudflare storage timed out')),
-    telegramOnlyStorageTimeoutMs(env)
+    telegramOnlyStorageTimeoutMs(env),
   );
   try {
     const response = await fetchImpl(`${auth.workerUrl}${path}`, {
@@ -1156,7 +1157,7 @@ async function loadTelegramOnlyCloudflareQuestions({
           index,
           fallbackSessionSlug: sessionSlug,
           source: 'telegram_only_cloudflare_questions',
-        }
+          },
       );
       if (normalized && !questionIsPayloadUnavailable(normalized) && !questionRecordMalformedReason(normalized)) {
         return { question: normalized };
@@ -1180,7 +1181,7 @@ async function loadTelegramOnlyCloudflareQuestions({
         index,
         fallbackSessionSlug: sessionSlug,
         source: 'telegram_only_cloudflare_questions',
-      }
+        },
     );
     return normalized ? { question: normalized } : null;
   }));
@@ -1452,7 +1453,7 @@ function scheduleManagedAccountFaucetForJoin({
       account,
       principal,
       createdAt,
-    })
+    }),
   );
   return { ok: true, scheduled: true, reason: 'faucet_request_scheduled' };
 }
@@ -2152,7 +2153,7 @@ export function buildLocalUrlQuestionCandidates({
 } = {}) {
   const requested = Math.min(
     TELEGRAM_GENERATED_QUESTION_MAX_COUNT,
-    Math.max(1, Number(count || TELEGRAM_GENERATED_QUESTION_COUNT))
+    Math.max(1, Number(count || TELEGRAM_GENERATED_QUESTION_COUNT)),
   );
   const normalizedType = normalizeQuestionProposalType(questionType) || 'agree_unsure_disagree';
   const themes = localGeneratedQuestionThemes(source, session);
@@ -2915,6 +2916,7 @@ async function persistAnswerDraft({
   answerLabel = '',
   answerValue = '',
   controlType = '',
+  ratingScale = null,
   submitLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
   metadata = null,
   agentMetadata = null,
@@ -2938,6 +2940,7 @@ async function persistAnswerDraft({
     answerLabel: safeString(answerLabel),
     answerValue: safeString(answerValue || answerLabel),
     controlType: safeString(controlType),
+    ...(ratingScale ? { ratingScale } : {}),
     status: 'draft_saved',
     submitLane: safeString(submitLane) || TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     selectedAt: savedAt,
@@ -3030,6 +3033,18 @@ async function persistTelegramSubmitRequest({
   if (!telegramUserId || !slug || !qid || draft.status !== 'draft_saved') {
     return { ok: false, reason: 'submit_request_incomplete' };
   }
+  let ratingScale = null;
+  if (['rating', 'rating_button'].includes(draft.controlType)) {
+    if (Number.isFinite(draft.ratingScale?.min) && Number.isFinite(draft.ratingScale?.max)) {
+      ratingScale = normalizeTelegramRatingScale({ ratingScale: draft.ratingScale });
+    } else {
+      const loaded = await loadQuestionsForSession(env, slug, { preferredQuestionIds: [qid] });
+      const question = (loaded.questions || []).find((entry) => questionId(entry) === qid);
+      // A cache miss is not evidence that this question uses the default scale.
+      if (!question) return { ok: false, reason: 'rating_scale_unavailable', retryable: true };
+      ratingScale = normalizeTelegramRatingScale(question);
+    }
+  }
   const answerFingerprint = answerDraftFingerprint(draft);
   const idempotencyKey = buildSubmitIdempotencyKey({
     transport: 'telegram_bot_submit', principal: telegramUserId, sessionSlug: slug, questionId: qid,
@@ -3101,6 +3116,7 @@ async function persistTelegramSubmitRequest({
           value: safeString(draft.answerValue),
           controlType: safeString(draft.controlType),
         },
+        ratingScale,
         onChainAnswer: onChainAnswerFromDraft(draft),
         answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
         draftProvenance,
@@ -3141,6 +3157,7 @@ async function persistTelegramSubmitRequest({
     questionRef: {
       sessionSlug: slug,
       questionId: qid,
+      ratingScale,
     },
     answer: onChainAnswerFromDraft(draft),
     idempotencyKey,
@@ -3453,7 +3470,7 @@ function directLinkMiniAppShortName(env = {}) {
     env.AGENT_BRIDGE_MINIAPP_SHORT_NAME ||
     env.AGENT_BRIDGE_MINI_APP_SHORT_NAME ||
     env.TELEGRAM_MINIAPP_SHORT_NAME ||
-    env.TELEGRAM_MINI_APP_SHORT_NAME
+      env.TELEGRAM_MINI_APP_SHORT_NAME,
   );
 }
 
@@ -3692,21 +3709,21 @@ function positiveIntegerEnv(value = '', fallback = 0) {
 function dmVoiceTranscribeMaxBytes(env = {}) {
   return positiveIntegerEnv(
     env.AGENT_BRIDGE_TRANSCRIBE_MAX_BYTES || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_MAX_BYTES,
-    DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES
+    DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES,
   );
 }
 
 function dmVoiceTranscribeRateLimit(env = {}) {
   return positiveIntegerEnv(
     env.AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_LIMIT,
-    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT
+    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT,
   );
 }
 
 function dmVoiceTranscribeRateWindowSeconds(env = {}) {
   return positiveIntegerEnv(
     env.AGENT_BRIDGE_TRANSCRIBE_RATE_WINDOW_SECONDS || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS,
-    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS
+    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS,
   );
 }
 
@@ -3819,7 +3836,7 @@ function selectMiniAppVoiceDraftQuestionId(record = {}) {
   const skipped = new Set(
     (Array.isArray(series.skippedQuestionIds) ? series.skippedQuestionIds : [])
       .map((questionIdRef) => lower(questionIdRef))
-      .filter(Boolean)
+      .filter(Boolean),
   );
   const ids = (Array.isArray(series.questionIds) ? series.questionIds : [])
     .map(safeString)
@@ -4099,6 +4116,8 @@ async function makeAnswerButton({
       answerLabel: label,
       answerValue: safeString(control.value || label),
       controlType: safeString(control.controlType),
+      ...(control.controlType === 'rating_button'
+        ? { ratingScale: { min: control.min, max: control.max, step: control.step } } : {}),
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     },
     seed: seed || `answer|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}|${safeString(control.controlType)}|${label}`,
@@ -4309,7 +4328,7 @@ function telegramSessionCreatedAfterMs(env = {}, policy = {}) {
     policy.telegramSessionCreatedAfter ||
     policy.telegramSessionsCreatedAfter ||
     policy.telegramGroupCreatedAfter ||
-    policy.sessionCreatedAfter
+      policy.sessionCreatedAfter,
   );
 }
 
@@ -4323,7 +4342,7 @@ function sessionCreatedAtMs(session = {}) {
     session.groupCreatedAt ||
     session.telegramCreatedAt ||
     session.blockTimestamp ||
-    session.createdBlockTimestamp
+      session.createdBlockTimestamp,
   );
 }
 
@@ -5947,7 +5966,7 @@ async function buildGeneratedQuestionRegenerationResponse({
     ? regeneration.count
     : Math.min(
       TELEGRAM_GENERATED_QUESTION_MAX_COUNT,
-      Math.max(1, Number(record.requestedCount || TELEGRAM_GENERATED_QUESTION_COUNT))
+        Math.max(1, Number(record.requestedCount || TELEGRAM_GENERATED_QUESTION_COUNT)),
     );
   const generated = await generateUrlQuestionCandidates({
     env,
@@ -8860,6 +8879,7 @@ async function buildAnswerDraftResponse({
     answerLabel,
     answerValue,
     controlType,
+    ratingScale: ref.ratingScale,
     createdAt,
   });
   const userSessionBinding = saved.ok
@@ -8917,7 +8937,7 @@ async function buildAnswerDraftResponse({
     screen: 'submit_response',
     extra: {
       ok,
-      reason: ok ? (submitted?.status || 'submit_request_created') : (saved.ok ? submitted?.reason : saved.reason),
+      reason: ok ? submitted?.status || 'submit_request_created' : saved.ok ? submitted?.reason : saved.reason,
       sessionSlug,
       questionId: selectedQuestionId,
       answerDraftSaved: saved.ok === true,
@@ -9001,7 +9021,7 @@ async function buildSubmitDraftResponse({
     screen: 'submit_response',
     extra: {
       ok: submitted.ok === true,
-      reason: submitted.ok ? (submitted.status || 'submit_request_created') : submitted.reason,
+      reason: submitted.ok ? submitted.status || 'submit_request_created' : submitted.reason,
       sessionSlug,
       questionId: selectedQuestionId,
       submitRequestCreated: submitted.ok === true,
@@ -10891,7 +10911,7 @@ function callbackQueryIdFromCommandResponse(commandResponse = {}) {
   return safeString(
     commandResponse.callbackQueryId ||
     commandResponse.normalized?.raw?.callback_query?.id ||
-    commandResponse.normalized?.callbackQueryId
+      commandResponse.normalized?.callbackQueryId,
   );
 }
 

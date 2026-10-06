@@ -19,19 +19,9 @@ import CompareAddress, {
   resolveCompareUnsureHeaderStyle,
   resolveCompareUnsureMoreStyle,
   resolveCompareUnsurePanelStyle,
-  resolveCompareVennNoteStyle,
-  resolveCompareVennSbtImageStyle,
-  resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipListStyle,
-  resolveCompareVennTooltipStyle,
-  resolveCompareVennWrapStyle,
   resolveCompareVisualSectionStyle,
 } from './CompareAddresses';
-import {
-  buildCompareSbtImageMap,
-  buildCompareSbtKeySets,
-  buildNicknameByAddressMap,
-} from './compareMembershipPresentation';
+import { buildNicknameByAddressMap } from './compareMembershipPresentation';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { runCompareToolkit } from '../../utilities/ai/aiClient.js';
 
@@ -48,10 +38,6 @@ jest.mock('../../utilities/ai/aiClient.js', () => ({
 const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
 const mockRunCompareToolkit = runCompareToolkit as jest.Mock;
 const buildNicknameMap = buildNicknameByAddressMap as (entries: Array<Record<string, unknown>>) => Map<string, string>;
-const buildSbtKeySets = buildCompareSbtKeySets as (entries: Array<Record<string, unknown>>) => Set<string>[];
-const buildSbtImageMap = buildCompareSbtImageMap as (
-  entries: Array<Record<string, unknown>>,
-) => Map<string, { name: string; image: string | null }>;
 const readObjectValues = readDgObjectValues as (namespace: string, sessionSlug?: string) => unknown[];
 
 describe('CompareAddresses cache scan helpers', () => {
@@ -127,57 +113,6 @@ describe('CompareAddresses cache scan helpers', () => {
     ]);
   });
 
-  it('keeps distinct locked-name SBTs separate in compare key sets', () => {
-    const sets = buildSbtKeySets([
-      {
-        sbts: [
-          {
-            name: '[encrypted]',
-            address: '0xSbt1',
-          },
-        ],
-      },
-      {
-        sbts: [
-          {
-            name: '[encrypted]',
-            address: '0xSbt2',
-          },
-        ],
-      },
-    ]);
-
-    expect(sets.map((set) => Array.from(set))).toEqual([['0xsbt1'], ['0xsbt2']]);
-  });
-
-  it('keeps separate image map entries for different locked-name SBTs', () => {
-    const map = buildSbtImageMap([
-      {
-        sbts: [
-          {
-            name: '[encrypted]',
-            address: '0xSbt1',
-            image: 'https://img.test/1.png',
-          },
-        ],
-      },
-      {
-        sbts: [
-          {
-            name: '[encrypted]',
-            address: '0xSbt2',
-            image: 'https://img.test/2.png',
-          },
-        ],
-      },
-    ]);
-
-    expect(Array.from(map.entries())).toEqual([
-      ['0xsbt1', { name: '[encrypted]', image: 'https://img.test/1.png' }],
-      ['0xsbt2', { name: '[encrypted]', image: 'https://img.test/2.png' }],
-    ]);
-  });
-
   it('resolves compare address pill styles consistently', () => {
     expect(resolveCompareAddressPillContentStyle()).toEqual({
       alignItems: 'center',
@@ -228,36 +163,6 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(resolveCompareLoadingTextStyle()).toEqual({ marginLeft: 6 });
     expect(resolveCompareClickableResultItemStyle()).toEqual({ cursor: 'pointer' });
     expect(resolveCompareDrillBodyStyle()).toEqual({ marginTop: 6 });
-  });
-
-  it('resolves compare Venn tooltip styles consistently', () => {
-    expect(resolveCompareVennWrapStyle()).toEqual({
-      overflowX: 'auto',
-      position: 'relative',
-    });
-    expect(resolveCompareVennTooltipStyle({ clientWidth: 500, x: 100, y: 20 })).toEqual({
-      left: 80,
-      top: 28,
-    });
-    expect(resolveCompareVennTooltipListStyle()).toEqual({
-      listStyle: 'none',
-      margin: 0,
-      padding: 0,
-    });
-    expect(resolveCompareVennSbtRowStyle()).toEqual({
-      alignItems: 'center',
-      display: 'flex',
-      gap: '8px',
-    });
-    expect(resolveCompareVennSbtImageStyle()).toEqual({
-      borderRadius: '4px',
-      flexShrink: 0,
-    });
-    expect(resolveCompareVennNoteStyle()).toEqual({
-      fontSize: 12,
-      marginTop: 4,
-      opacity: 0.75,
-    });
   });
 
   it('resolves compare compass styles consistently', () => {

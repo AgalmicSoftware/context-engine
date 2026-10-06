@@ -13,6 +13,7 @@ export function mergeInterviewReview(
   incoming: InterviewDraftResponse[],
   isInitiallySelected: (id: string) => boolean,
   modelId: string = DEFAULT_AI_MODEL,
+  savedComment: (id: string) => string = () => '',
 ) {
   const drafts = new Map(previous.map((draft) => [draft.questionId, draft]));
   const nextEdited = { ...edited };
@@ -39,13 +40,19 @@ export function mergeInterviewReview(
     if (prior && edited[draft.questionId]) {
       // Refresh AI-owned fields, but keep every field the responder changed during review.
       for (const field of ['answer', 'additionalComments', 'importance', 'conviction'] as const) {
+        const value = edited[draft.questionId][field];
         if (
           userEditedFields.has(field) ||
-          JSON.stringify(interviewDraftFieldValue(field, edited[draft.questionId][field])) !==
+          JSON.stringify(interviewDraftFieldValue(field, value)) !==
             JSON.stringify(interviewDraftFieldValue(field, prior[field]))
         ) {
-          userEditedFields.add(field);
-          reviewed = { ...reviewed, [field]: edited[draft.questionId][field] };
+          // Review seeds the saved comment when the AI proposed none; keep it without calling it an edit.
+          const seededSavedComment =
+            field === 'additionalComments' &&
+            !userEditedFields.has(field) &&
+            interviewDraftFieldValue(field, value) === savedComment(draft.questionId);
+          if (!seededSavedComment) userEditedFields.add(field);
+          reviewed = { ...reviewed, [field]: value };
         }
       }
     }

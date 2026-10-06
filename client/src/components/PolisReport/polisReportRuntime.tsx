@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   normalizePolisBinaryVote,
   parseReportResponse,
@@ -29,7 +28,6 @@ import {
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
 import { createLogger } from 'utilities/logging.js';
-import styles from './PolisReport.module.scss';
 
 export { normalizePolisBinaryVote } from './polisReportAnswers';
 
@@ -776,7 +774,7 @@ export function applyFilterStateToAggregator(
             score += 1;
           }
         } else {
-          const rawImportance = parsed?.conviction ?? parsed?.importance ?? 0;
+          const rawImportance = parsed?.importance ?? parsed?.conviction ?? 0;
           const imp = Number(asRecord(rawImportance).value ?? rawImportance);
           if (!Number.isNaN(imp)) score += imp;
         }

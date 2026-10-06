@@ -9,15 +9,13 @@ const scope = {
   sessionSlug: 'alpha',
   sessionId: '0x1234',
   groupId: 'group',
-  account: '0xABC',
 };
 beforeEach(() => localStorage.clear());
 
-it('persists only the matching account, session and group until explicitly cleared', () => {
+it('persists only the matching Worker, session and group until explicitly cleared', () => {
   expect(rememberWorkerGroupAutoJoinCancellation(scope)).toBe(true);
-  expect(isWorkerGroupAutoJoinCancelled({ ...scope, account: '0xabc' })).toBe(true);
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(true);
   for (const other of [
-    { account: '0xdef' },
     { workerUrl: 'https://other.example' },
     { sessionSlug: 'beta' },
     { sessionId: '0x5678' },
@@ -36,10 +34,26 @@ it('reports unavailable storage so the notice can explain that cancellation last
   set.mockRestore();
 });
 
-it('an explicit signed-in Join also clears the earlier signed-out choice, without clearing another account', () => {
-  rememberWorkerGroupAutoJoinCancellation({ ...scope, account: '' });
-  rememberWorkerGroupAutoJoinCancellation({ ...scope, account: '0xother' });
+it('honours cancellations saved per account until an explicit Join clears them', () => {
+  const legacyKey = (groupId: string, account: string) =>
+    `ce:worker-group-auto-join-cancelled:v1:${JSON.stringify(['https://worker.example', 'alpha', groupId, account])}`;
+  const saved = JSON.stringify({ cancelled: true, sessionId: '0x1234' });
+  localStorage.setItem(legacyKey('group', ''), saved);
+  localStorage.setItem(legacyKey('group', '0xabc'), saved);
+  localStorage.setItem(legacyKey('group-2', '0xabc'), saved);
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(true);
   clearWorkerGroupAutoJoinCancellation(scope);
-  expect(isWorkerGroupAutoJoinCancelled({ ...scope, account: '' })).toBe(false);
-  expect(isWorkerGroupAutoJoinCancelled({ ...scope, account: '0xother' })).toBe(true);
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(false);
+  expect(isWorkerGroupAutoJoinCancelled({ ...scope, groupId: 'group-2' })).toBe(true);
+});
+
+it('ignores a malformed legacy entry while honouring another browser cancellation', () => {
+  const legacyKey = (account: string) =>
+    `ce:worker-group-auto-join-cancelled:v1:${JSON.stringify(['https://worker.example', 'alpha', 'group', account])}`;
+  localStorage.setItem(legacyKey('0xaaa'), '{invalid');
+  localStorage.setItem(legacyKey('0xbbb'), JSON.stringify({ cancelled: true, sessionId: '0x1234' }));
+
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(true);
+  clearWorkerGroupAutoJoinCancellation(scope);
+  expect(isWorkerGroupAutoJoinCancelled(scope)).toBe(false);
 });

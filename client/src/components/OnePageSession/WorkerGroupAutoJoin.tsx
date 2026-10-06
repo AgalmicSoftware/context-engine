@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { finishWorkerGroupAutoJoin, canAutoJoinWorkerGroup } from '../../domains/worker/workerGroupAutoJoin';
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
@@ -62,7 +62,6 @@ function AutoJoinIntent({
   const finishedRef = useRef(false);
   const completedAccountRef = useRef<string>();
   const cancelRef = useRef(() => {});
-  const cancelledAccountRef = useRef<string>();
   const [groupLabel, setGroupLabel] = useState(groupId);
   const [retry, setRetry] = useState(0);
   const [progress, setProgress] = useState<Progress>({ phase: 'loading', message: 'Preparing to join group…' });
@@ -87,17 +86,10 @@ function AutoJoinIntent({
   }, [ready, workerUrl, sessionId, sessionSlug, groupId]);
 
   useEffect(() => {
-    const scope = { workerUrl, sessionSlug, sessionId, groupId, account };
-    // A cancellation before sign-in belongs to the first account that signs in
-    // for this invitation. It must not silently turn into a join on login.
-    if (ready && cancelledAccountRef.current === '') {
-      rememberWorkerGroupAutoJoinCancellation(scope);
-      clearWorkerGroupAutoJoinCancellation({ ...scope, account: '' });
-      cancelledAccountRef.current = account;
-    }
-    if (!finishedRef.current && isWorkerGroupAutoJoinCancelled(scope)) {
+    // A cancellation holds for this browser: signing in, switching accounts or
+    // following the invitation again must not turn it into a join.
+    if (!finishedRef.current && isWorkerGroupAutoJoinCancelled({ workerUrl, sessionSlug, sessionId, groupId })) {
       finishedRef.current = true;
-      cancelledAccountRef.current = account;
       onConsumed();
       clearPendingAutoJoin(intent);
       finishWorkerGroupAutoJoin(sessionSlug, groupId);
@@ -172,8 +164,7 @@ function AutoJoinIntent({
     onConsumed();
     clearPendingAutoJoin(intent);
     finishWorkerGroupAutoJoin(sessionSlug, groupId);
-    cancelledAccountRef.current = account;
-    const saved = rememberWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId, account });
+    const saved = rememberWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId });
     setProgress({
       phase: 'cancelled',
       message: saved ? 'Auto-join cancelled.' : 'Auto-join cancelled for this visit. Browser storage is unavailable.',
@@ -182,8 +173,7 @@ function AutoJoinIntent({
   const cancelled = progress.phase === 'cancelled';
   const done = progress.phase === 'done' || cancelled;
   const joinExplicitly = () => {
-    clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId, account });
-    cancelledAccountRef.current = undefined;
+    clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId });
     finishedRef.current = false;
     savePendingAutoJoin({ ...intent, sessionId });
     setProgress({ phase: 'loading', message: 'Preparing to join group…' });
@@ -335,7 +325,6 @@ export default function WorkerGroupAutoJoin(props: Props) {
             sessionSlug: intent.sessionSlug,
             sessionId: intent.sessionId,
             groupId: intent.groupId,
-            account: props.account,
           });
           clearPendingAutoJoin(intent);
           finishWorkerGroupAutoJoin(intent.sessionSlug, intent.groupId);

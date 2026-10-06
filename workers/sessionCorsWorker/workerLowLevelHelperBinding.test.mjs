@@ -53,6 +53,7 @@ test('createWorkerLowLevelHelpersWithWorkerDeps returns the expected low-level h
     },
   });
 
+  assert.equal(Object.hasOwn(helpers, 'resolveRegistryRpcUrl'), false);
   assert.deepEqual(helpers, {
     isBlockedOutboundUrl: 'isBlockedOutboundUrl',
     safeFetch: 'safeFetch',
@@ -67,7 +68,6 @@ test('createWorkerLowLevelHelpersWithWorkerDeps returns the expected low-level h
     formatEther: 'formatEther',
     toRegistrySessionSlug: 'toRegistrySessionSlug',
     resolveRegistryRpcUrls: 'resolveRegistryRpcUrls',
-    resolveRegistryRpcUrl: 'resolveRegistryRpcUrl',
     resolveRpcUrlListForGate: 'resolveRpcUrlListForGate',
     resolveFaucetRpcUrls: 'resolveFaucetRpcUrls',
     isBytes32Hex: 'isBytes32Hex',
@@ -160,7 +160,6 @@ test('createWorkerLowLevelHelpersWithWorkerDeps preserves low-level worker assem
         assert.equal(value.deps.toChainId, 'toChainId');
         assert.equal(value.deps.toStr, 'toStr');
         assert.equal(value.deps.isAddress, 'isAddress');
-        assert.equal(value.deps.resolveRegistryRpcUrl, 'resolveRegistryRpcUrl');
         assert.equal(typeof value.deps.callContractFunction, 'function');
         assert.equal(typeof value.deps.maskRpcUrl, 'function');
         assert.equal(value.deps.log, 'log');

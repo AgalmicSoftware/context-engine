@@ -5,7 +5,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SiteLoadOptions from './SiteLoadOptions';
 
-jest.mock('./GreetingModal', () => () => <div data-testid="mock-greeting-modal" />);
 jest.mock('utilities/logging.js', () => ({
   createLogger: () => ({
     log: jest.fn(),
@@ -33,32 +32,9 @@ const noop = () => {};
 const renderSiteLoadOptions = (arrowIndex: number, props: Record<string, unknown> = {}) =>
   render(
     <Provider store={buildStore()}>
-      <SiteLoadOptions
-        arrowIndex={arrowIndex}
-        sidebarOpen
-        closeSidebarFunction={jest.fn()}
-        clickRightArrow={noop}
-        clickLeftArrow={noop}
-        {...props}
-      />
+      <SiteLoadOptions arrowIndex={arrowIndex} clickRightArrow={noop} clickLeftArrow={noop} {...props} />
     </Provider>,
   );
-
-const SidebarHarness = ({ arrowIndex }: { arrowIndex: number }) => {
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
-
-  return (
-    <Provider store={buildStore()}>
-      <SiteLoadOptions
-        arrowIndex={arrowIndex}
-        sidebarOpen={sidebarOpen}
-        closeSidebarFunction={() => setSidebarOpen(false)}
-        clickRightArrow={noop}
-        clickLeftArrow={noop}
-      />
-    </Provider>
-  );
-};
 
 describe('SiteLoadOptions', () => {
   it('keeps the intro slide bound to the greeting-image layout hooks', () => {
@@ -111,16 +87,12 @@ describe('SiteLoadOptions', () => {
     expect(bulletList).toHaveClass('welcomeSlideBulletItems');
   });
 
-  it('removes the unused email updates UI and still lets the sidebar collapse', () => {
-    const { container } = render(<SidebarHarness arrowIndex={0} />);
-
-    expect(screen.queryByText(/Get updates/i)).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-site-load-sidebar')).toHaveClass('welcomeSlideSidebar');
-    expect(screen.getByTestId('ce-site-load-close-sidebar')).not.toHaveAttribute('data-dismiss');
-    expect(container.querySelectorAll('[data-dismiss="modal"]')).toHaveLength(0);
-
-    fireEvent.click(screen.getByTestId('ce-site-load-close-sidebar'));
-
-    expect(screen.getByTestId('ce-site-load-sidebar')).toHaveClass('isSidebarCollapsed');
+  it('advances from the intro image without a sidebar or metrics panel', () => {
+    const clickRightArrow = jest.fn();
+    renderSiteLoadOptions(0, { clickRightArrow });
+    expect(screen.queryByTestId('ce-site-load-sidebar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Metrics:/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-welcome-slide-media'));
+    expect(clickRightArrow).toHaveBeenCalledTimes(1);
   });
 });

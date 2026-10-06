@@ -1476,7 +1476,7 @@ test('private voice message updates the latest Mini App launch draft', async () 
   const stored = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(
     stored.serverContextRef.questionSeries.draftAnswersByQuestionId['q-readiness'].text,
-    'Existing draft\n\nspoken update'
+    'Existing draft\n\nspoken update',
   );
   assert.deepEqual(calls.map((call) => new URL(call.url).pathname), [
     '/auth/nonce',
@@ -3334,7 +3334,7 @@ test('/questions reads Cloudflare question storage without falling back to on-ch
   ].join('\n'));
   assert.deepEqual(
     fetchCalls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read']
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read'],
   );
 });
 
@@ -4518,22 +4518,31 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(binary.response.text.includes('Options:'), false);
   assert.equal(binary.response.text.includes('Tap an answer'), false);
   assert.deepEqual(
-    flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Agree', 'Disagree', 'Unsure']
+    flattenButtons(binary.response.replyMarkup)
+      .map((button) => button.text)
+      .slice(0, 3),
+    ['Agree', 'Disagree', 'Unsure'],
   );
   assert.deepEqual(
     binary.response.replyMarkup.inline_keyboard.slice(0, 3).map((row) => row.map((button) => button.text)),
     [['Agree', 'Disagree'], ['Unsure'], ['Other Questions']],
   );
   assert.deepEqual(
-    flattenButtons(rating.response.replyMarkup).map((button) => button.text).slice(0, 11),
-    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+    flattenButtons(rating.response.replyMarkup)
+      .map((button) => button.text)
+      .slice(0, 11),
+    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
   );
   assert.deepEqual(
-    flattenButtons(multichoice.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Option A', 'Option B', 'Option C']
+    flattenButtons(multichoice.response.replyMarkup)
+      .map((button) => button.text)
+      .slice(0, 3),
+    ['Option A', 'Option B', 'Option C'],
   );
-  assert.equal(binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'), false);
+  assert.equal(
+    binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'),
+    false,
+  );
 
   const binaryButtons = flattenButtons(binary.response.replyMarkup);
   const onboardAgent = binaryButtons.find((button) => button.text === 'Onboard Agent');
@@ -4946,7 +4955,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.doesNotMatch(copyInfo, /\/questions first/);
   assert.match(copyInfo, /\ntoken=ceagt_/);
   assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=42/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=43/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);

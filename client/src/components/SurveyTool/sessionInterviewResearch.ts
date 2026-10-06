@@ -28,8 +28,8 @@ const protectSnapshot = (values: unknown, encryptedAnswer: boolean, encryptedCom
   return {
     answer: encryptedAnswer ? redacted() : (source.answer ?? null),
     additionalComments: encryptedComments ? redacted() : (source.additionalComments ?? ''),
-    importance: source.importance ?? null,
-    conviction: source.conviction ?? null,
+    importance: encryptedAnswer || encryptedComments ? redacted() : (source.importance ?? null),
+    conviction: encryptedAnswer || encryptedComments ? redacted() : (source.conviction ?? null),
   };
 };
 
@@ -69,8 +69,8 @@ export const buildInterviewRevisionResearch = (
       modelId: String(revision.modelId || 'unknown').slice(0, 256),
       answer: answerEncrypted ? redacted() : (revision.answer ?? null),
       additionalComments: commentsEncrypted ? redacted() : (revision.additionalComments ?? ''),
-      importance: revision.importance ?? null,
-      conviction: revision.conviction ?? null,
+      importance: answerEncrypted || commentsEncrypted ? redacted() : (revision.importance ?? null),
+      conviction: answerEncrypted || commentsEncrypted ? redacted() : (revision.conviction ?? null),
       confidence: revision.confidence ?? null,
       evidence: answerEncrypted || commentsEncrypted ? '' : String(revision.evidence || ''),
     };
@@ -104,7 +104,11 @@ export const buildSelectedInterviewResearch = (
     finalSubmitted: protectSnapshot(draft, encryptedAnswer, encryptedComments),
     changedFields: buildInterviewChangedFields(original, draft),
     userEditedFields: buildInterviewUserEditedFields(draft),
-    redactedFields: [...(encryptedAnswer ? ['answer'] : []), ...(encryptedComments ? ['additionalComments'] : [])],
+    redactedFields: [
+      ...(encryptedAnswer ? ['answer'] : []),
+      ...(encryptedComments ? ['additionalComments'] : []),
+      ...(encryptedAnswer || encryptedComments ? ['importance', 'conviction'] : []),
+    ],
   };
 };
 
@@ -138,7 +142,35 @@ export const buildUnselectedInterviewResearch = (
           : null,
         changedFields: buildInterviewChangedFields(original, draft),
         userEditedFields: buildInterviewUserEditedFields(draft),
-        redactedFields: [...(encryptedAnswer ? ['answer'] : []), ...(encryptedComments ? ['additionalComments'] : [])],
+        redactedFields: [
+          ...(encryptedAnswer ? ['answer'] : []),
+          ...(encryptedComments ? ['additionalComments'] : []),
+          ...(encryptedAnswer || encryptedComments ? ['importance', 'conviction'] : []),
+        ],
       };
     })
     .filter((draft) => draft.questionId);
+
+// Rating envelopes are resolved after research snapshots are built. Apply their
+// final protection to every snapshot for this question before serialization.
+export const redactInterviewEncryptedRatings = (
+  value: unknown,
+  questionId: string,
+  protectedFields: Array<'importance' | 'conviction'>,
+): unknown => {
+  if (Array.isArray(value))
+    return value.map((entry) => redactInterviewEncryptedRatings(entry, questionId, protectedFields));
+  if (!value || typeof value !== 'object') return value;
+  const source = record(value);
+  if (source.questionId && String(source.questionId).toLowerCase() !== questionId.toLowerCase()) return value;
+  return Object.fromEntries(
+    Object.entries(source).map(([key, entry]) => [
+      key,
+      protectedFields.includes(key as 'importance' | 'conviction')
+        ? redacted()
+        : key === 'redactedFields' && Array.isArray(entry)
+          ? [...new Set([...entry, ...protectedFields])]
+          : redactInterviewEncryptedRatings(entry, questionId, protectedFields),
+    ]),
+  );
+};

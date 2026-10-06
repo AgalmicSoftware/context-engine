@@ -1,17 +1,4 @@
-const BROWSER_LOADING_VISUAL_GIF = 'gif';
-
-function normalizeBrowserLoadingVisual(value = '') {
-  return String(value || '').trim().toLowerCase() === 'spinner' ? 'spinner' : BROWSER_LOADING_VISUAL_GIF;
-}
-
-function miniAppLoadingVisualHtml(mode = BROWSER_LOADING_VISUAL_GIF) {
-  return normalizeBrowserLoadingVisual(mode) === BROWSER_LOADING_VISUAL_GIF
-    ? '<img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">'
-    : '<span class="loadingSpinner" aria-hidden="true"></span>';
-}
-
 export function renderTelegramMiniAppBrowserAsset({
-  loadingVisual = BROWSER_LOADING_VISUAL_GIF,
   launchRecoveryMessage = '',
   fastInitialQuestionLimit = 1,
   fastFollowupQuestionCount = 5,
@@ -19,7 +6,6 @@ export function renderTelegramMiniAppBrowserAsset({
   backgroundPageDelayMs = 650,
   maxQuestionLimit = 500,
 } = {}) {
-  const normalizedLoadingVisual = normalizeBrowserLoadingVisual(loadingVisual);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1657,14 +1643,6 @@ export function renderTelegramMiniAppBrowserAsset({
       flex: 0 0 auto;
       box-shadow: 0 0 28px rgba(98, 255, 191, 0.14);
     }
-    .loadingGif {
-      width: min(68vw, 240px);
-      height: min(68vw, 240px);
-      object-fit: contain;
-      border-radius: 0;
-      background: transparent;
-      flex: 0 0 auto;
-    }
     @media (max-width: 760px) {
       .toolMenu { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .settingsPanel, .adminPanel, .activityPanel, .draftsPanel, .documentsPanel, .addQuestionPanel, .groupsPanel, .filterPanel { grid-template-columns: 1fr; }
@@ -1792,7 +1770,7 @@ export function renderTelegramMiniAppBrowserAsset({
         </div>
       </section>
       <div class="status loadingStatus" id="status">
-        ${miniAppLoadingVisualHtml(normalizedLoadingVisual)}
+        <span class="loadingSpinner" aria-hidden="true"></span>
         <span>Loading questions and agent predictions</span>
         <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
       </div>
@@ -2110,7 +2088,6 @@ export function renderTelegramMiniAppBrowserAsset({
     const RESULT_GROUP_COUNT = 2;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
     const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';
-    const LOADING_VISUAL_MODE = ${JSON.stringify(normalizedLoadingVisual)};
     const MINI_APP_LAUNCH_RECOVERY_MESSAGE = ${JSON.stringify(launchRecoveryMessage)};
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
@@ -2919,14 +2896,8 @@ export function renderTelegramMiniAppBrowserAsset({
     const setLoadingProgress = (message, percent = 18) => {
       el.status.className = 'status loadingStatus';
       el.status.innerHTML = '';
-      const visual = document.createElement(LOADING_VISUAL_MODE === 'gif' ? 'img' : 'span');
-      if (LOADING_VISUAL_MODE === 'gif') {
-        visual.className = 'loadingGif';
-        visual.src = '/telegram/mini-app/loading.gif';
-        visual.alt = '';
-      } else {
-        visual.className = 'loadingSpinner';
-      }
+      const visual = document.createElement('span');
+      visual.className = 'loadingSpinner';
       visual.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
       label.textContent = message || 'Loading questions and agent predictions';
@@ -3288,13 +3259,14 @@ export function renderTelegramMiniAppBrowserAsset({
       } else if (question.questionType === 'rating') {
         const label = document.createElement('div');
         label.className = 'ratingValue';
-        label.textContent = draft.value ?? 5;
+        const scale = question.ratingScale || { min: 0, max: 10, step: 1 };
+        label.textContent = draft.value ?? scale.min;
         const input = document.createElement('input');
         input.type = 'range';
-        input.min = '0';
-        input.max = '10';
-        input.step = '1';
-        input.value = draft.value ?? 5;
+        input.min = String(scale.min);
+        input.max = String(scale.max);
+        input.step = String(scale.step || 1);
+        input.value = draft.value ?? scale.min;
         input.oninput = () => {
           activate(question);
           draft.value = Number(input.value);
@@ -3307,13 +3279,14 @@ export function renderTelegramMiniAppBrowserAsset({
         mount.append(label, input);
       } else if (question.questionType === 'quadratic') {
         const budget = question.voiceCredits ?? 99;
+        const example = Math.min(7, Math.floor(Math.sqrt(budget)));
         const votes = Array.isArray(draft.value) ? draft.value.slice() : question.options.map(() => 0);
         const header = document.createElement('div'); header.className = 'quadraticHeader';
         const status = document.createElement('p'); status.setAttribute('role', 'status');
         const help = document.createElement('details'); help.className = 'quadraticHelp';
         const helpToggle = document.createElement('summary'); helpToggle.textContent = '?'; helpToggle.setAttribute('aria-label', 'How voice credits work');
         const helpText = document.createElement('p');
-        helpText.textContent = 'Votes cost their square: +7 or −7 uses 49 credits. Share your ' + budget + ' credits across the options. You may leave credits unused.';
+        helpText.textContent = 'Votes cost their square: +' + example + ' or −' + example + ' uses ' + (example * example) + ' credit' + (example === 1 ? '' : 's') + '. Share your ' + budget + ' credits across the options. You may leave credits unused.';
         help.append(helpToggle, helpText);
         const spent = () => votes.reduce((total, vote) => total + vote * vote, 0);
         const updateStatus = () => { status.textContent = (budget - spent()) + ' credits left'; };

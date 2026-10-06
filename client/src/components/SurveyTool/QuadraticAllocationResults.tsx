@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './QuadraticAllocationInput.module.scss';
 import { summarizeQuadraticAllocations } from '../../../../shared/questions/quadraticAllocation.mjs';
 

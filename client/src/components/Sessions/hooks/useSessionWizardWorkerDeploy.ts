@@ -87,9 +87,7 @@ import {
 } from '../sessionWizardWorkerRuntimeSupport';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
 import type {
-  DeployFormLike,
   SessionWizardWorkerDeployRuntime,
-  SessionWizardWorkerDeployStateUpdate,
   UseSessionWizardWorkerDeployOptions,
 } from './useSessionWizardWorkerDeploy.types';
 

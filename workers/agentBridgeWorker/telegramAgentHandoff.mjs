@@ -8,6 +8,7 @@ import {
   stableFingerprint,
   kvKeySafePart,
   sanitizeSessionSlug,
+  sha256Hex,
 } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_EVENT_TYPES, TELEGRAM_BRIDGE_ACTIONS, TELEGRAM_CHAT_LANES } from './constants.mjs';
 import {
@@ -142,10 +143,10 @@ import { authenticateSessionWorker, directSubmitFeatureEnabled } from './onChain
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const LEGACY_AGENT_API_PREFIX = '/telegram/agent/api';
 const CANONICAL_AGENT_API_PREFIX = '/api/agent';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=43';
 const DEFAULT_AGENT_RAW_SKILL_URL =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-09-28 (v42)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-09-30 (v43)';
 const DEFAULT_SESSION_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/session-wrapped';
 const DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-session-wrapped/SKILL.md';
@@ -166,7 +167,6 @@ const RESULT_VIEW_GENERIC_MAX_OBJECT_KEYS = 200;
 const RESULT_VIEW_GENERIC_MAX_DEPTH = 6;
 const RESULT_VIEW_CACHE_MAX_BYTES = 512 * 1024;
 const ADMIN_QUESTIONS_DELETE_MAX_IDS = 50;
-const textEncoder = new TextEncoder();
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -216,15 +216,6 @@ function toCanonicalAgentApiPathname(pathname = '') {
     return `${CANONICAL_AGENT_API_PREFIX}${path.slice(LEGACY_AGENT_API_PREFIX.length)}`;
   }
   return path;
-}
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function sha256Hex(input = '') {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
-  return bytesToHex(new Uint8Array(digest));
 }
 
 function json(data, init = {}) {

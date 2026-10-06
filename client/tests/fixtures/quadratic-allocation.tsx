@@ -12,7 +12,8 @@ import { validateQuadraticAllocation } from '../../../shared/questions/quadratic
 const baseQuestion = { id: 'quadratic-smoke', type: 'quadratic', options: ['Parks', 'Transit', 'Housing'], voiceCredits: 99 };
 function Fixture() {
   const [manyOptions, setManyOptions] = useState(false);
-  const question = { ...baseQuestion, options: manyOptions ? ['Parks', 'Transit', 'Housing', 'Community spaces and neighbourhood amenities', 'Libraries', 'Schools', 'Waste reduction', 'Energy efficiency'] : baseQuestion.options };
+  const [voiceCredits, setVoiceCredits] = useState(99);
+  const question = { ...baseQuestion, voiceCredits, options: manyOptions ? ['Parks', 'Transit', 'Housing', 'Community spaces and neighbourhood amenities', 'Libraries', 'Schools', 'Waste reduction', 'Energy efficiency'] : baseQuestion.options };
   const [value, setValue] = useState<number[]>([0, 0, 0]);
   const [theme, setTheme] = useState('context-engine');
   const [deferDragUpdates, setDeferDragUpdates] = useState(false);
@@ -24,7 +25,8 @@ function Fixture() {
     <main style={{ maxWidth: 640, margin: '2rem auto', fontFamily: 'var(--ce-font-body)', lineHeight: 1.5, color: 'var(--ce-panel-text)' }}>
       <style>{'body { background: var(--ce-color-canvas); }'}</style>
       <label>Theme <select value={theme} onChange={event => setTheme(event.target.value)}><option value="context-engine">Context Engine</option><option value="classic-95">Classic 95</option></select></label>
-      <label style={{ display: 'block' }}><input type="checkbox" checked={deferDragUpdates} onChange={event => setDeferDragUpdates(event.target.checked)} /> Standalone question drag behavior</label>
+      <label>Voice credits <select value={voiceCredits} onChange={event => { setVoiceCredits(Number(event.target.value)); setValue(question.options.map(() => 0)); }}><option value="99">99</option><option value="999">999</option><option value="1000000">1000000 (legacy)</option></select></label>
+      <label style={{ display: 'block' }}><input type="checkbox" checked={deferDragUpdates} onChange={event => setDeferDragUpdates(event.target.checked)} /> Deferred drag compatibility</label>
       <label><input type="checkbox" checked={manyOptions} onChange={event => { setManyOptions(event.target.checked); setValue(Array(event.target.checked ? 8 : 3).fill(0)); }} /> Many options</label>
       <h1 style={{ color: 'inherit' }}>Survey questions pile</h1>
       <p>Question 3 of 12</p>

@@ -1,9 +1,8 @@
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
-import { trimIfString } from './stringCoercion.js';
+import { toStr, trimIfString } from './stringCoercion.js';
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 const normalizeEmbeddedDeployHelperEnabled = (raw) => {

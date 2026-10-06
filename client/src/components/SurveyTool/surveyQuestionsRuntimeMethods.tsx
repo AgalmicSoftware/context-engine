@@ -1,34 +1,10 @@
-import type * as React from 'react';
 import { loadPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
 import type {
-  SurveyQuestionsAuthoringPanelDisplayState,
-  SurveyQuestionsAuthoringRouteReadinessDescriptor,
-  SurveyQuestionsFullLoadingProgressState,
-  SurveyQuestionsJsonPanelDisplayState,
   SurveyQuestionsLegacyRecord,
   SurveyQuestionsLegacyValue,
-  SurveyQuestionsMaskedQuestionVisibilityState,
   SurveyQuestionsProps,
-  SurveyQuestionsPrimarySubmitPlan,
-  SurveyQuestionsRenderReadinessDescriptor,
-  SurveyQuestionsRouteViewDisplayState,
   SurveyQuestionsState,
-  SurveyQuestionsSubmitFooterDisplayState,
-  SurveyQuestionsSubmitReadinessDescriptor,
-  SurveySubmitFailureStatePatch,
-  SurveySubmitStartStatePatch,
-  SurveySubmitSuccessStatePatch,
 } from './surveyQuestionsTypes.js';
-import type {
-  SurveyQuestionsCacheQuestion,
-  SurveyQuestionsPendingStatsInput,
-  SurveyQuestionsRecord,
-} from './surveyQuestionsInstanceFields';
-import type {
-  SurveyQuestionsSubmitPendingStats,
-  SurveyQuestionsSubmitStaleStatePatch,
-  SurveyQuestionsSubmitStartControllerResult,
-} from './surveyQuestionsSubmitController';
 import { createSurveyQuestionsDataRuntime } from './surveyQuestionsDataRuntime.js';
 import { createSurveyQuestionsDraftPersistenceRuntime } from './surveyQuestionsDraftPersistenceRuntime.js';
 import { createSurveyQuestionsDecryptRuntime } from './surveyQuestionsDecryptRuntime.js';
@@ -48,6 +24,8 @@ import { createSurveyQuestionsRenderedHydrationRuntime } from './surveyQuestions
 import { createSurveyQuestionsRouteRuntime } from './surveyQuestionsRouteRuntime.js';
 import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRuntime.js';
 import { createSurveyQuestionsRuntimeStateRuntime } from './surveyQuestionsRuntimeStateRuntime.js';
+import { readQuestionsCache } from './surveyToolCacheState.js';
+import { resolveQuestionReadCacheContext } from './surveyToolScope.js';
 
 export type SurveyQuestionsRuntimeMethods = SurveyQuestionsLegacyRecord;
 
@@ -188,6 +166,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     runDedupedDecryptTask,
   } = createSurveyQuestionsDecryptRuntime({
     ...context,
+    deepClone: (value: SurveyQuestionsLegacyValue) => deepClone(value),
     buildSliceFromUserAnswers: (
       userAnswers: SurveyQuestionsLegacyValue,
       prevSlice: SurveyQuestionsLegacyValue = null,
@@ -595,6 +574,11 @@ export const createSurveyQuestionsRuntimeMethods = (
     handleAnswer,
     handleBookmarkToggle,
     handleConviction,
+    handleDecryptQuestionAnswer: (
+      questionId: SurveyQuestionsLegacyValue,
+      fieldToDecrypt?: SurveyQuestionsLegacyValue,
+      responseOverride?: SurveyQuestionsLegacyValue,
+    ) => handleDecryptQuestionAnswer(questionId, fieldToDecrypt, responseOverride),
     handleImportance,
     handleReloadMaskedPrompt,
     isQuestionFieldBusy,
@@ -824,6 +808,16 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
+    if (prevProps.account !== propsRef.current.account) {
+      // Props already identify the next account. Never flush the previous form
+      // through its draft key, including callbacks scheduled before this switch.
+      if (inst._persistTimer) clearTimeout(inst._persistTimer);
+      inst._persistTimer = null;
+      if (inst._jsonPreviewTimer) clearTimeout(inst._jsonPreviewTimer);
+      inst._jsonPreviewTimer = null;
+      inst._draftDirtyQids?.clear();
+      setState({ jsonPreview: null });
+    }
     const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
     const workerTargetChanged =
       resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
@@ -1035,11 +1029,13 @@ export const createSurveyQuestionsRuntimeMethods = (
         // We use a callback to ensure rehydration happens on the reset (empty) state,
         // followed by the fetch which merges on-chain data into the draft.
         resetFormStateForAccountChange(async () => {
-          setState(
-            buildResponseLoadingResetState(
+          setState({
+            ...buildResponseLoadingResetState(
               updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             ),
-          );
+            parsedViewAddressAnswers: null,
+            viewAddressAnswers: '',
+          });
 
           // 1. Apply Draft (Anon answers) onto Empty
           rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
@@ -1061,7 +1057,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           if (stateRef.current.userHasResponse && (isViewingOwnResponse || isViewingNoSpecificResponder)) {
             setState(buildEditingResponseModeState());
           }
-        });
+        }, propsRef.current.account === prevProps.account);
       }
 
       if (prevState.questionPool !== stateRef.current.questionPool) {
@@ -1134,16 +1130,14 @@ export const createSurveyQuestionsRuntimeMethods = (
       if (propsRef.current.account !== prevProps.account || propsRef.current.viewAddress !== prevProps.viewAddress) {
         // Clear live form state before reacting to new account/viewAddress
         resetFormStateForAccountChange(async () => {
-          setState(
-            buildSurveyAccountViewResetState({
-              parsedViewAddressAnswers:
-                propsRef.current.viewAddress !== prevProps.viewAddress
-                  ? null
-                  : stateRef.current.parsedViewAddressAnswers,
+          setState({
+            ...buildSurveyAccountViewResetState({
+              parsedViewAddressAnswers: null,
               noResponse: propsRef.current.viewAddress !== prevProps.viewAddress ? false : stateRef.current.noResponse,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             }),
-          );
+            viewAddressAnswers: '',
+          });
 
           // 1. Rehydrate draft immediately so it exists before fetch returns
           if (propsRef.current.account && propsRef.current.account !== prevProps.account) {
@@ -1162,7 +1156,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           if (stateRef.current.userHasResponse && (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)) {
             setState(buildEditingResponseModeState());
           }
-        });
+        }, propsRef.current.account === prevProps.account);
       }
     }
 
@@ -1215,7 +1209,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           // but we should also rerun cache/prior-response hydration when auth becomes ready.
           rehydrateDraftForRenderedIds();
           rehydrateLocalCacheAnswersForRenderedIds();
-        });
+        }, propsRef.current.account === prevProps.account);
       }
     }
 
@@ -1603,18 +1597,25 @@ export const createSurveyQuestionsRuntimeMethods = (
     });
 
     try {
-      const { sourceSlice, ratingEnvelopesByQid, chainId, lit, opts, poolForDecrypt }: SurveyQuestionsLegacyValue =
-        await prepareSurveyDecryptAttempt({
-          singleQuestionMode: decryptContext.singleQuestionMode,
-          questionId: decryptContext.questionID,
-          account: decryptContext.account,
-          providerLike: decryptContext.provider,
-          slug,
-          surveyId: decryptContext.surveyId,
-          fallbackUserAnswers,
-          fallbackSourceSlice,
-          previousStateSlice,
-        });
+      const {
+        latest,
+        sourceSlice,
+        ratingEnvelopesByQid,
+        chainId,
+        lit,
+        opts,
+        poolForDecrypt,
+      }: SurveyQuestionsLegacyValue = await prepareSurveyDecryptAttempt({
+        singleQuestionMode: decryptContext.singleQuestionMode,
+        questionId: decryptContext.questionID,
+        account: decryptContext.account,
+        providerLike: decryptContext.provider,
+        slug,
+        surveyId: decryptContext.surveyId,
+        fallbackUserAnswers,
+        fallbackSourceSlice,
+        previousStateSlice,
+      });
       if (
         (applySurveyDecryptStaleStatusHelper as SurveyQuestionsLegacyValue)({
           host: engine,
@@ -1649,13 +1650,18 @@ export const createSurveyQuestionsRuntimeMethods = (
 
       finishSurveyDecryptAttempt(decryptAttemptId);
       setState(
-        (prevState: SurveyQuestionsLegacyValue) =>
-          buildSurveyDecryptSuccessState(prevState, {
+        (prevState: SurveyQuestionsLegacyValue) => ({
+          ...buildSurveyDecryptSuccessState(prevState, {
             surveyIndex,
+            baselineSlice: sourceSlice,
             decryptedSlice: normalizedDecryptedSlice,
             decryptedImportanceFromEnv,
             decryptedConvictionFromEnv,
           }),
+          // Rating resubmission reads saved envelopes from userAnswers.
+          // Keep that source aligned with the response just decrypted.
+          ...(latest ? { userAnswers: deepClone(latest) } : {}),
+        }),
         () => {
           const jsonPreview: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex);
           setState(buildJsonPreviewState(jsonPreview));
@@ -1852,20 +1858,17 @@ export const createSurveyQuestionsRuntimeMethods = (
         return await handleDecryptViewedResponseField(qid, fieldToDecrypt, effectiveResponseOverride);
       }
 
-      const {
-        baselineSlice,
-        baselineForDecrypt,
-        ratingEnvelopes: latestRatingEnvs,
-      }: SurveyQuestionsLegacyValue = await prepareSelfQuestionDecryptState({
-        surveyIndex,
-        questionId: qid,
-        fieldToDecrypt,
-        responseOverride: effectiveResponseOverride,
-        userAnswers: stateRef.current.userAnswers,
-        account: context.account,
-        sessionSlug: context.sessionSlug || '',
-        networkID: context.networkID,
-      });
+      const { baselineForDecrypt, ratingEnvelopes: latestRatingEnvs }: SurveyQuestionsLegacyValue =
+        await prepareSelfQuestionDecryptState({
+          surveyIndex,
+          questionId: qid,
+          fieldToDecrypt,
+          responseOverride: effectiveResponseOverride,
+          userAnswers: stateRef.current.userAnswers,
+          account: context.account,
+          sessionSlug: context.sessionSlug || '',
+          networkID: context.networkID,
+        });
       if (!isDecryptContextCurrent(context)) {
         return false;
       }
@@ -1908,10 +1911,11 @@ export const createSurveyQuestionsRuntimeMethods = (
           questionId: qid,
           clearMode: attemptStatus.clearMode,
           didUpdate,
-          baselineSlice,
+          baselineSlice: baselineForDecrypt,
           decryptedStateSlice,
           decryptedImportance,
           decryptedConviction,
+          ratingEnvelopes: latestRatingEnvs,
         },
         onSuccessStateApplied: () => {
           updateJsonPreview && updateJsonPreview();
@@ -2055,7 +2059,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     failures.forEach((msg: SurveyQuestionsLegacyValue) => surveyLog.error(msg));
 
     if (!passed) {
-      throw new Error('Encryption verification failed. Some data marked for encryption was not processed correctly.');
+      throw new Error(
+        failures[0] || 'Encryption verification failed. Some data marked for encryption was not processed correctly.',
+      );
     }
     surveyLog.log('Encryption verification successful.');
     return true;
@@ -2130,6 +2136,38 @@ export const createSurveyQuestionsRuntimeMethods = (
     // - When the response is encrypted (or rating already encrypted), ensure ratings are stored in envelopes
     //   and remove plaintext copies from the uploaded payload.
     try {
+      const savedSource = stateRef.current.userAnswers;
+      const savedResponses: SurveyQuestionsLegacyValue[] = Array.isArray(savedSource?.responses)
+        ? savedSource.responses
+        : savedSource
+          ? [savedSource]
+          : [];
+      const savedIds = new Set(
+        // Optimistic answer rows may omit ratings; they must not shadow the saved envelopes.
+        savedResponses
+          .filter(
+            (response) =>
+              (typeof response.importanceEncrypted === 'string' && response.importanceEncrypted) ||
+              (typeof response.convictionEncrypted === 'string' && response.convictionEncrypted) ||
+              getImportanceFromResponse(response) !== null ||
+              getConvictionFromResponse(response) !== null,
+          )
+          .map((response) => normalizeQuestionIdKey(response.questionID || response.questionId)),
+      );
+      const cacheScope = resolveQuestionReadCacheContext(context.props || propsRef.current, submissionGroupKey);
+      const cachedResponses =
+        readQuestionsCache(submissionGroupKey)?.[cacheScope.networkIdStr]?.questionResponses || {};
+      const cachedRatingSources = questionResponses.flatMap((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
+        if (savedIds.has(qid)) return [];
+        const raw = cachedResponses[qid]?.[String(context.account || '').toLowerCase()];
+        try {
+          const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          return saved && typeof saved === 'object' ? [{ ...saved, questionID: qid }] : [];
+        } catch (_) {
+          return [];
+        }
+      });
       await processRatingEnvelopesForSubmit(
         {
           sliceForSubmit:
@@ -2141,7 +2179,8 @@ export const createSurveyQuestionsRuntimeMethods = (
                   conviction: {},
                   additionalComments: {},
                 },
-          userAnswersSource: stateRef.current.userAnswers,
+          // A standalone pile may hydrate fields without populating userAnswers.
+          userAnswersSource: { responses: [...savedResponses, ...cachedRatingSources] },
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {

@@ -2,7 +2,7 @@ import AdminInterviewOpening from './AdminInterviewOpening';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, FormGroup, FormText } from 'reactstrap';
+import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -71,10 +71,13 @@ import {
 import {
   addSessionConfigHint,
   buildHealthAuthMismatchState,
-  normalizeAdminWorkerFetchError,
   shouldSeedWorkerConfigFromError,
 } from './adminPageWorkerErrorHelpers';
-import { postSignedAdminWorkerRequest, type AdminSignedWorkerRequestArgs } from './adminPageSignedWorkerRequest';
+import {
+  normalizeAdminWorkerFetchError,
+  postSignedAdminWorkerRequest,
+  type AdminSignedWorkerRequestArgs,
+} from './adminPageSignedWorkerRequest';
 import {
   buildUserPageUrl,
   formatAllowOriginsDraft,
@@ -128,7 +131,6 @@ import {
   getAdminLitResourceLabel,
 } from './adminPageResourceDisplayHelpers';
 import {
-  ADMIN_AI_PROVIDER_OPTIONS,
   ADMIN_EDITABLE_CONTRACT_KEY_SET,
   applyAdminMetadataDraft,
   buildAdminMetadataDraft,
@@ -1505,12 +1507,11 @@ const AdminPageRuntime = ({
 
     const chainId =
       Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    const sessionId = toStr(selectedConfig?.sessionIdHex || selectedConfig?.sessionId).trim();
-    const { message } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
+    const { message, sessionId } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
       workerUrl: baseUrl,
       address: account,
       sessionSlug: slug,
-      sessionId,
+      sessionConfig: selectedConfig,
       chainId,
       statement: 'Sign in to Context Engine.',
     });

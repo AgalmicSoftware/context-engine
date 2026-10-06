@@ -339,6 +339,33 @@ describe('createSessionResponseHydrationController', () => {
     expect(Object.values(host.getStateSnapshot().partialWorkerResponseRuns)).toEqual([false]);
   });
 
+  it.each(['initial', 'readiness-reset', 'worker-changed', 'session-changed'])(
+    'does not restore unavailable response readiness after a failed %s run',
+    async (scenario) => {
+      let sessionConfig = createWorkerCanonicalSessionConfig();
+      const response = createDeferred();
+      const host = createMockHost({
+        getSessionCfg: () => sessionConfig,
+        loadWorkerResponses: jest.fn().mockResolvedValue([]),
+      });
+      const controller = createSessionResponseHydrationController(host);
+      if (scenario !== 'initial') await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      if (scenario === 'readiness-reset') host.setState({ isResponsesCacheReady: false });
+      host.loadWorkerResponses.mockImplementation(() => response.promise);
+      const run = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      const rejection = expect(run).rejects.toThrow('Read failed');
+      await flushMicrotasks(20);
+      if (scenario === 'worker-changed') {
+        sessionConfig = createWorkerCanonicalSessionConfig({ workerUrl: 'https://other-worker.example.test' });
+      }
+      if (scenario === 'session-changed') host.getActiveSessionSlug.mockReturnValue('another-session');
+      response.reject(new Error('Read failed'));
+      await rejection;
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(false);
+      controller.destroy();
+    },
+  );
+
   it('hydrates fresh worker-canonical question responses without starting an EVM scan', async () => {
     const sessionConfig = createWorkerCanonicalSessionConfig({ slug: 'demo-sh' });
     const loadWorkerResponses = jest.fn().mockResolvedValue([

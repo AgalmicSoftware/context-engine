@@ -1,6 +1,5 @@
 import {
   FETCH_SESSION_STATE,
-  CHANGE_METRICS_CHOICE,
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
@@ -96,15 +95,6 @@ export const updateLoginInfo =
     dispatch({
       type: LOGIN_IN_PROGRESS,
       payload: pendingLogin,
-    });
-  };
-
-export const changeMetricsChoice =
-  (newMetricsChoice: unknown): SessionStateThunk =>
-  (dispatch) => {
-    dispatch({
-      type: CHANGE_METRICS_CHOICE,
-      payload: newMetricsChoice,
     });
   };
 

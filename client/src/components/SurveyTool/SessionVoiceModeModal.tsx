@@ -1,3 +1,4 @@
+import { resolveConsentFlags, summarizeConsentChoice, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers, type InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
@@ -81,6 +82,7 @@ type InterviewDraftApplicationProps = InterviewQuestionControls & {
     includePredictionComparison: boolean,
     responderName: string,
     review?: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }>,
+    consentOverrides?: InterviewConsentOverrides,
   ) => void | Promise<void>;
 };
 
@@ -90,6 +92,7 @@ type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   context?: unknown;
   workerUrl?: string;
   existingResponseSlice?: UnknownRecord | null;
+  pendingInterviewProvenance?: UnknownRecord;
   onLoadSavedResponses?: InterviewSavedAnswerLoader;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
@@ -123,6 +126,7 @@ function SessionInterviewPanel({
   context,
   workerUrl = '',
   existingResponseSlice: formResponseSlice = null,
+  pendingInterviewProvenance,
   onLoadSavedResponses,
   prefillPacket = null,
   initialError = '',
@@ -198,6 +202,7 @@ function SessionInterviewPanel({
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [includePredictionComparison, setIncludePredictionComparison] = useState(false);
   const [includeResponderName, setIncludeResponderName] = useState(false);
+  const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -279,14 +284,11 @@ function SessionInterviewPanel({
   ].join('|');
   const hasReadinessContextToken =
     responseReadinessContextToken !== undefined && responseReadinessContextToken !== null;
-  const ownAnswers = useInterviewSavedAnswers({
-    load: onLoadSavedResponses,
-    contextKey: activeSubmitContextToken,
-    questionIds: [...questions.map((question) => question.id), ...drafts.map((draft) => draft.questionId)],
-    active: authenticatedForSubmit,
-    onLoaded: (slice) => {
+  // Answers discovered after a draft was selected need review before replacement.
+  const reviewSavedConflicts = useCallback(
+    (slice: SessionInterviewModalRecord | null | undefined) => {
       const conflicts = drafts.filter((draft) => hasDraftValue(responseFieldValue(slice, 'answers', draft.questionId)));
-      if (!conflicts.length) return;
+      if (!conflicts.length) return false;
       setSelected((current) => ({
         ...current,
         ...Object.fromEntries(conflicts.map((draft) => [draft.questionId, false])),
@@ -295,9 +297,54 @@ function SessionInterviewPanel({
       pendingSubmitActiveContextRef.current = '';
       setPendingSubmitAfterLogin(false);
       setStatus('Saved answers loaded. Select any answers you want to replace.');
+      return true;
     },
+    [drafts],
+  );
+  const ownAnswers = useInterviewSavedAnswers({
+    load: onLoadSavedResponses,
+    contextKey: activeSubmitContextToken,
+    questionIds: [...questions.map((question) => question.id), ...drafts.map((draft) => draft.questionId)],
+    active: authenticatedForSubmit,
+    onLoaded: reviewSavedConflicts,
   });
   const existingResponseSlice = ownAnswers.slice || formResponseSlice;
+  useEffect(() => {
+    setConsentOverrides({});
+  }, [activeSubmitContextToken]);
+  const savedConsent = {
+    ...((existingResponseSlice?.interviewProvenance || {}) as Record<string, UnknownRecord>),
+    ...pendingInterviewProvenance,
+  } as Record<string, UnknownRecord>;
+  const selectedDrafts = drafts.filter((draft) => selected[draft.questionId]);
+  const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
+  const aiChoice = summarizeConsentChoice(
+    consentDrafts.map((draft) =>
+      savedConsent[draft.questionId]
+        ? resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance
+        : hasAiPrefill && includeProvenance,
+    ),
+    consentOverrides.includeAiProvenance,
+  );
+  const comparisonChoice = summarizeConsentChoice(
+    consentDrafts.map((draft) =>
+      savedConsent[draft.questionId]
+        ? resolveConsentFlags(savedConsent[draft.questionId]).includePredictionComparison
+        : includePredictionComparison,
+    ),
+    consentOverrides.includePredictionComparison,
+  );
+  const nameChoice = summarizeConsentChoice(
+    consentDrafts.map((draft) =>
+      savedConsent[draft.questionId] ? !!savedConsent[draft.questionId].responderName : includeResponderName,
+    ),
+    consentOverrides.includeResponderName,
+  );
+  const hasSavedName = consentDrafts.some((draft) => !!savedConsent[draft.questionId]?.responderName);
+  const hasSavedAi = consentDrafts.some(
+    (draft) => resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance,
+  );
+
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
   const responseStateReadyForSubmit =
@@ -442,7 +489,12 @@ function SessionInterviewPanel({
             sessionConfig,
             workerUrl: url,
             previousResponses: drafts.map(({ revisions: _revisions, ...prediction }) => ({
-              prediction,
+              // The mapping prompt rates importance/conviction 0-100.
+              prediction: {
+                ...prediction,
+                ...(prediction.importance !== undefined ? { importance: prediction.importance * 10 } : {}),
+                ...(prediction.conviction !== undefined ? { conviction: prediction.conviction * 10 } : {}),
+              },
               reviewed: {
                 answer: editedDrafts[prediction.questionId]?.answer,
                 additionalComments: editedDrafts[prediction.questionId]?.additionalComments,
@@ -471,6 +523,7 @@ function SessionInterviewPanel({
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
           importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
+          (id) => String(responseFieldValue(existingResponsesRef.current, 'additionalComments', id) || ''),
         );
         for (const draft of review.drafts) {
           if (!editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
@@ -628,6 +681,7 @@ function SessionInterviewPanel({
       includePredictionComparison,
       includeProvenance,
       includeResponderName,
+      consentOverrides,
       isInterviewBusy,
       researchAvailable,
       responderContext,
@@ -671,6 +725,7 @@ function SessionInterviewPanel({
     includePredictionComparison,
     includeProvenance,
     includeResponderName,
+    consentOverrides,
     isInterviewBusy,
     isSubmitContextCurrent,
     onApplyAdditional,
@@ -702,6 +757,8 @@ function SessionInterviewPanel({
     if (pendingSubmitBaseContextRef.current !== baseSubmitContextToken) return;
     if (pendingSubmitActiveContextRef.current && pendingSubmitActiveContextRef.current !== activeSubmitContextToken)
       return;
+    // Legacy Workers have no own-answer load, so check the hydrated form state here.
+    if (ownAnswers.legacy && reviewSavedConflicts(existingResponsesRef.current)) return;
     void applyDrafts();
   }, [
     activeSubmitContextToken,
@@ -710,8 +767,10 @@ function SessionInterviewPanel({
     authenticatedForSubmit,
     baseSubmitContextToken,
     isInterviewBusy,
+    ownAnswers.legacy,
     pendingSubmitAfterLogin,
     responseStateReadyForSubmit,
+    reviewSavedConflicts,
   ]);
 
   const copyAgentPrompt = async () => {
@@ -729,6 +788,10 @@ function SessionInterviewPanel({
     : '';
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
+  const displayedResponderNames =
+    hasSavedName && (consentOverrides.includeResponderName === undefined || !importedResponderName)
+      ? [...new Set(consentDrafts.map((draft) => savedConsent[draft.questionId]?.responderName).filter(Boolean))]
+      : [importedResponderName];
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
@@ -1017,34 +1080,53 @@ function SessionInterviewPanel({
           ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
-              {researchAvailable || importedResponderName ? (
+              {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
                 <details className={styles.sessionInterviewConsentOptions}>
                   <summary>AI submission info</summary>
                   <div className={styles.sessionInterviewChoicesPanel}>
-                    {researchAvailable ? (
+                    {researchAvailable || hasSavedAi ? (
                       <SessionInterviewResearchConsent
                         packet={researchPacket}
-                        showProvenance={hasAiPrefill}
+                        showProvenance={hasAiPrefill || hasSavedAi}
                         revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
-                        includeProvenance={includeProvenance}
-                        includeComparison={includePredictionComparison}
-                        onProvenanceChange={setIncludeProvenance}
-                        onComparisonChange={setIncludePredictionComparison}
+                        includeProvenance={aiChoice.checked}
+                        includeComparison={comparisonChoice.checked}
+                        provenanceMixed={aiChoice.mixed}
+                        comparisonMixed={comparisonChoice.mixed}
+                        preserveSavedProvenance={hasSavedAi && consentOverrides.includeAiProvenance === undefined}
+                        onProvenanceChange={(included) => {
+                          setIncludeProvenance(included);
+                          setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
+                        }}
+                        onComparisonChange={(included) => {
+                          setIncludePredictionComparison(included);
+                          setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
+                        }}
                         coverageDetails={researchCoverageDetails}
                         selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
                         unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
                         disabled={applying}
                       />
                     ) : null}
-                    {importedResponderName ? (
+                    {importedResponderName || hasSavedName ? (
                       <Label check className={styles.sessionInterviewProvenance}>
                         <Input
                           type="checkbox"
-                          checked={includeResponderName}
-                          onChange={(event) => setIncludeResponderName(event.target.checked)}
+                          checked={nameChoice.mixed ? false : nameChoice.checked}
+                          aria-checked={nameChoice.mixed ? 'mixed' : nameChoice.checked}
+                          innerRef={(element: HTMLInputElement | null) => {
+                            if (element) element.indeterminate = nameChoice.mixed;
+                          }}
+                          disabled={applying}
+                          onChange={(event) => {
+                            const included = event.target.checked;
+                            setIncludeResponderName(included);
+                            setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
+                          }}
                           data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
                         />{' '}
-                        Include “{importedResponderName}” as the responder name with submitted responses
+                        {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
+                        {nameChoice.mixed ? ' (mixed saved choices)' : ''}
                       </Label>
                     ) : null}
                   </div>

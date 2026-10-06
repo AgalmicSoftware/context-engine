@@ -103,3 +103,13 @@ export function operatorPreviewSecretMatches(supplied, env = {}) {
   const expected = safeString(env.AGENT_BRIDGE_PREVIEW_SECRET);
   return Boolean(expected) && timingSafeEqualString(supplied, expected);
 }
+
+export function bytesToHex(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Lowercase hex SHA-256 of UTF-8 text; falsy inputs hash as '' (legacy bridge coercion).
+export async function sha256Hex(input = '') {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(input || '')));
+  return bytesToHex(new Uint8Array(digest));
+}

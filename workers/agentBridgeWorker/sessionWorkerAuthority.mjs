@@ -1,4 +1,4 @@
-import { safeString } from './runtimePrimitives.mjs';
+import { safeString, sha256Hex } from './runtimePrimitives.mjs';
 
 const SESSION_SLUG_RE = /^[a-z0-9_-]{1,128}$/;
 const ELIGIBLE_PRINCIPAL_KINDS = new Set(['evm_address', 'passkey_account']);
@@ -45,11 +45,6 @@ function decodeWorkerCredentialClaims(credential = '') {
 function nowSeconds(now = null) {
   const value = now instanceof Date ? now.getTime() : Date.parse(safeString(now));
   return Math.floor((Number.isFinite(value) ? value : Date.now()) / 1000);
-}
-
-async function sha256Hex(input = '') {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(input || '')));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function normalizeAddress(value = '') {

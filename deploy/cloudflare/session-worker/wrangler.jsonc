@@ -33,6 +33,6 @@
     "CE_WORKER_GROUPS_BOOTSTRAP": "fresh-template-v2",
     "DEPLOY_HELPER_ENABLED": "0",
     "WORKER_DEBUG_LOGS": "0",
-    "CE_BUNDLE_SHA256": "afd9b1f841d3b4d5fc20e49373ed78add4ab16d9fdd4fae88bc02853321f000c"
+    "CE_BUNDLE_SHA256": "2f4ab7fb23ae64bc6c2563f3ffb69a6bca19cd7959ce9506df9591287a5a9f62"
   }
 }

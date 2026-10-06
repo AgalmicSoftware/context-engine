@@ -339,36 +339,6 @@
   opacity: 1 !important;
 }
 
-.filterModal .modal-content {
-  background-color: var(--ce-color-white) !important;
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-  border-radius: var(--ce-radius-12);
-}
-
-.filterModal .modal-header,
-.filterModal .modal-footer {
-  border: none;
-}
-
-.filterModal .form-group label,
-.filterModal .mb-3 label {
-  font-size: 1.25em;
-}
-
-.filterModal .form-check-label {
-  font-size: 1.25em;
-}
-
-.filterModal .form-check-input {
-  width: 1.5em;
-  height: 1.5em;
-}
-
-.filterModal .modal-footer .btn {
-  font-size: 1.25em;
-}
-
 .htmlReportModal {
   :global(.modal-content) {
     background: var(--ce-text-inverse) !important;
@@ -1373,12 +1343,6 @@ grey background, white text, bigger icons, etc.
     border-color: var(--ce-document-border) !important;
     color: var(--ce-color-surface) !important;
   }
-
-  .dropdown-menu {
-    position: absolute;
-    will-change: transform;
-    border-radius: var(--ce-radius-8);
-  }
 }
 
 .downloadButton {
@@ -1408,8 +1372,7 @@ grey background, white text, bigger icons, etc.
     background-color: var(--ce-status-danger-text) !important;
     /* pastel pink */
     font-style: italic;
-    &:hover,
-    &.active {
+    &:hover {
       background-color: var(--ce-status-danger-text) !important;
       /* darker pastel pink */
     }
@@ -1418,8 +1381,7 @@ grey background, white text, bigger icons, etc.
   &.surveyItem {
     background-color: var(--ce-data-series-6) !important;
     /* pastel yellow */
-    &:hover,
-    &.active {
+    &:hover {
       background-color: var(--ce-data-series-6) !important;
       /* darker pastel yellow */
     }
@@ -1824,10 +1786,6 @@ grey background, white text, bigger icons, etc.
   padding: 10px;
   color: var(--ce-color-white);
   font-weight: bold;
-}
-
-.importanceSlider .rangeslider__fill {
-  background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
 }
 
 /* For aggregator binary results */

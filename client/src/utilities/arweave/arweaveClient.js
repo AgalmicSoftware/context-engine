@@ -1,3 +1,4 @@
+import { retryLazyImport } from '../ui/lazyImportRetry';
 /**
  * @file arweaveClient.js
  * @module arweaveClient
@@ -6,7 +7,6 @@
  *
  * Key exports: arweaveClient
  */
-import Arweave from 'arweave';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -82,6 +82,9 @@ import { buildArweaveUploadFallbackTelemetryEntry } from './arweaveClientHostCon
 
 const log = createLogger('general');
 const logArweaveFetchDebug = createArweaveFetchDebugLogger(log);
+// The Arweave SDK is only needed to sign direct uploads and read wallet balances;
+// gateway reads use fetch, so keep the SDK out of the initial page load.
+const loadArweave = async () => (await retryLazyImport(() => import('arweave'))).default;
 
 /* ==========================================================================
    Arweave utilities used by the chain gateway.
@@ -554,6 +557,7 @@ const parseDirectUploadArweaveJwk = (raw) => {
 
 const uploadDirectToArweave = async ({ data, contentType, tags, arweaveJwk, requestId = '' } = {}) => {
   const jwk = parseDirectUploadArweaveJwk(arweaveJwk);
+  const Arweave = await loadArweave();
   const arweave = Arweave.init({
     host: 'arweave.net',
     port: 443,
@@ -1611,6 +1615,7 @@ export const arweaveClient = {
   },
   readArweaveWalletBalance: async (jwk, opts = {}) => {
     const { gatewayBase, init } = getArweaveGatewayClientConfig(opts?.gateway);
+    const Arweave = await loadArweave();
     const arweave = Arweave.init(init);
     const address = await arweave.wallets.jwkToAddress(jwk);
     const balanceUrl = `${gatewayBase}/wallet/${address}/balance`;

@@ -9,8 +9,9 @@ jest.mock('./workerResponseFieldKeys', () => ({
 }));
 const owner = new ethers.Wallet(`0x${'61'.repeat(32)}`);
 const admin = new ethers.Wallet(`0x${'62'.repeat(32)}`);
-const signer = (wallet: ethers.Wallet) => ({
+const signer = (wallet: ethers.Wallet, calls: string[] = []) => ({
   request: async ({ method, params }: { method: string; params: string[] }) => {
+    calls.push(method);
     if (method === 'eth_chainId') return '0xaa37dc';
     if (method === 'eth_accounts') return [wallet.address];
     const { domain, types, message } = JSON.parse(params[1]);
@@ -165,4 +166,114 @@ it('optional public mode preserves public fields and self-only excludes Worker a
       account: owner.address,
     }),
   ).resolves.toBe('my private answer');
+});
+
+it.each(['admin', 'owner'])('only the %s field reader uses their applicable key recipient', async (reader) => {
+  let cek = new Uint8Array();
+  jest.mocked(wrapWorkerResponseFieldKey).mockImplementation(async (key, audience, context) => {
+    cek = new Uint8Array(key);
+    return {
+      type: 'worker-response-field-v1',
+      policy: {
+        audience,
+        context,
+        sessionSlug: 'example',
+        sessionId: config.sessionId,
+        owner: owner.address.toLowerCase(),
+      },
+      wrapped: { fixture: 'ciphertext' },
+    };
+  });
+  jest.mocked(unwrapWorkerResponseFieldKey).mockImplementation(async () => new Uint8Array(cek));
+  const encrypted = await cryptoUtils.encryptMultipleAnswers(
+    { answers: { q1: { value: 'reader fixture', encrypted: true, encryptionAudience: 'self_admin' } } },
+    {
+      ...workerContext,
+      provider: signer(owner),
+      account: owner.address,
+      questionPool: [{ id: 'q1', type: 'freeform' }],
+    },
+  );
+  const calls: string[] = [];
+  const wallet = reader === 'owner' ? owner : admin;
+  await expect(
+    cryptoUtils.decryptEnvelopeValue(encrypted.answers.q1.encryptedPortion as string, {
+      ...workerContext,
+      providerLike: signer(wallet, calls),
+      account: wallet.address,
+    }),
+  ).resolves.toBe('reader fixture');
+  expect(calls.filter((method) => method === 'eth_signTypedData_v4')).toHaveLength(reader === 'owner' ? 1 : 0);
+  expect(unwrapWorkerResponseFieldKey).toHaveBeenCalledTimes(reader === 'owner' ? 0 : 1);
+});
+
+it.each(['answer', 'rating'])('encrypts an edited Only me %s while session encryption is disabled', async (field) => {
+  const disabledConfig = {
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+      encryption: { mode: 'none' },
+      storage: { backend: 'cloudflare' },
+    },
+    storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+  };
+  const options = {
+    sessionSlug: 'example',
+    sessionConfig: disabledConfig,
+    provider: signer(owner),
+    account: owner.address,
+    surveyId: `0x${'ab'.repeat(32)}`,
+    questionPool: [{ id: 'q1', type: 'freeform' }],
+  };
+  const envelope =
+    field === 'rating'
+      ? await cryptoUtils.encryptEnvelopeValue(7, {
+          ...options,
+          kind: 'rating',
+          encryptionAudience: 'self',
+          qId: 'importance:q1',
+        })
+      : (
+          await cryptoUtils.encryptMultipleAnswers(
+            { answers: { q1: { value: 'edited answer', encrypted: true, encryptionAudience: 'self' } } },
+            options,
+          )
+        ).answers.q1.encryptedPortion;
+  expect(JSON.parse(envelope as string).recipients.map((recipient: { type: string }) => recipient.type)).toEqual([
+    'self-eip712-v1',
+  ]);
+  await expect(
+    cryptoUtils.decryptEnvelopeValue(envelope as string, {
+      sessionSlug: 'example',
+      sessionConfig: disabledConfig,
+      providerLike: signer(owner),
+      account: owner.address,
+    }),
+  ).resolves.toBe(field === 'rating' ? 7 : 'edited answer');
+  expect(wrapWorkerResponseFieldKey).not.toHaveBeenCalled();
+});
+
+it('pads binary votes to the same ciphertext length and preserves their values', async () => {
+  const lengths = new Set<number>();
+  for (const vote of ['Agree', 'Unsure', 'Disagree']) {
+    const result = await cryptoUtils.encryptMultipleAnswers(
+      { answers: { q1: { value: vote, encrypted: true, encryptionAudience: 'self' } } },
+      {
+        ...workerContext,
+        provider: signer(owner),
+        account: owner.address,
+        questionPool: [{ id: 'q1', type: 'binary' }],
+      },
+    );
+    const envelope = result.answers.q1.encryptedPortion as string;
+    lengths.add(JSON.parse(envelope).ciphertext.length);
+    expect((Buffer.from(JSON.parse(envelope).ciphertext, 'base64').length - 16) % 128).toBe(0);
+    await expect(
+      cryptoUtils.decryptEnvelopeValue(envelope, {
+        ...workerContext,
+        providerLike: signer(owner),
+        account: owner.address,
+      }),
+    ).resolves.toBe(vote);
+  }
+  expect(lengths.size).toBe(1);
 });

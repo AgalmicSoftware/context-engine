@@ -64,6 +64,10 @@ describe('surveyToolHydrationFlow local-cache hydration helpers', () => {
         },
         importance: { q1: 4, q2: 2 },
         conviction: { q1: 7, q2: 3 },
+        interviewProvenance: {
+          q1: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' },
+          q2: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' },
+        },
         additionalComments: {
           q1: { value: '*' },
           q2: { value: 'notes' },
@@ -133,6 +137,10 @@ describe('surveyToolHydrationFlow local-cache hydration helpers', () => {
         },
         importance: { q1: 4 },
         conviction: { q2: 6 },
+        interviewProvenance: {
+          q1: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' },
+          q2: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' },
+        },
         additionalComments: {
           q2: { value: 'notes-only' },
         },
@@ -486,6 +494,10 @@ describe('surveyToolHydrationFlow local-cache hydration helpers', () => {
       },
       importance: { q1: 4, q2: 2 },
       conviction: { q1: 7, q2: 3 },
+      interviewProvenance: {
+        q1: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' },
+        q2: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' },
+      },
       additionalComments: {
         q1: { value: 'alpha-notes' },
         q2: { value: 'beta-notes' },

@@ -378,6 +378,7 @@ describe('SurveyTool local-cache response rehydrate', () => {
     });
 
     expect(slice).toEqual({
+      interviewProvenance: { q1: { responderName: '', consentSavedAt: 0, consentStorageRefId: '' } },
       answers: {
         q1: {
           value: '*',

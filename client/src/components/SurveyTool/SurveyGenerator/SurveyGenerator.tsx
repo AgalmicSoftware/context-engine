@@ -3,12 +3,10 @@ import React, { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
-  faQuestionCircle,
   faCog,
   faCaretDown,
   faCaretUp,
   faLock,
-  faFileAudio,
   faClipboard,
   faCheck,
   faPlus,
@@ -45,7 +43,6 @@ import {
   getUnsupportedLitContractAccessControlError,
   getGlobalLitHooks,
   resolveLitChain,
-  litStorage,
 } from '../../../utilities/crypto/litProtocol.js';
 import {
   buildDocLibraryCommonTags,
@@ -122,8 +119,6 @@ import {
   hasDatabaseToolInputContent,
   isLikelyImageUrl,
   isSingleHttpUrlInput,
-  isSupportedAdditionalFile,
-  isSupportedPhotoFile,
   renameFileForLibraryUpload,
   revokePhotoPreviewUrl,
 } from './surveyGeneratorHelpers';

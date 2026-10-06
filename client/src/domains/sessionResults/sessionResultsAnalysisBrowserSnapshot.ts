@@ -20,6 +20,7 @@ const normalizeSlug = (value: unknown): string =>
   toText(value).toLowerCase() === 'general' ? '' : toText(value).toLowerCase();
 
 const valueLooksLocked = (value: unknown): boolean => {
+  if (value === '*') return true;
   const record = toRecord(value);
   return (
     record.encrypted === true ||
@@ -34,13 +35,7 @@ const responseLooksLocked = (response: RecordLike): boolean =>
   response.encrypted === true ||
   response.payloadEncrypted === true ||
   response.locked === true ||
-  valueLooksLocked(response.answer) ||
-  valueLooksLocked(response.value) ||
-  valueLooksLocked(response.response) ||
-  valueLooksLocked(response.additional) ||
-  valueLooksLocked(response.additionalComments) ||
-  valueLooksLocked(response.comments) ||
-  valueLooksLocked(response.comment);
+  valueLooksLocked(response.answer ?? response.value ?? response.response);
 
 const getAnswerValue = (value: unknown): unknown => {
   if (value == null) return '';
@@ -131,13 +126,13 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
         return;
       }
       const answer = getAnswerValue(record.answer ?? record.value ?? record.response);
-      const additionalValue = getAnswerValue(
-        record.additional ?? record.additionalComments ?? record.comments ?? record.comment,
-      );
+      const additionalField = record.additional ?? record.additionalComments ?? record.comments ?? record.comment;
+      const additionalValue = valueLooksLocked(additionalField) ? '' : getAnswerValue(additionalField);
       const additional = Array.isArray(additionalValue)
         ? additionalValue.map(toText).filter(Boolean).join('; ')
         : additionalValue;
       if (!toText(answer) && !toText(additional)) {
+        if (valueLooksLocked(additionalField)) lockedCount += 1;
         skippedCount += 1;
         return;
       }

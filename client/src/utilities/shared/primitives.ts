@@ -10,3 +10,4 @@ export const normalizeSessionIdHex = (hex: unknown): string => {
   return s.startsWith('0x') ? s : '0x' + s;
 };
 export const isValidEthAddress = (addr: unknown): boolean => /^0x[0-9a-fA-F]{40}$/.test(toStr(addr).trim());
+export const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);

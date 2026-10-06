@@ -44,6 +44,7 @@ export default function SessionInterviewReviewSection({
               type="button"
               id={helpId}
               className={styles.sessionInterviewHeaderButton}
+              data-ce-control-appearance="frameless"
               aria-label={`About ${title.replace(/ \(.*$/, '')}`}
               onClick={(event) => {
                 event.preventDefault();

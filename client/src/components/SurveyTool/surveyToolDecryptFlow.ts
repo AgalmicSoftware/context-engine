@@ -2,62 +2,9 @@ import {
   buildSurveyQuestionDecryptExecutionPlan,
   buildSurveyQuestionDecryptRequestPlan,
 } from './surveyQuestionDecryptRequestPlan';
-import {
-  buildClearedQuestionDecryptBusyTokens,
-  buildQuestionDecryptBusyTokenRegistration,
-  buildQuestionDecryptFailureState,
-  buildQuestionDecryptOwnedClearState,
-  buildQuestionDecryptStartState,
-  clearQuestionFieldBusyMap,
-  getQuestionFieldDecryptSelection,
-  getQuestionFieldTaskKey,
-  getQuestionFieldTaskKeys,
-  hasQuestionDecryptBusy,
-  markQuestionFieldBusyMap,
-  ownsQuestionDecryptBusyTokens,
-  runDedupedDecryptTask,
-} from './surveyToolDecryptBusyState';
-import {
-  buildAutoDecryptMaskedFieldSignature,
-  buildDecryptTaskKey,
-  buildEmptyQuestionDecryptSlice,
-  buildFieldDecryptState,
-  buildQuestionFieldDecryptControlDisplayState,
-  buildQuestionFieldDisplayState,
-  buildQuestionRenderDisplayState,
-  buildQuestionResponseDisplayState,
-  getViewedResponseOverrideForQuestion,
-  normalizeSingleQuestionViewedResponse,
-  parseEncryptedEnvelope,
-  resolveDecryptSurveyId,
-  resolveQuestionDecryptHandlingMode,
-} from './surveyToolDecryptState';
-import {
-  applyDecryptedQuestionResponseValues,
-  applyDecryptedQuestionResponseValuesToContainer,
-  applyDecryptedQuestionStateToSurveySlice,
-  buildSelfQuestionDecryptBaseline,
-  buildSelfQuestionDecryptSuccessState,
-  buildSurveyDecryptSuccessState,
-  buildViewedResponseDecryptBaseline,
-  buildViewedResponseDecryptSuccessState,
-  ensureQuestionDecryptSliceShape,
-  getQuestionRatingEnvelopes,
-  mergeLatestEncryptedQuestionFields,
-  mergeQuestionRatingEnvelopeState,
-  mergeQuestionResponseOverrideIntoDecryptSlice,
-  normalizeBulkDecryptedSliceForSurveyState,
-  syncDecryptedQuestionIntoBaseline,
-} from './surveyToolDecryptSliceState';
-import {
-  buildSurveyDecryptAttemptSourceInputs,
-  buildSurveyDecryptSourceState,
-  carryForwardSurveyQuestionRatings,
-  collectQuestionRatingEnvelopesByQid,
-  decryptQuestionRatingEnvelopeMap,
-  decryptQuestionRatingEnvelopes,
-} from './surveyToolDecryptSurveySource';
+import { buildQuestionDecryptStartState } from './surveyToolDecryptBusyState';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
+import type { QuestionsCacheByNetwork } from './surveyToolCacheState';
 import type {
   ApplyQuestionDecryptCompletionStatusOptions,
   ApplyQuestionDecryptFailureStatusOptions,
@@ -382,6 +329,21 @@ export const hydrateLatestQuestionDecryptState = async (
     if ((maskedAnswerForHydrate || maskedAdditionalForHydrate) && account && networkID) {
       const questionsCache = readQuestionsCachePort(sessionSlug) || {};
       const fetchQuestionId = String(questionId || '').toLowerCase();
+      // Standalone Worker piles have no chain response. Fill missing rating envelopes
+      // from the selected cached response without replacing newer in-memory values.
+      try {
+        const responder = String(responderForLatest || account)
+          .trim()
+          .toLowerCase();
+        const raw = (questionsCache as QuestionsCacheByNetwork)[networkID]?.questionResponses?.[fetchQuestionId]?.[
+          responder
+        ];
+        const cached = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const cachedRatings = mergeQuestionRatingEnvelopeState(null, cached, questionId);
+        nextRatingEnvelopes = mergeQuestionRatingEnvelopeState(cachedRatings, nextRatingEnvelopes, questionId);
+      } catch (error) {
+        logWarn(error);
+      }
       const latest = await getLatestQuestionResponsePort(
         responderForLatest || account,
         fetchQuestionId,

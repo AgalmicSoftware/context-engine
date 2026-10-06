@@ -1,8 +1,6 @@
 /** @file OnboardingWalkthrough.tsx */
 
-import React, { Component } from 'react';
-
-import { createLogger } from '../../utilities/logging';
+import { Component } from 'react';
 
 import 'assets/css/contextEngine.scss';
 import styles from './MainContent.module.scss';
@@ -15,8 +13,6 @@ import { WELCOME_SLIDES, getWelcomeSlide } from './welcomeSlides.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowRight, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
-const log = createLogger('ui');
-
 type OnboardingWalkthroughProps = {
   changeTabFunction: (tabIndex: number) => void;
   demoMode?: unknown;
@@ -24,14 +20,12 @@ type OnboardingWalkthroughProps = {
 };
 
 type OnboardingWalkthroughState = {
-  openSidebar: boolean;
   arrowIndex: number;
   numSlides: number;
 };
 
 class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, OnboardingWalkthroughState> {
   state: OnboardingWalkthroughState = {
-    openSidebar: false,
     arrowIndex: 0,
     numSlides: WELCOME_SLIDES.length,
   };
@@ -50,10 +44,6 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
 
   clickFinalButton = () => {
     this.props.changeTabFunction(4);
-  };
-
-  toggleSidebar = () => {
-    this.setState({ openSidebar: !this.state.openSidebar });
   };
 
   getOnboardingHeadline = () => {
@@ -107,8 +97,6 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
             {onboardingHeadline}
             <SiteLoadOptions
               arrowIndex={this.state.arrowIndex}
-              sidebarOpen={this.state.openSidebar}
-              closeSidebarFunction={this.toggleSidebar}
               clickRightArrow={this.clickRightArrow}
               clickLeftArrow={this.clickLeftArrow}
             />

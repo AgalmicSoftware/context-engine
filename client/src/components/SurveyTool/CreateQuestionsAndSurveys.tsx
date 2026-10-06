@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { sha256Utf8 } from '../../utilities/crypto/sha256';
-import { Button, Label, Input, FormGroup } from 'reactstrap';
+import { Button, Label, Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
@@ -12,7 +12,6 @@ import {
   faBookmark,
   faCheck,
   faPenNib,
-  faGlobe,
   faExternalLinkAlt,
   faMagic,
   faExclamationCircle,
@@ -134,7 +133,6 @@ import {
   getErrorCode,
   getErrorMessage,
   getCreateSurveyValidationError,
-  isMultichoiceQuestionType,
   isEncryptableFieldValueEmpty,
   normalizeAuthoringQuestionOptions,
   normalizeGateIds,
@@ -151,7 +149,6 @@ import {
   resolveCreateQuestionsManagedWorkerCacheIdentity,
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
-  selectManagedNetBucketSnapshot,
   type CreateQuestionsManagedCacheSeedTargets,
 } from './createQuestionsAndSurveysCacheHelpers';
 import { buildCreateSurveyHashValue } from './createQuestionsAndSurveysSignatureHelpers';
@@ -164,8 +161,6 @@ import {
   CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE,
   CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE,
   CREATE_SURVEY_SUBMIT_ICON_STYLE,
-  CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE,
-  CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE,
   CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE,
   CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE,
   CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE,
@@ -3227,14 +3222,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           >
             <div className={styles.typeTitle}>Quadratic allocation</div>
             <div className={styles.quadraticPreview} aria-hidden="true">
-              <span className={styles.quadraticPreviewNegative}>−</span>
-              <span className={styles.quadraticPreviewChart}>
-                <span className={styles.quadraticPreviewNegativeBar} />
-                <span className={styles.quadraticPreviewPositiveBar} />
+              <span className={styles.quadraticPreviewStep} data-step="down">
+                −
               </span>
-              <span className={styles.quadraticPreviewPositive}>+</span>
+              <span className={styles.quadraticPreviewVote}>2</span>
+              <span className={styles.quadraticPreviewStep} data-step="up" data-active="true">
+                +
+              </span>
+              <span className={styles.quadraticPreviewSquares}>
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
             </div>
-            <div className={styles.quadraticPreviewCaption}>99 voice credits per question</div>
           </button>
 
           <button

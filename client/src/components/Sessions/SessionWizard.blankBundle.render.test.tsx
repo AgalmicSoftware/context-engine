@@ -534,7 +534,7 @@ describe('SessionWizard blank bundle render regression', () => {
     }
 
     const advancedBundleUrlInput = screen.getByPlaceholderText(
-      'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js',
+      'https://github.com/<org>/<repo>/releases/download/<release-tag>/sessionCorsWorker.bundle.js',
     );
     setControlledInputValue(advancedBundleUrlInput, staleAdvancedBundleUrl);
 

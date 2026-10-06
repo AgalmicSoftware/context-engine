@@ -6,7 +6,7 @@
  * Key exports: parseSessionIdentity, parseSessionMetadata, parseWorkerConfig,
  *              parseLocalResourceOverrides
  */
-import { toStr, normalizeSessionIdHex } from '../shared/primitives.js';
+import { hasOwn, toStr, normalizeSessionIdHex } from '../shared/primitives.js';
 import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import {
   stripAuthoritativeSessionGateFields,
@@ -53,7 +53,6 @@ type MutableLocalOverrideSection = UnknownRecord & { useLocal: boolean };
 const WORKER_LIT_CREDENTIAL_FIELDS = ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid'] as const;
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
 const trimString = (value: unknown): string => toStr(value).trim();
 const cloneValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;

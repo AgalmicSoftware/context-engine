@@ -16,6 +16,8 @@ jest.mock('./WorkerSessionGroupsPanel', () => (props: unknown) => {
   return <div data-testid="worker-groups-panel">Native Worker Groups</div>;
 });
 
+jest.mock('./LinkedWorkerGroup', () => () => <div data-testid="linked-worker-group">Linked community</div>);
+
 jest.mock('../SBTs/SBTsPage', () => (props: unknown) => {
   mockSbtGroupsPage(props);
   return <div data-testid="sbt-groups-page">Registry SBT Groups</div>;
@@ -91,6 +93,7 @@ describe('OnePageSessionGroupsSection authority routing', () => {
         refreshNonce: 0,
         showGroupDescriptions: false,
         showMembershipListHeader: false,
+        inlineDetails: true,
       }),
     );
 
@@ -101,6 +104,27 @@ describe('OnePageSessionGroupsSection authority routing', () => {
         showGroupDescriptions: false,
         showMembershipListHeader: false,
       }),
+    );
+  });
+
+  it('omits duplicate local loading and empty notices when linked groups are configured without hiding the local group panel', () => {
+    const config = {
+      ...workerConfig(),
+      linkedWorkerGroups: [
+        { sessionSlug: 'source', sessionId: 'source-id', workerUrl: 'https://source.example', groupId: 'community' },
+      ],
+    };
+    const { rerender } = render(<OnePageSessionGroupsSection {...buildProps(config)} />);
+    expect(screen.getByTestId('linked-worker-group')).toBeInTheDocument();
+    expect(screen.getByTestId('worker-groups-panel')).toBeInTheDocument();
+    expect(mockWorkerGroupsPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showEmptyState: false, showLoadingState: false }),
+    );
+
+    rerender(<OnePageSessionGroupsSection {...buildProps(workerConfig())} />);
+    expect(screen.queryByTestId('linked-worker-group')).not.toBeInTheDocument();
+    expect(mockWorkerGroupsPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showEmptyState: true, showLoadingState: true }),
     );
   });
 
@@ -185,11 +209,11 @@ describe('OnePageSessionGroupsSection authority routing', () => {
         },
       },
     ],
-  ])('preserves the existing SBT collection for a %s session', (_label, config) => {
+  ])('preserves the existing SBT collection for a %s session', async (_label, config) => {
     const props = buildProps(config);
     render(<OnePageSessionGroupsSection {...props} />);
 
-    expect(screen.getByTestId('sbt-groups-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('sbt-groups-page')).toBeInTheDocument();
     expect(screen.getByText('SBTs', { selector: 'span' })).toBeInTheDocument();
     expect(screen.queryByTestId('worker-groups-panel')).not.toBeInTheDocument();
     expect(mockSbtGroupsPage).toHaveBeenCalledWith(

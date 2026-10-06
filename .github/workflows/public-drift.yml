@@ -39,3 +39,6 @@ jobs:
             exit 1
           fi
           echo "Public artifact matches the public main tree."
+
+      - name: Verify Worker release assets for this commit
+        run: CE_RELEASE_COMMIT="$GITHUB_SHA" npm run -s verify:release-assets

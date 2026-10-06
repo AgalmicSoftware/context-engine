@@ -1086,7 +1086,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(source, /name:\s+context-engine/);
   assert.match(source, /^# Context Engine Agent Runtime/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-09-28 \(v42\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-09-30 \(v43\)/);
   assert.match(source, /\{ "questionId": "q5", "value": \[3, -2, 0\] \}/);
   assert.match(source, /For `quadratic` questions, `value` holds one signed whole-number vote per option/);
   assert.match(source, /short runtime skill/);
@@ -1146,8 +1146,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(reference, /Detailed Context Engine Telegram bot, Mini App, admin, and operator reference/);
   assert.match(reference, /POST \/api\/agent\/mini-app-launch/);
   assert.match(reference, /`quadratic`: `value` is an array with one signed whole-number vote per option/);
-  assert.match(reference, /\*\*Reference version:\*\* 2026-09-28 \(v42\)/);
-  assert.match(reference, /### 2026-09-28 \(v42\)/);
+  assert.match(reference, /\*\*Reference version:\*\* 2026-09-30 \(v43\)/);
+  assert.match(reference, /### 2026-09-30 \(v43\)/);
   assert.match(source, /skillUpdateAvailable/);
   for (const installGuide of [readme, reference]) {
     assert.match(
@@ -1179,7 +1179,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/api\/agent\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/api\/agent\/skill-version`/);
-  assert.match(wrapped, /protocol v42/);
+  assert.match(wrapped, /protocol v43/);
   assert.match(wrapped, /Quiet Lifecycle/);
   assert.match(wrapped, /Create one fresh `run_id` for the whole run/);
   assert.match(wrapped, /Do not discover files, inspect logs\/configs\/\s+sessions/);
@@ -1255,12 +1255,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-09-28 (v42)');
+  assert.equal(body.version, '2026-09-30 (v43)');
   assert.equal(body.skill, 'context-engine');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(Object.hasOwn(body, 'changelogUrl'), false);
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-09-28 (v42)');
+  assert.equal(body.latestVersion, '2026-09-30 (v43)');
   assert.equal(body.updateNote, '');
 });
 
@@ -1279,7 +1279,7 @@ test('Telegram agent handoff exposes dedicated Session Wrapped skill metadata', 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.version, '2026-09-28 (session-wrapped-v1.2)');
-  assert.equal(body.protocolVersion, '2026-09-28 (v42)');
+  assert.equal(body.protocolVersion, '2026-09-30 (v43)');
   assert.equal(body.skill, 'ce-session-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-session-wrapped/SKILL.md');
   assert.equal(body.workerSkillVersionEndpoint, '/api/agent/skill-version');
@@ -1299,7 +1299,7 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
     location,
     /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/,
   );
-  assert.match(location, /v=2026-09-28-v42-/);
+  assert.match(location, /v=2026-09-30-v43-/);
 });
 
 test('Telegram agent handoff serves a dedicated Session Wrapped skill redirect', async () => {
@@ -1416,9 +1416,15 @@ test('Telegram agent handoff requires the configured token', async () => {
 test('Delegated authoring requires a stored allowed group binding, not a claimed chat', async () => {
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '', AGENT_BRIDGE_AUTHORING_GROUP_CHAT_IDS: '-10042' });
   const issued = await createTelegramAgentDelegationToken({
-    env, telegramUserId: '42', sessionSlug: 'alpha', accountAddress: `0x${'12'.repeat(20)}`,
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
   });
-  const request = () => agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&groupChatId=-10042&chatId=-10042', { token: issued.token });
+  const request = () =>
+    agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&groupChatId=-10042&chatId=-10042', {
+      token: issued.token,
+  });
   const denied = await handleTelegramAgentHandoffRequest({ request: request(), env });
   assert.equal(denied.status, 403);
   assert.equal((await denied.json()).reason, 'telegram_group_binding_required');
@@ -2630,9 +2636,11 @@ test('Invite onboarding keeps reservations after uncertain credential issuance o
           if (path === '/release') releases += 1;
           if (path === '/finalize') throw new Error('finalization unavailable');
           return stub.fetch(input, init);
-        } };
+          },
       };
-      const onboard = () => handleTelegramAgentHandoffRequest({
+      };
+      const onboard = () =>
+        handleTelegramAgentHandoffRequest({
         env,
         request: new Request('https://bridge.example/api/agent/invite/onboard', {
           method: 'POST', headers: { 'content-type': 'application/json' },
@@ -6047,7 +6055,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-09-28 (v42)');
+  assert.equal(questions.skillVersion, '2026-09-30 (v43)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -8034,7 +8042,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-09-28 (v42)');
+  assert.equal(initialStatus.version, '2026-09-30 (v43)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_root_token_required');
   assert.equal(setResponse.status, 200);

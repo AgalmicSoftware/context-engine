@@ -1,4 +1,5 @@
 import { getOrCreateCoordinatedStorageEnvelopeSessionKey } from './sessionWriteCoordinator.js';
+import { toStr } from './stringCoercion.js';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -9,7 +10,6 @@ const ENVELOPE_VERSION = 1;
 const AES_GCM = 'AES-GCM';
 const AES_256_GCM = 'AES-256-GCM';
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));

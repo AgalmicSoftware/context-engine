@@ -1,4 +1,5 @@
 import { FETCH_ACCOUNT, LOGIN_ACCOUNT, CHANGE_NETWORK } from '../actions/types';
+import { hasOwn } from '../utilities/shared/primitives.js';
 
 export type AccountState = {
   account: string;
@@ -28,7 +29,6 @@ const initialState: AccountState = {
   userImageURL: null,
 };
 
-const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 const isEmptyObject = (value: unknown): boolean =>

@@ -1,3 +1,4 @@
+import type { InterviewConsentOverrides } from './sessionInterviewConsent';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
 
@@ -18,6 +19,7 @@ type RunInterviewDraftSubmitInput = {
   includePredictionComparison: boolean;
   includeProvenance: boolean;
   includeResponderName: boolean;
+  consentOverrides?: InterviewConsentOverrides;
   isInterviewBusy: boolean;
   researchAvailable: boolean;
   responderContext: string;
@@ -43,6 +45,7 @@ type RunInterviewDraftSubmitInput = {
     includePredictionComparison: boolean,
     responderName: string,
     review?: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }>,
+    consentOverrides?: InterviewConsentOverrides,
   ) => void | Promise<void>;
   onSubmitResponses?: (questionIds?: string[]) => InterviewSubmitResult | Promise<InterviewSubmitResult>;
   onSubmitted?: () => void;
@@ -76,6 +79,7 @@ export const runInterviewDraftSubmit = async ({
   includePredictionComparison,
   includeProvenance,
   includeResponderName,
+  consentOverrides,
   isInterviewBusy,
   researchAvailable,
   responderContext,
@@ -183,6 +187,7 @@ export const runInterviewDraftSubmit = async ({
           selected: Boolean(selected[draft.questionId]),
         };
       }),
+      consentOverrides,
     );
 
     if (!isSubmitContextCurrent(attemptToken)) return;

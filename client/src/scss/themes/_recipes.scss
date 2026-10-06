@@ -39,6 +39,10 @@
     box-shadow: none;
   }
 
+  [data-ce-control-appearance='frameless']:focus:not(:focus-visible) {
+    outline: none;
+  }
+
   input,
   select,
   textarea,

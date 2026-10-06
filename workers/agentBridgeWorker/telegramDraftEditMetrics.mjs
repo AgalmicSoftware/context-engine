@@ -1,9 +1,4 @@
-import {
-  safeJsonParse,
-  stableJson,
-  stableFingerprint,
-  sanitizeSessionSlug,
-} from './runtimePrimitives.mjs';
+import { safeJsonParse, stableJson, stableFingerprint, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const DRAFT_EDIT_METRIC_KV_PREFIX = 'telegram:draft-edit-metric:v1:';
@@ -206,14 +201,6 @@ export function buildDraftEditMetricSummary({
   return metrics;
 }
 
-async function sha256Hex(value = '') {
-  const subtle = globalThis.crypto?.subtle;
-  if (!subtle || typeof subtle.digest !== 'function' || typeof TextEncoder === 'undefined') return '';
-  const bytes = new TextEncoder().encode(value);
-  const digest = await subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 async function participantRef({ env = {}, telegramUserId = '', sessionSlug = '' } = {}) {
   const rootSecret = safeString(env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || env.MANAGED_ACCOUNT_ROOT_SECRET);
   if (!rootSecret || !telegramUserId || !sessionSlug) return '';
@@ -223,7 +210,7 @@ async function participantRef({ env = {}, telegramUserId = '', sessionSlug = '' 
     telegramUserId,
     sessionSlug,
   });
-  const digest = await sha256Hex(seed);
+  const digest = globalThis.crypto?.subtle && typeof TextEncoder !== 'undefined' ? await sha256Hex(seed) : '';
   if (digest) return digest.slice(0, 24);
   return stableFingerprint(seed);
 }

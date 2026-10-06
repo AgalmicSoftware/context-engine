@@ -5,7 +5,7 @@ import { Button, FormGroup, FormText, Input, Label } from 'reactstrap';
 import SBTSelector from '../SBTs/SBTSelector';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeSlug } from './adminPageHelpers';
-import { ADMIN_AI_PROVIDER_OPTIONS, ADMIN_EDITABLE_CONTRACT_KEY_SET } from './adminPageMetadataDraftHelpers';
+import { ADMIN_AI_PROVIDER_OPTIONS } from './adminPageMetadataDraftHelpers';
 import { dedupeSbtSelections, type AdminSbtSelection } from './adminPageSbtGateSelectionHelpers';
 import styles from './AdminPage.module.scss';
 

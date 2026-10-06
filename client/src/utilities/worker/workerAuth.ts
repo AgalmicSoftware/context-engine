@@ -106,6 +106,9 @@ type BuildSiweMessageOptions = {
   nonce?: unknown;
   statement?: unknown;
   uri?: unknown;
+  workerUrl?: unknown;
+  sessionId?: unknown;
+  sessionSlug?: unknown;
 };
 type AdminActionAuthOptions = {
   action?: unknown;
@@ -118,6 +121,7 @@ type AdminActionAuthOptions = {
   workerUrl?: unknown;
 };
 type BootstrapAdminAuthOptions = {
+  sessionId?: unknown;
   context?: unknown;
   nonce?: unknown;
   slug?: unknown;
@@ -403,6 +407,9 @@ export const buildSiweMessage = ({
   statement,
   issuedAt,
   expirationTime,
+  workerUrl,
+  sessionId,
+  sessionSlug,
 }: BuildSiweMessageOptions = {}) => {
   const addr = toStr(address).trim();
   const host = toStr(domain || (typeof window !== 'undefined' ? window.location.host : '')).trim();
@@ -411,8 +418,13 @@ export const buildSiweMessage = ({
   const issued = issuedAt || new Date().toISOString();
   const exp = expirationTime || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const note = statement || 'Sign in to Context Engine.';
+  const id = toStr(sessionId).trim().toLowerCase();
+  const sessionResource = id
+    ? `urn:context-engine:session:id:${encodeURIComponent(id)}`
+    : `urn:context-engine:session:slug:${encodeURIComponent(normalizeSessionSlug(sessionSlug))}`;
+  const resources = workerUrl ? `\nResources:\n- ${new URL(toStr(workerUrl)).origin}\n- ${sessionResource}` : '';
 
-  return `${host} wants you to sign in with your Ethereum account:\n${addr}\n\n${note}\n\nURI: ${origin}\nVersion: 1\nChain ID: ${chain}\nNonce: ${nonce}\nIssued At: ${issued}\nExpiration Time: ${exp}`;
+  return `${host} wants you to sign in with your Ethereum account:\n${addr}\n\n${note}\n\nURI: ${origin}\nVersion: 1\nChain ID: ${chain}\nNonce: ${nonce}\nIssued At: ${issued}\nExpiration Time: ${exp}${resources}`;
 };
 
 const signMessage = async ({
@@ -562,6 +574,7 @@ export const buildSignedAdminActionAuth = async ({
 
 export const buildSignedBootstrapAdminAuth = async ({
   slug,
+  sessionId: providedSessionId,
   workerUrl,
   context,
   statement = 'Admin request: bootstrap arweave upload',
@@ -578,13 +591,19 @@ export const buildSignedBootstrapAdminAuth = async ({
   }
 
   const targetSlug = normalizeSessionSlug(slug);
+  let sessionId = toStr(providedSessionId).trim().toLowerCase();
   let nonce = toStr(providedNonce).trim();
   if (!nonce) {
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
       headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
+      body: JSON.stringify({
+        address,
+        sessionSlug: targetSlug,
+        ...(sessionId ? { sessionId } : {}),
+        adminAction: true,
+      }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
     if (!nonceResp.ok) {
@@ -597,11 +616,15 @@ export const buildSignedBootstrapAdminAuth = async ({
       throw new Error('Worker nonce response missing nonce.');
     }
     nonce = toStr(nonceData.nonce).trim();
+    sessionId = sessionId || toStr(nonceData.sessionId).trim().toLowerCase();
   }
 
   const message = buildSiweMessage({
     address,
     nonce,
+    workerUrl: resolvedWorkerUrl,
+    sessionSlug: targetSlug,
+    sessionId,
     chainId: wallet.chainId || 1,
     statement: toStr(statement).trim() || 'Admin request: bootstrap arweave upload',
   });
@@ -616,6 +639,7 @@ export const buildSignedBootstrapAdminAuth = async ({
     message,
     signature,
     sessionSlug: targetSlug,
+    ...(sessionId ? { sessionId } : {}),
   };
 };
 
@@ -707,6 +731,9 @@ export const getWorkerSessionToken = async ({
         nonce: nonceData.nonce,
         chainId,
         statement: 'Sign in to Context Engine.',
+        workerUrl: resolvedWorkerUrl,
+        sessionId,
+        sessionSlug: slug,
       });
       const signature = await signMessage({
         message,

@@ -45,13 +45,11 @@ jest.mock('./SurveyAudioFieldInput', () => {
 describe('SurveyQuestionsFullQuestionResponseInput', () => {
   it('keeps list rating drags local and commits the final value on release', () => {
     const onCommit = jest.fn();
-    const onChange = jest.fn();
     render(
       <SurveyQuestionsFullQuestionResponseInput
         question={{ id: 'q-rating', type: 'rating' }}
         answer={{ value: 4 }}
         onDeferredRatingCommit={onCommit}
-        onRatingChange={onChange}
       />,
     );
     const slider = screen.getByRole('slider');
@@ -60,7 +58,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     fireEvent.change(slider, { target: { value: '8' } });
     expect(slider).toHaveValue('8');
     expect(onCommit).not.toHaveBeenCalled();
-    expect(onChange).not.toHaveBeenCalled();
     fireEvent.mouseUp(slider);
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith(8);
@@ -97,8 +94,8 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       questionId: 'q2',
       ratingValue: 7,
       ratingScale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
+      answered: true,
       disabled: false,
-      useDeferredRating: true,
     });
 
     expect(
@@ -135,8 +132,8 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       questionId: 'q-rating',
       ratingValue: 1,
       ratingScale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' },
+      answered: true,
       disabled: false,
-      useDeferredRating: true,
     });
 
     render(
@@ -166,25 +163,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       question: { id: 'q-rating', type: 'rating' },
       answer: { value: '5' },
     });
-    const event = { type: 'keydown' };
-
-    const ratingChange = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'rating-change',
-      nextValue: 8,
-      event,
-    });
-    expect(ratingChange).toMatchObject({
-      kind: 'rating-change',
-      questionId: 'q-rating',
-      responseKey: 'answer',
-      disabled: false,
-      nextValue: 8,
-      persistStrategy: 'event-sensitive',
-    });
-    expect((ratingChange as { event?: unknown }).event).toBe(event);
-    expect(shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(ratingChange)).toBe(true);
-
     const ratingCommit = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
       inputDescriptor,
       kind: 'rating-commit',
@@ -267,8 +245,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
 
   it('buffers full-question rating drag ticks locally and commits the final value once', () => {
     const onDeferredRatingCommit = jest.fn();
-    const onRatingChange = jest.fn();
-    const onRatingChangeComplete = jest.fn();
     render(
       <SurveyQuestionsFullQuestionResponseInput
         question={{
@@ -278,8 +254,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         qIndex={0}
         answer={{ value: '5' }}
         onDeferredRatingCommit={onDeferredRatingCommit}
-        onRatingChange={onRatingChange}
-        onRatingChangeComplete={onRatingChangeComplete}
       />,
     );
 
@@ -293,21 +267,15 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
 
     expect(screen.getByText('8')).toBeInTheDocument();
     expect(onDeferredRatingCommit).not.toHaveBeenCalled();
-    expect(onRatingChange).not.toHaveBeenCalled();
-    expect(onRatingChangeComplete).not.toHaveBeenCalled();
 
     fireEvent.mouseUp(slider, { currentTarget: { value: '8' } });
 
     expect(onDeferredRatingCommit).toHaveBeenCalledTimes(1);
     expect(onDeferredRatingCommit).toHaveBeenCalledWith(8);
-    expect(onRatingChange).not.toHaveBeenCalled();
-    expect(onRatingChangeComplete).not.toHaveBeenCalled();
   });
 
   it('routes single-question rating changes through deferred commits', () => {
     const onDeferredRatingCommit = jest.fn();
-    const onRatingChange = jest.fn();
-    const onRatingChangeComplete = jest.fn();
     render(
       <SurveyQuestionsFullQuestionResponseInput
         question={{
@@ -318,8 +286,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
         answer={{ value: 4 }}
         singleQuestionMode
         onDeferredRatingCommit={onDeferredRatingCommit}
-        onRatingChange={onRatingChange}
-        onRatingChangeComplete={onRatingChangeComplete}
       />,
     );
 
@@ -330,8 +296,6 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     fireEvent.mouseUp(slider, { currentTarget: { value: '7' } });
 
     expect(onDeferredRatingCommit).toHaveBeenCalledWith(7);
-    expect(onRatingChange).not.toHaveBeenCalled();
-    expect(onRatingChangeComplete).not.toHaveBeenCalled();
   });
 
   it('renders default answer input props and preserves handler wiring', () => {

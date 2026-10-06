@@ -1,4 +1,4 @@
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+import { toStr } from './stringCoercion.js';
 const trim = (value) => toStr(value).trim();
 const lower = (value) => trim(value).toLowerCase().replace(/-/g, '_');
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);

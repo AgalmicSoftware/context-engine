@@ -29,7 +29,6 @@ import {
   isProfileScanColdDiagEnabled as isMainSiteProfileScanColdDiagEnabled,
   isProfileScanTelemetryEnabled as isMainSiteProfileScanTelemetryEnabled,
 } from './profileScanTelemetry.js';
-import { shouldEnableSessionRegistryRefresh } from './mainSiteProgressHelpers.js';
 
 const mainSiteLog = createLogger('mainSite');
 
@@ -187,7 +186,6 @@ export interface SessionProfileScanController {
     opts?: ResolveListScopeSessionConfigOptions,
   ) => Promise<ProfileScanSessionConfig | null>;
   ensureRegistryHydratedForProfileScan: (opts?: Record<string, unknown>) => Promise<RegistryHydrationStatus>;
-  isOnchainSessionRegistryEnabled: () => boolean;
   refreshSessionUniverseRegistryCache: () => Promise<unknown | null>;
   resolveProfileDeepScanPlan: (opts?: ResolveProfileDeepScanPlanOptions) => ProfileDeepScanPlan;
   getProfileDeepScanSlugs: () => string[];
@@ -817,10 +815,7 @@ export const createSessionProfileScanController = (host: SessionProfileScanHost)
     };
   };
 
-  const isOnchainSessionRegistryEnabled = (): boolean => shouldEnableSessionRegistryRefresh();
-
   const refreshSessionUniverseRegistryCache = async (): Promise<unknown | null> => {
-    if (!isOnchainSessionRegistryEnabled()) return null;
     const scopeContext = getProfileScanScopeContext();
     const activeChainId = getActiveProfileScanChainId();
     const chainIds = resolveSessionRegistryBootstrapChainIds({
@@ -1166,7 +1161,6 @@ export const createSessionProfileScanController = (host: SessionProfileScanHost)
     getProfileScanListScopeSessionConfigCacheKey,
     resolveListScopeSessionConfigFromRegistry,
     ensureRegistryHydratedForProfileScan,
-    isOnchainSessionRegistryEnabled,
     refreshSessionUniverseRegistryCache,
     resolveProfileDeepScanPlan,
     getProfileDeepScanSlugs,

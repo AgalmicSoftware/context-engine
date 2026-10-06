@@ -11,7 +11,7 @@ import type { SbtNameLookupState } from './sbtSelectorNameLookupHelpers';
 import { buildSbtSelectorListScopeTargetSlugSet, normalizeDiscoverySlugs } from './sbtSelectorScopeHelpers';
 import type { SbtSelectorDiscoverySlugOptions } from './sbtSelectorScopeHelpers';
 import { buildSbtLookupKey, normalizeChainValue } from './sbtSelectorSessionRuntimeHelpers';
-import { getSelectableSbtKey, normalizeSelectableSbtAddress } from './sbtSelectorSelectionKeyHelpers';
+import { getSelectableSbtKey } from './sbtSelectorSelectionKeyHelpers';
 import {
   buildScopedSbtIgnoreKey,
   hasOwn,

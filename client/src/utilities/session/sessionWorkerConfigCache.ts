@@ -2,7 +2,7 @@ import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { parseWorkerConfig } from './sessionParsers.js';
 import { readConfiguredSessionWorkerUrlCandidate } from './sessionWorkerUrlCompatibility.js';
 import { normalizeWorkerCanonicalSessionIdHex, parseSessionWorkerDiscoveryOrigin } from './sessionWorkerDiscovery.js';
-import { normalizeSessionIdHex } from '../shared/primitives.js';
+import { hasOwn, normalizeSessionIdHex } from '../shared/primitives.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type {
   SessionConfigLike,
@@ -76,7 +76,6 @@ const SLUG_WORKER_CACHE_KEY_PREFIX = 'slug:';
 const verifiedWorkerCanonicalBootstrapKeys = new Set<string>();
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
 const toTrimmedString = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
 const cloneValue = <T>(value: T): T => {

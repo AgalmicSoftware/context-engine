@@ -43,12 +43,12 @@ import {
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
+import { toStr } from './stringCoercion.js';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const isJsonContentType = (contentType) => {
@@ -446,10 +446,7 @@ const resolvePayloadAccessControl = (config = {}) => {
   const cloudflare = isObj(profile.cloudflare) ? profile.cloudflare : {};
   const payloadAccessControl = isObj(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
   const legacyMode = normalizeLegacyPayloadAccessMode(
-    payloadAccessControl.mode ||
-    cloudflare.payloadAccessMode ||
-    profile.payloadAccessMode ||
-    profile.accessControlMode
+    payloadAccessControl.mode || cloudflare.payloadAccessMode || profile.payloadAccessMode || profile.accessControlMode,
   );
   const accessControl = (
     Object.prototype.hasOwnProperty.call(payloadAccessControl, 'gate') ||
@@ -459,10 +456,7 @@ const resolvePayloadAccessControl = (config = {}) => {
     : normalizePayloadAccessControl(legacyMode);
   const resourceGates = isObj(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
   const conditions = normalizeAccessConditionDocument(
-    payloadAccessControl.accessConditions ||
-    payloadAccessControl.conditions ||
-    cloudflare.accessConditions ||
-    profile.accessConditions
+    payloadAccessControl.accessConditions || payloadAccessControl.conditions || cloudflare.accessConditions || profile.accessConditions,
   );
   return {
     ...accessControl,
@@ -886,7 +880,7 @@ const resolveBareRoleGateCondition = (config = {}) => {
       cloudflare.workerRole ||
       config.storageRoleGate ||
       config.workerRoleGate ||
-      'admin'
+          'admin',
     ) || 'admin',
   };
 };
@@ -1680,7 +1674,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   }
   let responseBody = body;
   const resolvedAccess = normalizePayloadAccessControl(
-    metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config)
+    metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config),
   );
   if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
     try {
@@ -1810,9 +1804,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       continue;
     }
     const metadataAccess = normalizePayloadAccessControl(
-      metadata?.payloadAccessControl ||
-      metadata?.payloadAccessMode ||
-      resolvePayloadAccessControl(config)
+      metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config),
     );
     items.push({
       storageRef,
@@ -1948,9 +1940,7 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
       continue;
     }
     const metadataAccess = normalizePayloadAccessControl(
-      row.metadata.payloadAccessControl ||
-      row.metadata.payloadAccessMode ||
-      resolvePayloadAccessControl(config)
+      row.metadata.payloadAccessControl || row.metadata.payloadAccessMode || resolvePayloadAccessControl(config),
     );
     if (metadataAccess.encryption === PAYLOAD_ENCRYPTION_MODES.NONE) continue;
     encryptedPayloadCount += 1;

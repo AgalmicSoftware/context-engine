@@ -387,16 +387,6 @@ test('worker serves Telegram Mini App shell', async () => {
   assert.match(text, /prompt\.textContent = question\.prompt \|\| question\.title/);
 });
 
-test('worker serves Telegram Mini App loading GIF asset', async () => {
-  const response = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/loading.gif'));
-  const bytes = new Uint8Array(await response.arrayBuffer());
-
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('content-type'), 'image/gif');
-  assert.equal(new TextDecoder().decode(bytes.slice(0, 6)), 'GIF89a');
-  assert.equal(bytes.length > 100000, true);
-});
-
 test('worker preview update is disabled unless explicitly enabled and does not mutate KV', async () => {
   const kv = new MemoryKv();
   const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
@@ -607,7 +597,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(JSON.parse(replayedSubmitRequests[0][1]).answer.value, 8);
   assert.equal(
     JSON.parse(replayedSubmitRequests[0][1]).canonicalApiRequest.body.idempotencyKey,
-    draft.submitRequest.idempotencyKey
+    draft.submitRequest.idempotencyKey,
   );
   assert.equal(JSON.parse(replayedSubmitRequests[0][1]).canonicalApiRequest.body.questionId, bytes32QuestionId);
 
@@ -1433,11 +1423,20 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,50}$/);
   assert.deepEqual(
     questionButtons.filter((button) => button.text !== 'Back to Start').map((button) => button.text),
-    ['Pose 1', 'Pose 2']
+    ['Pose 1', 'Pose 2'],
   );
-  assert.equal(questionButtons.some((button) => button.text === 'Back to Start'), true);
-  assert.equal(questionButtons.some((button) => button.text === 'Open Mini App'), false);
-  assert.equal(Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:group-session:')), true);
+  assert.equal(
+    questionButtons.some((button) => button.text === 'Back to Start'),
+    true,
+  );
+  assert.equal(
+    questionButtons.some((button) => button.text === 'Open Mini App'),
+    false,
+  );
+  assert.equal(
+    Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:group-session:')),
+    true,
+  );
   assert.equal(Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:action:')).length >= 12, true);
 });
 

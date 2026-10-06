@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { parseSiweMessage, validateSiwe } from './siweMessageValidation.js';
 import { resolveAuthLoginRequestAuthority } from './authLoginRequestAuthority.js';
 
 const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -528,3 +529,68 @@ test('resolveAuthLoginRequestAuthority preserves gate failure passthrough and re
     targetSlug: 'session-a',
   });
 });
+
+for (const [label, resources, canonical, expected] of [
+  ['legacy message', null, false, true],
+  ['bound slug', ['https://worker.example', 'urn:context-engine:session:slug:session-a'], false, true],
+  ['bound identity', ['https://worker.example', `urn:context-engine:session:id:${workerSessionId}`], true, true],
+  ['relayed Worker', ['https://other-worker.example', 'urn:context-engine:session:slug:session-a'], false, false],
+  ['relayed slug', ['https://worker.example', 'urn:context-engine:session:slug:session-b'], false, false],
+  ['relayed identity', ['https://worker.example', `urn:context-engine:session:id:${replacementWorkerSessionId}`], true, false],
+  ['empty resource section', [], false, false],
+  ['incomplete binding', ['https://worker.example'], false, false],
+  [
+    'conflicting bindings',
+    ['https://worker.example', 'urn:context-engine:session:slug:session-a', 'urn:context-engine:session:slug:session-b'],
+    false,
+    false,
+  ],
+]) {
+  test(`login signed Resources checks ${label} before consuming the nonce`, async () => {
+    const base = [
+      'allowed.example wants you to sign in with your Ethereum account:',
+      '0xabc',
+      '',
+      'Sign in to Context Engine.',
+      '',
+      'URI: https://allowed.example',
+      'Version: 1',
+      'Chain ID: 11155420',
+      'Nonce: nonce-1',
+      'Issued At: 2026-04-23T12:00:00.000Z',
+      'Expiration Time: 2026-04-24T12:00:00.000Z',
+    ];
+    const message = [...base, ...(resources === null ? [] : ['Resources:', ...resources.map((r) => `- ${r}`)])].join('\n');
+    let nonceCalls = 0;
+    const result = await resolveAuthLoginRequestAuthority(
+      createRequestArgs({
+        request: new Request('https://worker.example/auth/login', { headers: { Origin: 'https://allowed.example' } }),
+        body: createSignedBody({ message, ...(canonical ? { sessionId: workerSessionId } : {}) }),
+        deps: createAuthorityDeps({
+          parseSiweMessage,
+          validateSiwe,
+          consumeNonce: async () => {
+            nonceCalls++;
+            return { ok: true };
+          },
+          ...(canonical
+            ? {
+                resolveExistingSessionCors: async () => ({
+                  ok: true,
+                  headers: {},
+                  config: {
+                    sessionId: workerSessionId,
+                    allowOrigins: ['https://allowed.example'],
+                    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+                  },
+                }),
+              }
+            : {}),
+        }),
+      }),
+    );
+    assert.equal(result.ok, expected);
+    assert.equal(nonceCalls, expected ? 1 : 0);
+    if (!expected) assert.equal(result.response.status, 403);
+  });
+}

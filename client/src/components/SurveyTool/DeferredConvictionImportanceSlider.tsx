@@ -1,4 +1,3 @@
-import React from 'react';
 import DeferredCommitSlider from './DeferredCommitSlider';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import CESlider from '../Shared/CESlider';

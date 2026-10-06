@@ -169,7 +169,8 @@ jobs:
   client:
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Full-universe coverage runs serially; leave room for all suites and reporting.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout

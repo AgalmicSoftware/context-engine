@@ -1,4 +1,3 @@
-import React from 'react';
 import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
 

@@ -3,7 +3,6 @@ import React from 'react';
 
 import BinaryChoiceInput from './BinaryChoiceInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import {
@@ -42,8 +41,6 @@ type SurveyQuestionsFullQuestionResponseInputProps = {
   audioInputWorkerProps?: Record<string, unknown>;
   onAnswerChange?: (nextValue: unknown, event?: unknown) => void;
   onDeferredRatingCommit?: (nextValue: number) => void;
-  onRatingChange?: (nextValue: number, event?: unknown) => void;
-  onRatingChangeComplete?: (event?: unknown) => void;
   onToggleAnswerEncryption?: (nextEncryptedState: boolean) => void;
 };
 
@@ -57,8 +54,6 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
   audioInputWorkerProps = {},
   onAnswerChange,
   onDeferredRatingCommit,
-  onRatingChange,
-  onRatingChangeComplete,
   onToggleAnswerEncryption,
 }: SurveyQuestionsFullQuestionResponseInputProps): React.ReactNode => {
   const inputDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
@@ -84,17 +79,6 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
     }
   };
 
-  const emitRatingChange = (nextValue: number, event?: unknown) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'rating-change',
-      nextValue,
-      event,
-    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'rating-change' }>;
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    onRatingChange?.(action.nextValue, action.event);
-  };
-
   const emitDeferredRatingCommit = (nextValue: number) => {
     const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
       inputDescriptor,
@@ -103,20 +87,6 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
     }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'rating-commit' }>;
     if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
     onDeferredRatingCommit?.(action.nextValue);
-  };
-
-  const emitRatingChangeComplete = (event?: unknown) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'rating-change-complete',
-      event,
-    }) as Extract<SurveyQuestionsFullQuestionResponseInputActionDescriptor, { kind: 'rating-change-complete' }>;
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.event === undefined) {
-      onRatingChangeComplete?.();
-    } else {
-      onRatingChangeComplete?.(action.event);
-    }
   };
 
   const emitAnswerEncryptionToggle = (nextEncryptedState: boolean) => {
@@ -159,20 +129,14 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
       );
     }
     case 'rating': {
-      return inputDescriptor.useDeferredRating || onDeferredRatingCommit ? (
+      // Keep drag ticks local; parent updates rebuild the full question list.
+      return (
         <DeferredRatingSlider
           value={inputDescriptor.ratingValue}
           scale={inputDescriptor.ratingScale}
+          answered={inputDescriptor.answered}
           disabled={inputDescriptor.disabled}
           onCommit={emitDeferredRatingCommit}
-        />
-      ) : (
-        <FullQuestionRatingInput
-          value={inputDescriptor.ratingValue}
-          scale={inputDescriptor.ratingScale}
-          disabled={inputDescriptor.disabled}
-          onChange={emitRatingChange}
-          onChangeComplete={emitRatingChangeComplete}
         />
       );
     }

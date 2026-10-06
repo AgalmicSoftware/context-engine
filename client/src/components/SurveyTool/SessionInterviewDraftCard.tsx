@@ -69,6 +69,21 @@ const DraftEditableText = ({
 }: DraftEditableTextProps) => {
   const [editing, setEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocusRef = useRef(false);
+  // Reactstrap closes on keyup; consume that event before returning focus to the preview.
+  const finishOnEscape = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    event.stopPropagation();
+    restoreFocusRef.current = true;
+    setEditing(false);
+  };
+  useEffect(() => {
+    if (!editing && restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      previewRef.current?.focus();
+    }
+  }, [editing]);
   const injectedEditorRef = useRef<HTMLDivElement | null>(null);
   const injectedResizeFrameRef = useRef<number | null>(null);
   const displayValue = (displayValueOverride ?? value).trim();
@@ -138,15 +153,13 @@ const DraftEditableText = ({
         ref={injectedEditorRef}
         className={styles.injectedEditorShell}
         onInputCapture={scheduleInjectedResize}
+        onKeyUp={finishOnEscape}
         onBlur={(event) => {
           if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
           setEditing(false);
         }}
       >
         {renderEditor(value, onChange)}
-        <button type="button" className={styles.doneEditingButton} onClick={() => setEditing(false)}>
-          Done editing
-        </button>
       </div>
     );
   }
@@ -164,6 +177,7 @@ const DraftEditableText = ({
           resizeTextAreaToContent(node);
         }}
         onBlur={() => setEditing(false)}
+        onKeyUp={finishOnEscape}
         aria-label={label}
         className={styles.autosizeTextArea}
         rows={1}
@@ -175,6 +189,7 @@ const DraftEditableText = ({
     <div className={styles.readableTextShell}>
       <button
         type="button"
+        ref={previewRef}
         className={styles.readableTextButton}
         onClick={() => !disabled && setEditing(true)}
         onKeyDown={(event) => {
@@ -187,7 +202,6 @@ const DraftEditableText = ({
       >
         {displayValue ? displayValue : <span className={styles.emptyReadableText}>{placeholder}</span>}
       </button>
-      {!disabled ? <span className={styles.editHint}>Tap or press Enter to edit.</span> : null}
     </div>
   );
 };
@@ -323,15 +337,15 @@ export default function SessionInterviewDraftCard({
               sliderOpen={sliderOpen}
               sliderToggleExpandedByQuestion={{ [`interview-${draft.questionId}`]: sliderOpen }}
               sliderMode={sliderMode}
-              convictionValue={(edited.conviction ?? 0) / 10}
-              importanceValue={(edited.importance ?? 0) / 10}
-              activeSliderValue={(edited[sliderMode] ?? 0) / 10}
+              convictionValue={edited.conviction ?? 0}
+              importanceValue={edited.importance ?? 0}
+              activeSliderValue={edited[sliderMode] ?? 0}
               hasConvictionImportanceValue={edited.conviction !== undefined || edited.importance !== undefined}
               onSelectMode={(mode) => {
                 setSliderMode(mode);
                 setSliderOpen(true);
               }}
-              onChange={(value) => onEdit(markEdit(sliderMode, value * 10))}
+              onChange={(value) => onEdit(markEdit(sliderMode, value))}
             />
             <div className={styles.footerIconCluster}>
               {!hasHumanEditedDraft ? (
@@ -374,29 +388,6 @@ export default function SessionInterviewDraftCard({
           ) : null}
         </div>
       </div>
-      {draft.confidence !== undefined ? (
-        <div
-          className={styles.confidence}
-          title="The AI’s estimate of how well this draft is supported by the available evidence."
-          aria-label={`AI-estimated confidence: ${percent}%`}
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
-          data-ce-question-id={draft.questionId}
-        >
-          <div className={styles.confidenceMeta}>
-            <strong>{percent}% AI-estimated confidence</strong>
-          </div>
-          <div
-            className={styles.confidenceTrack}
-            role="progressbar"
-            aria-label={`AI-estimated confidence for ${prompt}`}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-          >
-            <span style={{ width: `${percent}%` }} />
-          </div>
-        </div>
-      ) : null}
       {draft.evidence || draft.confidence !== undefined ? (
         <div className={styles.evidenceDisclosure}>
           <button
@@ -416,6 +407,29 @@ export default function SessionInterviewDraftCard({
           </button>
           {showEvidence ? (
             <div id={evidenceId} className={styles.evidenceText}>
+              {draft.confidence !== undefined ? (
+                <div
+                  className={styles.confidence}
+                  title="The AI’s estimate of how well this draft is supported by the available evidence."
+                  aria-label={`AI-estimated confidence: ${percent}%`}
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
+                  data-ce-question-id={draft.questionId}
+                >
+                  <div className={styles.confidenceMeta}>
+                    <strong>{percent}% AI-estimated confidence</strong>
+                  </div>
+                  <div
+                    className={styles.confidenceTrack}
+                    role="progressbar"
+                    aria-label={`AI-estimated confidence for ${prompt}`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={percent}
+                  >
+                    <span style={{ width: `${percent}%` }} />
+                  </div>
+                </div>
+              ) : null}
               {draft.confidence !== undefined ? <div>AI-estimated support: {confidenceLabel}</div> : null}
               {draft.evidence}
             </div>

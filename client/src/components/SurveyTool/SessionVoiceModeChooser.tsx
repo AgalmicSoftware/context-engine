@@ -1,4 +1,3 @@
-import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -19,7 +18,7 @@ export default function SessionVoiceModeChooser({ onSelectMode }: SessionVoiceMo
       >
         <FontAwesomeIcon icon={faMicrophone} />
         <strong>Interview</strong>
-        <span>Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.</span>
+        <span>Talk with an AI interviewer to answer the session’s questions, then review your responses.</span>
       </button>
       <button
         type="button"
@@ -28,7 +27,7 @@ export default function SessionVoiceModeChooser({ onSelectMode }: SessionVoiceMo
       >
         <FontAwesomeIcon icon={faComments} />
         <strong>Group Conversation</strong>
-        <span>Record a group discussion and generate new question drafts from it.</span>
+        <span>Record a group discussion and generate questions and context from it.</span>
       </button>
     </div>
   );

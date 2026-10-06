@@ -1006,7 +1006,12 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(slice.interviewProvenance.q2.originalPrediction.answer).toBe('Original answer');
     expect(slice.interviewProvenance.q2.predictionRevisions).toEqual(revisions);
     await recordInterviewProvenance(engine, selected, null, null, false, false, '', [rejected]);
-    expect(engine.state.surveysResponseState[0].interviewProvenance).toEqual({});
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).toMatchObject({
+      includeAiProvenance: false,
+      includePredictionComparison: false,
+    });
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('source');
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('originalPrediction');
   });
 
   it('accepts unchanged interview answers only when every selected question is already saved', async () => {
@@ -1019,6 +1024,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       },
       valuesEqual: (a, b) => a === b,
       getSubmitCount: jest.fn(() => 0),
+      getSessionInterviewResponseReadinessToken: jest.fn(() => 'ready'),
       buildSliceFromUserAnswers: jest.fn(() => ({ answers: { q1: { value: 'Agree' } } })),
       handlePileSubmitClick: jest
         .fn()
@@ -1030,9 +1036,11 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await submitSessionInterviewResponses(engine, ['q1', 'q2'])).toMatchObject({ status: 'failed' });
     engine.state.surveysResponseState[0].answers.q1.value = 'Disagree';
     expect(await submitSessionInterviewResponses(engine, ['q1'])).toMatchObject({ status: 'failed' });
+    expect(engine.getSessionInterviewResponseReadinessToken).not.toHaveBeenCalled();
     engine.getSubmitCount.mockReturnValue(1);
     engine.handlePileSubmitClick.mockResolvedValue({ status: 'submitted' });
     expect(await submitSessionInterviewResponses(engine, ['q1'])).toEqual({ status: 'submitted' });
+    expect(engine.getSessionInterviewResponseReadinessToken).toHaveBeenCalledTimes(1);
     expect(engine.handlePileSubmitClick).toHaveBeenCalledTimes(3);
   });
 

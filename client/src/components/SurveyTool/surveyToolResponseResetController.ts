@@ -356,6 +356,7 @@ export const executeSurveyExitEditing = ({
     const surveyIndex = resolveActiveSurveyIndex(nextProps);
     const baselineSlice = resolveBaselineSlice({
       responderAddress: nextProps.responderAddress,
+      prevBaseline: nextState.editBaseline,
       parsedViewAddressAnswers: nextState.parsedViewAddressAnswers,
       userAnswers: nextState.userAnswers,
       buildSliceFromUserAnswers,

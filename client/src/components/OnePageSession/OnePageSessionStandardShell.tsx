@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import CETooltip from '../Shared/CETooltip';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -185,8 +186,10 @@ const buildResultsViewOptions = (
   isDemoSlug: boolean,
   showDemoAnalysisView: boolean,
   generatedOptions: ResultsViewOption[] = [],
+  showTopicPreview = false,
 ): ResultsViewOption[] => [
   { key: 'polis', label: 'Report', icon: '🧾' },
+  ...(showTopicPreview ? [{ key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' }] : []),
   ...(generatedOptions.length > 0
     ? generatedOptions
     : isDemoSlug
@@ -368,6 +371,7 @@ export default function OnePageSessionStandardShell({
   onViewAllQuestionsClick,
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
+  const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
   const generatedState = (
     generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
@@ -395,10 +399,15 @@ export default function OnePageSessionStandardShell({
       ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
         ? 'polis'
         : requestedResultsViewMode
-      : requestedResultsViewMode === 'polis'
+      : requestedResultsViewMode === 'polis' || (showTopicPreview && requestedResultsViewMode === 'debateAtlas')
         ? requestedResultsViewMode
         : 'polis';
-  const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView, generatedViewOptions);
+  const resultsViewOptions = buildResultsViewOptions(
+    isDemoSlug,
+    showDemoAnalysisView,
+    generatedViewOptions,
+    showTopicPreview,
+  );
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
   const generatedCanCheckStatus = generatedState.canCheckStatus === true;
@@ -418,8 +427,8 @@ export default function OnePageSessionStandardShell({
       : generatedHasArtifact
         ? 'Refresh AI Views'
         : 'Generate AI Views';
+  const sessionInfoTooltipId = `session-info-${React.useId().replace(/:/g, '')}`;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
   const showContextSection = isDemoSlug || !!sessionContext || showTopicPreview;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
@@ -470,18 +479,19 @@ export default function OnePageSessionStandardShell({
       <div className={brandingSectionClassName}>
         <div className={titleContainerClassName}>
           <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
-          <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
+          <button
+            type="button"
+            id={sessionInfoTooltipId}
+            className={styles.sessionInfoButton}
+            data-ce-control-appearance="frameless"
+            aria-label="Session info"
+            onClick={(event) => event.currentTarget.focus()}
+          >
             <FontAwesomeIcon icon={faQuestionCircle} />
-            <span className={styles.tooltiptext}>
-              {sessionInfo ? (
-                <p>
-                  <em>{sessionInfo}</em>
-                </p>
-              ) : (
-                <p>Share input; your responses help generate a collective intelligence map.</p>
-              )}
-            </span>
-          </div>
+          </button>
+          <CETooltip target={sessionInfoTooltipId} placement="bottom" trigger="hover focus" autohide={false}>
+            {sessionInfo || 'Share input; your responses help generate a collective intelligence map.'}
+          </CETooltip>
         </div>
 
         {showQuestions ? (
@@ -820,8 +830,8 @@ export default function OnePageSessionStandardShell({
           </div>
           {showResults && (
             <div className={styles.miniSectionContent}>
-              {showTopicPreview && <ReverseAlignmentTopicMap />}
               <div>
+                {showTopicPreview && effectiveResultsViewMode === 'debateAtlas' && <ReverseAlignmentTopicMap />}
                 {effectiveResultsViewMode === 'polis' && (
                   <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
                     <PolisReport

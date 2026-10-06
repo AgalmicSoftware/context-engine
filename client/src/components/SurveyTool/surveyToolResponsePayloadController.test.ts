@@ -63,9 +63,12 @@ describe('surveyToolResponsePayloadController', () => {
       ).responses![0];
       const finalRatings = { importance: ratings.expectedImportance, conviction: ratings.expectedConviction };
       expect(response).toMatchObject(finalRatings);
+      const researchRatings = encrypted
+        ? { importance: { redacted: true }, conviction: { redacted: true } }
+        : finalRatings;
       expect(response.interviewProvenance).toMatchObject({
-        finalSubmitted: finalRatings,
-        predictionComparison: { submitted: finalRatings },
+        finalSubmitted: researchRatings,
+        predictionComparison: { submitted: researchRatings },
       });
       if (encrypted) {
         expect(response.interviewProvenance).toMatchObject({
@@ -328,12 +331,12 @@ describe('surveyToolResponsePayloadController', () => {
         submitted: expect.objectContaining({
           answer: { redacted: true, reason: 'encrypted_field' },
           additionalComments: { redacted: true, reason: 'encrypted_field' },
-          importance: 80,
-          conviction: 70,
+          importance: { redacted: true, reason: 'encrypted_field' },
+          conviction: { redacted: true, reason: 'encrypted_field' },
         }),
         changedFields: ['answer', 'additionalComments', 'importance'],
         userEditedFields: [],
-        redactedFields: ['answer', 'additionalComments'],
+        redactedFields: ['answer', 'additionalComments', 'importance', 'conviction'],
       }),
     );
     expect(JSON.stringify(provenance)).not.toContain('private');
@@ -737,3 +740,19 @@ it.each([false, true])(
     );
   },
 );
+
+describe('ordinary saved-answer consent', () => {
+  it.each(['', 'Participant'])('does not invent AI provenance for a saved manual answer with name %j', (name) => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'binary' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Disagree' } },
+          interviewProvenance: { q1: { responderName: name, consentSavedAt: 42 } },
+        },
+      }),
+    );
+    expect(result.responses![0]).not.toHaveProperty('interviewProvenance');
+    if (name) expect(result.responses![0].responderName).toBe(name);
+  });
+});

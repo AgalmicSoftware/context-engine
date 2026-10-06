@@ -243,7 +243,7 @@ describe('WorkerGroupAutoJoin', () => {
     expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
   });
 
-  it('keeps cancellation scoped to the account on a fresh visit', async () => {
+  it('keeps a cancellation for every account in this browser on a fresh visit', async () => {
     getToken.mockImplementationOnce(() => new Promise(() => {}));
     const { unmount } = render(<WorkerGroupAutoJoin {...props} />);
     await flush();
@@ -252,7 +252,36 @@ describe('WorkerGroupAutoJoin', () => {
     window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026');
     render(<WorkerGroupAutoJoin {...props} account="0x0000000000000000000000000000000000000002" />);
     await flush();
-    expect(joins()).toHaveLength(1);
+    expect(joins()).toHaveLength(0);
+  });
+
+  it('keeps a signed-out cancellation when the visitor returns already signed in', async () => {
+    const { unmount } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    unmount();
+    window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026');
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(joins()).toHaveLength(0);
+  });
+
+  it('keeps a cancellation made before the invitation resolved when the visitor returns signed in', async () => {
+    bootstrap.mockImplementationOnce(() => new Promise(() => {}));
+    window.history.replaceState(
+      {},
+      '',
+      '/session/alpha?joinGroup=participants-2026&worker=https%3A%2F%2Fworker.example',
+    );
+    const { unmount } = render(
+      <WorkerGroupAutoJoin {...props} account="" loginComplete={false} sessionConfig={null} sessionSlug="" />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
+    unmount();
+    window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026');
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(joins()).toHaveLength(0);
   });
 
   it('keeps a pre-login cancellation through sign-in and a later signed-in visit', async () => {

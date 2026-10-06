@@ -6,6 +6,7 @@
 
 import { Buffer } from 'buffer';
 import { ethers } from 'ethers';
+import { getVoiceCredits } from '../questions/quadraticAllocation.mjs';
 
 const { utils } = ethers;
 
@@ -14,7 +15,7 @@ const { utils } = ethers;
 export const requireBigInt = () => {
   if (typeof BigInt !== 'function') {
     throw new Error(
-      'BigInt is required for commitments. Use a modern browser: Chrome >=67, Edge >=79, Firefox >=68, Safari/iOS >=14.'
+      'BigInt is required for commitments. Use a modern browser: Chrome >=67, Edge >=79, Firefox >=68, Safari/iOS >=14.',
     );
   }
 };
@@ -55,6 +56,49 @@ export const safeLower = (value) => (typeof value === 'string' ? value.toLowerCa
 export const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 export const stableStringify = (obj) => JSON.stringify(obj);
 
+// Measure encoded JSON bytes, including the pad key, so Unicode values and
+// JSON escapes share the same 128-byte buckets as plain ASCII values.
+const longestCategoricalValueBytes = (kind, question) => {
+  if (kind === 'binary') return utf8e(JSON.stringify('Disagree')).length;
+  // All finite JS numbers fit in 25 JSON bytes and the same rating bucket.
+  if (kind === 'rating') return 25;
+  const options = Array.isArray(question.options) ? question.options : [];
+  if (kind === 'multichoice' && options.length) {
+    const choices = question.singleSelect || question.singleChoice || question.oneSelectionOnly
+      ? options.map((option) => [option])
+      : [options];
+    return Math.max(...choices.map((choice) => utf8e(JSON.stringify(choice)).length));
+  }
+  if (kind === 'quadratic' && options.length) {
+    let remaining = getVoiceCredits(question);
+    if (!Number.isSafeInteger(remaining) || remaining < 1) return 0;
+    let length = options.length * 2 + 1; // JSON for an all-zero allocation.
+    let previousCost = 0;
+    // Negative votes are longest. Each extra digit costs more than the prior
+    // digit, so buy the cheapest character upgrades across options first.
+    for (let magnitude = 1; magnitude * magnitude <= remaining + previousCost; magnitude *= 10) {
+      const cost = magnitude * magnitude - previousCost;
+      const count = Math.min(options.length, Math.floor(remaining / cost));
+      length += count;
+      remaining -= count * cost;
+      if (count < options.length) break;
+      previousCost = magnitude * magnitude;
+    }
+    return length;
+  }
+  return 0;
+};
+
+export const encodePaddedEnvelopePlaintext = (value, question = {}) => {
+  const padded = { ...value, pad: '' };
+  const length = utf8e(JSON.stringify(padded)).length;
+  const overhead = utf8e(JSON.stringify({ ...padded, value: null })).length - 4;
+  const longest = overhead + longestCategoricalValueBytes(value.kind, question);
+  const target = Math.ceil(Math.max(length, longest) / 128) * 128;
+  padded.pad = ' '.repeat(target - length);
+  return utf8e(JSON.stringify(padded));
+};
+
 export const assertBytes32Hex = (value, label = 'value') => {
   if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(value)) {
     throw new Error(`${label} must be 32-byte hex (0x + 64 hex chars)`);
@@ -87,7 +131,7 @@ export const aesGcmEncrypt = async (key, plaintextBytes, { aadBytes } = {}) => {
   const ciphertext = await cryptoApi.subtle.encrypt(
     { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
     key,
-    plaintextBytes
+    plaintextBytes,
   );
   return { iv, ciphertext: new Uint8Array(ciphertext) };
 };
@@ -96,7 +140,7 @@ export const aesGcmDecrypt = async (key, iv, ciphertextBytes, { aadBytes } = {})
   const plaintext = await getCrypto().subtle.decrypt(
     { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
     key,
-    ciphertextBytes
+    ciphertextBytes,
   );
   return new Uint8Array(plaintext);
 };
@@ -111,7 +155,7 @@ export const deriveKekFromSig = async (signatureHex, contextBytes) => {
     hkdfKey,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
 };
 
@@ -470,7 +514,7 @@ export const wrapCekWithSelfRecipient = async ({
   const cipher = await cryptoApi.subtle.encrypt(
     { name: 'AES-GCM', iv: wrap_iv, additionalData: contextBytes },
     kek,
-    cekRaw
+    cekRaw,
   );
 
   return {

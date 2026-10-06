@@ -1,13 +1,15 @@
 import {
-  ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
   addSessionConfigHint,
-  buildAdminWorkerCorsMessage,
   buildHealthAuthMismatchState,
+  shouldSeedWorkerConfigFromError,
+} from './adminPageWorkerErrorHelpers';
+import {
+  ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
+  buildAdminWorkerCorsMessage,
   isRetryableAdminNonceFailure,
   normalizeAdminWorkerFetchError,
-  shouldSeedWorkerConfigFromError,
   sleep,
-} from './adminPageWorkerErrorHelpers';
+} from '../../utilities/worker/signedAdminWorkerRequest';
 
 describe('adminPageWorkerErrorHelpers', () => {
   it('builds worker CORS guidance with worker and origin context', () => {

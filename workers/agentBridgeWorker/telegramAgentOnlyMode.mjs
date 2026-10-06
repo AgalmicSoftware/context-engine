@@ -8,6 +8,8 @@ import {
   kvKeySafePart,
   nowIsoOrCurrent as nowIso,
   sanitizeSessionSlug,
+  bytesToHex,
+  sha256Hex,
 } from './runtimePrimitives.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
 import {
@@ -131,15 +133,6 @@ function normalizeQuestionId(value = '') {
   if (/^0x[0-9a-fA-F]{64}$/.test(raw)) return raw.toLowerCase();
   const id = raw.replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 96);
   return id.startsWith('ceq_') ? id : '';
-}
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function sha256Hex(input = '') {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
-  return bytesToHex(new Uint8Array(digest));
 }
 
 async function hmacSha256Hex(input = '', secret = '') {
@@ -1317,17 +1310,21 @@ function normalizeAgentTokenUsage(value = {}) {
       ?? source.totalTokens,
   );
   const recentSessionsTotalTokens = normalizeTokenCount(
-    source.recent_sessions_total_tokens
-      ?? source.recentSessionsTotalTokens
-      ?? source.across_sessions_total_tokens
-      ?? source.acrossSessionsTotalTokens
-      ?? source.historical_total_tokens
-      ?? source.historicalTotalTokens
-      ?? source.sessions_total_tokens
-      ?? source.sessionsTotalTokens,
+    source.recent_sessions_total_tokens ??
+      source.recentSessionsTotalTokens ??
+      source.across_sessions_total_tokens ??
+      source.acrossSessionsTotalTokens ??
+      source.historical_total_tokens ??
+      source.historicalTotalTokens ??
+      source.sessions_total_tokens ??
+      source.sessionsTotalTokens,
   );
-  const inputTokens = normalizeTokenCount(source.input_tokens ?? source.inputTokens ?? source.prompt_tokens ?? source.promptTokens);
-  const outputTokens = normalizeTokenCount(source.output_tokens ?? source.outputTokens ?? source.completion_tokens ?? source.completionTokens);
+  const inputTokens = normalizeTokenCount(
+    source.input_tokens ?? source.inputTokens ?? source.prompt_tokens ?? source.promptTokens,
+  );
+  const outputTokens = normalizeTokenCount(
+    source.output_tokens ?? source.outputTokens ?? source.completion_tokens ?? source.completionTokens,
+  );
   const dailyUsage30d = normalizeDailyTokenUsage(
     source.daily_usage_30d
       ?? source.dailyUsage30d
@@ -1338,15 +1335,19 @@ function normalizeAgentTokenUsage(value = {}) {
       ?? source.days,
   );
   const edgeInPersonDates = normalizeTokenUsageDates(
-    source.edge_in_person_dates
-      ?? source.edgeInPersonDates
-      ?? source.edge_dates
-      ?? source.edgeDates
-      ?? source.edgeos_in_person_dates
-      ?? source.edgeosInPersonDates,
+    source.edge_in_person_dates ??
+      source.edgeInPersonDates ??
+      source.edge_dates ??
+      source.edgeDates ??
+      source.edgeos_in_person_dates ??
+      source.edgeosInPersonDates,
   );
-  const tokenSource = wrappedDisplayText(redactSecrets(source.source || source.surface || source.observed_from || source.observedFrom), 120);
-  if (!currentRunTotalTokens && !recentSessionsTotalTokens && !inputTokens && !outputTokens && !dailyUsage30d.length) return null;
+  const tokenSource = wrappedDisplayText(
+    redactSecrets(source.source || source.surface || source.observed_from || source.observedFrom),
+    120,
+  );
+  if (!currentRunTotalTokens && !recentSessionsTotalTokens && !inputTokens && !outputTokens && !dailyUsage30d.length)
+    return null;
   return {
     ...(currentRunTotalTokens ? { currentRunTotalTokens } : {}),
     ...(recentSessionsTotalTokens ? { recentSessionsTotalTokens } : {}),

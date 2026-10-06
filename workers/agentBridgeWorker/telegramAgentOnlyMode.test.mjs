@@ -1600,7 +1600,7 @@ test('agent-only prediction reads do not materialize ordinary Wrapped windows', 
 test('ordinary Wrapped windows use canonical session questions without proposal config', async () => {
   const testEnv = env();
   const questionId = `0x${'ab'.repeat(32)}`;
-  await testEnv.AGENT_ACTION_KV.put('telegram:questions:v5:alpha', JSON.stringify({
+  await testEnv.AGENT_ACTION_KV.put('telegram:questions:v7:alpha', JSON.stringify({
     ok: true,
     source: 'telegram_worker_question_index',
     cachedAtMs: Date.now(),
@@ -1639,7 +1639,7 @@ test('active ordinary Wrapped windows sync the canonical session question set', 
   const secondId = `0x${'cd'.repeat(32)}`;
   const writeQuestionCache = async (questions) => {
     __test__sessionQuestions.clearCaches();
-    await testEnv.AGENT_ACTION_KV.put('telegram:questions:v5:alpha', JSON.stringify({
+    await testEnv.AGENT_ACTION_KV.put('telegram:questions:v7:alpha', JSON.stringify({
       ok: true,
       source: 'telegram_worker_question_index',
       cachedAtMs: Date.now(),

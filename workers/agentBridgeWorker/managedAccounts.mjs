@@ -8,6 +8,7 @@ import {
 import { normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
+import { sha256Hex } from './runtimePrimitives.mjs';
 
 const FORBIDDEN_REMOTE_SIGNING_MODES = new Set([
   ACCOUNT_MODES.PASSKEY,
@@ -16,17 +17,6 @@ const FORBIDDEN_REMOTE_SIGNING_MODES = new Set([
   ACCOUNT_MODES.LINKED_EXTERNAL_WALLET,
   ACCOUNT_MODES.PRODUCTION,
 ]);
-
-const textEncoder = new TextEncoder();
-
-function bytesToHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function sha256Hex(input) {
-  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
-  return bytesToHex(new Uint8Array(digest));
-}
 
 export function normalizeDeploymentId(value = '') {
   return String(value || '').trim() || 'local-demo';

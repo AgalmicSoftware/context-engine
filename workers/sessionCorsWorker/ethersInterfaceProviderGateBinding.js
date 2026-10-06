@@ -1,9 +1,5 @@
 import { attestRpcEndpointChain } from './rpcChainAttestation.js';
-import { resolveRegistryChainId } from './chainIdNormalization.js';
-import {
-  buildSafeRpcFailure,
-  createRpcDiagnosticMasker,
-} from './rpcDiagnosticSafety.js';
+import { buildSafeRpcFailure, createRpcDiagnosticMasker } from './rpcDiagnosticSafety.js';
 
 const toStr = (value, deps) => (
   typeof deps?.toStr === 'function'
@@ -87,37 +83,7 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     return faucetSbtGateInterface;
   };
 
-  const getJsonRpcProvider = (rpcUrl, chainId) => {
-    const resolvedChainId = deps?.toChainId?.(chainId);
-    const providers = deps?.ethers?.providers || deps?.ethers;
-    const ProviderCtor =
-      resolvedChainId && providers?.StaticJsonRpcProvider
-        ? providers.StaticJsonRpcProvider
-        : providers?.JsonRpcProvider;
-    if (!ProviderCtor) throw new Error('JsonRpcProvider unavailable');
-    if (!resolvedChainId) return new ProviderCtor(rpcUrl);
-    const network = { chainId: resolvedChainId, name: `chain-${resolvedChainId}` };
-    return new ProviderCtor(rpcUrl, network);
-  };
-
-  const getRegistryContract = (config) => {
-    const registryAddress = toStr(config?.registryAddress, deps).trim();
-    if (!deps?.isAddress?.(registryAddress)) return null;
-    const rpcUrl = deps?.resolveRegistryRpcUrl?.(config) || '';
-    if (!rpcUrl) return null;
-    const provider = getJsonRpcProvider(rpcUrl, resolveRegistryChainId(config));
-    return new deps.ethers.Contract(registryAddress, constants?.sessionRegistryAbi, provider);
-  };
-
-  const checkSbtGate = async ({
-    sbtAddresses,
-    address,
-    rpcUrl,
-    mode,
-    chainId,
-    rpcUrlIsPrivate = false,
-    chainAttestationCache,
-  }) => {
+  const checkSbtGate = async ({ sbtAddresses, address, rpcUrl, mode, chainId, rpcUrlIsPrivate = false, chainAttestationCache }) => {
     if (!Array.isArray(sbtAddresses) || sbtAddresses.length === 0) return true;
     if (!rpcUrl) return false;
     const log = deps?.log || console.log;
@@ -173,7 +139,7 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
           });
           return false;
         }
-      })
+      }),
     );
     if (!checks.some(Boolean) && errors.length) {
       log('[gating] sbt balanceOf failed', {
@@ -192,8 +158,6 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     getSbtAdminInterface,
     getHatsInterface,
     getFaucetSbtGateInterface,
-    getJsonRpcProvider,
-    getRegistryContract,
     isPositiveBalance,
     checkSbtGate,
   };

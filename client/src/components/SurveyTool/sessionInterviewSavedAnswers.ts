@@ -13,8 +13,10 @@ import { hasMeaningfulFieldValue } from './surveyToolDraftState';
 
 type RecordValue = Record<string, unknown>;
 const fields = ['answers', 'additionalComments', 'importance', 'conviction'] as const;
-export type InterviewSavedSlice = Record<(typeof fields)[number], RecordValue>;
-type InputSlice = { [K in keyof InterviewSavedSlice]?: RecordValue | null };
+export type InterviewSavedSlice = Record<(typeof fields)[number], RecordValue> & { interviewProvenance?: RecordValue };
+type InputSlice = { [K in keyof InterviewSavedSlice]?: RecordValue | null } & {
+  interviewProvenance?: RecordValue | null;
+};
 
 export const loadSessionInterviewSavedAnswers = async ({
   questionIds,
@@ -58,7 +60,13 @@ export const loadSessionInterviewSavedAnswers = async ({
         latest.set(row.questionId, row);
       }
     }
-    return [...latest.values()].map((row) => ({ ...row.response, questionID: row.questionId }));
+    return [...latest.values()].map((row) => ({
+      ...row.response,
+      questionID: row.questionId,
+      _responseTimestamp: row.timestamp,
+      _responseStorageRefId: row.storageRefId,
+      _consentOwnRead: true,
+    }));
   }
   const responses: RecordValue[] = [];
   // Existing strict per-account contract reads also cover chain-authoritative
@@ -77,7 +85,7 @@ export const loadSessionInterviewSavedAnswers = async ({
           forceArweaveFetch: true,
         });
         if (!response) throw new Error('A saved answer could not be read.');
-        return { ...response, questionID: questionId };
+        return { ...response, questionID: questionId, _consentOwnRead: true };
       }),
     );
     for (const response of batch) if (response) responses.push(response);
@@ -155,12 +163,44 @@ export const mergeInterviewSavedAnswerBaseline = (
     for (const id of questionIds) {
       // Loading a baseline must not discard a local edit made while it was in flight.
       if (!Object.hasOwn(next[field], id) || !isLocalEdit(field, id)) {
-        if (Object.hasOwn(saved?.[field] || {}, id)) next[field][id] = saved?.[field]?.[id];
-        else delete next[field][id];
+        if (Object.hasOwn(saved?.[field] || {}, id)) {
+          const currentField = next[field][id] as RecordValue | undefined;
+          const savedField = saved?.[field]?.[id] as RecordValue | undefined;
+          // A saved empty public field is not a reason to revoke a lock chosen
+          // before typing. The saved baseline below still reflects storage.
+          const keepBlankLock =
+            (field === 'answers' || field === 'additionalComments') &&
+            currentField?.value === '' &&
+            currentField.encrypted === true &&
+            // Match Answer stores the comment's chosen lock as an inherited policy.
+            (currentField.audienceMode === 'explicit' ||
+              (field === 'additionalComments' && currentField.audienceMode === 'inherit')) &&
+            !currentField.encryptedPortion &&
+            savedField?.value === '' &&
+            !savedField.encrypted &&
+            !savedField.encryptedPortion;
+          if (!keepBlankLock) next[field][id] = saved?.[field]?.[id];
+        }
+        // Blank text fields can carry a lock chosen before typing. Removing
+        // stale values must not erase that policy on an unsubmitted question.
+        else if (
+          (field !== 'answers' && field !== 'additionalComments') ||
+          hasMeaningfulFieldValue(next[field][id] as RecordValue)
+        )
+          delete next[field][id];
       }
       if (Object.hasOwn(saved?.[field] || {}, id)) nextBaseline[field][id] = saved?.[field]?.[id];
       else delete nextBaseline[field][id];
     }
   }
-  return { slice: next, baseline: nextBaseline };
+  return {
+    slice: {
+      ...next,
+      ...(current?.interviewProvenance ? { interviewProvenance: { ...current.interviewProvenance } } : {}),
+    },
+    baseline: {
+      ...nextBaseline,
+      interviewProvenance: { ...baseline?.interviewProvenance, ...saved?.interviewProvenance },
+    },
+  };
 };

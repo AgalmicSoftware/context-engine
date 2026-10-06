@@ -21,6 +21,7 @@ describe('buildArweaveUploadBootstrapAuth', () => {
     const sessionId = '0xb822b3eca85bdc35cf83cb947bceb6b2';
     const sessionConfig = {
       slug: 'demo-sh',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
       sessionIdHex: sessionId,
       networkChainId: 11155420,
       corsWorkerUrl: 'https://demo-sh-worker.example.test',
@@ -37,6 +38,9 @@ describe('buildArweaveUploadBootstrapAuth', () => {
       sessionConfig,
     });
 
+    expect(result?.message).toContain(
+      `Resources:\n- https://demo-sh-worker.example.test\n- urn:context-engine:session:id:${sessionId}`,
+    );
     expect(mockedGetCorsProxyUrlOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({ sessionSlug: 'demo-sh', sessionConfig }),
     );
@@ -57,5 +61,20 @@ describe('buildArweaveUploadBootstrapAuth', () => {
         sessionId,
       }),
     );
+  });
+  it('binds registry uploads to the slug even when metadata contains an ID', async () => {
+    const signer = ethers.Wallet.createRandom();
+    mockedGetCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example.test');
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ nonce: 'nonce-1' }),
+    })) as unknown as typeof fetch;
+    const auth = await buildArweaveUploadBootstrapAuth({
+      signer,
+      sessionSlug: 'sample',
+      sessionConfig: { sessionIdHex: '0x44444444444444444444444444444444', networkChainId: 11155420 },
+    });
+    expect(auth?.message).toContain('urn:context-engine:session:slug:sample');
+    expect(auth).not.toHaveProperty('sessionId');
   });
 });

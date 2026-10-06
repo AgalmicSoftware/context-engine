@@ -1,12 +1,12 @@
 ---
 name: ce-session-wrapped
-description: "Run a generic Context Engine session wrapped flow: onboard by invite, fetch session statements, predict answers, and return a shareable Mini App result."
+description: 'Run a generic Context Engine session wrapped flow: onboard by invite, fetch session statements, predict answers, and return a shareable Mini App result.'
 ---
 
 # Context Engine Session Wrapped Runtime
 
 **Skill version:** 2026-09-28 (session-wrapped-v1.2)
-**Protocol version:** Context Engine agent bridge v42
+**Protocol version:** Context Engine agent bridge v43
 
 Use this skill only to run a generic Context Engine session wrapped flow. Do
 not use the broader `context-engine` skill, local reference docs, setup
@@ -147,7 +147,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. Resolve the private credential.
-2. GET `/api/agent/skill-version`; silently verify protocol v42.
+2. GET `/api/agent/skill-version`; silently verify protocol v43.
 3. GET `/api/agent/agent-only/start` with the Bearer token.
 4. Create one fresh `run_id` for the whole run.
 5. Optional `token_usage`: before answer submission, make at most one quiet

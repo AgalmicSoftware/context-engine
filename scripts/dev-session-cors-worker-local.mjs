@@ -70,7 +70,7 @@ const readBodyBuffer = async (req) => {
 
 const server = http.createServer(async (req, res) => {
   try {
-    const origin = `http://${host}:${port}`;
+    const origin = `http://${req.headers.host || `${host}:${port}`}`;
     const url = new URL(req.url || '/', origin);
     const body = await readBodyBuffer(req);
 

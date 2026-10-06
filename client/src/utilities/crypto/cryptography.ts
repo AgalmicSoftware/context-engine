@@ -51,6 +51,7 @@ import {
   computeResponseFieldContext,
   computeSaltedCommitments as computeSharedSaltedCommitments,
   deriveKekFromSig,
+  encodePaddedEnvelopePlaintext,
   encodeValueBytes,
   getContextBytes,
   hashIdentifier,
@@ -1276,7 +1277,8 @@ const encryptField = async ({
   litOpts?: LitOptions;
   hasher?: PoseidonHasher | null;
 }) => {
-  if (workerContext?.sessionConfig) assertResponseFieldAudience(workerContext.sessionConfig, audience);
+  if (audience !== 'self' && workerContext?.sessionConfig)
+    assertResponseFieldAudience(workerContext.sessionConfig, audience);
   if (['self_admin', 'session'].includes(audience) && !workerContext?.sessionConfig) {
     throw new Error('Verified session context is required for Worker encryption.');
   }
@@ -1316,7 +1318,8 @@ const encryptField = async ({
     kind, // freeform | binary | rating | multichoice | additional (freeform)
     salt: commits.saltHex, // keep inside CEK-encrypted payload only
   };
-  const plaintextBytes = utf8e(JSON.stringify(plaintextObj));
+  const paddingQuestion = questionPool?.find((question) => safeLower(question.id) === safeLower(qId)) || meta;
+  const plaintextBytes = encodePaddedEnvelopePlaintext(plaintextObj, paddingQuestion);
 
   // CEK (256-bit) and content AES-GCM
   const cekRaw = new Uint8Array(32);
@@ -1432,19 +1435,22 @@ const unwrapCekFromRecipients = async ({
     }
   };
 
+  const workerRecipient = env.recipients.find((r) => r.type === 'worker-response-field-v1');
+  const workerOwner = isRecord(workerRecipient?.policy) ? workerRecipient.policy.owner : undefined;
+  const canTrySelfRecipient = !workerRecipient || workerOwner === String(account || '').toLowerCase();
+
   if (preferLitRecipients) {
     const litCek = await tryLitRecipients();
     if (litCek) return litCek;
-    const selfCek = await trySelfRecipient();
+    const selfCek = canTrySelfRecipient ? await trySelfRecipient() : null;
     if (selfCek) return selfCek;
   } else {
-    const selfCek = await trySelfRecipient();
+    const selfCek = canTrySelfRecipient ? await trySelfRecipient() : null;
     if (selfCek) return selfCek;
     const litCek = await tryLitRecipients();
     if (litCek) return litCek;
   }
 
-  const workerRecipient = env.recipients.find((r) => r.type === 'worker-response-field-v1');
   if (workerRecipient && workerContext?.sessionConfig) {
     const { unwrapWorkerResponseFieldKey } = await import('./workerResponseFieldKeys');
     return unwrapWorkerResponseFieldKey(workerRecipient as WorkerFieldRecipient, contextHex, workerContext);

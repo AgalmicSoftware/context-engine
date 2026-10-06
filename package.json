@@ -1,6 +1,6 @@
 {
   "name": "contextEngine",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Context Engine — an OSS toolkit for groups",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -40,7 +40,7 @@
     "verify:public-text:prepared": "bash scripts/verify-prepared-public-text.sh",
     "verify:public-release-pii": "bash scripts/verify-public-release-pii.sh",
     "verify:release-version": "node scripts/release-version.mjs verify-worktree",
-    "verify:release-assets": "bash scripts/verify-release-assets.sh",
+    "verify:release-assets": "node scripts/verify-release-assets.mjs",
     "arweave:jwk": "npm run -s ai:node -- scripts/arweave-jwk.js",
     "arweave:jwk:generate": "npm run -s ai:node -- scripts/arweave-jwk.js generate",
     "arweave:jwk:inspect": "npm run -s ai:node -- scripts/arweave-jwk.js inspect",

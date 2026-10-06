@@ -452,18 +452,20 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /<div class="sectionTitle">Sessions<\/div>/);
   assert.match(html, /id="continueSessions"/);
   assert.match(html, /id="continueSessions"[^>]*>Save<\/button>/);
-  assert.equal(html.includes("el.toggleSessions.onclick"), false);
+  assert.equal(html.includes('el.toggleSessions.onclick'), false);
   assert.equal(html.includes('sessionPickerCollapsed'), false);
   assert.equal(html.includes('if (isOpen && picker.required !== true)'), false);
   assert.match(html, /class="status loadingStatus" id="status"/);
-  assert.match(html, /class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true"/);
-  assert.match(html, /const LOADING_VISUAL_MODE = "gif";/);
+  assert.match(html, /<span class="loadingSpinner" aria-hidden="true"><\/span>/);
+  assert.equal(html.includes('loading.gif'), false);
   assert.equal(html.includes('data-loading-src="data:image/gif;base64,'), false);
   assert.match(html, /\.loadingStatus/);
   assert.match(html, /\.loadingStatus \{[\s\S]*flex-direction: column;[\s\S]*min-height: 280px;/);
   assert.match(html, /\.loadingStatus span \{[\s\S]*font-size: clamp\(22px, 5vw, 28px\);[\s\S]*font-weight: 800;/);
-  assert.match(html, /\.loadingSpinner \{[\s\S]*width: min\(34vw, 112px\);[\s\S]*animation: ceSpin 0\.9s linear infinite;/);
-  assert.match(html, /\.loadingGif \{[\s\S]*width: min\(68vw, 240px\);[\s\S]*height: min\(68vw, 240px\);[\s\S]*background: transparent;/);
+  assert.match(
+    html,
+    /\.loadingSpinner \{[\s\S]*width: min\(34vw, 112px\);[\s\S]*animation: ceSpin 0\.9s linear infinite;/,
+  );
   assert.match(html, /id="documentsPanel"[^>]*aria-label="Documents"/);
   assert.match(html, /id="toggleDocumentsPanelBody"[^>]*aria-expanded="true"/);
   assert.match(html, /id="documentsPanelBody"/);
@@ -1134,49 +1136,15 @@ test('Mini App admin menu action opens a visible admin panel above the session p
   assert.equal(elements.get('adminSummary').textContent.length > 0, true);
 });
 
-test('Mini App defaults to loading GIF and keeps CSS spinner test option', async () => {
-  const defaultResponse = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app'),
-    env: {},
-  });
-  const defaultHtml = await defaultResponse.text();
-  assert.equal(defaultResponse.status, 200);
-  assert.match(defaultHtml, /<img class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true">/);
-  assert.match(defaultHtml, /const LOADING_VISUAL_MODE = "gif";/);
-  assert.equal(defaultHtml.includes('class="loadingSpinner" aria-hidden="true"'), false);
-
-  const spinnerResponse = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app?loading=spinner'),
-    env: {},
-  });
-  const spinnerHtml = await spinnerResponse.text();
-  assert.equal(spinnerResponse.status, 200);
-  assert.match(spinnerHtml, /class="loadingSpinner" aria-hidden="true"/);
-  assert.match(spinnerHtml, /const LOADING_VISUAL_MODE = "spinner";/);
-  assert.equal(spinnerHtml.includes('<img class="loadingGif" src="/telegram/mini-app/loading.gif"'), false);
-
-  const envSpinnerResponse = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app'),
-    env: { AGENT_BRIDGE_MINI_APP_LOADING_VISUAL: 'spinner' },
-  });
-  const envSpinnerHtml = await envSpinnerResponse.text();
-  assert.equal(envSpinnerResponse.status, 200);
-  assert.match(envSpinnerHtml, /class="loadingSpinner" aria-hidden="true"/);
-});
-
-test('Mini App loading GIF route serves image bytes for Telegram WebView', async () => {
+test('Mini App loading screen uses the CSS spinner and serves no GIF', async () => {
   const response = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app/loading.gif'),
-    env: {},
+    request: new Request('https://bridge.example/telegram/mini-app?loading=gif'),
+    env: { AGENT_BRIDGE_MINI_APP_LOADING_VISUAL: 'gif' },
   });
-  const bytes = new Uint8Array(await response.arrayBuffer());
-
+  const html = await response.text();
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('content-type'), 'image/gif');
-  assert.equal(response.headers.get('x-ce-asset-source'), 'embedded-public-loading-asset');
-  assert.equal(response.headers.get('x-ce-asset-size'), '220x220');
-  assert.equal(new TextDecoder().decode(bytes.slice(0, 6)), 'GIF89a');
-  assert.equal(bytes.length > 700000, true);
+  assert.match(html, /<span class="loadingSpinner" aria-hidden="true"><\/span>/);
+  assert.equal(html.includes('loadingGif'), false);
 });
 
 test('Mini App session picker lists sessions and loads multi-selected questions', async () => {
@@ -1425,7 +1393,7 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
     fetchCalls
       .filter((call) => new URL(call.url).pathname.endsWith('/storage/read'))
       .map((call) => new URL(call.url).searchParams.get('id')),
-    ['q-storage-1']
+    ['q-storage-1'],
   );
 });
 
@@ -1524,7 +1492,7 @@ test('Mini App first state reuses inline Cloudflare question payloads without re
   assert.deepEqual(state.questions.map((question) => question.title), ['Inline listed question payload.']);
   assert.deepEqual(
     fetchCalls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/storage/list']
+    ['/auth/nonce', '/auth/login', '/storage/list'],
   );
 });
 
@@ -1623,7 +1591,7 @@ test('Mini App first state treats Cloudflare storage without explicit onchain mo
   assert.deepEqual(state.questions.map((question) => question.title), ['Cloudflare first question without chain mode.']);
   assert.deepEqual(
     fetchCalls.map((call) => new URL(call.url).pathname),
-    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read']
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read'],
   );
 });
 
@@ -5390,4 +5358,21 @@ test('Mini App live results can filter by saved lightweight group details', asyn
   });
   assert.equal(summary.questions.consensus[0].counts.Agree, 2);
   assert.equal(summary.questions.consensus[0].counts.Disagree, undefined);
+});
+
+
+test('Mini App quadratic help fits the question budget', () => {
+  const html = __test__telegramMiniApp.telegramMiniAppHtml();
+  const start = html.indexOf("const budget = question.voiceCredits ?? 99;");
+  const end = html.indexOf('help.append(helpToggle, helpText);', start);
+  assert.ok(start >= 0 && end > start);
+  // Execute the rendered help branch with the same DOM element contract as the browser.
+  const branch = html.slice(start, end) + '\nhelpText.textContent;';
+  for (const [budget, example] of [[1, 1], [9, 3], [99, 7]]) {
+    const text = vm.runInNewContext(branch, {
+      question: { voiceCredits: budget, options: ['Parks'] }, draft: { value: [] },
+      document: { createElement: () => ({ setAttribute() {} }) },
+    });
+    assert.ok(text.includes(`+${example} or −${example} uses ${example * example} credit${example === 1 ? '' : 's'}.`));
+  }
 });

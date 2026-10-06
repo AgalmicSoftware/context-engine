@@ -47,11 +47,11 @@ export const createSurveyQuestionsResponseStateRuntime = (
     updateSubmittedSinceLastEdit,
   } = context;
 
-  const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue) => {
+  const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue, persistCurrentIdentity = true) => {
     executeSurveyFormStateReset({
       props: propsRef.current,
       state: stateRef.current,
-      persistDraft: persistDraft,
+      persistDraft: persistCurrentIdentity ? persistDraft : () => {},
       clearPersistTimer: () => {
         if (inst._persistTimer) {
           clearTimeout(inst._persistTimer);

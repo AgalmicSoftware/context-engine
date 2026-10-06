@@ -2,7 +2,6 @@
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { ReactReduxContext } from 'react-redux';
-import styles from './SessionWizard.module.scss';
 import { resolveLitChain, getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import {
@@ -83,12 +82,8 @@ import { buildNormalModeCards, buildNormalModePublishSummary } from './sessionWi
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
-  resolveSessionWizardBundleUrlForMode,
-  resolveSessionWizardDeployBundlePayload,
   resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
-  resolveSponsoredBundleDeployReadiness,
-  shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
   appendSessionWizardRegisterTxEntry,
@@ -126,16 +121,8 @@ import {
 } from './sessionWizardPendingWorkerGroups';
 import { publishPendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroupPublish';
 import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
-import {
-  resolveSessionWizardPublishRequestDescriptor,
-  resolveSessionWizardPublishUiPlan,
-} from './sessionWizardPublishReadiness';
-import {
-  resolveDeployWorkerState,
-  resolveSessionWizardWorkerBaseUrl,
-  resolveSessionWizardWorkerVerificationUiState,
-  shouldCacheSessionWorkerConfigAfterDeploy,
-} from './sessionWizardWorkerState';
+import { resolveSessionWizardPublishRequestDescriptor } from './sessionWizardPublishReadiness';
+import { resolveSessionWizardWorkerVerificationUiState } from './sessionWizardWorkerState';
 import {
   buildSessionWizardDefaultAllowedOrigins,
   getSessionWizardDefaultWorkerUrl,
@@ -146,11 +133,10 @@ import {
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
 import { resolveSessionWizardAiModelProviderPatch } from './sessionWizardAiConfig';
-import { dedupeSbtSelection, normalizeSbtSelection, type SbtSelection } from './sessionWizardSbtSelections';
+import { dedupeSbtSelection, normalizeSbtSelection } from './sessionWizardSbtSelections';
 import {
   buildPendingSbtDeployContextSignature,
   deploySessionWizardPendingSbtDraft,
-  finalizeSessionWizardPendingSbtDraft,
   persistSessionWizardSbtRecoveryCodes,
 } from './sessionWizardPendingSbtPublish';
 import {
@@ -159,16 +145,11 @@ import {
   buildEncryptionGate,
   buildResourceGateMap,
   getNextGateIndex,
-  getValueAtPath,
-  isSecretFieldPath,
   parseListInput,
   resolveSessionWizardSelectorSourceConfig,
   setValueAtPath,
 } from './sessionWizardGateUtils';
-import {
-  cacheSessionWorkerConfigAfterDeploy,
-  resolveSponsoredBundleAdvancedFieldNotices,
-} from './sessionWizardSponsoredBundleSupport';
+import { resolveSponsoredBundleAdvancedFieldNotices } from './sessionWizardSponsoredBundleSupport';
 import { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWizardSponsoredBundleCache';
 import {
   getSessionWizardWorkerResourceKeys,
@@ -190,16 +171,7 @@ import {
   SESSION_WIZARD_DEFAULT_TEMPLATE,
   SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE,
 } from './sessionWizardConfig';
-import {
-  getSessionSlugValidationError,
-  hasInvalidSessionSlugFormat,
-  INVALID_SESSION_SLUG_FORMAT_ERROR,
-  isMissingSessionSlug,
-  isReservedSessionSlug,
-  REQUIRED_SESSION_SLUG_ERROR,
-  RESERVED_SESSION_SLUG_ERROR,
-  RESERVED_SESSION_SLUGS,
-} from './sessionWizardSlugValidation';
+import { getSessionSlugValidationError, isReservedSessionSlug } from './sessionWizardSlugValidation';
 import {
   buildSponsoredSbtLookupContextKey,
   deepClone,
@@ -222,7 +194,6 @@ import { buildPublishedPendingSbtLinks, type PublishedPendingSbtLink } from './s
 import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
 import {
   getSessionWizardExplorerBaseUrl as getExplorerBaseUrl,
-  normalizeSessionWizardSlug as normalizeSlug,
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
 } from './sessionWizardUrlSupport';
 import { resolveSessionWizardWorkerUrlSourceState } from './sessionWizardWorkerRuntimeSupport';
@@ -241,7 +212,6 @@ import {
   type SessionWizardCreateSbtLaunchOptions,
   type SessionWizardCreateSbtLaunchState,
 } from './sessionWizardCreateSbtSupport';
-import { getSessionWizardWorkerDeployValidationError } from './sessionWizardWorkerRpc';
 import { resolveSessionWizardFundingRequirement } from './sessionWizardFundingRequirement';
 import { getSessionWizardOrderedDraftEntries, splitSessionWizardDraftEntries } from './sessionWizardFieldDescriptors';
 import { buildSessionWizardDraftFieldRenderer } from './sessionWizardDraftFieldRenderer';

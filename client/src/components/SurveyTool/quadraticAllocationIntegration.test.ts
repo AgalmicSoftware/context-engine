@@ -91,5 +91,5 @@ it('preserves signed arrays when hydrating saved responses and includes budgets 
     },
   });
   expect(csv).toContain('"[3,-4]"');
-  expect(csv.split('\n')[1]).toMatch(/,"25"$/);
+  expect(csv.split('\n')[1]).toMatch(/,"25",""$/);
 });

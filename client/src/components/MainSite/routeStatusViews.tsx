@@ -2,7 +2,6 @@
  * @module components/MainSite/routeStatusViews
  */
 
-import React from 'react';
 import styles from './AppShell.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
