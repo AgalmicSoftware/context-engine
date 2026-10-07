@@ -1,5 +1,4 @@
 import { useId, useState } from 'react';
-import artwork from '../../assets/img/reverse-alignment-atlas-v1.jpg';
 import { REVERSE_ALIGNMENT_SOURCE, reverseAlignmentBranches, reverseAlignmentTopics } from './reverseAlignmentTopics';
 import styles from './ReverseAlignmentAtlas.module.scss';
 
@@ -30,7 +29,6 @@ export default function ReverseAlignmentAtlas() {
       </header>
       <div className={styles.explorer}>
         <div className={styles.map} role="group" aria-label="Explore twelve focus areas">
-          <img className={styles.artwork} src={artwork} alt="" width="1448" height="1086" loading="lazy" />
           {reverseAlignmentBranches.map((branch, branchIndex) => (
             <section key={branch.tone} className={`${styles.branch} ${styles[branch.tone]}`} aria-label={branch.label}>
               <h4>{branch.label}</h4>
