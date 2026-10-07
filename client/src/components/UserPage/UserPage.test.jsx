@@ -266,7 +266,7 @@ describe('UserPage username editing', () => {
 });
 
 describe('UserPage analyze action boundary', () => {
-  it('routes header analyze clicks through the parent-owned analyze handler with preserved args', () => {
+  it('routes header analyze clicks without treating the click event as a force refresh', () => {
     const instance = makeInstance();
     instance.analyzeUser = jest.fn();
     const tree = instance.render();
@@ -284,7 +284,7 @@ describe('UserPage analyze action boundary', () => {
     });
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
     expect(instance.analyzeUser).toHaveBeenCalledTimes(1);
-    expect(instance.analyzeUser).toHaveBeenCalledWith(event);
+    expect(instance.analyzeUser).toHaveBeenCalledWith();
   });
 
   it('keeps disabled header analyze clicks inert before reaching analyze side effects', () => {

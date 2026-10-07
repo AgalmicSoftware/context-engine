@@ -701,7 +701,7 @@ export const buildUserPageAnalysisCacheReadDescriptor = ({
   networkId = '',
   sessionSlug = '',
 }: BuildUserPageAnalysisCacheReadDescriptorArgs = {}): UserPageAnalysisCacheReadDescriptor => ({
-  action: forceRefresh ? 'skip-force-refresh' : 'read',
+  action: forceRefresh === true ? 'skip-force-refresh' : 'read',
   addressLower: String(addressLower || '')
     .trim()
     .toLowerCase(),
@@ -721,9 +721,9 @@ export const readUserPageAnalysisCacheThroughPort = ({
     descriptor: readDescriptor,
     entry: null,
   };
+  // An empty session slug is the valid default-session cache namespace.
   if (
     readDescriptor.action !== 'read' ||
-    !readDescriptor.sessionSlug ||
     !readDescriptor.networkId ||
     !readDescriptor.addressLower ||
     !readDescriptor.fingerprint ||
@@ -838,7 +838,6 @@ export const writeUserPageAnalysisCacheThroughPort = async ({
   let entry: UserPageAnalysisCacheEntry | null = null;
   let payload: UserPageUnknownRecord | null = null;
   if (
-    !String(sessionSlug || '') ||
     !String(networkId || '') ||
     !String(addressLower || '') ||
     !String(fingerprint || '') ||
