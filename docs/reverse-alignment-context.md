@@ -19,6 +19,8 @@ default. Debate Map uses the shared Debate Atlas **Circles** view: open one of
 the three topic groups, then select a topic to inspect its assignments. This
 preview appears only in Debate Map and shows **Waiting for more data**. Its
 circles have no question or response assignments, votes, or sample responses.
+The preview keeps its header, data status, and circles, with assignment details
+shown only after selecting a topic. Source links remain in the Context guide.
 There is no classification action yet; a future administrator workflow can
 populate those assignments. The Context atlas does not imply that classification
 has happened. Raw Results continues to open the detailed results view.
