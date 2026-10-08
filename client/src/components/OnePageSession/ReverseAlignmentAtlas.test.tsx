@@ -35,7 +35,7 @@ it('shows every focus area directly without a search field or closing promotiona
 
 it('returns to the last viewed topic and resets the reading tab when opening another topic', () => {
   render(<ReverseAlignmentAtlas />);
-  fireEvent.click(screen.getByRole('button', { name: 'Privacy', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Privacy' }));
   fireEvent.click(screen.getByRole('button', { name: /Agentic collaboration/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Sources' }));
   fireEvent.click(screen.getByRole('button', { name: 'Back to focus areas' }));
@@ -49,7 +49,7 @@ it('returns to the last viewed topic and resets the reading tab when opening ano
   expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('heading', { name: 'Education' })).toHaveFocus();
   fireEvent.click(screen.getByRole('button', { name: 'Back to focus areas' }));
-  expect(screen.getByRole('button', { name: 'Education', exact: true })).toHaveFocus();
+  expect(screen.getByRole('button', { name: 'Education' })).toHaveFocus();
 });
 
 it('wraps the guided navigation at each end of the atlas', () => {
