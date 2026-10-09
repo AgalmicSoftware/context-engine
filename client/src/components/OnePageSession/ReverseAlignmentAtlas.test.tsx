@@ -27,6 +27,7 @@ it('follows connections across groups and returns to the correct group and topic
   const reading = screen.getByRole('article', { name: 'Selected focus area' });
   expect(screen.queryByRole('group', { name: 'Trust and agency topics' })).not.toBeInTheDocument();
   expect(within(reading).getByRole('heading', { name: 'Privacy' })).toHaveFocus();
+  expect(within(reading).queryByRole('heading', { name: 'Connected focus areas' })).not.toBeInTheDocument();
   fireEvent.click(within(reading).getByRole('button', { name: /Agentic collaboration/ }));
   expect(within(reading).getByRole('heading', { name: 'Agentic collaboration' })).toHaveFocus();
   fireEvent.click(within(reading).getByRole('button', { name: 'Sources' }));

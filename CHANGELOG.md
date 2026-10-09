@@ -6,7 +6,10 @@ All notable changes to this project will be documented in this file.
 
 - Combine RxC context and topic navigation in one compact section. Start with
   three area circles, zoom into a group or topic in place, and use Back to return
-  without scrolling past the full topic list.
+  without scrolling past the full topic list. Related topic links omit the extra
+  heading.
+- Temporarily hide Debate Map for `rxc-ra-test`, keeping Report, Raw Results, and
+  the Context guide available.
 
 ## [0.6.6] - 2026-10-08
 

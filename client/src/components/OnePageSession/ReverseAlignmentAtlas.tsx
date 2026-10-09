@@ -177,7 +177,6 @@ export default function ReverseAlignmentAtlas({ context }: { context?: Context |
             </>
           )}
           <div className={styles.related}>
-            <h5>Connected focus areas</h5>
             {selected.related.map((topicId) => (
               <button
                 type="button"

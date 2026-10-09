@@ -44,6 +44,7 @@ export async function probeReverseAlignmentAtlas(page) {
   await guide.getByRole('button', { name: 'Previous topic group' }).click();
   await grid.getByRole('button', { name: 'Labor transition', exact: true }).press('Enter');
   await reading.waitFor({ state: 'visible' });
+  assert.equal(await reading.getByRole('heading', { name: 'Connected focus areas' }).count(), 0, 'Related topic links have no redundant heading');
   assert.equal(await grid.count(), 0, 'Details replace the grid');
   assert.equal(await reading.getByRole('heading', { name: 'Labor transition', exact: true }).evaluate(el => el === document.activeElement), true);
   await checkReadingLayout(reading);

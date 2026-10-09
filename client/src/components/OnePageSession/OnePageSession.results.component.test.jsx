@@ -916,53 +916,60 @@ describe('OnePageSession results routing', () => {
     expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
   });
 
-  it.each(['rxc-test', 'rxc-ra-test'])(
-    'keeps the %s topic Circles in Debate Map, separate from Report and Raw Results',
-    async (slug) => {
-      const props = buildProps();
-      render(
-        <MemoryRouter initialEntries={[`/session/${slug}`]}>
-          <OnePageSession
-            {...props}
-            slug={slug}
-            sessionConfig={{
-              ...props.sessionConfig,
-              slug,
-              sessionContext: {
-                title: 'Context',
-                paragraphs: ['A session introduction.', 'More background.'],
-                links: [{ label: 'Official source', url: 'https://example.org/' }],
-              },
-            }}
-          />
-        </MemoryRouter>,
-      );
-      expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-      const atlas = await screen.findByTestId('ce-rxc-context-atlas');
-      expect(atlas).toBeVisible();
-      expect(
-        within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
-          name: /^Context View/,
-          level: 2,
-        }),
-      ).toBeVisible();
-      expect(atlas).toContainElement(screen.getByTestId('ce-session-context'));
-      expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
-      expect(within(atlas).getByRole('group', { name: 'Explore topic groups' })).toBeVisible();
-      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-      const nav = screen.getByTestId('ce-session-results-view-nav');
-      expect(
-        within(nav)
-          .getAllByRole('button')
-          .map((button) => button.textContent.trim()),
-      ).toEqual(['🧾Report', '🗺️Debate Map', 'Raw Results']);
-      expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
-      expect(await screen.findByTestId('polis-report')).toBeVisible();
-      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+  it.each([
+    { slug: 'rxc-test', showDebateMap: true },
+    { slug: 'rxc-ra-test', showDebateMap: false },
+  ])('keeps context and the available results views for $slug', async ({ slug, showDebateMap }) => {
+    const props = buildProps();
+    const sessionRef = React.createRef();
+    render(
+      <MemoryRouter initialEntries={[`/session/${slug}`]}>
+        <OnePageSession
+          {...props}
+          ref={sessionRef}
+          slug={slug}
+          sessionConfig={{
+            ...props.sessionConfig,
+            slug,
+            sessionContext: {
+              title: 'Context',
+              paragraphs: ['A session introduction.', 'More background.'],
+              links: [{ label: 'Official source', url: 'https://example.org/' }],
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+    const atlas = await screen.findByTestId('ce-rxc-context-atlas');
+    expect(atlas).toBeVisible();
+    expect(
+      within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
+        name: /^Context View/,
+        level: 2,
+      }),
+    ).toBeVisible();
+    expect(atlas).toContainElement(screen.getByTestId('ce-session-context'));
+    expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
+    expect(within(atlas).getByRole('group', { name: 'Explore topic groups' })).toBeVisible();
+    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    if (!showDebateMap) {
+      act(() => sessionRef.current.setState({ resultsViewMode: 'debateAtlas' }));
+    }
+    const nav = screen.getByTestId('ce-session-results-view-nav');
+    expect(
+      within(nav)
+        .getAllByRole('button')
+        .map((button) => button.textContent.trim()),
+    ).toEqual(showDebateMap ? ['🧾Report', '🗺️Debate Map', 'Raw Results'] : ['🧾Report', 'Raw Results']);
+    expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByTestId('polis-report')).toBeVisible();
+    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
+    if (showDebateMap) {
       fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
       expect(await screen.findByTestId('topic-circles')).toBeVisible();
       expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
@@ -973,13 +980,13 @@ describe('OnePageSession results routing', () => {
       fireEvent.click(within(nav).getByRole('button', { name: 'Report' }));
       expect(await screen.findByTestId('polis-report')).toBeVisible();
       expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-      fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
-      expect(await screen.findByTestId('survey-page-full')).toBeVisible();
-      await waitFor(() => {
-        expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
-      });
-    },
-  );
+    }
+    fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
+    expect(await screen.findByTestId('survey-page-full')).toBeVisible();
+    await waitFor(() => {
+      expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+    });
+  });
 
   it('does not render an empty session context section', async () => {
     const props = buildProps();

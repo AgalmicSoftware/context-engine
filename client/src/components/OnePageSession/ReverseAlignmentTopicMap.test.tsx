@@ -21,9 +21,9 @@ jest.mock('../DebateMap/DebateMap', () => ({
   },
 }));
 
-it('limits the preview to Reverse Alignment sessions', () => {
+it('keeps the preview hidden for rxc-ra-test', () => {
   expect(hasReverseAlignmentTopicPreview('rxc-test')).toBe(true);
-  expect(hasReverseAlignmentTopicPreview('rxc-ra-test')).toBe(true);
+  expect(hasReverseAlignmentTopicPreview('rxc-ra-test')).toBe(false);
   expect(hasReverseAlignmentTopicPreview('eddy26')).toBe(false);
   expect(hasReverseAlignmentTopicPreview('demo')).toBe(false);
 });
