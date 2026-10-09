@@ -649,7 +649,7 @@ export default function OnePageSessionStandardShell({
 
         {showContextSection && (
           <div
-            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
+            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''} ${showTopicPreview ? styles.compactContextSection : ''}`}
             data-testid="ce-demo-documents-section"
           >
             <div className={`${styles.sectionHeaderRow} ${showDocuments ? styles.documentsHeaderRow : ''}`}>
@@ -663,7 +663,7 @@ export default function OnePageSessionStandardShell({
                 ) : (
                   <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                 )}
-                {renderSectionHeading('Context', 'View')}
+                {showTopicPreview ? 'Context' : renderSectionHeading('Context', 'View')}
                 {showDocuments && (
                   <div
                     className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
@@ -703,10 +703,10 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                {renderSessionContext(sessionContext)}
+                {!showTopicPreview && renderSessionContext(sessionContext)}
                 {showTopicPreview && (
                   <Suspense fallback={<LazyFallback label="Loading Reverse Alignment Atlas..." minHeight="20vh" />}>
-                    <ReverseAlignmentAtlas />
+                    <ReverseAlignmentAtlas context={sessionContext} />
                   </Suspense>
                 )}
                 {isDemoSlug && (

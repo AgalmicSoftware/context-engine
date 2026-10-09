@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- Combine RxC context and topic navigation in one compact section. Start with
+  three area circles, zoom into a group or topic in place, and use Back to return
+  without scrolling past the full topic list.
+
 ## [0.6.6] - 2026-10-08
 
 ### Client — available when the site deploys

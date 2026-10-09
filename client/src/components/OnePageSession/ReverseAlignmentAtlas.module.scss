@@ -1,16 +1,16 @@
 .atlas {
+  --area-accent: var(--ce-action-accent);
+  container-type: inline-size;
   color: var(--ce-panel-text);
-  background: var(--ce-surface-sunken);
-  border: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
-  border-radius: 16px;
-  overflow: hidden;
   text-align: left;
-  h3,
+  min-width: 0;
+  padding: 0 12px 8px;
   h4 {
     color: var(--ce-panel-text);
   }
   button,
-  a {
+  a,
+  summary {
     &:focus-visible {
       outline: 3px solid var(--ce-focus-ring);
       outline-offset: 3px;
@@ -25,109 +25,129 @@
     text-decoration: underline;
   }
 }
-.header {
-  padding: 24px;
-  h3 {
-    margin: 8px 0;
-    font-size: clamp(1.45rem, 2.8vw, 2.2rem);
-    font-weight: 800;
-  }
+.introduction {
   p {
-    margin: 0;
-    color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
-    line-height: 1.6;
-    max-width: 55ch;
+    margin: 0 0 10px;
+    line-height: 1.55;
+    font-size: 0.95rem;
   }
 }
-.eyebrow {
-  color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.contextLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
-.explorer {
-  border-top: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
+.moreContext {
+  margin-top: 8px;
+  summary {
+    cursor: pointer;
+    width: fit-content;
+    min-height: 44px;
+    align-content: center;
+    font-size: 0.9rem;
+  }
 }
-.map {
-  min-width: 0;
+.areas {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-areas: 'trust trust collective collective' '. learning learning .';
-  align-content: start;
-  gap: 24px;
-  padding: 24px;
+  grid-template-columns: repeat(3, minmax(0, 150px));
+  justify-content: center;
+  gap: clamp(8px, 3vw, 28px);
+  padding: 16px 0 4px;
 }
-.branch {
-  position: relative;
-  min-width: 0;
+.atlas .areas .area {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--area-accent);
+  background: color-mix(in srgb, var(--ce-surface-sunken) 95%, var(--area-accent));
+  color: var(--ce-panel-text);
+  box-shadow: none;
+  padding: clamp(8px, 2vw, 16px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  h4 {
-    font-size: clamp(0.75rem, 1.1vw, 1rem);
-    text-align: center;
-    margin: 0 0 4px;
-    color: var(--ce-panel-text);
-    text-shadow: 0 1px 6px var(--ce-overlay-base);
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-align: center;
+  font-size: clamp(0.8rem, 3.5cqi, 1rem);
+  line-height: 1.25;
+  strong {
     font-weight: 800;
   }
+  &:hover {
+    background: var(--ce-surface-raised);
+  }
+}
+.topicCount {
+  font-size: 0.75em;
+}
+.areaArrow {
+  color: var(--area-accent);
+  font-size: 1.3em;
+  line-height: 1;
+}
+.trust {
+  --area-accent: var(--ce-action-accent);
+}
+.collective {
+  --area-accent: var(--ce-status-warning-text);
+}
+.learning {
+  --area-accent: var(--ce-status-info-text);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--area-accent);
+  flex-shrink: 0;
+}
+.groupView {
+  scroll-margin-top: 16px;
+  h4 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+    font-size: 1.2rem;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+}
+.topics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   button {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 10px;
-    min-height: 32px;
-    border: 1px solid var(--ce-status-info-text);
-    border-radius: 8px;
-    color: var(--ce-panel-text);
-    background: color-mix(in srgb, var(--ce-surface-sunken) 95%, var(--ce-action-accent));
-    font-size: clamp(0.72rem, 1vw, 0.95rem);
+    gap: 10px;
+    min-width: 0;
+    min-height: 48px;
+    padding: 12px;
     text-align: left;
-    line-height: 1.2;
-    &:hover {
-      background: var(--ce-surface-raised);
-    }
-  }
-}
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ce-action-accent);
-  flex-shrink: 0;
-}
-.trust {
-  grid-area: trust;
-}
-.collective {
-  grid-area: collective;
-  button {
-    border-color: var(--ce-status-warning-text);
-    background: color-mix(in srgb, var(--ce-surface-sunken) 95%, var(--ce-status-warning-text));
-    &:hover {
-      background: var(--ce-surface-raised);
-    }
-  }
-  .dot {
-    background: var(--ce-status-warning-text);
-  }
-}
-.learning {
-  grid-area: learning;
-  button {
-    border-color: var(--ce-status-info-text);
+    color: var(--ce-panel-text);
     background: var(--ce-surface-sunken);
+    border: 1px solid var(--ce-border);
+    border-radius: var(--ce-radius-8);
+    font-size: 1rem;
+    line-height: 1.35;
+    box-shadow: none;
     &:hover {
       background: var(--ce-surface-raised);
+      border-color: var(--area-accent);
     }
   }
-  .dot {
-    background: var(--ce-status-info-text);
-  }
 }
+.topicArrow {
+  margin-left: auto;
+  font-size: 1.4rem;
+}
+
 .reading {
-  background: var(--ce-surface);
-  padding: 24px;
+  padding: 0;
   scroll-margin-top: 16px;
   display: flex;
   flex-direction: column;
@@ -155,7 +175,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 .readingNavigation .back {
   min-height: 44px;
@@ -172,7 +192,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   button {
     position: relative;
     padding: 10px 0;
@@ -265,44 +285,27 @@
     }
   }
 }
-@media (max-width: 1100px) {
-  .branch button {
-    font-size: clamp(0.8rem, 1.6vw, 1.1rem);
-    padding: 10px;
-  }
-  .branch h4 {
-    font-size: 1rem;
-  }
-}
-@media (max-width: 600px) {
-  .header {
-    padding: 18px;
-  }
-  .map {
-    padding: 16px;
+@container (max-width: 440px) {
+  .topics {
     grid-template-columns: 1fr;
-    grid-template-areas: none;
-    gap: 16px;
   }
-  .branch {
-    grid-area: auto;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    h4 {
-      grid-column: 1 / -1;
-      text-align: left;
-      padding-top: 4px;
-    }
-    button {
-      min-height: 44px;
-      font-size: 0.82rem;
-    }
-  }
-  .reading {
-    padding: 18px;
+  .readingNavigation .back {
+    font-size: 0.85rem;
   }
   .readingTabs {
     gap: 8px 16px;
+  }
+}
+@container (max-width: 300px) {
+  .areas {
+    gap: 6px;
+  }
+  .atlas .areas .area {
+    padding: 4px 3px;
+    gap: 3px;
+    font-size: 0.75rem;
+  }
+  .topicCount {
+    font-size: 0.8em;
   }
 }

@@ -1,18 +1,23 @@
 # Reverse Alignment context
 
-The RxC session Context section includes a field guide to the twelve
-focus areas on [Reverse Alignment](https://reversealignment.ai/). All twelve
-topic buttons are available directly; selecting one replaces the grid and atlas
-header with a compact reading view containing an overview, discussion prompt,
-source link, and related focus areas. **Back** restores the grid and keyboard
-focus to the last viewed topic. Back and the arrow-only Previous/Next controls
-sit at the top of the reading view, so navigation does not require scrolling
-past the content. Opening another topic resets the reading tab to Overview and
-brings its heading into focus and its controls into view.
-The topic groups follow the header directly, without a decorative image or space
-reserved for one. Their layout grows with wrapped labels; the grid and reading
-view are never stacked on mobile. The guide has no search field or closing
-promotional footer.
+The RxC session Context section combines its saved introduction and the twelve
+focus areas from [Reverse Alignment](https://reversealignment.ai/) in one compact
+explorer. Additional introduction paragraphs are available under **More context**.
+There is no separate field-guide banner or decorative image.
+
+The overview shows three area circles: **Trust and agency**, **Collective
+decisions**, and **Learning and work**. Selecting one replaces the overview with
+that area's four topics. Selecting a topic replaces the group with its overview,
+discussion prompt, sources, and related topics. **Back** returns one level and
+restores keyboard focus. Related topics and the twelve-topic Previous/Next tour
+can cross areas; Back then returns to the current topic's group. Group arrows
+also wrap through the three areas. Navigation stays at the top, and opening a
+new group or topic brings its heading and controls into view. New topics always
+start on the Overview tab.
+
+Only one navigation level is shown at a time. The layout adapts to the available
+container width, including narrow mobile panels, and keeps controls accessible
+in both themes. The guide has no search field or promotional footer.
 
 The three regions and their connections are editorial navigation. Discussion
 prompts are invitations for the session, not quotes from the source or submitted
@@ -43,9 +48,9 @@ response-audience behavior.
 
 With the client dev server running, open
 `/tests/fixtures/reverse-alignment-atlas.html` for an isolated guide with no Worker
-requests. The automated probe checks grid/detail replacement, keyboard focus,
-Back, tabs, related topics, all twelve topics, and viewport fit in both themes at
-desktop and mobile widths. From the repository root:
+requests. The automated probe checks area/group/detail replacement, compact overview height, keyboard
+focus, Back, tabs, related topics, both wrapping tours, and viewport fit in both
+themes at desktop and mobile widths down to 320px. From the repository root:
 
 ```bash
 node --input-type=module -e "import('./scripts/reverse-alignment-atlas-smoke.mjs').then(m => m.runSmoke())"
