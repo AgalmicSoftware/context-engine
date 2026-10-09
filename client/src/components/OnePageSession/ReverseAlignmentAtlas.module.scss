@@ -9,8 +9,7 @@
     color: var(--ce-panel-text);
   }
   button,
-  a,
-  summary {
+  a {
     &:focus-visible {
       outline: 3px solid var(--ce-focus-ring);
       outline-offset: 3px;
@@ -38,16 +37,6 @@
   gap: 8px 20px;
   font-size: 0.9rem;
   font-weight: 700;
-}
-.moreContext {
-  margin-top: 8px;
-  summary {
-    cursor: pointer;
-    width: fit-content;
-    min-height: 44px;
-    align-content: center;
-    font-size: 0.9rem;
-  }
 }
 .areas {
   display: grid;

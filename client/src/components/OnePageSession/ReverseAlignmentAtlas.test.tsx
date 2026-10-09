@@ -64,7 +64,7 @@ it('wraps both area navigation and the twelve-topic tour', () => {
   expect(screen.getByRole('heading', { name: 'Identity' })).toHaveFocus();
 });
 
-it('preserves supplied context and source links inside the explorer without a second card', () => {
+it('shows only the opening context paragraph and source links inside the explorer', () => {
   render(
     <ReverseAlignmentAtlas
       context={{
@@ -77,9 +77,8 @@ it('preserves supplied context and source links inside the explorer without a se
   expect(screen.getByTestId('ce-rxc-context-atlas')).toContainElement(context);
   expect(context).toHaveTextContent('A short session introduction.');
   expect(screen.getByRole('link', { name: /Official source/ })).toHaveAttribute('href', 'https://example.org/');
-  const more = screen.getByText('More context').closest('details');
-  expect(more).not.toHaveAttribute('open');
-  expect(more).toHaveTextContent('Additional background.');
+  expect(screen.queryByText('More context')).not.toBeInTheDocument();
+  expect(screen.queryByText('Additional background.')).not.toBeInTheDocument();
   openArea('Collective decisions');
   expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Back to all areas' }));

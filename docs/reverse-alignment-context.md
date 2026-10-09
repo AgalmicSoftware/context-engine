@@ -2,7 +2,8 @@
 
 The RxC session Context section combines its saved introduction and the twelve
 focus areas from [Reverse Alignment](https://reversealignment.ai/) in one compact
-explorer. Additional introduction paragraphs are available under **More context**.
+explorer. It shows only the opening introduction paragraph and source links;
+the topic circles replace the longer summary of the three areas.
 There is no separate field-guide banner or decorative image. The outer Context
 View dropdown uses the same heading style as Groups and Results.
 

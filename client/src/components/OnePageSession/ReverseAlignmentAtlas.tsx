@@ -15,9 +15,9 @@ export default function ReverseAlignmentAtlas({ context }: { context?: Context |
   const [tab, setTab] = useState<ReadingTab>('Overview');
   const selected = reverseAlignmentTopics.find((topic) => topic.id === selectedId);
   const branch = branchIndex === null ? null : reverseAlignmentBranches[branchIndex];
-  const paragraphs = context?.paragraphs.length
-    ? context.paragraphs
-    : ['How should society adapt to AI? Explore twelve topics across three areas.'];
+  const introduction = context?.paragraphs.length
+    ? context.paragraphs[0]
+    : 'How should society adapt to AI? Explore twelve topics across three areas.';
   const links = context?.links.length ? context.links : [{ label: 'Reverse Alignment', url: REVERSE_ALIGNMENT_SOURCE }];
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function ReverseAlignmentAtlas({ context }: { context?: Context |
       {branchIndex === null ? (
         <>
           <header className={styles.introduction} data-testid="ce-session-context">
-            <p>{paragraphs[0]}</p>
+            <p>{introduction}</p>
             <div className={styles.contextLinks}>
               {links.map((link) => (
                 <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
@@ -69,14 +69,6 @@ export default function ReverseAlignmentAtlas({ context }: { context?: Context |
                 </a>
               ))}
             </div>
-            {paragraphs.length > 1 && (
-              <details className={styles.moreContext}>
-                <summary>More context</summary>
-                {paragraphs.slice(1).map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
-                ))}
-              </details>
-            )}
           </header>
           <div className={styles.areas} role="group" aria-label="Explore topic groups">
             {reverseAlignmentBranches.map((area, index) => (
