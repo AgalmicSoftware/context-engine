@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.6] - 2026-10-08
+
+### Client — available when the site deploys
+
+- Reuse cached user analysis when visible profile inputs are unchanged, including
+  hosted profiles and the default session. Opening Analyze no longer forces a
+  refresh; changed inputs, explicit Refresh and the existing 24-hour expiry still
+  generate fresh analysis.
+- Open Reverse Alignment focus areas in place of the topic list, with Back and
+  previous/next controls at the top for easier navigation on mobile.
+- Remove the decorative atlas image and redundant debate-map preview text.
+
+These client changes do not require updating existing session Workers. The known
+issues listed for 0.6.5 remain unchanged.
+
 ## [0.6.5] - 2026-10-04
 
 ### Client — available when the site deploys

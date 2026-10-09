@@ -1,4 +1,5 @@
 /** @file UserPage.analysisCache.test.jsx */
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import UserPage from './UserPage';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -57,7 +58,7 @@ let analysisCacheTestSeq = 0;
 
 const makeAnalysisCacheInstance = (props = {}) => {
   analysisCacheTestSeq += 1;
-  const slug = props.activeSessionSlug || `analysis-cache-test-${analysisCacheTestSeq}`;
+  const slug = props.activeSessionSlug ?? `analysis-cache-test-${analysisCacheTestSeq}`;
   const viewAddress = props.viewAddress || '0x00000000000000000000000000000000000000aa';
   const networkID = String(props.network?.id || 84532);
   const instance = makeInstance({
@@ -347,6 +348,57 @@ describe('UserPage analysis cache and routing', () => {
       nowSpy.mockRestore();
     }
   });
+
+  it.each([
+    ['on-chain', { network: { id: 84532 } }, '84532'],
+    ['default-session', { network: { id: 84532 }, activeSessionSlug: '' }, '84532'],
+    ['hosted', { network: null, onChainProfileEnabled: false }, 'worker'],
+  ])(
+    'reuses %s analysis on header clicks after reopening, but regenerates when an answer changes',
+    async (_, props, networkID) => {
+      const { instance, slug, addressLower } = makeAnalysisCacheInstance(props);
+      analyzeUserOpinions.mockResolvedValueOnce({ summary: 'Original analysis' });
+      const view = render(instance.render().props.children[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+      await waitFor(() => {
+        expect(getSingleAnalysisCacheEntry({ slug, networkID, addressLower }).entry?.result.summary).toBe(
+          'Original analysis',
+        );
+      });
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+
+      const { instance: reopened } = makeAnalysisCacheInstance({ ...props, activeSessionSlug: slug });
+      view.rerender(reopened.render().props.children[0]);
+      fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+      await waitFor(() => expect(reopened.state.analysisServedFromCache).toBe(true));
+      expect(reopened.state.aiAnalysis).toBe('Original analysis');
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+
+      reopened.state.detailedQuestionResponses.q1.answer.value = 'A changed answer';
+      analyzeUserOpinions.mockResolvedValueOnce({ summary: 'Updated analysis' });
+      view.rerender(reopened.render().props.children[0]);
+      fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+      await waitFor(() => expect(reopened.state.aiAnalysis).toBe('Updated analysis'));
+      expect(reopened.state.analysisServedFromCache).toBe(false);
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(2);
+      expect(analyzeUserOpinions.mock.lastCall[0].questions[0].answer).toBe('A changed answer');
+      await waitFor(() => {
+        const cache = cacheScripts.peekCacheSync('analysisCache', slug, { clone: false });
+        expect(Object.values(cache[networkID][addressLower])).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ result: expect.objectContaining({ summary: 'Updated analysis' }) }),
+          ]),
+        );
+      });
+
+      view.rerender(reopened.render().props.children[0]);
+      fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+      await waitFor(() => expect(reopened.state.analysisServedFromCache).toBe(true));
+      expect(reopened.state.aiAnalysis).toBe('Updated analysis');
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('treats expired analysisCache entries as misses', async () => {
     const cachedAt = 1710000000000;

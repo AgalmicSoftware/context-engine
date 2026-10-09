@@ -46,30 +46,16 @@
   text-transform: uppercase;
 }
 .explorer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(265px, 31%);
   border-top: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
 }
 .map {
-  position: relative;
-  align-self: center;
-  aspect-ratio: 4 / 3;
   min-width: 0;
-  // Keep topic controls in flow so wrapped labels grow the map instead of
-  // spilling into the reading panel at intermediate widths or larger text sizes.
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-areas: 'trust trust collective collective' '. learning learning .';
-  align-content: space-around;
+  align-content: start;
   gap: 24px;
-  padding: 8% 8% 5%;
-}
-.artwork {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  inset: 0;
-  object-fit: cover;
+  padding: 24px;
 }
 .branch {
   position: relative;
@@ -100,14 +86,6 @@
     line-height: 1.2;
     &:hover {
       background: var(--ce-surface-raised);
-    }
-    &[aria-pressed='true'] {
-      border: 2px solid var(--ce-action-accent);
-      background: color-mix(in srgb, var(--ce-surface-sunken) 85%, var(--ce-action-accent));
-      padding: 6px 9px;
-      color: var(--ce-panel-text);
-      box-shadow: 0 0 0 3px var(--ce-surface-sunken);
-      font-weight: 800;
     }
   }
 }
@@ -148,14 +126,14 @@
   }
 }
 .reading {
-  border-left: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
   background: var(--ce-surface);
-  padding: 28px;
+  padding: 24px;
+  scroll-margin-top: 16px;
   display: flex;
   flex-direction: column;
   min-width: 0;
   h4 {
-    margin: 10px 0 20px;
+    margin: 8px 0 12px;
     font-size: 1.5rem;
     line-height: 1.25;
     font-weight: 800;
@@ -171,11 +149,30 @@
     margin: 0 0 20px;
   }
 }
+.readingNavigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.readingNavigation .back {
+  min-height: 44px;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  color: var(--ce-panel-text);
+  font-weight: 700;
+  &:hover {
+    color: var(--ce-action-accent);
+  }
+}
 .readingTabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   button {
     position: relative;
     padding: 10px 0;
@@ -221,13 +218,13 @@
   font-size: 0.85rem;
 }
 .related {
-  margin-top: auto;
-  padding-top: 24px;
+  padding-top: 16px;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 8px;
+  gap: 8px 20px;
   h5 {
+    flex-basis: 100%;
     margin: 0 0 4px;
   }
   button {
@@ -250,7 +247,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 24px;
   font-size: 0.85rem;
   color: color-mix(in srgb, var(--ce-panel-text) 85%, var(--ce-surface-sunken));
   button {
@@ -270,19 +266,9 @@
   }
 }
 @media (max-width: 1100px) {
-  .explorer {
-    grid-template-columns: 1fr;
-  }
-  .reading {
-    border-left: none;
-    border-top: 1px solid color-mix(in srgb, var(--ce-panel-text) 35%, var(--ce-surface-sunken));
-  }
   .branch button {
     font-size: clamp(0.8rem, 1.6vw, 1.1rem);
     padding: 10px;
-    &[aria-pressed='true'] {
-      padding: 9px;
-    }
   }
   .branch h4 {
     font-size: 1rem;
@@ -293,16 +279,10 @@
     padding: 18px;
   }
   .map {
-    aspect-ratio: auto;
-    padding: 65% 16px 16px;
+    padding: 16px;
     grid-template-columns: 1fr;
     grid-template-areas: none;
     gap: 16px;
-  }
-  .artwork {
-    height: auto;
-    aspect-ratio: 4 / 3;
-    object-fit: contain;
   }
   .branch {
     grid-area: auto;

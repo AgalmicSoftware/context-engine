@@ -3,12 +3,7 @@ import LazyFallback from '../Shared/LazyFallback';
 import type { DebateNode } from '../DebateMap/debateMapTypes';
 import debateStyles from '../DebateMap/DebateMap.module.scss';
 import styles from './ReverseAlignmentTopicMap.module.scss';
-import {
-  hasReverseAlignmentContext,
-  REVERSE_ALIGNMENT_SOURCE,
-  reverseAlignmentBranches,
-  reverseAlignmentTopics,
-} from './reverseAlignmentTopics';
+import { hasReverseAlignmentContext, reverseAlignmentBranches, reverseAlignmentTopics } from './reverseAlignmentTopics';
 
 const Circles = React.lazy(() => import('../DebateMap/DebateMap').then(({ AtlasView }) => ({ default: AtlasView })));
 
@@ -42,10 +37,6 @@ export default function ReverseAlignmentTopicMap() {
         <span className={styles.preview}>Circles · Preview</span>
       </header>
       <p className={styles.waiting}>Waiting for more data</p>
-      <p>Explore the topics below. No questions or responses have been assigned yet.</p>
-      <a href={REVERSE_ALIGNMENT_SOURCE} target="_blank" rel="noreferrer">
-        Based on Reverse Alignment
-      </a>
       <div className={`${debateStyles.debateMap} ${styles.canvas}`}>
         <Suspense fallback={<LazyFallback label="Loading topic circles…" minHeight="30vh" />}>
           <Circles
@@ -57,14 +48,12 @@ export default function ReverseAlignmentTopicMap() {
           />
         </Suspense>
       </div>
-      <div className={styles.empty} role="status" aria-live="polite">
-        {selected ? (
-          <>
+      <div role="status" aria-live="polite">
+        {selected && (
+          <div className={styles.empty}>
             <h4>{selected.name}</h4>
             <p>No questions or responses assigned yet.</p>
-          </>
-        ) : (
-          <p>Open a topic group, then select a circle to inspect its assignments.</p>
+          </div>
         )}
       </div>
     </section>

@@ -3133,7 +3133,7 @@ class UserPage extends Component<any, any> {
     return cacheWrite.entry as UserAnalysisCacheEntry;
   };
 
-  analyzeUser = async (forceRefresh: unknown = false): Promise<void> => {
+  analyzeUser = async (forceRefresh = false): Promise<void> => {
     if (!this._isMounted) return;
 
     // --- Assemble inputs strictly from current state (already hydrated from other caches) ---
@@ -3199,7 +3199,11 @@ class UserPage extends Component<any, any> {
     const addressLower = String(this.props.viewAddress || '')
       .trim()
       .toLowerCase();
-    const networkId = String(this.props.network?.id ?? this.props.network?.chainId ?? '');
+    // Hosted profiles have no chain ID; keep their cache independent of the connected wallet's network.
+    const networkId =
+      this.props.onChainProfileEnabled === false
+        ? 'worker'
+        : String(this.props.network?.id ?? this.props.network?.chainId ?? '');
     const hydrateAnalysisCacheIfPresent = (cacheContextToRead: UserAnalysisCacheContext): boolean => {
       const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
         sessionSlug: cacheContextToRead.sessionSlug,
@@ -3722,7 +3726,6 @@ class UserPage extends Component<any, any> {
           nicknameInput={this.state.nicknameInput || ''}
           onAnalyzeUser={(event) =>
             runUserPageAnalyzeActionController({
-              analyzeArgs: [event],
               event,
               plan: analyzeActionPlan,
               ports: { dispatchAnalyze: this.analyzeUser },

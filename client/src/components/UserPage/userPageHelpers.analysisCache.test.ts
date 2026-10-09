@@ -220,6 +220,10 @@ describe('userPageHelpers analysis cache helpers', () => {
     });
   });
 
+  it('requires an explicit true to bypass the analysis cache', () => {
+    expect(buildUserPageAnalysisCacheReadDescriptor({ forceRefresh: { type: 'click' } }).action).toBe('read');
+  });
+
   it('reads analysis cache entries through an injected port without owning state', () => {
     const now = 1710000000000;
     const validEntry = {
@@ -288,7 +292,7 @@ describe('userPageHelpers analysis cache helpers', () => {
       readUserPageAnalysisCacheThroughPort({
         descriptor: {
           ...descriptor,
-          sessionSlug: '',
+          networkId: '',
         },
         peekCache,
       }),
