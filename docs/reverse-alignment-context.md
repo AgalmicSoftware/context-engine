@@ -3,7 +3,8 @@
 The RxC session Context section combines its saved introduction and the twelve
 focus areas from [Reverse Alignment](https://reversealignment.ai/) in one compact
 explorer. Additional introduction paragraphs are available under **More context**.
-There is no separate field-guide banner or decorative image.
+There is no separate field-guide banner or decorative image. The outer Context
+View dropdown uses the same heading style as Groups and Results.
 
 The overview shows three area circles: **Trust and agency**, **Collective
 decisions**, and **Learning and work**. Selecting one replaces the overview with

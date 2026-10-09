@@ -945,7 +945,7 @@ describe('OnePageSession results routing', () => {
       expect(atlas).toBeVisible();
       expect(
         within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
-          name: /^Context(?! View)/,
+          name: /^Context View/,
           level: 2,
         }),
       ).toBeVisible();

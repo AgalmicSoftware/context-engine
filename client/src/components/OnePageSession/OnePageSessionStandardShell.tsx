@@ -663,7 +663,7 @@ export default function OnePageSessionStandardShell({
                 ) : (
                   <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                 )}
-                {showTopicPreview ? 'Context' : renderSectionHeading('Context', 'View')}
+                {renderSectionHeading('Context', 'View')}
                 {showDocuments && (
                   <div
                     className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
