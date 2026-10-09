@@ -139,6 +139,27 @@ const openSettingsRow = () => {
   if (btn) fireEvent.click(btn);
 };
 
+describe('PolisReport session description', () => {
+  const introduction = 'Short questions about institutions and AI.';
+  const retiredCopy =
+    'Answer any you like, skip the rest, or take the short voice interview. Critique is welcome; answering implies no endorsement of the coalition or RadicalxChange.';
+
+  it.each([
+    { slugProps: { sessionSlug: 'rxc-ra-test' }, copy: retiredCopy },
+    { slugProps: { slug: 'rxc-ra-test' }, copy: `**${retiredCopy}**` },
+  ])('omits retired RxC instructions from the report header', ({ slugProps, copy }) => {
+    render(<PolisReport {...baseReportProps} {...slugProps} sessionInfo={`${introduction} ${copy}`} />);
+    expect(screen.getByText(introduction, { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(/Answer any you like/)).not.toBeInTheDocument();
+  });
+
+  it('keeps descriptions for other sessions unchanged', () => {
+    const description = `${introduction} ${retiredCopy}`;
+    render(<PolisReport {...baseReportProps} sessionSlug="rxc-test" sessionInfo={description} />);
+    expect(screen.getByText(description, { exact: true })).toBeInTheDocument();
+  });
+});
+
 describe('PolisReport report palette', () => {
   it('shares runtime categorical colors with other report charts', () => {
     expect(POLIS_CLUSTER_COLORS).toBe(CHART_SERIES_COLORS);

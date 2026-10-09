@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
   heading, and the introduction omits the repeated “More context” topic summary.
 - Temporarily hide Debate Map for `rxc-ra-test`, keeping Report, Raw Results, and
   the Context guide available.
+- Omit retired participation instructions from the `rxc-ra-test` report description,
+  including when older session metadata is cached.
 
 ## [0.6.6] - 2026-10-08
 

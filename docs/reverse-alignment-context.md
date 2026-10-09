@@ -28,7 +28,11 @@ participant responses. Text and controls remain accessible HTML.
 
 `rxc-ra-test` currently offers **Report** and **Raw Results**. Its Debate Map is
 hidden until it is ready to return; a previously selected map falls back to
-Report. Context navigation remains available.
+Report. Context navigation remains available. The report omits the retired
+answer-or-skip/voice-interview and endorsement instructions from this session’s
+description, including older Worker and cached metadata. The remaining description
+is preserved in the report and its PDF capture. This display correction does not
+rewrite the saved Worker configuration.
 
 `rxc-test` still offers **Report**, **Debate Map**, and **Raw Results**. Report opens
 by default. Debate Map uses the shared Debate Atlas **Circles** view: open one of
