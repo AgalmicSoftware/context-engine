@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_context_engine_results_sync",
-  "sourceCommit": "ce10e9ed18e0ffb39b020669423e0b1909cf26ab",
+  "sourceCommit": "c2cc4d820b0e9a97e05ea0b1c3ef6a0b290dfcc3",
   "files": {
-    "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "4587bc502c7ea66e4175d9bd9297d21fe55f08547386d7f1425ffa454bce0d56",
+    "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "644a493308e4ab0a0a3e67092ed30586dfee7073af9346957b7b599ea0289860",
     "client/src/components/OnePageSession/OnePageSession.tsx": "b518833bd756025e814ec0080165906408b29bcffd29e766fd6428fa6c3465ca",
-    "client/src/components/OnePageSession/OnePageSession.module.scss": "2b4d24fff69113bb0b68fc2a911ee2bbbb564cf76bdaf23a4ad52b995898b294",
-    "client/src/components/PolisReport/PolisReport.tsx": "b3195225cfc2efb67b768f5bb0bb419e5845067b7c9d7c35921b761adc84dfc4",
+    "client/src/components/OnePageSession/OnePageSession.module.scss": "f4d575054628f2df1b17fee7677e6c6ec47d7e10a8a765b159b9cf6bf2570c1e",
+    "client/src/components/PolisReport/PolisReport.tsx": "6af0fd1ad26074aacb64b6434024f0a4abb451b7c5a798c174508da038ea8f03",
     "client/src/components/PolisReport/PolisReport.module.scss": "59de656cb18233fc1cea6e2c3667aa273d1ddfa84ee7feeb7ac724f3311d9ef5",
     "client/src/components/DebateMap/DebateMap.tsx": "cb4d9a14c4863a5310699b0399d8aa1abd528d7648c348d152402c60b0fabc28",
     "client/src/components/DebateMap/DebateMap.module.scss": "2a9eed733e446ad31d6153bf8b56ea56be37926804ace90c6e9d3b517f9c1a9a",
