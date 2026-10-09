@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.6.7] - 2026-10-09
+
+### Client — available when the site deploys
 
 - Combine RxC context and topic navigation in one compact section. Start with
   three area circles, zoom into a group or topic in place, and use Back to return
@@ -12,6 +14,9 @@ All notable changes to this project will be documented in this file.
   the Context guide available.
 - Omit retired participation instructions from the `rxc-ra-test` report description,
   including when older session metadata is cached.
+
+These client changes do not require updating existing session Workers. The known
+issues listed for 0.6.5 remain unchanged.
 
 ## [0.6.6] - 2026-10-08
 
