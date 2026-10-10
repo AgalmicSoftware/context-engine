@@ -338,3 +338,20 @@
     width: 8px;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .policyCard {
+    background: var(--ce-document-surface);
+    border-color: var(--ce-document-border);
+  }
+
+  .statusProposed {
+    background: var(--ce-response-unsure-bg);
+    color: var(--ce-response-unsure-text);
+  }
+
+  .statusInactive {
+    background: var(--ce-response-disagree-bg);
+    color: var(--ce-response-disagree-text);
+  }
+}

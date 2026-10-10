@@ -16,7 +16,7 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 
 `REACT_APP_CE_DEFAULT_THEME` selects a bundled theme for a custom frontend.
 Supported values currently come from `client/src/scss/themes/registry.json`:
-`context-engine` (default) and `classic-95`. Unknown values fall back to
+`context-engine` (default), `classic-95`, and `civic` (white and minimal). Unknown values fall back to
 `context-engine`; this setting cannot load a URL, remote stylesheet, or custom
 CSS. It is embedded into the document for the pre-paint bootstrap, so changing
 it requires a rebuild/redeploy.

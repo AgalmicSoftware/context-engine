@@ -16,6 +16,7 @@ const postsDir = path.resolve(__dirname, '..', 'posts');
 const groupPasswordDerivationCjsPath = path.resolve(srcDir, 'utilities', 'crypto', 'groupPasswordDerivation.cjs');
 const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
+const lightThemeIds = themeRegistry.themes.filter(({ colorScheme }) => colorScheme === 'light').map(({ id }) => id);
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -512,7 +513,8 @@ export default defineConfig(({ mode }) => {
           return html
             .replace(/__PUBLIC_URL__/g, normalizePublicUrlForHtml(clientEnv.PUBLIC_URL))
             .replace(/__CE_DEFAULT_THEME__/g, normalizeDeploymentThemeForHtml(clientEnv.REACT_APP_CE_DEFAULT_THEME))
-            .replace(/__CE_THEME_IDS__/g, themeIds.join(' '));
+            .replace(/__CE_THEME_IDS__/g, themeIds.join(' '))
+            .replace(/__CE_LIGHT_THEME_IDS__/g, lightThemeIds.join(' '));
         },
       },
     ],

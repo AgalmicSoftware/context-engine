@@ -136,3 +136,29 @@
   font-family: var(--ce-font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace);
   line-height: 1.4;
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .jsonIconButton,
+  .jsonIconButton:disabled,
+  .jsonToggleButton,
+  .jsonToggleButton:hover,
+  .jsonToggleButton:disabled {
+    color: var(--ce-control-text);
+    opacity: 1;
+  }
+
+  .jsonToggleButton {
+    background: var(--ce-control-face);
+    border-color: transparent;
+  }
+
+  .jsonToggleButtonActive {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
+
+    &:hover {
+      background: var(--ce-action-primary-hover);
+      color: var(--ce-selection-text);
+    }
+  }
+}

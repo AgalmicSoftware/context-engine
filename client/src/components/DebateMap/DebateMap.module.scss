@@ -2858,3 +2858,270 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     animation: none !important;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .debateMap {
+    .title {
+      background: none;
+      color: var(--ce-panel-text);
+      -webkit-text-fill-color: var(--ce-panel-text);
+      text-shadow: none;
+    }
+
+    .emptyState {
+      opacity: 1;
+      color: var(--ce-document-text-muted);
+    }
+
+    .categorySelector .categoryButton,
+    .categorySelector .categoryButton:hover {
+      color: var(--ce-control-text);
+      background: var(--ce-control-face);
+    }
+
+    .categorySelector .categoryButton.active {
+      color: var(--ce-selection-text);
+      background: var(--ce-selection-bg);
+      box-shadow: none;
+    }
+
+    .orgChartContainer {
+      background: var(--ce-document-surface);
+    }
+
+    .orgCard,
+    .orgCard:hover,
+    .orgCard.collapsed {
+      background: var(--ce-surface);
+      opacity: 1;
+
+      .cardHeader .nodeTitle,
+      .collapseBtn {
+        color: var(--ce-document-text);
+      }
+    }
+
+    .flatNodeContainer .pathContainer .pathButton.pathButton {
+      color: var(--ce-document-text);
+      background: var(--ce-document-surface);
+    }
+
+    .controls .viewModeSwitch,
+    .controls .atlasLayoutSwitch {
+      background: var(--ce-control-face);
+
+      button,
+      button:hover {
+        color: var(--ce-control-text);
+      }
+
+      button.active {
+        background: var(--ce-selection-bg);
+        color: var(--ce-selection-text);
+        box-shadow: none;
+      }
+    }
+
+    .atlasViewContainer {
+      .hotDebatesBtn,
+      .hotDebatesBtn:hover,
+      .backBtn,
+      .backBtn:hover {
+        background: var(--ce-control-face);
+        color: var(--ce-control-text);
+        box-shadow: none;
+      }
+
+      .topNodesOverlay {
+        background: var(--ce-overlay-surface);
+        color: var(--ce-overlay-text);
+        border-color: var(--ce-document-border);
+
+        h3,
+        .nodeStats,
+        .minimizeBtn:hover {
+          color: var(--ce-overlay-text);
+        }
+      }
+
+      .atlasNode.atlasNode {
+        .nodeLabel {
+          color: var(--ce-document-text);
+          text-shadow: none;
+        }
+
+        .nodeLabel.alwaysVisible {
+          opacity: 1;
+        }
+
+        &:hover .nodeLabel,
+        &.hovered .nodeLabel {
+          background: var(--ce-document-surface);
+          color: var(--ce-document-text);
+        }
+      }
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .debateMap .atlasViewContainer .atlasNode.atlasNode.packedAtlasNode {
+    .packedNodeLabel {
+      color: var(--ce-document-text);
+      text-shadow: none;
+    }
+
+    .packedNodeLabel.alwaysVisible {
+      opacity: 1;
+    }
+
+    .packedNodeDot {
+      box-shadow: none;
+    }
+
+    &:hover,
+    &.hovered,
+    &:focus-visible {
+      .packedNodeDot {
+        transform: none;
+        box-shadow: none;
+        border-color: var(--ce-action-primary);
+      }
+
+      .packedNodeLabel {
+        background: transparent;
+        padding: 0;
+        text-shadow: none;
+        color: var(--ce-document-text);
+        transform: none;
+      }
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .debateMap .modalContent {
+    background: var(--ce-overlay-surface);
+    color: var(--ce-overlay-text);
+    border-color: var(--ce-document-border);
+
+    .modalHeader .titleSection .modalTitle,
+    .headerVoteSection .netScoreContainer .netScoreValue,
+    .collapseHeader > span:first-of-type,
+    .collapseHeader > svg,
+    .argumentClaim,
+    .generatedSummarySection p,
+    .historicalCaseTitle,
+    .historicalCaseSummary,
+    .historicalCaseDetailBlock p,
+    .historicalCasePrinciplesName,
+    .historicalCasePrinciplesList li,
+    .historicalCaseArticleBody,
+    .historicalCaseFactValue,
+    .historicalCasePatchName,
+    .historicalCasePatchCard p {
+      color: var(--ce-document-text);
+    }
+
+    .collapseCount,
+    .collapseToggle,
+    .historicalCaseMeta,
+    .historicalCaseFactLabel,
+    .historicalCasePatchFavoredBy > span,
+    .historicalCaseEmptyText {
+      color: var(--ce-document-text-muted);
+    }
+
+    .modalHeader .titleSection .linkButton,
+    .modalHeader .modalControls .closeIcon {
+      color: var(--ce-control-text);
+      opacity: 1;
+    }
+
+    .headerVoteSection .netScoreContainer .voteBreakdown,
+    .argumentCard,
+    .argumentCard[data-side],
+    .historicalCaseCard,
+    .historicalCaseDetailBlock,
+    .historicalCasePrinciplesCard,
+    .historicalCaseArticleItem,
+    .historicalCaseExploitSection,
+    .historicalCasePatchCard {
+      background: var(--ce-document-surface);
+      border-color: var(--ce-document-border);
+      box-shadow: none;
+    }
+
+    .historicalCaseCard .historicalCaseDetailLabel,
+    .historicalCaseExploitHeading,
+    .generatedSummaryEyebrow,
+    .argumentSource {
+      color: var(--ce-link);
+    }
+
+    .historicalCaseTags span,
+    .historicalCaseArticleLabel,
+    .historicalCasePatchBadge,
+    .historicalCaseBestPatchPill,
+    .historicalCasePatchFavoredByList > span,
+    .historicalCaseSource,
+    .historicalCaseExpandButton,
+    .historicalCaseSource:hover,
+    .historicalCaseExpandButton:hover,
+    .modalTags .tag,
+    .modalTags .tag.clickable:hover {
+      background: var(--ce-control-face);
+      color: var(--ce-control-text);
+      border-color: var(--ce-document-border);
+    }
+
+    .modalTags .depthTag.depthTag {
+      background: var(--ce-control-face);
+      color: var(--ce-control-text);
+      box-shadow: none;
+    }
+
+    .glassInput {
+      background: var(--ce-input-bg);
+      color: var(--ce-control-text);
+      border-color: var(--ce-input-border-strong);
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .debateMap .modalContent .questionsSection {
+    .pileCard {
+      background: var(--ce-document-surface);
+      box-shadow: none;
+      border-color: var(--ce-document-border);
+    }
+
+    .questionText,
+    .multichoiceOptions > div > span:last-child {
+      color: var(--ce-document-text);
+    }
+
+    .freeformArea,
+    .typeBadge[data-type] {
+      background: var(--ce-control-face);
+      color: var(--ce-control-text);
+      border-color: var(--ce-document-border);
+    }
+
+    .binaryPills > span:nth-child(1) {
+      background: var(--ce-response-agree-bg);
+      color: var(--ce-response-agree-text);
+    }
+
+    .binaryPills > span:nth-child(2) {
+      background: var(--ce-response-unsure-bg);
+      color: var(--ce-response-unsure-text);
+    }
+
+    .binaryPills > span:nth-child(3) {
+      background: var(--ce-response-disagree-bg);
+      color: var(--ce-response-disagree-text);
+    }
+  }
+}

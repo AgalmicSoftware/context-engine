@@ -102,6 +102,7 @@
   "COMMUNITY_STAT_QUESTIONS": "ce-community-stat-questions",
   "COMMUNITY_STAT_SURVEYS": "ce-community-stat-surveys",
   "COMMUNITY_STAT_GROUPS": "ce-community-stat-groups",
+  "COMMUNITY_STAT_SESSIONS": "ce-community-stat-sessions",
   "TAG_GROUPS_SECTION": "ce-tag-groups-section",
   "SESSION_ADVANCED_ONCHAIN_ACCESS_GATES": "ce-session-advanced-onchain-access-gates",
   "SESSION_GROUPS_UNAVAILABLE": "ce-session-groups-unavailable",

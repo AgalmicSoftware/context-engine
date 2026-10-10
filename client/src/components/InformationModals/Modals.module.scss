@@ -759,3 +759,48 @@ input[type='radio']:checked:after {
     line-height: 1.4;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .welcomeSlideFooter {
+    background: transparent;
+    border: 0;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImage {
+    opacity: 1;
+    filter: none;
+    mix-blend-mode: normal !important;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageIntro,
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageGoals,
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageCollaborators {
+    // These illustrations use white line art; invert them for the light canvas.
+    filter: invert(1) contrast(1.2);
+    mix-blend-mode: multiply !important;
+    object-position: center;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton[data-slide-key='intro'] {
+    width: 100%;
+  }
+
+  .welcomeSlideBulletItems,
+  .welcomeSlideBulletItems li::marker,
+  .welcomeSlideBulletText,
+  .welcomeSlideBulletTrailingText {
+    color: var(--ce-panel-text);
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton[data-slide-key='built-to-help'] {
+    align-items: center;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageAudience {
+    content: url('../../assets/img/seedsman_civic.png');
+    align-self: center;
+    object-position: center;
+  }
+}

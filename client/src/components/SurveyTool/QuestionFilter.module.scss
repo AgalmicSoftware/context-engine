@@ -286,7 +286,10 @@ $text-color: var(--ce-border);
   padding: 0.5rem 0;
   color: $text-color;
   input[type='checkbox'] {
-    margin-right: 0.75rem;
+    position: static;
+    float: none;
+    flex: 0 0 auto;
+    margin: 0 0.75rem 0 0;
     cursor: pointer;
   }
 
@@ -1021,6 +1024,117 @@ $text-color: var(--ce-border);
     &:active {
       border-color: var(--ce-border-inset) !important;
       box-shadow: var(--ce-shadow-pressed) !important;
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .tagBubbleSelected,
+  .tagBubble[aria-pressed='true'],
+  .tagBubbleSelected:hover,
+  .tagBubble[aria-pressed='true']:hover,
+  .tagBubble[aria-pressed='true']:focus,
+  .tagBubble[aria-pressed='true']:focus-visible {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
+    opacity: 1;
+  }
+
+  .questionFilterInline,
+  .modalBody,
+  .filterSection .sectionContent,
+  .filterOption,
+  .filterBubble,
+  .typeTitle {
+    color: var(--ce-document-text);
+  }
+
+  .typeButton,
+  .typeButton:hover:not(:disabled) {
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .typeButtonActive,
+  .typeButtonActive:hover:not(:disabled) {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
+
+    .typeTitle {
+      color: inherit;
+    }
+  }
+
+  .typePillAgree {
+    background: var(--ce-response-agree-bg);
+    color: var(--ce-response-agree-text);
+  }
+
+  .typePillUnsure {
+    background: var(--ce-response-unsure-bg);
+    color: var(--ce-response-unsure-text);
+  }
+
+  .typePillDisagree {
+    background: var(--ce-response-disagree-bg);
+    color: var(--ce-response-disagree-text);
+  }
+
+  .aiFilterInputWrap {
+    :global(.audioTextarea),
+    :global([class*='audioTextarea']) {
+      color: var(--ce-text) !important;
+      background: var(--ce-input-bg) !important;
+      border-color: var(--ce-input-border) !important;
+    }
+
+    input[type='number'] {
+      color: var(--ce-text);
+      background: var(--ce-input-bg);
+      border-color: var(--ce-input-border);
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  // Disabled headers carry inline opacity; keep their loading labels readable.
+  .filterSection .sectionHeader {
+    opacity: 1 !important;
+  }
+
+  .disabledSection {
+    opacity: 1;
+  }
+
+  .filterSection .sbtSectionLoadingStatus {
+    color: var(--ce-document-text-muted);
+    opacity: 1;
+  }
+
+  #topQuestionsCountInput {
+    color: var(--ce-text) !important;
+    opacity: 1;
+  }
+
+  .aiApplyButton {
+    background: var(--ce-action-primary) !important;
+    color: var(--ce-action-primary-text) !important;
+    border-color: transparent !important;
+    box-shadow: none;
+
+    &:hover:not(:disabled),
+    &:focus,
+    &:focus-visible {
+      background: var(--ce-action-primary-hover) !important;
+      color: var(--ce-action-primary-text) !important;
+    }
+
+    &:disabled {
+      background: var(--ce-control-disabled-bg) !important;
+      color: var(--ce-control-disabled-text) !important;
+      opacity: 1;
     }
   }
 }

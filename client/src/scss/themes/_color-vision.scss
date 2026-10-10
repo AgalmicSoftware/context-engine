@@ -53,7 +53,8 @@
     }
   }
 
-  :root[data-ce-color-vision='color-blind'][data-ce-theme='classic-95'] {
+  :root[data-ce-color-vision='color-blind'][data-ce-theme='classic-95'],
+  :root[data-ce-color-vision='color-blind'][data-ce-theme='civic'] {
     --ce-response-agree-bg: #d9edf8;
     --ce-response-agree-text: #004b70;
     --ce-response-agree-border: #004b70;

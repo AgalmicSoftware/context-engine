@@ -3521,3 +3521,107 @@ $muted-text: var(--ce-panel-text-muted);
     grid-template-columns: 1fr;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .header h1,
+  .modeSectionHeading h3,
+  .contractLabel {
+    color: var(--ce-panel-text);
+  }
+
+  .groupWizard {
+    input::placeholder,
+    textarea::placeholder,
+    .interviewModePanelBody :global(.form-control)::placeholder {
+      color: var(--ce-document-text-muted) !important;
+      -webkit-text-fill-color: var(--ce-document-text-muted);
+      opacity: 1;
+    }
+
+    input:disabled,
+    select:disabled,
+    textarea:disabled,
+    input[readonly],
+    select[readonly],
+    textarea[readonly],
+    select option,
+    select optgroup {
+      background: var(--ce-control-disabled-bg);
+      color: var(--ce-control-disabled-text);
+      -webkit-text-fill-color: var(--ce-control-disabled-text);
+    }
+
+    button:disabled {
+      background: var(--ce-control-disabled-bg) !important;
+      color: var(--ce-control-disabled-text) !important;
+      border-color: var(--ce-document-border) !important;
+      opacity: 1 !important;
+    }
+  }
+
+  .normalModeCard,
+  .normalModeCard:hover {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    box-shadow: none;
+  }
+
+  .normalModeCardActive,
+  .normalModeCardActive:hover {
+    background: color-mix(in srgb, var(--ce-action-submit) 12%, var(--ce-surface));
+  }
+
+  .normalModeCardNumber,
+  .normalModeCardActive .normalModeCardNumber,
+  .normalModeCardSummary,
+  .step,
+  .stepCompleted {
+    color: var(--ce-document-text-muted);
+  }
+
+  .sessionIdBadge,
+  .sessionIdBadge:hover,
+  .headerChainSelector,
+  .headerChainSelector:hover {
+    color: var(--ce-document-text-muted);
+    opacity: 1;
+  }
+
+  .modeProfilePanel .moreOptionsToggleActive,
+  .publishSettingsButton:hover,
+  .publishSettingsButton:focus,
+  .publishSettingsButton:active {
+    color: var(--ce-control-text);
+  }
+
+  .workerModePillActive {
+    background: var(--ce-selection-bg) !important;
+    color: var(--ce-selection-text) !important;
+    box-shadow: none;
+  }
+
+  .modePresetButtonSelected,
+  .modePresetButton:hover,
+  .modePresetButton:focus-visible,
+  .createSbtButton,
+  .createSbtButton:hover,
+  .createSbtButton:focus,
+  .createSbtButton:active {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
+  }
+
+  .moreOptionsBody,
+  .interviewModePanel,
+  .interviewModePanelBody,
+  .promptPreview,
+  .encryptionGateCard,
+  .contractViewerModalContent {
+    background: var(--ce-document-surface);
+  }
+
+  .interviewModePanelBody p,
+  .modeSectionHeading p {
+    color: var(--ce-document-text-muted);
+  }
+}

@@ -583,8 +583,8 @@ $input-border: var(--ce-input-border);
       border-radius: var(--ce-radius-round);
     }
     .liveIndicator {
-      background: var(--ce-action-accent);
-      color: var(--ce-action-accent);
+      background: var(--ce-status-success);
+      color: var(--ce-status-success);
     }
     .endedIndicator {
       background: var(--ce-status-error);
@@ -1293,5 +1293,11 @@ $input-border: var(--ce-input-border);
   .modalBody button:not(.userItemActions button),
   .modalBody .userItem {
     transition-duration: 0.01ms !important;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .sbtItem .miniSbtName {
+    color: var(--ce-document-text);
   }
 }

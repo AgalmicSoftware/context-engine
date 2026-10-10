@@ -7,7 +7,8 @@ describe('pre-paint theme bootstrap', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('style');
-    document.documentElement.dataset.ceThemeRegistry = 'context-engine classic-95';
+    document.documentElement.dataset.ceThemeRegistry = 'context-engine classic-95 civic';
+    document.documentElement.dataset.ceLightThemes = 'classic-95 civic';
     document.documentElement.dataset.ceDeploymentTheme = 'classic-95';
     document.documentElement.removeAttribute('data-ce-theme');
     document.documentElement.removeAttribute('data-ce-theme-source');
@@ -19,6 +20,14 @@ describe('pre-paint theme bootstrap', () => {
 
     expect(document.documentElement.dataset.ceTheme).toBe('context-engine');
     expect(document.documentElement.dataset.ceThemeSource).toBe('user');
+  });
+
+  test('restores Civic with light native controls before the app loads', () => {
+    window.localStorage.setItem('ce:theme', 'civic');
+    window.eval(source);
+    expect(document.documentElement.dataset.ceTheme).toBe('civic');
+    expect(document.documentElement.dataset.ceThemeSource).toBe('user');
+    expect(document.documentElement.style.colorScheme).toBe('light');
   });
 
   test('rejects stale preferences and uses the deployment theme', () => {

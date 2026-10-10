@@ -563,7 +563,7 @@ export function QuestionFilterAiSection({
         <FormGroup>
           {!aiAccessEnabled && (
             <p className={styles.disabledText} style={QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE}>
-              AI filter unavailable. Requires an AI sponsored gate in this session or a local API key.
+              AI filter unavailable. Configure AI access for this session or add a local API key.
             </p>
           )}
           {isTopQuestionsModeActive && (

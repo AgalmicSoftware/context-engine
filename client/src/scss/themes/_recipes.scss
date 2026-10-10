@@ -81,3 +81,13 @@
     outline-offset: 2px;
   }
 }
+
+// Minimal controls use their fill and label for affordance; fields retain boundaries.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  :root[data-ce-theme] button,
+  :root[data-ce-theme] .btn,
+  :root[data-ce-theme] [role='button'] {
+    border-color: transparent;
+    box-shadow: none;
+  }
+}

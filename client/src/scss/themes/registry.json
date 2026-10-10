@@ -12,6 +12,12 @@
       "label": "Classic 95",
       "colorScheme": "light",
       "layoutProfile": "desktop-window"
+    },
+    {
+      "id": "civic",
+      "label": "Civic",
+      "colorScheme": "light",
+      "layoutProfile": "minimal-app"
     }
   ]
 }

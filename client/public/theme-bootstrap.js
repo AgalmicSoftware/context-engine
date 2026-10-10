@@ -34,5 +34,8 @@
     : isAllowed(deploymentTheme)
       ? 'deployment'
       : 'default';
-  root.style.colorScheme = themeId === 'classic-95' ? 'light' : 'dark';
+  var lightThemeIds = String(root.dataset.ceLightThemes || '')
+    .split(' ')
+    .filter(Boolean);
+  root.style.colorScheme = lightThemeIds.indexOf(themeId) !== -1 ? 'light' : 'dark';
 })();

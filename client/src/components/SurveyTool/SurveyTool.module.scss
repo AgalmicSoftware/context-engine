@@ -6915,3 +6915,305 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border: 1px solid var(--ce-card-border);
   border-radius: var(--ce-radius-8);
 }
+
+// Minimal layouts retain the existing answering flow while removing decorative depth.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .surveyTool,
+  .fullQuestionCard,
+  .pileCardInner,
+  .pileEmptyState {
+    background: var(--ce-surface);
+    border: 1px solid var(--ce-card-border);
+    color: var(--ce-panel-text);
+    box-shadow: none;
+    opacity: 1;
+  }
+
+  .pileCardHeader,
+  .fullQuestionHeader #questionTitle,
+  #questionTitle {
+    font-family: var(--ce-font-body);
+    color: var(--ce-panel-text);
+    letter-spacing: normal;
+    opacity: 1;
+  }
+
+  #questionTitle {
+    line-height: 1.45;
+  }
+
+  .pileNavCounterText {
+    color: var(--ce-panel-text-muted);
+    text-shadow: none;
+  }
+
+  .ratingValueDisplay {
+    color: var(--ce-panel-text);
+  }
+
+  .pileNavArrow,
+  .actionButton,
+  .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileCardFooter .pileIconButton,
+  .pileCardFooter .iconButton,
+  .fullQuestionBody .iconButton,
+  .fullQuestionBody .cardLinkButton {
+    color: var(--ce-control-text) !important;
+    opacity: 1;
+    filter: none;
+    box-shadow: none;
+    text-shadow: none;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      color: var(--ce-link) !important;
+      background: var(--ce-surface-subtle);
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+
+    &:disabled {
+      color: var(--ce-control-disabled-text) !important;
+      background: var(--ce-control-disabled-bg);
+      opacity: 1;
+    }
+  }
+
+  .pileNavArrow,
+  .pileNavArrow:hover:not(:disabled),
+  .pileNavArrow:focus-visible,
+  .pileNavArrow:active,
+  .pileNavArrow:disabled {
+    background: transparent;
+  }
+
+  .pileCardFooter .importanceText,
+  .pileCardFooter .convictionToggleLine,
+  .pileCardFooter .convictionToggleButton,
+  .pileCardFooter .convictionToggleDivider,
+  .pileCardFooter .convictionToggleValue {
+    color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+
+  .actionButtonActive,
+  .fullQuestionBody .fullQuestionBookmarkButtonActive {
+    color: var(--ce-action-accent) !important;
+  }
+
+  .pileActionsMenuEligible .pileActionButtonGroup {
+    border-color: var(--ce-card-border);
+    background: var(--ce-surface);
+    box-shadow: var(--ce-card-shadow);
+  }
+
+  .loadingContainer {
+    color: var(--ce-panel-text-muted);
+  }
+
+  // Choice labels previously borrowed inverse text; pair them with the control surface.
+  #multiChoice .checkboxOptionText,
+  .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+    color: var(--ce-control-text);
+    background: var(--ce-control-face);
+    border-color: transparent;
+    box-shadow: none;
+    opacity: 1;
+    transition: none;
+
+    &:hover {
+      background: var(--ce-surface-alt);
+      color: var(--ce-control-text);
+      box-shadow: none;
+      transform: none;
+    }
+
+    &.selected {
+      background: var(--ce-action-primary);
+      color: var(--ce-action-primary-text);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    &:has(input:disabled) {
+      background: var(--ce-control-disabled-bg);
+      color: var(--ce-control-disabled-text);
+      opacity: 1;
+    }
+  }
+
+  .pileFooter .pileIconButton,
+  .headerSubmitActions .pileIconButton,
+  .sessionListeningClose,
+  .sessionListeningClearTranscript,
+  .submitAux button {
+    color: var(--ce-status-danger-text);
+    background: transparent;
+    opacity: 1;
+    box-shadow: none;
+    text-shadow: none;
+    filter: none;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      color: var(--ce-status-danger-text);
+      background: var(--ce-response-disagree-bg);
+      opacity: 1;
+    }
+  }
+
+  #dropdownToggle,
+  #filterButton,
+  #showResultsButton,
+  #createSurveyButton {
+    border-color: transparent;
+    background: var(--ce-control-face);
+    box-shadow: none;
+  }
+
+  .pileFooter .pileSubmitButton,
+  .headerSubmitButton,
+  #submitSurveyButton {
+    box-shadow: none;
+
+    &:hover:not(:disabled),
+    &:focus:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+    }
+
+    &::before,
+    &::after {
+      display: none;
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  @media (max-width: 768px) {
+    .miniSpinnerWrapper {
+      right: 4px;
+    }
+  }
+}
+
+// Popovers need a matched surface/text pair; overlay-base is a scrim, not a panel.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .lockAudiencePopover {
+    background: var(--ce-overlay-surface);
+    color: var(--ce-overlay-text);
+    border: 1px solid var(--ce-document-border-strong);
+    box-shadow: var(--ce-card-shadow);
+    backdrop-filter: none;
+  }
+
+  .lockAudiencePopover .convictionToggleLine,
+  .lockAudiencePopover .convictionToggleButton,
+  .lockAudiencePopover .convictionToggleValue,
+  .lockAudiencePopover .lockAudienceCaretButton,
+  .lockAudiencePopover .lockAudienceGateDetailItem {
+    color: var(--ce-overlay-text);
+    opacity: 1;
+    text-shadow: none;
+  }
+
+  .lockAudiencePopover .lockAudienceMeta,
+  .lockAudiencePopover .lockAudienceGateDetailSbts {
+    color: var(--ce-overlay-text-muted);
+    opacity: 1;
+  }
+
+  .lockAudiencePopover .convictionToggleLine {
+    padding: 6px 8px;
+    border: 0;
+    box-shadow: none;
+
+    &:hover,
+    &:focus-visible,
+    &.convictionToggleButtonActive {
+      background: var(--ce-surface-alt);
+      color: var(--ce-link);
+      text-shadow: none;
+    }
+  }
+
+  .fullQuestionFooter .importanceSlider,
+  .pileCardFooter .importanceSlider,
+  .fullQuestionFooter .importanceText,
+  .fullQuestionFooter .convictionToggleLine,
+  .fullQuestionFooter .convictionToggleButton,
+  .fullQuestionFooter .convictionToggleDivider,
+  .fullQuestionFooter .convictionToggleValue {
+    color: var(--ce-panel-text);
+    opacity: 1;
+    text-shadow: none;
+  }
+
+  .pileCardFooter .convictionToggleButtonActive {
+    color: var(--ce-link);
+    text-shadow: none;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .sessionAgentKickoffToggle {
+    color: var(--ce-panel-text);
+    opacity: 1;
+  }
+
+  .sessionInterviewStatusPill {
+    color: var(--ce-response-agree-text) !important;
+    background: var(--ce-response-agree-bg) !important;
+
+    &[data-tone='pending'] {
+      color: var(--ce-response-unsure-text) !important;
+      background: var(--ce-response-unsure-bg) !important;
+    }
+
+    &[data-tone='error'] {
+      color: var(--ce-response-disagree-text) !important;
+      background: var(--ce-response-disagree-bg) !important;
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .ratingLabelText {
+    color: var(--ce-document-text);
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .pileNavArrow,
+  .actionButton,
+  .pileActionsMenuEligible .pileActionMenuToggle,
+  .pileCardFooter .pileIconButton,
+  .pileCardFooter .iconButton,
+  .fullQuestionBody .iconButton,
+  .fullQuestionBody .cardLinkButton {
+    opacity: 0.45;
+    transition: opacity 0.15s ease;
+
+    &:hover:not(:disabled),
+    &:focus-visible,
+    &:active:not(:disabled),
+    &[aria-pressed='true'],
+    &[aria-expanded='true'],
+    &[title='Close Create Interface'],
+    &.actionButtonActive,
+    &.iconButtonActive,
+    &.pileLockButtonMenuOpen,
+    &.fullQuestionBookmarkButtonActive {
+      opacity: 1 !important;
+    }
+
+    &:disabled {
+      opacity: 0.25;
+    }
+  }
+
+  .pileCardFooter:has(.pileCommentsRow) .pileCardIcons .commentButton {
+    opacity: 1;
+  }
+}

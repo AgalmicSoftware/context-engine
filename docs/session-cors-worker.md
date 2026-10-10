@@ -2088,6 +2088,13 @@ Signed login/bootstrap requests:
     conflicting payloads; missing coordination fails closed before the deploy
     or faucet side effect.
 - `POST /ai` or `POST /` with JSON `{ action: "ai", provider: "anthropic"|"openai"|"openrouter"|"custom", ... }`
+  - The question filter uses the matching session-page configuration for its
+    AI request. Worker-canonical sessions expose the filter when their valid
+    version-1 authority policy declares an `ai` participant or anonymous scope,
+    a Worker URL is configured, and `scopes.ai` is not explicitly disabled.
+    Registry SBT metadata is not required for this UI availability check;
+    the Worker still enforces authentication, scope access, and provider-key
+    availability when the request runs.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).
   - Anonymous `apiKey` + `provider: "custom"` requires `rpcUrl`; worker secret `customRpcUrl` is not used for this bypass path.

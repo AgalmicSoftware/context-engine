@@ -1295,3 +1295,62 @@ button.cell {
     font-size: 0.82rem;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .container {
+    // Keep the full heatmap intensity range readable with dark labels.
+    --ce-risk-opportunity-color: color-mix(in srgb, var(--ce-status-success) 60%, var(--ce-surface));
+    --ce-risk-danger-color: color-mix(in srgb, var(--ce-status-danger) 60%, var(--ce-surface));
+  }
+
+  .diagonalCell {
+    color: var(--ce-document-text-muted);
+  }
+
+  .atlasScenarioCard,
+  .atlasScenarioCard:hover,
+  .atlasScenarioCard:focus-within,
+  .commentItem,
+  .commentItemOpportunity,
+  .commentItemRisk {
+    background: var(--ce-document-surface);
+    border-color: var(--ce-document-border);
+  }
+
+  .commentSectionOpportunity,
+  .commentSectionRisk {
+    background: var(--ce-surface);
+  }
+
+  .atlasScenarioValence,
+  .atlasScenarioMetaPill,
+  .commentSectionCount,
+  .commentBadge,
+  .commentIntensity,
+  .commentFigureAvatarFallback {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+  }
+
+  .atlasScenarioValenceRisk {
+    background: var(--ce-response-disagree-bg);
+    color: var(--ce-response-disagree-text);
+  }
+
+  .atlasScenarioValenceOpportunity {
+    background: var(--ce-response-agree-bg);
+    color: var(--ce-response-agree-text);
+  }
+
+  .atlasScenarioValenceMixed {
+    background: var(--ce-response-unsure-bg);
+    color: var(--ce-response-unsure-text);
+  }
+
+  .commentReferenceLine,
+  .commentReferenceLink,
+  .commentReferenceLink:hover,
+  .commentReferenceLink:focus {
+    color: var(--ce-link);
+  }
+}

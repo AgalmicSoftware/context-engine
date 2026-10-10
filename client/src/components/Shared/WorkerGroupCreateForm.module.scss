@@ -343,3 +343,29 @@
     justify-self: start;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .sessionContextLabel {
+    color: var(--ce-panel-text-muted);
+  }
+
+  .sessionContextName,
+  .sectionHeading,
+  .accessLabel {
+    color: var(--ce-control-text);
+  }
+
+  .field input[type],
+  .field textarea,
+  .accessSelect,
+  .accessInput,
+  .inlineInputRow input[type] {
+    background: var(--ce-input-bg);
+    color: var(--ce-control-text);
+    border-color: var(--ce-input-border-strong);
+
+    &:focus {
+      background: var(--ce-input-bg);
+    }
+  }
+}

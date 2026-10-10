@@ -87,3 +87,44 @@
     background: var(--ce-status-error);
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .content,
+  .header,
+  .body {
+    background: var(--ce-overlay-surface);
+    color: var(--ce-overlay-text);
+    border-color: var(--ce-document-border);
+  }
+
+  .content .header {
+    padding: 16px;
+  }
+
+  .content .header :global(.close),
+  .content .header :global(.btn-close) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0 0 0 auto;
+    background: transparent;
+    color: var(--ce-control-text);
+    opacity: 1;
+  }
+
+  .footer {
+    border-color: var(--ce-document-border);
+  }
+
+  .cancelButton,
+  .cancelButton:hover,
+  .cancelButton:focus {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    border-color: transparent;
+  }
+}

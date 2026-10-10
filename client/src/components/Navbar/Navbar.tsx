@@ -3,6 +3,7 @@ import React, { Component } from 'react';
 
 import styles from './Navbar.module.scss';
 import StaticLogo from 'assets/img/context_engine_logo_static.png';
+import CivicLogo from 'assets/img/context_engine_logo_civic.png';
 import AnimatedLogo from 'assets/img/context_engine_logo_animation.gif';
 import AnimatedLogoPingPong from 'assets/img/context_engine_logo_animation_pingpong.gif';
 import {
@@ -143,7 +144,15 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               aria-label="Context Engine home"
               onClick={this.handleLogoLinkClick}
             >
-              <img id={styles.mainLogo} src={logoSrc} {...legacyFluidImgProp} alt="" aria-hidden="true"></img>
+              <img
+                id={styles.mainLogo}
+                className={styles.defaultLogo}
+                src={logoSrc}
+                {...legacyFluidImgProp}
+                alt=""
+                aria-hidden="true"
+              ></img>
+              <img className={styles.cleanLogo} src={CivicLogo} alt="" aria-hidden="true" />
             </a>
           </div>
           <div id={styles.accountSection}>
@@ -170,7 +179,15 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               aria-label="Context Engine home"
               onClick={this.handleLogoLinkClick}
             >
-              <img id={styles.mainLogoLoggedIn} src={logoSrc} {...legacyFluidImgProp} alt="" aria-hidden="true"></img>
+              <img
+                id={styles.mainLogoLoggedIn}
+                className={styles.defaultLogo}
+                src={logoSrc}
+                {...legacyFluidImgProp}
+                alt=""
+                aria-hidden="true"
+              ></img>
+              <img className={styles.cleanLogo} src={CivicLogo} alt="" aria-hidden="true" />
             </a>
           </div>
           <div id={styles.accountSectionLoggedIn}>

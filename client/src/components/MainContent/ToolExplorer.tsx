@@ -8,7 +8,6 @@ import {
   faExclamationTriangle,
   faExpand,
   faEye,
-  faLightbulb,
   faPlus,
   faProjectDiagram,
   faQuestionCircle,
@@ -37,12 +36,10 @@ import worldVoteImage from '../../assets/img/world_vote.jpg';
 import magnifyingGlassImage from '../../assets/img/magnifying_glass.png';
 import artHeader from '../../assets/img/art_header.png';
 import styles from './ToolExplorer.module.scss';
-import plusSignImage from '../../assets/img/plus_sign.png';
 
 // Tools/plugins are lazy-loaded so chunks are fetched only on click.
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const SurveyTool = React.lazy(() => import('../SurveyTool/SurveyTool'));
-const AudioInput = React.lazy(() => import('../Shared/AudioInput/AudioInput'));
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const AudioSurveyGenerator = React.lazy(() => import('../SurveyTool/SurveyGenerator/SurveyGenerator'));
@@ -122,7 +119,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       status: 'live',
     },
     {
-      name: 'Debate Tree',
+      name: 'Debate Map',
       subtext: 'For efficient discourse',
       icon: faProjectDiagram,
       explainText:
@@ -143,17 +140,6 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       headerImage: null,
       content: RiskMatrix,
       disabled: false,
-      status: 'future',
-    },
-    {
-      name: 'Suggest Tool',
-      subtext: 'Fill form',
-      icon: faLightbulb,
-      explainText: 'Suggest a tool or plugin which would aid in coordination between AI researchers and/or the public',
-      image: plusSignImage,
-      headerImage: null,
-      content: AudioInput,
-      disabled: true,
       status: 'future',
     },
   ];
@@ -293,7 +279,14 @@ const ToolExplorer = (props: ToolExplorerProps) => {
               preventUrlChange: true,
             }
           : {}),
-        ...(expandedToolName === 'Debate Tree' ? { demoMode: demoSurfaceEnabled } : {}),
+        ...(expandedToolName === 'Debate Map'
+          ? {
+              demoMode: demoSurfaceEnabled,
+              // The child clears its modal; its default close otherwise routes
+              // to /atlas and discards the surrounding Explorer view.
+              onModalClose: () => undefined,
+            }
+          : {}),
         ...(showGroupsHeaderActions
           ? {
               sessionSlug: props.activeSessionSlug,
@@ -434,7 +427,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
                   </div>
                 )}
 
-                {expandedComponent.data.name === 'Debate Tree' && (
+                {expandedComponent.data.name === 'Debate Map' && (
                   <a
                     href={buildPublicRoute('/atlas')}
                     className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}

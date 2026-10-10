@@ -94,6 +94,7 @@
     "ai:mint-test-sbt:dry": "DRY_RUN=1 npm run -s ai:node -- scripts/mint-test-sbt.js",
     "ai:test-worker-groups:auto-join": "node scripts/worker-group-auto-join-smoke.js",
     "ai:test-nav:smoke": "node scripts/vite-navigation-smoke.js",
+    "ai:test-theme:civic": "node --input-type=module -e \"import('./scripts/civic-theme-smoke.mjs').then(m => m.runSmoke())\"",
     "ai:test-theme:runtime": "npm run -s ai:node -- scripts/app-theme-runtime-smoke.js",
     "ai:test-nav:smoke:mobile": "PLAYWRIGHT_VIEWPORT=mobile npm run -s ai:test-nav:smoke",
     "ai:test-nav:smoke:firefox": "PLAYWRIGHT_BROWSER=firefox npm run -s ai:test-nav:smoke",

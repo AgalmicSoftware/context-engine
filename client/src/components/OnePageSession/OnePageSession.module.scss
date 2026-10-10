@@ -1102,6 +1102,10 @@
   min-width: 0;
 }
 
+.sectionExpanded .sectionHeaderText {
+  align-self: center;
+}
+
 .sectionHeaderTitle {
   display: block;
   max-width: 100%;
@@ -1119,9 +1123,12 @@
 }
 
 .sectionHeaderTooltip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1em;
+  line-height: 1;
   margin-left: 6px;
-  margin-top: 2px;
-  align-self: flex-start;
+  align-self: center;
   flex: 0 0 auto;
 }
 
@@ -1714,7 +1721,7 @@
   }
 
   .sectionHeader {
-    align-items: center;
+    align-items: flex-start;
     font-size: 1.6em;
     padding-left: 10px;
   }
@@ -2209,6 +2216,10 @@
     opacity: 0.5;
   }
 
+  .sectionsGrid .sectionHeaderTooltip {
+    font-size: 1.35rem;
+  }
+
   .sectionsGrid .sectionHeaderSubtitle {
     font-size: 1rem;
     font-weight: 400;
@@ -2359,4 +2370,184 @@
 
 .generatedResultsEmpty p {
   margin: 0;
+}
+
+// Center the session title while preserving its shared timed fade and interaction reveal.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .onePageDemoContainer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 clamp(12px, 3vw, 32px) 32px;
+    color: var(--ce-panel-text);
+  }
+
+  .titleContainer,
+  .titleContainer:hover,
+  .titleContainer:focus-within,
+  .titleContainer:active {
+    align-self: center;
+    margin: 16px 0 24px;
+    transform: none;
+  }
+
+  .brandingSectionTitle {
+    font-weight: 600;
+    opacity: 1;
+    letter-spacing: normal;
+    line-height: 1.3;
+  }
+
+  .sectionsGrid,
+  .sectionsGridTwoUp {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .sectionsGrid .sectionContainer {
+    margin: 0;
+    padding: 16px 20px;
+    box-shadow: none;
+  }
+
+  .sectionHeader,
+  .sectionHeaderTitle,
+  .sectionToggleIcon,
+  .pileHeaderTitleWrap,
+  .pileHeaderTitle {
+    color: var(--ce-panel-text);
+    opacity: 1;
+    font-family: var(--ce-font-body);
+  }
+
+  .sectionHeader {
+    align-items: center;
+    flex-wrap: nowrap;
+    line-height: 1.4;
+  }
+
+  .sectionHeader .sectionHeaderText {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .sectionHeader .sectionHeaderTitle {
+    // Match the caret's 1.5em box; subtitles must not shift its alignment.
+    line-height: 1.5;
+  }
+
+  .sectionHeaderTooltip svg {
+    color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+
+  .sectionHeader .sectionHeaderSubtitle {
+    color: var(--ce-panel-text-muted);
+    font-size: 1em;
+    font-weight: 400;
+    line-height: 1.5;
+    align-self: center;
+    opacity: 0.75;
+  }
+
+  .sectionHeaderViewModeButton,
+  .sectionHeaderActionButton,
+  .pileBackButton {
+    background: var(--ce-control-face);
+    border: 1px solid transparent;
+    color: var(--ce-control-text);
+    box-shadow: none;
+    text-shadow: none;
+    opacity: 1;
+    transform: none;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-surface-subtle);
+      border-color: var(--ce-focus-ring);
+      color: var(--ce-control-text);
+      box-shadow: none;
+      transform: none;
+    }
+  }
+
+  .sectionHeaderViewModeButtonActive,
+  .sectionHeaderViewModeButtonActive:hover,
+  .sectionHeaderViewModeButtonActive:focus-visible {
+    background: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+    border-color: var(--ce-action-primary);
+    box-shadow: none;
+    text-shadow: none;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  @media (min-width: 769px) {
+    // Reserve room for the submit rail while the title is visible or revealed.
+    .titleContainerWithPileSubmitRail,
+    .titleContainerWithPileSubmitRail:hover,
+    .titleContainerWithPileSubmitRail:focus-within,
+    .titleContainerWithPileSubmitRail:active {
+      margin-bottom: 96px;
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .telegramListEmpty {
+    color: var(--ce-panel-text-muted);
+  }
+}
+
+// Keep nested section surfaces from consuming the mobile content width.
+@media only screen and (max-width: 767px) {
+  .onePageDemoContainer {
+    padding: 0 6px 20px;
+  }
+
+  .sectionsGrid,
+  .sectionsGridTwoUp {
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .sectionsGrid .sectionContainer {
+    min-height: 0;
+    margin: 0;
+    padding: 8px;
+  }
+
+  .sectionsGrid .sectionHeaderRow,
+  .sectionsGrid .sectionExpanded .sectionHeaderRow {
+    min-height: 44px;
+    gap: 8px;
+  }
+
+  .sectionsGrid .sectionHeader {
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .sectionsGrid .miniSectionContent {
+    margin-top: 8px;
+    padding: 0;
+  }
+
+  .sectionsGrid .sectionExpanded .resultsModeActionsScroller {
+    padding: 4px 0;
+    margin-block: -4px;
+  }
+
+  .resultsModeActions {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 8px;
+  }
+
+  .resultsModeActions .sectionHeaderViewModeButton {
+    min-height: 44px;
+    padding: 8px 10px;
+  }
 }

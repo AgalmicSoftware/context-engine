@@ -30,13 +30,13 @@
   border: 1px solid var(--ce-color-border-light);
   border-radius: var(--ce-radius-4);
   background: var(--ce-color-white);
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
 }
 
 .heading {
   font-size: 1.4rem;
   margin-bottom: 10px;
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
 }
 
 .demoToggleRow {
@@ -151,11 +151,11 @@
 .statLabel {
   font-weight: 600;
   margin-right: 4px;
-  color: var(--ce-color-border); // UPDATED: Ensure label text is always dark.
+  color: var(--ce-document-text); // UPDATED: Ensure label text is always dark.
 }
 
 .statValue {
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
 }
 
 .filterList > div {
@@ -242,13 +242,13 @@
 .sectionTitle {
   margin: 0;
   font-size: 1.2rem;
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
 }
 
 .sectionHeader {
   font-size: 1.4rem;
   margin-bottom: 10px;
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
   font-weight: 600;
 }
 
@@ -561,7 +561,7 @@
 
 .toggleButtonInactive {
   background-color: var(--ce-surface-subtle);
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
   border: 1px solid var(--ce-text-muted);
   padding: 4px 8px;
   cursor: pointer;
@@ -587,7 +587,7 @@
 }
 
 .orgReportTitle {
-  font-size: 1.4rem; // Make org title prominent  color: var(--ce-color-border);
+  font-size: 1.4rem; // Make org title prominent  color: var(--ce-document-text);
   margin-bottom: 5px;
 }
 
@@ -778,7 +778,7 @@
 }
 
 .analysisNote {
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
 }
 
 .clusterAnalysisText {
@@ -794,7 +794,7 @@
 }
 
 .clusterAnalysisLong {
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
 }
 
 .clusterAnalysisError {
@@ -835,7 +835,7 @@
 
 .participantAddressLink {
   text-decoration: none;
-  color: var(--ce-color-border);
+  color: var(--ce-document-text);
   font-family: var(--ce-font-mono);
   font-size: 1.1rem;
   display: block;
@@ -1497,5 +1497,41 @@
 
   .clusterHeader .analyzeClustersBtn {
     order: 1;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .sessionInfo {
+    color: var(--ce-document-text-muted);
+    opacity: 1;
+  }
+
+  .polisReportContainer button {
+    border-color: transparent !important;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .polisReportContainer.sessionEmbeddedReport {
+    margin-top: 0;
+    padding: 6px;
+    max-width: 100%;
+    overflow-x: auto;
+
+    .settingsRow {
+      padding: 6px;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .reportInner:not(.pdfDesktopWidth) {
+      padding: 8px;
+    }
+
+    .brandingHeader {
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+    }
   }
 }

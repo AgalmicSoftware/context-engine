@@ -6,8 +6,8 @@ global compatibility styles, and browser-rendered visualizations.
 ## Sources Of Truth
 
 - The exact required-token contract lives in `client/src/scss/themes/_contract.scss`.
-- Named values live in `client/src/scss/themes/_context-engine.scss` and
-  `client/src/scss/themes/_classic-95.scss`.
+- Named values live in `client/src/scss/themes/_context-engine.scss`,
+  `client/src/scss/themes/_classic-95.scss`, and `client/src/scss/themes/_civic.scss`.
 - Theme metadata and the closed runtime allowlist live in
   `client/src/scss/themes/registry.json`.
 - Shared theme-aware control recipes live in `client/src/scss/themes/_recipes.scss`.
@@ -17,6 +17,21 @@ global compatibility styles, and browser-rendered visualizations.
   values. Do not add theme-dependent component values there.
 
 ## Runtime Resolution
+
+Session section headers show their action subtitles only while collapsed:
+Groups uses “Join or Create”, and Context and Results use “View”. Expanding
+a section removes its subtitle; collapsing it restores the subtitle. This
+behavior is shared across all themes.
+
+Below 768px, the session shell uses compact shared gutters and section gaps.
+Expanded content avoids an extra padded wrapper, and the embedded report uses
+smaller toolbar and content insets. Results controls retain 44px touch targets
+and use the available width; desktop and standalone report spacing is unchanged.
+
+Civic question previews and response cards use panel text on light surfaces for
+choice labels, freeform answers, rating values, comments, encrypted placeholders,
+and aggregate summaries. Response stance pills keep their semantic background
+and foreground colors.
 
 The document root carries `data-ce-theme` and `data-ce-theme-source`. Resolution
 order is:
@@ -42,7 +57,7 @@ theme selector. It persists locally as `ce:color-vision`, restores before paint,
 and synchronizes across tabs. The shared palette uses blue for support/agree,
 orange for oppose/disagree, and gray for unsure. Response labels and signed
 values remain present. Semantic response, status, and chart-series tokens update
-across both themes; report text uses darker shades on white paper. Polis binary
+across all bundled themes; report text uses darker shades on white paper. Polis binary
 bars use the same `--ce-binary-choice-*` tokens as the pile inputs. Report SVG
 colors are resolved on the PDF capture clone so exports retain the preference.
 The palette overlay lives in `scss/themes/_color-vision.scss`; categorical SVG
@@ -50,7 +65,8 @@ charts use `chartColors.ts` token references instead of fixed JavaScript colors.
 
 Quadratic option scrolling uses `--ce-option-scroll-*` tokens for its yellow
 navigation cues, including hover and disabled states. These controls retain the
-same colors in both bundled themes and are independent of response stance colors.
+same colors in Context Engine and Classic 95; Civic uses a quiet blue-gray treatment.
+They remain independent of response stance colors.
 Their foreground/background pairs are contrast-tested at 4.5:1.
 
 ## Adding A Bundled Theme
@@ -71,11 +87,57 @@ The `--ce-layout-profile` contract token is the structural counterpart to the
 palette and control tokens. The document root is the named `ce-theme` style
 container, so components that genuinely change layout use
 `@container ce-theme style(--ce-layout-profile: …)` instead of naming an app
-theme ID. The `standard-app` profile keeps the existing application layout;
-the `desktop-window` profile provides the compact window grammar used by the home
+theme ID. The `standard-app` profile keeps the existing application layout.
+The `minimal-app` profile adds the restrained session and control layout used by Civic.
+The `desktop-window` profile provides the compact window grammar used by the home
 window, Control Panel applets, Statistics split pane, question dialog, login
 control, and bottom taskbar. Keep ordinary color, spacing, and control changes
 on their narrower semantic tokens rather than adding structural queries.
+
+`civic` is a white, minimal theme for government and business sessions. Select
+**Civic** in Settings → App theme, or use `REACT_APP_CE_DEFAULT_THEME=civic`
+for a deployment default. It uses dark slate text, blue actions, subtle borders,
+modest corner radii, sans-serif typography with system fallbacks, and flat surfaces.
+Login and Submit share the brighter blue submit palette, including hover states.
+Civic Welcome slides use a white canvas, opaque artwork, dark copy, and blue navigation. White line-art illustrations are inverted only within this profile; color illustrations retain their original colors.
+
+The `minimal-app` layout profile centers session titles with the shared five-second fade and hover/focus reveal, presents session
+sections as a single column of compact rows, and removes decorative depth from
+question cards and account controls. Explorer tabs use blue selected/hover text
+and dark inactive icons on the light header. Expanded Explorer controls, group
+names, Context corpus cards, Risk Matrix details, and Debate Map labels use
+explicit light-surface text pairs. Stats leaderboard addresses, detail dialogs,
+and group filter controls also use these pairs. Debate details use light argument cards,
+historical-case briefs, badges, and question previews. Existing answering, results, privacy, and
+access workflows are preserved. Code and JSON retain a separate monospace font.
+Question authoring uses readable type previews, form placeholders, option labels,
+JSON/AI prompt panels, and disabled submit labels on light surfaces.
+Native controls use a light color scheme before first paint; color-blind mode
+uses the light-surface response palette. The contrast checks cover text,
+controls, disabled actions, session chrome, and focus indicators; this is not a
+claim of complete accessibility certification.
+
+The Stats tab includes a Sessions count across the app's discovered registry
+sessions, configured Worker sessions, and previously visited Worker sessions.
+Opening it shows centralized and decentralized totals and a scrollable list of
+session links. Classification follows canonical authority: Worker authority is
+centralized and EVM registry authority is decentralized, even when a session also
+uses the other backend for supporting services. Missing authority metadata is
+shown as "Type unavailable." This directory is independent of the selected
+session scope used by the other Stats counts. Its five summary buttons wrap to
+three columns on narrow phones.
+The Sessions dialog's header filter button opens type, creation-date range,
+last-activity range, and admin-address filters. These combine immediately and
+update the visible totals. Date ranges include both local calendar dates;
+address matching ignores case and accepts partial addresses. Activity reflects
+recorded session creation or updates, not when a local cache was refreshed.
+Sessions with unavailable metadata are excluded only by the relevant active
+filter. Clear filters restores the full directory.
+
+The Consensus Difference chart and leaderboard each show their session scope at
+the top of the section, using the session name and slug when available. Combined
+views list selected sessions or show "All sessions." When the chart displays
+bundled demo data, its label identifies the demo session that supplied the data.
 
 `classic-95` follows the owner's personal-site visual grammar—teal canvas,
 gray raised/inset surfaces, navy title bars, square controls, and Tahoma-style
@@ -180,7 +242,7 @@ session appearance state.
 
 ## Semantic Token Families
 
-Components consume meanings, not palette values. The two bundled theme maps
+Components consume meanings, not palette values. The bundled theme maps
 may therefore change color, typography, geometry, borders, elevation, and
 control states without component selectors in a theme file.
 
@@ -316,7 +378,7 @@ Use this shared blue CTA family for actual end-of-flow create and submit actions
 ## Literal Ownership And Usage Rules
 
 - Do not introduce hardcoded theme-semantic colors. The baseline is zero.
-- The exact raw-value owners are the two bundled app-theme maps, the
+- The exact raw-value owners are the bundled app-theme maps, the
   color-vision palette overlay, the bundled session-scheme map, the
   deterministic fixed-light standalone export, the fixed-media QR/bitmap
   constants, and the deterministic blockie generator.
@@ -362,3 +424,21 @@ Welcome geometry and theme-specific artwork/action styling are also checked at
 the 735×803 feedback viewport plus compact, wide, and ultra-wide/short desktop
 sizes so content, artwork, and the bottom controls cannot overlap or escape the
 frame.
+
+For Civic Explorer tab labels, session choice-state contrast, clear control, centered title with timed fade, report
+readability, and login-size regression smoke, start a local server with demo surfaces
+enabled and run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:civic`.
+The smoke covers desktop and mobile Explorer cards and all five expanded tools,
+including the eight Context corpus categories, Risk Matrix details, and Debate Map
+circle/tree/list views and expanded historical-case briefs with question previews.
+Stats checks cover the expanded participant list, detail dialogs, group filters,
+session scope labels, session filters and clearing, and session totals, links, and keyboard scrolling through
+the directory.
+Wizard checks cover both hosting profiles, every setup
+step, custom settings, local group drafts, group selectors, and contract previews.
+Session checks include encryption audience menus, group
+details, comments, conviction controls, question filters, tag menus, and the voice
+mode chooser/setup. Manual authoring checks cover all five question types, survey
+fields, and JSON/AI prompt panels. It checks rendered text contrast with ancestor opacity, translucent surfaces,
+gradient stops, and text-field fill colors included. It never deploys a session,
+submits responses, or starts recording.

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import * as sass from 'sass';
+import registry from './registry.json';
 
 type Rgba = [number, number, number, number];
 
@@ -83,7 +84,7 @@ describe('bundled app-theme contrast', () => {
     style: 'expanded',
   }).css;
 
-  test.each(['context-engine', 'classic-95'])('%s meets documented text and focus contrast', (themeId) => {
+  test.each(registry.themes.map(({ id }) => id))('%s meets documented text and focus contrast', (themeId) => {
     const values = themeValues(css, themeId);
     const textPairs = [
       ['document-text', 'document-canvas', 'document-canvas'],
@@ -139,19 +140,35 @@ describe('bundled app-theme contrast', () => {
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
   });
 
+  test('Civic keeps forms, disabled actions, and session chrome readable', () => {
+    const values = themeValues(css, 'civic');
+    [
+      ['text', 'input-bg'],
+      ['text-muted', 'input-bg'],
+      ['session-chrome-contrast', 'session-chrome'],
+      ['session-accent-contrast', 'session-accent'],
+      ['control-disabled-text', 'control-disabled-bg'],
+      ['action-submit-disabled-text', 'action-submit-disabled-bg'],
+      ['nav-tab-inactive', 'titlebar-bg'],
+    ].forEach(([foreground, background]) => assertContrast(values, foreground, background, 4.5));
+    assertContrast(values, 'input-border', 'input-bg', 3);
+  });
+
   test('classic-95 keeps inactive title-bar tab icons visibly distinct', () => {
     const values = themeValues(css, 'classic-95');
     assertContrast(values, 'nav-tab-inactive', 'titlebar-bg', 3, 'canvas');
   });
 
-  test.each(['context-engine', 'classic-95'])('%s color-blind mode keeps response text legible', (themeId) => {
+  test.each(registry.themes.map(({ id }) => id))('%s color-blind mode keeps response text legible', (themeId) => {
     const values = themeValues(css, themeId);
     const selectors = [':root[data-ce-color-vision=color-blind]'];
-    if (themeId === 'classic-95') selectors.push(':root[data-ce-color-vision=color-blind][data-ce-theme=classic-95]');
+    if (registry.themes.find(({ id }) => id === themeId)?.colorScheme === 'light') {
+      selectors.push(`:root[data-ce-color-vision=color-blind][data-ce-theme=${themeId}]`);
+    }
     selectors.forEach((selector) => {
-      const start = css.indexOf(`${selector} {`);
+      const start = css.indexOf(selector);
       expect(start).toBeGreaterThan(-1);
-      const block = css.slice(start, css.indexOf('}', start));
+      const block = css.slice(css.indexOf('{', start), css.indexOf('}', start));
       for (const match of block.matchAll(/--ce-([a-z0-9-]+):\s*([^;]+);/g)) values[match[1]] = match[2].trim();
     });
     ['agree', 'unsure', 'disagree'].forEach((stance) => {

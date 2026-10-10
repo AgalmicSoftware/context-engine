@@ -1423,6 +1423,29 @@ describe('OnePageSession view gating', () => {
     expect(contextTextWrap.parentElement).toBe(contextHeader);
   });
 
+  it('hides section subtitles while expanded and restores them when collapsed', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        sessionConfig={{ ...buildProps().sessionConfig, slug: 'demo', sessionName: 'Context Engine' }}
+      />,
+    );
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    for (const [testId, subtitle] of [
+      [E2E_TESTIDS.SESSION_GROUPS_TOGGLE, 'Join or Create'],
+      ['ce-demo-documents-toggle', 'View'],
+      [E2E_TESTIDS.SESSION_RESULTS_TOGGLE, 'View'],
+    ]) {
+      const header = screen.getByTestId(testId);
+      expect(within(header).getByText(subtitle)).toBeInTheDocument();
+      fireEvent.click(header);
+      expect(within(header).queryByText(subtitle)).not.toBeInTheDocument();
+      fireEvent.click(header);
+      expect(within(header).getByText(subtitle)).toBeInTheDocument();
+    }
+  });
+
   it('keeps both words in compact expandable-section headings at the same size', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const compactSectionHeaderBlock = extractMediaBlock(

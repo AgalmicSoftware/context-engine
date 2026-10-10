@@ -278,3 +278,23 @@
     gap: 6px;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .urlInput {
+    color: var(--ce-control-text);
+    background: var(--ce-input-bg);
+    border-color: var(--ce-input-border-strong);
+
+    &::placeholder {
+      color: var(--ce-panel-text-muted);
+      opacity: 1;
+    }
+  }
+
+  .previewOverlay,
+  .clearButton,
+  .clearButton:hover {
+    background: var(--ce-overlay-surface);
+    color: var(--ce-overlay-text);
+  }
+}

@@ -494,3 +494,41 @@
     }
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .copyrightContent {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  @media (min-width: 769px) {
+    .footer {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+      gap: 16px;
+
+      nav {
+        width: auto;
+      }
+
+      .copyright {
+        flex: 0 0 auto;
+        margin: 0 0 0 auto;
+      }
+    }
+  }
+
+  .githubLink {
+    margin-left: 10px;
+    color: var(--ce-panel-text);
+    opacity: 1;
+
+    &:hover,
+    &:focus {
+      color: var(--ce-link);
+    }
+  }
+}

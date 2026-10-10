@@ -3,6 +3,7 @@ import * as aiClient from '../../utilities/ai/aiClient.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
 jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
@@ -10,7 +11,96 @@ jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
 const QuestionFilter: any = QuestionFilterComponent;
 const sponsoredAccessAny: any = sponsoredAccess;
 
+const workerAiConfig = () => ({
+  slug: 'worker-ai',
+  sessionId: '0x11111111111111111111111111111111',
+  corsWorkerUrl: 'https://worker-ai.example.test',
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  workerAuthority: { version: 1, participantScopes: ['ai'], anonymousScopes: [] },
+});
+
 describe('QuestionFilter AI ranking lifecycle', () => {
+  it.each([
+    { version: 1, participantScopes: ['ai'], anonymousScopes: [] },
+    { version: 1, participantScopes: [], anonymousScopes: ['ai'] },
+    { version: 1, participantScopes: [' AI '], anonymousScopes: [] },
+  ])('enables Worker AI without an on-chain gate for policy %j', (workerAuthority) => {
+    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    try {
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'worker-ai',
+        sessionConfig: { ...workerAiConfig(), workerAuthority },
+      });
+      expect(instance.getAiAccessState()).toMatchObject({ enabled: true, localKeyAvailable: false });
+    } finally {
+      localSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    { workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] } },
+    { workerAuthority: { participantScopes: ['ai'] } },
+    { workerAuthority: null },
+    { scopes: { ai: false } },
+    { corsWorkerUrl: '' },
+    { sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+  ])('does not infer Worker AI access from an incomplete or disabled policy %j', (overrides) => {
+    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    try {
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'worker-ai',
+        sessionConfig: { ...workerAiConfig(), ...overrides },
+      });
+      expect(instance.getAiAccessState().enabled).toBe(false);
+    } finally {
+      localSpy.mockRestore();
+    }
+  });
+
+  it('ranks through the active Worker session without requiring registry gate metadata', async () => {
+    const sessionConfig = workerAiConfig();
+    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q2', 'q1']);
+    try {
+      const questions = [
+        { id: 'q1', type: 'binary', prompt: 'Question one' },
+        { id: 'q2', type: 'binary', prompt: 'Question two' },
+      ];
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'worker-ai',
+        sessionConfig,
+        questions,
+        questionResponses: {},
+      });
+      instance._isMounted = true;
+      instance.handleApplyFilters = jest.fn();
+      instance.setState = (next, cb) => {
+        instance.state = { ...instance.state, ...(typeof next === 'function' ? next(instance.state) : next) };
+        cb?.();
+      };
+      instance.state = { ...instance.state, mergedQuestions: questions, aiDraftQuery: 'governance', aiRankingCount: 2 };
+      expect(await instance.handleApplyAIFilter()).toBe(true);
+      expect(rankSpy).toHaveBeenCalledWith(
+        'governance',
+        questions,
+        2,
+        expect.objectContaining({
+          sessionSlug: 'worker-ai',
+          sessionConfig: expect.objectContaining({
+            corsWorkerUrl: sessionConfig.corsWorkerUrl,
+            workerAuthority: sessionConfig.workerAuthority,
+          }),
+          throwOnError: true,
+        }),
+      );
+      expect(instance.state.aiRankedQuestionIds).toEqual(['q2', 'q1']);
+      expect(instance.state.aiFilterApplied).toBe(true);
+    } finally {
+      localSpy.mockRestore();
+      rankSpy.mockRestore();
+    }
+  });
+
   it('enables AI filter when sponsored gate is available or local key exists', () => {
     const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource');
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings');

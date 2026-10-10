@@ -1678,3 +1678,15 @@ $placeholder-color: var(--ce-panel-text-muted);
     }
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .createGroupExpanded .inputColumn {
+    input[type='text'],
+    input[type='number'],
+    input[type='password'],
+    textarea {
+      color: var(--ce-control-text);
+      background: var(--ce-input-bg);
+    }
+  }
+}

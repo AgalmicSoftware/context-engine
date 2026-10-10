@@ -488,3 +488,61 @@
   box-shadow: 0 8px 22px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   color: var(--ce-document-text);
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .filterButton,
+  .filterButton:hover,
+  .filterButton:focus,
+  .filterButton:active {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    border-color: var(--ce-input-border);
+    opacity: 1;
+  }
+
+  .filterOptions,
+  .filterOptionsOnLight {
+    background: var(--ce-card-bg);
+    border-color: var(--ce-input-border);
+    color: var(--ce-panel-text);
+  }
+
+  .filterOptions h5,
+  .filterOptions .sbtLabel {
+    color: var(--ce-panel-text);
+  }
+
+  .adminVariant,
+  .adminVariant .groupPicker,
+  .createVariant .groupPicker,
+  .menuFooter {
+    background: var(--ce-document-surface);
+  }
+
+  .adminVariant .groupSelect,
+  .adminVariant .sbtAddressInput,
+  .createVariant .groupSelect,
+  .createVariant .sbtAddressInput {
+    background: var(--ce-input-bg);
+    color: var(--ce-control-text);
+  }
+
+  .adminVariant .addressTag,
+  .createVariant .addressTag,
+  .createVariant .sbtAddButton,
+  .quickChip,
+  .quickChip:hover,
+  .menuButton,
+  .menuButton:hover {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    opacity: 1;
+  }
+
+  .quickChipSelected,
+  .quickChipSelected:hover {
+    background: var(--ce-control-disabled-bg);
+    color: var(--ce-control-disabled-text);
+    opacity: 1;
+  }
+}

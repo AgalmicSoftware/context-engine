@@ -12,6 +12,7 @@ import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtil
 import { toStr } from '../../utilities/shared/primitives.js';
 import { rankQuestionsAI } from '../../utilities/ai/aiClient.js';
 import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
 import {
   getGateSbtAddresses,
@@ -409,12 +410,30 @@ class QuestionFilter extends React.Component<any, any> {
 
   getAiAccessState = (propsIn: QuestionFilterSessionProps = this.props): QuestionFilterAiAccessState => {
     const cfg = this.getEffectiveSessionConfig(propsIn);
+    const capabilities = resolveSessionCapabilityProjection(cfg);
+    const workerPolicy = toUnknownRecord(cfg.workerAuthority);
+    const hasAiScope = (scopes: unknown): boolean =>
+      Array.isArray(scopes) &&
+      scopes.some(
+        (scope) =>
+          String(scope || '')
+            .trim()
+            .toLowerCase() === 'ai',
+      );
+    // Worker sessions have no registry SBT gate. Offer their configured AI route;
+    // the Worker still enforces login, scopes, and resource availability on use.
+    const workerAvailable =
+      capabilities.isWorkerCanonical &&
+      Number(workerPolicy.version) === 1 &&
+      !!String(cfg.corsWorkerUrl || '').trim() &&
+      toUnknownRecord(cfg.scopes).ai !== false &&
+      (hasAiScope(workerPolicy.participantScopes) || hasAiScope(workerPolicy.anonymousScopes));
     const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
     const sponsoredStatus = String(gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE);
     const sponsoredAvailable =
       sponsoredStatus === SPONSORED_GATE_STATES.OPEN || sponsoredStatus === SPONSORED_GATE_STATES.RESTRICTED;
     const localKeyAvailable = this.hasConfiguredLocalAiKey();
-    const enabled = sponsoredAvailable || localKeyAvailable;
+    const enabled = workerAvailable || sponsoredAvailable || localKeyAvailable;
     return {
       enabled,
       sponsoredAvailable,
@@ -1984,7 +2003,7 @@ class QuestionFilter extends React.Component<any, any> {
       if (!auto) {
         this.setState(
           buildQuestionFilterAiApplyErrorPatch(
-            'AI filter is unavailable. Add a local API key or use a session with sponsored AI access.',
+            'AI filter is unavailable. Add a local API key or use a session with AI access configured.',
           ),
         );
       }

@@ -2426,7 +2426,10 @@ export default function PolisReport({
    ***************************************************************/
   if (groupResolution.cohort.active && groupResolution.cohort.status !== 'ready')
     return (
-      <div className={styles.polisReportContainer} data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}>
+      <div
+        className={`${styles.polisReportContainer} ${onePageDemo ? styles.sessionEmbeddedReport : ''}`}
+        data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}
+      >
         <p role={groupResolution.cohort.status === 'error' ? 'alert' : 'status'}>{groupResolution.cohort.message}</p>
         <button type="button" onClick={groupResolution.refresh}>
           Retry Group filter
@@ -2435,7 +2438,7 @@ export default function PolisReport({
     );
   return (
     <div
-      className={`${styles.polisReportContainer} ${isModernStyle ? styles.polisReportModern : ''} ${isDarkStyle ? styles.polisReportDark : ''}`}
+      className={`${styles.polisReportContainer} ${onePageDemo ? styles.sessionEmbeddedReport : ''} ${isModernStyle ? styles.polisReportModern : ''} ${isDarkStyle ? styles.polisReportDark : ''}`}
       data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}
       ref={containerRef}
       onMouseMove={handleContainerMouseMove}

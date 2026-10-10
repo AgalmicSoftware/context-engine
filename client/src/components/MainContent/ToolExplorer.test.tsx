@@ -116,6 +116,19 @@ describe('ToolExplorer session propagation', () => {
     });
   });
 
+  it('keeps the expanded Debate Map mounted when its detail modal closes', async () => {
+    renderToolExplorer();
+    fireEvent.click(screen.getByText('Debate Map', { exact: true }));
+    await screen.findByTestId('mock-debate-map');
+    const { onModalClose } = mockDebateMap.mock.calls.at(-1)[0];
+    expect(onModalClose).toEqual(expect.any(Function));
+    onModalClose();
+    expect(screen.getByTestId('mock-debate-map')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '← Back', exact: true }));
+    expect(screen.queryByTestId('mock-debate-map')).not.toBeInTheDocument();
+    expect(screen.getByText('Debate Map', { exact: true })).toBeInTheDocument();
+  });
+
   it('passes the inherited active session slug into the embedded SurveyTool', async () => {
     const sessionConfig = { slug: 'demo', storageProfile: { backend: 'cloudflare' } };
     const questionScanProgress = { slug: 'demo', phase: 'hydrate', discoveredQuestions: 3 };
@@ -235,7 +248,7 @@ describe('ToolExplorer session propagation', () => {
     fireEvent.click(screen.getByText('Groups'));
     expect(await screen.findByRole('link', { name: /^View All$/i })).toHaveAttribute('href', `/ce${sbtsListPath()}`);
     fireEvent.click(screen.getByRole('button', { name: /^← Back$/i }));
-    fireEvent.click(screen.getByText('Debate Tree'));
+    fireEvent.click(screen.getByText('Debate Map'));
     expect(await screen.findByRole('link', { name: /^Full Screen$/i })).toHaveAttribute('href', '/ce/atlas');
   });
 
@@ -339,13 +352,13 @@ describe('ToolExplorer session propagation', () => {
     async ({ demoSurfaceMode, expectedDemoMode }: { demoSurfaceMode: boolean | null; expectedDemoMode: string }) => {
       renderToolExplorer({ demoSurfaceMode });
 
-      expect(screen.getByText('Debate Tree')).toBeInTheDocument();
+      expect(screen.getByText('Debate Map')).toBeInTheDocument();
       expect(screen.getByText('Risks')).toBeInTheDocument();
-      expect(screen.getByText('Suggest Tool')).toBeInTheDocument();
+      expect(screen.queryByText('Suggest Tool')).not.toBeInTheDocument();
       expect(screen.getByText('Live')).toBeInTheDocument();
       expect(screen.getByText('Demo')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByText('Debate Tree'));
+      fireEvent.click(screen.getByText('Debate Map'));
 
       expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', expectedDemoMode);
     },
@@ -355,7 +368,7 @@ describe('ToolExplorer session propagation', () => {
     const { container } = renderToolExplorer({ demoSurfaceMode: false });
 
     expect(screen.getByText('Questions')).toBeInTheDocument();
-    expect(screen.queryByText('Debate Tree')).not.toBeInTheDocument();
+    expect(screen.queryByText('Debate Map')).not.toBeInTheDocument();
     expect(screen.queryByText('Risks')).not.toBeInTheDocument();
     expect(screen.queryByText('Suggest Tool')).not.toBeInTheDocument();
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
@@ -391,7 +404,7 @@ describe('ToolExplorer session propagation', () => {
     const { container } = renderToolExplorer({ demoSurfaceMode: true });
     const explorerCols = Array.from(container.querySelectorAll(`.${styles.explorerCol}`));
 
-    expect(explorerCols).toHaveLength(6);
+    expect(explorerCols).toHaveLength(5);
     explorerCols.forEach((col) => {
       expect(col).toHaveClass(styles.statusBorderEnabled);
     });
@@ -400,7 +413,7 @@ describe('ToolExplorer session propagation', () => {
   it('collapses an expanded demo card when demoSurfaceMode flips to false', async () => {
     const { rerender } = renderToolExplorer({ demoSurfaceMode: true });
 
-    fireEvent.click(screen.getByText('Debate Tree'));
+    fireEvent.click(screen.getByText('Debate Map'));
     expect(await screen.findByTestId('mock-debate-map')).toBeInTheDocument();
 
     rerender(
@@ -420,6 +433,6 @@ describe('ToolExplorer session propagation', () => {
 
     expect(screen.queryByTestId('mock-debate-map')).not.toBeInTheDocument();
     expect(screen.getByText('Questions')).toBeInTheDocument();
-    expect(screen.queryByText('Debate Tree')).not.toBeInTheDocument();
+    expect(screen.queryByText('Debate Map')).not.toBeInTheDocument();
   });
 });

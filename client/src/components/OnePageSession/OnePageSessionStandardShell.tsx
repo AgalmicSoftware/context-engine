@@ -665,7 +665,7 @@ export default function OnePageSessionStandardShell({
                 ) : (
                   <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                 )}
-                {renderSectionHeading('Context', 'View')}
+                {renderSectionHeading('Context', showDocuments ? null : 'View')}
                 {showDocuments && (
                   <div
                     className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
@@ -741,7 +741,7 @@ export default function OnePageSessionStandardShell({
               ) : (
                 <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
               )}
-              {renderSectionHeading('Results', 'View')}
+              {renderSectionHeading('Results', showResults ? null : 'View')}
               {showResults && (
                 <div
                   className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}

@@ -211,6 +211,7 @@ export function resolveEffectiveSessionContext(props: QuestionFilterSessionProps
     pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
     activeSessionSlug: props.activeSessionSlug,
     sessionSlug: props.sessionSlug,
+    sessionConfig: props.sessionConfig,
     resolveBySlug: getSessionConfigBySlug,
   });
 }

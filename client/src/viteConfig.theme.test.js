@@ -11,6 +11,7 @@ describe('Vite theme bootstrap contract', () => {
     const { normalizeThemeIdForHtml } = await import('../scripts/theme-registry-core.mjs');
 
     expect(normalizeThemeIdForHtml(' classic-95 ', registry)).toBe('classic-95');
+    expect(normalizeThemeIdForHtml(' civic ', registry)).toBe('civic');
     expect(normalizeThemeIdForHtml('../remote.css', registry)).toBe('context-engine');
   });
 
@@ -21,6 +22,7 @@ describe('Vite theme bootstrap contract', () => {
 
     expect(html).toContain('data-ce-deployment-theme="__CE_DEFAULT_THEME__"');
     expect(html).toContain('data-ce-theme-registry="__CE_THEME_IDS__"');
+    expect(html).toContain('data-ce-light-themes="__CE_LIGHT_THEME_IDS__"');
     expect(bootstrapIndex).toBeGreaterThan(0);
     expect(bootstrapIndex).toBeLessThan(appIndex);
     expect(html).not.toMatch(/<script[^>]*>\s*\(function bootstrapCeTheme/);
