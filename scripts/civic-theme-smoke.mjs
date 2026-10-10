@@ -38,6 +38,10 @@ export const readControl = (element) => {
   };
 };
 
+export async function inspectCivicAbout(page) {
+  await assertReadable(page.getByTestId('ce-about-hero'));
+}
+
 export async function inspectCivicWelcome(page) {
   await page.getByRole('tab', { name: 'Tools', exact: true }).click();
   await page.getByRole('tab', { name: 'Welcome', exact: true }).click();
@@ -331,6 +335,8 @@ export async function runSmoke() {
       await inspectCivicStats(page);
       await inspectCivicWelcome(page);
       await inspectCivicExplorerContent(page);
+      await page.goto(`${baseUrl}/about`, { waitUntil: 'domcontentloaded' });
+      await inspectCivicAbout(page);
       await page.goto(`${baseUrl}/session/new`, { waitUntil: 'domcontentloaded' });
       await inspectCivicWizard(page);
       await page.goto(`${baseUrl}/session/demo-2`, { waitUntil: 'domcontentloaded' });
