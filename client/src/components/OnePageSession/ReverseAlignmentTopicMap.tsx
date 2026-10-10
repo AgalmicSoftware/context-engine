@@ -26,7 +26,9 @@ const topicTree: DebateNode[] = reverseAlignmentBranches.map((branch, index) => 
     })),
 }));
 
-export const hasReverseAlignmentTopicPreview = hasReverseAlignmentContext;
+// Keep the RxC research session on Report and Raw Results until its map is ready.
+export const hasReverseAlignmentTopicPreview = (slug: string) =>
+  hasReverseAlignmentContext(slug) && slug !== 'rxc-ra-test';
 
 export default function ReverseAlignmentTopicMap() {
   const [selected, setSelected] = useState<DebateNode | null>(null);

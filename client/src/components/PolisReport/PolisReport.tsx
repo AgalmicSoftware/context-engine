@@ -25,6 +25,7 @@ import {
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import styles from './PolisReport.module.scss';
+import { formatPolisReportSessionInfo } from './polisReportSessionInfo';
 import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
 import {
   filterWorkerGroupResponses,
@@ -2392,8 +2393,7 @@ export default function PolisReport({
   const hasRenderableReport = !!stats || reportData.answers.length > 0;
   const isModernStyle = reportStyle === 'modern';
   const isDarkStyle = reportStyle === 'dark';
-  const sessionInfoText =
-    typeof resolvedSessionInfo === 'string' ? resolvedSessionInfo : JSON.stringify(resolvedSessionInfo) || '';
+  const sessionInfoText = formatPolisReportSessionInfo(resolvedSessionInfo, resolvedSessionSlug);
   const hydrateDiscovered = Math.max(0, Number(scopedQuestionScanProgress?.discoveredQuestions || 0));
   const hydrateDone = Math.max(0, Number(scopedQuestionScanProgress?.hydratedQuestions || 0));
   const isHydratingLoading = scopedQuestionScanProgress?.phase === 'hydrate';
@@ -2564,7 +2564,7 @@ export default function PolisReport({
               {resolvedSessionName} - Context Engine Report
             </h3>
           )} */}
-          {!!resolvedSessionInfo && <p className={styles.sessionInfo}>{sessionInfoText}</p>}
+          {!!resolvedSessionInfo && !!sessionInfoText && <p className={styles.sessionInfo}>{sessionInfoText}</p>}
         </div>
         {/* --- END ORGANIZATION BRANDING SECTION --- */}
 

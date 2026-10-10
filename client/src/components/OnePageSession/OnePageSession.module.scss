@@ -356,6 +356,13 @@
   }
 }
 
+.compactContextSection {
+  .documentsSectionContent {
+    margin-top: 12px;
+    padding-bottom: 0;
+  }
+}
+
 .sessionContextSection {
   width: min(100%, 980px);
   margin: 1.25rem auto 1rem;

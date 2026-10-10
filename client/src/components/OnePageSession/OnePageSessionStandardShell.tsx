@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
+import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -372,6 +373,7 @@ export default function OnePageSessionStandardShell({
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
   const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
+  const showContextAtlas = hasReverseAlignmentContext(displaySessionSlug);
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
   const generatedState = (
     generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
@@ -429,7 +431,7 @@ export default function OnePageSessionStandardShell({
         : 'Generate AI Views';
   const sessionInfoTooltipId = `session-info-${React.useId().replace(/:/g, '')}`;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showContextSection = isDemoSlug || !!sessionContext || showTopicPreview;
+  const showContextSection = isDemoSlug || !!sessionContext || showContextAtlas;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -649,7 +651,7 @@ export default function OnePageSessionStandardShell({
 
         {showContextSection && (
           <div
-            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
+            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''} ${showContextAtlas ? styles.compactContextSection : ''}`}
             data-testid="ce-demo-documents-section"
           >
             <div className={`${styles.sectionHeaderRow} ${showDocuments ? styles.documentsHeaderRow : ''}`}>
@@ -703,10 +705,10 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                {renderSessionContext(sessionContext)}
-                {showTopicPreview && (
+                {!showContextAtlas && renderSessionContext(sessionContext)}
+                {showContextAtlas && (
                   <Suspense fallback={<LazyFallback label="Loading Reverse Alignment Atlas..." minHeight="20vh" />}>
-                    <ReverseAlignmentAtlas />
+                    <ReverseAlignmentAtlas context={sessionContext} />
                   </Suspense>
                 )}
                 {isDemoSlug && (
