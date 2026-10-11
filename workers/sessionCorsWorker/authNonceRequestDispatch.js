@@ -135,14 +135,12 @@ export const dispatchAuthNonceRequest = async ({
   }
 
   const nonce = deps?.buildNonce?.();
-  // The caller lets the coordinator keep other callers' pending nonces.
   const issueResult = await deps?.issueNonce?.(
     env,
     targetSlug,
     address.toLowerCase(),
     nonce,
     deps?.NONCE_TTL_SECONDS,
-    rateLimitIdentity,
   );
   if (!issueResult?.ok) {
     return deps?.json?.(
@@ -154,7 +152,8 @@ export const dispatchAuthNonceRequest = async ({
 
   const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : '';
   return deps?.json?.({
-    nonce,
+    // The coordinator returns the random part signed for this session and wallet.
+    nonce: issueResult?.nonce || nonce,
     ...(responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {}),
     ...(bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}),
   }, 200, headers);

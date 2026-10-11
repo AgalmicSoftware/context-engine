@@ -38,13 +38,19 @@ test('issueNonce requires durable coordination before writing the KV compatibili
     usedNonceTtlSeconds: 600,
     issueCoordinatedAuthNonce: async (value) => {
       calls.push(value);
-      return { ok: true, status: 200 };
+      return { ok: true, status: 200, nonce: 'n1signed' };
     },
   });
-  assert.equal(issued.ok, true);
+  assert.deepEqual(issued, { ok: true, nonce: 'n1signed' });
   assert.equal(calls[0].slug, 'session-a');
   assert.equal(calls[0].usedNonceTtlSeconds, 600);
   assert.equal(calls.length, 1);
+  // Only a nonce the coordinator signed can be consumed later.
+  const unsigned = await issueNonce(env, 'session-a', '0xabc', 'nonce-1', 300, {
+    issueCoordinatedAuthNonce: async () => ({ ok: true, status: 200 }),
+  });
+  assert.equal(unsigned.ok, false);
+  assert.equal(unsigned.status, 503);
 });
 
 test('consumeNonce trusts the durable verdict without redundant KV writes', async () => {

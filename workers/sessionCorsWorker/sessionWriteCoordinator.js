@@ -60,7 +60,7 @@ const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
 const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
-const MAX_ACTIVE_AUTH_NONCES = 16;
+const AUTH_NONCE_MAC_KEY = 'auth-nonce-mac-key';
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
 const WRAPPED_SESSION_KEY_FIELDS = [
   'alg',
@@ -98,42 +98,15 @@ const normalizeBoundedFutureTimestamp = (value, nowMs, maxAheadMs) => {
   return numeric;
 };
 
-// Version 1 stored one nonce; version 2 keeps several per address. The newest
-// entry stays in the version-1 fields so a rolled-back Worker still accepts it.
+// Nonces issued before signed nonces were stored per address: version 1 kept
+// one, version 2 several, with the newest in the version-1 fields.
 const readActiveAuthNonces = (record, nowMs) => {
   const entries = Array.isArray(record?.entries)
     ? record.entries
     : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
   return entries
-    .map((entry) => ({
-      nonce: toTrimmedString(entry?.nonce),
-      expiresAtMs: Number(entry?.expiresAtMs || 0),
-      caller: toTrimmedString(entry?.caller),
-    }))
+    .map((entry) => ({ nonce: toTrimmedString(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) }))
     .filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
-};
-
-// Anyone can request a nonce for any address. When the list is full, a new
-// nonce replaces the requesting caller's own oldest one, else the oldest of the
-// caller holding the most; another caller's only pending nonce is never
-// dropped, so the request is refused instead (null).
-const admitActiveAuthNonce = (active, entry) => {
-  if (active.length < MAX_ACTIVE_AUTH_NONCES) return [...active, entry];
-  const counts = new Map();
-  active.forEach((item) => counts.set(item.caller, (counts.get(item.caller) || 0) + 1));
-  let evicted = counts.has(entry.caller) ? entry.caller : null;
-  if (evicted === null) {
-    let most = 1;
-    counts.forEach((count, caller) => {
-      if (count > most) {
-        most = count;
-        evicted = caller;
-      }
-    });
-  }
-  if (evicted === null) return null;
-  const oldest = active.findIndex((item) => item.caller === evicted);
-  return [...active.slice(0, oldest), ...active.slice(oldest + 1), entry];
 };
 
 const putActiveAuthNonces = async (transaction, entries) => {
@@ -148,6 +121,28 @@ const putActiveAuthNonces = async (transaction, entries) => {
     expiresAtMs: newest.expiresAtMs,
     entries,
   });
+};
+
+// Signed nonces: "n1", 32 random hex characters from the Worker, the expiry as
+// 13 digits of epoch milliseconds, and a 128-bit HMAC of these for this
+// session and wallet under a key kept in this object. Issuing one stores
+// nothing, so others cannot use up a wallet's nonces; using one records it
+// until it expires, so each works once. Letters and digits only (EIP-4361).
+const SIGNED_AUTH_NONCE_RE = /^n1([0-9a-f]{32})(\d{13})([0-9a-f]{32})$/;
+
+const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+const hexToBytes = (hex) => Uint8Array.from(hex.match(/../g) || [], (pair) => parseInt(pair, 16));
+const equalText = (left, right) => {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+};
+
+const signAuthNonce = async ({ cryptoImpl, keyHex, slug, address, random, expiry }) => {
+  const key = await cryptoImpl.subtle.importKey('raw', hexToBytes(keyHex), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const message = new TextEncoder().encode(`ce-auth-nonce-v1\n${slug}\n${address}\n${random}\n${expiry}`);
+  return bytesToHex(new Uint8Array(await cryptoImpl.subtle.sign('HMAC', key, message))).slice(0, 32);
 };
 
 const isBase64url = (value, length) => (
@@ -1925,43 +1920,36 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async readAuthNonceKey({ create = false } = {}) {
+    const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
+    if (/^[0-9a-f]{64}$/.test(toTrimmedString(existing?.key)) || !create) return toTrimmedString(existing?.key);
+    const candidate = { version: 1, key: bytesToHex(this.crypto.getRandomValues(new Uint8Array(32))) };
+    const record = await this.state.storage.transaction(async (transaction) => {
+      const current = await transaction.get(AUTH_NONCE_MAC_KEY);
+      if (/^[0-9a-f]{64}$/.test(toTrimmedString(current?.key))) return current;
+      await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
+      return candidate;
+    });
+    return record.key;
+  }
+
   async executeAuthNonceIssue(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString(payload?.address).toLowerCase();
-    const nonce = toTrimmedString(payload?.nonce);
-    const caller = toTrimmedString(payload?.caller).slice(0, 128);
+    const random = toTrimmedString(payload?.nonce);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.expiresAtMs,
       nowMs,
       MAX_AUTH_NONCE_LIFETIME_MS,
     );
-    const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
-      payload?.usedExpiresAtMs,
-      nowMs,
-      MAX_AUTH_NONCE_LIFETIME_MS,
-    );
-    if (!slug || !address || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
+    if (!slug || !address || !/^[0-9a-f]{32}$/.test(random) || !expiresAtMs) {
       return jsonResponse({ error: 'Invalid auth nonce issuance request.' }, 400);
     }
-
-    const admitted = await this.state.storage.transaction(async (transaction) => {
-      const used = await transaction.get(AUTH_NONCE_USED_KEY);
-      const entries = Array.isArray(used?.entries)
-        ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs)
-        : [];
-      await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-      // A new nonce must not cancel the owner's pending one.
-      const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs)
-        .filter((entry) => entry.nonce !== nonce);
-      const next = admitActiveAuthNonce(active, { nonce, expiresAtMs, caller });
-      if (!next) return false;
-      await putActiveAuthNonces(transaction, next);
-      return true;
-    });
-    return admitted
-      ? jsonResponse({ ok: true })
-      : jsonResponse({ ok: false, error: 'Too many pending sign-ins for this wallet. Try again shortly.' }, 429);
+    const keyHex = await this.readAuthNonceKey({ create: true });
+    const expiry = String(expiresAtMs).padStart(13, '0');
+    const mac = await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address, random, expiry });
+    return jsonResponse({ ok: true, nonce: `n1${random}${expiry}${mac}` });
   }
 
   async executeAuthNonceConsume(payload) {
@@ -1977,6 +1965,19 @@ export class SessionWriteCoordinator {
     if (!slug || !address || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
       return jsonResponse({ error: 'Invalid auth nonce consumption request.' }, 400);
     }
+    // Check a signed nonce before the transaction; its key never changes.
+    const signed = nonce.match(SIGNED_AUTH_NONCE_RE);
+    let signedExpiresAtMs = 0;
+    if (signed) {
+      const keyHex = await this.readAuthNonceKey();
+      const expiresAtMs = Number(signed[2]);
+      const mac = keyHex
+        ? await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address, random: signed[1], expiry: signed[2] })
+        : '';
+      if (mac && equalText(mac, signed[3]) && expiresAtMs > nowMs && expiresAtMs <= nowMs + MAX_AUTH_NONCE_LIFETIME_MS) {
+        signedExpiresAtMs = expiresAtMs;
+      }
+    }
 
     const result = await this.state.storage.transaction(async (transaction) => {
       const used = await transaction.get(AUTH_NONCE_USED_KEY);
@@ -1987,7 +1988,13 @@ export class SessionWriteCoordinator {
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return { ok: false, error: 'Nonce already used.' };
       }
+      if (signed) {
+        if (signedExpiresAtMs) entries.push({ nonce, expiresAtMs: signedExpiresAtMs });
+        await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+        return signedExpiresAtMs ? { ok: true } : { ok: false, error: 'Nonce mismatch or expired.' };
+      }
 
+      // A nonce the previous release issued is consumed from its stored list.
       const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs);
       const remaining = active.filter((entry) => entry.nonce !== nonce);
       await putActiveAuthNonces(transaction, remaining);
@@ -2576,13 +2583,8 @@ export const issueCoordinatedAuthNonce = async ({
   ttlSeconds,
   usedNonceTtlSeconds = 600,
   now = Date.now,
-  caller = '',
 } = {}) => {
   const nowMs = Number(typeof now === 'function' ? now() : now) || Date.now();
-  // Durable state keeps only a hash of the requesting network.
-  const callerKey = toTrimmedString(caller)
-    ? (await sha256Hex(`auth-nonce-caller:${toTrimmedString(caller).toLowerCase()}`)).slice(0, 32)
-    : '';
   return callAuthStateCoordinator({
     env,
     identity: `auth-nonce:${toTrimmedString(slug)}:${toTrimmedString(address).toLowerCase()}`,
@@ -2591,7 +2593,6 @@ export const issueCoordinatedAuthNonce = async ({
       slug,
       address,
       nonce,
-      ...(callerKey ? { caller: callerKey } : {}),
       expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1000,
       usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1000,
     },

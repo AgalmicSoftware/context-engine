@@ -53,16 +53,17 @@ export const issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {
     ttlSeconds,
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
     now: deps?.now,
-    caller: deps?.caller,
   });
-  if (!result?.ok) {
+  // The coordinator signs the random part; only its signed nonce can be used.
+  const signed = typeof result?.nonce === 'string' ? result.nonce.trim() : '';
+  if (!result?.ok || !signed) {
     return {
       ok: false,
-      status: Number(result?.status || 0) || 503,
+      status: Number(result?.status || 0) >= 400 ? Number(result.status) : 503,
       error: result?.error || 'Authorization state coordination is unavailable.',
     };
   }
-  return { ok: true };
+  return { ok: true, nonce: signed };
 };
 
 export const consumeNonce = async (env, slug, address, nonce, deps = {}) => {

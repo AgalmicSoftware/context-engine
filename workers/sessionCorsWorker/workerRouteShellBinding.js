@@ -235,7 +235,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
             now: deps?.now,
             buildNonce: () => deps?.buildNonce?.(),
-            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl, caller) => (
+            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (
               deps?.issueNonce || issueNonceBoundary
             )(
               currentEnv,
@@ -245,7 +245,6 @@ export const createWorkerRouteShellWithWorkerDeps = ({
               ttl,
               {
                 now: deps?.now,
-                caller,
               },
             ),
             MISSING_SLUG_ERROR: constants?.missingSlugError,
