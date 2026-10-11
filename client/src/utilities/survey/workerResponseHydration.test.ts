@@ -260,6 +260,47 @@ describe('workerCanonicalResponseHydration', () => {
     ]);
   });
 
+  it('skips a response with non-text fields instead of failing the whole load', async () => {
+    // JSON can carry an object whose text conversion throws.
+    const hostile = () => JSON.parse('{"toString":1}');
+    const payloads: Record<string, Record<string, unknown>> = {
+      good: { questionID: 'question-a', sessionId: SESSION_ID, sessionSlug: 'demo-sh', answer: { value: true } },
+      badSlug: { questionID: 'question-a', sessionId: SESSION_ID, sessionSlug: hostile(), answer: { value: true } },
+      badQuestion: { questionID: hostile(), sessionId: SESSION_ID, sessionSlug: 'demo-sh', answer: { value: true } },
+      badPrompt: {
+        questionID: 'question-b',
+        sessionId: SESSION_ID,
+        sessionSlug: 'demo-sh',
+        prompt: hostile(),
+        type: hostile(),
+        answer: { value: true },
+      },
+    };
+    const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
+      items: Object.keys(payloads).map((id) => ({
+        storageRef: { backend: 'cloudflare', id },
+        metadata: { responder: `0xresponder-${id}`, createdAt: '2026-07-22T12:00:01.000Z' },
+      })),
+      listComplete: true,
+      cursor: null,
+    });
+    const readSessionStorageBlob = jest.fn(
+      async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
+    );
+
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig },
+      { listSessionStorageRefsPage, readSessionStorageBlob },
+    );
+    expect(rows.map((row) => row.storageRefId)).toEqual(['good', 'badPrompt']);
+
+    // Its prompt and type are not text, so it adds an answer but no placeholder question.
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: workerConfig, sessionSlug: 'demo-sh' });
+    const merged = mergeWorkerQuestionResponses({}, rows, 'demo-sh', identity) as any;
+    expect(merged.worker.questions['question-b']).toBeUndefined();
+    expect(Object.keys(merged.worker.questionResponses['question-b'])).toEqual(['0xresponder-badprompt']);
+  });
+
   it('fails closed on a repeated incomplete-page cursor', async () => {
     const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
       items: [],

@@ -87,7 +87,11 @@ const METADATA_READ_CONCURRENCY = 8;
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const readString = (value: unknown): string => String(value || '').trim();
+// Stored payloads are any uploader's JSON, and converting an object with a
+// broken toString throws, so only strings count as text here.
+const readString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+
+const isTextOrAbsent = (value: unknown): boolean => value == null || typeof value === 'string';
 
 const isHiddenEntry = (entry: WorkerCanonicalMetadataEntry): entry is WorkerCanonicalHiddenMetadataRow =>
   (entry as WorkerCanonicalHiddenMetadataRow).hidden === true;
@@ -347,6 +351,13 @@ const loadWorkerCanonicalMetadata = async (
     if (!isRecord(payload) || !payloadMatchesTarget(payload, target)) return null;
     // A non-text title crashes survey views; such a row cannot be a survey.
     if (resource === STORAGE_RESOURCE_KEYS.SURVEYS && typeof payload.title !== 'string') return null;
+    // Likewise a non-text prompt or type crashes question cards.
+    if (
+      resource === STORAGE_RESOURCE_KEYS.QUESTIONS &&
+      !(isTextOrAbsent(payload.prompt) && isTextOrAbsent(payload.type))
+    ) {
+      return null;
+    }
     const id = readPayloadResourceId(payload, resource);
     if (!id || hiddenIds.has(id)) return null;
     const compatiblePayload = attachStorageRefCompatibilityFields(

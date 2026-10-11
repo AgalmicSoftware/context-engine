@@ -704,6 +704,48 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       expect(rows).toHaveLength(19);
     });
 
+    it('drops a stored row with non-text fields instead of failing the whole load', async () => {
+      // JSON can carry an object whose text conversion throws.
+      const hostile = () => JSON.parse('{"toString":1}');
+      const otherId = String(generateQuestionId('binary', 'Other question', [], false, 99)).toLowerCase();
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+          listedItem('cf_bad_slug', '2026-10-01T00:00:01.000Z', ATTACKER),
+          listedItem('cf_bad_session', '2026-10-01T00:00:02.000Z', ATTACKER),
+          listedItem('cf_bad_id', '2026-10-01T00:00:03.000Z', ATTACKER),
+          listedItem('cf_bad_prompt', '2026-10-01T00:00:04.000Z', ATTACKER),
+          listedItem('cf_object_type', '2026-10-01T00:00:05.000Z', ATTACKER),
+        ],
+        {
+          cf_official: question(),
+          cf_bad_slug: question({ id: otherId, sessionSlug: hostile() }),
+          cf_bad_session: question({ id: otherId, sessionId: hostile() }),
+          cf_bad_id: question({ id: hostile() }),
+          // A prompt or type that is not text crashes question cards, so the row is no question.
+          cf_bad_prompt: question({ id: otherId, prompt: hostile() }),
+          cf_object_type: question({ id: otherId, type: { kind: 'binary' } }),
+        },
+      );
+      // A non-text session id counts as missing, as in legacy payloads, and the
+      // row takes this session's own id; the other bad rows are dropped.
+      expect(rows.map((row: any) => row.storageRefId)).toEqual(['cf_official', 'cf_bad_session']);
+      expect((rows[1] as any).payload.sessionId).toBe(SESSION_ID);
+
+      const surveys = await loadFrom(
+        [
+          listedItem('cf_survey', '2026-10-01T00:00:00.000Z', AUTHOR, 'surveys'),
+          listedItem('cf_bad_survey', '2026-10-01T00:00:01.000Z', ATTACKER, 'surveys'),
+        ],
+        {
+          cf_survey: { surveyID: '0xsurvey', title: 'Survey', sessionId: SESSION_ID, sessionSlug: 'worker-session' },
+          cf_bad_survey: { surveyID: hostile(), title: 'Survey', sessionId: SESSION_ID, sessionSlug: 'worker-session' },
+        },
+        'surveys',
+      );
+      expect(surveys.rows.map((row: any) => row.storageRefId)).toEqual(['cf_survey']);
+    });
+
     it('marks rows from a listed session admin uploader', async () => {
       const { rows } = await loadFrom(
         [
