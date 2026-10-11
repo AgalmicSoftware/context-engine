@@ -832,6 +832,7 @@ export function buildRatingMatrixFromRealData(
   const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
   const promptsMap: StringMap = {};
   const displayNamesMap: StringMap = {};
+  const votesByQuestion = new Map<string, Map<string, ConcretePolisVote>>();
 
   Object.entries(realQR).forEach(([qId, arr]) => {
     if (!Array.isArray(arr) || arr.length === 0) return;
@@ -852,20 +853,28 @@ export function buildRatingMatrixFromRealData(
     binaryQuestions.push({ qId, prompt });
     promptsMap[qId] = prompt;
 
-    // Gather participants who answered this (binary) question
+    // Only a readable Agree/Unsure/Disagree vote makes someone a participant.
+    // Comment-only, rating-only, cleared and encrypted rows would otherwise be
+    // plotted and clustered as participants who voted on nothing.
+    const votes = new Map<string, ConcretePolisVote>();
+    votesByQuestion.set(qId, votes);
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
+      // Skip a row whose payload claims another question type.
+      if (!parsed || (parsed.type && parsed.type !== 'binary')) continue;
       if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (r?.responder) {
-        const responder = String(r.responder).toLowerCase();
-        participantsSet.add(responder);
-        const responderName = String(parsed?.responderName || '')
-          .trim()
-          .replace(/\s+/g, ' ')
-          .slice(0, 160);
-        if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
-      }
+      const answer = asRecord(parsed.answer);
+      const vote = answer.encrypted ? null : normalizePolisBinaryVote(answer.value);
+      const responder = String(r?.responder || '').toLowerCase();
+      if (!responder || vote === null) continue;
+      votes.set(responder, vote);
+      participantsSet.add(responder);
+      const responderName = String(parsed.responderName || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, 160);
+      if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
     }
   });
 
@@ -898,23 +907,9 @@ export function buildRatingMatrixFromRealData(
   // Fill matrix with -1 / 0 / 1 for Disagree / Unsure / Agree
   questionsSorted.forEach((qId) => {
     const rowIndex = questionIndexMap[qId];
-    const arr = Array.isArray(realQR[qId]) ? (realQR[qId] as PolisResponseRow[]) : [];
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      // Skip a row whose payload claims another question type.
-      if (!parsed || (parsed.type && parsed.type !== 'binary')) continue;
-      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      const answer = asRecord(parsed.answer);
-      if (answer.encrypted) continue;
-
-      const val: PolisVote = normalizePolisBinaryVote(answer.value);
-
-      const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
-      if (pIdx !== undefined) {
-        matrix[rowIndex][pIdx] = val;
-      }
-    }
+    votesByQuestion.get(qId)?.forEach((vote, responder) => {
+      matrix[rowIndex][participantIndexMap[responder]] = vote;
+    });
   });
 
   return {
@@ -924,6 +919,22 @@ export function buildRatingMatrixFromRealData(
     promptsMap,
     displayNamesMap,
   };
+}
+
+/**
+ * UMAP input: one row per participant. A skipped question takes that
+ * question's mean vote, as in the PCA projection; reading a skip as Unsure (0)
+ * would pull participants who skipped the same questions together.
+ */
+export function buildUmapParticipantData(ratingMatrix: RatingMatrix): number[][] {
+  const nParticipants = ratingMatrix[0]?.length || 0;
+  const means = ratingMatrix.map((votes) => {
+    const answered = votes.filter((vote): vote is ConcretePolisVote => vote !== null && vote !== undefined);
+    return answered.length ? answered.reduce<number>((sum, vote) => sum + vote, 0) / answered.length : 0;
+  });
+  return Array.from({ length: nParticipants }, (_, participantIndex) =>
+    ratingMatrix.map((votes, questionIndex) => votes[participantIndex] ?? means[questionIndex]),
+  );
 }
 
 export function buildRatingMatrixFromDemo(demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA): RatingMatrixBuildResult {

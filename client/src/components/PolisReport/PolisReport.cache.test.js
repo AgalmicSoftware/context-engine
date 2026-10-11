@@ -23,6 +23,8 @@ import PolisReport, {
   resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
+import { buildReportResponseStats } from './polisReportAnswers';
+import { buildUmapParticipantData } from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { doUMAP } from '../../utilities/survey/consensusMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
@@ -449,6 +451,74 @@ describe('PolisReport cache read options', () => {
     expect(result.displayNamesMap).toEqual({ '0xdemo': 'Ada Example' });
     expect(JSON.stringify(result)).not.toContain('0xforeign');
     expect(JSON.stringify(result)).not.toContain('test-2');
+  });
+
+  it('counts only readable binary votes as report participants', () => {
+    const row = (responder, answer, extra = {}) => ({
+      responder,
+      questionId: 'q1',
+      response: JSON.stringify({ type: 'binary', prompt: 'Q', answer, ...extra }),
+    });
+    const responses = {
+      q1: [
+        row('0xa', { value: 'Agree' }),
+        row('0xb', { value: 'Disagree' }),
+        row('0xcomment', { value: '' }, { additional: { value: 'Only a comment' } }),
+        row('0xrating', { value: '' }, { importance: 7, conviction: 7 }),
+        row('0xlocked', { value: '*', encrypted: true }),
+      ],
+    };
+
+    const result = buildRatingMatrixFromRealData(responses);
+
+    expect(result.responders).toEqual(['0xa', '0xb']);
+    expect(result.matrix).toEqual([[1, -1]]);
+    expect(buildReportResponseStats(responses).binary.participants).toBe(result.responders.length);
+  });
+
+  it('fills skipped votes with the question mean for UMAP instead of reading them as Unsure', () => {
+    expect(
+      buildUmapParticipantData([
+        [1, -1, 1],
+        [1, null, 1],
+        [null, null, -1],
+      ]),
+    ).toEqual([
+      [1, 1, -1],
+      [-1, 1, -1],
+      [1, 1, -1],
+    ]);
+  });
+
+  it('runs UMAP on voters only, with skipped votes mean-filled', async () => {
+    const row = (responder, qid, value, extra = {}) => ({
+      responder,
+      questionId: qid,
+      response: JSON.stringify({ type: 'binary', prompt: `Prompt ${qid}`, answer: { value }, ...extra }),
+    });
+    const responses = {
+      q1: [
+        row('0xa', 'q1', 'Agree'),
+        row('0xb', 'q1', 'Disagree'),
+        row('0xc', 'q1', 'Agree'),
+        row('0xd', 'q1', '', { additional: { value: 'Only a comment' } }),
+      ],
+      q2: [row('0xa', 'q2', 'Agree'), row('0xc', 'q2', 'Agree')],
+    };
+
+    render(<PolisReport {...baseReportProps} slug="umap-voters" questionResponses={responses} />);
+
+    await waitFor(() => {
+      expect(doUMAP).toHaveBeenCalledWith(
+        [
+          [1, 1],
+          [-1, 1],
+          [1, 1],
+        ],
+        2,
+        42,
+      );
+    });
   });
 
   it('takes binary question prompts and types from metadata before participant payloads', () => {

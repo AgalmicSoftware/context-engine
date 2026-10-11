@@ -90,6 +90,7 @@ import {
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromDemo,
   buildRatingMatrixFromRealData,
+  buildUmapParticipantData,
   clusterUMAPPointsKmeansTyped,
   d3Report,
   doUMAPTyped,
@@ -936,7 +937,6 @@ export default function PolisReport({
     }
 
     try {
-      const nComments = ratingMatrix.length;
       const nParticipants = ratingMatrix[0]?.length || 0;
       if (nParticipants < 2) {
         setUmapParticipantCoords([]);
@@ -950,17 +950,8 @@ export default function PolisReport({
         return;
       }
 
-      const participantData: number[][] = [];
-      for (let participantIndex = 0; participantIndex < nParticipants; participantIndex += 1) {
-        const row: number[] = [];
-        for (let commentIndex = 0; commentIndex < nComments; commentIndex += 1) {
-          row.push(ratingMatrix[commentIndex][participantIndex] ?? 0);
-        }
-        participantData.push(row);
-      }
-
       const nNeighbors = Math.max(2, Math.min(15, nParticipants - 1));
-      const embedding = doUMAPTyped(participantData, nNeighbors, DETERMINISTIC_SEED);
+      const embedding = doUMAPTyped(buildUmapParticipantData(ratingMatrix), nNeighbors, DETERMINISTIC_SEED);
       setUmapParticipantCoords(
         embedding.map((point, index) => ({
           x: point[0],
