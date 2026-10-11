@@ -1,4 +1,5 @@
 import React from 'react';
+import fs from 'fs';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
 import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
@@ -868,7 +869,13 @@ describe('AppShell route render smoke', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
-  it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', () => {
+  it('loads the built-in demo question pool only when the demo route seeds it', () => {
+    const source = fs.readFileSync(`${__dirname}/AppShell.tsx`, 'utf8');
+    expect(source).not.toMatch(/^import\s[^;]*surveyPolisDemoQuestionPool['"]/m);
+    expect(source).toContain("await import('../SurveyTool/surveyPolisDemoQuestionPool')");
+  });
+
+  it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', async () => {
     const subject = createSubject({
       path: '/session/demo',
       activeSessionSlug: 'demo',
@@ -896,7 +903,7 @@ describe('AppShell route render smoke', () => {
     const firstQuestion = demoQuestions[0];
     expect(firstQuestion?.id).toBeTruthy();
 
-    expect(subject.seedBuiltInDemoQuestionCache()).toBe(true);
+    await expect(subject.seedBuiltInDemoQuestionCache()).resolves.toBe(true);
 
     const generalQuestions = cacheStore['questionsCache:']?.['11155420']?.questions || {};
     const scopedQuestions = cacheStore['questionsCache:demo']?.['11155420']?.questions || {};

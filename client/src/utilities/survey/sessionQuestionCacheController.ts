@@ -12,7 +12,6 @@ import {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } from '../session/sessionScanScope.js';
-import { getTemporaryDemoSessionQuestionFixtures } from '../session/demoSessionQuestionFixtures.js';
 import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import {
   buildQuestionDecryptContextForSession,
@@ -249,6 +248,10 @@ export interface SessionQuestionCacheController {
   isInitInFlight: (slugIn?: string) => boolean;
   destroy: () => void;
 }
+
+// Demo question fixtures ship in their own chunk, and every fixture slug starts
+// with "demo"; other sessions never download them.
+export const mayHaveTemporaryDemoQuestionFixtures = (slug: string): boolean => slug.startsWith('demo');
 
 const mainSiteLog = createLogger('mainSite');
 const questionCacheContractScripts = contractScripts as unknown as QuestionCacheContractScripts;
@@ -740,10 +743,12 @@ export const createSessionQuestionCacheController = (
         return seeded;
       };
 
-      const temporaryDemoQuestionFixtures = getTemporaryDemoSessionQuestionFixtures(
-        scopedSlug,
-        sessionCfgForScan || {},
-      ) as QuestionMetadata[];
+      const temporaryDemoQuestionFixtures = mayHaveTemporaryDemoQuestionFixtures(scopedSlug)
+        ? ((await import('../session/demoSessionQuestionFixtures.js')).getTemporaryDemoSessionQuestionFixtures(
+            scopedSlug,
+            sessionCfgForScan || {},
+          ) as QuestionMetadata[])
+        : [];
       if (temporaryDemoQuestionFixtures.length > 0) {
         await seedTemporaryDemoQuestionFixtures(initialLastBlockQuestionFromCfg, temporaryDemoQuestionFixtures);
       }

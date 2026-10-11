@@ -119,7 +119,6 @@ import FooterRaw from '../Footer/Footer';
 import LazyFallbackRaw from '../Shared/LazyFallback';
 import DevE2eNavRaw from '../E2E/DevE2eNav';
 import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
-import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -1656,7 +1655,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     return routePath === '/session/demo' || routePath.startsWith('/session/demo/');
   };
 
-  seedBuiltInDemoQuestionCache = (): boolean => {
+  seedBuiltInDemoQuestionCache = async (): Promise<boolean> => {
+    // The demo question pool ships in its own chunk, so only the built-in demo route loads it.
+    const { getPolisDemoQuestionPool } = await import('../SurveyTool/surveyPolisDemoQuestionPool');
     const questionPool = getPolisDemoQuestionPool();
     if (!Array.isArray(questionPool) || questionPool.length === 0) return false;
 
@@ -2587,7 +2588,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       } else if (isDemoPath) {
         // Demo prioritized: Questions -> (SBT partial) -> listeners -> Responses -> Surveys
         if (isBuiltInDemoSessionRoute) {
-          this.seedBuiltInDemoQuestionCache();
+          await this.seedBuiltInDemoQuestionCache();
         } else {
           await this.initializeQuestionCache();
         }
@@ -2963,7 +2964,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             } else {
               // Demo prioritized: Questions -> (SBT partial) -> listeners -> Responses -> Surveys
               if (isBuiltInDemoSessionRoute) {
-                this.seedBuiltInDemoQuestionCache();
+                await this.seedBuiltInDemoQuestionCache();
               } else {
                 await this.initializeQuestionCacheWithGeneralBackfill(nextActiveSlug);
               }
@@ -3374,7 +3375,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   ) => {
     const normalizedSlug = normalizeSessionSlug(slug || '');
     if (this.isBuiltInDemoSessionRoutePath() && (normalizedSlug === 'demo' || normalizedSlug === '')) {
-      this.seedBuiltInDemoQuestionCache();
+      await this.seedBuiltInDemoQuestionCache();
       return;
     }
     return this._questionCacheController.initializeQuestionCacheForGroup(slug, opts);
@@ -4062,7 +4063,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   refreshQuestionMetadataForGroup: RefreshQuestionMetadataForGroupFn = async (slug, opts) => {
     const normalizedSlug = normalizeSessionSlug(slug || '');
     if (this.isBuiltInDemoSessionRoutePath() && (normalizedSlug === 'demo' || normalizedSlug === '')) {
-      this.seedBuiltInDemoQuestionCache();
+      await this.seedBuiltInDemoQuestionCache();
       return;
     }
     return this._questionCacheController.refreshQuestionMetadataForGroup(slug, opts);
