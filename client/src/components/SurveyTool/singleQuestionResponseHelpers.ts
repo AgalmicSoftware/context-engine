@@ -1,3 +1,4 @@
+import { normalizePolisBinaryVote } from '../PolisReport/polisReportAnswers';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { DEFAULT_RATING_SCALE, type RatingScale } from '../../utilities/survey/ratingValue.js';
 
@@ -248,12 +249,13 @@ export const buildBinaryAggregatorSummary = (parsedResponses: unknown = []): Bin
   const counts = { Agree: 0, Unsure: 0, Disagree: 0 };
   let total = 0;
   responses.forEach((response) => {
-    const answerValue = (response as { answer?: { value?: unknown } } | null | undefined)?.answer?.value;
-    if (answerValue === 'Agree' || answerValue === 'Unsure' || answerValue === 'Disagree') {
-      const key = answerValue as 'Agree' | 'Unsure' | 'Disagree';
-      counts[key] += 1;
-      total += 1;
-    }
+    // Read votes as the Report does, including legacy yes/no and 1/0/-1 values.
+    const vote = normalizePolisBinaryVote(
+      (response as { answer?: { value?: unknown } } | null | undefined)?.answer?.value,
+    );
+    if (vote === null) return;
+    counts[vote === 1 ? 'Agree' : vote === -1 ? 'Disagree' : 'Unsure'] += 1;
+    total += 1;
   });
   return { counts, total };
 };
