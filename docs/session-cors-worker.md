@@ -316,6 +316,67 @@ deleted speculatively.
   - `POST /admin/origins` with the same bearer token and JSON `{ "origins": ["https://example.com"] }` stores the normalized allowlist in `DEPLOY_HELPER_KV`.
   - Posting an empty `origins` array clears the KV override, so the helper falls back to `env.ALLOWED_ORIGINS` or the localhost default.
 
+### Sponsored deploy release
+
+A grant-backed sponsored deploy installs the release recorded on the
+sponsoring session Worker, never code chosen by the person who redeems the
+grant. The Worker keeps that release in four plain-text variables, where
+`<release>` is
+`https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>`:
+
+| Variable                           | Value                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| `WORKER_BUNDLE_URL`                | `<release>/sessionCorsWorker.bundle.js`                                    |
+| `WORKER_BUNDLE_MANIFEST_URL`       | `<release>/worker-release-manifest.json`                                   |
+| `AGENT_BRIDGE_BUNDLE_URL`          | `<release>/agentBridgeWorker.bundle.js` (to sponsor Agents HTTP sessions)  |
+| `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` | `<release>/worker-release-manifest.json` (to sponsor Agents HTTP sessions) |
+
+Each sponsored deploy downloads the manifest and bundles again and stops if a
+bundle's SHA-256 differs from the digest the manifest lists.
+
+Session Workers deployed by the 0.6.8 or later deploy helper record their
+release automatically:
+
+- The helper sets `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` only
+  when it downloaded the Worker bundle from a URL and the bundle matched its
+  release manifest. An uploaded bundle file (`bundleText`), or a bundle URL
+  without a manifest, records nothing.
+- It sets the Agent Bridge pair only when the new session enables Agents HTTP
+  and the bridge bundle matched its manifest. The helper checks that bundle
+  before it creates the session's KV namespace and Worker, so a bad bridge
+  release stops the deploy early.
+- The recorded URLs are the ones that deploy used. A release named in the
+  deploy request takes precedence over the helper's own `WORKER_BUNDLE_URL`
+  and `WORKER_BUNDLE_MANIFEST_URL` defaults. A sponsored deploy always uses
+  the sponsoring Worker's variables, so each new Worker records its sponsor's
+  release and can sponsor that release in turn.
+- The helper writes these variables only into the upload of a Worker it is
+  creating. It never changes an existing Worker, so values set by hand stay
+  as they are.
+
+Workers deployed before 0.6.8, or from an uploaded bundle file, have no
+recorded release, and a Worker records the Agent Bridge pair only when its own
+session enabled Agents HTTP at deploy time. To add missing variables, set them
+once:
+
+1. Choose the release new sessions should run, normally the commit pinned in
+   `client/src/variables/workerReleasePin.json` (see
+   [Release bundle](#release-bundle)). Check it with
+   `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. The GitHub
+   release page
+   `https://github.com/AgalmicSoftware/context-engine/releases/tag/worker-bundles-<commit>`
+   lists its assets.
+2. In the Cloudflare dashboard, open the sponsoring Worker's **Settings** >
+   **Variables and Secrets**, add `WORKER_BUNDLE_URL` and
+   `WORKER_BUNDLE_MANIFEST_URL` as **Text** variables with the values above,
+   and deploy. If you sponsor sessions that enable Agents HTTP, add the Agent
+   Bridge pair too; both manifest variables use the same
+   `worker-release-manifest.json`, which lists both bundles.
+
+Until the Worker pair is set, `POST /sponsored/redeem-deploy` returns `400`
+before the grant is used. An Agents HTTP deploy without the Agent Bridge pair
+returns `400` the same way.
+
 ## Sponsored bundle flow (`/sponsor` -> `/new?sponsored=<txId>` + separate key handoff)
 
 - `/sponsor` is a dedicated paste-first UI for creating sponsored-session handoffs; it does not read back worker KV secrets.
@@ -366,12 +427,14 @@ deleted speculatively.
   - A grant lends the sponsor's Cloudflare token, not a code upload. The
     sponsoring Worker ignores the redeemer's `bundleText`, `bundleUrl`,
     `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent-bridge
-    bundle fields, and deploys only its own configured release: the
+    bundle fields, and deploys only the release recorded on it: the
     `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars, plus
     `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when the
     new session enables the Agents HTTP surface. The manifest pins the bundle
-    digest. Without these vars the route returns `400` before the grant is used;
-    set them on the sponsoring Worker to enable grant-backed deploys.
+    digest. Without these vars the route returns `400` before the grant is used.
+    Workers deployed by the 0.6.8 or later deploy helper record them
+    automatically; set them once on older Workers, as described in
+    [Sponsored deploy release](#sponsored-deploy-release).
   - In that deploy-ready state, Publish deploys the worker first. A
     worker-canonical profile then persists and verifies Worker KV config; a
     decentralized profile keeps the existing metadata upload and on-chain

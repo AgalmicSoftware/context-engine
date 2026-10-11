@@ -111,6 +111,15 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     expected digest in the stable request identity. The manifest and downloaded
     bytes are rechecked before resource mutation; a moved `latest` pointer cannot
     silently change retry bytes
+  - the new session Worker records the release it was deployed with in its
+    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` vars, so its
+    embedded helper can sponsor grant deploys of the same release. Only a
+    bundle fetched from `bundleUrl` that matched its manifest is recorded;
+    `bundleText` records nothing. An Agents HTTP session also records
+    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when its
+    bridge bundle matched its manifest; that bundle is checked before the
+    session's KV namespace and Worker are created. See "Sponsored deploy
+    release" in `docs/session-cors-worker.md`
   - manifest and bundle URLs require HTTPS, no URL credentials, and a public
     hostname. Literal IPs, private/local hostnames, and unsafe redirects are
     rejected. Each of up to five redirects is checked before fetching. No
