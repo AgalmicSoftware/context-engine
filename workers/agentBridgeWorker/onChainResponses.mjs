@@ -497,12 +497,17 @@ export async function authenticateSessionWorker({
         }
         const nonce = nonceResponse.nonce;
 
+        // Session Workers require the signed Worker/session binding.
+        const sessionResource = workerCanonical
+          ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}`
+          : `urn:context-engine:session:slug:${encodeURIComponent(lower(authSessionSlug) === 'general' ? '' : lower(authSessionSlug))}`;
         const message = `${originUrl.host} wants you to sign in with your Ethereum account:\n`
           + `${wallet.address}\n\nSign in to Context Engine.\n\n`
           + `URI: ${origin}\nVersion: 1\nChain ID: ${normalizeChainId(env, session)}`
           + `\nNonce: ${nonce}`
           + `\nIssued At: ${issuedAt.toISOString()}`
-          + `\nExpiration Time: ${expiresAt.toISOString()}`;
+          + `\nExpiration Time: ${expiresAt.toISOString()}`
+          + `\nResources:\n- ${new URL(baseUrl).origin}\n- ${sessionResource}`;
         const signature = await wallet.signMessage(message);
         const login = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/login`, {
           method: 'POST',

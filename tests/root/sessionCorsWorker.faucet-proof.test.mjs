@@ -113,18 +113,28 @@ const buildSiweMessage = ({
   chainId = 84532,
   issuedAt,
   expirationTime,
+  sessionSlug = '',
+  sessionId = '',
 }) => {
   const resolvedIssuedAt = issuedAt || new Date(Date.now() - 60 * 1000).toISOString();
   const resolvedExpirationTime = expirationTime || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const sessionResource = sessionId
+    ? `urn:context-engine:session:id:${encodeURIComponent(String(sessionId).toLowerCase())}`
+    : `urn:context-engine:session:slug:${encodeURIComponent(sessionSlug)}`;
   return `${domain} wants you to sign in with your Ethereum account:
 ${address}
+
+Sign in to Context Engine.
 
 URI: https://${domain}
 Version: 1
 Chain ID: ${chainId}
 Nonce: ${nonce}
 Issued At: ${resolvedIssuedAt}
-Expiration Time: ${resolvedExpirationTime}`;
+Expiration Time: ${resolvedExpirationTime}
+Resources:
+- https://worker.example
+- ${sessionResource}`;
 };
 
 const { computeGroupPasswordHash, deriveGroupPasswordWallet } = (
@@ -258,6 +268,8 @@ const issueWorkerLoginToken = async ({
   const message = buildSiweMessage({
     address: wallet.address,
     nonce: noncePayload.nonce,
+    sessionSlug,
+    sessionId,
   });
   const signature = await wallet.signMessage(message);
 

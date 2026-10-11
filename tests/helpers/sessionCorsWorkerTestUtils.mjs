@@ -311,6 +311,20 @@ export const decodeTokenPayload = (token) => {
   return JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
 };
 
+// The session Worker binding the client signs: the receiving Worker origin
+// and the session id (worker-canonical) or slug (registry, general = '').
+export const buildSiweResources = ({ sessionSlug = '', sessionId = '' } = {}) => {
+  const id = String(sessionId || '').trim().toLowerCase();
+  const slug = String(sessionSlug || '').trim().toLowerCase();
+  return [
+    'https://worker.example',
+    id
+      ? `urn:context-engine:session:id:${encodeURIComponent(id)}`
+      : `urn:context-engine:session:slug:${encodeURIComponent(slug === 'general' ? '' : slug)}`,
+  ];
+};
+
+// Strict EIP-4361 in the exact shape the client signs (workerAuth.ts).
 export const buildSiweMessage = ({
   domain = 'worker.example',
   address,
@@ -319,19 +333,28 @@ export const buildSiweMessage = ({
   uri,
   issuedAt,
   expirationTime,
+  sessionSlug = '',
+  sessionId = '',
+  resources = buildSiweResources({ sessionSlug, sessionId }),
 }) => {
   const resolvedIssuedAt = issuedAt || new Date(Date.now() - 60 * 1000).toISOString();
   const resolvedExpirationTime = expirationTime || new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const resolvedUri = uri || `https://${domain}`;
-  return `${domain} wants you to sign in with your Ethereum account:
-${address}
-
-URI: ${resolvedUri}
-Version: 1
-Chain ID: ${chainId}
-Nonce: ${nonce}
-Issued At: ${resolvedIssuedAt}
-Expiration Time: ${resolvedExpirationTime}`;
+  return [
+    `${domain} wants you to sign in with your Ethereum account:`,
+    address,
+    '',
+    'Sign in to Context Engine.',
+    '',
+    `URI: ${resolvedUri}`,
+    'Version: 1',
+    `Chain ID: ${chainId}`,
+    `Nonce: ${nonce}`,
+    `Issued At: ${resolvedIssuedAt}`,
+    `Expiration Time: ${resolvedExpirationTime}`,
+    'Resources:',
+    ...resources.map((resource) => `- ${resource}`),
+  ].join('\n');
 };
 
 export const createSignedSiweBody = async ({
@@ -441,6 +464,8 @@ export const createSignedSiweBody = async ({
     address: wallet.address,
     nonce: noncePayload.nonce,
     chainId,
+    sessionSlug,
+    sessionId: body?.sessionId,
   });
   const signature = await wallet.signMessage(message);
 
@@ -512,6 +537,7 @@ export const workerTestUtils = {
   makeJsonRequest,
   decodeTokenPayload,
   buildSiweMessage,
+  buildSiweResources,
   createSignedSiweBody,
   issueWorkerLoginToken,
 };

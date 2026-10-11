@@ -44,6 +44,7 @@ describe('sessionCorsWorker auth routes', () => {
   const buildLoginSiweMessage = (params = {}, origin = loginOrigin) => buildSiweMessage({
     domain: new URL(origin).host || loginDomain,
     uri: origin,
+    sessionSlug,
     ...params,
   });
 
@@ -433,7 +434,7 @@ describe('sessionCorsWorker auth routes', () => {
       sessionId: workerSessionId,
     });
     const { nonce } = noncePayload;
-    const message = buildLoginSiweMessage({ address: wallet.address, nonce });
+    const message = buildLoginSiweMessage({ address: wallet.address, nonce, sessionId: workerSessionId });
     const signature = await wallet.signMessage(message);
     const loginResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/login', {
