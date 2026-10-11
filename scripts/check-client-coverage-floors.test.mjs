@@ -27,14 +27,8 @@ function coverageFile(relativePath, count) {
 function withFixture(run) {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-client-coverage-'));
   try {
-    writeJson(rootDir, 'scripts/coverage-baseline.json', {
-      global: { statements: 100, branches: 100, functions: 100, lines: 100 },
-    });
     writeJson(rootDir, 'scripts/client-coverage-full-baseline.json', {
       global: { statements: 50, branches: 50, functions: 50, lines: 50 },
-    });
-    writeJson(rootDir, 'scripts/client-coverage-legacy-files.json', {
-      files: ['client/src/imported.ts'],
     });
     writeJson(rootDir, 'client/coverage/coverage-final.json', {
       [path.join(rootDir, 'client/src/imported.ts')]: coverageFile('client/src/imported.ts', 1),
@@ -49,22 +43,18 @@ function withFixture(run) {
   }
 }
 
-test('dual coverage checker enforces fixed legacy and whole-production metrics from one artifact', () => withFixture((rootDir) => {
+test('coverage checker enforces the whole-production floor from one artifact', () => withFixture((rootDir) => {
   const result = collectClientCoverageFloorResult({
     repoDir: rootDir,
     currentProductionFiles: ['client/src/imported.ts', 'client/src/unimported.ts'],
   });
 
   assert.deepEqual(result.findings, []);
-  assert.deepEqual(result.metrics.legacy, { statements: 100, branches: 100, functions: 100, lines: 100 });
   assert.deepEqual(result.metrics.fullUniverse, { statements: 50, branches: 50, functions: 50, lines: 50 });
   assert.deepEqual(result.zeroHitFiles, ['client/src/unimported.ts']);
 }));
 
-test('dual coverage checker reports labeled legacy and whole-universe regressions', () => withFixture((rootDir) => {
-  writeJson(rootDir, 'scripts/coverage-baseline.json', {
-    global: { statements: 101, branches: 101, functions: 101, lines: 101 },
-  });
+test('coverage checker reports labeled whole-production regressions', () => withFixture((rootDir) => {
   writeJson(rootDir, 'scripts/client-coverage-full-baseline.json', {
     global: { statements: 51, branches: 51, functions: 51, lines: 51 },
   });
@@ -73,11 +63,15 @@ test('dual coverage checker reports labeled legacy and whole-universe regression
     repoDir: rootDir,
     currentProductionFiles: ['client/src/imported.ts', 'client/src/unimported.ts'],
   });
-  assert.ok(result.findings.some((finding) => finding.startsWith('legacy-imported statements:')));
-  assert.ok(result.findings.some((finding) => finding.startsWith('whole-production statements:')));
+  assert.deepEqual(result.findings, [
+    'whole-production statements: 50% is below floor 51%',
+    'whole-production branches: 50% is below floor 51%',
+    'whole-production functions: 50% is below floor 51%',
+    'whole-production lines: 50% is below floor 51%',
+  ]);
 }));
 
-test('dual coverage checker fails when a current production file is absent from coverage', () => withFixture((rootDir) => {
+test('coverage checker fails when a current production file is absent from coverage', () => withFixture((rootDir) => {
   fs.writeFileSync(path.join(rootDir, 'client/src/missing.ts'), 'export const missing = true;\n');
   const result = collectClientCoverageFloorResult({
     repoDir: rootDir,

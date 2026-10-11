@@ -3,7 +3,6 @@
   "measuredAt": "2026-08-03",
   "source": "npm --prefix client run test:coverage:full-universe",
   "denominator": "Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.",
-  "nonComparableWithLegacyImportedMetric": true,
   "productionFileCount": 1110,
   "zeroHitFileCount": 11,
   "zeroHitFiles": [

@@ -12,9 +12,7 @@ import {
 const require = createRequire(import.meta.url);
 const {
   CLIENT_COVERAGE_EXCLUSION_RULES,
-  classifyClientCoveragePath,
   listTrackedClientCoverageFiles,
-  normalizeRepoPath,
 } = require('./clientCoverageUniverse');
 
 function parseArgs(argv) {
@@ -35,8 +33,8 @@ function parseArgs(argv) {
       throw new Error(`unknown option: ${key}`);
     }
   }
-  if (!['legacy', 'full', 'exclusions'].includes(options.mode)) {
-    throw new Error('--mode must be legacy, full, or exclusions');
+  if (!['full', 'exclusions'].includes(options.mode)) {
+    throw new Error('--mode must be full or exclusions');
   }
   if (!options.outputPath) throw new Error('--output is required');
   return options;
@@ -54,27 +52,6 @@ function roundFloor(value) {
   return Math.floor(Number(value) * 10) / 10;
 }
 
-function captureLegacy(repoDir, coverageFinal) {
-  const trackedProduction = new Set(listTrackedClientCoverageFiles(repoDir));
-  const files = Object.entries(coverageFinal)
-    .map(([coveragePath, entry]) => normalizeRepoPath(path.relative(
-      repoDir,
-      path.isAbsolute(entry?.path || coveragePath)
-        ? (entry?.path || coveragePath)
-        : path.resolve(repoDir, entry?.path || coveragePath),
-    )))
-    .filter((relativePath) => trackedProduction.has(relativePath))
-    .filter((relativePath) => classifyClientCoveragePath(relativePath).included)
-    .sort();
-  return {
-    schemaVersion: 1,
-    measuredAt: '2026-07-21',
-    source: 'pre-full-universe imported-module coverage-final.json',
-    contract: 'Fixed comparable legacy file set; entries may leave only when the tracked production file is deleted.',
-    files: [...new Set(files)],
-  };
-}
-
 function captureFull(repoDir, coverageFinal) {
   const files = listTrackedClientCoverageFiles(repoDir);
   const result = aggregateCoverageForFiles({
@@ -90,7 +67,6 @@ function captureFull(repoDir, coverageFinal) {
     measuredAt: '2026-07-21',
     source: 'npm --prefix client run test:coverage:full-universe',
     denominator: 'Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.',
-    nonComparableWithLegacyImportedMetric: true,
     productionFileCount: files.length,
     zeroHitFileCount: result.zeroHitFiles.length,
     zeroHitFiles: result.zeroHitFiles,
@@ -111,9 +87,7 @@ function main() {
     };
   } else {
     const coverageFinal = JSON.parse(fs.readFileSync(path.resolve(repoDir, options.coveragePath), 'utf8'));
-    value = options.mode === 'legacy'
-      ? captureLegacy(repoDir, coverageFinal)
-      : captureFull(repoDir, coverageFinal);
+    value = captureFull(repoDir, coverageFinal);
   }
   writeNewJson(repoDir, options.outputPath, value);
   console.log(`Wrote ${options.mode} client coverage baseline to ${options.outputPath}.`);

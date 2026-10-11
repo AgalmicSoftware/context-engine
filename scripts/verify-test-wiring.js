@@ -138,8 +138,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-client-coverage-floors.test.mjs');
   expectFile('scripts/clientCoverageUniverse.js');
   expectFile('scripts/clientCoverageUniverse.test.js');
-  expectFile('scripts/coverage-baseline.json');
-  expectFile('scripts/client-coverage-legacy-files.json');
   expectFile('scripts/client-coverage-exclusions.json');
   expectFile('scripts/client-coverage-full-baseline.json');
   expectFile('scripts/check-client-test-types.mjs');

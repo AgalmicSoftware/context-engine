@@ -531,8 +531,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/check-client-coverage-floors.test.mjs',
       'scripts/clientCoverageUniverse.js',
       'scripts/clientCoverageUniverse.test.js',
-      'scripts/coverage-baseline.json',
-      'scripts/client-coverage-legacy-files.json',
       'scripts/client-coverage-exclusions.json',
       'scripts/client-coverage-full-baseline.json',
       'scripts/check-client-test-types.mjs',
