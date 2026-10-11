@@ -142,18 +142,20 @@ export const dispatchAuthNonceRequest = async ({
     nonce,
     deps?.NONCE_TTL_SECONDS,
   );
-  if (!issueResult?.ok) {
+  // The coordinator signs the random part for this session and wallet; only
+  // that signed nonce can be used to sign in.
+  const signedNonce = typeof issueResult?.nonce === 'string' ? issueResult.nonce : '';
+  if (!issueResult?.ok || !signedNonce) {
     return deps?.json?.(
       { error: issueResult?.error || 'Authorization state coordination is unavailable.' },
-      Number(issueResult?.status || 0) || 503,
+      Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,
       headers,
     );
   }
 
   const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : '';
   return deps?.json?.({
-    // The coordinator returns the random part signed for this session and wallet.
-    nonce: issueResult?.nonce || nonce,
+    nonce: signedNonce,
     ...(responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {}),
     ...(bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}),
   }, 200, headers);

@@ -31,7 +31,8 @@ const createNonceDeps = (overrides = {}) => ({
   }),
   resolveTrustedAdminOrigins: () => ['http://localhost:3000'],
   buildNonce: () => 'nonce-1',
-  issueNonce: async () => ({ ok: true }),
+  // The coordinator returns the signed nonce; tests echo the random part.
+  issueNonce: async (_env, _slug, _address, nonce) => ({ ok: true, nonce }),
   MISSING_SLUG_ERROR: 'Missing sessionSlug.',
   NONCE_TTL_SECONDS: 60 * 5,
   ...overrides,
@@ -415,9 +416,9 @@ test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN
         headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
         config: { allowOrigins: ['https://app.example'] },
       }),
-      issueNonce: async () => {
+      issueNonce: async (_env, _slug, _address, nonce) => {
         issueNonceCalled = true;
-        return { ok: true };
+        return { ok: true, nonce };
       },
       buildNonce: () => 'nonce-admin',
     }),
@@ -450,7 +451,6 @@ test('dispatchAuthNonceRequest does not use caller-controlled ids for auth nonce
       identities.push(value.identity);
       return { ok: true };
     },
-    issueNonce: async () => ({ ok: true }),
   });
 
   const first = await dispatchAuthNonceRequest({
@@ -594,6 +594,21 @@ test('dispatchAuthNonceRequest keeps issuing a wallet nonces while strangers hol
   assert.equal((await consumeNonce(env, 'session-a', admin, first.body.nonce, { now })).error, 'Nonce mismatch or expired.');
 });
 
+test('dispatchAuthNonceRequest never hands out a nonce the coordinator did not sign', async () => {
+  const result = await dispatchAuthNonceRequest({
+    request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+    env: {},
+    baseHeaders: {},
+    slug: '',
+    deps: createNonceDeps({ issueNonce: async () => ({ ok: true }) }),
+  });
+  assert.deepEqual(result, {
+    body: { error: 'Authorization state coordination is unavailable.' },
+    status: 503,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
 test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and nonce storage', async () => {
   let corsCalled = false;
   let issueNonceCalled = false;
@@ -688,7 +703,7 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
       }),
       issueNonce: async (...args) => {
         writes.push(args);
-        return { ok: true };
+        return { ok: true, nonce: args[3] };
       },
       buildNonce: () => 'nonce-success',
       NONCE_TTL_SECONDS: 123,
@@ -742,7 +757,7 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
       },
       issueNonce: async (...args) => {
         writes.push(args);
-        return { ok: true };
+        return { ok: true, nonce: args[3] };
       },
       buildNonce: () => 'nonce-general',
     }),
