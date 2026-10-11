@@ -91,7 +91,8 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const mountWithInterview = async (prefill) => {
+// `edit` runs on the pile before the interview opens; drafts arrive after the own-answer read.
+const mountWithInterview = async (prefill, edit = null) => {
   let engine = null;
   const strategy = createPileViewRuntimeStrategy();
   const renderPile = strategy.render;
@@ -122,13 +123,36 @@ const mountWithInterview = async (prefill) => {
   });
   await waitFor(() => expect(engine?.state?.pileQuestions?.length).toBe(2), { timeout: 8000 });
   await settle();
-  await act(async () =>
-    engine.setState({ showVoiceModeModal: true, sessionVoiceMode: 'interview', interviewPrefillPacket: prefill }),
-  );
+  if (edit) await run(() => edit(engine));
+  await act(async () => engine.setState({ showVoiceModeModal: true, sessionVoiceMode: 'interview' }));
+  await settle();
+  await act(async () => engine.setState({ interviewPrefillPacket: prefill }));
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   await settle();
   return { engine: () => engine, view };
 };
+const run = async (fn) => {
+  let promise;
+  await act(async () => {
+    promise = fn();
+  });
+  await act(async () => {
+    await promise;
+  });
+};
+const typeInPile = (fields) => (engine) =>
+  Object.entries(fields).reduce(
+    (previous, [key, value]) =>
+      previous.then(
+        () =>
+          new Promise((resolve) =>
+            key === 'answer'
+              ? engine.handleAnswerPile('q1', value, { afterUpdate: resolve })
+              : engine.handleAdditionalPile('q1', value, { afterUpdate: resolve }),
+          ),
+      ),
+    Promise.resolve(),
+  );
 const submitDrafts = async () => {
   await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)));
   await settle();
@@ -164,4 +188,33 @@ it('does not upload a draft removed after a failed interview submit', async () =
   expect(upload).toHaveBeenCalledTimes(2);
   expect(uploadedRows(upload, 1)).toEqual([['q1', 'Agree']]);
   expect(pile.engine().getPendingEditStats().total).toBe(0);
+});
+
+it('keeps an unsaved pile comment when the AI proposes no comment', async () => {
+  const upload = mockSession();
+  await mountWithInterview(
+    packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }]),
+    typeInPile({ comment: 'My unsaved note' }),
+  );
+  // Review shows the pending comment and selects the draft for the unanswered question.
+  expect(screen.getByText('My unsaved note')).toBeInTheDocument();
+
+  await submitDrafts();
+
+  expect(upload).toHaveBeenCalledTimes(1);
+  const [row] = upload.mock.calls[0][2];
+  expect(row.answer.value).toBe('Agree');
+  expect(row.additional.value).toBe('My unsaved note');
+});
+
+it('treats an unsaved pile answer as existing, so its draft is not preselected', async () => {
+  const upload = mockSession();
+  await mountWithInterview(
+    packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }]),
+    typeInPile({ answer: 'Disagree' }),
+  );
+
+  expect(screen.getByRole('button', { name: 'Replace with draft' })).toBeEnabled();
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
+  expect(upload).not.toHaveBeenCalled();
 });

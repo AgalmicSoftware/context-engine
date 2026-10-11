@@ -12,6 +12,12 @@ export const responseFieldValue = (
   questionId: string,
 ): unknown => asRecord(asRecord(asRecord(slice)[field])[questionId]).value;
 
+// A masked ("*") comment is locked: review neither shows it as text nor sends it back.
+export const responseCommentValue = (slice: SessionInterviewModalRecord | null | undefined, questionId: string) => {
+  const value = responseFieldValue(slice, 'additionalComments', questionId);
+  return value === '*' ? '' : String(value ?? '');
+};
+
 export const hasDraftValue = (value: unknown): boolean =>
   value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
 

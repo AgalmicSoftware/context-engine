@@ -1,6 +1,6 @@
 import { useInterviewReadiness } from './useInterviewReadiness';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -1682,7 +1682,8 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed answer'));
-    expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'Existing explanation');
+    // The AI proposed no comment and none was edited, so the existing comment is left as it is.
+    expect(baseProps.onApplyAdditional).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Original prediction' })]),
@@ -1697,6 +1698,38 @@ describe('SessionVoiceModeModal', () => {
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+  });
+
+  it('treats a masked comment as locked instead of showing or re-sending "*"', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', confidence: 0.81 },
+    ]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
+          responderContext: { summary: 'Relevant context' },
+        }}
+        existingResponseSlice={{
+          answers: { q1: { value: 'Existing answer' } },
+          additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: '{"v":1}' } },
+        }}
+      />,
+    );
+
+    const review = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(within(review).queryByText('*')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Original prediction'));
+    expect(baseProps.onApplyAdditional).not.toHaveBeenCalled();
   });
 
   it.each(['submitted', 'already-saved'])(

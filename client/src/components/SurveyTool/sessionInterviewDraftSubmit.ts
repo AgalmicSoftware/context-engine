@@ -162,8 +162,11 @@ export const runInterviewDraftSubmit = async ({
       const draft = editedDrafts[original.questionId] || original;
       await onApplyAnswer(draft.questionId, draft.answer);
       if (!isSubmitContextCurrent(attemptToken)) return;
-      await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
-      if (!isSubmitContextCurrent(attemptToken)) return;
+      // Review shows the form's comment when the AI proposed none; only a proposal or an edit replaces it.
+      if (String(original.additionalComments || '').trim() || draft.userEditedFields?.includes('additionalComments')) {
+        await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
+        if (!isSubmitContextCurrent(attemptToken)) return;
+      }
       if (draft.importance !== undefined) await onApplyImportance(draft.questionId, draft.importance);
       if (!isSubmitContextCurrent(attemptToken)) return;
       if (draft.conviction !== undefined) await onApplyConviction(draft.questionId, draft.conviction);

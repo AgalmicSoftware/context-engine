@@ -56,6 +56,7 @@ import {
   describeResearchCoverage,
   displayResponderContext,
   hasDraftValue,
+  responseCommentValue,
   responseFieldValue,
   type SessionInterviewModalRecord,
 } from './sessionInterviewModalState';
@@ -310,7 +311,8 @@ function SessionInterviewPanel({
     active: authenticatedForSubmit,
     onLoaded: reviewSavedConflicts,
   });
-  const existingResponseSlice = ownAnswers.slice || formResponseSlice;
+  // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
+  const existingResponseSlice = formResponseSlice || ownAnswers.slice;
   useEffect(() => {
     setConsentOverrides({});
   }, [activeSubmitContextToken]);
@@ -525,15 +527,13 @@ function SessionInterviewPanel({
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
           importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
-          (id) => String(responseFieldValue(existingResponsesRef.current, 'additionalComments', id) || ''),
+          (id) => responseCommentValue(existingResponsesRef.current, id),
         );
         for (const draft of review.drafts) {
           if (!editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
             review.edited[draft.questionId] = {
               ...review.edited[draft.questionId],
-              additionalComments: String(
-                responseFieldValue(existingResponsesRef.current, 'additionalComments', draft.questionId) || '',
-              ),
+              additionalComments: responseCommentValue(existingResponsesRef.current, draft.questionId),
             };
           }
         }
@@ -1008,9 +1008,7 @@ function SessionInterviewPanel({
                   question={questions.find((question) => question.id === draft.questionId)}
                   selected={Boolean(selected[draft.questionId])}
                   existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
-                  savedComment={String(
-                    responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || '',
-                  )}
+                  savedComment={responseCommentValue(existingResponseSlice, draft.questionId)}
                   disabled={applying}
                   onSelect={(value) => {
                     setSubmitSucceeded(false);
