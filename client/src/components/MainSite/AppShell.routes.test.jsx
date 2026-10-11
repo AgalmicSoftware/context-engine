@@ -21,6 +21,7 @@ import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbackRedirect.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
+import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController';
 import {
@@ -930,6 +931,32 @@ describe('AppShell route render smoke', () => {
       }),
       expect.any(Function),
     );
+  });
+
+  it('drops cached decrypts only when the signed-in account really changes', () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    const ACCOUNT_A = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_B = '0x00000000000000000000000000000000000000bb';
+    const update = (prevAccount, nextAccount) => {
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount };
+      subject.componentDidUpdate(prevProps, subject.state);
+    };
+    const start = getDecryptCacheGeneration();
+
+    update(ACCOUNT_A, ACCOUNT_A.toUpperCase().replace('0X', '0x'));
+    expect(getDecryptCacheGeneration()).toBe(start);
+
+    update(ACCOUNT_A, ACCOUNT_B);
+    expect(getDecryptCacheGeneration()).toBe(start + 1);
+
+    // Logout clears the store account.
+    update(ACCOUNT_B, undefined);
+    expect(getDecryptCacheGeneration()).toBe(start + 2);
+
+    update(undefined, undefined);
+    expect(getDecryptCacheGeneration()).toBe(start + 2);
   });
 
   it('forwards the active session cache context to the home tools explorer', () => {

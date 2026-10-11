@@ -34,7 +34,7 @@ import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
@@ -2748,6 +2748,16 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   }
 
   componentDidUpdate(prevProps: MainSiteProps, prevState: MainSiteState) {
+    // Decrypted plaintext and Lit content keys are cached for the whole tab.
+    // Every logout and account switch reaches the store's account, so drop them here.
+    const accountKey = (account: unknown) =>
+      String(account || '')
+        .trim()
+        .toLowerCase();
+    if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
+      clearDecryptCaches();
+    }
+
     this.redirectLegacyDemoPath();
 
     // Handle auto-hash persistence (save on change)
