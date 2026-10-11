@@ -82,7 +82,7 @@ Header images should therefore be compressed web assets, preferably JPEG or
 WebP, rather than full-resolution working files.
 
 Non-post routes use the square Context Engine mark at
-`/assets/img/context-engine-social-preview-square.png`. Individual posts replace
+`/context-engine-social-preview-square.png`. Individual posts replace
 that default with their manifest header image.
 
 ## Disclosure Blocks

@@ -47,9 +47,7 @@ describe('publicPageHead', () => {
 
   it('uses contextengine.sh for deployment-independent public metadata defaults', () => {
     expect(DEFAULT_PUBLIC_SITE_URL).toBe('https://contextengine.sh/');
-    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe(
-      'https://contextengine.sh/assets/img/context-engine-social-preview-square.png',
-    );
+    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe('https://contextengine.sh/context-engine-social-preview-square.png');
     expect(PUBLIC_DISCOVERABILITY_URL).toBe('https://contextengine.sh/discoverability.html');
     expect(PUBLIC_LLMS_URL).toBe('https://contextengine.sh/llms.txt');
   });

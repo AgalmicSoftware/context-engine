@@ -228,17 +228,20 @@ be scoped to the same deployed base path by the hosting platform.
 Relative mount paths are normalized directly; route lookups avoid repeatedly
 parsing them as absolute URLs during question-list rendering.
 
-Set browser cache headers so search-result clicks and fresh navigations
-revalidate the deployed files after each deploy. For manual drag-and-drop
-deploys, keep the `_headers` file inside `client/public/` so Vite copies it into
-the uploaded `client/build/` directory:
+Cache Vite's content-hashed bundles for a year and let everything else
+revalidate. For manual drag-and-drop deploys, keep the `_headers` file inside
+`client/public/` so Vite copies it into the uploaded `client/build/` directory:
 
 ```text
-/*
-  Cache-Control: no-cache, max-age=0, must-revalidate
-  Pragma: no-cache
-  Expires: 0
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 ```
+
+Netlify's default `Cache-Control: public, max-age=0, must-revalidate` already
+makes the browser re-check `index.html` and other unhashed files, so the `/*`
+rule sets no cache header; overlapping rules could otherwise combine values.
+Keep unhashed public files out of `client/public/assets/`, because anything
+served under `/assets/` is cached as immutable.
 
 This cannot replace already-running JavaScript in an open tab. It makes the
 browser re-check the app shell on the next navigation, reload, or new visit.

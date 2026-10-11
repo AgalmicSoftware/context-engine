@@ -96,6 +96,24 @@ test('client HTML shell description stays aligned with the README framing', () =
   assert.match(html, /cryptographic access control/);
 });
 
+const readHeaderRules = () => {
+  const rules = {};
+  let current = null;
+  readText('client/public/_headers')
+    .split('\n')
+    .forEach((line) => {
+      if (!line.trim() || line.trim().startsWith('#')) return;
+      if (!/^\s/.test(line)) {
+        current = {};
+        rules[line.trim()] = current;
+        return;
+      }
+      const separator = line.indexOf(':');
+      current[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+    });
+  return rules;
+};
+
 test('client static headers deny framing and report broader CSP compatibility', () => {
   const headers = readText('client/public/_headers');
 
@@ -103,6 +121,25 @@ test('client static headers deny framing and report broader CSP compatibility', 
   assert.match(headers, /Content-Security-Policy: frame-ancestors 'none'/);
   assert.match(headers, /Content-Security-Policy-Report-Only: default-src 'self'/);
   assert.match(headers, /connect-src 'self' https: wss: data:/);
+});
+
+test('client static headers cache only hashed build assets as immutable', () => {
+  const rules = readHeaderRules();
+
+  // Overlapping Netlify rules combine values, so the catch-all rule must not set caching.
+  ['Cache-Control', 'Pragma', 'Expires'].forEach((name) => assert.equal(rules['/*'][name], undefined, name));
+  assert.deepEqual(rules['/assets/*'], { 'Cache-Control': 'public, max-age=31536000, immutable' });
+  // Public files are copied unhashed, so none may be served from the immutable /assets path.
+  assert.equal(existsSync(resolve(rootDir, 'client/public/assets')), false);
+});
+
+test('client social preview image lives outside the immutable asset path', () => {
+  const html = readText('client/index.html');
+  const imageUrl = 'https://contextengine.sh/context-engine-social-preview-square.png';
+
+  assert.ok(html.includes(`<meta property="og:image" content="${imageUrl}" />`));
+  assert.ok(html.includes(`<meta name="twitter:image" content="${imageUrl}" />`));
+  assert.ok(existsSync(resolve(rootDir, 'client/public/context-engine-social-preview-square.png')));
 });
 
 test('public favicon family uses white circuit C artwork with alpha transparency', () => {
