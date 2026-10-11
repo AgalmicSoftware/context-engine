@@ -2,7 +2,9 @@ import {
   clearBootReloadMarker,
   clearBootCaches,
   clearStaleChunkReloadMarker,
+  installStaleChunkPreloadRecovery,
   isStaleChunkLoadError,
+  reloadForStaleChunk,
   reloadWithCacheBuster,
   recoverFromStaleChunkLoadError,
   renderBootFailure,
@@ -227,6 +229,47 @@ describe('bootRecovery', () => {
     expect(isStaleChunkLoadError(new TypeError("'text/html' is not a valid JavaScript MIME type."))).toBe(true);
     expect(isStaleChunkLoadError(new Error('Failed to fetch dynamically imported module'))).toBe(true);
     expect(isStaleChunkLoadError(new Error('Kaboom'))).toBe(false);
+  });
+
+  it('recognizes Vite CSS preload and Firefox dynamic import failures as stale chunks', () => {
+    expect(isStaleChunkLoadError(new Error('Unable to preload CSS for /assets/OnePageSession-00000000.css'))).toBe(
+      true,
+    );
+    expect(
+      isStaleChunkLoadError(
+        new TypeError('error loading dynamically imported module: https://app.example.test/assets/Report-00000000.js'),
+      ),
+    ).toBe(true);
+  });
+
+  it('recovers when Vite reports a failed lazy chunk preload without swallowing the rejection', () => {
+    const reload = jest.fn();
+    const storage = { getItem: jest.fn(() => null), setItem: jest.fn() };
+    const fakeWindow = { location: { href: 'https://app.example.test/session/alpha' }, sessionStorage: storage };
+    const preloadError = (payload) => Object.assign(new Event('vite:preloadError', { cancelable: true }), { payload });
+    const uninstall = installStaleChunkPreloadRecovery(window, { window: fakeWindow, storage, reload });
+
+    const staleCss = preloadError(new Error('Unable to preload CSS for /assets/OnePageSession-00000000.css'));
+    window.dispatchEvent(staleCss);
+    window.dispatchEvent(preloadError(new Error('Kaboom')));
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(staleCss.defaultPrevented).toBe(false);
+    expect(storage.setItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b', 'true');
+
+    uninstall();
+    window.dispatchEvent(preloadError(new Error('Unable to preload CSS for /assets/Other-00000000.css')));
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads a stale route through the chunk recovery marker', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(123456);
+    const assign = jest.fn();
+
+    reloadForStaleChunk({ location: { href: 'http://localhost:3000/session/demo-1?existing=1', assign } });
+
+    expect(assign).toHaveBeenCalledWith('http://localhost:3000/session/demo-1?existing=1&ceChunkReload=123456');
+    Date.now.mockRestore();
   });
 
   it('recovers from stale chunk errors with a single cache-busted reload', () => {

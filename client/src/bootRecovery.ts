@@ -66,7 +66,9 @@ export const isStaleChunkLoadError = (error: unknown): boolean => {
   return (
     message.includes('not a valid javascript mime type') ||
     message.includes('failed to fetch dynamically imported module') ||
+    message.includes('error loading dynamically imported module') ||
     message.includes('importing a module script failed') ||
+    message.includes('unable to preload css') ||
     message.includes('chunkloaderror') ||
     (message.includes('loading chunk') && message.includes('failed'))
   );
@@ -179,6 +181,28 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   }
   reload();
   return true;
+};
+
+// React.lazy caches a rejected chunk import, so only a fresh page load can pick up a newer deploy.
+export const reloadForStaleChunk = (win: BootWindow = globalThis.window): void =>
+  reloadWithCacheBuster(win, STALE_CHUNK_RELOAD_PARAM);
+
+type PreloadErrorTarget = {
+  addEventListener?: (type: string, listener: (event: Event) => void) => void;
+  removeEventListener?: (type: string, listener: (event: Event) => void) => void;
+};
+
+// Vite reports a failed lazy chunk or CSS preload here before the import rejects. The
+// rejection still reaches its caller, so error boundaries keep their fallback.
+export const installStaleChunkPreloadRecovery = (
+  target: PreloadErrorTarget | undefined = globalThis.window,
+  options: BootRecoveryOptions = {},
+): (() => void) => {
+  const listener = (event: Event) => {
+    recoverFromStaleChunkLoadError((event as Event & { payload?: unknown }).payload, options);
+  };
+  target?.addEventListener?.('vite:preloadError', listener);
+  return () => target?.removeEventListener?.('vite:preloadError', listener);
 };
 
 const appendTextNode = (

@@ -1,5 +1,5 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
+import React, { Suspense } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import * as bootRecovery from '../../bootRecovery.js';
 import AppErrorBoundary from './AppErrorBoundary';
 import RouteErrorBoundary from './RouteErrorBoundary';
@@ -63,6 +63,48 @@ describe('Error boundaries', () => {
     expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));
 
     recoverSpy.mockRestore();
+  });
+
+  it('reloads instead of re-rendering a route whose lazy chunk failed to load', async () => {
+    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
+    const reloadSpy = jest.spyOn(bootRecovery, 'reloadForStaleChunk').mockImplementation(() => undefined);
+    const StaleRoute = React.lazy(() =>
+      Promise.reject(new Error('Unable to preload CSS for /assets/OnePageSession-00000000.css')),
+    );
+
+    render(
+      <RouteErrorBoundary>
+        <Suspense fallback={null}>
+          <StaleRoute />
+        </Suspense>
+      </RouteErrorBoundary>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    recoverSpy.mockRestore();
+    reloadSpy.mockRestore();
+  });
+
+  it('re-renders an ordinary route error when the reader tries again', () => {
+    const reloadSpy = jest.spyOn(bootRecovery, 'reloadForStaleChunk').mockImplementation(() => undefined);
+    let shouldThrow = true;
+    const FlakyRoute = () => {
+      if (shouldThrow) throw new Error('Kaboom');
+      return <p>Recovered route</p>;
+    };
+
+    render(
+      <RouteErrorBoundary>
+        <FlakyRoute />
+      </RouteErrorBoundary>,
+    );
+    shouldThrow = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(screen.getByText('Recovered route')).toBeInTheDocument();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    reloadSpy.mockRestore();
   });
 
   it('asks the app-wide fallback to recover a stale AppShell chunk without clearing its loop guard', () => {
