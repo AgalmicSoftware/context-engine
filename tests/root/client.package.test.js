@@ -166,6 +166,15 @@ test('client static headers enforce the baseline CSP and report a strict-script 
   });
 });
 
+test('client isolation headers come from the host, not ignored meta tags', () => {
+  const headers = readHeaderRules()['/*'];
+
+  // Browsers ignore COOP/COEP in <meta http-equiv>; auth popups rely on the HTTP headers.
+  assert.doesNotMatch(readText('client/index.html'), /http-equiv="Cross-Origin-/i);
+  assert.equal(headers['Cross-Origin-Opener-Policy'], 'same-origin-allow-popups');
+  assert.equal(headers['Cross-Origin-Embedder-Policy'], 'unsafe-none');
+});
+
 test('client static headers cache only hashed build assets as immutable', () => {
   const rules = readHeaderRules();
 
