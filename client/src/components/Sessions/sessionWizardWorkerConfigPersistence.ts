@@ -336,6 +336,42 @@ const verifyCriticalWorkerConfigFields = ({
   }
 };
 
+const PUBLICATION_FINALIZED_ERROR_PATTERN = /publication is already finalized/i;
+
+// A publication commits before its readback. When that readback failed and
+// the draft changed since, the next attempt meets the committed publication;
+// it is this session's if the Worker still serves the same identity.
+const isPublishedForIdentity = async ({
+  fetchImpl,
+  workerOrigin,
+  slug,
+  sessionId,
+  adminAddress,
+  environment,
+}: {
+  fetchImpl: SessionWizardWorkerConfigFetchPort;
+  workerOrigin: string;
+  slug: string;
+  sessionId: string;
+  adminAddress: string;
+  environment?: DiscoveryEnvironment;
+}): Promise<boolean> => {
+  try {
+    const response = await fetchImpl(`${workerOrigin}/session-config`, {
+      method: 'GET',
+      credentials: 'omit',
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'X-Session-Slug': slug },
+    });
+    if (!response.ok) return false;
+    const config = getPublicConfigFromResponse(await readResponseJson(response));
+    verifyCriticalWorkerConfigFields({ config, slug, sessionId, workerOrigin, environment });
+    return normalizeAdminAddress(config.adminAddress) === adminAddress;
+  } catch {
+    return false;
+  }
+};
+
 export const persistAndVerifySessionWizardWorkerConfig = async ({
   workerUrl,
   slug,
@@ -423,6 +459,24 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   if (!writeResponse.ok) {
     const writeBody = await readResponseJson(writeResponse);
     const detail = readResponseError(writeBody);
+    if (
+      finalizePublication &&
+      writeResponse.status === 409 &&
+      PUBLICATION_FINALIZED_ERROR_PATTERN.test(detail) &&
+      (await isPublishedForIdentity({
+        fetchImpl,
+        workerOrigin,
+        slug: normalizedSlug,
+        sessionId: normalizedSessionId,
+        adminAddress: normalizedAdminAddress,
+        environment,
+      }))
+    ) {
+      throw Object.assign(
+        new Error('This session is already published. Its earlier settings are live; later edits were not applied.'),
+        { workerCanonicalAlreadyPublished: true },
+      );
+    }
     throw new Error(`Worker config write failed (${writeResponse.status})${detail ? `: ${detail}` : '.'}`);
   }
 

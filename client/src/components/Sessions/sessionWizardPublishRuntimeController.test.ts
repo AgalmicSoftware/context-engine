@@ -170,6 +170,31 @@ describe('sessionWizardPublishRuntimeController', () => {
     expect(harness.events).toEqual([]);
   });
 
+  it('names the live session when an earlier publication already committed', async () => {
+    const harness = createControllerHarness();
+    harness.persistWorkerConfig.mockRejectedValueOnce(
+      Object.assign(new Error('This session is already published.'), { workerCanonicalAlreadyPublished: true }),
+    );
+
+    await expect(
+      harness.controller.runPreparation({
+        publishAllowed: true,
+        publishExecutionPlan: {
+          shouldPersistWorkerConfig: true,
+          shouldRegisterSession: false,
+          shouldRefreshRegistryCache: false,
+        },
+        signerAccountOverride: ADMIN_ADDRESS,
+        runTrackedPublishEffect: harness.runTrackedPublishEffect,
+      }),
+    ).rejects.toThrow(
+      `This session is already published at http://localhost/session/worker-session?worker=${encodeURIComponent(
+        WORKER_ORIGIN,
+      )}. Its earlier settings are live; later edits were not applied.`,
+    );
+    expect(harness.callbacks.setWorkerCanonicalPublishSettled).not.toHaveBeenCalled();
+  });
+
   it('persists worker config inside the tracked publish effect and returns the verified origin', async () => {
     const harness = createControllerHarness();
 

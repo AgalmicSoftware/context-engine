@@ -253,6 +253,21 @@ export const createSessionWizardPublishRuntimeController = ({
                 adminAddress: signerAccount,
                 config,
                 signAdminAction: (input) => signTypedAdminAction({ ...input, accountOverride: signerAccount }),
+              }).catch((error: unknown) => {
+                if (
+                  (error as { workerCanonicalAlreadyPublished?: unknown })?.workerCanonicalAlreadyPublished !== true
+                ) {
+                  throw error;
+                }
+                const { sessionUrl } = resolveSessionWizardWorkerPublishSuccessSettlementDescriptor({
+                  slug: draft.slug,
+                  sessionId,
+                  workerOrigin: workerUrl,
+                });
+                throw new Error(
+                  `This session is already published${sessionUrl ? ` at ${sessionUrl}` : ''}. ` +
+                    'Its earlier settings are live; later edits were not applied.',
+                );
               });
               const liveEvidence = getWorkerPublishEvidence({ workerUrlOverride: verified.workerOrigin });
               // The remote write is terminal, so never clear local state unless the

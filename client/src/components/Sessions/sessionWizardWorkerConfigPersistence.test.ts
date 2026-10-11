@@ -510,6 +510,32 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ).rejects.toThrow(/timed out waiting for worker config revision "publication-revision"/i);
   });
 
+  it('recognizes a publication that committed before an edit, and only for this session', async () => {
+    const finalizedWrite = () => jsonResponse(409, { error: 'Worker-canonical publication is already finalized.' });
+    const publishWith = (readback: Record<string, unknown>) =>
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl: jest
+          .fn()
+          .mockResolvedValueOnce(finalizedWrite())
+          .mockResolvedValueOnce(jsonResponse(200, { config: readback })),
+        retryDelaysMs: [],
+      });
+
+    await expect(publishWith(verifiedConfig('earlier-revision'))).rejects.toMatchObject({
+      message: 'This session is already published. Its earlier settings are live; later edits were not applied.',
+      workerCanonicalAlreadyPublished: true,
+    });
+    await expect(
+      publishWith(verifiedConfig('earlier-revision', { adminAddress: '0x2222222222222222222222222222222222222222' })),
+    ).rejects.toThrow('Worker config write failed (409): Worker-canonical publication is already finalized.');
+  });
+
   it('signs the exact non-secret Lit descriptor fields for a worker-canonical Lit session', async () => {
     const litCredentials = {
       litApiBase: 'https://api.chipotle.litprotocol.com',
