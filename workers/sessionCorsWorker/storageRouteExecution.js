@@ -1830,6 +1830,9 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);
   }
   const items = [];
+  // Clients cannot see every Worker role, so lists say whether each question
+  // or survey uploader is a session admin under the current role set.
+  const admins = isOwnedStorageResource(resource) ? resolveSessionAdminAddresses(config) : null;
   for (const { name, raw } of rows) {
     if (!name) continue;
     let metadata;
@@ -1890,6 +1893,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
           : {}),
         ...(resourceId ? { resourceId } : {}),
         ...(owned && trim(metadata?.uploader) ? { uploader: normalizeAddress(metadata.uploader) } : {}),
+        ...(owned ? { uploaderIsAdmin: !!admins?.has(normalizeAddress(metadata?.uploader)) } : {}),
         payloadAccessControl: {
           gate: metadataAccess.gate,
           encryption: metadataAccess.encryption,

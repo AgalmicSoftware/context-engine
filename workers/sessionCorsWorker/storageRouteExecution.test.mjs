@@ -4349,6 +4349,21 @@ test('question and survey uploads record their authenticated uploader and id', a
 	assert.equal(survey.metadata.resourceId, '0xs1');
 });
 
+test('lists say whether each question or survey uploader is a session admin now', async () => {
+	const { common, upload, list } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('By the author', '0xq1'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('By a role admin', '0xq2'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
+	// A Worker role admin that the public adminAddress fields do not name.
+	common.config.workerRoles = { admin: [OWNERSHIP_OTHER] };
+	const flags = (items) => items.map((item) => [item.metadata.resourceId, item.metadata.uploaderIsAdmin]).sort();
+	assert.deepEqual(flags((await list()).items), [['0xq1', false], ['0xq2', true]]);
+	assert.deepEqual(flags((await list('surveys')).items), [['0xs1', true]]);
+	// The flag follows the current role set, not the one at upload time.
+	common.config.workerRoles = {};
+	assert.deepEqual(flags((await list()).items), [['0xq1', false], ['0xq2', false]]);
+});
+
 test('only the first author or a session admin can upload an existing question or survey id again', async () => {
 	const { upload, list } = createOwnershipHarness();
 	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
