@@ -363,9 +363,9 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {(input: { password?: string, sbtAddress?: string }) => Promise<string>} computeGroupPasswordHash
  * @property {(error: unknown) => boolean} isGroupPasswordMismatchError
  * @property {(sbtAddress: string, userAddress: string, chainId: unknown) => string} computeGroupMintMessageHash
- * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, groupPasswordHash?: string }) => Promise<string>} signGroupMintAuthorization
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, groupPasswordHash: string }) => Promise<string>} signGroupMintAuthorization
  * @property {(input: { chainId?: unknown, sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
- * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonces?: Array<string | number>, groupPasswordHash?: string }) => Promise<string[]>} signInvites
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonces?: Array<string | number>, groupPasswordHash: string }) => Promise<string[]>} signInvites
  * @property {(payload: Record<string, unknown>) => string} encodeInvite
  * @property {(inviteCode: string) => ({ chainId: string, sbtAddress: string, nonce: string, signature: string } | null)} decodeInvite
  * @property {() => string} generateInviteNonce
