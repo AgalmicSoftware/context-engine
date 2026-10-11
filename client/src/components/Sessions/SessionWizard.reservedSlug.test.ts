@@ -8,6 +8,8 @@ import {
   isReservedSessionSlug,
 } from './sessionWizardSlugValidation';
 import { buildSessionWorkerBootstrapUrl } from '../../utilities/session/sessionWorkerDiscovery';
+import { canonicalizeSessionSlug } from '../../utilities/session/sessionSlug';
+import { validateInboundWorkerSessionSlug } from '../../../../workers/sessionCorsWorker/sessionSlugResolution.js';
 
 describe('SessionWizard reserved slug validation', () => {
   it('marks "general" as reserved regardless of case or surrounding whitespace', () => {
@@ -16,9 +18,11 @@ describe('SessionWizard reserved slug validation', () => {
     expect(isReservedSessionSlug('General')).toBe(true);
   });
 
-  it('does not mark removed legacy demo aliases as reserved', () => {
-    expect(isReservedSessionSlug('debate')).toBe(false);
-    expect(isReservedSessionSlug(' DEBATE ')).toBe(false);
+  it('reserves debate, which the Worker opens as rxc, and names the route resolves elsewhere', () => {
+    expect(isReservedSessionSlug('debate')).toBe(true);
+    expect(isReservedSessionSlug(' DEBATE ')).toBe(true);
+    expect(isReservedSessionSlug('constructor')).toBe(true);
+    expect(isReservedSessionSlug('prototype')).toBe(true);
     expect(isReservedSessionSlug('rxc')).toBe(false);
     expect(isReservedSessionSlug(' RXC ')).toBe(false);
   });
@@ -36,17 +40,22 @@ describe('SessionWizard reserved slug validation', () => {
   });
 
   it('accepts exactly the slugs a participant link can open', () => {
-    const accepted = ['a', '0-team', 'good_slug-1', 'a'.repeat(128)];
-    const rejected = ['-team', '_x', 'a'.repeat(129)];
-    [...accepted, ...rejected].forEach((slug) => {
-      let opensForParticipants = true;
+    // A link opens a slug only if the bootstrap accepts it and neither the
+    // session route nor the Worker resolves it to another session.
+    const opensForParticipants = (slug: string): boolean => {
       try {
         buildSessionWorkerBootstrapUrl('https://worker.example.test', slug);
       } catch {
-        opensForParticipants = false;
+        return false;
       }
-      expect(hasInvalidSessionSlugFormat(slug)).toBe(!opensForParticipants);
-      expect(opensForParticipants).toBe(accepted.includes(slug));
+      const worker = validateInboundWorkerSessionSlug(slug);
+      return canonicalizeSessionSlug(slug) === slug && worker.ok && worker.slug === slug;
+    };
+    const accepted = ['a', '0-team', 'good_slug-1', 'rxc', 'general-1', 'a'.repeat(128)];
+    const rejected = ['-team', '_x', 'a'.repeat(129), 'general', 'debate', 'constructor', 'prototype', '__proto__'];
+    [...accepted, ...rejected].forEach((slug) => {
+      expect(opensForParticipants(slug)).toBe(accepted.includes(slug));
+      expect(getSessionSlugValidationError(slug) === '').toBe(opensForParticipants(slug));
     });
   });
 
@@ -62,7 +71,7 @@ describe('SessionWizard reserved slug validation', () => {
     expect(getSessionSlugValidationError('   ')).toBe(REQUIRED_SESSION_SLUG_ERROR);
     expect(getSessionSlugValidationError('Bad Slug')).toBe(INVALID_SESSION_SLUG_FORMAT_ERROR);
     expect(getSessionSlugValidationError('general')).toBe(RESERVED_SESSION_SLUG_ERROR);
-    expect(getSessionSlugValidationError('debate')).toBe('');
+    expect(getSessionSlugValidationError('debate')).toBe(RESERVED_SESSION_SLUG_ERROR);
     expect(getSessionSlugValidationError('rxc')).toBe('');
     expect(getSessionSlugValidationError('community')).toBe('');
   });
@@ -73,7 +82,7 @@ describe('SessionWizard reserved slug validation', () => {
       'Session slugs must start with a lowercase letter or number and use at most 128 lowercase letters, numbers, "_" or "-".',
     );
     expect(RESERVED_SESSION_SLUG_ERROR).toBe(
-      'This slug is reserved for the default session or legacy compatibility aliases ("general"). Please choose a different slug.',
+      'This slug is reserved because its link opens a different session ("general", "debate", "constructor", "prototype"). Please choose a different slug.',
     );
   });
 });
