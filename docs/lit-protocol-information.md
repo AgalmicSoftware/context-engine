@@ -90,8 +90,8 @@ Primary docs:
 - Current public docs do not document a Naga-to-Chipotle import path for accounts, usage keys, PKPs, groups, permissions, or balances; plan to recreate those resources during migration.
 - Current public docs are also internally inconsistent about IPFS action execution. CE should therefore treat inline `code` execution as the most certain worker-mediated path until Lit documents the `ipfs_id` / cached-action model more cleanly.
 
-The rest of this document contains legacy background plus repo context that is
-still useful for understanding the older Naga-era implementation.
+The sections below cover the current runtime, the Lit platform state, brief
+Lit background with the concepts Context Engine uses, and the repo wiring.
 
 ---
 
@@ -118,7 +118,7 @@ still useful for understanding the older Naga-era implementation.
 
 ## External Lit platform state (research baseline: 2026-04-28)
 
-- Naga is no longer a future migration concern; it is sunset. The repo still contains Naga-era wiring, but the hosted Naga path should be treated as legacy.
+- Naga is sunset. The only Naga-era code left normalizes old network labels (such as `naga-dev` or `datil`) to `chipotle` when old session metadata is read or rewritten.
 - Chipotle production is live at:
   - `https://api.chipotle.litprotocol.com`
   - `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
