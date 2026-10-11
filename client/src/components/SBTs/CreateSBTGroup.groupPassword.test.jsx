@@ -185,4 +185,86 @@ describe('CreateSBTGroup group password', () => {
     expect(labelsDuringDerivation).toEqual(['Securing password…']);
     expect(instance.state.groupPasswordSecuring).toBe(false);
   });
+
+  describe('while a create is in flight', () => {
+    const PASSPHRASE = 'orbit-maple-signal-tunnel-quartz';
+    const PREDICTED = '0x00000000000000000000000000000000000000c9';
+
+    const makeCreatingInstance = (stateOverrides = {}, props = {}) => {
+      const instance = makeGroupPasswordInstance({ groupPassword: PASSPHRASE, ...stateOverrides }, props);
+      instance.persistFormCache = jest.fn();
+      instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
+      instance.commitPendingDocumentUrl = jest.fn(async () => false);
+      instance.uploadImageToArweave = jest.fn(async () => null);
+      instance.uploadTokenUriToArweave = jest.fn(async () => {
+        instance.state = { ...instance.state, tokenURI: 'ar://metadata' };
+        return 'ar://metadata';
+      });
+      jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(PREDICTED);
+      jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+        logs: [makeFactoryReceiptLog('SBTCreated', [PREDICTED])],
+      });
+      return instance;
+    };
+
+    it('locks the password and Generate new, and shows the deployed password afterwards', async () => {
+      const instance = makeCreatingInstance();
+      let lockedDuringCreate = null;
+      const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockImplementation(async () => {
+        render(instance.render());
+        const input = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT);
+        const generate = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE);
+        lockedDuringCreate = input.disabled && generate.disabled;
+        fireEvent.click(generate);
+        instance.handleGenerateGroupPassword();
+        return `0x${'66'.repeat(32)}`;
+      });
+
+      // Not wrapped in act(): React would defer the render inside the hash step until act() ends.
+      await instance.handleMintClick();
+
+      expect(lockedDuringCreate).toBe(true);
+      expect(hashSpy).toHaveBeenCalledWith({ password: PASSPHRASE, sbtAddress: PREDICTED });
+      expect(instance.state.sbtMinted).toBe(true);
+      expect(instance.state.groupPassword).toBe(PASSPHRASE);
+    });
+
+    it('deploys the password captured at Create even if the field changes during the upload', async () => {
+      const instance = makeCreatingInstance();
+      instance.uploadImageToArweave = jest.fn(async () => {
+        instance.handleInputChange({ target: { name: 'groupPassword', type: 'text', value: 'abc' } });
+      });
+      const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'66'.repeat(32)}`);
+
+      await act(async () => {
+        await instance.handleMintClick();
+      });
+
+      expect(hashSpy).toHaveBeenCalledTimes(1);
+      expect(hashSpy).toHaveBeenCalledWith({ password: PASSPHRASE, sbtAddress: PREDICTED });
+      expect(contractScripts.createSBT).toHaveBeenCalledTimes(1);
+      expect(instance.state.groupPassword).toBe(PASSPHRASE);
+    });
+
+    it('saves a deferred draft with the password captured at Create', async () => {
+      const onSaveDraft = jest.fn().mockResolvedValue(undefined);
+      const instance = makeCreatingInstance(
+        { tokenURI: 'ar://metadata', create2Salt: 'test/password-group' },
+        { deferredDeploy: true, onSaveDraft },
+      );
+      jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockImplementation(async () => {
+        instance.handleInputChange({ target: { name: 'groupPassword', type: 'text', value: 'abc' } });
+        return `0x${'77'.repeat(32)}`;
+      });
+
+      await act(async () => {
+        await instance.handleMintClick();
+      });
+
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        expect.objectContaining({ groupPassword: PASSPHRASE, finalGroupPasswordHash: `0x${'77'.repeat(32)}` }),
+      );
+      expect(instance.state.groupPassword).toBe(PASSPHRASE);
+    });
+  });
 });

@@ -517,6 +517,8 @@ type PredictablePasswordListArgs = {
 };
 type PredictableDeployShapeArgs = {
   allowStateMutation?: boolean;
+  // The click-time group password a create uses; address previews read the field instead.
+  groupPassword?: string;
 };
 type PredictableDeployGroupConfig = Record<string, unknown> & {
   contracts?: {
@@ -573,6 +575,7 @@ type PredictableDeployReadyShape = PredictableDeployShape & {
 };
 type ResolvePredictableDeployPlanArgs = {
   tokenURI: string;
+  groupPassword: string;
 };
 type PredictableDeployPlan = PredictableDeployReadyShape & {
   predictedAddress: string;
@@ -1580,8 +1583,16 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   handleGenerateGroupPassword = (): void => {
+    if (this.isCreateInFlight()) return;
     this.setState({ groupPassword: generateCreateSbtGroupPassphrase(), groupPasswordWeakConfirmed: false });
   };
+
+  // A create uses the password captured when Create was clicked, so the field stays locked until it ends.
+  isCreateInFlight = (): boolean => !!this.state.startedMinting && !this.state.sbtMinted && !this.state.mintingFailed;
+
+  // After a create, the field shows exactly the password the group was created with.
+  buildCreatedGroupPasswordPatch = (distributionOption: unknown, groupPassword: string): Record<string, unknown> =>
+    distributionOption === 'groupPassword' ? { groupPassword } : {};
 
   // The v4 group password KDF takes up to a couple of seconds, so say so on the create button.
   secureGroupPassword = async (password: string, sbtAddress: string): Promise<string> => {
@@ -1681,6 +1692,7 @@ class CreateSBTGroup extends Component<any, any> {
 
   buildPredictableDeployShape = ({
     allowStateMutation = true,
+    groupPassword: groupPasswordSnapshot,
   }: PredictableDeployShapeArgs = {}): PredictableDeployShape | null => {
     if (!this.isPredictableAddressEnabled()) return null;
 
@@ -1735,7 +1747,7 @@ class CreateSBTGroup extends Component<any, any> {
     const hashedPasswords = usesClaimCodes
       ? resolvedPasswordList.map((password) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)))
       : [];
-    const groupPassword = cryptoUtils.normalizeGroupPasswordInput(rawGroupPassword);
+    const groupPassword = groupPasswordSnapshot ?? cryptoUtils.normalizeGroupPasswordInput(rawGroupPassword);
     if (distributionOption === 'groupPassword' && !groupPassword) {
       return { unavailableReason: 'Enter a group password to preview the address.' };
     }
@@ -2901,15 +2913,20 @@ class CreateSBTGroup extends Component<any, any> {
     if (warning) notify.warn(warning);
   };
 
-  handleDeferredSave = async (): Promise<CreateSbtDeferredDraftPayload> => {
+  handleDeferredSave = async ({
+    groupPassword,
+  }: { groupPassword?: string } = {}): Promise<CreateSbtDeferredDraftPayload> => {
     if (typeof this.props.onSaveDraft !== 'function') {
       throw new Error('Session draft save is unavailable.');
     }
     await this.commitPendingDocumentUrl();
-    const draftPayload = await this.buildDeferredDraftPayload();
+    const draftPayload = await this.buildDeferredDraftPayload({ groupPassword });
     await this.props.onSaveDraft(draftPayload);
     this.clearFormCache();
-    await this.setStateAsync(buildCreateSbtDeferredSaveCompletePatch());
+    await this.setStateAsync({
+      ...buildCreateSbtDeferredSaveCompletePatch(),
+      ...this.buildCreatedGroupPasswordPatch(draftPayload.distributionOption, toStr(draftPayload.groupPassword)),
+    });
     return draftPayload;
   };
 
@@ -3230,8 +3247,9 @@ class CreateSBTGroup extends Component<any, any> {
 
   resolvePredictableDeployPlan = async ({
     tokenURI,
+    groupPassword,
   }: ResolvePredictableDeployPlanArgs): Promise<PredictableDeployPlan> => {
-    const predictionShape = this.buildPredictableDeployShape();
+    const predictionShape = this.buildPredictableDeployShape({ groupPassword });
     if (!predictionShape || predictionShape.pendingStateUpdate) {
       throw new Error('Address preview is still preparing. Please retry in a moment.');
     }
@@ -3263,7 +3281,9 @@ class CreateSBTGroup extends Component<any, any> {
     };
   };
 
-  buildDeferredDraftPayload = async (): Promise<CreateSbtDeferredDraftPayload> => {
+  buildDeferredDraftPayload = async ({
+    groupPassword = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPassword),
+  }: { groupPassword?: string } = {}): Promise<CreateSbtDeferredDraftPayload> => {
     const authoringPayload = await this.buildSerializableAuthoringPayload();
     const arweaveKey = await this.getEffectiveArweaveUploadKey();
     let tokenURI = String(this.state.tokenURI || '').trim();
@@ -3289,7 +3309,7 @@ class CreateSBTGroup extends Component<any, any> {
         }
       }
     }
-    const deployPlan = await this.resolvePredictableDeployPlan({ tokenURI });
+    const deployPlan = await this.resolvePredictableDeployPlan({ tokenURI, groupPassword });
     const metadataPreview = this.buildMetadataPreview();
     return {
       id: deployPlan.predictedAddress.toLowerCase(),
@@ -3320,7 +3340,7 @@ class CreateSBTGroup extends Component<any, any> {
     };
   };
 
-  async mintSBT() {
+  async mintSBT({ groupPassword: groupPasswordSnapshot }: { groupPassword?: string } = {}) {
     if (!this.props.loginComplete) {
       this.props.toggleLoginModal(true);
       return;
@@ -3348,8 +3368,9 @@ class CreateSBTGroup extends Component<any, any> {
       return;
     }
 
-    // Validation: require group password when using groupPassword distribution
-    const groupPassword = cryptoUtils.normalizeGroupPasswordInput(rawGroupPassword);
+    // Validation: require group password when using groupPassword distribution. The password captured when
+    // Create was clicked is the only one this create uses, so later edits cannot change what deploys.
+    const groupPassword = groupPasswordSnapshot ?? cryptoUtils.normalizeGroupPasswordInput(rawGroupPassword);
     if (distributionOption === 'groupPassword' && !groupPassword) {
       this.setState(
         buildCreateSbtMintValidationFailurePatch({ error: 'Group password is required for group minting.' }),
@@ -3394,7 +3415,7 @@ class CreateSBTGroup extends Component<any, any> {
       let createOptions: PredictableCreateOptions = {};
 
       if (this.isPredictableAddressEnabled()) {
-        deploymentExpectation = await this.resolvePredictableDeployPlan({ tokenURI: tokenUriFull });
+        deploymentExpectation = await this.resolvePredictableDeployPlan({ tokenURI: tokenUriFull, groupPassword });
         finalPasswordList = Array.isArray(deploymentExpectation.passwordList) ? deploymentExpectation.passwordList : [];
         hashedPasswords = Array.isArray(deploymentExpectation.hashedPasswords)
           ? deploymentExpectation.hashedPasswords
@@ -3468,12 +3489,13 @@ class CreateSBTGroup extends Component<any, any> {
       this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
       this.suppressFormCachePersistenceAfterSuccess();
 
-      this.setState(
-        buildCreateSbtMintSuccessPatch({
+      this.setState({
+        ...buildCreateSbtMintSuccessPatch({
           sbtAddress,
           passwordList: codesToStore,
         }),
-      );
+        ...this.buildCreatedGroupPasswordPatch(distributionOption, groupPassword),
+      });
 
       // Shareable links
       const publicAutoJoinUrl = this.buildSessionAutoJoinUrl(sbtAddress);
@@ -3619,14 +3641,16 @@ class CreateSBTGroup extends Component<any, any> {
       return;
     }
 
-    // Validation: groupPassword flow requires a non-empty password
-    if (this.state.sbtDistribution.distributionOption === 'groupPassword') {
-      const gpNormalized = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPassword);
-      if (!gpNormalized) {
+    // Validation: groupPassword flow requires a non-empty password. Capture it now; the whole create uses
+    // this copy, and the field stays locked until the create ends.
+    const usesGroupPassword = this.state.sbtDistribution.distributionOption === 'groupPassword';
+    const groupPassword = usesGroupPassword ? cryptoUtils.normalizeGroupPasswordInput(this.state.groupPassword) : '';
+    if (usesGroupPassword) {
+      if (!groupPassword) {
         this.setState(buildCreateSbtErrorPatch({ error: 'Group password is required for group minting.' }));
         return;
       }
-      if (isShortCreateSbtGroupPassword(gpNormalized) && !this.state.groupPasswordWeakConfirmed) {
+      if (isShortCreateSbtGroupPassword(groupPassword) && !this.state.groupPasswordWeakConfirmed) {
         this.setState(
           buildCreateSbtErrorPatch({
             error: 'Confirm the short group password warning, or use a longer password, before creating.',
@@ -3658,11 +3682,11 @@ class CreateSBTGroup extends Component<any, any> {
 
     try {
       if (this.isDeferredDeployMode()) {
-        await this.handleDeferredSave();
+        await this.handleDeferredSave({ groupPassword });
       } else {
         await this.uploadImageToArweave();
         await this.uploadTokenUriToArweave();
-        await this.mintSBT();
+        await this.mintSBT({ groupPassword });
       }
     } catch (error) {
       if (this.state.error) return;
@@ -4363,6 +4387,7 @@ class CreateSBTGroup extends Component<any, any> {
               groupPasswordIsShort: isShortCreateSbtGroupPassword(
                 cryptoUtils.normalizeGroupPasswordInput(groupPassword),
               ),
+              groupPasswordLocked: this.isCreateInFlight(),
               groupPasswordWeakConfirmed: groupPasswordWeakConfirmed === true,
               sbtDistribution,
               handleInputChange: this.handleInputChange,

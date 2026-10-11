@@ -317,6 +317,8 @@ type RenderCreateSbtDistributionOptionsSectionArgs = {
   actionDisplayState: ActionDisplayState;
   groupPassword: string;
   groupPasswordIsShort: boolean;
+  // Locked while a create is in flight: it uses the password captured when Create was clicked.
+  groupPasswordLocked: boolean;
   groupPasswordWeakConfirmed: boolean;
   sbtDistribution: CreateSbtDistributionState;
   handleInputChange: React.ChangeEventHandler<HTMLInputElement>;
@@ -328,6 +330,7 @@ export const renderCreateSbtDistributionOptionsSection = ({
   actionDisplayState,
   groupPassword,
   groupPasswordIsShort,
+  groupPasswordLocked,
   groupPasswordWeakConfirmed,
   sbtDistribution,
   handleInputChange,
@@ -382,12 +385,14 @@ export const renderCreateSbtDistributionOptionsSection = ({
             placeholder="Enter the group password"
             aria-label="Group password"
             className={styles.groupPasswordInput}
+            disabled={groupPasswordLocked}
             data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT}
           />
           <button
             type="button"
             onClick={onGenerateGroupPassword}
             className={styles.exportButton}
+            disabled={groupPasswordLocked}
             data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE}
           >
             Generate new
@@ -403,6 +408,7 @@ export const renderCreateSbtDistributionOptionsSection = ({
                 type="checkbox"
                 name="groupPasswordWeakConfirmed"
                 checked={groupPasswordWeakConfirmed}
+                disabled={groupPasswordLocked}
                 onChange={handleInputChange}
                 data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_CONFIRM}
               />
