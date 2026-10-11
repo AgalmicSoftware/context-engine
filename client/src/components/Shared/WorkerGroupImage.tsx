@@ -3,6 +3,7 @@ import { usesPublicReadCloudflareStorage } from '../../utilities/storage/session
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
+import { isInertRasterImageMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 
 type WorkerGroupImageProps = {
   alt?: string;
@@ -94,7 +95,11 @@ const WorkerGroupImage = ({
       if (!response.ok) throw new Error(`Group image request failed (${response.status}).`);
       const imageBlob = await response.blob();
       if (abortController.signal.aborted) return;
-      objectUrl = URL.createObjectURL(imageBlob);
+      // The image comes from the group's creator. Only a raster image may display:
+      // "Open image in new tab" on an SVG blob would run its script as the app.
+      const image = toViewerBlob(imageBlob, imageBlob.type);
+      if (!isInertRasterImageMime(image.mime)) throw new Error('Unsupported group image type.');
+      objectUrl = URL.createObjectURL(image.blob);
       setResolvedSrc(objectUrl);
     };
     void load().catch(() => {
