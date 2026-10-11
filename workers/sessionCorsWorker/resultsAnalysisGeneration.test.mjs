@@ -241,6 +241,32 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
   assert.equal(source.snapshot.responses[0].participantId, 'participant_001');
 });
 
+test('worker-canonical source breaks equal-time ties by storage id, not list order', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qmeta1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' },
+  });
+  const responder = '0x1111111111111111111111111111111111111111';
+  const createdAt = '2026-09-17T00:00:00.000Z';
+  const answer = (id) => ({
+    metadata: { id, responder, createdAt },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `from ${id}` },
+  });
+  // The KV mock lists keys in insertion order, so the higher id is listed first.
+  for (const id of ['ref-b', 'ref-a']) await putPayload({ kv, resource: 'responses', id, ...answer(id) });
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.deepEqual(source.snapshot.responses.map((row) => row.answer), ['from ref-b']);
+  // Queued rows are read before index rows; the same rule applies across both.
+  const queued = await loadWorkerCanonicalResultsAnalysisSource({
+    env, slug: 'session-a', config, committedResponses: [answer('ref-c')],
+  });
+  assert.deepEqual(queued.snapshot.responses.map((row) => row.answer), ['from ref-c']);
+});
+
 test('worker-canonical source keeps the first or admin version of each question and skips hidden ids', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };

@@ -369,6 +369,14 @@ const selectRoundRobinResponses = ({ responseRows, questionIds, limit }) => {
   return out;
 };
 
+// Worker time orders a participant's answers. Equal times have no order, so
+// the immutable storage id breaks the tie, as the client does
+// (client/src/utilities/survey/workerResponseRecency.ts).
+const isNewerResponseRow = (candidate, current) => (
+  candidate.rowTime > current.rowTime ||
+  (candidate.rowTime === current.rowTime && candidate.storageRefId > current.storageRefId)
+);
+
 const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
   const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
   const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
@@ -434,6 +442,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     }
     participantDigests.add(digest);
     const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0;
+    const storageRefId = trim(row.__storageRefId);
     const dedupeKey = `${questionId}:${digest}`;
     const candidate = {
       questionId,
@@ -446,9 +455,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       questionPrompt: knownQuestion.prompt || '',
       questionType: knownQuestion.type || 'text',
       rowTime,
+      storageRefId,
     };
     const existing = responseByQuestionParticipant.get(dedupeKey);
-    if (!existing || candidate.rowTime >= existing.rowTime) responseByQuestionParticipant.set(dedupeKey, candidate);
+    if (!existing || isNewerResponseRow(candidate, existing)) responseByQuestionParticipant.set(dedupeKey, candidate);
   }
   const sortedParticipantDigests = [...participantDigests].sort();
   const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, '0')}`]));
@@ -589,6 +599,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     responseRows.push({
       ...payload,
       __trustedParticipantId: metadata.responder,
+      __storageRefId: metadata.id,
       responder: metadata.responder,
       createdAt: metadata.createdAt,
       submittedAt: metadata.createdAt,
@@ -624,6 +635,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     responseRows.push({
       ...payload,
       __trustedParticipantId: metadata.responder,
+      __storageRefId: metadata.id,
       responder: metadata.responder,
       createdAt: metadata.createdAt,
       submittedAt: metadata.createdAt,
