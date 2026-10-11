@@ -10,8 +10,11 @@ import {
   assessReleaseImpact,
   compareVersions,
   incrementPatch,
+  listWorkerSourceChanges,
+  pinWorkerRelease,
   planReleaseVersion,
   readVersionSurfaces,
+  verifyWorkerReleasePin,
   writeVersionSurfaces,
 } from './release-version.mjs';
 
@@ -194,6 +197,173 @@ test('verify-ref rejects an exact SemVer downgrade beyond the safe integer range
 
     assert.notEqual(result.status, 0, 'unsafe large-version downgrade unexpectedly passed');
     assert.match(result.stderr, /must not be lower/);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+const PIN_PATH = path.join('client', 'src', 'variables', 'workerReleasePin.json');
+const EXAMPLE_CONFIG_PATH = path.join('workers', 'deploy-helper', 'wrangler.example.toml');
+
+const writeRepoFile = (rootDir, relativePath, contents) => {
+  fs.mkdirSync(path.dirname(path.join(rootDir, relativePath)), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, relativePath), contents);
+};
+
+const commitAll = (rootDir, message) => {
+  git(rootDir, ['add', '-A']);
+  git(rootDir, ['commit', '--quiet', '-m', message]);
+  return git(rootDir, ['rev-parse', 'HEAD']);
+};
+
+const writePin = (rootDir, commit) => writeRepoFile(
+  rootDir,
+  PIN_PATH,
+  `${JSON.stringify({ commit, manifestSha256: 'a'.repeat(64) }, null, 2)}\n`,
+);
+
+// Public main with three published releases and an unpublished tip:
+// release B only restamps the version, release C changes Worker code and
+// the tip changes only a Worker test.
+const createPublishedReleaseHistory = () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-pin-'));
+  git(rootDir, ['init', '--quiet', '--initial-branch', 'main']);
+  git(rootDir, ['config', 'user.name', 'Release Tester']);
+  git(rootDir, ['config', 'user.email', '[redacted-email]']);
+  const writeVersion = (version) => {
+    writeRepoFile(rootDir, 'package.json', packageJson('contextEngine', version));
+    writeRepoFile(rootDir, 'package-lock.json', packageLock('contextEngine', version));
+    writeRepoFile(rootDir, path.join('client', 'package.json'), packageJson('client', version));
+    writeRepoFile(rootDir, path.join('client', 'package-lock.json'), packageLock('client', version));
+  };
+  writeVersion('0.1.0');
+  writeRepoFile(rootDir, path.join('workers', 'sessionCorsWorker', 'worker.js'), 'export default 1;\n');
+  writeRepoFile(
+    rootDir,
+    EXAMPLE_CONFIG_PATH,
+    'WORKER_BUNDLE_URL = "https://github.com/o/r/releases/download/worker-bundles-' + 'f'.repeat(40) + '/sessionCorsWorker.bundle.js"\n',
+  );
+  const releaseA = commitAll(rootDir, 'release a');
+  writeVersion('0.1.1');
+  writeRepoFile(rootDir, 'docs/notes.md', 'notes\n');
+  const releaseB = commitAll(rootDir, 'release b');
+  writeRepoFile(rootDir, path.join('workers', 'sessionCorsWorker', 'worker.js'), 'export default 2;\n');
+  const releaseC = commitAll(rootDir, 'release c');
+  writeRepoFile(rootDir, path.join('workers', 'sessionCorsWorker', 'worker.test.mjs'), 'test\n');
+  const unpublishedTip = commitAll(rootDir, 'unpublished tip');
+  for (const commit of [releaseA, releaseB, releaseC]) git(rootDir, ['tag', `worker-bundles-${commit}`, commit]);
+  git(rootDir, ['tag', 'worker-bundles-stable', releaseC]);
+  return { rootDir, releaseA, releaseB, releaseC, unpublishedTip };
+};
+
+const commitCandidatePin = (rootDir, commit) => {
+  git(rootDir, ['checkout', '--quiet', '-B', 'candidate', 'main']);
+  writePin(rootDir, commit);
+  return commitAll(rootDir, `pin ${commit}`);
+};
+
+test('Worker source comparison ignores version stamps and test-only changes', () => {
+  const { rootDir, releaseA, releaseB, releaseC, unpublishedTip } = createPublishedReleaseHistory();
+  try {
+    assert.deepEqual(listWorkerSourceChanges({ repoRoot: rootDir, fromRef: releaseA, toRef: releaseB }), []);
+    assert.deepEqual(listWorkerSourceChanges({ repoRoot: rootDir, fromRef: releaseB, toRef: releaseC }), [
+      'workers/sessionCorsWorker/worker.js',
+    ]);
+    assert.deepEqual(listWorkerSourceChanges({ repoRoot: rootDir, fromRef: releaseC, toRef: unpublishedTip }), []);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('the Worker release pin must carry the newest published Worker code', () => {
+  const { rootDir, releaseA, releaseC, unpublishedTip } = createPublishedReleaseHistory();
+  try {
+    const verify = (pinCommit) => verifyWorkerReleasePin({
+      repoRoot: rootDir,
+      candidateRef: commitCandidatePin(rootDir, pinCommit),
+      baselineRef: 'main',
+    });
+
+    assert.deepEqual(verify(releaseC), { pinCommit: releaseC, newestRelease: releaseC });
+    assert.throws(() => verify(releaseA), /pin [a-f0-9]{40} is stale: worker-bundles-[a-f0-9]{40}.*worker\.js/);
+    assert.throws(() => verify(unpublishedTip), /not a published worker-bundles release in main/);
+    assert.equal(
+      verifyWorkerReleasePin({ repoRoot: rootDir, candidateRef: 'main', baselineRef: 'main' }),
+      null,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('release preparation and release-ref verification refuse a stale Worker pin', () => {
+  const { rootDir, releaseA, releaseC } = createPublishedReleaseHistory();
+  const run = (args) => spawnSync(process.execPath, [SCRIPT_PATH, ...args, '--repo-root', rootDir], { encoding: 'utf8' });
+  try {
+    const staleCandidate = commitCandidatePin(rootDir, releaseA);
+    writeVersionSurfaces(rootDir, '0.1.2');
+    commitAll(rootDir, 'stamp');
+
+    const plan = run(['plan', '--main-ref', 'main']);
+    assert.notEqual(plan.status, 0, 'plan accepted a stale pin');
+    assert.match(plan.stderr, /Worker release pin [a-f0-9]{40} is stale/);
+    // A dry run reads the target base, not the replayed candidate.
+    assert.equal(run(['plan', '--main-ref', 'main', '--dry-run']).status, 0);
+
+    const verifyRef = run(['verify-ref', '--candidate-ref', 'HEAD', '--baseline-ref', 'main']);
+    assert.notEqual(verifyRef.status, 0, `verify-ref accepted a stale pin from ${staleCandidate}`);
+    assert.match(verifyRef.stderr, /is stale/);
+
+    writePin(rootDir, releaseC);
+    commitAll(rootDir, 'move pin');
+    assert.equal(run(['plan', '--main-ref', 'main']).status, 0);
+    const fresh = run(['verify-ref', '--candidate-ref', 'HEAD', '--baseline-ref', 'main']);
+    assert.equal(fresh.status, 0, fresh.stderr);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('pin-worker-release pins the newest verified release and its deploy-helper example', async () => {
+  const { rootDir, releaseA, releaseB, releaseC } = createPublishedReleaseHistory();
+  try {
+    await assert.rejects(
+      pinWorkerRelease({ repoRoot: rootDir, mainRef: 'main', fetchRemote: '' }),
+      /workerReleasePin\.json was not found/,
+    );
+    writePin(rootDir, releaseA);
+    const verified = [];
+    const pin = await pinWorkerRelease({
+      repoRoot: rootDir,
+      mainRef: 'main',
+      fetchRemote: '',
+      verifyRelease: async ({ commit }) => {
+        verified.push(commit);
+        return { ok: true, failures: [], manifestSha256: 'b'.repeat(64) };
+      },
+    });
+
+    assert.deepEqual(verified, [releaseC]);
+    assert.deepEqual(pin, { commit: releaseC, manifestSha256: 'b'.repeat(64) });
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(rootDir, PIN_PATH), 'utf8')), pin);
+    assert.match(
+      fs.readFileSync(path.join(rootDir, EXAMPLE_CONFIG_PATH), 'utf8'),
+      new RegExp(`worker-bundles-${releaseC}/sessionCorsWorker`),
+    );
+    await assert.rejects(
+      pinWorkerRelease({
+        repoRoot: rootDir,
+        mainRef: 'main',
+        commit: releaseB,
+        fetchRemote: '',
+        verifyRelease: async () => ({ ok: false, failures: ['manifest: HTTP 404'] }),
+      }),
+      /failed verification: manifest: HTTP 404/,
+    );
+    await assert.rejects(
+      pinWorkerRelease({ repoRoot: rootDir, mainRef: 'main', commit: 'c'.repeat(40), fetchRemote: '' }),
+      /is not a published release in main history/,
+    );
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
   }

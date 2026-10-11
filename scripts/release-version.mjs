@@ -235,6 +235,156 @@ export const readVersionAtRef = (repoRoot, ref) => {
   return parseSurfaceJson(contentsByPath);
 };
 
+// Worker release pin. Builds without COMMIT_REF (local and self-hosted
+// clients) and the deploy-helper CLI deploy the release pinned here. A
+// release's own Worker bundles are published only after its public merge,
+// so each release pins the newest published one, and preparing a release
+// fails while a newer published release ships different Worker code.
+export const WORKER_RELEASE_PIN_PATH = 'client/src/variables/workerReleasePin.json';
+const DEPLOY_HELPER_EXAMPLE_CONFIG_PATH = 'workers/deploy-helper/wrangler.example.toml';
+const WORKER_RELEASE_TAG_RE = /^worker-bundles-([a-f0-9]{40})$/;
+const FULL_COMMIT_RE = /^[a-f0-9]{40}$/;
+const ROOT_LOCKFILE_PATH = 'package-lock.json';
+// What the release bundles are built from (scripts/worker-bundle.mjs).
+export const WORKER_RELEASE_SOURCE_PATHSPEC = Object.freeze([
+  ':(glob)workers/**/*.js',
+  ':(glob)workers/**/*.mjs',
+  ':(glob)workers/**/*.cjs',
+  ':(glob)shared/**/*.js',
+  ':(glob)shared/**/*.mjs',
+  ':(glob)shared/**/*.cjs',
+  'workers/sessionCorsWorker/package-lock.json',
+  'scripts/worker-bundle.mjs',
+  ':(exclude,glob)**/*.test.*',
+]);
+
+const gitOrNull = (repoRoot, args) => {
+  try {
+    return git(repoRoot, args);
+  } catch {
+    return null;
+  }
+};
+
+// Every release stamps its version into the root lockfile; only its
+// dependency entries can change a Worker bundle.
+const readRootLockDependencies = (repoRoot, ref) => {
+  const contents = gitOrNull(repoRoot, ['show', `${ref}:${ROOT_LOCKFILE_PATH}`]);
+  if (contents == null) return '';
+  const lock = JSON.parse(contents);
+  delete lock.version;
+  if (lock.packages?.['']) delete lock.packages[''].version;
+  return JSON.stringify(lock);
+};
+
+export const listWorkerSourceChanges = ({ repoRoot, fromRef, toRef }) => {
+  const changed = git(repoRoot, ['diff', '--name-only', fromRef, toRef, '--', ...WORKER_RELEASE_SOURCE_PATHSPEC])
+    .split(/\r?\n/)
+    .filter(Boolean);
+  if (readRootLockDependencies(repoRoot, fromRef) !== readRootLockDependencies(repoRoot, toRef)) {
+    changed.push(ROOT_LOCKFILE_PATH);
+  }
+  return changed;
+};
+
+// Publish Worker Bundles tags each release worker-bundles-<public commit>.
+// Lists the releases on the baseline's first-parent line, newest first.
+export const listPublishedWorkerReleases = ({ repoRoot, baselineRef }) => {
+  const tagged = new Set(
+    git(repoRoot, ['tag', '--list', 'worker-bundles-*'])
+      .split(/\r?\n/)
+      .map((name) => name.trim().match(WORKER_RELEASE_TAG_RE)?.[1])
+      .filter(Boolean),
+  );
+  if (!tagged.size) return [];
+  return git(repoRoot, ['rev-list', '--first-parent', baselineRef])
+    .split(/\s+/)
+    .filter((commit) => tagged.has(commit));
+};
+
+const PIN_COMMAND = 'node scripts/release-version.mjs pin-worker-release';
+
+export const verifyWorkerReleasePin = ({ repoRoot, candidateRef, baselineRef }) => {
+  const pinContents = gitOrNull(repoRoot, ['show', `${candidateRef}:${WORKER_RELEASE_PIN_PATH}`]);
+  if (pinContents == null) return null;
+  let pinCommit = '';
+  try {
+    pinCommit = String(JSON.parse(pinContents)?.commit || '');
+  } catch {
+    pinCommit = '';
+  }
+  if (!FULL_COMMIT_RE.test(pinCommit)) {
+    throw new Error(`${WORKER_RELEASE_PIN_PATH} at ${candidateRef} must pin a full lowercase commit`);
+  }
+  const published = listPublishedWorkerReleases({ repoRoot, baselineRef });
+  if (!published.includes(pinCommit)) {
+    throw new Error(
+      `Worker release pin ${pinCommit} is not a published worker-bundles release in ${baselineRef}; `
+        + `fetch release tags (git fetch --tags origin) or run ${PIN_COMMAND}`,
+    );
+  }
+  const newestRelease = published[0];
+  const changed = listWorkerSourceChanges({ repoRoot, fromRef: pinCommit, toRef: newestRelease });
+  if (changed.length) {
+    const shown = changed.slice(0, 3).join(', ');
+    const more = changed.length > 3 ? ` and ${changed.length - 3} more` : '';
+    throw new Error(
+      `Worker release pin ${pinCommit} is stale: worker-bundles-${newestRelease} ships different Worker code `
+        + `(${shown}${more}). Run ${PIN_COMMAND}, commit the pin, then prepare the release again`,
+    );
+  }
+  return { pinCommit, newestRelease };
+};
+
+// Moves the pin to a published release (the newest by default) after the
+// same download checks verify-release-assets applies, and keeps the
+// deploy-helper example config on that release.
+export const pinWorkerRelease = async ({
+  repoRoot,
+  mainRef = 'origin/main',
+  commit = '',
+  fetchRemote = 'origin',
+  verifyRelease = null,
+}) => {
+  const pinPath = path.join(repoRoot, WORKER_RELEASE_PIN_PATH);
+  if (!fs.existsSync(pinPath)) throw new Error(`${WORKER_RELEASE_PIN_PATH} was not found in ${repoRoot}`);
+  if (fetchRemote) git(repoRoot, ['fetch', '--quiet', '--tags', fetchRemote, 'main']);
+  const published = listPublishedWorkerReleases({ repoRoot, baselineRef: mainRef });
+  const selected = String(commit || published[0] || '').trim().toLowerCase();
+  if (!published.includes(selected)) {
+    throw new Error(
+      selected
+        ? `worker-bundles-${selected} is not a published release in ${mainRef} history`
+        : `No published worker-bundles release in ${mainRef} history`,
+    );
+  }
+  const verify = verifyRelease || (await import('./verify-release-assets.mjs')).verifyWorkerRelease;
+  const result = await verify({ commit: selected });
+  if (!result?.ok || !/^[a-f0-9]{64}$/.test(String(result.manifestSha256 || ''))) {
+    throw new Error(`worker-bundles-${selected} failed verification: ${(result?.failures || []).join('; ')}`);
+  }
+  const pin = { commit: selected, manifestSha256: result.manifestSha256 };
+  fs.writeFileSync(pinPath, `${JSON.stringify(pin, null, 2)}\n`);
+  const exampleConfigPath = path.join(repoRoot, DEPLOY_HELPER_EXAMPLE_CONFIG_PATH);
+  if (fs.existsSync(exampleConfigPath)) {
+    const exampleConfig = fs.readFileSync(exampleConfigPath, 'utf8');
+    fs.writeFileSync(
+      exampleConfigPath,
+      exampleConfig.replace(/worker-bundles-[a-f0-9]{40}\//g, `worker-bundles-${selected}/`),
+    );
+  }
+  return pin;
+};
+
+const pickNewestRef = (repoRoot, refs) => refs.find((ref) => refs.every((other) => {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', other, ref], { cwd: repoRoot, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})) || refs[0];
+
 const readNonEmptyLines = (filePath) => {
   if (!filePath) return [];
   return fs.readFileSync(filePath, 'utf8')
@@ -256,7 +406,7 @@ const parseArgs = (argv) => {
   const options = { baselineRefs: [], minimumRefs: [] };
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (token === '--acknowledge-patch' || token === '--dry-run' || token === '--json') {
+    if (token === '--acknowledge-patch' || token === '--dry-run' || token === '--json' || token === '--no-fetch') {
       options[token.slice(2).replaceAll('-', '_')] = true;
       continue;
     }
@@ -309,6 +459,12 @@ const runPlan = (options) => {
     );
   }
 
+  // A dry run's clone still holds public main's pin; the replayed candidate
+  // is checked when the release is prepared.
+  if (!options.dry_run) {
+    verifyWorkerReleasePin({ repoRoot, candidateRef: 'HEAD', baselineRef: mainRef });
+  }
+
   reportPlan({ impact, plan });
   if (options.result_file) {
     fs.writeFileSync(
@@ -347,6 +503,13 @@ const verifyCandidateRef = (options) => {
       );
     }
   }
+  if (baselines.length) {
+    verifyWorkerReleasePin({
+      repoRoot,
+      candidateRef: options.candidate_ref,
+      baselineRef: pickNewestRef(repoRoot, baselines.map(({ ref }) => ref)),
+    });
+  }
   process.stdout.write(`release version verified: ${candidate.version}\n`);
 };
 
@@ -359,6 +522,8 @@ const usage = () => {
   node scripts/release-version.mjs verify-worktree [--root DIR]
   node scripts/release-version.mjs verify-ref --candidate-ref REF [--baseline-ref REF ...]
     [--minimum-ref REF ...]
+  node scripts/release-version.mjs pin-worker-release [--repo-root DIR] [--main-ref REF]
+    [--commit SHA] [--remote NAME | --no-fetch]
 `);
 };
 
@@ -382,16 +547,31 @@ export const runCli = (argv = process.argv.slice(2)) => {
     verifyCandidateRef(options);
     return;
   }
+  if (command === 'pin-worker-release') {
+    return pinWorkerRelease({
+      repoRoot: path.resolve(options.repo_root || process.cwd()),
+      mainRef: options.main_ref || 'origin/main',
+      commit: options.commit || '',
+      fetchRemote: options.no_fetch ? '' : options.remote || 'origin',
+    }).then((pin) => {
+      process.stdout.write(
+        `Worker release pinned: worker-bundles-${pin.commit} (manifest SHA-256 ${pin.manifestSha256})\n`,
+      );
+    });
+  }
   usage();
   throw new Error(`Unknown release-version command: ${command || '<missing>'}`);
 };
 
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) {
-  try {
-    runCli();
-  } catch (error) {
+  const fail = (error) => {
     process.stderr.write(`release version error: ${error.message}\n`);
     process.exitCode = 1;
+  };
+  try {
+    Promise.resolve(runCli()).catch(fail);
+  } catch (error) {
+    fail(error);
   }
 }
