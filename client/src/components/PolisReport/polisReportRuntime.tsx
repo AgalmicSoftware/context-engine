@@ -415,13 +415,15 @@ export function shouldAutoEnablePolisDemoData(
   return POLIS_DEMO_AUTOLOAD_SLUG_SET.has(slug) && hasPolisDemoDatasetForSlug(slug, input);
 }
 
+// AI cluster summaries are keyed on what they were written from: the prompts,
+// who is in each cluster, and the votes. A refresh that changes none of these
+// keeps its summaries; any changed vote, prompt or membership replaces them.
 export function buildClusterAnalysisDataKey({
   activeClusterAssignments = [],
   activeClusterCount = 0,
   activeRepQuestions = {},
   embeddingChoice = '',
-  useDemoData = false,
-  questionResponsesNonce = 0,
+  ratingMatrix = [],
   questionPrompts = {},
   allQuestions = [],
   allResponders = [],
@@ -430,8 +432,7 @@ export function buildClusterAnalysisDataKey({
   activeClusterCount?: number;
   activeRepQuestions?: PolisRepQuestionsMap;
   embeddingChoice?: string;
-  useDemoData?: boolean;
-  questionResponsesNonce?: number;
+  ratingMatrix?: RatingMatrix | null;
   questionPrompts?: StringMap;
   allQuestions?: string[];
   allResponders?: string[];
@@ -452,11 +453,19 @@ export function buildClusterAnalysisDataKey({
   });
   const questionCount = allQuestions?.length || 0;
   const repCount = Object.keys(activeRepQuestions || {}).length;
-  // Demo-mode analysis derives from the fixed fixture, so upstream response
-  // nonce churn should not invalidate the visible cluster-analysis cache.
-  const nonce = useDemoData ? 0 : (questionResponsesNonce ?? 0);
+  // The votes decide each cluster's statements and counts. Two independent
+  // hashes keep an accidental match between different vote sets negligible.
+  let votesHash = 0;
+  let votesCheck = 0;
+  (Array.isArray(ratingMatrix) ? ratingMatrix : []).forEach((row) => {
+    [...(Array.isArray(row) ? row : []), 'end'].forEach((vote) => {
+      const code = vote === 1 ? 1 : vote === -1 ? 2 : vote === 0 ? 3 : vote === 'end' ? 5 : 4;
+      votesHash = (votesHash * 7 + code) % 1000000007;
+      votesCheck = (votesCheck * 11 + code) % 998244353;
+    });
+  });
 
-  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}-${JSON.stringify(allResponders)}`;
+  return `${embeddingChoice}-${activeClusterCount}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}-${votesHash}.${votesCheck}-${JSON.stringify(allResponders)}`;
 }
 
 // AI cluster summaries are kept for the few most recent views, so switching

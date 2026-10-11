@@ -1377,39 +1377,45 @@ describe('PolisReport demo data defaults', () => {
     );
   });
 
-  it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
+  it('keeps cluster summaries across refreshes with the same votes and drops them when a vote changes', () => {
     const sharedArgs = {
       activeClusterAssignments: [0, 1, 1, 0],
       activeClusterCount: 2,
       activeRepQuestions: { 0: [{ questionIndex: 0 }], 1: [{ questionIndex: 1 }] },
       embeddingChoice: 'UMAP',
       questionPrompts: { 0: 'Prompt A', 1: 'Prompt B' },
-      allQuestions: [{}, {}],
+      allQuestions: ['q0', 'q1'],
+      allResponders: ['0x1', '0x2', '0x3', '0x4'],
     };
+    const votes = () => [
+      [1, -1, 0, null],
+      [-1, 1, 1, 0],
+    ];
+    const before = buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: votes() });
 
-    const demoKeyA = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: true,
-      questionResponsesNonce: 0,
-    });
-    const demoKeyB = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: true,
-      questionResponsesNonce: 7,
-    });
-    const liveKeyA = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: false,
-      questionResponsesNonce: 0,
-    });
-    const liveKeyB = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: false,
-      questionResponsesNonce: 7,
-    });
+    // A live refresh rebuilds equal data in new arrays and bumps the response
+    // nonce; the key, and so the cached summaries, must survive it.
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: votes() })).toBe(before);
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: votes(), questionResponsesNonce: 7 })).toBe(
+      before,
+    );
 
-    expect(demoKeyA).toBe(demoKeyB);
-    expect(liveKeyA).not.toBe(liveKeyB);
+    const changed = votes();
+    changed[1][3] = -1;
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: changed })).not.toBe(before);
+    const answered = votes();
+    answered[0][3] = 0;
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: answered })).not.toBe(before);
+    // Moving a vote between questions changes the content too.
+    expect(
+      buildClusterAnalysisDataKey({
+        ...sharedArgs,
+        ratingMatrix: [
+          [1, -1, 0],
+          [null, -1, 1, 1, 0],
+        ],
+      }),
+    ).not.toBe(before);
   });
 
   it('defaults custom demo datasets to UMAP with 3 groups and clears manual K in Polis Auto mode', () => {
