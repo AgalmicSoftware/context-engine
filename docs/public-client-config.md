@@ -137,8 +137,6 @@ npm run build
 ```
 
 The output directory is `client/build/`.
-Before building, the build script removes stale legacy `client/build-vite/` and
-`client/vite-build/` directories if they exist locally.
 
 ### 3. Publish to Netlify
 
@@ -178,12 +176,10 @@ wildcard preview origin. Helper-based Worker deployments fail in Deploy
 Previews: the PR commit has no immutable Worker release assets. Test those
 deployments using a client built for an existing verified release.
 
-For a manual fallback, drag `client/build/` into Netlify's deploy UI. Do not
-upload `client/build-vite/` or `client/vite-build/`. Those names are legacy
-ignored artifacts from older local builds and can contain partial or stale CSS
-output. Run `npm run verify:release-assets` from the repository root before a
-manual build so the uploaded client references a verified release (the pin, or
-the commit you set in `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`). If a deploy
+For a manual fallback, drag `client/build/` into Netlify's deploy UI. Run
+`npm run verify:release-assets` from the repository root before a manual build
+so the uploaded client references a verified release (the pin, or the commit
+you set in `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`). If a deploy
 looks unstyled or low-contrast, rebuild from `client/` and upload the fresh
 `client/build/` directory.
 

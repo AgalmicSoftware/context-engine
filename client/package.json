@@ -52,7 +52,6 @@
     "dev": "PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000",
     "analyze": "CE_BUNDLE_REPORT=1 npm run build",
     "start": "npm run preview",
-    "prebuild": "node scripts/clean-legacy-vite-output.mjs",
     "build": "PUBLIC_URL=/ vite build",
     "verify:passkey-only-bundle": "node scripts/verify-passkey-only-bundle.mjs",
     "preview": "vite preview --host 0.0.0.0",

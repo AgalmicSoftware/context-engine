@@ -7,7 +7,7 @@ const SKIP_DIRS = new Set(['.git', 'node_modules']);
 const MARKDOWN_FILE_RE = /\.md$/i;
 const REPO_PATH_RE = /^(?:client|docs|scripts|workers|contracts|foundry|tests|posts|whitepaper|ai-discourse-corpus)\//;
 const ROOT_FILE_RE = /^(?:README|ARCHITECTURE|CONTRIBUTING|CHANGELOG|LICENSING|SECURITY|ROADMAP|spec|package)(?:\.[A-Za-z0-9]+)?$/;
-const ALLOWED_UNTRACKED_PATH_RE = /^(?:client\/(?:build(?:-vite)?|vite-build)(?:\/|$)|client\/\.env(?:$|\.)|(?:dist|out|broadcast|cache|coverage|release-public)(?:\/|$))/;
+const ALLOWED_UNTRACKED_PATH_RE = /^(?:client\/build(?:\/|$)|client\/\.env(?:$|\.)|(?:dist|out|broadcast|cache|coverage|release-public)(?:\/|$))/;
 const FORBIDDEN_DOCUMENT_PATHS = Object.freeze([
   { label: 'internal agent instruction document', re: /(?:^|\/)AGENTS\.md$/i },
   { label: 'internal planning document path', re: /^docs\/plans(?:\/|$)/i },
