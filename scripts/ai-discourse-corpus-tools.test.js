@@ -19,7 +19,6 @@ test('summarizes corpus files without dumping full JSON records', () => {
   const tweets = summary.corpuses.find((entry) => entry.corpus === 'tweets');
 
   assert.equal(crossCorpus.count, 16);
-  assert.equal(summary.clientDebates.count, 16);
   assert.equal(tweets.count, 4140);
   assert.ok(tweets.sizeBytes > 10_000_000);
 });
@@ -30,11 +29,9 @@ test('normalizes common corpus aliases used inside debate references', () => {
   assert.equal(normalizeCorpusKey('dwarkesh_lab_insiders'), 'dwarkesh-lab-insiders');
 });
 
-test('validates corpus references and client mirrors', () => {
+test('validates corpus references and the client sample mirror', () => {
   const validation = collectValidation();
 
-  assert.deepEqual(validation.clientDebateMirror.missingFromClient, []);
-  assert.deepEqual(validation.clientDebateMirror.extraInClient, []);
   assert.deepEqual(validation.clientSampleMirror.countDrift, []);
   assert.deepEqual(validation.clientSampleMirror.missingEntries, []);
   assert.deepEqual(validation.debateReferences.missing, []);
