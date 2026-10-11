@@ -2545,6 +2545,14 @@ const SessionWizard = ({
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
   const isNormalMode = wizardMode !== 'advanced';
+  const showUserPaidUsage = sessionModeRequirements.authorityMode === 'evm_registry_canonical';
+  const profileHidesUserPaidUsage = sessionModeRequirements.selected && !showUserPaidUsage;
+  // "Require users to pay for usage" turns Worker secrets off, and only its
+  // toggle turns them back on. A selected profile without that toggle would
+  // otherwise keep a value set under another profile and lock the AI keys.
+  useEffect(() => {
+    if (profileHidesUserPaidUsage && !workerSecretsEnabled) setWorkerSecretsEnabled(true);
+  }, [profileHidesUserPaidUsage, setWorkerSecretsEnabled, workerSecretsEnabled]);
   const hasConfiguredDeployHelperUrl = !!workerAuthPublishAdapter.normalizeWorkerUrl(
     toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim(),
   );
@@ -3038,7 +3046,7 @@ const SessionWizard = ({
       workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
       setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
       workerMode={workerMode}
-      showUserPaidUsage={sessionModeRequirements.authorityMode === 'evm_registry_canonical'}
+      showUserPaidUsage={showUserPaidUsage}
       workerSecretsEnabled={workerSecretsEnabled}
       workerUrlAutoFilled={workerUrlAutoFilled}
       workerUrlSource={workerUrlSource}

@@ -306,6 +306,23 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByTestId('ce-wizard-worker-tooltip-gw-worker-kv-tip')).not.toBeInTheDocument();
   });
 
+  it('turns Worker secrets back on when a profile change hides user-paid usage', async () => {
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY));
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
+
+    await selectFastCheapPreset();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
+  });
+
   it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
