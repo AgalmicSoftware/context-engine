@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { readAnswerTooLongMessage, sessionStoresAnswersInWorker } from '../../utilities/survey/answerSizeBudget';
 import { resolveRevertPendingAnswerValue } from './surveyToolHydrationFlow';
 import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 
@@ -57,6 +58,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     renderQuestionTagDropdown,
     renderQuestionTagDropdownRow,
     renderSurveyQuestionsFullQuestionGatedPromptCard,
+    resolveEffectiveResponseGateConfig,
     resolveEffectiveSlug,
     resolveExplicitSessionContext,
     resolveGatedPromptGateNames,
@@ -305,6 +307,15 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     });
   };
 
+  // The same budget the submit check enforces, shown while the answer is edited.
+  const getAnswerTooLongMessage = (answer: SurveyQuestionsLegacyValue, additional: SurveyQuestionsLegacyValue) => {
+    const message = readAnswerTooLongMessage(answer?.value, additional?.value);
+    if (!message) return '';
+    const slug: SurveyQuestionsLegacyValue =
+      (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') || resolveEffectiveSlug(propsRef.current);
+    return sessionStoresAnswersInWorker(resolveEffectiveResponseGateConfig(slug, propsRef.current)) ? message : '';
+  };
+
   const getQuestionRenderDisplayState = ({ questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
     const responseDisplayState: SurveyQuestionsLegacyValue = getQuestionResponseDisplayState({
       questionId,
@@ -316,10 +327,13 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
       additional: responseDisplayState.additional,
     });
 
-    return (buildQuestionRenderDisplayStateHelper as SurveyQuestionsLegacyValue)({
-      responseDisplayState,
-      fieldDisplayState,
-    });
+    return {
+      ...(buildQuestionRenderDisplayStateHelper as SurveyQuestionsLegacyValue)({
+        responseDisplayState,
+        fieldDisplayState,
+      }),
+      answerTooLongMessage: getAnswerTooLongMessage(responseDisplayState.answer, responseDisplayState.additional),
+    };
   };
 
   const isQuestionPromptMasked = (question: SurveyQuestionsLegacyValue): boolean =>

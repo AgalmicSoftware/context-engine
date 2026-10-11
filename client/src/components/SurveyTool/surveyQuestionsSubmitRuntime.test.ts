@@ -472,3 +472,54 @@ it('marks only the uploaded questions saved and keeps other changes drafted', as
   const { editBaseline } = context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0];
   expect(editBaseline.answers).toEqual({ q1: { value: 'Yes' }, q2: { value: 'Saved' } });
 });
+
+describe('answer size budget', () => {
+  const half = 49_152 / 2;
+  // Counted as JSON strings: these fill half the budget each, quotes included.
+  const fill = (bytes: number) => 'x'.repeat(bytes - 2);
+  const prepare = (mode: 'cloudflare' | 'smart-contracts', answer: string, comment: string) => {
+    const context = createContext();
+    context.propsRef.current.sessionConfig =
+      mode === 'cloudflare' ? makeWorkerConfig('https://worker.example', '0x00112233445566778899aabbccddeeff') : {};
+    context.stateRef.current.surveysResponseState[2] = {
+      answers: { q1: { value: answer } },
+      additionalComments: { q1: { value: comment } },
+      importance: {},
+      conviction: {},
+    };
+    return context;
+  };
+
+  it('refuses an oversized Worker answer before locking or upload', async () => {
+    const context = prepare('cloudflare', fill(half), fill(half + 10));
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: 'This answer is too long to save. Shorten it by about 10 characters.',
+    });
+    expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+    expect(context.verifyEncryption).not.toHaveBeenCalled();
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+    expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({
+          message: 'This answer is too long to save. Shorten it by about 10 characters.',
+        }),
+      }),
+    );
+  });
+
+  it('submits a Worker answer that exactly fills the budget', async () => {
+    const context = prepare('cloudflare', fill(half), fill(half));
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+    expect(context.submitSurveyResponse).toHaveBeenCalled();
+  });
+
+  it('leaves answers stored outside the Worker unchanged', async () => {
+    const context = prepare('smart-contracts', fill(half), fill(half + 10));
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(context.submitSurveyResponse).toHaveBeenCalled();
+  });
+});

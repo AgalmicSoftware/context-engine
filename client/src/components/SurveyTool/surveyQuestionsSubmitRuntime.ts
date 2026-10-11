@@ -1,5 +1,6 @@
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
+import { readAnswerTooLongMessage, sessionStoresAnswersInWorker } from '../../utilities/survey/answerSizeBudget';
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type {
   SurveyQuestionsLegacyRecord,
@@ -324,6 +325,20 @@ export const createSurveyQuestionsSubmitRuntime = (
         if (value === '' || value === undefined || value === null) continue;
         const error = validateQuadraticAllocation(value, question);
         if (error) throw new Error(error);
+      }
+      // The Worker refuses an oversized answer; check its plaintext before locking or upload.
+      if (
+        sessionStoresAnswersInWorker(
+          resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
+        )
+      ) {
+        for (const qid of changedQids as Set<string>) {
+          const tooLong = readAnswerTooLongMessage(
+            activeSlice.answers?.[qid]?.value,
+            activeSlice.additionalComments?.[qid]?.value,
+          );
+          if (tooLong) throw new Error(tooLong);
+        }
       }
       activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, changedQids);
 

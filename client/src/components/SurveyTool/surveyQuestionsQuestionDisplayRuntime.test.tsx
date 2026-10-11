@@ -156,6 +156,28 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
     );
   });
 
+  it('flags an answer the session Worker would refuse as too long', () => {
+    const resolveEffectiveResponseGateConfig = jest.fn((_slug: string, _props: unknown): Record<string, unknown> => ({
+      storageProfile: { backend: 'cloudflare' },
+    }));
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext({ resolveEffectiveResponseGateConfig }));
+    // 49,160 bytes as a JSON string, plus 2 for the empty comment: 10 over.
+    const responseSlice = { answers: { q1: { value: 'x'.repeat(49_158) } }, additionalComments: {} };
+
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe(
+      'This answer is too long to save. Shorten it by about 10 characters.',
+    );
+    expect(resolveEffectiveResponseGateConfig).toHaveBeenCalledWith('edge', expect.any(Object));
+
+    resolveEffectiveResponseGateConfig.mockReturnValue({ storageProfile: { backend: 'arweave' } });
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe('');
+
+    const shortSlice = { answers: { q1: { value: 'short' } }, additionalComments: {} };
+    expect(
+      runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice: shortSlice }).answerTooLongMessage,
+    ).toBe('');
+  });
+
   it('reuses per-question input handlers while preserving answer semantics', () => {
     const handleAnswer = jest.fn();
     const toggleAnswerEncryption = jest.fn();

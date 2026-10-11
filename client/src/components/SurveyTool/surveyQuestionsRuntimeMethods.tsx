@@ -588,6 +588,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     renderPromptWithManualDecrypt,
     renderQuestionTagDropdown,
     renderQuestionTagDropdownRow,
+    resolveEffectiveResponseGateConfig,
     toggleAdditionalCommentsEncryption,
     toggleAnswerEncryption,
   });

@@ -22,6 +22,7 @@ import QuestionFilter from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import AnswerTooLongNotice from './AnswerTooLongNotice';
 import { extractSingleQuestionOptionsFromCandidate } from './singleQuestionResponseHelpers.js';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -2975,12 +2976,13 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
     allowDecryptAdditional,
     isAnswerDecrypting,
     isAdditionalDecrypting,
+    answerTooLongMessage,
   } = engine.getQuestionRenderDisplayState({
     questionId: question.id,
     responseSlice: slice,
   });
 
-  const questionComponent = engine.renderPileResponseInput({
+  const responseInput = engine.renderPileResponseInput({
     question,
     answer,
     glowAnswer,
@@ -2989,6 +2991,14 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
     decryptTooltip,
     isAnswerDecrypting,
   });
+  const questionComponent = answerTooLongMessage ? (
+    <>
+      {responseInput}
+      <AnswerTooLongNotice message={answerTooLongMessage} />
+    </>
+  ) : (
+    responseInput
+  );
 
   const questionContainerClass = styles[`${question.type}QuestionContainer`] || '';
   const promptMasked = engine.isQuestionPromptMasked(question);

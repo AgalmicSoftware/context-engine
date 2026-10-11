@@ -1,5 +1,6 @@
 import React from 'react';
 
+import AnswerTooLongNotice from './AnswerTooLongNotice';
 import { buildSurveyQuestionsFullQuestionContentSections } from './SurveyQuestionsFullQuestionContentSections';
 
 type SurveyQuestionsFullQuestionRecord = {
@@ -12,6 +13,7 @@ type SurveyQuestionsFullQuestionDisplayState = {
   allowDecryptAdditional?: boolean;
   allowDecryptAnswer?: boolean;
   answer?: unknown;
+  answerTooLongMessage?: string;
   convictionValue?: unknown;
   decryptTooltip?: string;
   glowAdditional?: boolean;
@@ -145,6 +147,7 @@ export const renderSurveyQuestionsFullQuestionDisplay = ({
     allowDecryptAdditional = false,
     allowDecryptAnswer = false,
     answer = null,
+    answerTooLongMessage = '',
     convictionValue = null,
     decryptTooltip = 'Login to decrypt this encrypted field.',
     glowAdditional = false,
@@ -230,7 +233,14 @@ export const renderSurveyQuestionsFullQuestionDisplay = ({
     cardKey,
     question,
     cardIcons,
-    mainContent: contentSections.mainContent,
+    mainContent: answerTooLongMessage ? (
+      <>
+        {contentSections.mainContent}
+        <AnswerTooLongNotice message={answerTooLongMessage} />
+      </>
+    ) : (
+      contentSections.mainContent
+    ),
     footerIcons,
     sliderSection,
     commentsSection: contentSections.commentsSection,
