@@ -296,7 +296,10 @@ Smoke-test the deployed domain with:
 - login/auth flows, including gated flows if the session uses SBT gates
 
 Vercel, Cloudflare Pages, and GitHub Pages use the same static build output and
-SPA fallback concept, but their redirect config syntax differs.
+SPA fallback concept, but their redirect config syntax differs. The generated
+caching rules in `_headers` target Netlify: Cloudflare Pages reads the same file
+but caps it at 100 rules, fewer than the one rule per hashed file that the build
+writes (about 240), so set up caching there separately.
 
 ## Notes
 
