@@ -75,7 +75,8 @@ type CachedVersion = {
   admin: boolean;
   createdAtMs: number;
   storageRefId: string;
-  verified: boolean;
+  // Whether a plaintext question hashes to its id; null when it cannot be checked.
+  verified: boolean | null;
 };
 
 const MAX_METADATA_LIST_PAGES = 50;
@@ -117,9 +118,9 @@ const isLockedQuestionPayload = (payload: UnknownRecord): boolean =>
 
 // Plaintext question ids are hashes of their authoring inputs, so a version
 // whose content does not hash to its id is a rewrite. Locked questions keep
-// their plaintext private and cannot be checked here.
-const questionPayloadMatchesId = (id: string, payload: UnknownRecord): boolean => {
-  if (isLockedQuestionPayload(payload)) return true;
+// their plaintext private, so their check is unknown (null), never a pass.
+const questionPayloadMatchesId = (id: string, payload: UnknownRecord): boolean | null => {
+  if (isLockedQuestionPayload(payload)) return null;
   try {
     const options = Array.isArray(payload.options) ? payload.options : [];
     const voiceCredits = Number(payload.voiceCredits ?? 99);
@@ -133,14 +134,17 @@ const questionPayloadMatchesId = (id: string, payload: UnknownRecord): boolean =
 };
 
 // One version per id: a session admin's newest upload wins, otherwise the
-// earliest upload, and for plaintext questions a version that matches its id
-// hash beats one that does not. The Worker's readers apply the same order.
+// earliest upload. Between two plaintext questions, one that matches its id
+// hash beats one that does not; a locked version cannot be checked, so then
+// age decides. The Worker's readers apply the same admin-then-earliest order.
 const isPreferredVersion = (candidate: CachedVersion, current: CachedVersion | null): boolean => {
   if (!current || candidate.storageRefId === current.storageRefId) return true;
   if (candidate.admin !== current.admin) return candidate.admin;
   const age = candidate.createdAtMs - current.createdAtMs || candidate.storageRefId.localeCompare(current.storageRefId);
   if (candidate.admin) return age > 0;
-  if (candidate.verified !== current.verified) return candidate.verified;
+  if (candidate.verified !== null && current.verified !== null && candidate.verified !== current.verified) {
+    return candidate.verified;
+  }
   return age < 0;
 };
 
@@ -392,14 +396,15 @@ const createWorkerSurveyCacheNode = (): UnknownRecord => ({
   workerSurveyMetadataRefs: {},
 });
 
-const readCachedVersion = (ref: unknown, verifyCachedItem: () => boolean): CachedVersion | null => {
+const readCachedVersion = (ref: unknown, verifyCachedItem: () => boolean | null): CachedVersion | null => {
   if (!isRecord(ref)) return null;
   return {
     admin: ref.admin === true,
     createdAtMs: Number(ref.createdAtMs || 0),
     storageRefId: readString(ref.storageRefId),
-    // Refs cached before this rule have no flag; check the cached copy.
-    verified: typeof ref.verified === 'boolean' ? ref.verified : verifyCachedItem(),
+    // Always re-check the cached copy: older refs have no flag, or a flag that
+    // counted a locked rewrite as verified.
+    verified: verifyCachedItem(),
   };
 };
 
@@ -416,7 +421,7 @@ const mergeMetadataEntries = ({
   pending: UnknownRecord;
   refs: UnknownRecord;
   toItem: (row: WorkerCanonicalMetadataRow, base: UnknownRecord) => UnknownRecord;
-  verify: (id: string, payload: UnknownRecord) => boolean;
+  verify: (id: string, payload: UnknownRecord) => boolean | null;
 }): void => {
   const hiddenIds = new Set(entries.filter(isHiddenEntry).map((entry) => entry.id));
   hiddenIds.forEach((id) => {
@@ -427,7 +432,7 @@ const mergeMetadataEntries = ({
   entries.forEach((entry) => {
     if (isHiddenEntry(entry) || hiddenIds.has(entry.id)) return;
     const existing = isRecord(items[entry.id]) ? (items[entry.id] as UnknownRecord) : null;
-    const current = readCachedVersion(refs[entry.id], () => !existing || verify(entry.id, existing));
+    const current = readCachedVersion(refs[entry.id], () => (existing ? verify(entry.id, existing) : null));
     const candidate: CachedVersion = {
       admin: entry.uploaderIsAdmin === true,
       createdAtMs: entry.createdAtMs,

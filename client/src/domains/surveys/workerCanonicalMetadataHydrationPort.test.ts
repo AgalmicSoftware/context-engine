@@ -524,6 +524,45 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       expect(legacyCache.worker.questions['0xlegacypoll'].prompt).toBe(PROMPT);
     });
 
+    it('never lets a locked rewrite beat an earlier plaintext question it cannot be checked against', async () => {
+      // Legacy demo question ids were hashed from other inputs, so the original
+      // fails the content check; a locked rewrite cannot be checked at all.
+      const LEGACY_ID = '0xlegacypoll';
+      const original = question({ id: LEGACY_ID, type: 'multichoice', options: ['A', 'B'] });
+      const lockedRewrite = question({
+        id: LEGACY_ID,
+        prompt: '[encrypted]',
+        promptEncrypted: { ciphertext: 'rewrite' },
+        encryption: { mode: 'lit' },
+      });
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_locked', '2026-10-02T00:00:00.000Z', ATTACKER),
+          listedItem('cf_original', '2026-10-01T00:00:00.000Z', AUTHOR),
+        ],
+        { cf_original: original, cf_locked: lockedRewrite },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[LEGACY_ID].prompt).toBe(PROMPT);
+      expect(cache.worker.workerQuestionMetadataRefs[LEGACY_ID]).toEqual(
+        expect.objectContaining({ storageRefId: 'cf_original', verified: false }),
+      );
+
+      // A cache that kept the locked rewrite because its ref said "verified" is corrected.
+      const stale = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
+      stale.worker.questions[LEGACY_ID] = { ...lockedRewrite };
+      stale.worker.workerQuestionMetadataRefs[LEGACY_ID] = {
+        admin: false,
+        createdAtMs: Date.parse('2026-10-02T00:00:00.000Z'),
+        storageRefId: 'cf_locked',
+        verified: true,
+      };
+      const originalOnly = rows.filter((row: any) => row.storageRefId === 'cf_original');
+      const corrected = mergeWorkerCanonicalQuestionMetadata(stale, originalOnly, identity) as any;
+      expect(corrected.worker.questions[LEGACY_ID].prompt).toBe(PROMPT);
+      expect(corrected.worker.questions[LEGACY_ID].encryption).toBeUndefined();
+    });
+
     it('corrects a cache that kept a later rewrite under the old newest-wins rule', async () => {
       const staleCache = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
       staleCache.worker.questions[QUESTION_ID] = { ...question({ prompt: 'ATTACKER rewrite' }), voiceCredits: 1 };
