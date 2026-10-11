@@ -812,11 +812,14 @@ export const finalizeQuestionDecryptAttempt = async (
   const producedAdditional = !!(decryptedStateSlice.additionalComments && decryptedStateSlice.additionalComments[qid]);
   const didUpdate = producedAnswer || producedAdditional;
 
+  // Binds each rating to this question, so an envelope moved from another
+  // question or rating does not decrypt here.
   const { decryptedImportance, decryptedConviction } = await decryptQuestionRatingEnvelopesPort(ratingEnvelopes, {
     account,
     chainId,
     lit,
     providerLike,
+    questionId: qid,
   });
 
   return {

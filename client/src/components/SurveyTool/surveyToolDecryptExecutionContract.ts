@@ -36,6 +36,8 @@ export type RatingEnvelopeDecryptContext = UnknownRecord & {
   chainId?: unknown;
   lit?: unknown;
   providerLike?: unknown;
+  // The question the ratings belong to; decrypts then reject other questions' ratings.
+  questionId?: unknown;
 };
 
 export type QuestionRatingEnvelopeDecryptResult = {

@@ -7,6 +7,8 @@ import {
   decryptQuestionRatingEnvelopeMap,
   decryptQuestionRatingEnvelopes,
 } from './surveyToolDecryptSurveySource';
+import { finalizeQuestionDecryptAttempt } from './surveyToolDecryptFlow';
+import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 
 describe('surveyToolDecryptSurveySource', () => {
   it('normalizes latest responses into a typed source slice and rating envelope map', () => {
@@ -133,5 +135,62 @@ describe('rating envelope decrypt binding', () => {
         ports,
       ),
     ).resolves.toEqual({ decryptedImportance: null, decryptedConviction: 3 });
+  });
+
+  // The only rating writer, the submit controller, encrypts each rating with
+  // qId `${fieldKey}:${lowercased questionID}`, so binding single-question
+  // decrypts to that qId keeps every saved rating readable.
+  const writeLockedRatings = async (questionID: string, importance: number, conviction: number) => {
+    const response: Record<string, unknown> = { questionID, importance, conviction };
+    await processRatingEnvelopesForSubmit(
+      {
+        sliceForSubmit: { answers: { [questionID.toLowerCase()]: { value: 'locked', encrypted: true } } },
+        userAnswersSource: null,
+        questionResponses: [response],
+        changedMapForSubmit: { [questionID.toLowerCase()]: { importance: true, conviction: true } },
+        encryptionBaseOpts: {
+          provider: context.providerLike,
+          account: context.account,
+          chainId: context.chainId,
+          surveyId: ethers.constants.HashZero,
+          kind: 'rating',
+          hasher: null,
+        },
+      },
+      {
+        isQuestionLockedForResponse: () => false,
+        resolveFieldEncryptionAudience: () => 'self',
+        getEffectiveRecipientsForQid: () => [],
+        getEffectiveRecipientsForField: () => [],
+        getDefaultResponseEncryptionAudienceForQid: () => 'self',
+        buildLitEncryptionOptionsForRecipients: () => null,
+        encryptEnvelopeValue: (value, options) => cryptoUtils.encryptEnvelopeValue(value, options),
+        getImportanceFromResponse: () => null,
+        getConvictionFromResponse: () => null,
+      },
+    );
+    return { importanceEncrypted: response.importanceEncrypted, convictionEncrypted: response.convictionEncrypted };
+  };
+  const finalizeRatings = (questionId: string, ratingEnvelopes: unknown) =>
+    finalizeQuestionDecryptAttempt(
+      { questionId, fieldToDecrypt: 'answer', baselineForDecrypt: {}, ratingEnvelopes, ...context },
+      {
+        decryptSingleField: async () => ({ answers: {} }),
+        decryptQuestionRatingEnvelopes: (envelopes, ratingContext) =>
+          decryptQuestionRatingEnvelopes(envelopes, ratingContext, ports),
+      },
+    );
+
+  it('decrypts saved ratings on their own question page and nowhere else', async () => {
+    const questionA = `0x${'Ab'.repeat(32)}`;
+    const questionB = `0x${'cd'.repeat(32)}`;
+    const ratingsA = await writeLockedRatings(questionA, 8, 2);
+
+    await expect(finalizeRatings(questionA.toUpperCase().replace('0X', '0x'), ratingsA)).resolves.toEqual(
+      expect.objectContaining({ decryptedImportance: 8, decryptedConviction: 2 }),
+    );
+    await expect(finalizeRatings(questionB, ratingsA)).resolves.toEqual(
+      expect.objectContaining({ decryptedImportance: null, decryptedConviction: null }),
+    );
   });
 });

@@ -1385,6 +1385,7 @@ describe('surveyToolDecryptFlow', () => {
         chainId: 84532,
         lit: { getKey: expect.any(Function) },
         providerLike: { provider: true },
+        questionId: 'q1',
       },
     );
   });
