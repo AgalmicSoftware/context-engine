@@ -300,7 +300,10 @@ test('the Worker release pin must carry the newest published Worker code', () =>
 
     assert.deepEqual(verify(releaseC), { pinCommit: releaseC, newestRelease: releaseC });
     assert.throws(() => verify(releaseA), /pin [a-f0-9]{40} is stale: worker-bundles-[a-f0-9]{40}.*worker\.js/);
-    assert.throws(() => verify(unpublishedTip), /not a published worker-bundles release in main/);
+    assert.throws(
+      () => verify(unpublishedTip),
+      /not a published worker-bundles release in main; fetch release tags \(git fetch --no-tags origin main '\+refs\/tags\/worker-bundles-\*:refs\/tags\/worker-bundles-\*'\)/,
+    );
     assert.equal(
       verifyWorkerReleasePin({ repoRoot: rootDir, candidateRef: 'main', baselineRef: 'main' }),
       null,
@@ -421,18 +424,25 @@ test('pin-worker-release pins the newest verified release and its deploy-helper 
 });
 
 test('pin-worker-release fetches moved release channel tags and reports git failures', async () => {
-  const { rootDir: publicDir, releaseB, releaseC } = createPublishedReleaseHistory();
+  const { rootDir: publicDir, releaseA, releaseB, releaseC } = createPublishedReleaseHistory();
   const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-pin-clone-'));
   try {
+    git(publicDir, ['tag', 'v0.1.0', releaseA]);
     git(cloneDir, ['clone', '--quiet', publicDir, '.']);
     // Promote Worker Bundles moves worker-bundles-stable after this clone fetched it.
     git(publicDir, ['tag', '-f', 'worker-bundles-stable', releaseB]);
+    // Tags outside the Worker release namespace are left as the clone has them.
+    git(publicDir, ['tag', '-f', 'v0.1.0', releaseB]);
+    git(publicDir, ['tag', 'v0.1.1', releaseC]);
     writePin(cloneDir, releaseB);
     const verifyRelease = async () => ({ ok: true, failures: [], manifestSha256: 'c'.repeat(64) });
 
     const pin = await pinWorkerRelease({ repoRoot: cloneDir, mainRef: 'origin/main', verifyRelease });
 
     assert.equal(pin.commit, releaseC);
+    assert.equal(git(cloneDir, ['rev-parse', 'worker-bundles-stable^{commit}']), releaseB);
+    assert.equal(git(cloneDir, ['rev-parse', 'v0.1.0^{commit}']), releaseA);
+    assert.equal(git(cloneDir, ['tag', '--list', 'v0.1.1']), '');
     await assert.rejects(
       pinWorkerRelease({ repoRoot: cloneDir, mainRef: 'origin/main', fetchRemote: 'missing-remote', verifyRelease }),
       /Fetching release tags from missing-remote failed: .*missing-remote/s,

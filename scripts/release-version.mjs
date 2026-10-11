@@ -317,6 +317,9 @@ export const listPublishedWorkerReleases = ({ repoRoot, baselineRef }) => {
 };
 
 const PIN_COMMAND = 'node scripts/release-version.mjs pin-worker-release';
+// Promotion moves the worker-bundles-stable and -previous tags, so release
+// tags are force-updated; no other local tag is fetched or touched.
+const WORKER_RELEASE_TAG_REFSPEC = '+refs/tags/worker-bundles-*:refs/tags/worker-bundles-*';
 
 // Offline by design (the pre-push hook and release-staging CI run it), so it
 // checks the digest's form only; pin-worker-release verifies the digest when it
@@ -355,7 +358,8 @@ export const verifyWorkerReleasePin = ({ repoRoot, candidateRef, baselineRef }) 
   if (!published.includes(pinCommit)) {
     throw new Error(
       `Worker release pin ${pinCommit} is not a published worker-bundles release in ${baselineRef}; `
-        + `fetch release tags (git fetch --tags --force origin) or run ${PIN_COMMAND}`,
+        + `fetch release tags (git fetch --no-tags origin main '${WORKER_RELEASE_TAG_REFSPEC}') `
+        + `or run ${PIN_COMMAND}`,
     );
   }
   const newestRelease = published[0];
@@ -384,9 +388,8 @@ export const pinWorkerRelease = async ({
   const pinPath = path.join(repoRoot, WORKER_RELEASE_PIN_PATH);
   if (!fs.existsSync(pinPath)) throw new Error(`${WORKER_RELEASE_PIN_PATH} was not found in ${repoRoot}`);
   if (fetchRemote) {
-    // --force: promotion moves the worker-bundles-stable and -previous tags.
     try {
-      git(repoRoot, ['fetch', '--tags', '--force', fetchRemote, 'main']);
+      git(repoRoot, ['fetch', '--no-tags', fetchRemote, 'main', WORKER_RELEASE_TAG_REFSPEC]);
     } catch (error) {
       const detail = String(error?.stderr || error?.message || '').trim();
       throw new Error(`Fetching release tags from ${fetchRemote} failed: ${detail || 'git fetch exited with an error'}`);
