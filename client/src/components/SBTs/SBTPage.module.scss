@@ -978,8 +978,19 @@ $input-border: var(--ce-input-border);
   width: 120px;
   height: 120px;
   object-fit: contain;
-  filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--ce-compat-dark) 35%, transparent));
-  animation: none;
+  filter: var(--ce-brand-logo-filter);
+  animation: loadingLogoPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes loadingLogoPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
 }
 
 .loadingTitle {

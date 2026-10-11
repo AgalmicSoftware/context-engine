@@ -563,24 +563,3 @@
     align-items: center;
   }
 }
-
-.cleanLogo {
-  display: none;
-}
-
-@container ce-theme style(--ce-layout-profile: minimal-app) {
-  // Theme visibility must win over the narrow-screen ID-based display rules.
-  #mainLogo.defaultLogo,
-  #mainLogoLoggedIn.defaultLogo {
-    display: none;
-  }
-
-  .cleanLogo {
-    display: block;
-    width: clamp(90px, 15vw, 150px);
-    height: auto;
-    object-fit: contain;
-    filter: brightness(0);
-    opacity: 0.55;
-  }
-}

@@ -15,6 +15,9 @@ All notable changes to this project will be documented in this file.
   chart and leaderboard's session scope above each section.
 - Improve mobile session spacing, section help icons, filter checkboxes, and
   narrow-screen logo display. Hide section subtitles while their content is open.
+- Show one lightweight vector logo in every theme, sized and placed like the
+  previous default logo. Remove the animated logo and the hidden per-theme
+  copies that a first visit downloaded (up to about 8 MB).
 - Enable the AI question filter for Worker sessions with configured AI access.
 - Rename the Tools entry to Debate Map, retain its embedded view when a detail
   closes, and remove the disabled Suggest Tool card.

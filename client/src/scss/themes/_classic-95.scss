@@ -210,7 +210,7 @@ $theme: (
   nav-tab-inactive: #c0c0c0,
   brand-logo-opacity: 0.74,
   brand-logo-blend-mode: screen,
-  brand-logo-filter: brightness(1.45) contrast(1.12),
+  brand-logo-filter: invert(1),
   recognition-logo-backing: transparent,
   recognition-logo-border: transparent,
   welcome-artwork-blend-soft: normal,

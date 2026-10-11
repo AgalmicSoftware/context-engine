@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faInfinity, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 
-import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
+import contextEngineLogo from '../../assets/img/context_engine_logo.svg';
 import { getChainLabelById } from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import CETooltip from '../Shared/CETooltip';
@@ -137,7 +137,7 @@ type RenderSbtPageFullViewArgs = {
 
 export const renderSbtPageFullViewLoading = ({ sbtLabel }: { sbtLabel: string }): React.ReactElement => (
   <div className={styles.loadingPage}>
-    <img src={contextEngineLoadingGif} alt="Context Engine loading" className={styles.loadingLogo} />
+    <img src={contextEngineLogo} alt="" className={styles.loadingLogo} />
     <div className={styles.loadingTitle}>{`Loading ${sbtLabel} Details`}</div>
   </div>
 );

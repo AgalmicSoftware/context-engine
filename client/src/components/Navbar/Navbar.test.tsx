@@ -31,13 +31,6 @@ jest.mock('utilities/logging.js', () => ({
   }),
 }));
 
-jest.mock('../../variables/appConfig.js', () => ({
-  ENABLE_CE_LOGO_ANIMATION: false,
-  CE_LOGO_ANIMATION_MODE: 'forward',
-  CE_LOGO_ANIMATION_DURATION_MS_FORWARD: 0,
-  CE_LOGO_ANIMATION_DURATION_MS_PINGPONG: 0,
-}));
-
 describe('Navbar logo navigation', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
 
@@ -178,7 +171,26 @@ describe('Navbar logo navigation', () => {
     );
   });
 
-  it('renders both navbar logo variants through the app-theme brand contract', () => {
+  it.each([
+    ['logged-out', {}, {}],
+    [
+      'logged-in',
+      { account: '0x1111111111111111111111111111111111111111', provider: 'wagmi', loginComplete: true },
+      { sessionState: { loginComplete: true } },
+    ],
+  ])('renders a single logo image in the %s navbar', (state, props, storeOverrides) => {
+    renderNavbar(props, storeOverrides);
+    const homeLink = screen.getByRole('link', { name: 'Context Engine home' });
+
+    // Hidden images still download, so every theme shares one logo element.
+    expect(homeLink.querySelectorAll('img')).toHaveLength(1);
+    expect(homeLink.querySelector('img')).toHaveAttribute(
+      'id',
+      state === 'logged-in' ? 'mainLogoLoggedIn' : 'mainLogo',
+    );
+  });
+
+  it('renders the navbar logo through the app-theme brand contract', () => {
     expect(navbarStylesheet).toMatch(
       /#mainLogo\s*{[\s\S]*?opacity:\s*var\(--ce-brand-logo-opacity\);[\s\S]*?mix-blend-mode:\s*var\(--ce-brand-logo-blend-mode\);[\s\S]*?filter:\s*var\(--ce-brand-logo-filter\);/,
     );

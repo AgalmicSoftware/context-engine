@@ -3707,22 +3707,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (classicLogoState && currentLogoState) {
     assert.equal(classicLogoState.opacity, '0.74', 'Classic 95 navbar logo should be visibly brighter');
     assert.equal(classicLogoState.mixBlendMode, 'screen', 'Classic 95 navbar logo should blend lightly into teal');
-    assert.match(
-      classicLogoState.filter,
-      /brightness\(1\.45\).*contrast\(1\.12\)/,
-      'Classic 95 navbar logo should retain its contrast lift',
-    );
+    assert.equal(classicLogoState.filter, 'invert(1)', 'Classic 95 navbar logo should render light on teal');
     assert.equal(currentLogoState.opacity, '0.4', 'Context Engine navbar logo should preserve its original opacity');
-    assert.equal(
-      currentLogoState.mixBlendMode,
-      'luminosity',
-      'Context Engine navbar logo should preserve its original blend',
-    );
-    assert.equal(
-      currentLogoState.filter,
-      'none',
-      'Context Engine navbar logo should not inherit the Classic 95 filter',
-    );
+    assert.equal(currentLogoState.mixBlendMode, 'normal', 'Context Engine navbar logo should not blend');
+    assert.equal(currentLogoState.filter, 'invert(1)', 'Context Engine navbar logo should render light on navy');
   }
   if (classicRecognitionLogoState && currentRecognitionLogoState) {
     assert.equal(
