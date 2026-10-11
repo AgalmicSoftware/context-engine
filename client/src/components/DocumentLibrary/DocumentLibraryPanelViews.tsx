@@ -399,7 +399,6 @@ type DocumentLibraryUploadControlsProps = {
   requiresLitDocumentStorage: boolean;
   locked: boolean;
   onToggleLocked: () => void;
-  sessionGateUnsupportedMessage: string;
   audienceMode: string;
   onAudienceModeChange: (mode: string) => void;
   docUploadsGate: DocUploadsGateState;
@@ -440,7 +439,6 @@ export const DocumentLibraryUploadControls = ({
   requiresLitDocumentStorage,
   locked,
   onToggleLocked,
-  sessionGateUnsupportedMessage,
   audienceMode,
   onAudienceModeChange,
   docUploadsGate,
@@ -547,10 +545,6 @@ export const DocumentLibraryUploadControls = ({
             <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
           </button>
         </div>
-
-        {sessionGateUnsupportedMessage ? (
-          <div className={styles.noticeInline}>{sessionGateUnsupportedMessage}</div>
-        ) : null}
 
         {locked && showSbtAudienceControls ? (
           <div className={styles.encryptControls}>

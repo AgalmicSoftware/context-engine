@@ -1565,7 +1565,6 @@ export default function DocumentLibraryPanel({
           requiresLitDocumentStorage={requiresLitDocumentStorage}
           locked={effectiveLocked}
           onToggleLocked={toggleLocked}
-          sessionGateUnsupportedMessage=""
           audienceMode={audienceMode}
           onAudienceModeChange={(nextMode) => {
             userEncryptionOverrideRef.current = true;
