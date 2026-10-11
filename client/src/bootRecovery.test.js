@@ -51,20 +51,22 @@ describe('bootRecovery', () => {
 
   it('clears stale-chunk recovery state only after a primary route commits', () => {
     const replaceState = jest.fn();
-    const removeItem = jest.fn();
     const historyState = { idx: 2 };
+    const sessionStorage = { ...createMemoryStorage(), clear: jest.fn() };
     const fakeWindow = {
       history: { replaceState, state: historyState },
       location: {
         href: 'https://contextengine.example.test/docs?ceBootReload=123&ceChunkReload=456&session=alpha#guide',
       },
-      sessionStorage: { clear: jest.fn(), removeItem },
+      sessionStorage,
     };
 
     expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(true);
     expect(replaceState).toHaveBeenCalledWith(historyState, '', '/docs?ceBootReload=123&session=alpha#guide');
-    expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
-    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
+    expect(sessionStorage.removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
+    // The marked reload time moves into storage before the URL marker goes away.
+    expect(sessionStorage.getItem('ce:staleChunkReloadAt:v20261011')).toBe('456');
+    expect(sessionStorage.clear).not.toHaveBeenCalled();
   });
 
   it('clears only the stale-chunk sentinel when its URL marker is absent', () => {
@@ -315,6 +317,59 @@ describe('bootRecovery', () => {
 
     expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
     expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it('keeps the reload marker as the guard when session storage cannot save the reload time', () => {
+    const reload = jest.fn();
+    const storage = {
+      getItem: jest.fn(() => null),
+      removeItem: jest.fn(),
+      setItem: jest.fn(() => {
+        throw new Error('QuotaExceededError');
+      }),
+    };
+    const fakeWindow = {
+      history: { replaceState: jest.fn() },
+      location: { href: 'https://app.example.test/session/alpha' },
+      sessionStorage: storage,
+    };
+    const recover = () =>
+      recoverFromStaleChunkLoadError(new TypeError('Failed to fetch dynamically imported module'), {
+        window: fakeWindow,
+        reload,
+      });
+
+    expect(recover()).toBe(true);
+    // The reload lands on the marked URL and its route commits.
+    fakeWindow.location.href = 'https://app.example.test/session/alpha?ceChunkReload=123';
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
+    expect(fakeWindow.history.replaceState).not.toHaveBeenCalled();
+    expect(recover()).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers without throwing when reading session storage throws', () => {
+    const reload = jest.fn();
+    const fakeWindow = {
+      history: { replaceState: jest.fn() },
+      location: { href: 'https://app.example.test/session/alpha' },
+    };
+    Object.defineProperty(fakeWindow, 'sessionStorage', {
+      get() {
+        throw new Error('SecurityError: site data is blocked');
+      },
+    });
+    const recover = () =>
+      recoverFromStaleChunkLoadError(new TypeError('Failed to fetch dynamically imported module'), {
+        window: fakeWindow,
+        reload,
+      });
+
+    expect(recover()).toBe(true);
+    fakeWindow.location.href = 'https://app.example.test/session/alpha?ceChunkReload=123';
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
+    expect(recover()).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('reloads a stale route through the chunk recovery marker', () => {

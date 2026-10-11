@@ -130,6 +130,15 @@ const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
   }
 };
 
+// Reading window.sessionStorage itself throws when site data is blocked.
+const readSessionStorage = (win: BootWindow | undefined): BootStorage | undefined => {
+  try {
+    return win?.sessionStorage;
+  } catch {
+    return undefined;
+  }
+};
+
 export const clearBootReloadMarker = (
   win: BootWindow = globalThis.window,
   reloadParam = BOOT_RELOAD_PARAM,
@@ -148,17 +157,22 @@ export const clearBootReloadMarker = (
 };
 
 export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window): boolean => {
-  // A primary route committed, so drop the boot-loop flag. The automatic-reload time
-  // stays as the loop guard; without session storage the URL marker is that guard.
-  let storageAvailable = false;
+  // A primary route committed, so drop the boot-loop flag. The reload time is the loop
+  // guard from here on; keep the URL marker unless that time reads back from storage.
+  const storage = readSessionStorage(win);
+  let reloadTimeStored = false;
   try {
-    storageAvailable = !!win?.sessionStorage;
-    win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+    storage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+    if (!storage?.getItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY)) {
+      const markerTime = win?.location ? new URL(win.location.href).searchParams.get(STALE_CHUNK_RELOAD_PARAM) : null;
+      if (Number(markerTime) > 0) storage?.setItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY, String(markerTime));
+    }
+    reloadTimeStored = Number(storage?.getItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY)) > 0;
   } catch {
-    storageAvailable = false;
+    reloadTimeStored = false;
   }
 
-  return storageAvailable ? clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM) : false;
+  return reloadTimeStored ? clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM) : false;
 };
 
 const wasRecentlyAutoReloaded = (storage: BootStorage | undefined, storageKey: string, now: number): boolean => {
@@ -181,7 +195,7 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   // Offline failures are transient; a reload would only reach the browser's offline page.
   if (win?.navigator?.onLine === false) return false;
 
-  const storage = options.storage || win?.sessionStorage;
+  const storage = options.storage || readSessionStorage(win);
   const storageKey = options.storageKey || STALE_CHUNK_RELOAD_STORAGE_KEY;
   const reloadParam = options.reloadParam || STALE_CHUNK_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));

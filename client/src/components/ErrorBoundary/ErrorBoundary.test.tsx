@@ -107,6 +107,27 @@ describe('Error boundaries', () => {
     reloadSpy.mockRestore();
   });
 
+  it('keeps the app-wide fallback on screen when reading session storage throws', () => {
+    const storageGetter = jest.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
+      throw new Error('SecurityError: site data is blocked');
+    });
+    // The marked URL means this load already reloaded once, so no navigation starts.
+    window.history.replaceState({}, '', '/?ceChunkReload=123');
+
+    try {
+      render(
+        <AppErrorBoundary>
+          <StaleChunkThrower />
+        </AppErrorBoundary>,
+      );
+
+      expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    } finally {
+      storageGetter.mockRestore();
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
   it('asks the app-wide fallback to recover a stale AppShell chunk without clearing its loop guard', () => {
     const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError');
     window.sessionStorage.setItem(bootRecovery.STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
