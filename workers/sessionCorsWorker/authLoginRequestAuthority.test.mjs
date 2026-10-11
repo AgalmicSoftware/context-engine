@@ -5,6 +5,9 @@ import { parseSiweMessage, validateSiwe } from './siweMessageValidation.js';
 import { resolveAuthLoginRequestAuthority } from './authLoginRequestAuthority.js';
 
 const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+// The Worker origin and session binding every current client signs.
+const SIGNED_RESOURCES = ['https://worker.example', 'urn:context-engine:session:slug:session-a'];
+const LOGIN_URL = 'https://worker.example/auth/login';
 const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -44,6 +47,7 @@ const createAuthorityDeps = (overrides = {}) => ({
     uri: 'https://allowed.example',
     nonce: 'nonce-1',
     issuedAt: '2026-04-23T12:00:00.000Z',
+    resources: SIGNED_RESOURCES,
   }),
   validateSiwe: () => ({ ok: true }),
   validateSiweAddressMatchesRequest: () => ({ ok: true }),
@@ -64,6 +68,7 @@ const createAuthorityDeps = (overrides = {}) => ({
 const createRequestArgs = (overrides = {}) => ({
   env: { GROUP_KV: {} },
   request: {
+    url: LOGIN_URL,
     headers: new Headers({ Origin: 'https://allowed.example' }),
   },
   body: createSignedBody(),
@@ -320,6 +325,7 @@ test('resolveAuthLoginRequestAuthority rejects originless and mismatched SIWE lo
   let missingOriginNonceCalled = false;
   const missingOrigin = await resolveAuthLoginRequestAuthority(createRequestArgs({
     request: {
+      url: LOGIN_URL,
       headers: new Headers(),
     },
     deps: createAuthorityDeps({
@@ -348,6 +354,7 @@ test('resolveAuthLoginRequestAuthority rejects originless and mismatched SIWE lo
         uri: 'https://evil.example',
         nonce: 'nonce-1',
         issuedAt: '2026-04-23T12:00:00.000Z',
+        resources: SIGNED_RESOURCES,
       }),
       consumeNonce: async () => {
         mismatchedOriginNonceCalled = true;
@@ -369,6 +376,7 @@ test('resolveAuthLoginRequestAuthority rejects originless and mismatched SIWE lo
   let untrustedOriginNonceCalled = false;
   const untrustedOrigin = await resolveAuthLoginRequestAuthority(createRequestArgs({
     request: {
+      url: LOGIN_URL,
       headers: new Headers({ Origin: 'https://evil.example' }),
     },
     deps: createAuthorityDeps({
@@ -385,6 +393,7 @@ test('resolveAuthLoginRequestAuthority rejects originless and mismatched SIWE lo
         uri: 'https://evil.example',
         nonce: 'nonce-1',
         issuedAt: '2026-04-23T12:00:00.000Z',
+        resources: SIGNED_RESOURCES,
       }),
       consumeNonce: async () => {
         untrustedOriginNonceCalled = true;
@@ -426,6 +435,13 @@ test('resolveAuthLoginRequestAuthority accepts an explicit general-session slug'
           },
         };
       },
+      parseSiweMessage: () => ({
+        domain: 'allowed.example',
+        uri: 'https://allowed.example',
+        nonce: 'nonce-1',
+        issuedAt: '2026-04-23T12:00:00.000Z',
+        resources: ['https://worker.example', 'urn:context-engine:session:slug:'],
+      }),
       computeScopesForLogin: async (value) => {
         assert.equal(value.slug, '');
         return {
@@ -531,7 +547,7 @@ test('resolveAuthLoginRequestAuthority preserves gate failure passthrough and re
 });
 
 for (const [label, resources, canonical, expected] of [
-  ['legacy message', null, false, true],
+  ['legacy message without Resources', null, false, false],
   ['bound slug', ['https://worker.example', 'urn:context-engine:session:slug:session-a'], false, true],
   ['bound identity', ['https://worker.example', `urn:context-engine:session:id:${workerSessionId}`], true, true],
   ['relayed Worker', ['https://other-worker.example', 'urn:context-engine:session:slug:session-a'], false, false],

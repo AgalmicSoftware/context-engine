@@ -373,3 +373,20 @@ test('login accepts the exact client sign-in message and rejects lenient look-al
 	});
 	assert.equal(login.status, 200, JSON.stringify(login.body));
 });
+
+test('login requires the signed Worker and session binding and keeps the nonce on refusal', async () => {
+	const { env } = createSessionEnv();
+	const wallet = Wallet.createRandom();
+	const nonce = await requestNonce({ env, address: wallet.address });
+	const bound = buildClientSiweMessage({ address: wallet.address, nonce: nonce.body.nonce });
+	const unbound = bound.slice(0, bound.indexOf('\nResources:'));
+	const otherWorker = bound.replace(`- ${WORKER_ORIGIN}`, '- https://other-worker.example');
+
+	for (const message of [unbound, otherWorker]) {
+		const refused = await loginWithMessage({ env, wallet, message });
+		assert.equal(refused.status, 403, JSON.stringify(refused.body));
+		assert.equal(refused.body.error, 'Signed login resources do not match this Worker and session.');
+	}
+	const login = await loginWithMessage({ env, wallet, message: bound });
+	assert.equal(login.status, 200, JSON.stringify(login.body));
+});

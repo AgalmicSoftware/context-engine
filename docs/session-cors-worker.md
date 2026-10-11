@@ -1740,9 +1740,11 @@ login, and signed admin request bodies must carry that config's canonical
    Include exactly two `Resources:` URI-list entries with a `- ` prefix: the
    receiving Worker origin and `urn:context-engine:session:id:<encoded-id>` for
    Worker-canonical sessions, or `urn:context-engine:session:slug:<encoded-slug>`
-   for registry sessions (`general` uses the empty slug). `/auth/login` checks
-   these signed resources before consuming the nonce. Messages without a
-   Resources section remain accepted for legacy-client compatibility.
+   for registry sessions (`general` uses the empty slug). `/auth/login` and
+   bootstrap uploads check these signed resources before consuming the nonce,
+   and reject a message without them with `403`, so a signature made for
+   another Worker or session cannot be replayed here. Browser tabs that still
+   run a client from before this binding existed must reload.
 3. `POST /auth/login` body:
    `{ address, message, signature, sessionSlug, sessionId }` for
    `worker_canonical`; registry compatibility may omit `sessionId`.

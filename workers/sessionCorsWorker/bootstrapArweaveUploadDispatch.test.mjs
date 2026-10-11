@@ -3,6 +3,24 @@ import assert from 'node:assert/strict';
 
 import { dispatchBootstrapArweaveUpload } from './bootstrapArweaveUploadDispatch.js';
 
+const UPLOAD_URL = 'https://worker.example/arweave/upload';
+// A bootstrap admin message bound to this Worker and session, as the client signs it.
+const signedBootstrapMessage = (slug) => [
+  'allowed.example wants you to sign in with your Ethereum account:',
+  '0x0000000000000000000000000000000000000abc',
+  '',
+  'Admin request: bootstrap arweave upload',
+  '',
+  'URI: https://allowed.example',
+  'Version: 1',
+  'Chain ID: 1',
+  'Nonce: nonce-1',
+  'Issued At: 2026-10-01T00:00:00.000Z',
+  'Resources:',
+  '- https://worker.example',
+  `- urn:context-engine:session:slug:${slug}`,
+].join('\n');
+
 test('dispatchBootstrapArweaveUpload ignores authenticated upload requests', async () => {
   let payloadCalled = false;
 
@@ -86,13 +104,13 @@ test('dispatchBootstrapArweaveUpload accepts an explicit general-session slug', 
   const response = new Response('ok');
 
   const result = await dispatchBootstrapArweaveUpload({
-    request: { headers: new Headers({ Origin: 'https://allowed.example' }) },
+    request: { url: UPLOAD_URL, headers: new Headers({ Origin: 'https://allowed.example' }) },
     hasAuthorization: false,
     deps: {
       corsHeaders: () => ({ 'Access-Control-Allow-Origin': 'https://allowed.example' }),
       readArweaveBootstrapUploadPayload: async () => ({
         ok: true,
-        body: { requestId: 'bootstrap-general', sessionSlug: 'general' },
+        body: { requestId: 'bootstrap-general', sessionSlug: 'general', message: signedBootstrapMessage('') },
         hasProvidedArweaveJwk: true,
       }),
       resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: '', explicitSlugProvided: true }),
@@ -222,13 +240,13 @@ test('dispatchBootstrapArweaveUpload preserves bootstrap admin verification fail
   let secretsCalled = false;
 
   const result = await dispatchBootstrapArweaveUpload({
-    request: { headers: new Headers({ Origin: 'https://allowed.example' }) },
+    request: { url: UPLOAD_URL, headers: new Headers({ Origin: 'https://allowed.example' }) },
     hasAuthorization: false,
     deps: {
       corsHeaders: () => ({ 'Access-Control-Allow-Origin': '*' }),
       readArweaveBootstrapUploadPayload: async () => ({
         ok: true,
-        body: { requestId: 'bootstrap-4' },
+        body: { requestId: 'bootstrap-4', message: signedBootstrapMessage('session-a') },
         hasProvidedArweaveJwk: true,
       }),
       resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: 'session-a' }),
@@ -258,7 +276,7 @@ test('dispatchBootstrapArweaveUpload preserves bootstrap admin verification fail
 });
 
 test('dispatchBootstrapArweaveUpload bootstraps uploads without config when request arweaveJwk is provided', async () => {
-  const request = { headers: new Headers({ Origin: 'https://allowed.example' }) };
+  const request = { url: UPLOAD_URL, headers: new Headers({ Origin: 'https://allowed.example' }) };
   const uploadResponse = new Response('uploaded');
 
   const result = await dispatchBootstrapArweaveUpload({
@@ -268,7 +286,7 @@ test('dispatchBootstrapArweaveUpload bootstraps uploads without config when requ
       corsHeaders: () => ({ 'Access-Control-Allow-Origin': '*' }),
       readArweaveBootstrapUploadPayload: async () => ({
         ok: true,
-        body: { requestId: 'bootstrap-5' },
+        body: { requestId: 'bootstrap-5', message: signedBootstrapMessage('session-a') },
         hasProvidedArweaveJwk: true,
       }),
       resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: 'session-a' }),
@@ -308,7 +326,7 @@ test('dispatchBootstrapArweaveUpload bootstraps uploads without config when requ
 });
 
 test('dispatchBootstrapArweaveUpload loads existing config and secrets before upload handoff', async () => {
-  const request = { headers: new Headers({ Origin: 'https://allowed.example' }) };
+  const request = { url: UPLOAD_URL, headers: new Headers({ Origin: 'https://allowed.example' }) };
   const config = { allowOrigins: ['https://allowed.example'] };
   const secrets = { arweaveJwk: '{"kty":"RSA"}' };
   const uploadResponse = new Response('uploaded');
@@ -320,7 +338,7 @@ test('dispatchBootstrapArweaveUpload loads existing config and secrets before up
       corsHeaders: () => ({ 'Access-Control-Allow-Origin': '*' }),
       readArweaveBootstrapUploadPayload: async () => ({
         ok: true,
-        body: { requestId: 'bootstrap-6' },
+        body: { requestId: 'bootstrap-6', message: signedBootstrapMessage('session-a') },
         hasProvidedArweaveJwk: false,
       }),
       resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: 'session-a' }),
@@ -369,7 +387,7 @@ for (const [label, resources, accepted, mode] of [
   ['other session', ['https://worker.example', 'urn:context-engine:session:slug:other'], false, 'registry'],
   ['valid registry', ['https://worker.example', 'urn:context-engine:session:slug:sample'], true, 'registry'],
   ['valid canonical', ['https://worker.example', 'urn:context-engine:session:id:0x44444444444444444444444444444444'], true, 'worker_canonical'],
-  ['legacy without Resources', null, true, 'registry'],
+  ['legacy without Resources', null, false, 'registry'],
 ]) {
   test(`bootstrap upload checks ${label} before signature verification consumes a nonce`, async () => {
     let verified = false;

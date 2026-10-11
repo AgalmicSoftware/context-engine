@@ -372,10 +372,10 @@ export const validateSiwe = (siwe, deps) => {
   return { ok: true };
 };
 
-// Check signed destinations before consuming nonces. Keep no-Resources clients
-// compatible during rollout; present Resources must bind both boundaries.
+// Check signed destinations before consuming nonces. Every current client
+// signs this Worker's origin and the session, so a signature made for another
+// Worker or session, or one that names neither, cannot log in here.
 export const validateSiweResources = ({ siwe, request, config, targetSlug } = {}) => {
-  if (siwe?.resources === undefined) return { ok: true };
   const workerOrigin = normalizeOrigin(request?.url);
   const canonical = toStr(config?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical';
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
