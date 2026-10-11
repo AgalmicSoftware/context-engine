@@ -127,7 +127,9 @@ describe('Error boundaries', () => {
   });
 
   it('keeps the app-wide fallback on screen when reading session storage throws', () => {
-    jest.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
+    // A narrow view of window keeps jest.spyOn's getter key type from collapsing to never.
+    const storageHost: { readonly sessionStorage: Storage } = window;
+    jest.spyOn(storageHost, 'sessionStorage', 'get').mockImplementation(() => {
       throw new Error('SecurityError: site data is blocked');
     });
     // The marked URL means this load already reloaded once, so no navigation starts.
