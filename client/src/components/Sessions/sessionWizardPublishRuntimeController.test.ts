@@ -207,7 +207,7 @@ describe('sessionWizardPublishRuntimeController', () => {
         deployPayload: expect.objectContaining({
           adminAddress: ADMIN_ADDRESS,
           allowOrigins: ['https://app.example.test'],
-          limits: { perWalletPerDay: 7 },
+          limits: { perWalletPerDay: 7, perAnonymousIpPerDay: null },
         }),
       }),
     );

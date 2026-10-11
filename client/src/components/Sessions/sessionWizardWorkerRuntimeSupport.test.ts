@@ -197,8 +197,15 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
     });
   });
 
-  it('omits blank limits but preserves explicit zero for wallet and anonymous IP caps', () => {
-    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '', perAnonymousIpPerDay: '' })).toEqual({});
+  it('clears blank limits with null but preserves explicit zero for wallet and anonymous IP caps', () => {
+    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '', perAnonymousIpPerDay: '' })).toEqual({
+      perWalletPerDay: null,
+      perAnonymousIpPerDay: null,
+    });
+    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '9' })).toEqual({
+      perWalletPerDay: 9,
+      perAnonymousIpPerDay: null,
+    });
     expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '0', perAnonymousIpPerDay: '0' })).toEqual({
       perWalletPerDay: 0,
       perAnonymousIpPerDay: 0,

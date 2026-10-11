@@ -463,8 +463,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
   };
 
   if (isWorkerCanonical) {
-    const sessionEndsAt = normalizeSessionWizardEndsAt(resolvedDraft.sessionEndsAt);
-    if (sessionEndsAt) next.sessionEndsAt = sessionEndsAt;
+    // set-config merges fields, so a blank end time is sent as '' to clear one
+    // an earlier verification stored. Omitting it would keep the old time.
+    next.sessionEndsAt = normalizeSessionWizardEndsAt(resolvedDraft.sessionEndsAt);
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);
