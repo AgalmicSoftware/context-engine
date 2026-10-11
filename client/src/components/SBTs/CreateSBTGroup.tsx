@@ -168,10 +168,12 @@ import {
   getFetchableCreateSbtImageUrl,
   getCreateSbtValidGateIds,
   getMetadataFieldLockGateIds,
+  generateCreateSbtGroupPassphrase,
   generateCreateSbtInviteNonces,
   generateCreateSbtRandomHexString,
   hasUsableCreateSbtFactoryForChain,
   isPlainObject,
+  isShortCreateSbtGroupPassword,
   normalizeGateIds,
   normalizeCreateSbtMetadataLockGateIdsForValidGates,
   normalizeMetadataLockGateIds,
@@ -231,7 +233,6 @@ const getCreateSbtProgressIcon = (iconState: string) => {
   return faExclamationCircle;
 };
 type CreateSbtContractScripts = {
-  computeGroupPasswordHash: (input: unknown) => string;
   countSBTCreated: (provider: unknown, groupCfg?: unknown) => Promise<number> | number;
   createSBT: (...args: unknown[]) => Promise<unknown>;
   predictSBTAddress: (...args: unknown[]) => Promise<string>;
@@ -1402,6 +1403,8 @@ class CreateSBTGroup extends Component<any, any> {
   }
 
   componentDidUpdate(prevProps: Record<string, unknown>, prevState: CreateSbtLifecycleState): void {
+    // Runs before the early returns below so no update path can skip it.
+    this.maybePrefillGeneratedGroupPassword(prevState);
     const authoringContextChanged =
       this.props.network !== prevProps.network ||
       this.props.sessionConfigOverride !== prevProps.sessionConfigOverride ||
@@ -1556,12 +1559,39 @@ class CreateSBTGroup extends Component<any, any> {
 
   isDeferredDeployMode = (): boolean => !!this.props.deferredDeploy;
 
-  isPredictableAddressEnabled = (): boolean =>
+  isPredictableAddressConfigured = (): boolean =>
     resolveCreateSbtPredictableAddressActive({
       create2Salt: this.state.create2Salt,
       deferredDeployMode: this.isDeferredDeployMode(),
       predictableAddressEnabled: this.state.predictableAddressEnabled,
     });
+
+  // Group-password hashes are scoped to the SBT address, so that mode always deploys to a predicted address.
+  isPredictableAddressEnabled = (): boolean =>
+    this.state.sbtDistribution?.distributionOption === 'groupPassword' || this.isPredictableAddressConfigured();
+
+  maybePrefillGeneratedGroupPassword = (prevState: CreateSbtLifecycleState): void => {
+    const enteredGroupPassword =
+      prevState?.sbtDistribution?.distributionOption !== 'groupPassword' &&
+      this.state.sbtDistribution?.distributionOption === 'groupPassword';
+    if (enteredGroupPassword && !String(this.state.groupPassword || '').trim()) {
+      this.handleGenerateGroupPassword();
+    }
+  };
+
+  handleGenerateGroupPassword = (): void => {
+    this.setState({ groupPassword: generateCreateSbtGroupPassphrase(), groupPasswordWeakConfirmed: false });
+  };
+
+  // The v4 group password KDF takes up to a couple of seconds, so say so on the create button.
+  secureGroupPassword = async (password: string, sbtAddress: string): Promise<string> => {
+    this.setState({ groupPasswordSecuring: true });
+    try {
+      return await sbtGroupMintAuthorizationPort.computeGroupPasswordHash({ password, sbtAddress });
+    } finally {
+      this.setState({ groupPasswordSecuring: false });
+    }
+  };
 
   maybeClearAutoPredictableAddressForGroupPasswordExit = (prevState: CreateSbtLifecycleState): boolean => {
     const prevDistributionOption = prevState?.sbtDistribution?.distributionOption;
@@ -1585,7 +1615,7 @@ class CreateSBTGroup extends Component<any, any> {
     const entryPatch = buildCreateSbtGroupPasswordPredictableEntryPatch({
       autoSalt,
       isDeferredDeployMode: this.isDeferredDeployMode(),
-      isPredictableAddressEnabled: this.isPredictableAddressEnabled(),
+      isPredictableAddressEnabled: this.isPredictableAddressConfigured(),
       nextDistributionOption,
       prevDistributionOption,
     });
@@ -3218,10 +3248,7 @@ class CreateSBTGroup extends Component<any, any> {
     this._predictedAddressShapeSignature = predictionSignature;
 
     const finalGroupPasswordHash = deployShape.initializeGroupPasswordHash
-      ? createSbtContractScripts.computeGroupPasswordHash({
-          password: deployShape.groupPassword,
-          sbtAddress: predictedAddress,
-        })
+      ? await this.secureGroupPassword(deployShape.groupPassword, predictedAddress)
       : ethers.constants.HashZero;
 
     return {
@@ -3434,7 +3461,7 @@ class CreateSBTGroup extends Component<any, any> {
               sbtAddress,
               chainId: Number(groupCfg.networkChainId),
               nonces: Array.from({ length: limitedCount }, (_, index) => String(index + 1)),
-              walletScopeSbtAddress: deploymentExpectation ? sbtAddress : '',
+              groupPasswordHash: groupPasswordHashForCreate,
             })
           ).map(({ inviteCode }) => inviteCode)
         : finalPasswordList;
@@ -3597,6 +3624,14 @@ class CreateSBTGroup extends Component<any, any> {
       const gpNormalized = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPassword);
       if (!gpNormalized) {
         this.setState(buildCreateSbtErrorPatch({ error: 'Group password is required for group minting.' }));
+        return;
+      }
+      if (isShortCreateSbtGroupPassword(gpNormalized) && !this.state.groupPasswordWeakConfirmed) {
+        this.setState(
+          buildCreateSbtErrorPatch({
+            error: 'Confirm the short group password warning, or use a longer password, before creating.',
+          }),
+        );
         return;
       }
     }
@@ -3894,6 +3929,8 @@ class CreateSBTGroup extends Component<any, any> {
       documentURLs,
       startedMinting,
       groupPassword,
+      groupPasswordSecuring,
+      groupPasswordWeakConfirmed,
       shareableUrl,
       autoJoinUrl,
       openLockKey,
@@ -3977,14 +4014,16 @@ class CreateSBTGroup extends Component<any, any> {
       fieldSectionClassName: styles.fieldSection,
       metaCardClassName: styles.tokenInfoMetaCard,
     });
-    const primaryActionLabel = resolveCreateSbtPrimaryActionLabel({
-      createActionLabel,
-      currentStep,
-      deferredDeployMode,
-      mintedLabel: 'Created',
-      mintingLabel: 'Creating',
-      sbtMinted,
-    });
+    const primaryActionLabel = groupPasswordSecuring
+      ? 'Securing password…'
+      : resolveCreateSbtPrimaryActionLabel({
+          createActionLabel,
+          currentStep,
+          deferredDeployMode,
+          mintedLabel: 'Created',
+          mintingLabel: 'Creating',
+          sbtMinted,
+        });
     const primaryButtonState = resolveCreateSbtPrimaryButtonState({
       sbtMinted,
       startedMinting,
@@ -4321,8 +4360,13 @@ class CreateSBTGroup extends Component<any, any> {
               distributionOptions,
               actionDisplayState,
               groupPassword,
+              groupPasswordIsShort: isShortCreateSbtGroupPassword(
+                cryptoUtils.normalizeGroupPasswordInput(groupPassword),
+              ),
+              groupPasswordWeakConfirmed: groupPasswordWeakConfirmed === true,
               sbtDistribution,
               handleInputChange: this.handleInputChange,
+              onGenerateGroupPassword: this.handleGenerateGroupPassword,
             })}
         </div>
 

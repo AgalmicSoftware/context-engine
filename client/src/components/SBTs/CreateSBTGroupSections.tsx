@@ -7,7 +7,11 @@ import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildCreateSbtActiveClassName, resolveCreateSbtTooltipIconStyle } from './createSbtGroupHelpers';
+import {
+  buildCreateSbtActiveClassName,
+  CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH,
+  resolveCreateSbtTooltipIconStyle,
+} from './createSbtGroupHelpers';
 
 type CreateSbtDistributionState = Record<string, unknown> & {
   burnAdmin?: string;
@@ -312,16 +316,22 @@ type RenderCreateSbtDistributionOptionsSectionArgs = {
   distributionOptions: SelectableDistributionOptionConfig[];
   actionDisplayState: ActionDisplayState;
   groupPassword: string;
+  groupPasswordIsShort: boolean;
+  groupPasswordWeakConfirmed: boolean;
   sbtDistribution: CreateSbtDistributionState;
   handleInputChange: React.ChangeEventHandler<HTMLInputElement>;
+  onGenerateGroupPassword: () => void;
 };
 
 export const renderCreateSbtDistributionOptionsSection = ({
   distributionOptions,
   actionDisplayState,
   groupPassword,
+  groupPasswordIsShort,
+  groupPasswordWeakConfirmed,
   sbtDistribution,
   handleInputChange,
+  onGenerateGroupPassword,
 }: RenderCreateSbtDistributionOptionsSectionArgs) => (
   <div className={styles.distributionSection}>
     <div className={styles.distributionGrid}>
@@ -363,14 +373,43 @@ export const renderCreateSbtDistributionOptionsSection = ({
 
     {actionDisplayState.shouldRenderGroupPasswordInput && (
       <div className={styles.groupPasswordInputContainer}>
-        <input
-          type="text"
-          name="groupPassword"
-          value={groupPassword}
-          onChange={handleInputChange}
-          placeholder="Enter the group password"
-          className={styles.groupPasswordInput}
-        />
+        <div className={styles.groupPasswordRow}>
+          <input
+            type="text"
+            name="groupPassword"
+            value={groupPassword}
+            onChange={handleInputChange}
+            placeholder="Enter the group password"
+            aria-label="Group password"
+            className={styles.groupPasswordInput}
+            data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT}
+          />
+          <button
+            type="button"
+            onClick={onGenerateGroupPassword}
+            className={styles.exportButton}
+            data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE}
+          >
+            Generate new
+          </button>
+        </div>
+        {groupPasswordIsShort && (
+          <div className={styles.groupPasswordWarning} data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_WARNING}>
+            <p>
+              {`This group's password check is public on-chain, so a password shorter than ${CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH} characters can be guessed offline. Use the generated passphrase or a longer password.`}
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                name="groupPasswordWeakConfirmed"
+                checked={groupPasswordWeakConfirmed}
+                onChange={handleInputChange}
+                data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_CONFIRM}
+              />
+              <span>I understand a short password can be guessed offline.</span>
+            </label>
+          </div>
+        )}
       </div>
     )}
 

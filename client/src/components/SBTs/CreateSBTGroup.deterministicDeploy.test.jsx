@@ -63,7 +63,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
     const address = '0x00000000000000000000000000000000000000f1';
     instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
     jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(address);
-    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'11'.repeat(32)}`);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'11'.repeat(32)}`);
     jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
       logs: [makeFactoryReceiptLog('SBTCreated', [address])],
     });
@@ -78,6 +78,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
         sbtAddress: address,
         chainId: 84532,
         nonces: ['1', '2'],
+        groupPasswordHash: `0x${'11'.repeat(32)}`,
       }),
     );
     expect(instance.state.passwordList).toEqual(['signed-slot-one', 'signed-slot-two']);
@@ -109,7 +110,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
     const predictedAddress = '0x00000000000000000000000000000000000000f1';
     const deterministicSymbol = `CE-SBT-${ethers.utils.id('deterministic-salt').slice(2, 8).toUpperCase()}`;
     jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(predictedAddress);
-    const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'11'.repeat(32)}`);
+    const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'11'.repeat(32)}`);
     const createSpy = jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
       logs: [
         makeFactoryReceiptLog('SBTCreatedDeterministic', [predictedAddress, ethers.utils.id('deterministic-salt')]),
@@ -289,7 +290,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
 
     const freshPredictedAddress = '0x00000000000000000000000000000000000000e5';
     const predictSpy = jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(freshPredictedAddress);
-    const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'55'.repeat(32)}`);
+    const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'55'.repeat(32)}`);
 
     const payload = await instance.buildDeferredDraftPayload();
 
@@ -333,7 +334,7 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
       instance.buildPredictableDeployShape(),
     );
     const predictSpy = jest.spyOn(contractScripts, 'predictSBTAddress');
-    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'44'.repeat(32)}`);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'44'.repeat(32)}`);
 
     const payload = await instance.buildDeferredDraftPayload();
 

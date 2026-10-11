@@ -1,9 +1,13 @@
+import { ethers } from 'ethers';
 import {
   buildCreateSbtDeferredDraftCreate2Salt,
   buildCreateSbtInviteLinks,
   buildCreateSbtPasswordExportFile,
+  CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH,
+  generateCreateSbtGroupPassphrase,
   generateCreateSbtInviteNonces,
   generateCreateSbtRandomHexString,
+  isShortCreateSbtGroupPassword,
   resolveCreateSbtInviteCodeList,
   resolveCreateSbtPasswordGenerationCount,
   resolveCreateSbtPredictablePasswordListDecision,
@@ -228,5 +232,53 @@ describe('createSbtGroupPasswordHelpers', () => {
         randomBytes: () => new Uint8Array(12).fill(9),
       }),
     ).toEqual([]);
+  });
+
+  it('generates five hyphen-joined BIP-39 words from the low 11 bits of each random value', () => {
+    const wordlist = ethers.wordlists.en;
+    const getRandomValues = jest.fn((array: Uint16Array) => {
+      array.set([0, 2047, 2048, 65535, 4097]);
+      return array;
+    });
+
+    expect(generateCreateSbtGroupPassphrase(getRandomValues)).toBe(
+      [0, 2047, 0, 2047, 1].map((index) => wordlist.getWord(index)).join('-'),
+    );
+    expect(getRandomValues).toHaveBeenCalledWith(expect.any(Uint16Array));
+    expect(getRandomValues.mock.calls[0][0]).toHaveLength(5);
+  });
+
+  it('draws passphrase words from crypto.getRandomValues by default', () => {
+    const spy = jest.spyOn(globalThis.crypto, 'getRandomValues');
+    try {
+      const words = generateCreateSbtGroupPassphrase().split('-');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(words).toHaveLength(5);
+      words.forEach((word) => expect(ethers.wordlists.en.getWordIndex(word)).toBeGreaterThanOrEqual(0));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('never flags a generated passphrase as short, even from the shortest words', () => {
+    const wordlist = ethers.wordlists.en;
+    let shortestIndex = 0;
+    for (let index = 1; index < 2048; index += 1) {
+      if (wordlist.getWord(index).length < wordlist.getWord(shortestIndex).length) shortestIndex = index;
+    }
+    const passphrase = generateCreateSbtGroupPassphrase((array) => array.fill(shortestIndex));
+
+    expect(passphrase.length).toBeGreaterThanOrEqual(CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH);
+    expect(isShortCreateSbtGroupPassword(passphrase)).toBe(false);
+  });
+
+  it('flags custom passwords shorter than the minimum length', () => {
+    expect(CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH).toBe(16);
+    expect(isShortCreateSbtGroupPassword('')).toBe(false);
+    expect(isShortCreateSbtGroupPassword('a'.repeat(15))).toBe(true);
+    expect(isShortCreateSbtGroupPassword('a'.repeat(16))).toBe(false);
+    // Counts characters, not UTF-16 code units.
+    expect(isShortCreateSbtGroupPassword('\u{1F642}'.repeat(15))).toBe(true);
   });
 });
