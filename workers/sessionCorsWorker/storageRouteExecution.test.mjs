@@ -172,12 +172,22 @@ const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 					...coordinatorDeps,
 				});
 				instances.set(id, {
+					values,
 					fetch: (input, init) => coordinator.fetch(input instanceof Request ? input : new Request(input, init)),
 				});
 			}
 			return instances.get(id);
 		},
+		instances,
 	};
+};
+
+// A value any test coordinator instance has stored under this key.
+const readCoordinatorValue = (env, key) => {
+	for (const instance of env.CE_SESSION_COORDINATOR.instances.values()) {
+		if (instance.values.has(key)) return structuredClone(instance.values.get(key));
+	}
+	return undefined;
 };
 
 const readStorageIndexMetadata = async (kv, slug, resource, id) => JSON.parse(await kv.get(`ce-storage:${slug}:${resource}:${id}`));
@@ -4508,6 +4518,48 @@ test('the legacy owner scan advances in bounded steps and keeps its progress', a
 	// Progress is kept: every legacy row is read once in total.
 	assert.equal(reads.rows, 30);
 	assert.equal(reads.payloads, 30);
+});
+
+test('a payload read error fails the legacy scan step instead of skipping the id', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const legacyIds = ['0xl1', '0xl2', '0xl3'];
+	const stored = [];
+	for (const id of legacyIds) stored.push((await upload(OWNERSHIP_ADMIN, ownedQuestion('Legacy?', id))).body.id);
+	makeLegacyOwnedRows(kv, 'questions', legacyIds);
+	attachSessionCoordinator(common.env, () => {});
+	// One transient failure reading the second row's payload.
+	const failing = `ce-storage-payload:session-a:${stored[1]}`;
+	const get = kv.get.bind(kv);
+	let failed = false;
+	kv.get = async (key) => {
+		if (key === failing && !failed) {
+			failed = true;
+			throw new Error('KV GET failed: 500 Internal Server Error');
+		}
+		return get(key);
+	};
+	// Each upload tries a few steps; the failed step is retried from the same place.
+	const result = await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'));
+	assert.equal(failed, true);
+	assert.equal(result.status, 503);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'))).status, 200);
+	for (const id of legacyIds) {
+		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Claim', id))).status, 409, id);
+	}
+});
+
+test('the legacy scan skips and counts a row whose payload is gone', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const stored = [];
+	for (const id of ['0xl1', '0xl2']) stored.push((await upload(OWNERSHIP_ADMIN, ownedQuestion('Legacy?', id))).body.id);
+	makeLegacyOwnedRows(kv, 'questions', ['0xl1', '0xl2']);
+	kv.store.delete(`ce-storage-payload:session-a:${stored[0]}`);
+	attachSessionCoordinator(common.env, () => {});
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Claim', '0xl2'))).status, 409);
+	const scan = readCoordinatorValue(common.env, 'storage-legacy-scan:questions');
+	assert.equal(scan.done, true);
+	assert.equal(scan.skippedRows, 1);
 });
 
 test('admins hide a question id without deleting it, and unhide restores it', async () => {

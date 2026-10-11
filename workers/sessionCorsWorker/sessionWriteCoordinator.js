@@ -396,11 +396,13 @@ export class SessionWriteCoordinator {
       }
       await this.state.storage.transaction(async (transaction) => {
         for (const id of step.ids) await transaction.put(ownerKey(id), true);
+        // Rows skipped because their payload is gone or unreadable by design.
         await transaction.put(scanKey, {
           version: 1,
           cursor: step.cursor,
           lastKey: step.lastKey,
           done: step.done === true,
+          skippedRows: (Number(scan?.skippedRows) || 0) + (Number(step.skippedRows) || 0),
           updatedAtMs: Number(this.now()) || Date.now(),
         });
       });

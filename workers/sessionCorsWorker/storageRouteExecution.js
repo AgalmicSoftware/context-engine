@@ -141,10 +141,19 @@ const normalizeGroupIdList = (value) => {
   const source = Array.isArray(raw) ? raw : [raw];
   return Array.from(new Set(source.map(safeGroupId).filter(Boolean)));
 };
-const readKvPayloadEnvelope = async ({ index, slug, id }) => {
+// A storage error reads as a missing payload unless strict, which lets it
+// propagate so a caller can retry instead of treating the payload as gone.
+const readKvPayloadEnvelope = async ({ index, slug, id, strict = false }) => {
   if (!index || typeof index.get !== 'function') return null;
+  let raw;
   try {
-    const envelope = JSON.parse(await index.get(buildPayloadKey({ slug, id })) || 'null');
+    raw = await index.get(buildPayloadKey({ slug, id }));
+  } catch (error) {
+    if (strict) throw error;
+    return null;
+  }
+  try {
+    const envelope = JSON.parse(raw || 'null');
     return envelope && isObj(envelope?.metadata) ? envelope : null;
   } catch {
     return null;
@@ -1951,7 +1960,7 @@ export const listCloudflareMetadataRows = async ({ index, slug, resource = '' })
   return rows;
 };
 
-export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
+export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false }) => {
   const id = trim(metadata?.id);
   if (!id) return null;
   const r2 = getStorageR2Binding(env);
@@ -1959,9 +1968,15 @@ export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metad
     const object = await r2.get(buildObjectKey({ slug, id }));
     if (object) return toUint8Array(object);
   }
-  const envelope = await readKvPayloadEnvelope({ index, slug, id });
-  if (envelope?.payloadBase64url) return base64urlToBytes(envelope.payloadBase64url);
-  return null;
+  const envelope = await readKvPayloadEnvelope({ index, slug, id, strict });
+  if (!envelope?.payloadBase64url) return null;
+  if (!strict) return base64urlToBytes(envelope.payloadBase64url);
+  // Strict reads fail only on storage errors; a malformed payload is no payload.
+  try {
+    return base64urlToBytes(envelope.payloadBase64url);
+  } catch {
+    return null;
+  }
 };
 
 const readStoredPayloadJson = async ({ env, index, slug, config, metadata, deps }) => {
@@ -1992,6 +2007,30 @@ const readIndexRowResourceId = async ({ env, index, slug, config, resource, row,
   return isStorageResourceId(resourceId) ? resourceId : '';
 };
 
+// The id of a row the legacy-owner scan reads. A storage error propagates, so
+// the step fails and is retried from the same place rather than skipping an
+// id for good. A payload that is gone, or that the Worker cannot read by
+// design (client-encrypted, undecryptable, or not JSON), has no id to find.
+const readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
+  const recorded = normalizeAddress(metadata.resourceId);
+  if (recorded) return recorded;
+  if (metadata.encrypted === true && !isObj(metadata.envelope)) return '';
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
+  if (!bytes) return '';
+  try {
+    if (isObj(metadata.envelope)) {
+      bytes = await decryptPayloadWithStorageEnvelope({
+        env, config, slug, payloadId: trim(metadata.id), ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+      });
+    }
+    const payload = JSON.parse(decoder.decode(await toUint8Array(bytes)));
+    const resourceId = isObj(payload) ? readStoragePayloadResourceId(resource, payload) : '';
+    return isStorageResourceId(resourceId) ? resourceId : '';
+  } catch {
+    return '';
+  }
+};
+
 // Questions and surveys stored before first-writer records existed have no
 // owner, so the first upload of such an id after an update would claim it.
 // The ids of rows without a recorded uploader are admin-only instead. This is
@@ -2009,6 +2048,7 @@ export const scanLegacyStorageOwnerIds = async ({
   const prefix = buildIndexPrefix({ slug, resource });
   const ids = new Set();
   let rows = 0;
+  let skippedRows = 0;
   let pageCursor = trim(cursor);
   let after = trim(lastKey);
   for (;;) {
@@ -2021,7 +2061,7 @@ export const scanLegacyStorageOwnerIds = async ({
       .filter((name) => name && (!after || name > after))
       .sort();
     for (const name of names) {
-      if (rows >= maxRows) return { ids: [...ids], cursor: pageCursor, lastKey: after, done: false };
+      if (rows >= maxRows) return { ids: [...ids], skippedRows, cursor: pageCursor, lastKey: after, done: false };
       rows += 1;
       after = name;
       const raw = await index.get(name);
@@ -2032,10 +2072,11 @@ export const scanLegacyStorageOwnerIds = async ({
         continue;
       }
       if (!isObj(metadata) || !trim(metadata.id) || normalizeAddress(metadata.uploader)) continue;
-      const resourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row: { key: name, metadata }, deps });
+      const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
       if (resourceId) ids.add(resourceId);
+      else skippedRows += 1;
     }
-    if (!nextCursor) return { ids: [...ids], cursor: '', lastKey: '', done: true };
+    if (!nextCursor) return { ids: [...ids], skippedRows, cursor: '', lastKey: '', done: true };
     pageCursor = nextCursor;
     after = '';
   }
