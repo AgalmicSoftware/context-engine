@@ -6,6 +6,10 @@ export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v202
 // every load reloads at most once per window instead of looping.
 export const STALE_CHUNK_RELOAD_AT_STORAGE_KEY = 'ce:staleChunkReloadAt:v20261011';
 export const STALE_CHUNK_RELOAD_WINDOW_MS = 60_000;
+// Failures that already caused an automatic reload in this tab. One that comes back,
+// for example a chunk a content blocker always blocks, shows the error panel instead.
+const STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY = 'ce:staleChunkReloadedFailures:v20261011';
+const MAX_REMEMBERED_RELOAD_FAILURES = 20;
 
 type BootStorage = {
   clear?: () => void;
@@ -175,6 +179,18 @@ export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window)
   return reloadTimeStored ? clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM) : false;
 };
 
+const describeReloadFailure = (error: unknown): string =>
+  (readErrorField(error, 'message') || String(error || '')).trim().slice(0, 500);
+
+const readReloadedFailures = (storage: BootStorage | undefined): string[] => {
+  try {
+    const failures: unknown = JSON.parse(storage?.getItem?.(STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY) || '[]');
+    return Array.isArray(failures) ? failures.filter((failure): failure is string => typeof failure === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
 const wasRecentlyAutoReloaded = (storage: BootStorage | undefined, storageKey: string, now: number): boolean => {
   try {
     if (storage?.getItem?.(storageKey) === 'true') return true;
@@ -201,15 +217,25 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
   const now = Date.now();
 
-  // Regression guard: at most one automatic reload per window, even after a route
-  // commits; within it the error boundary stays up and "Try again" reloads by hand.
-  if (hasReloadParam(win, reloadParam) || wasRecentlyAutoReloaded(storage, storageKey, now)) {
+  // Regression guard: at most one automatic reload per window, and never twice in a tab
+  // for the same failure; otherwise the error boundary stays up and reloads on request.
+  const failure = describeReloadFailure(error);
+  const reloadedFailures = readReloadedFailures(storage);
+  if (
+    hasReloadParam(win, reloadParam) ||
+    wasRecentlyAutoReloaded(storage, storageKey, now) ||
+    reloadedFailures.includes(failure)
+  ) {
     return false;
   }
 
   try {
     storage?.setItem?.(storageKey, 'true');
     storage?.setItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY, String(now));
+    storage?.setItem?.(
+      STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY,
+      JSON.stringify([...reloadedFailures, failure].slice(-MAX_REMEMBERED_RELOAD_FAILURES)),
+    );
   } catch {
     // Best-effort loop guard; reloadWithCacheBuster also marks the URL.
   }

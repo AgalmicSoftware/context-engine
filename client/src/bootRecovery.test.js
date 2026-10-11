@@ -282,21 +282,48 @@ describe('bootRecovery', () => {
       location: { href: 'https://app.example.test/session/alpha' },
       sessionStorage: storage,
     };
-    const recover = () =>
-      recoverFromStaleChunkLoadError(new TypeError('Failed to fetch dynamically imported module'), {
-        window: fakeWindow,
-        storage,
-        reload,
-      });
+    const recover = (chunk) =>
+      recoverFromStaleChunkLoadError(
+        new TypeError(`Failed to fetch dynamically imported module: https://app.example.test/assets/${chunk}.js`),
+        { window: fakeWindow, storage, reload },
+      );
 
     try {
-      expect(recover()).toBe(true);
-      // The reloaded page commits its route, then the same chunk fails again.
+      expect(recover('First-1')).toBe(true);
+      // The reloaded page commits its route, then another chunk fails.
       clearStaleChunkReloadMarker(fakeWindow);
       now.mockReturnValue(1_000_000 + STALE_CHUNK_RELOAD_WINDOW_MS - 1);
-      expect(recover()).toBe(false);
+      expect(recover('Second-2')).toBe(false);
       now.mockReturnValue(1_000_000 + STALE_CHUNK_RELOAD_WINDOW_MS);
-      expect(recover()).toBe(true);
+      expect(recover('Second-2')).toBe(true);
+      expect(reload).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('never reloads automatically twice in one tab for the same failure', () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const reload = jest.fn();
+    const storage = createMemoryStorage();
+    const fakeWindow = {
+      history: { replaceState: jest.fn() },
+      location: { href: 'https://app.example.test/session/alpha' },
+      sessionStorage: storage,
+    };
+    const recover = (message) =>
+      recoverFromStaleChunkLoadError(new TypeError(message), { window: fakeWindow, storage, reload });
+    const blocked = 'Failed to fetch dynamically imported module: https://app.example.test/assets/Blocked-1.js';
+
+    try {
+      expect(recover(blocked)).toBe(true);
+      clearStaleChunkReloadMarker(fakeWindow);
+      // Long after the window, a content blocker keeps failing the same chunk.
+      now.mockReturnValue(1_000_000 + 10 * STALE_CHUNK_RELOAD_WINDOW_MS);
+      expect(recover(blocked)).toBe(false);
+      expect(recover('Failed to fetch dynamically imported module: https://app.example.test/assets/Other-2.js')).toBe(
+        true,
+      );
       expect(reload).toHaveBeenCalledTimes(2);
     } finally {
       now.mockRestore();
