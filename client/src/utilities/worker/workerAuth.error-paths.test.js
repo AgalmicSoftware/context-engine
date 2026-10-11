@@ -149,8 +149,9 @@ describe('error paths', () => {
       'Worker login did not return a token.',
     );
 
+    // The nonce and login requests prove the persisted bearer was ignored. Token reads
+    // stay memory-only; start-up and token writes purge legacy storage records.
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(localStorage.getItem(cacheKey)).toBeNull();
   });
 
   it('treats malformed nonce responses as controlled failures instead of crashing', async () => {

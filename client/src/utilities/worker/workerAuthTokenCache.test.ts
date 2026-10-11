@@ -22,6 +22,15 @@ describe('workerAuthTokenCache', () => {
     }
   });
 
+  it('purges a legacy persisted record when a token for that key is cached', () => {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ token: 'persisted-token' }));
+
+    writeTokenCache(CACHE_KEY, { token: 'memory-token' });
+
+    expect(localStorage.getItem(CACHE_KEY)).toBeNull();
+    expect(readTokenCache(CACHE_KEY)).toEqual({ token: 'memory-token' });
+  });
+
   it('never treats a record persisted by an older tab as a cached token', () => {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ token: 'persisted-token' }));
 
