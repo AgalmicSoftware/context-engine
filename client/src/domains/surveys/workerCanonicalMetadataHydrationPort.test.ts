@@ -790,6 +790,67 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         expect(hidden(question())).toBe(false);
       });
 
+      it('ignores a placeholder question built from a response payload', async () => {
+        // An attacker owns the id with a row readers drop (another session), then
+        // answers it with the predicted prompt, so responses alone describe it.
+        const responseCache = mergeWorkerQuestionResponses(
+          null,
+          [
+            {
+              questionId: QUESTION_ID,
+              responder: ATTACKER,
+              response: { questionID: QUESTION_ID, prompt: PROMPT, type: 'binary', answer: { value: 'yes' } },
+              storageRefId: 'cf_response',
+              timestamp: 1,
+            },
+          ],
+          'worker-session',
+          identity,
+        ) as any;
+        expect(responseCache.worker.questions[QUESTION_ID].source).toBe('worker-response-payload');
+        (peekCacheSync as jest.Mock).mockReturnValue(responseCache);
+
+        const matches = await loadMatcher([listedItem('cf_squat', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_squat: question({ sessionSlug: 'elsewhere' }),
+        });
+        expect(matches(question())).toBe(false);
+      });
+
+      it('needs the exact authoring inputs, not only the same id hash', async () => {
+        const variants: Array<Record<string, unknown>> = [
+          { prompt: `  ${PROMPT.toUpperCase()}  ` },
+          { options: ['Yes, obviously', 'No'] },
+          { singleSelect: true },
+          { voiceCredits: 5 },
+        ];
+        for (const variant of variants) {
+          const matches = await loadMatcher([listedItem('cf_variant', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+            cf_variant: question(variant),
+          });
+          expect(matches(question())).toBe(false);
+        }
+
+        // Multichoice options are joined with commas in the hash, so a re-split
+        // list shares the id but is a different question.
+        const MULTI_PROMPT = 'Which budget?';
+        const realOptions = ['$1,000', '$2,000'];
+        const splitOptions = ['$1', '000', '$2', '000'];
+        const multiId = String(generateQuestionId('multichoice', MULTI_PROMPT, realOptions, false, 99)).toLowerCase();
+        expect(String(generateQuestionId('multichoice', MULTI_PROMPT, splitOptions, false, 99)).toLowerCase()).toBe(
+          multiId,
+        );
+        const multi = (options: string[]) =>
+          question({ id: multiId, type: 'multichoice', prompt: MULTI_PROMPT, options });
+        const resplit = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_multi: multi(splitOptions),
+        });
+        expect(resplit(multi(realOptions))).toBe(false);
+        const same = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_multi: multi(realOptions),
+        });
+        expect(same(multi(realOptions))).toBe(true);
+      });
+
       it('uses the cached copy of a version it does not read again', async () => {
         const cached = mergeWorkerCanonicalQuestionMetadata(
           null,

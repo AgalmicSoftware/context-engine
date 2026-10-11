@@ -550,10 +550,23 @@ export const loadWorkerCanonicalSurveys = (
   deps: WorkerCanonicalMetadataHydrationDeps = {},
 ): Promise<WorkerCanonicalMetadataEntry[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.SURVEYS, input, deps);
 
+// The authoring inputs a question id is hashed from, compared exactly: the
+// hash trims and lowercases the prompt, skips options for most types and joins
+// multichoice options with commas, so equal ids can hide different questions.
+const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
+  JSON.stringify([
+    payload.type,
+    payload.prompt,
+    Array.isArray(payload.options) ? payload.options : [],
+    !!(payload.singleSelect || payload.oneSelectionOnly),
+    payload.voiceCredits ?? 99,
+  ]);
+
 // Loads the session's questions once and returns a check for whether readers
-// already see a given question under its id: the version that wins there has
-// the same content, so both it and the question hash to that id. Locked or
-// unknown questions never match.
+// already see a given question under its id: a stored Worker version won that
+// id and has exactly the same authoring inputs. Response hydration also writes
+// placeholder questions from responders' payloads; those have no stored version
+// and never match. Locked or unknown questions never match either.
 export const loadWorkerCanonicalQuestionMatcher = async (
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
@@ -574,13 +587,18 @@ export const loadWorkerCanonicalQuestionMatcher = async (
   });
   const node = mergeWorkerCanonicalQuestionMetadata(cache, rows, identity)[WORKER_CANONICAL_CACHE_SCOPE_KEY];
   const questions = isRecord(node) && isRecord(node.questions) ? node.questions : {};
+  const refs =
+    isRecord(node) && isRecord(node[METADATA_REFS_FIELDS[STORAGE_RESOURCE_KEYS.QUESTIONS]])
+      ? (node[METADATA_REFS_FIELDS[STORAGE_RESOURCE_KEYS.QUESTIONS]] as UnknownRecord)
+      : {};
   return (question) => {
     const id = readPayloadResourceId(question, STORAGE_RESOURCE_KEYS.QUESTIONS);
     const stored = id ? questions[id] : null;
     return (
+      isRecord(refs[id]) &&
       isRecord(stored) &&
       questionPayloadMatchesId(id, question) === true &&
-      questionPayloadMatchesId(id, stored) === true
+      readQuestionAuthoringInputs(stored) === readQuestionAuthoringInputs(question)
     );
   };
 };
