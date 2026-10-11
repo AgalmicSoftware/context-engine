@@ -1,6 +1,6 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
-import { hasDemoAnalysisFixture, hasSimulatedDemoResponses, resolveDemoPolisDataset } from './demoPolisDatasets';
+import { resolveDemoPolisDataset } from './demoPolisDatasets';
 
 const LEGACY_DEMO_SLUGS = ['demo', 'demo-1', 'demo-3', 'demo-sh'];
 
@@ -18,21 +18,6 @@ describe('demoPolisDatasets', () => {
     const customFallback = { source: 'custom' };
     expect(resolveDemoPolisDataset('unknown-demo', customFallback)).toBe(customFallback);
     expect(resolveDemoPolisDataset('', customFallback)).toBe(customFallback);
-  });
-
-  it('keeps typed simulated responses exclusive to demo-2', () => {
-    expect(hasSimulatedDemoResponses('demo-2')).toBe(true);
-    [...LEGACY_DEMO_SLUGS, 'unknown-demo'].forEach((slug) => {
-      expect(hasSimulatedDemoResponses(slug)).toBe(false);
-    });
-  });
-
-  it('uses the legacy analysis fixture for legacy slugs but not demo-2', () => {
-    LEGACY_DEMO_SLUGS.forEach((slug) => {
-      expect(hasDemoAnalysisFixture(slug)).toBe(true);
-    });
-    expect(hasDemoAnalysisFixture('demo-2')).toBe(false);
-    expect(hasDemoAnalysisFixture('unknown-demo')).toBe(false);
   });
 });
 

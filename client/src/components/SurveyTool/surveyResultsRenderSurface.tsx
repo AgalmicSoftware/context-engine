@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets.js';
+import { hasDemoAnalysisFixture } from '../../utilities/demo/demoFixtureSessionSlugs';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   SurveyResultsLockedResponsesBanner,

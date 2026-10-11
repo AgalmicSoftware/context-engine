@@ -15,6 +15,7 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
+import * as demoSessionFixtureLoader from '../SurveyTool/demoSessionFixtureLoader';
 import { captureSessionRecruitmentSource, readSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
 import { writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -878,6 +879,27 @@ describe('OnePageSession view gating', () => {
       }),
     );
     expect(questionResponses).toEqual({});
+  });
+
+  it('loads the demo fixtures for demo sessions and never for other sessions', async () => {
+    const loadSpy = jest.spyOn(demoSessionFixtureLoader, 'loadDemoSessionFixtures');
+    try {
+      const view = render(<OnePageSession {...buildProps()} slug="edge" />);
+      expect(loadSpy).not.toHaveBeenCalled();
+      view.unmount();
+
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo-2"
+          questionSessionSlug="demo-2"
+          sessionConfig={{ ...buildProps().sessionConfig, slug: 'demo-2' }}
+        />,
+      );
+      await waitFor(() => expect(demoSessionFixtureLoader.getLoadedDemoSessionFixtures()).not.toBeNull());
+    } finally {
+      loadSpy.mockRestore();
+    }
   });
 
   it('builds built-in demo live report responses only from the demo source bucket', async () => {

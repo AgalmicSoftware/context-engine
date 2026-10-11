@@ -1,5 +1,6 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsCacheQuestion, SurveyQuestionsRecord } from './surveyQuestionsInstanceFields';
+import { hasDemoQuestionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
 
 export type SurveyQuestionsDataRuntime = SurveyQuestionsLegacyRecord;
 
@@ -37,11 +38,11 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
     executeViewedSingleQuestionResponseBootstrap,
     fetchSingleQuestionMetadataCandidates,
     getBlockedQuestionIdsSet,
-    getTemporaryDemoSessionQuestionFixtures,
     inst,
     invalidateResponseHydrationRuns,
     isMaskedQuestionPayload,
     isPendingQuestionMetadataPlaceholder,
+    loadTemporaryDemoSessionQuestionFixtures,
     mergeDecryptedViewedResponse,
     normalizeQuestionIdKey,
     normalizeSessionSlugValue,
@@ -231,7 +232,12 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
     let temporaryDemoFixtureSlug: SurveyQuestionsLegacyValue = '';
     let temporaryDemoFixtureQuestions: SurveyQuestionsLegacyValue[] = [];
     for (const candidateSlug of temporaryDemoSlugCandidates) {
-      const candidateQuestions = getTemporaryDemoSessionQuestionFixtures(candidateSlug, temporaryDemoSessionConfig);
+      // Only demo slugs load the fixtures, in their own chunk; other sessions skip the await.
+      if (!hasDemoQuestionFixtures(candidateSlug)) continue;
+      const candidateQuestions: SurveyQuestionsLegacyValue[] = await loadTemporaryDemoSessionQuestionFixtures(
+        candidateSlug,
+        temporaryDemoSessionConfig,
+      );
       if (!candidateQuestions.length) continue;
       temporaryDemoFixtureSlug = normalizeSessionSlugValue(candidateSlug);
       temporaryDemoFixtureQuestions = candidateQuestions;

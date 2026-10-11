@@ -17,7 +17,13 @@ import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
 import { captureSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
-import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
+import {
+  getLoadedDemoSessionFixtures,
+  loadDemoSessionFixtures,
+  resolveLoadedPolisDemoQuestionPool,
+  shouldUseBuiltInPolisDemoQuestionPool,
+} from '../SurveyTool/demoSessionFixtureLoader';
+import { usesDemoSessionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
@@ -223,6 +229,8 @@ class OnePageSession extends Component<any, any> {
     }
 
     this.state = {
+      // Demo sessions render from fixtures that load on demand.
+      demoFixturesLoaded: !!getLoadedDemoSessionFixtures(),
       // Core UI sections
       showQuestions: routeUiState.showQuestions,
       showGroups: false,
@@ -424,9 +432,32 @@ class OnePageSession extends Component<any, any> {
     this.scheduleGeneratedResultsViewerRefresh();
 
     this.bootstrapTelegramSession();
+    this.ensureDemoSessionFixtures();
+  }
+
+  // Loads the demo fixtures only for a demo session; the state flip rebuilds
+  // the results and re-renders the demo question pool.
+  ensureDemoSessionFixtures(propsIn: any = this.props) {
+    if (this.state.demoFixturesLoaded) return;
+    const displaySlug = resolveEffectiveSlug(propsIn);
+    const sourceSlug = resolveOnePageSessionSurveySlug(propsIn);
+    const pathname = typeof window !== 'undefined' ? window.location?.pathname : '';
+    if (
+      !usesDemoSessionFixtures(displaySlug, sourceSlug) &&
+      !shouldUseBuiltInPolisDemoQuestionPool({ displaySlug, sourceSlug, pathname })
+    ) {
+      return;
+    }
+    loadDemoSessionFixtures().then(
+      () => {
+        if (!this._demoFixturesDisposed) this.setState({ demoFixturesLoaded: true });
+      },
+      (error: unknown) => demoLog.warn('OnePageSession: demo fixtures failed to load', error),
+    );
   }
 
   componentWillUnmount() {
+    this._demoFixturesDisposed = true;
     this.disposeTelegramActions();
     this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
@@ -467,6 +498,7 @@ class OnePageSession extends Component<any, any> {
       props.isQuestionCacheReady ? 1 : 0,
       props.isResponsesCacheReady ? 1 : 0,
       Number(props.questionResponsesNonce || 0),
+      state.demoFixturesLoaded ? 1 : 0,
     ].join('|');
   }
 
@@ -645,6 +677,7 @@ class OnePageSession extends Component<any, any> {
     const slugChanged = prevSlug !== nextSlug;
     if (slugChanged) {
       captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
+      this.ensureDemoSessionFixtures();
     }
     const telegramTargetChanged =
       getAgentClientLoginEnvelopeMemoryKey(
@@ -979,7 +1012,7 @@ class OnePageSession extends Component<any, any> {
           questionSourceSlug,
           readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug),
           resolveQuestionPool: (candidateDisplaySlug, candidateSourceSlug) =>
-            resolvePolisDemoQuestionPool({ displaySlug: candidateDisplaySlug, sourceSlug: candidateSourceSlug }),
+            resolveLoadedPolisDemoQuestionPool({ displaySlug: candidateDisplaySlug, sourceSlug: candidateSourceSlug }),
           workerCacheIdentity,
           writeQuestionsCache: (candidateSlug, cache) => void writeCache('questionsCache', candidateSlug, cache),
         });
@@ -2250,7 +2283,7 @@ class OnePageSession extends Component<any, any> {
     // Only show demo-specific result surfaces on configured public demo sessions.
     const isDemoSlug = isDemoSessionSlug(effectiveSlug);
     const displaySessionSlug = normalizeOnePageSessionSlug(effectiveSlug || slug);
-    const demoQuestionPool = resolvePolisDemoQuestionPool({
+    const demoQuestionPool = resolveLoadedPolisDemoQuestionPool({
       displaySlug: displaySessionSlug,
       sourceSlug: surveySessionSlug,
     });

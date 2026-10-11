@@ -1,5 +1,6 @@
 // Demo Polis fixture selection stays centralized here so session and results
-// surfaces agree on which slugs use generated data and analysis overlays.
+// surfaces agree on which slugs use generated data. The slug checks live in
+// demoFixtureSessionSlugs, so callers can test a slug without loading the data.
 
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
@@ -13,20 +14,7 @@ const DEMO_POLIS_DATASETS_BY_SLUG: Readonly<Record<string, unknown>> = Object.fr
   'demo-sh': demoPolisData,
 });
 
-const DEMO_SIMULATED_RESPONSE_SLUGS = Object.freeze(['demo-2']);
-
-// The checked-in Breakdown fixture is derived from the legacy demo dataset.
-// demo-2's Polis cluster summaries are separate; keep Breakdown hidden until
-// demo-2 has a matching Breakdown fixture.
-const DEMO_ANALYSIS_FIXTURE_SLUGS = Object.freeze(['demo', 'demo-1', 'demo-3', 'demo-sh']);
-
 export const resolveDemoPolisDataset = (slugIn: unknown, fallback: unknown = demoPolisData): unknown => {
   const slug = normalizeSessionSlug(slugIn);
   return DEMO_POLIS_DATASETS_BY_SLUG[slug] || fallback;
 };
-
-export const hasSimulatedDemoResponses = (slugIn: unknown): boolean =>
-  DEMO_SIMULATED_RESPONSE_SLUGS.includes(normalizeSessionSlug(slugIn));
-
-export const hasDemoAnalysisFixture = (slugIn: unknown): boolean =>
-  DEMO_ANALYSIS_FIXTURE_SLUGS.includes(normalizeSessionSlug(slugIn));

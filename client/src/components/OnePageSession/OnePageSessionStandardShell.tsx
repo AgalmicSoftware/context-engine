@@ -18,7 +18,7 @@ import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets';
+import { hasDemoAnalysisFixture } from '../../utilities/demo/demoFixtureSessionSlugs';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
