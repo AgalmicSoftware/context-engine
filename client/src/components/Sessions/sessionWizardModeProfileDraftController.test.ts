@@ -9,9 +9,10 @@ import {
 } from './sessionWizardModeProfileDraftController';
 
 describe('sessionWizardModeProfileDraftController', () => {
-  it('keeps session mode profile synchronized with Cloudflare Lit storage changes', () => {
+  it('changes only the storage profile', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const prev = {
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      sessionModeProfile,
       storageProfile: { backend: 'arweave' },
     };
 
@@ -24,13 +25,7 @@ describe('sessionWizardModeProfileDraftController', () => {
       backend: 'cloudflare',
       payloadAccessControl: { mode: 'lit_encrypted' },
     });
-    expect(next.sessionModeProfile).toMatchObject({
-      preset: 'custom',
-      storage: { backend: 'cloudflare' },
-      authority: { mode: 'worker_canonical' },
-      encryption: { mode: 'lit' },
-      surfaces: { web: true },
-    });
+    expect(next.sessionModeProfile).toEqual(sessionModeProfile);
     expect(prev.storageProfile).toEqual({ backend: 'arweave' });
   });
 

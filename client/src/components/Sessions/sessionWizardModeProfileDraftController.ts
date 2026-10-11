@@ -1,6 +1,5 @@
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import type { UnknownRecord } from '../../utilities/session/sessionTypes';
-import { toStr } from '../../utilities/shared/primitives.js';
 import { deepClone } from './sessionWizardCoreUtils';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import {
@@ -33,35 +32,15 @@ type DraftWithSelectedModeProfile<Draft extends SessionWizardModeDraft> = DraftW
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
+// The storage profile field renders only for drafts without a session mode
+// profile (getSessionWizardOrderedDraftEntries hides it otherwise), so a change
+// never has a mode profile to keep in step.
 export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
   nextProfile: unknown,
 ): Draft => {
   const next = deepClone(prev) as Draft;
-  const normalizedProfile = normalizeSessionStorageProfileConfig(nextProfile);
-  next.storageProfile = normalizedProfile;
-  if (isRecord(next.sessionModeProfile)) {
-    const modeProfile = deepClone(next.sessionModeProfile) as UnknownRecord;
-    const backend = toStr(normalizedProfile.backend).trim();
-    modeProfile.preset = 'custom';
-    modeProfile.storage = {
-      ...(isRecord(modeProfile.storage) ? modeProfile.storage : {}),
-      backend: backend === 'cloudflare' ? 'cloudflare' : 'arweave',
-    };
-    modeProfile.authority = {
-      ...(isRecord(modeProfile.authority) ? modeProfile.authority : {}),
-      mode: backend === 'cloudflare' ? 'worker_canonical' : 'evm_registry_canonical',
-    };
-    modeProfile.encryption = {
-      ...(isRecord(modeProfile.encryption) ? modeProfile.encryption : {}),
-      mode:
-        backend === 'lit-arweave' || normalizedProfile.payloadAccessControl?.mode === 'lit_encrypted' ? 'lit' : 'none',
-    };
-    if (isRecord(modeProfile.surfaces)) {
-      modeProfile.surfaces.web = true;
-    }
-    next.sessionModeProfile = modeProfile;
-  }
+  next.storageProfile = normalizeSessionStorageProfileConfig(nextProfile);
   return next;
 };
 
