@@ -141,14 +141,41 @@ export const buildCommunitySessionCatalog = ({
     });
   };
 
-  // Configured/registry routes take precedence over stale local Worker hints,
+  const records = workerRecords
+    .map(asRecord)
+    .filter((record) => record.authorityMode === 'worker_canonical' && !!record.canonicalConfig);
+  const workerOrigin = (value: unknown) => {
+    try {
+      return parseSessionWorkerDiscoveryOrigin(value) || '';
+    } catch (_) {
+      return '';
+    }
+  };
+  // A bundled or configured Worker hint carries no admins or dates. A verified
+  // bootstrap record for the same slug (and the same Worker, when the hint
+  // names one) describes that session, so it takes the hint's place.
+  const verifiedRecordFor = (slugIn: unknown, config: SessionRecord) => {
+    if (classifyCommunitySession(config) !== 'centralized') return null;
+    const slug = parseSessionSlug(typeof config.slug === 'string' ? config.slug : slugIn);
+    const hintOrigin = workerOrigin(config.corsWorkerUrl);
+    return (
+      records.find(
+        (record) =>
+          slug.ok &&
+          parseSessionSlug(record.slug).slug === slug.slug &&
+          (!hintOrigin || workerOrigin(record.workerOrigin) === hintOrigin),
+      ) || null
+    );
+  };
+
+  // Configured/registry routes take precedence over stale local Worker records,
   // matching the session route resolver's authority choice for a shared slug.
-  entries.forEach(([slug, config]) => add(slug, config));
-  workerRecords.forEach((value) => {
-    const record = asRecord(value);
-    if (record.authorityMode !== 'worker_canonical' || !record.canonicalConfig) return;
-    add(record.slug, record.canonicalConfig, record.workerOrigin);
+  entries.forEach(([slug, value]) => {
+    const record = verifiedRecordFor(slug, asRecord(value));
+    if (record) add(record.slug, record.canonicalConfig, record.workerOrigin);
+    else add(slug, value);
   });
+  records.forEach((record) => add(record.slug, record.canonicalConfig, record.workerOrigin));
   return [...sessions.values()].sort((a, b) => a.name.localeCompare(b.name) || a.slug.localeCompare(b.slug));
 };
 

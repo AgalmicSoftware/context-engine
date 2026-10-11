@@ -78,6 +78,31 @@ describe('Community session directory', () => {
     });
   });
 
+  it('lets a verified Worker record replace a bundled hint for the same Worker', () => {
+    const admin = '0xabcdef0123456789abcdef0123456789abcdef01';
+    const hint = { ...centralized, sessionName: 'Bundled hint' };
+    const record = {
+      authorityMode: 'worker_canonical',
+      slug: 'cloud',
+      workerOrigin: 'https://session.example',
+      canonicalConfig: { ...centralized, sessionName: 'From the Worker', adminAddresses: [admin] },
+    };
+    const catalog = buildCommunitySessionCatalog({ entries: [['cloud', hint]], workerRecords: [record] });
+
+    expect(catalog).toEqual([
+      expect.objectContaining({ slug: 'cloud', name: 'From the Worker', adminAddresses: [admin] }),
+    ]);
+    expect(
+      filterCommunitySessions(catalog, { ...createCommunitySessionFilters(), adminAddress: admin.slice(0, 10) }),
+    ).toHaveLength(1);
+
+    // A record from another Worker that shares the slug does not take over the hint.
+    const otherWorker = { ...record, workerOrigin: 'https://other.example' };
+    expect(buildCommunitySessionCatalog({ entries: [['cloud', hint]], workerRecords: [otherWorker] })).toEqual([
+      expect.objectContaining({ name: 'Bundled hint', adminAddresses: [] }),
+    ]);
+  });
+
   it('includes previously discovered Worker sessions with the origin in their session link', () => {
     const catalog = buildCommunitySessionCatalog({
       workerRecords: [
