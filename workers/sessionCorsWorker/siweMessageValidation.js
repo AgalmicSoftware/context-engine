@@ -223,6 +223,8 @@ const SIWE_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 // EIP-4361 statement characters: RFC 3986 reserved and unreserved, and space.
 const SIWE_STATEMENT_RE = /^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;= ]+$/;
 const SIWE_VALUE_RE = /^\S+$/;
+// EIP-4361: nonce = 8*( ALPHA / DIGIT ).
+const SIWE_NONCE_RE = /^[A-Za-z0-9]{8,}$/;
 const SIWE_REQUIRED_FIELDS = Object.freeze([
   ['URI: ', 'uri'],
   ['Version: ', 'version'],
@@ -298,6 +300,7 @@ export const parseSiweMessage = (message) => {
   if (index !== lines.length) return malformedSiwe('unexpected or repeated line');
   if (fields.version !== '1') return malformedSiwe('unsupported version');
   if (!/^\d+$/.test(fields.chainId)) return malformedSiwe('invalid chain ID');
+  if (!SIWE_NONCE_RE.test(fields.nonce)) return malformedSiwe('invalid nonce');
 
   return {
     domain,

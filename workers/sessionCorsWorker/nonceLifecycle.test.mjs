@@ -8,23 +8,17 @@ import {
   issueNonce,
 } from './nonceLifecycle.js';
 
-test('buildNonce fills a 16-byte buffer and encodes it with the provided base64url helper', () => {
-  const calls = [];
-
+// EIP-4361 nonces are alphanumeric; wallet parsers reject "-" and "_".
+test('buildNonce issues 32 hex characters from 16 random bytes', () => {
   const nonce = buildNonce({
     getRandomValues: (bytes) => {
       assert.equal(bytes.length, 16);
-      bytes.set([1, 2, 3, 4]);
+      bytes.set([1, 2, 254, 255]);
       return bytes;
     },
-    base64UrlEncode: (bytes) => {
-      calls.push(Array.from(bytes));
-      return 'encoded-nonce';
-    },
   });
-
-  assert.equal(nonce, 'encoded-nonce');
-  assert.deepEqual(calls, [[1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]);
+  assert.equal(nonce, '0102feff000000000000000000000000');
+  for (let index = 0; index < 50; index += 1) assert.match(buildNonce(), /^[0-9a-f]{32}$/);
 });
 
 test('issueNonce requires durable coordination before writing the KV compatibility mirror', async () => {

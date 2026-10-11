@@ -24,7 +24,7 @@ const clientSiweLines = () => [
   'URI: https://app.example',
   'Version: 1',
   'Chain ID: 84532',
-  'Nonce: nonce-1',
+  'Nonce: nonce0001',
   'Issued At: 2026-03-11T00:00:00.000Z',
   'Expiration Time: 2026-03-12T00:00:00.000Z',
   'Resources:',
@@ -39,7 +39,7 @@ test('parseSiweMessage extracts the fields of the message the client signs', () 
     statement: 'Sign in to Context Engine.',
     uri: 'https://app.example',
     chainId: '84532',
-    nonce: 'nonce-1',
+    nonce: 'nonce0001',
     issuedAt: '2026-03-11T00:00:00.000Z',
     expirationTime: '2026-03-12T00:00:00.000Z',
     resources: ['https://worker.example', 'urn:context-engine:session:id:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
@@ -48,7 +48,7 @@ test('parseSiweMessage extracts the fields of the message the client signs', () 
   const withoutStatement = clientSiweLines();
   withoutStatement.splice(3, 2, '');
   assert.equal(parseSiweMessage(withoutStatement.join('\n')).statement, undefined);
-  assert.equal(parseSiweMessage(withoutStatement.join('\n')).nonce, 'nonce-1');
+  assert.equal(parseSiweMessage(withoutStatement.join('\n')).nonce, 'nonce0001');
 });
 
 const withLines = (edit) => {
@@ -79,6 +79,10 @@ for (const [label, message] of [
   ['an unsupported version', withLines((lines) => { lines[6] = 'Version: 2'; })],
   ['a statement outside the EIP-4361 character set', withLines((lines) => { lines[3] = 'Claim your <reward>'; })],
   ['a resource without the list prefix', withLines((lines) => { lines[12] = 'https://worker.example'; })],
+  // EIP-4361 nonces are at least eight letters or digits.
+  ['a nonce with a hyphen', withLines((lines) => { lines[8] = 'Nonce: nonce-0001'; })],
+  ['a nonce with an underscore', withLines((lines) => { lines[8] = 'Nonce: nonce_0001'; })],
+  ['a nonce shorter than eight characters', withLines((lines) => { lines[8] = 'Nonce: abc1234'; })],
 ]) {
   test(`parseSiweMessage rejects ${label}`, () => {
     const parsed = parseSiweMessage(message);

@@ -35,16 +35,12 @@ const fillRandomValues = (bytes, deps) => {
   return crypto.getRandomValues(bytes);
 };
 
+// EIP-4361 nonces are letters and digits only, and wallet parsers reject
+// base64url's "-" and "_", so nonces are hex.
 export const buildNonce = (deps) => {
   const bytes = new Uint8Array(16);
   fillRandomValues(bytes, deps);
-
-  const encode = typeof deps?.base64UrlEncode === 'function'
-    ? deps.base64UrlEncode
-    : () => {
-      throw new Error('base64UrlEncode unavailable');
-    };
-  return encode(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
 export const issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {}) => {

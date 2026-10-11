@@ -1726,7 +1726,8 @@ login, and signed admin request bodies must carry that config's canonical
      `{ nonce, sessionSlug, sessionId }`, and a missing or mismatched canonical
      session ID is rejected before nonce issue.
    - Nonce generation/consumption now also route through a shared helper:
-     it preserves 16-byte base64url nonce creation, lowercase nonce KV keys,
+     it creates 16-byte random nonces as 32 hex characters (EIP-4361 nonces
+     are letters and digits only), and preserves lowercase nonce KV keys,
      `Nonce mismatch or expired.`, `Nonce already used.`, used-nonce TTL writes,
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
@@ -1753,8 +1754,9 @@ login, and signed admin request bodies must carry that config's canonical
    `Chain ID`, `Nonce`, and `Issued At`, then optional `Expiration Time`,
    `Not Before`, and `Request ID`, all in that order, and an optional final
    `Resources:` list. Reordered, duplicated, unknown, padded, or trailing
-   lines, CRLF line breaks, and statements outside the EIP-4361 character set
-   are rejected with `400` before the nonce is consumed.
+   lines, CRLF line breaks, statements outside the EIP-4361 character set, and
+   nonces other than at least eight letters or digits are rejected with `400`
+   before the nonce is consumed.
    Include exactly two `Resources:` URI-list entries with a `- ` prefix: the
    receiving Worker origin and `urn:context-engine:session:id:<encoded-id>` for
    Worker-canonical sessions, or `urn:context-engine:session:slug:<encoded-slug>`

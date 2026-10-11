@@ -572,7 +572,7 @@ for (const [label, resources, canonical, expected] of [
       'URI: https://allowed.example',
       'Version: 1',
       'Chain ID: 11155420',
-      'Nonce: nonce-1',
+      'Nonce: nonce0001',
       'Issued At: 2026-04-23T12:00:00.000Z',
       'Expiration Time: 2026-04-24T12:00:00.000Z',
     ];
