@@ -697,7 +697,11 @@ Admin test panel:
   checked for ownership.
 - Only encryption flags and envelopes lock an answer or comment. Public text
   such as "Locked", "Redacted", or "***" is analysed like any other answer; a
-  `*` or `[encrypted]` mask without its encryption flag reads as no answer.
+  `*` or `[encrypted]` mask without its encryption flag reads as no answer. An
+  answer or comment flagged `encrypted: true` but blank and without an
+  envelope, as clients up to 0.6.7 uploaded a cleared locked field, reads as
+  cleared: it is not counted as locked, does not fail an admin snapshot, and
+  as the latest row still withdraws an older public answer.
 - Importance and conviction follow the client's stored-rating rule: unrated
   values are omitted rather than published as `0`, and interview ratings saved
   on the old 0-100 scale are read on the 0-10 scale.
