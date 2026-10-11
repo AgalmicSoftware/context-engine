@@ -46,6 +46,7 @@ type PayloadPointerUpload = {
 };
 
 const toMetadataPayload = (value: MetadataPayload | null | undefined): MetadataPayload => value || {};
+const ID_PRECHECK_TIMEOUT_MS = 10_000;
 
 export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRuntimeDeps): ContractScriptsMethodMap => {
   const {
@@ -56,6 +57,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     attachStorageRefCompatibilityFields,
     clearReadCachesForGroup,
     getSessionAddresses,
+    getSurveysReadProviderForSession,
     resolveArweaveUploadOpts,
     refreshSessionRegistryFieldsCache,
     contractsLog,
@@ -83,6 +85,60 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     }
     if (!hasNonZeroHashValue(value)) {
       throw new Error(`${label} cannot be zero.`);
+    }
+  };
+
+  // Surveys.sol reverts when a survey or question id already exists, so learn
+  // that from its public view getters before paying for uploads. A failed read
+  // is not proof either way: the transaction still enforces uniqueness.
+  const assertIdsNotPublished = async ({
+    addr,
+    cfg,
+    groupKeyOrCfg,
+    chainId,
+    surveyId = '',
+    questionIds,
+  }: {
+    addr: string;
+    cfg: unknown;
+    groupKeyOrCfg: GroupKeyOrConfig;
+    chainId: unknown;
+    surveyId?: string;
+    questionIds: string[];
+  }): Promise<void> => {
+    let surveyHash: unknown = null;
+    let questionHashes: unknown[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chainId);
+      if (!provider) return;
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+      [surveyHash, questionHashes] = await Promise.race([
+        Promise.all([
+          surveyId ? SurveyContract.surveyHashes(surveyId) : null,
+          Promise.all(questionIds.map((id) => SurveyContract.questionHashes(id))),
+        ]),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Survey id pre-check timed out.')), ID_PRECHECK_TIMEOUT_MS);
+        }),
+      ]);
+    } catch (error: unknown) {
+      contractsLog.warn('Survey id pre-check unavailable; the transaction will still enforce unique ids.', error);
+      return;
+    } finally {
+      clearTimeout(timer);
+    }
+    const fail = (message: string): never => {
+      throw Object.assign(new Error(message), { resetSubmitProgress: true });
+    };
+    if (hasNonZeroHashValue(surveyHash)) {
+      fail('This survey is already published on-chain. Change its title or documents to publish a new survey.');
+    }
+    const publishedIndex = questionHashes.findIndex((hash) => hasNonZeroHashValue(hash));
+    if (publishedIndex !== -1) {
+      fail(
+        `Question ${publishedIndex + 1} is already published on-chain. Edit its text or options, or remove it, then try again.`,
+      );
     }
   };
 
@@ -134,6 +190,14 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       assertNonZeroBytes32(sId, 'addSurveyWithQuestions: surveyId');
       qIds32.forEach((id: string, i: number) => {
         assertNonZeroBytes32(id, `addSurveyWithQuestions: questionIds[${i}]`);
+      });
+      await assertIdsNotPublished({
+        addr,
+        cfg,
+        groupKeyOrCfg,
+        chainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
+        surveyId: sId,
+        questionIds: qIds32,
       });
 
       const canUseSessionStorage =
@@ -323,6 +387,13 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       });
       sIds32.forEach((id: string, i: number) => {
         if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
+      });
+      await assertIdsNotPublished({
+        addr,
+        cfg,
+        groupKeyOrCfg,
+        chainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
+        questionIds: qIds32,
       });
 
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
