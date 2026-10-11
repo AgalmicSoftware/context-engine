@@ -219,6 +219,25 @@ describe('SBT authorization signing', () => {
     },
   );
 
+  it('says a group with a zero on-chain hash has no group password, before deriving', async () => {
+    const { importKey } = useFastKdf();
+    const errors = await Promise.all([
+      cryptoUtils
+        .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash: ethers.constants.HashZero })
+        .catch((caught) => caught),
+      cryptoUtils
+        .signInvites({ ...input, nonces: ['1'], groupPasswordHash: ethers.constants.HashZero })
+        .catch((caught) => caught),
+    ]);
+
+    for (const error of errors) {
+      expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+      expect(cryptoUtils.isGroupPasswordMismatchError(error)).toBe(false);
+      expect(error.message).toBe("This group has no group password, so it can't be joined with one.");
+    }
+    expect(importKey).not.toHaveBeenCalled();
+  });
+
   it('reports missing WebCrypto as a clear error, not a wrong password, when signing', async () => {
     const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
     Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });

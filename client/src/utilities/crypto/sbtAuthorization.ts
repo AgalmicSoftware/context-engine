@@ -86,6 +86,13 @@ const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: Sb
       GROUP_PASSWORD_UNVERIFIABLE,
     );
   }
+  // A zero hash means the group has no group password: no password can match, so skip the slow KDF.
+  if (expectedHash === ethers.constants.HashZero) {
+    throw withGroupPasswordCode(
+      new Error("This group has no group password, so it can't be joined with one."),
+      GROUP_PASSWORD_UNVERIFIABLE,
+    );
+  }
   const signer = await deriveGroupPasswordWallet({ password, sbtAddress }).catch((error: unknown) => {
     throw withGroupPasswordCode(error, GROUP_PASSWORD_UNVERIFIABLE);
   });
