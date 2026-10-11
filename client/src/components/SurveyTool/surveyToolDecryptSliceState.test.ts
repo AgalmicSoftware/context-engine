@@ -220,3 +220,35 @@ it('keeps a rating edited before Decrypt Answer pending and leaves the previous 
   expect(edited.conviction).toEqual({ [qid]: 9 });
   expect(edited.importance).toEqual({});
 });
+
+it('keeps a rating edited before the survey-level Decrypt & Edit pending', () => {
+  const qid = '0xq1';
+  const other = '0xq2';
+  const masked = {
+    answers: {
+      [qid]: { value: '*', encrypted: true, encryptionAudience: 'self', encryptedPortion: 'answer-env' },
+      [other]: { value: '*', encrypted: true, encryptionAudience: 'self', encryptedPortion: 'other-env' },
+    },
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  };
+  const edited = { ...masked, conviction: { [qid]: 9 } };
+  const previous = { surveysResponseState: [edited], editBaseline: JSON.parse(JSON.stringify(masked)) };
+
+  const next = buildSurveyDecryptSuccessState(
+    previous,
+    {
+      surveyIndex: 0,
+      decryptedSlice: { answers: { [qid]: { value: 'Agree' }, [other]: { value: 'Disagree' } } },
+      decryptedImportanceFromEnv: { [qid]: 6, [other]: 3 },
+      decryptedConvictionFromEnv: { [qid]: 4, [other]: 2 },
+    },
+    (value: unknown) => JSON.parse(JSON.stringify(value)),
+  ) as Record<string, any>;
+
+  expect(next.surveysResponseState[0].conviction).toEqual({ [qid]: 9, [other]: 2 });
+  expect(next.surveysResponseState[0].importance).toEqual({ [qid]: 6, [other]: 3 });
+  expect(next.editBaseline.conviction).toEqual({ [qid]: 4, [other]: 2 });
+  expect(edited.conviction).toEqual({ [qid]: 9 });
+});
