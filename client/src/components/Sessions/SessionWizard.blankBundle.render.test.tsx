@@ -311,8 +311,7 @@ describe('SessionWizard blank bundle render regression', () => {
     expect(bundleUrlOverrideInput).toHaveValue(manualBundleUrl);
   });
 
-  it('shows the sponsored publish override controls immediately when the hosted bundle URL default is blank', async () => {
-    const manualBundleUrl = 'https://assets.example.test/sponsored-sessionCorsWorker.bundle.js';
+  it('offers sponsored publish without bundle controls when the hosted bundle URL default is blank', async () => {
     let resolveSponsoredBundle!: (bundle: ReturnType<typeof buildMockSponsoredBundle>) => void;
     const sponsoredBundleReady = new Promise<ReturnType<typeof buildMockSponsoredBundle>>((resolve) => {
       resolveSponsoredBundle = resolve;
@@ -380,105 +379,13 @@ describe('SessionWizard blank bundle render regression', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /step \d+: deploy session/i }));
 
-    const bundleUrlOverrideInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE);
-    expect(bundleUrlOverrideInput).toBeInTheDocument();
-    expect(screen.getByText('Worker bundle fallback (optional)')).toBeInTheDocument();
-
-    fireEvent.change(bundleUrlOverrideInput, {
-      target: { value: manualBundleUrl },
-    });
-
-    expect(bundleUrlOverrideInput).toHaveValue(manualBundleUrl);
-  });
-
-  it('shows the blank-default sponsored publish file-only fallback state when a bundle file is selected', async () => {
-    const bundleFile = {
-      name: 'sessionCorsWorker.bundle.js',
-      type: 'text/javascript',
-      text: async () => 'export default { async fetch() { return new Response("blank-default-file"); } };',
-    };
-    let resolveSponsoredBundle!: (bundle: ReturnType<typeof buildMockSponsoredBundle>) => void;
-    const sponsoredBundleReady = new Promise<ReturnType<typeof buildMockSponsoredBundle>>((resolve) => {
-      resolveSponsoredBundle = resolve;
-    });
-
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          networkChainId: 84532,
-          blockLimits: {
-            start: mockSelectorSourceStartBlock,
-            end: null,
-          },
-          contracts: {
-            sbtFactory: {
-              address: mockSelectorSourceFactory,
-              chainId: 84532,
-            },
-          },
-          __registry: {
-            chainId: 84532,
-            registryChainId: 84532,
-          },
-        },
-        deployForm: {
-          workerName: 'sponsored-blank-bundle-worker',
-        },
-      }),
-    );
-    mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
-
-    renderLoggedInSessionWizard({
-      initialSponsoredBundleId: 'sponsor-tx-id',
-      initialSponsoredBundleKey: 'sponsor-secret',
-    });
-
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
-      target: { value: 'Sponsored Publish Blank Bundle File' },
-    });
-
-    await selectDecentralizedProfile();
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: session worker/i }));
-
-    const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-    setControlledInputValue(cloudflareTokenInput, 'cf-test-token');
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
-      target: { value: 'sk-sponsored-blank-default-file' },
-    });
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
-      target: { value: '{"kty":"RSA","n":"sponsored-blank-default-file"}' },
-    });
-
-    await act(async () => {
-      resolveSponsoredBundle(buildMockSponsoredBundle());
-      await sponsoredBundleReady;
-    });
-
+    // The grant deploys the sponsoring Worker's release, so no bundle source is needed.
+    const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
     await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.',
-      );
+      expect(publishButton).not.toBeDisabled();
     });
-
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: deploy session/i }));
-
-    const bundleUrlOverrideInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE);
-    const bundleFileInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT);
-    const publishBundleClearButton = screen.getByTestId(E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_PUBLISH);
-
-    expect(bundleUrlOverrideInput).toHaveValue('');
-    expect(publishBundleClearButton).toBeDisabled();
-
-    fireEvent.change(bundleFileInput, {
-      target: { files: [bundleFile] },
-    });
-
-    await waitFor(() => {
-      expect(publishBundleClearButton).not.toBeDisabled();
-      expect(screen.getByText('Using sessionCorsWorker.bundle.js for this publish.')).toBeInTheDocument();
-    });
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
+    expect(screen.queryByText('Worker bundle fallback (optional)')).not.toBeInTheDocument();
   });
 
   it('does not leak a stale advanced-mode bundle URL into normal-mode deploys when the hosted default is blank', async () => {

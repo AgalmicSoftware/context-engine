@@ -53,7 +53,7 @@ export type SessionWizardShellProps = {
   adminUrl: PublishSectionProps['adminUrl'];
   adminUrlStatus: PublishSectionProps['adminUrlStatus'];
   advancedBundleFileInputRef: WorkerPanelProps['advancedBundleFileInputRef'];
-  bundleFile: PublishSectionProps['bundleFile'];
+  bundleFile: WorkerPanelProps['bundleFile'];
   bundleMode: WorkerPanelProps['bundleMode'];
   clearSelectedBundleFile: WorkerPanelProps['clearSelectedBundleFile'];
   clearWorkerSecretFields: WorkerPanelProps['clearWorkerSecretFields'];
@@ -93,8 +93,8 @@ export type SessionWizardShellProps = {
   isWorkerCanonical?: boolean;
   jsonCopied: MetadataEditorProps['jsonCopied'];
   launchCreateSbtModal: EncryptionPanelBoundaryProps['launchCreateSbtModal'];
-  localWorkerBundleFallbackFilePath: PublishSectionProps['localWorkerBundleFallbackFilePath'];
-  manualBundleUrlOverrideHelp: PublishSectionProps['manualBundleUrlOverrideHelp'];
+  localWorkerBundleFallbackFilePath: WorkerPanelProps['localWorkerBundleFallbackFilePath'];
+  manualBundleUrlOverrideHelp: WorkerPanelProps['manualBundleUrlOverrideHelp'];
   manualGasLimit: PublishSectionProps['manualGasLimit'];
   manualGasPriceGwei: PublishSectionProps['manualGasPriceGwei'];
   manualMaxFeePerGasGwei: PublishSectionProps['manualMaxFeePerGasGwei'];
@@ -111,8 +111,8 @@ export type SessionWizardShellProps = {
   normalizeSbtSelection: WizardModalsProps['normalizeSbtSelection'];
   normalModeBundleHelpText: WorkerPanelProps['normalModeBundleHelpText'];
   normalModeBundleUrl: WorkerPanelProps['normalModeBundleUrl'];
-  normalModeBundleUrlOverride: PublishSectionProps['normalModeBundleUrlOverride'];
-  normalModeBundleUrlOverrideValidationError: PublishSectionProps['normalModeBundleUrlOverrideValidationError'];
+  normalModeBundleUrlOverride: WorkerPanelProps['normalModeBundleUrlOverride'];
+  normalModeBundleUrlOverrideValidationError: WorkerPanelProps['normalModeBundleUrlOverrideValidationError'];
   normalModeCards: IntroStatusRailProps['normalModeCards'];
   normalModeManualBundleHelpText: WorkerPanelProps['normalModeManualBundleHelpText'];
   normalModePublishSummary: PublishSectionProps['normalModePublishSummary'];
@@ -130,7 +130,6 @@ export type SessionWizardShellProps = {
   onManualMaxFeePerGasGweiChange: PublishSectionProps['onManualMaxFeePerGasGweiChange'];
   onManualMaxPriorityFeePerGasGweiChange: PublishSectionProps['onManualMaxPriorityFeePerGasGweiChange'];
   onManualMetadataUrlChange: PublishSectionProps['onManualMetadataUrlChange'];
-  onNormalModeBundleUrlOverrideChange: PublishSectionProps['onNormalModeBundleUrlOverrideChange'];
   onNativeWorkerVerified?: WorkerPanelProps['onNativeWorkerVerified'];
   onPublish: PublishSectionProps['onPublish'];
   onRegistryChainIdChange: HeaderProps['onRegistryChainIdChange'];
@@ -198,15 +197,12 @@ export type SessionWizardShellProps = {
   showNormalModeManualBundleControls: WorkerPanelProps['showNormalModeManualBundleControls'];
   showNormalModeWorkerStep: boolean;
   showSharedWorkerChoice: WorkerPanelProps['showSharedWorkerChoice'];
-  showSponsoredBundleFallbackInput: PublishSectionProps['showSponsoredBundleFallbackInput'];
   showSponsoredDeployAccessNotice: WorkerPanelProps['showSponsoredDeployAccessNotice'];
   showWorkerUrlField: WorkerPanelProps['showWorkerUrlField'];
   showNetworkSelector?: boolean;
   showOnChainGateControls?: boolean;
   sponsoredBundleKey?: IntroStatusRailProps['sponsoredBundleKey'];
   sponsoredBundleStatus: IntroStatusRailProps['sponsoredBundleStatus'];
-  sponsoredManualBundleRetryMessage: PublishSectionProps['sponsoredManualBundleRetryMessage'];
-  sponsoredPublishBundleFileInputRef: PublishSectionProps['bundleFileInputRef'];
   status: PublishSectionProps['status'];
   signBootstrapAdminAction: WizardModalsProps['signBootstrapAdminAction'];
   t: WizardModalsProps['t'];
@@ -314,7 +310,6 @@ const SessionWizardShell = ({
   onManualMaxFeePerGasGweiChange,
   onManualMaxPriorityFeePerGasGweiChange,
   onManualMetadataUrlChange,
-  onNormalModeBundleUrlOverrideChange,
   onNativeWorkerVerified,
   onPublish,
   onRegistryChainIdChange,
@@ -382,15 +377,12 @@ const SessionWizardShell = ({
   showNormalModeManualBundleControls,
   showNormalModeWorkerStep,
   showSharedWorkerChoice,
-  showSponsoredBundleFallbackInput,
   showSponsoredDeployAccessNotice,
   showWorkerUrlField,
   showNetworkSelector = true,
   showOnChainGateControls = true,
   sponsoredBundleKey,
   sponsoredBundleStatus,
-  sponsoredManualBundleRetryMessage,
-  sponsoredPublishBundleFileInputRef,
   status,
   signBootstrapAdminAction,
   t,
@@ -622,17 +614,6 @@ const SessionWizardShell = ({
           onCreateAnotherSession={onCreateAnotherSession}
           onPublish={onPublish}
           onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
-          showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-          normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-          onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
-          normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-          manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-          bundleFileInputRef={sponsoredPublishBundleFileInputRef}
-          onBundleFileChange={setBundleFile}
-          onClearBundleFile={clearSelectedBundleFile}
-          bundleFile={bundleFile}
-          localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-          sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
           publishUiPlan={publishUiPlan}
           publishSettingsCapabilities={publishSettingsCapabilities}
           renderInfoTooltip={renderSessionWizardInfoTooltip}

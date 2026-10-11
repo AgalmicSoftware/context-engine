@@ -42,7 +42,6 @@ type SponsoredBundleControllerRefs<TDeployForm, TProvisionedSponsoredContext> = 
   workerSecretsRef: MutableRefObject<WorkerSecretsLike>;
   advancedBundleFileInputRef: RefObject<HTMLInputElement>;
   normalModeRetryBundleFileInputRef: RefObject<HTMLInputElement>;
-  sponsoredPublishBundleFileInputRef: RefObject<HTMLInputElement>;
 };
 
 type UseSessionWizardSponsoredBundleControllerOptions<
@@ -111,7 +110,6 @@ const useSessionWizardSponsoredBundleController = <
     workerSecretsRef,
     advancedBundleFileInputRef,
     normalModeRetryBundleFileInputRef,
-    sponsoredPublishBundleFileInputRef,
   } = refs;
 
   const getCurrentWorkerSecrets = useCallback(
@@ -264,21 +262,12 @@ const useSessionWizardSponsoredBundleController = <
 
   const clearSelectedBundleFile = useCallback(() => {
     setBundleFile(null);
-    [
-      advancedBundleFileInputRef.current,
-      normalModeRetryBundleFileInputRef.current,
-      sponsoredPublishBundleFileInputRef.current,
-    ].forEach((input) => {
+    [advancedBundleFileInputRef.current, normalModeRetryBundleFileInputRef.current].forEach((input) => {
       if (input && typeof input.value === 'string') {
         input.value = '';
       }
     });
-  }, [
-    advancedBundleFileInputRef,
-    normalModeRetryBundleFileInputRef,
-    setBundleFile,
-    sponsoredPublishBundleFileInputRef,
-  ]);
+  }, [advancedBundleFileInputRef, normalModeRetryBundleFileInputRef, setBundleFile]);
 
   return {
     ...sponsoredBundleLifecycle,

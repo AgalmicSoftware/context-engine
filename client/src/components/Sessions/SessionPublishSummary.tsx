@@ -5,7 +5,6 @@ import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSettingsPanel';
 import SessionPublishActionControls from './SessionPublishActionControls';
-import SessionPublishBundleFallbackPanel from './SessionPublishBundleFallbackPanel';
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
@@ -28,17 +27,6 @@ export type SessionPublishSummaryProps = {
   normalModePublishSummary: PublishSummaryItem[];
   onPublish: () => void;
   onTogglePublishAdvanced: () => void;
-  showSponsoredBundleFallbackInput: boolean;
-  normalModeBundleUrlOverride: string;
-  onNormalModeBundleUrlOverrideChange: (value: string) => void;
-  normalModeBundleUrlOverrideValidationError: string;
-  manualBundleUrlOverrideHelp: string;
-  bundleFileInputRef: React.RefObject<HTMLInputElement>;
-  onBundleFileChange: (file: File | null) => void;
-  onClearBundleFile: () => void;
-  bundleFile: File | null;
-  localWorkerBundleFallbackFilePath: string;
-  sponsoredManualBundleRetryMessage: string;
   publishUiPlan: SessionWizardPublishUiPlan;
   publishSettingsCapabilities: SessionWizardModeRequirements['publishSettings'];
   renderInfoTooltip: (options: Record<string, unknown>) => React.ReactNode;
@@ -72,17 +60,6 @@ const SessionPublishSummary = ({
   normalModePublishSummary,
   onPublish,
   onTogglePublishAdvanced,
-  showSponsoredBundleFallbackInput,
-  normalModeBundleUrlOverride,
-  onNormalModeBundleUrlOverrideChange,
-  normalModeBundleUrlOverrideValidationError,
-  manualBundleUrlOverrideHelp,
-  bundleFileInputRef,
-  onBundleFileChange,
-  onClearBundleFile,
-  bundleFile,
-  localWorkerBundleFallbackFilePath,
-  sponsoredManualBundleRetryMessage,
   publishUiPlan,
   publishSettingsCapabilities,
   renderInfoTooltip,
@@ -153,21 +130,6 @@ const SessionPublishSummary = ({
               showSettingsButton={showPublishSettingsButton}
             />
           )}
-
-          {showSponsoredBundleFallbackInput ? (
-            <SessionPublishBundleFallbackPanel
-              bundleFile={bundleFile}
-              bundleFileInputRef={bundleFileInputRef}
-              localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-              manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-              normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-              normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-              onBundleFileChange={onBundleFileChange}
-              onClearBundleFile={onClearBundleFile}
-              onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
-              sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
-            />
-          ) : null}
 
           <SessionPublishProgressPanel progressDisplayState={publishProgressDisplayState} />
 

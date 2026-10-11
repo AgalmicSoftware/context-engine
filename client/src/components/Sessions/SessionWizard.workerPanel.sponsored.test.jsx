@@ -178,13 +178,9 @@ describe('SessionWizard worker panel rendering', () => {
       await waitFor(() => {
         expect(publishButton).not.toBeDisabled();
       });
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).toBeInTheDocument();
-      expect(screen.getByText('Worker bundle fallback (optional)')).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          'Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
-        ),
-      ).toBeInTheDocument();
+      // The grant deploys the sponsoring Worker's release, so publish offers no bundle fallback.
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
+      expect(screen.queryByText('Worker bundle fallback (optional)')).not.toBeInTheDocument();
 
       fireEvent.click(publishButton);
 
@@ -337,6 +333,9 @@ describe('SessionWizard worker panel rendering', () => {
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
       });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
+        target: { files: [bundleFile] },
+      });
 
       await act(async () => {
         resolveSponsoredBundle(buildMockSponsoredBundle());
@@ -350,15 +349,6 @@ describe('SessionWizard worker panel rendering', () => {
       });
 
       selectNormalModeCard('Deploy Session');
-
-      const publishBundleClearButton = screen.getByTestId(E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_PUBLISH);
-      expect(publishBundleClearButton).toBeDisabled();
-
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
-        target: { files: [bundleFile] },
-      });
-
-      expect(publishBundleClearButton).not.toBeDisabled();
 
       const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
       await waitFor(() => {
@@ -499,6 +489,9 @@ describe('SessionWizard worker panel rendering', () => {
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
       });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE), {
+        target: { value: manualBundleUrl },
+      });
 
       await act(async () => {
         resolveSponsoredBundle(buildMockSponsoredBundle());
@@ -512,10 +505,6 @@ describe('SessionWizard worker panel rendering', () => {
       });
 
       selectNormalModeCard('Deploy Session');
-
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE), {
-        target: { value: manualBundleUrl },
-      });
 
       const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
       await waitFor(() => {

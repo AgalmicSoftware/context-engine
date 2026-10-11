@@ -249,20 +249,14 @@ const useSessionWizardWorkerDeploy = ({
             throw new Error(`Missing required secrets before deploy: ${missing.join(', ')}`);
           }
         }
-        // Regression guard: deploy-ready sponsored links still force the URL path
-        // in normal mode, but manual retry must still be able to override that
-        // path with an uploaded bundle file after a remote fetch failure.
         const sponsoredAutoDeployReady =
           runtime.workerMode !== 'default' &&
           resolveSessionWizardSponsoredAutoDeployReadiness({
-            wizardMode: runtime.wizardMode,
             sponsoredBundle: sponsoredBundleAppliedBundleRef?.current || undefined,
             deployForm: currentDeployForm,
             workerSecretsEnabled: runtime.workerSecretsEnabled,
             currentWorkerSecrets,
             getMissingWorkerSecretsForDeploy,
-            hasBundleFile: !!runtime.bundleFile,
-            normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
           }).ready;
         effectiveBundleMode = resolveSessionWizardDeployBundleMode({
           wizardMode: runtime.wizardMode,
