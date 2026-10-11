@@ -1,5 +1,5 @@
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { cryptoGatePort } from './cryptoGatePort';
+import { cryptoGatePort, type CryptoGateDecryptOptions } from './cryptoGatePort';
 
 describe('cryptoGatePort', () => {
   afterEach(() => {
@@ -25,6 +25,19 @@ describe('cryptoGatePort', () => {
       litOpts: { getKey },
       providerLike: { provider: true },
     });
+  });
+
+  it('declares and forwards the verified session context for Worker-held keys', async () => {
+    const decryptEnvelopeValue = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('decrypted value');
+    const options: CryptoGateDecryptOptions = {
+      account: '0xabc',
+      sessionConfig: { sessionId: 'example-session-id' },
+      sessionSlug: 'example',
+    };
+
+    await cryptoGatePort.decryptEnvelopeValue('{"ciphertext":"abc"}', options);
+
+    expect(decryptEnvelopeValue).toHaveBeenCalledWith('{"ciphertext":"abc"}', options);
   });
 
   it('performs call-time crypto lookup so spies keep intercepting', async () => {
