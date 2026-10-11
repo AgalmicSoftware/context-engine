@@ -64,8 +64,26 @@ test('Netlify builds the client from the repository-root deployment contract', (
     config,
     /from\s*=\s*"\/\*"[\s\S]*?to\s*=\s*"\/index\.html"[\s\S]*?status\s*=\s*200/
   );
+  // Missing hashed assets must 404 before the SPA rewrite can answer them with HTML that
+  // the year-long /assets cache header would pin; the moved preview image redirects.
+  const previewRedirect = config.search(
+    /from\s*=\s*"\/assets\/img\/context-engine-social-preview-square\.png"\s*to\s*=\s*"\/context-engine-social-preview-square\.png"\s*status\s*=\s*301/
+  );
+  const missingAssetRule = config.search(/from\s*=\s*"\/assets\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
+  const spaFallback = config.search(/from\s*=\s*"\/\*"/);
+  assert.ok(previewRedirect > 0 && previewRedirect < missingAssetRule, 'preview redirect precedes the asset 404');
+  assert.ok(missingAssetRule > 0 && missingAssetRule < spaFallback, 'asset 404 precedes the SPA fallback');
 
-  assert.equal(readText('client/public/_redirects'), '/demo/dacc /about 301\n/* /index.html 200\n');
+  assert.equal(
+    readText('client/public/_redirects'),
+    [
+      '/demo/dacc /about 301',
+      '/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301',
+      '/assets/* /404.html 404',
+      '/* /index.html 200',
+      '',
+    ].join('\n'),
+  );
 });
 
 test('client HTML shell leaves route-specific canonical metadata to runtime head sync', () => {

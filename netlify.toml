@@ -13,6 +13,18 @@
   to = "/about"
   status = 301
 
+# The social preview image moved out of the immutable /assets path.
+[[redirects]]
+  from = "/assets/img/context-engine-social-preview-square.png"
+  to = "/context-engine-social-preview-square.png"
+  status = 301
+
+# Missing hashed assets must 404, not get the SPA HTML under a year-long cache header.
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

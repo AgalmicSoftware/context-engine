@@ -194,7 +194,9 @@ uploads:
 
 ```text
 /demo/dacc /about 301
-/*    /index.html   200
+/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301
+/assets/* /404.html 404
+/* /index.html 200
 ```
 
 The connected-build equivalent is:
@@ -206,12 +208,25 @@ The connected-build equivalent is:
   status = 301
 
 [[redirects]]
+  from = "/assets/img/context-engine-social-preview-square.png"
+  to = "/context-engine-social-preview-square.png"
+  status = 301
+
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 ```
 
-Keep specific legacy redirects above the SPA fallback rule in both files.
+Keep specific legacy redirects above the SPA fallback rule in both files. The
+`/assets/*` rule makes a missing hashed file return 404 instead of the SPA HTML,
+which the year-long asset cache header would otherwise pin in browsers across a
+rollback. It is not forced, so files that exist are still served.
 
 For rollback, use Netlify's deploy history to republish the previous known-good
 production deploy, then correct `main` normally. A frontend rollback does not
