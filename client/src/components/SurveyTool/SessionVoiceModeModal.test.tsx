@@ -2023,6 +2023,58 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).not.toContain('claude-example');
   });
 
+  it('sends only the reviewed responder context to the interviewer and the draft mapper', async () => {
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      options.onTranscript?.('Responder: I mostly care about local policy.', []);
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: 'Responder: I mostly care about local policy.', turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => '',
+      };
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v5',
+          source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+          responderContext: {
+            name: 'Fixture Person',
+            facts: [
+              { fact: 'Works on local policy', evidence: 'stated', relatedQuestionIds: ['q1'] },
+              { fact: 'Removed private detail', evidence: 'inferred', relatedQuestionIds: ['q1'] },
+            ],
+          },
+          responses: [{ questionId: 'q1', answer: 'Local policy', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT), {
+      target: { value: 'Works on local policy' },
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const instructions = mockedStartSessionRealtimeInterview.mock.calls[0][0].instructions;
+    expect(instructions).toContain('Works on local policy');
+    expect(instructions).not.toContain('Removed private detail');
+    expect(instructions).not.toContain('Fixture Person');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    const { prefillPacket } = mockedMapInterviewEvidenceToResponses.mock.calls[0][0];
+    expect(prefillPacket?.responderContext).toEqual({ summary: 'Works on local policy' });
+  });
+
   it('uses the pile-view Agree, Unsure, and Disagree control for binary drafts', async () => {
     const prefillPacket = {
       version: 1 as const,

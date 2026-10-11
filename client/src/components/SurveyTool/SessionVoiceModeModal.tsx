@@ -469,7 +469,11 @@ function SessionInterviewPanel({
           : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions);
         const contextPacket: InterviewPrefillPacket | null =
           (prefillPacket
-            ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
+            ? scopeInterviewPrefillToQuestions(
+                prefillPacket,
+                validatedPrefillQuestionsRef.current || questions,
+                responderContext,
+              )
             : null) ||
           (responderContext.trim()
             ? {
@@ -591,10 +595,16 @@ function SessionInterviewPanel({
     setGroupRecommendationRequest({
       requestId: Date.now(),
       transcript,
-      prefillPacket,
+      prefillPacket: prefillPacket
+        ? scopeInterviewPrefillToQuestions(
+            prefillPacket,
+            validatedPrefillQuestionsRef.current || questions,
+            responderContext,
+          )
+        : null,
       draftResponses: drafts.map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
     });
-  }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, transcript]);
+  }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, questions, responderContext, transcript]);
 
   useEffect(() => {
     if (!prefillPacket || importedRef.current || !questions.length) return;
@@ -621,7 +631,11 @@ function SessionInterviewPanel({
     setShowTranscript(false);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
-        ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
+        ? scopeInterviewPrefillToQuestions(
+            prefillPacket,
+            validatedPrefillQuestionsRef.current || questions,
+            responderContext,
+          )
         : null;
     const importedDrafts = validatedPrefillPacket
       ? readImportedInterviewDraftResponses(validatedPrefillPacket, validatedPrefillQuestionsRef.current || questions)
