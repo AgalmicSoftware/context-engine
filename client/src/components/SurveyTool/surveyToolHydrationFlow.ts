@@ -1,10 +1,7 @@
 import { buildSavedInterviewConsent, consentSignature, keepConsentWithdrawals } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
-import {
-  shouldForceOverwriteDraftValues,
-  withoutStaleDraftFields,
-  withoutUnrestorableUnlocks,
-} from './surveyToolDraftState.js';
+import { withoutStaleDraftFields, withoutUnrestorableUnlocks } from './surveyDraftSavedBaseline';
+import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 import {
   buildEmptyResponseSlice,
   isSurveyToolRecord as isRecord,
