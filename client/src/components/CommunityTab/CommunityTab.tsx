@@ -79,6 +79,7 @@ import {
   countCommunitySessions,
   createCommunitySessionFilters,
   filterCommunitySessions,
+  isCommunitySessionDateUnavailable,
   type CommunitySessionEntry,
   type CommunitySessionFilters,
 } from './communitySessionStats';
@@ -2256,7 +2257,8 @@ class CommunityTab extends Component<any, any> {
           </fieldset>
         ))}
         <p className={styles.sessionFilterHint}>
-          Activity uses recorded session updates. Sessions with unavailable dates are excluded by date filters.
+          Activity uses recorded session updates. Sessions without recorded dates, such as centralized sessions, stay
+          listed and are marked “date unavailable”.
         </p>
         <button
           type="button"
@@ -2307,7 +2309,10 @@ class CommunityTab extends Component<any, any> {
                   <a href={session.href} className={styles.sessionLink}>
                     <span className={styles.sessionIdentity}>
                       <strong>{session.name}</strong>
-                      <span>{session.slug || 'general'}</span>
+                      <span>
+                        {session.slug || 'general'}
+                        {isCommunitySessionDateUnavailable(session, this.state.sessionFilters) && ' · date unavailable'}
+                      </span>
                     </span>
                     <span className={styles.sessionKind}>{kindLabels[session.kind]}</span>
                   </a>

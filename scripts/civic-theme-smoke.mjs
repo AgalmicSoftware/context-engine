@@ -217,8 +217,13 @@ export async function inspectSessionDirectoryFilters(dialog, { total, centralize
     await dialog.getByRole('textbox', { name, exact: true }).press('ArrowLeft');
     await dialog.getByRole('textbox', { name, exact: true }).press('ArrowLeft');
     await dialog.getByRole('textbox', { name, exact: true }).press('ArrowUp');
-    assert.equal(await rows(), 0, `${name} excludes older and unknown dates`);
-    assert(await dialog.getByText('No sessions match these filters.', { exact: true }).isVisible());
+    // Older dated sessions drop out; undated (Worker) sessions stay and say so.
+    const remaining = await rows();
+    for (let index = 0; index < remaining; index += 1) {
+      const text = await dialog.getByRole('link').nth(index).innerText();
+      assert.match(text, /date unavailable/, `${name} keeps only undated sessions`);
+    }
+    if (!remaining) assert(await dialog.getByText('No sessions match these filters.', { exact: true }).isVisible());
     await dialog.getByRole('button', { name: 'Clear filters', exact: true }).click();
   }
   await dialog.getByRole('searchbox', { name: 'Admin address', exact: true }).fill('unmatched-admin');

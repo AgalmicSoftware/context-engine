@@ -68,7 +68,9 @@ const sessionMetadata = (config: SessionRecord, kind: CommunitySessionKind) => {
 
 const inDateRange = (timestamp: number | null, from: string, to: string) => {
   if (!from && !to) return true;
-  if (timestamp === null) return false;
+  // Worker (centralized) sessions publish no dates. Keep undated rows; the
+  // directory marks them "date unavailable" instead of hiding them.
+  if (timestamp === null) return true;
   // Date controls select local calendar days; constructing the next midnight
   // keeps the inclusive upper bound correct across daylight-saving transitions.
   const boundary = (date: string, nextDay = false) => {
@@ -78,6 +80,11 @@ const inDateRange = (timestamp: number | null, from: string, to: string) => {
   };
   return (!from || timestamp >= boundary(from)) && (!to || timestamp < boundary(to, true));
 };
+
+// True when a date bound is set but this row has no date it could be checked against.
+export const isCommunitySessionDateUnavailable = (session: CommunitySessionEntry, filters: CommunitySessionFilters) =>
+  (!!(filters.createdFrom || filters.createdTo) && session.createdAt === null) ||
+  (!!(filters.activityFrom || filters.activityTo) && session.lastActivityAt === null);
 
 export const filterCommunitySessions = (sessions: CommunitySessionEntry[], filters: CommunitySessionFilters) => {
   const admin = filters.adminAddress.trim().toLowerCase();

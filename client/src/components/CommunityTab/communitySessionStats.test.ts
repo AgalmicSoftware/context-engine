@@ -4,6 +4,7 @@ import {
   countCommunitySessions,
   filterCommunitySessions,
   createCommunitySessionFilters,
+  isCommunitySessionDateUnavailable,
 } from './communitySessionStats';
 
 const centralized = {
@@ -194,13 +195,34 @@ describe('Community session directory', () => {
         adminAddress: ' 0xAABB ',
       }).map(({ slug }) => slug),
     ).toEqual(['cloud']);
-    expect(filterCommunitySessions(catalog, { ...defaults, createdFrom: '2026-02-02' })).toEqual([]);
-    expect(filterCommunitySessions(catalog, { ...defaults, activityTo: '2026-01-31' })).toEqual([]);
-    expect(
-      filterCommunitySessions(catalog, { ...defaults, createdFrom: '2026-02-03', createdTo: '2026-02-01' }),
-    ).toEqual([]);
+    // Dated rows outside the bounds drop out; the undated row stays (see below).
+    const slugsFor = (filters: typeof defaults) => filterCommunitySessions(catalog, filters).map(({ slug }) => slug);
+    expect(slugsFor({ ...defaults, createdFrom: '2026-02-02' })).toEqual(['unknown']);
+    expect(slugsFor({ ...defaults, activityTo: '2026-01-31' })).toEqual(['unknown']);
+    expect(slugsFor({ ...defaults, createdFrom: '2026-02-03', createdTo: '2026-02-01' })).toEqual(['unknown']);
     expect(filterCommunitySessions(catalog, { ...defaults, kind: 'decentralized' }).map(({ slug }) => slug)).toEqual([
       'chain',
     ]);
+  });
+
+  it('keeps undated Worker sessions under date bounds and marks them date unavailable', () => {
+    const catalog = buildCommunitySessionCatalog({
+      entries: [
+        ['cloud', centralized],
+        ['chain', { ...decentralized, __registry: { createdAt: new Date(2026, 1, 1).getTime() } }],
+      ],
+    });
+    const defaults = createCommunitySessionFilters();
+    const bounded = { ...defaults, createdFrom: '2026-03-01' };
+    const rows = filterCommunitySessions(catalog, bounded);
+
+    expect(rows.map(({ slug }) => slug)).toEqual(['cloud']);
+    expect(countCommunitySessions(rows)).toMatchObject({ centralized: 1, decentralized: 0 });
+    expect(isCommunitySessionDateUnavailable(rows[0], bounded)).toBe(true);
+    expect(isCommunitySessionDateUnavailable(rows[0], { ...defaults, kind: 'centralized' })).toBe(false);
+    const chain = catalog.find(({ slug }) => slug === 'chain')!;
+    // The registry session's activity date falls back to its creation date.
+    expect(isCommunitySessionDateUnavailable(chain, { ...defaults, createdTo: '2026-03-01' })).toBe(false);
+    expect(isCommunitySessionDateUnavailable(chain, { ...defaults, activityFrom: '2026-01-01' })).toBe(false);
   });
 });

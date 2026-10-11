@@ -300,6 +300,39 @@ describe('CommunityTab helpers', () => {
     expect(toggle().props['aria-pressed']).toBe(false);
   });
 
+  it('keeps undated sessions under a date filter and marks them date unavailable', () => {
+    const instance = attachMutableSetState(new CommunityTab({}));
+    instance.state.modalType = 'sessions';
+    instance.state.sessions = [
+      {
+        slug: 'cloud',
+        name: 'Cloud',
+        kind: 'centralized',
+        href: '/session/cloud',
+        createdAt: null,
+        lastActivityAt: null,
+        adminAddresses: [],
+      },
+      {
+        slug: 'chain',
+        name: 'Chain',
+        kind: 'decentralized',
+        href: '/session/chain',
+        createdAt: new Date(2026, 1, 1).getTime(),
+        lastActivityAt: new Date(2026, 1, 1).getTime(),
+        adminAddresses: [],
+      },
+    ];
+    instance.state.sessionFilters = { ...instance.state.sessionFilters, createdFrom: '2026-03-01' };
+
+    const content = instance.renderModalContent();
+    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
+      '/session/cloud',
+    ]);
+    expect(collectNodeText(content)).toContain('cloud · date unavailable');
+    expect(collectNodeText(content)).toContain('1 of 2 sessions1Centralized0Decentralized');
+  });
+
   it('groups the chart and leaderboard under one selected-session label', () => {
     const instance = new CommunityTab({
       activeSessionSlug: 'cloud',
