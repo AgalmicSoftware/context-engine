@@ -644,6 +644,23 @@ describe('SingleQuestionResponse rating rendering', () => {
   });
 });
 
+describe('SingleQuestionResponse conviction display', () => {
+  it('shows legacy 0-100 interview conviction on the 0-10 scale', () => {
+    const subject = createSubject({
+      mode: 'fullscreen',
+      showImportance: true,
+      question: { id: 'q1', type: 'binary', prompt: 'Agree?' },
+      response: {
+        answer: { value: 'Agree', encrypted: false },
+        additional: { value: '', encrypted: false },
+        conviction: 75,
+      },
+    });
+
+    expect(renderToStaticMarkup(subject.renderSinglePersonView())).toContain('Conviction: 7.5');
+  });
+});
+
 describe('SingleQuestionResponse encrypted answer CTA variants', () => {
   const litEncryptedPortion = JSON.stringify({
     v: 1,

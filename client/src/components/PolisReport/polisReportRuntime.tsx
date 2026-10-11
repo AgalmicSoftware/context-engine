@@ -7,6 +7,7 @@ import {
 import * as d3 from 'd3';
 
 import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import demoData from '../../variables/demo/demo_polis_data.json';
 import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';
@@ -774,9 +775,7 @@ export function applyFilterStateToAggregator(
             score += 1;
           }
         } else {
-          const rawImportance = parsed?.importance ?? parsed?.conviction ?? 0;
-          const imp = Number(asRecord(rawImportance).value ?? rawImportance);
-          if (!Number.isNaN(imp)) score += imp;
+          score += readStoredRating(parsed.importance) ?? readStoredRating(parsed.conviction) ?? 0;
         }
       }
       return { qId, score };

@@ -9,6 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faLock, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { rankQuestionsAI } from '../../utilities/ai/aiClient.js';
 import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
@@ -1565,8 +1566,7 @@ class QuestionFilter extends React.Component<any, any> {
       responderKeys.forEach((resp) => {
         const parsed = this.parseResponse(respondersMap[resp]);
         const parsedRecord = toUnknownRecord(parsed);
-        const next = Number(parsedRecord.importance ?? parsedRecord.conviction ?? 0);
-        if (Number.isFinite(next)) totalImportance += next;
+        totalImportance += readStoredRating(parsedRecord.importance) ?? readStoredRating(parsedRecord.conviction) ?? 0;
         if (!isFreeformBlankAnswer(questionType, parsed)) {
           responseCount += 1;
         }

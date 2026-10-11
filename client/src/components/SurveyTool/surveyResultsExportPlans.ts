@@ -1,3 +1,4 @@
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import { formatTsForCsv, pickTimestampMs } from './surveyResultsHelpers.js';
 
 export type SurveyResultsExportOption = {
@@ -339,13 +340,11 @@ const getResponseQuestionPromptForCsv = (response: SurveyResultsRecord, question
 const getResponseQuestionTypeForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
   response.type || questionData.type || '';
 
-const getImportanceValueForCsv = (response: SurveyResultsRecord): unknown => {
-  if (response.importance !== undefined && response.importance !== null) return response.importance;
-  if (response.conviction !== undefined && response.conviction !== null) return response.conviction;
-  return '';
-};
+const getImportanceValueForCsv = (response: SurveyResultsRecord): unknown =>
+  readStoredRating(response.importance) ?? readStoredRating(response.conviction) ?? '';
 
-const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => response.conviction ?? '';
+const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown =>
+  readStoredRating(response.conviction) ?? '';
 
 const getResponseFieldValueForCsv = (
   response: SurveyResultsRecord,

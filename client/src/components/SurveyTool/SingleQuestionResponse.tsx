@@ -33,6 +33,7 @@ import {
   RATING_MAX,
   RATING_MIN,
 } from '../../utilities/survey/ratingValue.js';
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import {
   buildAggregatorResponseSignature,
   buildBinaryAggregatorSummary,
@@ -1047,7 +1048,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const answer = response.answer || {};
     const additional = response.additional || {};
     const conviction = response.conviction !== undefined ? response.conviction : (response.importance ?? null);
-    const normalizedConviction = normalizeRatingValue(conviction, null);
+    const normalizedConviction = readStoredRating(conviction);
 
     const isAnswerEncrypted = answer.encrypted && answer.value === '*';
     const isAdditionalEncrypted = additional.encrypted && additional.value === '*';
