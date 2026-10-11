@@ -272,6 +272,30 @@ describe('workerCanonicalResponseHydration', () => {
     ).rejects.toThrow('invalid cursor');
   });
 
+  it('keeps known question metadata when a response payload claims another prompt or type', () => {
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: workerConfig, sessionSlug: 'demo-sh' });
+    const empty = mergeWorkerQuestionResponses({}, [], 'demo-sh', identity) as any;
+    const canonical = { id: 'question-a', prompt: 'Canonical prompt', type: 'binary' };
+    empty.worker.questions = { 'question-a': canonical };
+
+    const merged = mergeWorkerQuestionResponses(
+      empty,
+      [
+        {
+          questionId: 'question-a',
+          responder: '0xresponder',
+          response: { questionID: 'question-a', prompt: 'Spoofed headline', type: 'freeform', answer: { value: 'x' } },
+          storageRefId: 'response-a-ref',
+          timestamp: 10,
+        },
+      ],
+      'demo-sh',
+      identity,
+    ) as any;
+
+    expect(merged.worker.questions['question-a']).toEqual(canonical);
+  });
+
   it('replaces same-slug response caches when the exact Worker authority changes to an empty session', () => {
     const identityA = resolveWorkerCanonicalCacheIdentity({
       sessionConfig: workerConfig,
