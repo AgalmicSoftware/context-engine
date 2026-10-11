@@ -48,13 +48,11 @@ export const purgePersistedTokenCache = (): void => {
 // records at startup and keep all newly issued credentials page-memory-only.
 purgePersistedTokenCache();
 
+// Reads come only from page memory, so a record an older tab persists can never
+// authenticate. Startup, writes, and clears purge those records without a
+// synchronous storage call on every token read.
 export const readTokenCache = (key: string): unknown | null => {
   if (typeof window === 'undefined') return null;
-  try {
-    // Remove a legacy record defensively if another older tab wrote it after
-    // this module initialized. It must never become an authentication source.
-    window.localStorage.removeItem(key);
-  } catch (_) {}
   try {
     return JSON.parse(tokenMemoryCache.get(key) || 'null');
   } catch {
