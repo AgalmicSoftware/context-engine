@@ -32,7 +32,7 @@ import {
 } from './aiProviderExecution.js';
 import { json as jsonResponse } from './responseKvHelpers.js';
 import { normalizePayloadAccessControl } from './payloadAccessControl.js';
-import { formatValidAnalysisAnswer } from './resultsAnalysisAnswerValidation.js';
+import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -470,8 +470,8 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       participantKey,
       answer,
       additionalComments,
-      importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : safeNumber(row.importance),
-      conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : safeNumber(row.conviction),
+      importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : readStoredRating(row.importance),
+      conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : readStoredRating(row.conviction),
       submittedAt: normalizeSubmittedAt(row.submittedAt || row.createdAt || row.timestamp),
       questionPrompt: knownQuestion.prompt || '',
       questionType: knownQuestion.type || 'text',
