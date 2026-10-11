@@ -4,6 +4,7 @@ import { WagmiHooksHOC } from './withWagmiBridge';
 import type { WagmiInjectedProps } from './withWagmiBridge';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
 
 const mockUseAccount = jest.fn();
 const mockUseBalance = jest.fn();
@@ -35,6 +36,10 @@ jest.mock('../../utilities/web3/wagmiDisconnectState.js', () => ({
   clearUserExplicitlyDisconnected: jest.fn(),
 }));
 
+jest.mock('../../wallet/passkeyWallet.js', () => ({
+  logoutPasskeyWallet: jest.fn(async () => undefined),
+}));
+
 jest.mock('utilities/logging.js', () => ({
   createLogger: () => ({
     log: jest.fn(),
@@ -44,6 +49,7 @@ jest.mock('utilities/logging.js', () => ({
 }));
 
 const mockGetSessionNetwork = getSessionNetwork as jest.Mock;
+const mockLogoutPasskeyWallet = logoutPasskeyWallet as jest.Mock;
 const mockClearUserExplicitlyDisconnected = clearUserExplicitlyDisconnected as jest.Mock;
 
 type TypedProbeOwnProps = {
@@ -346,5 +352,45 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
       chainId: 84532,
       name: 'Base Sepolia',
     });
+  });
+});
+
+describe('WagmiHooksHOC wallet-side disconnect', () => {
+  const address = '0x0000000000000000000000000000000000000009';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete window.__wagmiReduxBridgeOwner;
+  });
+
+  afterEach(() => {
+    cleanup();
+    delete window.__wagmiReduxBridgeOwner;
+  });
+
+  it('also disconnects a saved passkey wallet, so start-up restore cannot sign it back in', async () => {
+    configureWagmiMocks({ address });
+    const Wrapped = WagmiHooksHOC(() => null);
+    const props = buildProps({ provider: 'wagmi', account: address, loginComplete: true });
+    const { rerender } = render(<Wrapped {...props} />);
+    await act(async () => {});
+
+    // The wallet extension disconnects.
+    configureWagmiMocks({ address: undefined });
+    rerender(<Wrapped {...props} />);
+
+    await waitFor(() => expect(props.changeAccount).toHaveBeenCalledWith({}));
+    expect(mockLogoutPasskeyWallet).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the passkey wallet alone when the signed-in account is not the wallet one', async () => {
+    configureWagmiMocks({ address: undefined });
+    const Wrapped = WagmiHooksHOC(() => null);
+    const props = buildProps({ provider: 'passkey_eoa', account: address, loginComplete: true });
+    render(<Wrapped {...props} />);
+    await act(async () => {});
+
+    expect(props.changeAccount).not.toHaveBeenCalled();
+    expect(mockLogoutPasskeyWallet).not.toHaveBeenCalled();
   });
 });
