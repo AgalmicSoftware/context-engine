@@ -364,29 +364,6 @@ const jsToTsCompatibilityPlugin = () => ({
   },
 });
 
-const litContractsSubpathShim = () => ({
-  name: 'ce-lit-contracts-subpath-shim',
-  enforce: 'pre',
-  async resolveId(source, importer, options) {
-    const match = source.match(/^@lit-protocol\/contracts\/(prod|dev)\/(.+)$/);
-    if (!match) return null;
-
-    const nestedBase = path.resolve(
-      __dirname,
-      'node_modules',
-      '@lit-protocol',
-      'access-control-conditions',
-      'node_modules',
-      '@lit-protocol',
-      'contracts',
-    );
-    const rootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
-    const base = fs.existsSync(path.join(nestedBase, 'dist')) ? nestedBase : rootBase;
-    const candidate = path.join(base, 'dist', match[1], match[2]);
-    return this.resolve(candidate, importer, { ...options, skipSelf: true });
-  },
-});
-
 const jsxInJsCompatibilityPlugin = () => ({
   name: 'ce-jsx-in-js-compatibility',
   enforce: 'pre',
@@ -508,7 +485,6 @@ export default defineConfig(({ mode }) => {
       jsxInJsCompatibilityPlugin(),
       react(),
       jsToTsCompatibilityPlugin(),
-      litContractsSubpathShim(),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
       lazyDocumentBuildPlugin(),
       ...(process.env.CE_BUNDLE_REPORT === '1'
@@ -542,10 +518,6 @@ export default defineConfig(({ mode }) => {
         { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
-        { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
-        { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
-        { find: /^node:worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
-        { find: /^source-map-support\/register$/, replacement: path.resolve(srcDir, 'shims', 'source-map-support-register.ts') },
       ],
     },
     server: {
