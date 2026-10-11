@@ -214,11 +214,9 @@ describe('surveyQuestionsDecryptRuntime', () => {
       { account: '0xabc', questionId: 'q1' },
     );
 
-    expect(context.decryptQuestionRatingEnvelopesHelper).toHaveBeenCalledWith(
-      { importanceEncrypted: 'env' },
-      expect.objectContaining({ account: '0xabc', questionId: 'q1' }),
-      expect.any(Object),
-    );
+    const [envelopes, ratingContext] = (context.decryptQuestionRatingEnvelopesHelper as jest.Mock).mock.calls[0];
+    expect(envelopes).toEqual({ importanceEncrypted: 'env' });
+    expect(ratingContext).toEqual(expect.objectContaining({ account: '0xabc', questionId: 'q1' }));
   });
 
   it('binds rating key releases to the active session context', async () => {

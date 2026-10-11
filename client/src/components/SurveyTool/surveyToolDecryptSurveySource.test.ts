@@ -164,7 +164,8 @@ describe('rating envelope decrypt binding', () => {
         getEffectiveRecipientsForField: () => [],
         getDefaultResponseEncryptionAudienceForQid: () => 'self',
         buildLitEncryptionOptionsForRecipients: () => null,
-        encryptEnvelopeValue: (value, options) => cryptoUtils.encryptEnvelopeValue(value, options),
+        encryptEnvelopeValue: (value, options) =>
+          cryptoUtils.encryptEnvelopeValue(value, options as Parameters<typeof cryptoUtils.encryptEnvelopeValue>[1]),
         getImportanceFromResponse: () => null,
         getConvictionFromResponse: () => null,
       },
@@ -175,7 +176,7 @@ describe('rating envelope decrypt binding', () => {
     finalizeQuestionDecryptAttempt(
       { questionId, fieldToDecrypt: 'answer', baselineForDecrypt: {}, ratingEnvelopes, ...context },
       {
-        decryptSingleField: async () => ({ answers: {} }),
+        decryptSingleField: async () => ({ answers: {}, additionalComments: {}, importance: {}, conviction: {} }),
         decryptQuestionRatingEnvelopes: (envelopes, ratingContext) =>
           decryptQuestionRatingEnvelopes(envelopes, ratingContext, ports),
       },
