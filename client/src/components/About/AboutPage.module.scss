@@ -27,7 +27,7 @@ $modal-cta-text: var(--ce-action-submit-text);
 .aboutPageContainer {
   position: relative;
   overflow: hidden;
-  padding: 0 20px 56px;
+  padding: 16px 20px 56px;
   color: $text-color;
   font-family: var(--ce-font-mono);
 }
@@ -1522,7 +1522,7 @@ button.recognitionModalCloseButton {
 
 @media (max-width: 640px) {
   .aboutPageContainer {
-    padding: 0 14px 40px;
+    padding: 16px 14px 40px;
   }
 
   .pageShell {

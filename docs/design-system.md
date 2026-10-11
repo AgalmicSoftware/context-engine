@@ -436,7 +436,8 @@ including the eight Context corpus categories, Risk Matrix details, and Debate M
 circle/tree/list views and expanded historical-case briefs with question previews.
 Stats checks cover the expanded participant list, detail dialogs, group filters,
 session scope labels, session filters and clearing, and session totals, links, and keyboard scrolling through
-the directory. About checks cover the hero title and copy against the rendered panel.
+the directory. About checks cover the hero title and copy against the rendered panel
+and the page's 16px of top spacing below the navbar.
 Wizard checks cover both hosting profiles, every setup
 step, custom settings, local group drafts, group selectors, and contract previews.
 Session checks include encryption audience menus, group

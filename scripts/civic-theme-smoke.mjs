@@ -39,7 +39,13 @@ export const readControl = (element) => {
 };
 
 export async function inspectCivicAbout(page) {
-  await assertReadable(page.getByTestId('ce-about-hero'));
+  const hero = page.getByTestId('ce-about-hero');
+  await assertReadable(hero);
+  const topPadding = await hero.evaluate((element) => {
+    const container = element.closest('[class*="aboutPageContainer_"]');
+    return element.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  });
+  assert(topPadding >= 16, 'The About hero has space above it below the navbar');
 }
 
 export async function inspectCivicWelcome(page) {
