@@ -73,6 +73,12 @@ test('Netlify builds the client from the repository-root deployment contract', (
   const spaFallback = config.search(/from\s*=\s*"\/\*"/);
   assert.ok(previewRedirect > 0 && previewRedirect < missingAssetRule, 'preview redirect precedes the asset 404');
   assert.ok(missingAssetRule > 0 && missingAssetRule < spaFallback, 'asset 404 precedes the SPA fallback');
+  // A forced rule would shadow real hashed files.
+  assert.doesNotMatch(config, /force\s*=/);
+  // The 404 target must exist, and it stays a static page that the CSP allows.
+  const notFoundPage = readText('client/public/404.html');
+  assert.match(notFoundPage, /^<!doctype html>/i);
+  assert.doesNotMatch(notFoundPage, /<script|style=/i);
 
   assert.equal(
     readText('client/public/_redirects'),

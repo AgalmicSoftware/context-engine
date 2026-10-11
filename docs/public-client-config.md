@@ -220,9 +220,10 @@ The connected-build equivalent is:
 ```
 
 Keep specific legacy redirects above the SPA fallback rule in both files. The
-`/assets/*` rule makes a missing hashed file return 404 instead of the SPA HTML,
-which the year-long asset cache header would otherwise pin in browsers across a
-rollback. It is not forced, so files that exist are still served.
+`/assets/*` rule makes a missing hashed file return 404 (with
+`client/public/404.html`) instead of the SPA HTML, which the year-long asset
+cache header would otherwise pin in browsers across a rollback. It is not
+forced, so files that exist are still served.
 
 For rollback, use Netlify's deploy history to republish the previous known-good
 production deploy, then correct `main` normally. A frontend rollback does not
