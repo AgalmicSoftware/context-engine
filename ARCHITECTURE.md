@@ -251,6 +251,15 @@ group, with the code entered separately. `sbtAuthorization.ts` supplies the
 same signing implementation to the browser and the local contract smoke test;
 there is no legacy signature fallback or alternate contract generation.
 
+The client derives a group-password signer with PBKDF2-SHA256 (600,000
+iterations) over the NFKC-normalized password, salted by
+`keccak256(abi.encodePacked("sbt-group-password-v4", sbtAddress))`; the SBT
+stores only `keccak256(signer address)` as `groupPasswordHash`. Because the salt
+is the group's own address, group-password groups deploy through
+`SBTFactory.createSBTDeterministicConfigured` at their predicted CREATE2
+address, and the factory sets `groupPasswordHash` once during that deployment.
+See `client/src/utilities/crypto/groupPasswordDerivation.cjs`.
+
 The current CustomSBT source uses one mutable `admin`, rotated with `changeAdmin`.
 It exposes no transferable collection ownership. Zero admin permanently disables
 issuer actions; holder burns still follow `OwnerOnly`/`Both`, and `Neither`
