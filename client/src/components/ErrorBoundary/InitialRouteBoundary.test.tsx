@@ -95,7 +95,7 @@ describe('InitialRouteBoundary', () => {
       }
     });
 
-    expect(screen.getByText(/this section encountered an error/i)).toBeInTheDocument();
+    expect(screen.getByText('A new version of Context Engine is available')).toBeInTheDocument();
     expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));
     expect(clearSpy).not.toHaveBeenCalled();
 

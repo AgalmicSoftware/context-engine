@@ -1,6 +1,6 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
-import { recoverFromStaleChunkLoadError } from '../../bootRecovery.js';
+import { isStaleChunkLoadError, recoverFromStaleChunkLoadError, reloadForStaleChunk } from '../../bootRecovery.js';
 
 type AppErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -9,6 +9,7 @@ type AppErrorBoundaryProps = {
 type AppErrorBoundaryState = {
   hasError: boolean;
   errorMessage: string;
+  staleChunk: boolean;
 };
 
 class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
@@ -17,6 +18,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
     this.state = {
       hasError: false,
       errorMessage: '',
+      staleChunk: false,
     };
   }
 
@@ -24,6 +26,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
     return {
       hasError: true,
       errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
+      staleChunk: isStaleChunkLoadError(error),
     };
   }
 
@@ -32,8 +35,17 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
     recoverFromStaleChunkLoadError(error);
   }
 
+  handleReload = () => {
+    if (this.state.staleChunk) {
+      reloadForStaleChunk();
+      return;
+    }
+    window.location.reload();
+  };
+
   render() {
     if (this.state.hasError) {
+      const { staleChunk } = this.state;
       return (
         <div
           style={{
@@ -57,11 +69,16 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
               padding: '28px',
             }}
           >
-            <h2 style={{ margin: '0 0 12px 0', color: 'var(--ce-panel-text)' }}>Something went wrong</h2>
-            <p style={{ margin: '0 0 20px 0', color: 'var(--ce-panel-text-muted)' }}>{this.state.errorMessage}</p>
+            {/* A stale chunk is a new deploy, not a bug: skip the raw module URL. */}
+            <h2 style={{ margin: '0 0 12px 0', color: 'var(--ce-panel-text)' }}>
+              {staleChunk ? 'A new version of Context Engine is available' : 'Something went wrong'}
+            </h2>
+            <p style={{ margin: '0 0 20px 0', color: 'var(--ce-panel-text-muted)' }}>
+              {staleChunk ? 'Reload the page to finish loading Context Engine.' : this.state.errorMessage}
+            </p>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={this.handleReload}
               style={{
                 background: 'var(--ce-action-accent)',
                 border: 'none',
@@ -74,21 +91,23 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
             >
               Reload
             </button>
-            <div style={{ marginTop: '16px' }}>
-              <a
-                href={PUBLIC_REPO_NEW_ISSUE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="ce-error-report-github"
-                style={{
-                  color: 'var(--ce-action-accent)',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                }}
-              >
-                Report this issue on GitHub
-              </a>
-            </div>
+            {staleChunk ? null : (
+              <div style={{ marginTop: '16px' }}>
+                <a
+                  href={PUBLIC_REPO_NEW_ISSUE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="ce-error-report-github"
+                  style={{
+                    color: 'var(--ce-action-accent)',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Report this issue on GitHub
+                </a>
+              </div>
+            )}
           </div>
         </div>
       );

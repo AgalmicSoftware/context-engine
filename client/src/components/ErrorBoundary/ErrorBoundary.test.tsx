@@ -12,15 +12,29 @@ const StaleChunkThrower = () => {
   throw new TypeError("'text/html' is not a valid JavaScript MIME type.");
 };
 
-describe('Error boundaries', () => {
-  let consoleSpy: jest.SpyInstance;
+const STALE_CSS_MESSAGE = 'Unable to preload CSS for /assets/OnePageSession-00000000.css';
 
+const renderStaleRoute = () => {
+  const StaleRoute = React.lazy(() => Promise.reject(new Error(STALE_CSS_MESSAGE)));
+  return render(
+    <RouteErrorBoundary>
+      <Suspense fallback={null}>
+        <StaleRoute />
+      </Suspense>
+    </RouteErrorBoundary>,
+  );
+};
+
+describe('Error boundaries', () => {
   beforeEach(() => {
-    consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
+    // Restore every spy here so one failing test cannot leak a mock into the next.
+    jest.restoreAllMocks();
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/');
   });
 
   it('renders the GitHub issue link in the app-wide fallback', () => {
@@ -61,29 +75,19 @@ describe('Error boundaries', () => {
     );
 
     expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));
-
-    recoverSpy.mockRestore();
   });
 
-  it('reloads instead of re-rendering a route whose lazy chunk failed to load', async () => {
-    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
+  it('explains a stale route chunk as a new version and reloads instead of re-rendering', async () => {
+    jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
     const reloadSpy = jest.spyOn(bootRecovery, 'reloadForStaleChunk').mockImplementation(() => undefined);
-    const StaleRoute = React.lazy(() =>
-      Promise.reject(new Error('Unable to preload CSS for /assets/OnePageSession-00000000.css')),
-    );
 
-    render(
-      <RouteErrorBoundary>
-        <Suspense fallback={null}>
-          <StaleRoute />
-        </Suspense>
-      </RouteErrorBoundary>,
-    );
-    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    renderStaleRoute();
+    fireEvent.click(await screen.findByRole('button', { name: 'Reload' }));
 
+    expect(screen.getByRole('heading', { name: 'A new version of Context Engine is available' })).toBeInTheDocument();
+    expect(screen.queryByText(STALE_CSS_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-error-report-github')).not.toBeInTheDocument();
     expect(reloadSpy).toHaveBeenCalledTimes(1);
-    recoverSpy.mockRestore();
-    reloadSpy.mockRestore();
   });
 
   it('re-renders an ordinary route error when the reader tries again', () => {
@@ -104,28 +108,38 @@ describe('Error boundaries', () => {
 
     expect(screen.getByText('Recovered route')).toBeInTheDocument();
     expect(reloadSpy).not.toHaveBeenCalled();
-    reloadSpy.mockRestore();
+  });
+
+  it('explains a stale app chunk as a new version with a Reload button', () => {
+    jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
+    const reloadSpy = jest.spyOn(bootRecovery, 'reloadForStaleChunk').mockImplementation(() => undefined);
+
+    render(
+      <AppErrorBoundary>
+        <StaleChunkThrower />
+      </AppErrorBoundary>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+
+    expect(screen.getByRole('heading', { name: 'A new version of Context Engine is available' })).toBeInTheDocument();
+    expect(screen.queryByText(/not a valid JavaScript MIME type/)).not.toBeInTheDocument();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the app-wide fallback on screen when reading session storage throws', () => {
-    const storageGetter = jest.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
+    jest.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
       throw new Error('SecurityError: site data is blocked');
     });
     // The marked URL means this load already reloaded once, so no navigation starts.
     window.history.replaceState({}, '', '/?ceChunkReload=123');
 
-    try {
-      render(
-        <AppErrorBoundary>
-          <StaleChunkThrower />
-        </AppErrorBoundary>,
-      );
+    render(
+      <AppErrorBoundary>
+        <StaleChunkThrower />
+      </AppErrorBoundary>,
+    );
 
-      expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
-    } finally {
-      storageGetter.mockRestore();
-      window.history.replaceState({}, '', '/');
-    }
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
   });
 
   it('asks the app-wide fallback to recover a stale AppShell chunk without clearing its loop guard', () => {
@@ -140,8 +154,5 @@ describe('Error boundaries', () => {
 
     expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));
     expect(window.sessionStorage.getItem(bootRecovery.STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
-
-    recoverSpy.mockRestore();
-    window.sessionStorage.removeItem(bootRecovery.STALE_CHUNK_RELOAD_STORAGE_KEY);
   });
 });

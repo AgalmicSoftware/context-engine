@@ -58,6 +58,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
 
   render() {
     if (this.state.hasError) {
+      const { staleChunk } = this.state;
       return (
         <div
           style={{
@@ -78,8 +79,13 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
               padding: '20px',
             }}
           >
-            <h3 style={{ margin: '0 0 10px 0', color: 'var(--ce-panel-text)' }}>This section encountered an error</h3>
-            <p style={{ margin: '0 0 16px 0', color: 'var(--ce-panel-text-muted)' }}>{this.state.errorMessage}</p>
+            {/* A stale chunk is a new deploy, not a bug: skip the raw module URL. */}
+            <h3 style={{ margin: '0 0 10px 0', color: 'var(--ce-panel-text)' }}>
+              {staleChunk ? 'A new version of Context Engine is available' : 'This section encountered an error'}
+            </h3>
+            <p style={{ margin: '0 0 16px 0', color: 'var(--ce-panel-text-muted)' }}>
+              {staleChunk ? 'Reload the page to finish loading this section.' : this.state.errorMessage}
+            </p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"
@@ -94,7 +100,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
                   cursor: 'pointer',
                 }}
               >
-                Try again
+                {staleChunk ? 'Reload' : 'Try again'}
               </button>
               <button
                 type="button"
@@ -110,25 +116,27 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
               >
                 Go back
               </button>
-              <a
-                href={PUBLIC_REPO_NEW_ISSUE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="ce-error-report-github"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '8px 14px',
-                  borderRadius: '8px',
-                  color: 'var(--ce-action-accent)',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  border: '1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent)',
-                  background: 'color-mix(in srgb, var(--ce-action-accent) 8%, transparent)',
-                }}
-              >
-                Report this issue on GitHub
-              </a>
+              {staleChunk ? null : (
+                <a
+                  href={PUBLIC_REPO_NEW_ISSUE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="ce-error-report-github"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    color: 'var(--ce-action-accent)',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    border: '1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent)',
+                    background: 'color-mix(in srgb, var(--ce-action-accent) 8%, transparent)',
+                  }}
+                >
+                  Report this issue on GitHub
+                </a>
+              )}
             </div>
           </div>
         </div>
