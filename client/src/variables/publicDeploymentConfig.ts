@@ -21,8 +21,6 @@ export const DEFAULT_SHARED_WORKER_URL = readPublicEnv('REACT_APP_CE_SHARED_WORK
 
 export const DEPLOY_HELPER_URL = readPublicEnv('REACT_APP_CE_DEPLOY_HELPER_URL', DEFAULT_PROJECT_DEPLOY_HELPER_URL);
 
-export const HEALTHCHECK_WORKER_URL = readPublicEnv('REACT_APP_CE_HEALTHCHECK_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
-
 // Worker bundles, their release manifest and the native Cloudflare deploy come
 // from one immutable release: REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT
 // (the Netlify build's own COMMIT_REF), else workerReleasePin.json. An invalid

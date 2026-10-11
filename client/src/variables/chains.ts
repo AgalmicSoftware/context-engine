@@ -829,9 +829,6 @@ export function getDefaultChainId(): number | null {
 export function buildExplorerAddressUrl(chainId: unknown, address: unknown): string | null {
   return buildExplorerEntityUrl(chainId, 'address', address);
 }
-export function buildExplorerTxUrl(chainId: unknown, txHash: unknown): string | null {
-  return buildExplorerEntityUrl(chainId, 'tx', txHash);
-}
 export function isChainWithFaucetRpcFallback(chainId: unknown): boolean {
   const id = normalizeChainIdValue(chainId);
   return !!id && CHAINS_WITH_FAUCET_RPC_FALLBACK.has(id);

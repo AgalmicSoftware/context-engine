@@ -1,4 +1,4 @@
-import { getDemoAvatar, getDemoAvatarByName } from './demoAvatars.js';
+import { getDemoAvatarByName } from './demoAvatars.js';
 
 describe('demoAvatars', () => {
   const expectHistoricalPhotoUrl = (url: string) => {
@@ -7,7 +7,7 @@ describe('demoAvatars', () => {
     );
   };
 
-  const requireAvatarInfo = (avatarInfo: ReturnType<typeof getDemoAvatar>) => {
+  const requireAvatarInfo = (avatarInfo: ReturnType<typeof getDemoAvatarByName>) => {
     expect(avatarInfo).not.toBeNull();
     if (!avatarInfo) {
       throw new Error('Expected demo avatar metadata.');
@@ -15,8 +15,8 @@ describe('demoAvatars', () => {
     return avatarInfo;
   };
 
-  it('resolves merged demo wallet addresses to avatar metadata', () => {
-    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x000000000000000000000000000000000000000b'));
+  it('resolves merged demo figures to avatar metadata', () => {
+    const avatarInfo = requireAvatarInfo(getDemoAvatarByName('Abraham Lincoln'));
 
     expect(avatarInfo).toEqual(
       expect.objectContaining({
@@ -28,8 +28,8 @@ describe('demoAvatars', () => {
     expect(avatarInfo.fallbackColor).toMatch(/^var\(--ce-data-series-[1-5]\)$/);
   });
 
-  it('resolves policy atlas pseudo addresses to avatar metadata', () => {
-    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x_pseudo_address_turing'));
+  it('resolves policy atlas figures to avatar metadata', () => {
+    const avatarInfo = requireAvatarInfo(getDemoAvatarByName('Alan Turing'));
 
     expect(avatarInfo).toEqual(
       expect.objectContaining({
@@ -41,7 +41,7 @@ describe('demoAvatars', () => {
   });
 
   it('resolves policy atlas-only figures through the local historical avatar manifest by name', () => {
-    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x_pseudo_address_aurelius'));
+    const avatarInfo = requireAvatarInfo(getDemoAvatarByName('Marcus Aurelius'));
 
     expect(avatarInfo).toEqual(
       expect.objectContaining({
@@ -74,8 +74,7 @@ describe('demoAvatars', () => {
     );
   });
 
-  it('returns null for unknown demo addresses and names', () => {
-    expect(getDemoAvatar('0x_not_a_demo_address')).toBeNull();
+  it('returns null for unknown names', () => {
     expect(getDemoAvatarByName('Unknown Figure')).toBeNull();
   });
 });

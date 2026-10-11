@@ -3,7 +3,6 @@ import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import {
   getHistoricalFigureAvatar,
   getHistoricalFigureAvatarOrBlockie,
-  getHistoricalFigureAvatarUsernames,
   hasHistoricalFigureAvatar,
 } from './historicalFigureAvatars.js';
 
@@ -54,12 +53,11 @@ describe('historicalFigureAvatars', () => {
 
   it('covers the usernames declared in historical_figure_users.json and keeps extra atlas-only photo entries available', () => {
     const allUsernames = historicalFigures.map((entry) => entry?.username).filter(Boolean);
-    const avatarUsernames = getHistoricalFigureAvatarUsernames();
 
     allUsernames.forEach((username) => {
-      expect(avatarUsernames).toContain(username);
+      expect(hasHistoricalFigureAvatar(username)).toBe(true);
     });
-    expect(avatarUsernames).toContain('Hypatia');
+    expect(hasHistoricalFigureAvatar('Hypatia')).toBe(true);
   });
 
   it('returns an empty string for unknown usernames', () => {

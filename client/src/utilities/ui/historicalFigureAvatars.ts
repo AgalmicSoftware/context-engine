@@ -100,5 +100,3 @@ export const getHistoricalFigureAvatarOrBlockie = (usernameIn = '', options: Blo
 
   return getHistoricalFigureBlockie(username, options);
 };
-
-export const getHistoricalFigureAvatarUsernames = (): string[] => HISTORICAL_FIGURE_USERNAMES.slice();

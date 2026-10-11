@@ -1,4 +1,4 @@
-import { isValidEthAddress, normalizeSessionIdHex, normalizeSlug, toStr } from './primitives.js';
+import { normalizeSessionIdHex, normalizeSlug, toStr } from './primitives.js';
 
 describe('shared primitives', () => {
   describe('toStr', () => {
@@ -35,14 +35,6 @@ describe('shared primitives', () => {
       expect(normalizeSessionIdHex('')).toBe('');
       expect(normalizeSessionIdHex('0x')).toBe('');
       expect(normalizeSessionIdHex('0x0000')).toBe('');
-    });
-  });
-
-  describe('isValidEthAddress', () => {
-    it('accepts 20-byte hex addresses and rejects malformed values', () => {
-      expect(isValidEthAddress('0x0000000000000000000000000000000000000001')).toBe(true);
-      expect(isValidEthAddress('0000000000000000000000000000000000000001')).toBe(false);
-      expect(isValidEthAddress('0x000000000000000000000000000000000000000g')).toBe(false);
     });
   });
 });

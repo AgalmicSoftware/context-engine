@@ -2,18 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   DEFAULT_SESSION_COLOR_SCHEME_ID,
-  SESSION_COLOR_SCHEME_IDS,
+  SESSION_COLOR_SCHEME_REGISTRY,
   getSessionColorScheme,
   normalizeSessionAppearance,
   normalizeSessionColorSchemeId,
   parseSessionColorSchemeId,
 } from './sessionColorSchemes';
 
+const SCHEME_IDS = SESSION_COLOR_SCHEME_REGISTRY.map(({ id }) => id);
+
 describe('session color scheme registry', () => {
   const scssPath = path.resolve(__dirname, '..', '..', 'scss', 'session-color-schemes', '_schemes.scss');
 
   test('accepts only the three bundled stable ids and falls back safely', () => {
-    expect(SESSION_COLOR_SCHEME_IDS).toEqual(['context-engine', 'ocean', 'amber']);
+    expect(SCHEME_IDS).toEqual(['context-engine', 'ocean', 'amber']);
     expect(parseSessionColorSchemeId(' OCEAN ')).toBe('ocean');
     expect(parseSessionColorSchemeId('url(https://example.invalid/theme.css)')).toBeNull();
     expect(normalizeSessionColorSchemeId('../custom.scss')).toBe(DEFAULT_SESSION_COLOR_SCHEME_ID);
@@ -40,7 +42,7 @@ describe('session color scheme registry', () => {
       ([, id]) => id,
     );
 
-    expect(selectorIds).toEqual(SESSION_COLOR_SCHEME_IDS);
+    expect(selectorIds).toEqual(SCHEME_IDS);
   });
 
   test('keeps the Worker trust-boundary allowlist in parity with the client registry', () => {
@@ -53,7 +55,7 @@ describe('session color scheme registry', () => {
       ?.match(/'([^']+)'/g)
       ?.map((value) => value.slice(1, -1));
 
-    expect(ids).toEqual(SESSION_COLOR_SCHEME_IDS);
+    expect(ids).toEqual(SCHEME_IDS);
   });
 
   test('meets AA text and non-text contrast for every bundled scheme', () => {
@@ -72,7 +74,7 @@ describe('session color scheme registry', () => {
       return (light + 0.05) / (dark + 0.05);
     };
 
-    for (const id of SESSION_COLOR_SCHEME_IDS) {
+    for (const id of SCHEME_IDS) {
       const block = source.match(
         new RegExp(`\\[data-ce-session-color-scheme=['"]${id}['"]\\] \\{([\\s\\S]*?)\\n\\}`),
       )?.[1];
