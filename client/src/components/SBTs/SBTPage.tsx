@@ -22,6 +22,7 @@ import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
+import { GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE } from 'utilities/crypto/sbtAuthorization';
 import { createLogger } from 'utilities/logging.js';
 import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
@@ -178,6 +179,7 @@ import {
   shouldRunSbtPagePropPasswordAutoMint,
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
+  isKnownOpenSbt,
   resolveSbtGroupPasswordFailureMessage,
 } from './sbtPageHelpers';
 import type {
@@ -1270,6 +1272,12 @@ class SBTPage extends Component<any, any> {
     if (sbtInfoRecord.hasPasswordMint) {
       if (this._isMounted)
         this.setState(buildSbtPageMintFailurePatch({ error: `Password required for this ${t('sbt')}.` }));
+      return false;
+    }
+    // A failed read (null) may hide a group password, so only metadata that says the group is open lets it claim.
+    if (!onchainGph && !isKnownOpenSbt(sbtInfoRecord)) {
+      if (this._isMounted)
+        this.setState(buildSbtPageMintFailurePatch({ error: GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE }));
       return false;
     }
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {

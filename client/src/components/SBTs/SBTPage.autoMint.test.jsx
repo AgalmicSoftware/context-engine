@@ -1059,6 +1059,45 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
+  it.each([
+    ['metadata without a mint mode', { hasPasswordMint: false }, 0],
+    ['metadata that says the group is open', { hasPasswordMint: false, mintMode: 0 }, 1],
+  ])(
+    'claims a code-free auto-join link after a failed hash read only with %s',
+    async (_case, sbtInfo, expectedClaims) => {
+      const sbtAddress = '0x0000000000000000000000000000000000000106';
+      const previousHref = window.location.href;
+      window.history.replaceState(
+        {},
+        '',
+        `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+      );
+
+      try {
+        const subject = createSubject({
+          SBTAddress: sbtAddress,
+          account: '0x0000000000000000000000000000000000000abc',
+          loginComplete: true,
+        });
+        subject.state = { ...subject.state, sbtInfo, userHasSBT: false, mintingStatus: 'idle' };
+        subject.completeMintSuccessForTarget = jest.fn();
+        jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+        const claim = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+
+        await subject.handleUrlAutoMintIntent();
+
+        expect(claim).toHaveBeenCalledTimes(expectedClaims);
+        if (!expectedClaims) {
+          expect(subject.state.error).toBe(
+            "Could not read this group's password check from the chain. Check the network and try again.",
+          );
+        }
+      } finally {
+        window.history.replaceState({}, '', previousHref);
+      }
+    },
+  );
+
   it('reports an unreadable URL group hash as a read failure instead of asking for an invite code', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000105';
     const previousHref = window.location.href;
