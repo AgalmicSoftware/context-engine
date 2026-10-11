@@ -5,6 +5,7 @@ import {
 } from './workerGroups.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import {
+  isInterviewModeEnabled,
   proxyOpenAiRealtimeCall as proxyOpenAiRealtimeCallBoundary,
   readRealtimeCallRequestPayload as readRealtimeCallRequestPayloadBoundary,
 } from './realtimeCallExecution.js';
@@ -111,6 +112,9 @@ export const dispatchAnonymousRoute = async ({
   }
 
   if (path === '/realtime/call') {
+    if (!isInterviewModeEnabled(config)) {
+      return deps?.json?.({ error: 'Interview mode is disabled for this session.' }, 403, headers);
+    }
     const readRealtimeCallRequestPayload = deps?.readRealtimeCallRequestPayload || readRealtimeCallRequestPayloadBoundary;
     const realtimeRequest = await readRealtimeCallRequestPayload({ request });
     if (!realtimeRequest?.ok) {

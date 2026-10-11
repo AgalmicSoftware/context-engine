@@ -7,6 +7,13 @@ export const DEFAULT_INTERVIEW_REALTIME_MODEL = DEFAULT_REALTIME_INTERVIEW_MODEL
 const trim = (value) => String(value == null ? '' : value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
+// The owner's interview switch. Resource presence reports it and the voice
+// route enforces it, so a disabled interview cannot spend the session's key.
+export const isInterviewModeEnabled = (config = {}) => {
+  const interview = isObj(config?.interviewMode || config?.interview) ? (config.interviewMode || config.interview) : {};
+  return config?.interviewModeEnabled !== false && interview.enabled !== false;
+};
+
 const buildRealtimeMultipartBody = ({ sdp, session }) => {
   const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, '')}`;
   const body = [

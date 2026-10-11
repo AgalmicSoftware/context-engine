@@ -2164,6 +2164,9 @@ Signed login/bootstrap requests:
 - `POST /admin/refresh-interview-opening`
   - Uses the existing signed admin request body and authority checks. Regenerates the cached opening when `interviewMode.allowManualRefresh` is enabled (default true). Owner-written openings are preserved.
 - `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
+  - Returns `403` without contacting OpenAI when `interviewModeEnabled=false`
+    or `interviewMode.enabled=false`, the same switch `/resource-presence`
+    reports.
   - Uses the anonymous AI eligibility policy above and the Worker-held
     `openaiKey`. The key is never accepted from or returned to the browser.
   - Defaults to `gpt-live-1`. Posts JSON to OpenAI `/v1/live/sessions` with

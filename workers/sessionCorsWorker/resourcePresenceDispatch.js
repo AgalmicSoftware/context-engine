@@ -1,4 +1,5 @@
 import { resolveSessionLifecycle } from '../shared/sessionLifecycle.mjs';
+import { isInterviewModeEnabled } from './realtimeCallExecution.js';
 
 const toPresent = (value) => {
   if (typeof value === 'string') return value.trim().length > 0;
@@ -49,7 +50,7 @@ export const dispatchResourcePresenceRequest = async ({
     const settings = config.interviewMode || config.interview || {};
     let reason = '';
     if (resolveSessionLifecycle(config).ended) reason = 'This session has ended.';
-    else if (config.interviewModeEnabled === false || settings.enabled === false) reason = 'Interview mode is disabled for this session.';
+    else if (!isInterviewModeEnabled(config)) reason = 'Interview mode is disabled for this session.';
     else if (String(settings.provider || 'openai').trim().toLowerCase() !== 'openai') reason = 'Voice interviews require the OpenAI provider.';
     else if (!String(secrets.openaiKey || '').trim()) reason = 'The session owner needs to configure an OpenAI key for voice interviews.';
     else {
