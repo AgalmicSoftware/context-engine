@@ -2121,35 +2121,44 @@ export const setCloudflareStorageResourceHidden = async ({ env, config, slug, bo
   } catch (error) {
     return { ok: false, status: 503, error: error?.message || 'Storage audit store is unavailable.' };
   }
-  await writeStorageResourceHidden({
-    index, slug, resource, resourceId, hidden, actor, updatedAt: new Date(deps?.now?.() || Date.now()).toISOString(),
-  });
   // Mark every stored version so lists can skip them from index metadata.
   // Uploads from before this release lack resourceId; read those once here and
   // record it, so later scans read only the index. KV takes one write per key
   // per second, so each row gets a single put carrying both changes.
   let matchedRows = 0;
   let unreadableRows = 0;
-  for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
-    if (!row.metadata) {
-      unreadableRows += 1;
-      continue;
+  try {
+    await writeStorageResourceHidden({
+      index, slug, resource, resourceId, hidden, actor, updatedAt: new Date(deps?.now?.() || Date.now()).toISOString(),
+    });
+    for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
+      if (!row.metadata) {
+        unreadableRows += 1;
+        continue;
+      }
+      const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+      if (rowResourceId === null) {
+        unreadableRows += 1;
+        continue;
+      }
+      const matched = rowResourceId === resourceId;
+      const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
+      if (!matched && !recordsId) continue;
+      const next = { ...row.metadata, resourceId: rowResourceId };
+      if (matched) {
+        matchedRows += 1;
+        if (hidden) next.hidden = true;
+        else delete next.hidden;
+      }
+      await index.put(row.key, JSON.stringify(next));
     }
-    const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
-    if (rowResourceId === null) {
-      unreadableRows += 1;
-      continue;
+  } catch (error) {
+    // A change within a second of the last one hits KV's per-key write limit.
+    // Its audit entry is already written; the retry completes the change.
+    if (/\b429\b|too many requests/i.test(toStr(error?.message))) {
+      return { ok: false, status: 429, error: 'This id changed less than a second ago. Try again in a moment.' };
     }
-    const matched = rowResourceId === resourceId;
-    const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
-    if (!matched && !recordsId) continue;
-    const next = { ...row.metadata, resourceId: rowResourceId };
-    if (matched) {
-      matchedRows += 1;
-      if (hidden) next.hidden = true;
-      else delete next.hidden;
-    }
-    await index.put(row.key, JSON.stringify(next));
+    throw error;
   }
   const hiddenIds = [...await listHiddenStorageResourceIds({ index, slug, resource })].sort();
   return {

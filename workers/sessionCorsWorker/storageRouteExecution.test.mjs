@@ -4637,6 +4637,22 @@ test('hiding reads each legacy payload once and records its id for later scans',
 	assert.equal(payloadReads.length, 3);
 });
 
+test('a hide toggled again within a second asks the admin to retry', async () => {
+	const { common, upload, list, hide } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
+	assert.equal((await hide('0xq9')).status, 200);
+	// Same second: KV refuses a second write of the hidden marker with 429.
+	const again = await setCloudflareStorageResourceHidden({
+		...common, body: { resource: 'questions', id: '0xq9', hidden: false }, actor: OWNERSHIP_ADMIN,
+	});
+	assert.equal(again.ok, false);
+	assert.equal(again.status, 429);
+	assert.match(again.error, /Try again in a moment/);
+	// A moment later the unhide goes through.
+	assert.equal((await hide('0xq9', false)).body.hiddenIds.length, 0);
+	assert.equal((await list()).items.filter((item) => item.storageRef).length, 1);
+});
+
 test('hide requests validate the resource, id, and flag', async () => {
 	const { common } = createOwnershipHarness();
 	for (const [body, error] of [
