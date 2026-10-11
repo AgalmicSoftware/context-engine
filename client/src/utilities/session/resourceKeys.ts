@@ -4,7 +4,7 @@
  * @description Worker KV resource key management — keeps per-session RPC keys,
  *              Arweave JWKs, and faucet configuration in memory and resolves session defaults.
  *
- * Key exports: getEffectiveArweaveKey, getEffectiveFaucetConfig, getLocalResourceKeys
+ * Key exports: getEffectiveArweaveKey, getLocalResourceKeys
  */
 import { sessionRegistryStore } from '../web3/sessionRegistry.js';
 import { toStr } from '../shared/primitives.js';
@@ -62,20 +62,6 @@ type EffectiveArweaveKeyResult = {
   sessionStatus: string;
   groupStatus: string;
   localStatus: string;
-};
-type EffectiveFaucetConfigResult = {
-  privateKey: string;
-  source: 'session' | 'local';
-  sessionConfigSource: string;
-  status: string;
-  preferLocal: boolean;
-  sessionStatus: string;
-  groupStatus: string;
-  localStatus: string;
-  rpcUrl: string;
-  amountEth: string;
-  balanceThresholdEth: string;
-  encryptedAvailable: boolean;
 };
 
 const STORAGE_KEY = 'ce:resourceKeys:v1';
@@ -218,15 +204,6 @@ const resolveSessionArweaveKey = async (
   return buildWorkerKeyMeta('jwk');
 };
 
-const resolveSessionFaucetKey = async (
-  sessionCfg: SessionConfig | null,
-  context: ResourceKeyResolutionContext = {},
-): Promise<WorkerKeyMeta<'privateKey'>> => {
-  void sessionCfg;
-  void context;
-  return buildWorkerKeyMeta('privateKey');
-};
-
 export const getEffectiveArweaveKey = async ({
   sessionSlug,
   sessionConfig,
@@ -266,66 +243,5 @@ export const getEffectiveArweaveKey = async ({
     sessionStatus: sessionResolved.status,
     groupStatus: sessionResolved.status,
     localStatus: localResolved.status,
-  };
-};
-
-export const getEffectiveFaucetConfig = async ({
-  sessionSlug,
-  sessionConfig,
-  preferLocal,
-  context,
-}: EffectiveResourceKeyOptions = {}): Promise<EffectiveFaucetConfigResult> => {
-  const resolved = resolveCanonicalSessionConfig({
-    source: { sessionSlug, sessionConfig },
-    resolveBySlug: resolveSessionConfig,
-  });
-  const slug = resolved.sessionSlug;
-  const cfg = resolved.sessionConfig;
-  const local = getLocalResourceKeys(slug);
-  const preferLocalResolved = typeof preferLocal === 'boolean' ? preferLocal : !!local.faucet.useLocal;
-
-  const sessionResolved = await resolveSessionFaucetKey(cfg, context);
-  const localKey = toStr(local.faucet.privateKey).trim();
-  const localResolved = {
-    privateKey: localKey,
-    status: localKey ? 'local' : 'missing',
-    encryptedAvailable: false,
-  };
-
-  let selected = sessionResolved;
-  let source: 'session' | 'local' = 'session';
-  if (preferLocalResolved) {
-    selected = localResolved;
-    source = 'local';
-  }
-
-  const faucetCfg = isObj(cfg?.faucet) ? cfg.faucet : {};
-  const localFaucetCfg = local?.faucet || {};
-
-  const rpcUrl = preferLocalResolved
-    ? toStr(localFaucetCfg.rpcUrl || faucetCfg.rpcUrl || '')
-    : toStr(faucetCfg.rpcUrl || localFaucetCfg.rpcUrl || '');
-
-  const amountEth = preferLocalResolved
-    ? toStr(localFaucetCfg.amountEth || faucetCfg.amountEth || '')
-    : toStr(faucetCfg.amountEth || localFaucetCfg.amountEth || '');
-
-  const balanceThresholdEth = preferLocalResolved
-    ? toStr(localFaucetCfg.balanceThresholdEth || faucetCfg.balanceThresholdEth || '')
-    : toStr(faucetCfg.balanceThresholdEth || localFaucetCfg.balanceThresholdEth || '');
-
-  return {
-    privateKey: toStr(selected.privateKey || '').trim(),
-    source,
-    sessionConfigSource: resolved.sessionConfigSource,
-    status: selected.status,
-    preferLocal: preferLocalResolved,
-    sessionStatus: sessionResolved.status,
-    groupStatus: sessionResolved.status,
-    localStatus: localResolved.status,
-    rpcUrl: toStr(rpcUrl || '').trim(),
-    amountEth: toStr(amountEth || '').trim(),
-    balanceThresholdEth: toStr(balanceThresholdEth || '').trim(),
-    encryptedAvailable: !!sessionResolved.encryptedAvailable,
   };
 };

@@ -120,8 +120,6 @@ jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   normalizeSessionScanSlugs: jest.fn((value) => value || []),
   readSessionScanScope: jest.fn(() => 'all'),
   readSessionScanSlugs: jest.fn(() => []),
-  writeSessionScanScope: jest.fn(),
-  writeSessionScanSlugs: jest.fn(),
 }));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({

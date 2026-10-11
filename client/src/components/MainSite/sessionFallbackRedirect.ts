@@ -119,16 +119,6 @@ export const isFirstVisitRootRedirectEnabled = (deps: {
   return buildTimeFallback;
 };
 
-export const getFirstVisitRootRedirectTarget = (deps: {
-  isFirstVisitRootRedirectEnabled: () => boolean;
-}): FirstVisitRootRedirectTarget | null => {
-  if (!deps.isFirstVisitRootRedirectEnabled()) return null;
-
-  return {
-    path: '/about',
-  };
-};
-
 // Temporary demo-launch guard: only an initial normalized root document load
 // may go to /about. The caller owns the one-time consumption check so this
 // path matcher stays storage-independent.

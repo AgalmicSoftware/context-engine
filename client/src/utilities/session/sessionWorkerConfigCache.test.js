@@ -1,5 +1,4 @@
 import {
-  clearCachedSessionWorkerConfig,
   getCachedSessionWorkerConfig,
   getSessionWorkerConfigReplicaState,
   getVerifiedWorkerCanonicalSessionBootstrap,
@@ -278,18 +277,6 @@ describe('sessionWorkerConfigCache', () => {
       slug: 'edge',
       config: { sessionName: 'not-a-worker-config' },
     });
-    expect(getCachedSessionWorkerConfig('edge')).toBeNull();
-  });
-
-  it('clears a stored entry by slug', () => {
-    upsertCachedSessionWorkerConfig({
-      slug: 'edge',
-      config: {
-        corsWorkerUrl: 'https://worker.example',
-      },
-    });
-
-    clearCachedSessionWorkerConfig('edge');
     expect(getCachedSessionWorkerConfig('edge')).toBeNull();
   });
 
@@ -583,7 +570,7 @@ describe('sessionWorkerConfigCache', () => {
     });
   });
 
-  it('drops an applied replica when the cached worker config is cleared', () => {
+  it('drops an applied replica when the cached worker config is removed', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
     const baseConfig = {
       slug: 'edge',
@@ -608,7 +595,8 @@ describe('sessionWorkerConfigCache', () => {
       sessionConfig: baseConfig,
     });
 
-    clearCachedSessionWorkerConfig('edge');
+    upsertCachedSessionWorkerConfig({ slug: 'edge', config: null });
+    expect(getCachedSessionWorkerConfig('edge')).toBeNull();
 
     expect(
       overlayCachedSessionWorkerConfig({

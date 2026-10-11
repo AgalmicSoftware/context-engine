@@ -3,7 +3,6 @@ import {
   changeFocusedTab,
   fetchSessionState,
   setDemoSurfaceMode,
-  setOnboardingStep,
   toggleDemoMode,
   toggleLoginModal,
   toggleTooltips,
@@ -16,7 +15,6 @@ import {
   FETCH_SESSION_STATE,
   LOGIN_IN_PROGRESS,
   SET_DEMO_SURFACE_MODE,
-  SET_ONBOARDING_STEP,
   TOGGLE_DEMO_MODE,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
@@ -116,10 +114,6 @@ describe('sessionStateActions', () => {
       {
         run: (dispatch) => changeActiveSessionSlug('debate')(dispatch),
         action: { type: CHANGE_ACTIVE_SESSION_SLUG, payload: 'debate' },
-      },
-      {
-        run: (dispatch) => setOnboardingStep(null)(dispatch),
-        action: { type: SET_ONBOARDING_STEP, payload: null },
       },
     ];
 
