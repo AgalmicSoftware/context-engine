@@ -1,5 +1,8 @@
 import { removeKeys, safeJsonRead } from '../cache/storageJson.js';
 
+// Nothing writes the unscoped legacy key: it is read, migrated to the scoped
+// key, and cleared. Drop it one public release after scoped create-SBT draft
+// writes are verified.
 const LEGACY_CREATE_SBT_FORM_CACHE_KEY = 'createSbtFormCache';
 const SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX = 'dg:createSbtFormCache:';
 
@@ -31,14 +34,6 @@ const CREATE_SBT_CREDENTIAL_FIELDS = Object.freeze([
   'sbtInviteLinks',
 ]);
 const CREATE_SBT_CREDENTIAL_FIELD_SET = new Set(CREATE_SBT_CREDENTIAL_FIELDS.map((field) => field.toLowerCase()));
-
-export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
-  legacyKey: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
-  scopedKeyPrefix: SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX,
-  legacyWritesAllowed: false,
-  migration: 'read-migrate-clear',
-  removeAfter: 'one public release after scoped create-SBT draft writes are verified',
-});
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 

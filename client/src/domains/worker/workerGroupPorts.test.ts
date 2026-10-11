@@ -11,7 +11,6 @@ import {
   loadWorkerGroupMembers,
   loadWorkerGroupOverview,
   normalizeWorkerGroupDefaultTags,
-  reconcileEmptyWorkerGroupsAdmin,
   removeWorkerGroupMember,
   updateWorkerGroup,
 } from './workerGroupPorts';
@@ -961,11 +960,6 @@ describe('worker group ports', () => {
       sessionSlug: SESSION_SLUG,
       postSignedRequest,
     });
-    await reconcileEmptyWorkerGroupsAdmin({
-      sessionId: SESSION_ID,
-      sessionSlug: SESSION_SLUG,
-      postSignedRequest,
-    });
 
     expect(postSignedRequest).toHaveBeenNthCalledWith(1, {
       action: 'groups/create',
@@ -1024,11 +1018,6 @@ describe('worker group ports', () => {
       action: 'groups/delete',
       path: '/admin/groups/delete',
       body: { groupId: 'reviewers', sessionId: SESSION_ID },
-    });
-    expect(postSignedRequest).toHaveBeenNthCalledWith(8, {
-      action: 'groups/reconcile-empty',
-      path: '/admin/groups/reconcile-empty',
-      body: { sessionId: SESSION_ID },
     });
   });
 

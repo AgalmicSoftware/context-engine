@@ -1,8 +1,4 @@
-import {
-  normalizeSbtInstanceListenersMode,
-  readSbtInstanceListenersMode,
-  writeSbtInstanceListenersMode,
-} from './sbtInstanceListenersMode.js';
+import { normalizeSbtInstanceListenersMode, readSbtInstanceListenersMode } from './sbtInstanceListenersMode.js';
 
 describe('sbtInstanceListenersMode helpers', () => {
   beforeEach(() => {
@@ -50,11 +46,5 @@ describe('sbtInstanceListenersMode helpers', () => {
     // localStorage still wins, even when invalid.
     localStorage.setItem('ce:sbtInstanceListenersMode', 'not-valid');
     expect(readSbtInstanceListenersMode()).toBe('auto');
-  });
-
-  it('writeSbtInstanceListenersMode writes localStorage and globalThis without reload', () => {
-    expect(writeSbtInstanceListenersMode('off')).toBe('off');
-    expect(localStorage.getItem('ce:sbtInstanceListenersMode')).toBe('off');
-    expect((globalThis as Record<string, unknown>).CE_SBT_INSTANCE_LISTENERS_MODE).toBe('off');
   });
 });

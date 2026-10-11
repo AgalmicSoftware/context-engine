@@ -25,10 +25,6 @@ export interface SbtRealtimeEventLike extends CacheRecord {
 
 export type SbtRealtimeCursorRecord = SbtRealtimeEventCursor;
 
-export interface SbtRealtimeListenerCleanupHandle {
-  dispose: () => unknown;
-}
-
 export interface SbtHydrationQueueEntry {
   address: string;
   addressKey: string;

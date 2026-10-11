@@ -782,23 +782,6 @@ export const listWorkerGroupsAdmin = ({
     groups: normalizeGroups(payload.groups, sessionSlug),
   }));
 
-export const reconcileEmptyWorkerGroupsAdmin = ({
-  sessionId,
-  sessionSlug,
-  postSignedRequest,
-}: {
-  sessionId: unknown;
-  sessionSlug: unknown;
-  postSignedRequest: PostSignedWorkerGroupRequest;
-}): Promise<UnknownRecord> =>
-  runAdminAction({
-    action: 'groups/reconcile-empty',
-    body: {},
-    sessionId,
-    sessionSlug,
-    postSignedRequest,
-  });
-
 export const listWorkerGroupMembers = ({
   groupId,
   cursor,

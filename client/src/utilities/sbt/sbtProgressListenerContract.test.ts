@@ -1,8 +1,4 @@
-import {
-  buildSbtHydrationQueueEntry,
-  buildSbtLightDiscoveryInFlightKey,
-  type SbtRealtimeListenerCleanupHandle,
-} from './sbtProgressListenerContract.js';
+import { buildSbtHydrationQueueEntry, buildSbtLightDiscoveryInFlightKey } from './sbtProgressListenerContract.js';
 
 describe('sbtProgressListenerContract', () => {
   it('normalizes a hydration address without mutating queue state', () => {
@@ -42,14 +38,5 @@ describe('sbtProgressListenerContract', () => {
       }),
     ).toBe('alpha|beta|1');
     expect(buildSbtLightDiscoveryInFlightKey({ sessionSlug: 'alpha' })).toBe('alpha||0');
-  });
-
-  it('keeps listener cleanup handles explicit for the eventual typed host', () => {
-    const dispose = jest.fn();
-    const handle = { dispose } satisfies SbtRealtimeListenerCleanupHandle;
-
-    handle.dispose();
-
-    expect(dispose).toHaveBeenCalledTimes(1);
   });
 });

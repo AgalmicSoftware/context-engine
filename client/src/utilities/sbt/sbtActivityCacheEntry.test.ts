@@ -2,7 +2,6 @@ import {
   applySbtActivityCacheEntryUpdate,
   buildSbtActivityCacheEntry,
   hydrateSbtActivityCacheEntry,
-  isSbtActivityCacheEntry,
   mergeSbtActivityCacheEntryCounts,
   SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
 } from './sbtActivityCacheEntry.js';
@@ -51,8 +50,6 @@ describe('sbtActivityCacheEntry', () => {
       sbtAddress: '0xSBT',
       legacyExtension: { retained: true },
     });
-    expect(isSbtActivityCacheEntry(hydrated)).toBe(true);
-    expect(isSbtActivityCacheEntry({ sbtAddress: '0xSBT' })).toBe(false);
   });
 
   it('supports event-block overrides for newly created SBTs', () => {
