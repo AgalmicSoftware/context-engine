@@ -7,7 +7,6 @@ import {
   SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE,
   SURVEY_GENERATOR_ERROR_STYLE,
   SURVEY_GENERATOR_TEXT_INPUT_STYLE,
-  buildManualLibraryTextFile,
   buildPhotoAnalysisFilename,
   buildPhotoAnalysisMarkdown,
   buildPhotoPreviewUrl,
@@ -37,7 +36,6 @@ import {
   getPhotoStatusLabel,
   hasDatabaseToolInputContent,
   isLikelyImageUrl,
-  isManualLibraryUploadableContent,
   isSingleHttpUrlInput,
   isSupportedAdditionalFile,
   isSupportedPhotoFile,
@@ -340,26 +338,9 @@ describe('surveyGeneratorHelpers', () => {
     expect(renameFileForLibraryUpload({ name: 'not-file.txt' }, 'Title')).toEqual({ name: 'not-file.txt' });
   });
 
-  it('builds manual library text files as markdown or plain text', () => {
-    const markdownFile = buildManualLibraryTextFile({ title: 'Agenda', text: '# Heading' });
-    const textFile = buildManualLibraryTextFile({ title: 'Note', text: 'plain note' });
-
-    expect(markdownFile.name).toBe('Agenda.md');
-    expect(markdownFile.type).toBe('text/markdown');
-    expect(markdownFile.size).toBe('# Heading'.length);
-    expect(textFile.name).toBe('Note.txt');
-    expect(textFile.type).toBe('text/plain');
-    expect(textFile.size).toBe('plain note'.length);
-  });
-
-  it('detects database and library input content', () => {
+  it('detects database tool input content', () => {
     expect(hasDatabaseToolInputContent({ audioFile: { name: 'clip.wav' } })).toBe(true);
     expect(hasDatabaseToolInputContent({ pastedText: '  ', additionalSources: [] })).toBe(false);
-    expect(isManualLibraryUploadableContent({ additionalUrlInput: 'https://example.test/doc' })).toBe(true);
-    expect(isManualLibraryUploadableContent({ additionalSources: [{ id: 'source-1' }] })).toBe(true);
-    expect(isManualLibraryUploadableContent({ pastedText: '', additionalUrlInput: '', additionalSources: [] })).toBe(
-      false,
-    );
   });
 
   it('formats configured AI prompt model labels', () => {

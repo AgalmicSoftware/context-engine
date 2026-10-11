@@ -6,7 +6,7 @@ import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared
  * @description User comparison algorithms — pure math and deterministic computation helpers
  *              for PCA, clustering, similarity scoring, and stance encoding.
  *
- * Key exports: buildUsersFromCaches, pcaLiteCompass, computeOverlapMatrix, deriveUserLabels
+ * Key exports: buildUsersFromCaches, pcaLiteCompass, deriveUserLabels
  */
 
 // Purpose: centralize compare/computation helpers (pure math + deterministic logic).
@@ -120,14 +120,6 @@ interface CompassBundle {
     y: string[];
   };
 }
-
-interface OverlapColumn {
-  key: string;
-  label: string;
-}
-
-type OpinionOverlapRows = Array<Array<-1 | 0 | 1>>;
-type SbtOverlapRows = Array<Array<{ has: boolean }>>;
 
 interface SbtAggregate {
   identity: CanonicalMembershipIdentity;
@@ -254,38 +246,6 @@ export function encodeStancesForUser(user: Partial<CompareUser> = {}): EncodedSt
   return { tokens };
 }
 
-/** selectTopOpinionTokens(users, topN=20) → token[]  (variance × coverage) */
-export function selectTopOpinionTokens(users: CompareUser[] = [], topN = 20): string[] {
-  const U = Math.max(0, Math.min(Array.isArray(users) ? users.length : 0, 10));
-  if (U === 0) return [];
-  const encs = (users || []).map(encodeStancesForUser);
-  if (encs.every((e) => (e?.tokens?.size || 0) < 3)) return [];
-  const allTokens = new Set<string>();
-  encs.forEach((e) => e.tokens.forEach((_, t) => allTokens.add(t)));
-  const scores: Array<{ tok: string; score: number; cov: number }> = [];
-  for (const tok of allTokens) {
-    const vals = [];
-    let nz = 0;
-    for (let i = 0; i < U; i++) {
-      const obj = encs[i]?.tokens?.get(tok);
-      const v = obj ? obj.sign * obj.weight : 0;
-      if (v !== 0) nz++;
-      vals.push(v);
-    }
-    const cov = nz / U;
-    if (cov === 0) continue;
-    const mean = vals.reduce((a, b) => a + b, 0) / U;
-    const varSum = vals.reduce((a, b) => a + (b - mean) * (b - mean), 0);
-    const variance = varSum / U;
-    scores.push({ tok, score: variance * cov, cov });
-  }
-  const N = Math.min(Math.max(1, topN || 20), 20);
-  return scores
-    .sort((a, b) => b.score - a.score || b.cov - a.cov || (a.tok < b.tok ? -1 : 1))
-    .slice(0, N)
-    .map((x) => x.tok);
-}
-
 /** pcaLiteCompass(users) → deterministic axes+points in [-1,1] */
 export function pcaLiteCompass(users: CompareUser[] = []): CompassBundle {
   const safe = Array.isArray(users) ? users : [];
@@ -397,79 +357,6 @@ export function pcaLiteCompass(users: CompareUser[] = []): CompassBundle {
   return { axes, points, evidence: { x: [], y: [] } };
 }
 
-/** computeOverlapMatrix(users, topN) → { mode, columns:[{key,label}], rows:(number[][]|{has:boolean}[][]) } */
-export function computeOverlapMatrix(
-  users: CompareUser[] = [],
-  topN = 20,
-):
-  | { mode: 'opinion'; columns: OverlapColumn[]; rows: OpinionOverlapRows }
-  | { mode: 'sbt'; columns: OverlapColumn[]; rows: SbtOverlapRows } {
-  const U = Math.max(0, Math.min(Array.isArray(users) ? users.length : 0, 10));
-  const N = Math.min(Math.max(1, topN || 20), 20);
-  if (U === 0) return { mode: 'opinion', columns: [], rows: [] };
-
-  const encs = users.map(encodeStancesForUser);
-  const haveSignal = !encs.every((e) => (e?.tokens?.size || 0) < 3);
-
-  // Build qid → prompt/tags for labels
-  const qMeta = new Map<string, { prompt: string; tags: unknown[] }>();
-  (users || []).forEach((u) =>
-    (u?.questions || []).forEach((q) => {
-      const id = String(q?.id || q?.questionID || q?.questionId || '').toLowerCase();
-      if (id && !qMeta.has(id))
-        qMeta.set(id, { prompt: String(q?.prompt || ''), tags: Array.isArray(q?.tags) ? q.tags : [] });
-    }),
-  );
-  const labelForToken = (tok: string): string => {
-    const s = String(tok || '');
-    const idx = s.indexOf('::');
-    const qid = idx === -1 ? s : s.slice(0, idx);
-    const opt = idx === -1 ? '' : s.slice(idx + 2);
-    const meta = qMeta.get(qid);
-    const tag = (meta?.tags || []).find((t) => typeof t === 'string' && t.length <= 16);
-    const base = tag ? `#${tag}` : (meta?.prompt || tok).slice(0, 28);
-    return opt ? `${base} · ${opt.slice(0, 16)}` : base;
-  };
-
-  if (haveSignal) {
-    const topTokens = selectTopOpinionTokens(users, N);
-    if (topTokens.length > 0) {
-      const columns: OverlapColumn[] = topTokens.map((t) => ({ key: t, label: labelForToken(t) }));
-      const rows = encs.map((enc) =>
-        columns.map((col) => {
-          const cell = enc.tokens.get(col.key);
-          return cell ? (cell.sign > 0 ? 1 : -1) : 0; // -1, 0, +1
-        }),
-      );
-      return { mode: 'opinion', columns, rows };
-    }
-  }
-
-  // Fallback: SBT presence matrix
-  const labelByKey = new Map<string, string>();
-  const userSets = (users || []).map((u) => {
-    const set = new Set<string>();
-    (u?.sbts || []).forEach((s) => {
-      const key = getCompareSbtKey(s);
-      if (!key) return;
-      set.add(key);
-      if (!labelByKey.has(key)) {
-        const label = getCompareSbtLabel(s);
-        if (label) labelByKey.set(key, label);
-      }
-    });
-    return set;
-  });
-  const nameCounts = new Map<string, number>();
-  userSets.forEach((set) => set.forEach((key) => nameCounts.set(key, (nameCounts.get(key) || 0) + 1)));
-  const topNames = Array.from(nameCounts.entries())
-    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
-    .slice(0, N);
-  const columns: OverlapColumn[] = topNames.map(([key]) => ({ key, label: labelByKey.get(key) || key }));
-  const rows = userSets.map((set) => columns.map((col) => ({ has: set.has(col.key) })));
-  return { mode: 'sbt', columns, rows };
-}
-
 /** sanitizeCompass(bundle, addressesInOrder?) – clamp points, ensure axes & order */
 export function sanitizeCompass(bundle: unknown, addressesInOrder: unknown[] = []): CompassBundle | null {
   if (!bundle || typeof bundle !== 'object') return null;
@@ -527,18 +414,6 @@ export function sanitizeCompass(bundle: unknown, addressesInOrder: unknown[] = [
         }
       : { x: [], y: [] };
   return { axes, points, evidence };
-}
-
-/** Return per-user sets of stable SBT compare keys (fallback use in visuals). */
-export function sbtNameSets(users: CompareUser[] = []): Array<Set<string>> {
-  return (users || []).map((u) => {
-    const set = new Set<string>();
-    (u?.sbts || []).forEach((s) => {
-      const key = getCompareSbtKey(s);
-      if (key) set.add(key);
-    });
-    return set;
-  });
 }
 
 /* =========================

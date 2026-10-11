@@ -164,17 +164,6 @@ export const parseQuestionSessionIdFromSearch = (search = ''): string | null => 
   return trimmed || null;
 };
 
-export const isPinnableQuestionRouteSlug = (slugIn: unknown, getSessionConfigBySlug: SessionConfigResolver): boolean =>
-  slugIn != null && isKnownOrGeneralSessionSlug(slugIn, getSessionConfigBySlug);
-
-export const isPinnableQuestionRouteSearchSlug = (
-  search = '',
-  getSessionConfigBySlug: SessionConfigResolver,
-): boolean => {
-  const slug = parseQuestionSessionSlugFromSearch(search);
-  return isPinnableQuestionRouteSlug(slug, getSessionConfigBySlug);
-};
-
 export const buildQuestionRoutePath = (questionId: unknown, opts: QuestionRouteOptions = {}): string => {
   const qid = String(questionId || '')
     .trim()

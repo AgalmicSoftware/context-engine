@@ -40,7 +40,6 @@ import {
   buildQuestionsJsonToggleState,
   buildQuestionPoolResponseMergeState,
   buildRenderedQuestionPayloadPoolsState,
-  buildResponseEditCompleteState,
   buildResponseHydrationInvalidatedState,
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
@@ -92,7 +91,6 @@ import {
   resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
-  toggleShowJsonState,
 } from './surveyQuestionsTypes.js';
 import { buildEncryptionTogglePlan } from './surveyToolFieldEncryptionController';
 
@@ -1219,11 +1217,6 @@ describe('surveyQuestionsTypes', () => {
       isDecrypting: false,
       submissionError: 'Decryption failed.',
     });
-    expect(buildResponseEditCompleteState()).toEqual({
-      isEditing: false,
-      userHasResponse: true,
-      userResponseEncrypted: true,
-    });
     expect(buildParsedViewAddressAnswersState()).toEqual({
       parsedViewAddressAnswers: null,
     });
@@ -1370,12 +1363,6 @@ describe('surveyQuestionsTypes', () => {
       showJson: true,
     });
     expect(buildShowJsonState('')).toEqual({
-      showJson: false,
-    });
-    expect(toggleShowJsonState({ showJson: false })).toEqual({
-      showJson: true,
-    });
-    expect(toggleShowJsonState({ showJson: true })).toEqual({
       showJson: false,
     });
     expect(buildAutoDecryptToggleState({ autoDecryptEnabled: false })).toEqual({

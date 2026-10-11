@@ -2,9 +2,9 @@
  * @file defaultTags.js
  * @module defaultTags
  * @description Default tag/label constants and normalization for surveys and questions.
- *              Provides tag list parsing and overlap detection.
+ *              Provides tag list normalization and relevance matching.
  *
- * Key exports: normalizeTagList, parseDefaultTags, hasAnyTagOverlap, isDefaultTagRelevant, getRelevantDefaultTags
+ * Key exports: normalizeTagList, isDefaultTagRelevant, getRelevantDefaultTags
  */
 const normalizeTag = (raw: unknown): string =>
   String(raw ?? '')
@@ -38,11 +38,6 @@ export const normalizeTagList = (rawList: unknown): string[] => {
     out.push(tag);
   });
   return out;
-};
-
-export const parseDefaultTags = (rawCsv: unknown): string[] => {
-  if (typeof rawCsv !== 'string') return [];
-  return normalizeTagList(rawCsv.split(','));
 };
 
 const normalizeTagMatchSource = (value: unknown): string => {
@@ -122,17 +117,4 @@ export const getRelevantDefaultTags = (textSource: unknown, defaultTags: unknown
   });
 
   return out;
-};
-
-// OR semantics: returns true if any required tag overlaps with questionTags.
-// If requiredTags is empty, returns true (no gating).
-export const hasAnyTagOverlap = (questionTags: unknown, requiredTags: unknown): boolean => {
-  const required = normalizeTagList(requiredTags);
-  if (required.length === 0) return true;
-
-  const qTags = normalizeTagList(questionTags);
-  if (qTags.length === 0) return false;
-
-  const qSet = new Set(qTags);
-  return required.some((tag) => qSet.has(tag));
 };

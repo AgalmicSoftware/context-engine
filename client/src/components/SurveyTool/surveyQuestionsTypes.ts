@@ -231,12 +231,6 @@ export type SurveyDecryptEditFailureStatePatch = {
   submissionError: string;
 };
 
-export type SurveyResponseEditCompleteStatePatch = {
-  isEditing: boolean;
-  userHasResponse: boolean;
-  userResponseEncrypted: boolean;
-};
-
 export type SurveyParsedViewAddressAnswersStatePatch = {
   parsedViewAddressAnswers: unknown;
 };
@@ -775,10 +769,6 @@ export const buildJsonPreviewState = (jsonPreview: unknown): SurveyJsonPreviewSt
 
 export const buildShowJsonState = (showJson: unknown): SurveyShowJsonStatePatch => ({
   showJson: !!showJson,
-});
-
-export const toggleShowJsonState = (prevState: { showJson?: unknown } = {}): SurveyShowJsonStatePatch => ({
-  showJson: !prevState.showJson,
 });
 
 export const buildAutoDecryptToggleState = (
@@ -1514,12 +1504,6 @@ export const buildDecryptEditFailureState = (
 ): SurveyDecryptEditFailureStatePatch => ({
   isDecrypting: false,
   submissionError: String(submissionError || 'Decryption failed.'),
-});
-
-export const buildResponseEditCompleteState = (): SurveyResponseEditCompleteStatePatch => ({
-  isEditing: false,
-  userHasResponse: true,
-  userResponseEncrypted: true,
 });
 
 export const buildParsedViewAddressAnswersState = (

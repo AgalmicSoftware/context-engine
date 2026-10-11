@@ -1,5 +1,4 @@
 import {
-  addCreateSurveyEncryptionGateSbt,
   buildCreateSurveyQuestionTagCommitList,
   buildCreateSurveyQuestionTagInputValueList,
   buildCreateSurveyQuestionTagRemovalList,
@@ -10,7 +9,6 @@ import {
   normalizeGateIds,
   normalizeGateText,
   normalizeTagList,
-  removeCreateSurveyEncryptionGateSbt,
   stableGateColor,
 } from './createQuestionsAndSurveysHelpers.js';
 
@@ -29,20 +27,6 @@ describe('createQuestionsAndSurveysHelpers gate and tag normalizers', () => {
 
   it('dedupes address lists case-insensitively while preserving first spelling', () => {
     expect(normalizeAddressList([' 0xAAA ', '0xaaa', '', '0xBbb'])).toEqual(['0xAAA', '0xBbb']);
-  });
-
-  it('adds and removes encryption gate SBTs without mutating the original list', () => {
-    const first = { address: '0xAAA', name: 'Alpha' };
-    const second = { address: '0xBbb', name: 'Beta' };
-    const original = [first];
-
-    const added = addCreateSurveyEncryptionGateSbt(original, second);
-    expect(added).toEqual([first, second]);
-    expect(added).not.toBe(original);
-    expect(original).toEqual([first]);
-
-    expect(removeCreateSurveyEncryptionGateSbt([first, second], '0xaaa')).toEqual([second]);
-    expect(removeCreateSurveyEncryptionGateSbt([first], '0xmissing')).toEqual([first]);
   });
 
   it('normalizes primitive tags and drops object-like values', () => {

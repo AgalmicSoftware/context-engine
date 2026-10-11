@@ -171,11 +171,6 @@ export type UploadFilenameInput = {
   fallbackExtension?: unknown;
 };
 
-export type ManualLibraryTextFileInput = {
-  title?: unknown;
-  text?: unknown;
-};
-
 export type LibraryContentInput = {
   pastedText?: unknown;
   additionalUrlInput?: unknown;
@@ -460,30 +455,6 @@ export const renameFileForLibraryUpload = (file: unknown, title: unknown) => {
     lastModified: Number(file.lastModified || Date.now()),
   });
 };
-
-export const buildManualLibraryTextFile = ({ title, text }: ManualLibraryTextFileInput = {}) => {
-  const body = toStr(text);
-  const looksLikeMarkdown = /(^|\n)\s*(#|\* |- |\d+\.)/.test(body);
-  const extension = looksLikeMarkdown ? 'md' : 'txt';
-  const filename = buildUploadFilename({
-    title,
-    originalName: '',
-    fallbackBase: 'context-note',
-    fallbackExtension: extension,
-  });
-  return new File([body], filename, {
-    type: looksLikeMarkdown ? 'text/markdown' : 'text/plain',
-  });
-};
-
-export const isManualLibraryUploadableContent = ({
-  pastedText = '',
-  additionalUrlInput = '',
-  additionalSources = [],
-}: LibraryContentInput = {}) =>
-  Boolean(toStr(pastedText).trim()) ||
-  Boolean(toStr(additionalUrlInput).trim()) ||
-  (Array.isArray(additionalSources) && additionalSources.length > 0);
 
 export const hasDatabaseToolInputContent = ({
   pastedText = '',
