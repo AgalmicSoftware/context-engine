@@ -54,6 +54,7 @@ export type WorkerPanelProps = {
   deployWorkerUrl?: string;
   deployComplete: boolean;
   deployVerifiedInUi?: boolean;
+  showUserPaidUsage?: boolean;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
   clearWorkerSecretFields: () => void;
@@ -121,6 +122,7 @@ const WorkerPanel = ({
   deployWorkerUrl,
   deployComplete,
   deployVerifiedInUi,
+  showUserPaidUsage = false,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
   clearWorkerSecretFields,
@@ -263,6 +265,7 @@ const WorkerPanel = ({
             )}
           </div>
           <WorkerSecretsSection
+            showUserPaidUsage={showUserPaidUsage}
             isNormalMode={isNormalMode}
             translate={translate}
             renderInfoTooltip={renderInfoTooltip}

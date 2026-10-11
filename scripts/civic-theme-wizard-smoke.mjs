@@ -112,6 +112,11 @@ export async function inspectCivicWizard(page) {
     await page.getByRole('button', { name: 'Session Information', exact: true }).click();
     await page.getByRole('button', { name: 'Worker deployment & secrets', exact: true }).click();
     await inspectParticipationChannels(page);
+    assert.equal(
+      await page.getByTestId('ce-wizard-worker-secrets-require-pay').count(),
+      profile.startsWith('Decentralized') ? 1 : 0,
+      'User-paid usage is offered only for decentralized sessions',
+    );
     await assertReadable(body);
     const accessMenu = page.getByRole('button', { name: 'Choose access rule', exact: true }).first();
     await accessMenu.click();

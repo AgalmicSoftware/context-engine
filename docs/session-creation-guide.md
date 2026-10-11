@@ -375,6 +375,9 @@ custom settings in the draft. Profile settings follow the existing stages:
   once the service is deployed and verified, subject to session access rules.
   Telegram Mini App is independently selectable but
   requires Telegram; disabling Telegram also disables its Mini App.
+- **Require users to pay for usage** appears only in the custom Worker settings
+  for decentralized (Ethereum registry + Arweave) sessions. Centralized Cloudflare
+  sessions, including those using Lit, do not show this option.
 - Deploy owns the export policy. Selected-channel export remains visible as
   unavailable until the export runtime consumes that filter.
 

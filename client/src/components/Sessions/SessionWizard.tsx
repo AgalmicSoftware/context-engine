@@ -3038,6 +3038,7 @@ const SessionWizard = ({
       workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
       setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
       workerMode={workerMode}
+      showUserPaidUsage={sessionModeRequirements.authorityMode === 'evm_registry_canonical'}
       workerSecretsEnabled={workerSecretsEnabled}
       workerUrlAutoFilled={workerUrlAutoFilled}
       workerUrlSource={workerUrlSource}

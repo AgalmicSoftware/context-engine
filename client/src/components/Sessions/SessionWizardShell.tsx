@@ -219,6 +219,7 @@ export type SessionWizardShellProps = {
   workerLimitPerWallet: WorkerPanelProps['workerLimitPerWallet'];
   workerLimitPerAnonymousIp: WorkerPanelProps['workerLimitPerAnonymousIp'];
   workerMode: WorkerPanelProps['workerMode'];
+  showUserPaidUsage?: WorkerPanelProps['showUserPaidUsage'];
   workerSecretsEnabled: WorkerPanelProps['workerSecretsEnabled'];
   workerUrlAutoFilled: WorkerPanelProps['workerUrlAutoFilled'];
   workerUrlSource: PublishSectionProps['workerUrlSource'];
@@ -402,6 +403,7 @@ const SessionWizardShell = ({
   workerLimitPerWallet,
   workerLimitPerAnonymousIp,
   workerMode,
+  showUserPaidUsage = false,
   workerSecretsEnabled,
   workerUrlAutoFilled,
   workerUrlSource,
@@ -554,6 +556,7 @@ const SessionWizardShell = ({
             deployWorkerUrl={deployWorkerUrl}
             deployComplete={deployComplete}
             deployVerifiedInUi={deployVerifiedInUi}
+            showUserPaidUsage={showUserPaidUsage}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}
