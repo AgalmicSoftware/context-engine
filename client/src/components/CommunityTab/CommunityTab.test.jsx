@@ -283,9 +283,18 @@ describe('CommunityTab helpers', () => {
       collectTreeNodes(instance.renderModalContent(), (node) => node.type === 'a').map((node) => node.props.href),
     ).toEqual(['/session/cloud']);
     expect(collectNodeText(instance.renderModalContent())).toContain('1 of 2 sessions1Centralized0Decentralized');
-    expect(toggle().props['aria-pressed']).toBe(true);
+    // A disclosure button: no toggle-button state; the filtered summary describes it.
+    const [summary] = collectTreeNodes(instance.renderModalContent(), (node) => node.props?.role === 'status');
+    expect(toggle().props).not.toHaveProperty('aria-pressed');
+    expect(toggle().props['aria-describedby']).toBe(summary.props.id);
+    expect(collectNodeText(summary)).toBe('Filtered: 1 of 2 sessions');
     toggle().props.onClick();
     expect(toggle().props['aria-expanded']).toBe(false);
+    // Collapsed filters stay mounted (hidden) so aria-controls always resolves.
+    const panels = () =>
+      collectTreeNodes(instance.renderModalContent(), (node) => node.props?.id === toggle().props['aria-controls']);
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].props.hidden).toBe(true);
     expect(collectTreeNodes(instance.renderModalContent(), (node) => node.type === 'a')).toHaveLength(1);
     toggle().props.onClick();
     controls()
@@ -297,7 +306,8 @@ describe('CommunityTab helpers', () => {
       (node) => node.type === 'button' && collectNodeText(node) === 'Clear filters',
     )[0].props.onClick();
     expect(collectTreeNodes(instance.renderModalContent(), (node) => node.type === 'a')).toHaveLength(2);
-    expect(toggle().props['aria-pressed']).toBe(false);
+    expect(toggle().props['aria-describedby']).toBeUndefined();
+    expect(panels()[0].props.hidden).toBe(false);
   });
 
   it('keeps undated sessions under a date filter and marks them date unavailable', () => {

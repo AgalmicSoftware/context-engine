@@ -1018,7 +1018,7 @@
   }
 }
 
-.sessionFilterToggle[aria-pressed='true'] {
+.sessionFilterToggle[data-active='true'] {
   background: var(--ce-selection-bg);
   color: var(--ce-selection-text);
 }

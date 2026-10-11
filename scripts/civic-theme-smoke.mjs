@@ -229,7 +229,13 @@ export async function inspectSessionDirectoryFilters(dialog, { total, centralize
   await dialog.getByRole('searchbox', { name: 'Admin address', exact: true }).fill('unmatched-admin');
   assert.equal(await rows(), 0, 'Admin address filter excludes nonmatching sessions');
   await toggle.click();
-  assert.equal(await toggle.getAttribute('aria-pressed'), 'true', 'Collapsed header indicates active filters');
+  assert.equal(await toggle.getAttribute('aria-pressed'), null, 'The filter toggle is a disclosure button');
+  const panel = dialog.locator(`#${await toggle.getAttribute('aria-controls')}`);
+  assert.equal(await panel.count(), 1, 'Collapsed filters stay mounted for aria-controls');
+  assert.equal(await panel.isVisible(), false, 'Collapsed filters are hidden');
+  const summaryId = await toggle.getAttribute('aria-describedby');
+  assert(summaryId, 'The collapsed toggle is described by the filtered summary');
+  assert.match(await dialog.locator(`#${summaryId}`).innerText(), /^Filtered: /, 'The summary says filters are active');
   await toggle.click();
   await dialog.getByRole('button', { name: 'Clear filters', exact: true }).click();
   assert.equal(await rows(), total, 'Clear filters restores every session');

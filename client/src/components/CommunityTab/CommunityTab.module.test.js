@@ -81,4 +81,13 @@ describe('CommunityTab module styles', () => {
     expect(scss).toMatch(/^ {2}\.statsSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
     expect(scss).toMatch(/^ {2}\.leaderboardItem \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
   });
+
+  it('marks active session filters with a data attribute instead of a toggle-button state', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.sessionFilterToggle\[data-active='true'\]\s*{[\s\S]*?background:\s*var\(--ce-selection-bg\);/,
+    );
+    expect(scss).not.toContain('aria-pressed');
+  });
 });

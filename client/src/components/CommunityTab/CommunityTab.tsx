@@ -86,6 +86,7 @@ import {
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
+const SESSION_FILTER_SUMMARY_ID = 'ce-community-session-filter-summary';
 const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
 type CacheReadOptions = { clone?: boolean };
 type SessionSelectorOption = { value: string; label: string };
@@ -2205,8 +2206,9 @@ class CommunityTab extends Component<any, any> {
 
   renderSessionFilters = () => {
     const filters: CommunitySessionFilters = this.state.sessionFilters;
+    // Stay mounted while collapsed so the toggle's aria-controls always resolves.
     return (
-      <div id="ce-community-session-filters" className={styles.sessionFilters}>
+      <div id="ce-community-session-filters" className={styles.sessionFilters} hidden={!this.state.showSessionFilters}>
         <label>
           Session type
           <select value={filters.kind} onChange={(event) => this._setSessionFilter('kind', event.target.value)}>
@@ -2279,10 +2281,10 @@ class CommunityTab extends Component<any, any> {
     const kindLabels = { centralized: 'Centralized', decentralized: 'Decentralized', unknown: 'Type unavailable' };
     return (
       <div className={styles.sessionsContent}>
-        {this.state.showSessionFilters && this.renderSessionFilters()}
+        {this.renderSessionFilters()}
         {hasFilters && (
-          <p className={styles.sessionFilterSummary} role="status">
-            {sessions.length} of {allSessions.length} sessions
+          <p id={SESSION_FILTER_SUMMARY_ID} className={styles.sessionFilterSummary} role="status">
+            Filtered: {sessions.length} of {allSessions.length} sessions
           </p>
         )}
         <div className={styles.sessionCounts}>
@@ -2466,6 +2468,7 @@ class CommunityTab extends Component<any, any> {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
     const participantCount = this.getMemoizedLeaderboardData().length;
     const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
+    const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
     const swarmView = this._getQuestionSwarmView();
 
     return (
@@ -2550,7 +2553,10 @@ class CommunityTab extends Component<any, any> {
                   aria-label="Session filters"
                   aria-expanded={this.state.showSessionFilters}
                   aria-controls="ce-community-session-filters"
-                  aria-pressed={Object.values(this.state.sessionFilters).some((value) => String(value).trim())}
+                  // A disclosure button is not a toggle button: the filtered
+                  // summary announces whether filters are active.
+                  aria-describedby={sessionFiltersActive ? SESSION_FILTER_SUMMARY_ID : undefined}
+                  data-active={sessionFiltersActive ? 'true' : undefined}
                   onClick={() => this.setState((state: any) => ({ showSessionFilters: !state.showSessionFilters }))}
                 >
                   <FontAwesomeIcon icon={faFilter} />
