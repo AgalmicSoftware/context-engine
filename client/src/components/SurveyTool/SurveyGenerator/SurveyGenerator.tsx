@@ -39,7 +39,6 @@ import SessionChipSelector from '../../Shared/SessionChipSelector';
 import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
   buildSbtAccessControlConditions,
-  getUnsupportedLitContractAccessControlError,
   getGlobalLitHooks,
   resolveLitChain,
 } from '../../../utilities/crypto/litProtocol.js';
@@ -565,37 +564,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     .map((addr) => addr.toLowerCase())
     .sort()
     .join('|');
-  const sessionHasLitChipotle = useMemo(() => {
-    const litCredentials = asSurveyGeneratorPlainRecord(resolvedSessionConfig?.litCredentials);
-    const hasCompleteLitCredentials = !!(
-      litCredentials &&
-      toStr(litCredentials?.litApiBase).trim() &&
-      toStr(litCredentials?.litActionCid).trim() &&
-      toStr(litCredentials?.litPkpId).trim()
-    );
-    const litConfig = asSurveyGeneratorPlainRecord(resolvedSessionConfig?.lit);
-    const litNetworkHint = toStr(litConfig?.network || resolvedSessionConfig?.litNetwork)
-      .trim()
-      .toLowerCase();
-    return !!(
-      toStr(resolvedSessionConfig?.corsWorkerUrl).trim() &&
-      (hasCompleteLitCredentials ||
-        litNetworkHint === 'chipotle' ||
-        docSaveGate.hasRecipients ||
-        summaryGateAddresses.length > 0)
-    );
-  }, [docSaveGate.hasRecipients, resolvedSessionConfig, summaryGateAddresses.length]);
-  const docSaveSessionChainError = useMemo(
-    () =>
-      docSaveGate.hasRecipients && !sessionHasLitChipotle
-        ? getUnsupportedLitContractAccessControlError({
-            chainId: docSaveGate.chainId || networkChainId || null,
-          })
-        : '',
-    [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId, sessionHasLitChipotle],
-  );
-  const docSaveSessionAudienceAvailable =
-    usesWorkerNativeDocStorage || (docSaveGate.hasRecipients && !docSaveSessionChainError);
+  const docSaveSessionAudienceAvailable = usesWorkerNativeDocStorage || docSaveGate.hasRecipients;
   const activeSessionKey = useMemo(() => {
     const hasExplicit = typeof effectiveSessionSlugInput === 'string';
     if (!hasExplicit) return null;
@@ -975,7 +944,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         throw new Error('Connect a wallet to add sources to session context.');
       }
       if (!docSaveSessionAudienceAvailable) {
-        throw new Error(docSaveSessionChainError || 'Session docUploads gate is unavailable or empty.');
+        throw new Error('Session docUploads gate is unavailable or empty.');
       }
       const chainId = Number(docSaveGate.chainId || fallbackChainId || 0) || null;
       const litChain = resolveLitChain({ chainId });
@@ -1974,9 +1943,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                               </button>
                             ) : (
                               <div className={styles.docSaveAudienceNote}>
-                                {docSaveSessionChainError
-                                  ? docSaveSessionChainError
-                                  : `${docSaveSessionLabel} has no shared document audience. Saves stay private to your wallet.`}
+                                {`${docSaveSessionLabel} has no shared document audience. Saves stay private to your wallet.`}
                               </div>
                             )}
                           </div>

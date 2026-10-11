@@ -12,7 +12,6 @@ import { DOC_LIBRARY_ARWEAVE_GATEWAYS } from '../../variables/arweaveGateways.js
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import {
   buildSbtAccessControlConditions,
-  getUnsupportedLitContractAccessControlError,
   getGlobalLitHooks,
   litStorage,
   resolveLitChain,
@@ -196,11 +195,6 @@ const buildSbtAccessControlConditionsUntyped = buildSbtAccessControlConditions a
 }) => unknown;
 
 const resolveLitChainUntyped = resolveLitChain as (args: { chainId: number | null }) => string;
-
-const getUnsupportedLitContractAccessControlErrorUntyped = getUnsupportedLitContractAccessControlError as (args: {
-  chainId: number | null;
-  litChain?: string | null;
-}) => string;
 
 const uploadDocLibraryFileUntyped = uploadDocLibraryFile as (args: {
   file: File;
@@ -421,52 +415,6 @@ export default function DocumentLibraryPanel({
       hasRecipients: Boolean(resolved?.hasRecipients),
     };
   }, [sessionConfig]);
-  const sessionHasLitChipotle = useMemo(() => {
-    const litCredentials =
-      sessionConfig &&
-      typeof sessionConfig === 'object' &&
-      sessionConfig.litCredentials &&
-      typeof sessionConfig.litCredentials === 'object' &&
-      !Array.isArray(sessionConfig.litCredentials)
-        ? (sessionConfig.litCredentials as Record<string, unknown>)
-        : null;
-    const hasCompleteLitCredentials = !!(
-      litCredentials &&
-      toStr(litCredentials?.litApiBase).trim() &&
-      toStr(litCredentials?.litActionCid).trim() &&
-      toStr(litCredentials?.litPkpId).trim()
-    );
-    const litConfig =
-      sessionConfig &&
-      typeof sessionConfig === 'object' &&
-      sessionConfig.lit &&
-      typeof sessionConfig.lit === 'object' &&
-      !Array.isArray(sessionConfig.lit)
-        ? (sessionConfig.lit as Record<string, unknown>)
-        : null;
-    const litNetworkHint = toStr(litConfig?.network || sessionConfig?.litNetwork)
-      .trim()
-      .toLowerCase();
-    return !!(
-      toStr(sessionConfig?.corsWorkerUrl).trim() &&
-      (hasCompleteLitCredentials || litNetworkHint === 'chipotle' || docUploadsGate.hasRecipients)
-    );
-  }, [docUploadsGate.hasRecipients, sessionConfig]);
-  const sessionGateUnsupportedMessage = useMemo(
-    () =>
-      allowsSbtDocumentControls && docUploadsGate.hasRecipients && !sessionHasLitChipotle
-        ? getUnsupportedLitContractAccessControlErrorUntyped({
-            chainId: Number(docUploadsGate.chainId || documentNetwork?.id || 0) || null,
-          })
-        : '',
-    [
-      allowsSbtDocumentControls,
-      docUploadsGate.chainId,
-      docUploadsGate.hasRecipients,
-      documentNetwork?.id,
-      sessionHasLitChipotle,
-    ],
-  );
   const docAsyncConfigKey = useMemo(
     () =>
       buildAsyncContextKeyPart({
@@ -645,10 +593,7 @@ export default function DocumentLibraryPanel({
   useEffect(() => {
     const shouldLock =
       requiresLitDocumentStorage ||
-      (allowsSbtDocumentControls &&
-        docProvider !== STORAGE_BACKENDS.CLOUDFLARE &&
-        !!docUploadsGate.hasRecipients &&
-        !sessionGateUnsupportedMessage);
+      (allowsSbtDocumentControls && docProvider !== STORAGE_BACKENDS.CLOUDFLARE && !!docUploadsGate.hasRecipients);
     if (userEncryptionOverrideRef.current) return;
     setLocked(shouldLock);
     setAudienceMode(shouldLock && docUploadsGate.hasRecipients ? 'sessionGate' : 'custom');
@@ -658,7 +603,6 @@ export default function DocumentLibraryPanel({
     allowsSbtDocumentControls,
     panelContextKey,
     requiresLitDocumentStorage,
-    sessionGateUnsupportedMessage,
   ]);
 
   useEffect(() => {
@@ -1160,11 +1104,8 @@ export default function DocumentLibraryPanel({
     };
 
     if (audienceMode === 'sessionGate') {
-      if (!docUploadsGate.hasRecipients || sessionGateUnsupportedMessage) {
-        return {
-          ok: false,
-          error: sessionGateUnsupportedMessage || 'Session docUploads gate is unavailable or empty.',
-        };
+      if (!docUploadsGate.hasRecipients) {
+        return { ok: false, error: 'Session docUploads gate is unavailable or empty.' };
       }
       const chainId = Number(docUploadsGate.chainId || documentNetwork?.id || 0) || null;
       const litChain = resolveLitChainUntyped({ chainId });
@@ -1181,12 +1122,6 @@ export default function DocumentLibraryPanel({
     const list = (customSbtList || []).map((e) => e.address).filter(Boolean);
     const chainId = Number(sbtChainId || docUploadsGate.chainId || documentNetwork?.id || 0) || null;
     const litChain = resolveLitChainUntyped({ chainId });
-    const customUnsupportedMessage = sessionHasLitChipotle
-      ? ''
-      : getUnsupportedLitContractAccessControlErrorUntyped({ chainId, litChain });
-    if (customUnsupportedMessage) {
-      return { ok: false, error: customUnsupportedMessage };
-    }
     const acc = buildSbtAccessControlConditionsUntyped({
       sbtAddresses: list,
       chainId,
@@ -1206,8 +1141,6 @@ export default function DocumentLibraryPanel({
     documentNetwork?.id,
     customSbtList,
     customGateMode,
-    sessionGateUnsupportedMessage,
-    sessionHasLitChipotle,
     sbtChainId,
     getActiveLitHooks,
   ]);
@@ -1632,7 +1565,7 @@ export default function DocumentLibraryPanel({
           requiresLitDocumentStorage={requiresLitDocumentStorage}
           locked={effectiveLocked}
           onToggleLocked={toggleLocked}
-          sessionGateUnsupportedMessage={sessionGateUnsupportedMessage}
+          sessionGateUnsupportedMessage=""
           audienceMode={audienceMode}
           onAudienceModeChange={(nextMode) => {
             userEncryptionOverrideRef.current = true;

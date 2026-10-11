@@ -8,7 +8,6 @@ import {
   E2E_TESTIDS,
   mockBuildSbtAccessControlConditions,
   mockGetGlobalLitHooks,
-  mockGetUnsupportedLitContractAccessControlError,
   mockListArweaveTransactionsByTags,
   mockResolveDocUploadsGate,
   mockUploadDocLibraryFile,
@@ -341,9 +340,6 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
       chainId: 11155420,
       mode: 'any',
       hasRecipients: true,
-    });
-    mockGetUnsupportedLitContractAccessControlError.mockImplementation(() => {
-      throw new Error('OP Sepolia session-gate uploads should stay on the scoped Lit path.');
     });
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
 
