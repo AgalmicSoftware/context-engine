@@ -65,8 +65,13 @@ describe('createPasskeyCredential', () => {
     rawId: new Uint8Array([1, 2, 3]).buffer,
     getClientExtensionResults: () => ({ prf: { enabled: true } }),
   } as unknown as PublicKeyCredential;
-  const createdUser = (credentials: PasskeyCredentialClient, call: number) =>
-    (credentials.create as jest.Mock).mock.calls[call][0].publicKey.user;
+  const createOptions = (credentials: PasskeyCredentialClient, call = 0) =>
+    ((credentials.create as jest.Mock).mock.calls[call][0] as CredentialCreationOptions)
+      .publicKey as PublicKeyCredentialCreationOptions;
+  const createdUser = (credentials: PasskeyCredentialClient, call: number) => ({
+    ...createOptions(credentials, call).user,
+    id: createOptions(credentials, call).user.id as Uint8Array,
+  });
 
   it('gives every passkey its own random 32-byte user handle', async () => {
     const credentials = makeCredentials(async () => prfCredential);
@@ -79,7 +84,7 @@ describe('createPasskeyCredential', () => {
     expect(second.id).toHaveLength(32);
     expect(Buffer.from(first.id).equals(Buffer.from(second.id))).toBe(false);
     expect(first.name).toBe(second.name);
-    expect((credentials.create as jest.Mock).mock.calls[0][0].publicKey).not.toHaveProperty('excludeCredentials');
+    expect(createOptions(credentials)).not.toHaveProperty('excludeCredentials');
   });
 
   it('excludes saved passkeys and explains when the device already holds one', async () => {
@@ -90,8 +95,8 @@ describe('createPasskeyCredential', () => {
     await expect(
       createPasskeyCredential({ config, salt: new Uint8Array(32), credentials, excludeCredentialIds: ['AQID'] }),
     ).rejects.toThrow(/already holds the passkey.*Use Login/);
-    const { excludeCredentials } = (credentials.create as jest.Mock).mock.calls[0][0].publicKey;
+    const excludeCredentials = createOptions(credentials).excludeCredentials || [];
     expect(excludeCredentials).toEqual([{ id: expect.any(ArrayBuffer), type: 'public-key' }]);
-    expect([...new Uint8Array(excludeCredentials[0].id)]).toEqual([1, 2, 3]);
+    expect([...new Uint8Array(excludeCredentials[0].id as ArrayBuffer)]).toEqual([1, 2, 3]);
   });
 });

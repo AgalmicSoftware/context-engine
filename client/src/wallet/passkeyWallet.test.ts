@@ -171,10 +171,12 @@ describe('PasskeyEoaWalletClient', () => {
     const saved = await storage.read();
     await createClient().createWallet();
 
-    const [firstCall, secondCall] = (credentials.create as jest.Mock).mock.calls;
-    expect(firstCall[0].publicKey).not.toHaveProperty('excludeCredentials');
-    const secondExclusions = secondCall[0].publicKey.excludeCredentials || [];
-    expect(secondExclusions.map(({ id }: { id: ArrayBuffer }) => bufferToBase64URL(id))).toEqual(
+    const [firstOptions, secondOptions] = (credentials.create as jest.Mock).mock.calls.map(
+      ([options]) => (options as CredentialCreationOptions).publicKey,
+    );
+    expect(firstOptions).not.toHaveProperty('excludeCredentials');
+    const secondExclusions = secondOptions?.excludeCredentials || [];
+    expect(secondExclusions.map(({ id }) => bufferToBase64URL(id as ArrayBuffer))).toEqual(
       excluded ? [saved?.credentialId] : [],
     );
   });
