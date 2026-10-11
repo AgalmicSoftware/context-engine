@@ -335,6 +335,62 @@ describe('CreateSBTGroup group password', () => {
       expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE)).toBeEnabled();
       expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_SUBMIT)).toBeEnabled();
     });
+
+    it.each([
+      [
+        'the wallet rejects the deploy',
+        {},
+        () => contractScripts.createSBT.mockRejectedValue(Object.assign(new Error('user rejected'), { code: 4001 })),
+      ],
+      [
+        'the password cannot be secured',
+        {},
+        () => contractScripts.computeGroupPasswordHash.mockRejectedValue(new Error('Group passwords need WebCrypto.')),
+      ],
+      [
+        'the metadata upload fails',
+        {},
+        (instance) => {
+          instance.uploadTokenUriToArweave = jest.fn(async () => {
+            instance.setState({ mintingFailed: true, startedMinting: false, currentStep: 0, error: 'Upload failed.' });
+            throw new Error('Upload failed.');
+          });
+        },
+      ],
+      [
+        'the metadata is missing at deploy',
+        {},
+        (instance) => {
+          instance.uploadTokenUriToArweave = jest.fn(async () => '');
+        },
+      ],
+      [
+        'a deferred draft fails to save',
+        { deferredDeploy: true, onSaveDraft: jest.fn().mockRejectedValue(new Error('Draft save failed.')) },
+        () => {},
+      ],
+    ])('unlocks the password and mode after %s', async (_reason, props, breakCreate) => {
+      const deferredState = props.deferredDeploy
+        ? { tokenURI: 'ar://metadata', create2Salt: 'test/password-group' }
+        : {};
+      const instance = makeCreatingInstance(deferredState, props);
+      jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'66'.repeat(32)}`);
+      breakCreate(instance);
+
+      await act(async () => {
+        await instance.handleMintClick();
+      });
+
+      expect(instance.state.sbtMinted).toBe(false);
+      expect(instance.state.error).toBeTruthy();
+      const view = render(instance.render());
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT)).toBeEnabled();
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT)).toHaveValue(PASSPHRASE);
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE)).toBeEnabled();
+      view.container
+        .querySelectorAll('input[name="sbtDistribution.distributionOption"]')
+        .forEach((radio) => expect(radio).toBeEnabled());
+    });
   });
 
   describe('after a successful create', () => {
@@ -443,17 +499,24 @@ describe('CreateSBTGroup group password', () => {
       expect(screen.getByText(NOTICE)).toBeInTheDocument();
     });
 
-    it('drops the notice once the creator picks or types a password', () => {
-      const generated = restoreGroupPasswordForm();
-      generated.handleGenerateGroupPassword();
-      const typed = restoreGroupPasswordForm();
-      typed.handleInputChange({ target: { name: 'groupPassword', type: 'text', value: 'my-own-long-group-password' } });
+    it.each([
+      ['generates a new passphrase', (instance) => instance.handleGenerateGroupPassword()],
+      [
+        'types a password',
+        (instance) =>
+          instance.handleInputChange({
+            target: { name: 'groupPassword', type: 'text', value: 'my-own-long-group-password' },
+          }),
+      ],
+    ])('drops the notice once the creator %s', (_action, changePassword) => {
+      const instance = restoreGroupPasswordForm();
+      const view = render(instance.render());
+      expect(screen.getByText(NOTICE)).toBeInTheDocument();
 
-      for (const instance of [generated, typed]) {
-        const view = render(instance.render());
-        expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
-        view.unmount();
-      }
+      changePassword(instance);
+      view.rerender(instance.render());
+
+      expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
     });
   });
 });
