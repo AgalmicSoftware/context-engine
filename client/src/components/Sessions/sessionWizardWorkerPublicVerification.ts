@@ -163,6 +163,10 @@ export const completeSessionWizardWorkerPublicDeployment = async ({
     // Keep the cause: a rejected write (such as a 409) or a readback mismatch
     // needs a different fix than a Worker that is still starting.
     const detail = toStr(error instanceof Error ? error.message : error).trim();
-    throw new Error(detail ? `${pendingMessage} Last error: ${detail}` : pendingMessage);
+    // The cause is about the session Worker, so deploy-error handling must not
+    // read it as a deploy-helper failure (e.g. "Failed to fetch").
+    throw Object.assign(new Error(detail ? `${pendingMessage} Last error: ${detail}` : pendingMessage), {
+      sessionWorkerVerificationFailure: true,
+    });
   }
 };

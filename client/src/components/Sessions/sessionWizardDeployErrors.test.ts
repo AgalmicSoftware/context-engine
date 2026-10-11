@@ -7,6 +7,7 @@ import {
   resolveSessionWizardDeployStatusDisplayState,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from './sessionWizardDeployErrors';
+import { completeSessionWizardWorkerPublicDeployment } from './sessionWizardWorkerPublicVerification';
 
 describe('sessionWizardDeployErrors', () => {
   it('builds the deploy-helper CORS message with origin and helper details', () => {
@@ -196,6 +197,31 @@ describe('sessionWizardDeployErrors', () => {
       }),
     ).toBe(
       'This deployment request is already bound to a different Cloudflare account. Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.',
+    );
+  });
+
+  it('keeps session Worker verification failures out of deploy-helper hints', async () => {
+    const verificationError = await completeSessionWizardWorkerPublicDeployment({
+      workerUrl: 'https://worker.example.test',
+      slug: 'session',
+      sessionId: '0x00000000000000000000000000000001',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      config: {},
+      isWorkerCanonical: true,
+      signAdminAction: async () => ({}),
+      verify: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+    }).catch((error: unknown) => error);
+
+    expect(
+      normalizeSessionWizardDeployErrorMessage({
+        err: verificationError,
+        helperBase: 'https://helper.example.test',
+        currentOrigin: 'https://app.example.test',
+      }),
+    ).toBe(
+      'Worker infrastructure was created, but public config readback and browser-origin verification are still pending. Last error: Failed to fetch',
     );
   });
 

@@ -205,6 +205,10 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   const orphanResourcesSummary = formatSessionWizardDeployOrphanResources(error?.responseOrphanResources);
   const withOrphanResources = (message: string): string => `${message}${orphanResourcesSummary}`;
 
+  // After a successful deploy, verification talks to the session Worker, so
+  // none of the deploy-helper hints below apply to its message.
+  if (error?.sessionWorkerVerificationFailure === true && raw) return raw;
+
   if ((statusCode === 403 && responseLower.includes('origin')) || responseLower.includes('origin not allowed')) {
     return withOrphanResources(
       buildSessionWizardDeployHelperCorsMessage({
