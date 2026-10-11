@@ -2,10 +2,12 @@ import { ethers } from 'ethers';
 import fs from 'fs';
 import path from 'path';
 import SBT_FACTORY_ABI from '../../client/src/contractsABI/SBT_FACTORY_ABI.json';
+import CUSTOM_SBT_ABI from '../../client/src/contractsABI/CUSTOM_SBT_ABI.json';
 import SURVEYS_ABI from '../../client/src/contractsABI/SURVEYS_ABI.json';
 import * as localArweaveDb from '../helpers/localArweaveDb.js';
 
 import contractScripts from '../../client/src/utilities/web3/chainGateway.js';
+import { cryptoUtils } from '../../client/src/utilities/crypto/cryptography.js';
 import { arweaveClient } from '../../client/src/utilities/arweave/arweaveClient.js';
 
 const LOCAL_RPC_URL = process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545';
@@ -95,6 +97,14 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     activeAccountIndex = index;
   };
   const getActiveAccount = () => accounts[activeAccountIndex];
+  // contractScripts hides revert reasons for credential and admin calls, so these checks read the
+  // contract's own reason with a static call from the active account.
+  const expectSbtCallRejection = (sbtAddress, method, args, reason) =>
+    expect(
+      new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, rpcProvider.getSigner(getActiveAccount())).callStatic[method](
+        ...args
+      )
+    ).rejects.toThrow(reason);
   const advanceTime = async (seconds) => {
     const latest = await rpcProvider.getBlock('latest');
     const baseTime = latest?.timestamp || Math.floor(Date.now() / 1000);
@@ -777,6 +787,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       userAddress: account,
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
     await contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signature);
@@ -804,7 +816,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('mints with invite signature payloads', async () => {
     const groupPassword = 'invite-secret';
-    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
       name: 'ContextEngine Invite',
       symbol: 'CEINV2',
       limitedNumber: 5,
@@ -822,6 +834,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       nonces: [1],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
     expect(invites.length).toBe(1);
@@ -908,7 +922,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('does not mint on invalid invite nonce', async () => {
     const groupPassword = 'invite-bad-nonce';
-    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
       name: 'ContextEngine Invite Bad',
       symbol: 'CEINVX',
       limitedNumber: 1,
@@ -926,8 +940,16 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       nonces: [2],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
+    await expectSbtCallRejection(
+      sbtAddress,
+      'claimWithInvite',
+      [Number(invites[0].nonce), invites[0].signature],
+      /InvalidInviteSlot/
+    );
     await expect(
       contractScripts.claimWithInvite(
         'wagmi',
@@ -935,7 +957,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(invites[0].nonce),
         invites[0].signature
       )
-    ).rejects.toThrow(/InvalidNonce/);
+    ).rejects.toThrow();
 
     const minted = await contractScripts.getMintedTokens('none', sbtAddress, groupCfg);
     expect(Number(minted)).toBe(0);
@@ -1024,7 +1046,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       tags: ['contextEngine', 'password'],
     });
 
-    await expect(contractScripts.claimWithPassword('wagmi', sbtAddress, password)).rejects.toThrow(/Claim not started/);
+    await expectSbtCallRejection(sbtAddress, 'claimWithPassword', [password], /Claim not started/);
+    await expect(contractScripts.claimWithPassword('wagmi', sbtAddress, password)).rejects.toThrow();
   });
 
   it('rejects group signature mint outside group-signature mode', async () => {
@@ -1048,14 +1071,13 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       tags: ['contextEngine', 'group'],
     });
 
-    await expect(
-      contractScripts.mintWithGroupSignature('wagmi', sbtAddress, '0x')
-    ).rejects.toThrow(/Group signature mint not enabled/);
+    await expectSbtCallRejection(sbtAddress, 'mintWithGroupSignature', ['0x'], /Group signature mint not enabled/);
+    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, '0x')).rejects.toThrow();
   });
 
   it('rejects group signature mint with wrong password', async () => {
     const groupPassword = 'group-right';
-    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
       name: 'ContextEngine Group Wrong',
       symbol: 'CEGRW',
       groupPassword,
@@ -1067,20 +1089,29 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       },
     });
 
-    const signature = await contractScripts.signGroupMintAuthorization({
+    const wrongInput = {
       password: 'group-wrong',
       sbtAddress,
       userAddress: account,
-    });
+      chainId: groupCfg.networkChainId,
+    };
+    // The client refuses to sign a password that does not derive the on-chain hash...
+    const mismatch = await contractScripts
+      .signGroupMintAuthorization({ ...wrongInput, groupPasswordHash })
+      .catch((error) => error);
+    expect(cryptoUtils.isGroupPasswordMismatchError(mismatch)).toBe(true);
 
-    await expect(
-      contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signature)
-    ).rejects.toThrow(/Invalid signature/);
+    // ...and the contract rejects a signature from any other signer.
+    const wrongHash = await contractScripts.computeGroupPasswordHash({ password: 'group-wrong', sbtAddress });
+    const signature = await contractScripts.signGroupMintAuthorization({ ...wrongInput, groupPasswordHash: wrongHash });
+
+    await expectSbtCallRejection(sbtAddress, 'mintWithGroupSignature', [signature], /Invalid signature/);
+    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signature)).rejects.toThrow();
   });
 
   it('enforces maxTokens for group signature mints', async () => {
     const groupPassword = 'group-limit';
-    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
       name: 'ContextEngine Group Limit',
       symbol: 'CEGRL',
       limitedNumber: 1,
@@ -1097,6 +1128,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       userAddress: account,
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
     await contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signatureOne);
 
@@ -1105,10 +1138,11 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       userAddress: accountTwo,
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
-    await expect(
-      contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signatureTwo)
-    ).rejects.toThrow(/Max tokens reached/);
+    await expectSbtCallRejection(sbtAddress, 'mintWithGroupSignature', [signatureTwo], /Max tokens reached/);
+    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signatureTwo)).rejects.toThrow();
   });
 
   it('rejects invite with wrong signature', async () => {
@@ -1131,8 +1165,16 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: 'invite-wrong',
       sbtAddress,
       nonces: [1],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash: await contractScripts.computeGroupPasswordHash({ password: 'invite-wrong', sbtAddress }),
     });
 
+    await expectSbtCallRejection(
+      sbtAddress,
+      'claimWithInvite',
+      [Number(invites[0].nonce), invites[0].signature],
+      /InvalidSignature/
+    );
     await expect(
       contractScripts.claimWithInvite(
         'wagmi',
@@ -1140,12 +1182,12 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(invites[0].nonce),
         invites[0].signature
       )
-    ).rejects.toThrow(/InvalidSignature/);
+    ).rejects.toThrow();
   });
 
   it('rejects invite when maxTokens is reached', async () => {
     const groupPassword = 'invite-limit';
-    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
       name: 'ContextEngine Invite Limit',
       symbol: 'CEINVL',
       limitedNumber: 1,
@@ -1163,6 +1205,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       nonces: [1],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
     await contractScripts.claimWithInvite(
@@ -1177,8 +1221,16 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       nonces: [2],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
+    await expectSbtCallRejection(
+      sbtAddress,
+      'claimWithInvite',
+      [Number(inviteTwo[0].nonce), inviteTwo[0].signature],
+      /MaxTokensReached/
+    );
     await expect(
       contractScripts.claimWithInvite(
         'wagmi',
@@ -1186,12 +1238,12 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(inviteTwo[0].nonce),
         inviteTwo[0].signature
       )
-    ).rejects.toThrow(/MaxTokensReached/);
+    ).rejects.toThrow();
   });
 
   it('rejects invite when address already owns an SBT', async () => {
     const groupPassword = 'invite-own';
-    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
       name: 'ContextEngine Invite Own',
       symbol: 'CEINVO',
       limitedNumber: 2,
@@ -1209,6 +1261,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       nonces: [1],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
     await contractScripts.claimWithInvite(
@@ -1222,8 +1276,16 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       password: groupPassword,
       sbtAddress,
       nonces: [2],
+      chainId: groupCfg.networkChainId,
+      groupPasswordHash,
     });
 
+    await expectSbtCallRejection(
+      sbtAddress,
+      'claimWithInvite',
+      [Number(inviteTwo[0].nonce), inviteTwo[0].signature],
+      /AlreadyOwns/
+    );
     await expect(
       contractScripts.claimWithInvite(
         'wagmi',
@@ -1231,7 +1293,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(inviteTwo[0].nonce),
         inviteTwo[0].signature
       )
-    ).rejects.toThrow(/AlreadyOwns/);
+    ).rejects.toThrow();
   });
 
   it('rejects addHashedPasswords from non-admin', async () => {
@@ -1257,7 +1319,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
     const hashed = utils.keccak256(utils.toUtf8Bytes('new-pass'));
     setActiveAccount(1);
-    await expect(contractScripts.addHashedPasswords('wagmi', sbtAddress, [hashed])).rejects.toThrow(/Not admin/);
+    await expectSbtCallRejection(sbtAddress, 'addHashedPasswords', [[hashed]], /Not admin/);
+    await expect(contractScripts.addHashedPasswords('wagmi', sbtAddress, [hashed])).rejects.toThrow();
   });
 
   it('enforces burn auth: OwnerOnly', async () => {
