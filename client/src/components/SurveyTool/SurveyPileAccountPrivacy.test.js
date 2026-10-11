@@ -226,3 +226,29 @@ it('drops the previous account saved answers when another account takes over the
   await settle();
   expect(pile.getEngine().state.surveysResponseState[0].answers.q1?.value ?? '').toBe('');
 });
+
+it.each([
+  ['sign-out', { account: '', loginComplete: false }],
+  ['account switch', { account: OTHER, loginComplete: true }],
+])("removes the previous account's drafts for the session on %s", async (_label, next) => {
+  mockCaches();
+  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
+  const pile = mountPile();
+  await waitFor(() => expect(pile.getEngine()?.state?.pileQuestions?.length).toBe(1), { timeout: 8000 });
+  await settle();
+  await run(
+    () =>
+      new Promise((resolve) => pile.getEngine().handleAdditionalPile('q1', 'Unsaved note', { afterUpdate: resolve })),
+  );
+  await act(async () => pile.getEngine().persistDraft());
+  const ownerDraftKeys = () =>
+    Object.keys(sessionStorage).filter((key) => key.startsWith('dg:surveyDraft:edge:') && key.includes(`:${ACCOUNT}:`));
+  expect(ownerDraftKeys()).not.toEqual([]);
+
+  await act(async () => {
+    pile.view.rerenderSurveyQuestions(next);
+  });
+  await settle();
+
+  expect(ownerDraftKeys()).toEqual([]);
+});

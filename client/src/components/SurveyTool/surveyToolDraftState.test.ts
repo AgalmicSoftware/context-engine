@@ -17,6 +17,7 @@ import {
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   isDraftEntryStale,
+  selectSurveyDraftKeysForAccount,
   removeQuestionFromPersistedDraftPayload,
   buildSurveyDraftCompatScope,
   buildSurveyDraftStorageKey,
@@ -204,6 +205,23 @@ describe('surveyToolDraftState', () => {
         q2: { value: 'keep baseline' },
       },
     });
+  });
+
+  it("selects one account's draft keys for a session across networks and scopes", () => {
+    const keys = [
+      'dg:surveyDraft:edge:84532:0xabc:questions',
+      'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
+      'dg:surveyDraft:edge:84532:anon:questions',
+      'dg:surveyDraft:edge:84532:0xdef:questions',
+      'dg:surveyDraft:other:84532:0xabc:questions',
+      'unrelated',
+    ];
+
+    expect(selectSurveyDraftKeysForAccount(keys, 'edge', '0xABC')).toEqual([
+      'dg:surveyDraft:edge:84532:0xabc:questions',
+      'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
+    ]);
+    expect(selectSurveyDraftKeysForAccount(keys, 'edge', '')).toEqual([]);
   });
 
   it('flags a draft as stale only when the loaded saved answer differs from its stored baseline', () => {

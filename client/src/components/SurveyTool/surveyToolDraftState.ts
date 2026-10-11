@@ -728,6 +728,21 @@ export const buildSurveyDraftStorageKey = ({
   return `dg:surveyDraft:${slug}:${networkSegment}:${accountOwner}:${scope}`;
 };
 
+// Every stored draft one account owns for a session, across networks and scopes.
+export const selectSurveyDraftKeysForAccount = (
+  storageKeys: string[],
+  sessionSlug: unknown,
+  account: unknown,
+): string[] => {
+  const owner = String(account || '')
+    .trim()
+    .toLowerCase();
+  const prefix = `dg:surveyDraft:${String(sessionSlug || '')}:`;
+  if (!owner || owner === 'anon') return [];
+  // Key layout after the prefix: <network>:<account>:<scope>.
+  return storageKeys.filter((key) => key.startsWith(prefix) && key.slice(prefix.length).split(':')[1] === owner);
+};
+
 export const buildSurveyDraftStorageVariantKeys = ({
   sessionSlug = '',
   networkIdStr = '',
