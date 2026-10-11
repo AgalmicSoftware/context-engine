@@ -3726,9 +3726,11 @@ var init_deployHelperCore = __esm({
       const bundleText = typeof body?.bundleText === "string" ? body.bundleText : toStr10(body?.bundleText);
       const hasBundleText = bundleText.trim() !== "";
       const bundleUrl = toStr10(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
+      const bundleManifestUrl = toStr10(body?.bundleManifestUrl).trim();
       const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex2(bundleText) : "";
       const suppliedBundleSha256 = toStr10(body?.bundleSha256).trim();
       let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+      let releaseManifestBundleSha256 = "";
       let bundleSource = hasBundleText ? bundleText : "";
       const bundleSourceKind = hasBundleText ? "bundleText" : "bundleUrl";
       let bundleDiagnostics = null;
@@ -3739,9 +3741,9 @@ var init_deployHelperCore = __esm({
       const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
       const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
       const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
-      if (!hasBundleText && toStr10(body?.bundleManifestUrl).trim()) {
+      if (!hasBundleText && bundleManifestUrl) {
         const manifestDigest = await fetchExpectedWorkerBundleDigest({
-          manifestUrl: toStr10(body.bundleManifestUrl).trim(),
+          manifestUrl: bundleManifestUrl,
           artifactFile: "sessionCorsWorker.bundle.js",
           artifactKind: "session-cors-worker",
           fetchImpl
@@ -3753,6 +3755,7 @@ var init_deployHelperCore = __esm({
           return buildFailure(409, { error: "Worker release manifest digest conflicts with bundleSha256." });
         }
         expectedBundleSha256 = manifestDigest.digest;
+        releaseManifestBundleSha256 = manifestDigest.digest;
       }
       if (expectedBundleSha256 && !bundleSource) {
         try {
@@ -4097,6 +4100,11 @@ var init_deployHelperCore = __esm({
           idempotencyContext.mutationStarted = true;
         }
       }
+      const agentHttpRequested = body?.sessionModeProfile?.surfaces?.agentHttp === true;
+      const agentBridgeBundleUrl = toStr10(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL).trim();
+      const agentBridgeBundleManifestUrl = toStr10(body?.agentBridgeBundleManifestUrl).trim();
+      const agentBridgeManifestSha256 = agentBridgeBundleManifestUrl ? normalizeWorkerBundleSha256(body?.agentBridgeBundleSha256) : "";
+      let agentBridgeReleaseVerified = false;
       if (!resumeUploadedWorker) {
         const preparedBundle = await prepareBundleDiagnostics();
         if (!preparedBundle.ok) return preparedBundle.result;
@@ -4105,6 +4113,22 @@ var init_deployHelperCore = __esm({
             error: "Deployment bundle content changed after this request started; upload was stopped.",
             deploymentRequestPending: true
           });
+        }
+        if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
+          let agentBridgeSource = "";
+          try {
+            agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
+          } catch (error) {
+            return buildFailure(502, {
+              error: `Failed to fetch Agent Bridge bundle: ${toStr10(error?.message || error).trim() || "Unknown error."}`
+            }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
+          }
+          if (await sha256Hex2(agentBridgeSource) !== agentBridgeManifestSha256) {
+            return buildFailure(409, {
+              error: "Agent Bridge bundle SHA-256 does not match the verified release manifest."
+            });
+          }
+          agentBridgeReleaseVerified = true;
         }
       }
       let kvCreate = null;
@@ -4207,6 +4231,7 @@ var init_deployHelperCore = __esm({
           });
         }
       }
+      const sessionReleaseVerified = !hasBundleText && !!bundleUrl && !!releaseManifestBundleSha256 && bundleDiagnostics?.sha256 === releaseManifestBundleSha256;
       const metadata = {
         main_module: "worker.mjs",
         bindings: [
@@ -4223,7 +4248,15 @@ var init_deployHelperCore = __esm({
             type: "durable_object_namespace",
             class_name: SESSION_COORDINATOR_CLASS_NAME
           },
-          { name: "DEPLOY_HELPER_ENABLED", type: "plain_text", text: embeddedDeployHelperEnabled ? "1" : "0" }
+          { name: "DEPLOY_HELPER_ENABLED", type: "plain_text", text: embeddedDeployHelperEnabled ? "1" : "0" },
+          ...sessionReleaseVerified ? [
+            { name: "WORKER_BUNDLE_URL", type: "plain_text", text: bundleUrl },
+            { name: "WORKER_BUNDLE_MANIFEST_URL", type: "plain_text", text: bundleManifestUrl }
+          ] : [],
+          ...agentBridgeReleaseVerified ? [
+            { name: "AGENT_BRIDGE_BUNDLE_URL", type: "plain_text", text: agentBridgeBundleUrl },
+            { name: "AGENT_BRIDGE_BUNDLE_MANIFEST_URL", type: "plain_text", text: agentBridgeBundleManifestUrl }
+          ] : []
         ],
         migrations: {
           old_tag: "",
@@ -4703,7 +4736,7 @@ var init_deployHelperCore = __esm({
         }
         deploymentPayload.tokenSecretSet = true;
       }
-      if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
+      if (agentHttpRequested) {
         const wrappedDeploy = await executeAgentSessionWrappedDeployment({
           body: {
             deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
