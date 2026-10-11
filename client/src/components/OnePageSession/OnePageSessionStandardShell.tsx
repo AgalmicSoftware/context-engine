@@ -856,6 +856,12 @@ export default function OnePageSessionStandardShell({
                       defaultTags={defaultTags}
                       isQuestionCacheReady={isQuestionCacheReady}
                       isResponsesCacheReady={isResponsesCacheReady}
+                      cacheInitializationError={cacheInitializationError}
+                      onRetryLoad={
+                        typeof refreshQuestionResponses === 'function'
+                          ? () => refreshQuestionResponses(null, { slug: embeddedQuestionSessionSlug })
+                          : undefined
+                      }
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}

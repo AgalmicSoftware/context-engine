@@ -817,6 +817,23 @@ describe('OnePageSession view gating', () => {
     expect(polisCalls[polisCalls.length - 1]?.questionScanProgress).toBe(progress);
   });
 
+  it('lets the embedded report retry a failed saved-response load', async () => {
+    const refreshQuestionResponses = jest.fn(async () => {});
+    render(
+      <OnePageSession {...buildProps()} cacheInitializationError refreshQuestionResponses={refreshQuestionResponses} />,
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+
+    const reportProps = mockPolisReport.mock.calls.map((args) => args[0]).at(-1);
+    expect(reportProps.cacheInitializationError).toBe(true);
+    await act(async () => reportProps.onRetryLoad());
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(null, { slug: 'edge' });
+  });
+
   it('passes the built-in demo display slug to the embedded report', async () => {
     render(
       <OnePageSession

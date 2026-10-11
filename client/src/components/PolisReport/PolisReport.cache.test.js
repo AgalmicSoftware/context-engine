@@ -823,6 +823,26 @@ describe('PolisReport cache read options', () => {
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
   });
 
+  it('offers a retry instead of loading forever when the session load failed', async () => {
+    const onRetryLoad = jest.fn(async () => {});
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="edge"
+        isResponsesCacheReady={false}
+        cacheInitializationError
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Responses could not be loaded, so the report can't be shown yet.",
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
+  });
+
   it('shows block-count loading progress under the Polis spinner when scoped question scan progress is available', () => {
     render(
       <PolisReport

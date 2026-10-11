@@ -193,8 +193,11 @@ export default function PolisReport({
   slug = '',
   sessionSlug = '',
   sessionConfig = null,
+  cacheInitializationError = false,
+  onRetryLoad,
 }: PolisReportProps) {
   const [ratingMatrix, setRatingMatrix] = useState<RatingMatrix | null>(null);
+  const [retryingLoad, setRetryingLoad] = useState(false);
   const [allResponders, setAllResponders] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<string[]>([]);
   const [stats, setStats] = useState<PolisStats | null>(null);
@@ -2375,6 +2378,19 @@ export default function PolisReport({
   const isRefreshing =
     !effectiveUseDemoData && !hasCompletedScopedBlockScan && (!isQuestionCacheReady || !isResponsesCacheReady);
   const isLoading = isRefreshing && !hasRenderableReport;
+  // A failed session load never settles on its own; say so and offer a retry instead of spinning.
+  const loadFailed = isLoading && !!cacheInitializationError && typeof onRetryLoad === 'function';
+  const retryLoad = async () => {
+    if (retryingLoad || typeof onRetryLoad !== 'function') return;
+    setRetryingLoad(true);
+    try {
+      await onRetryLoad();
+    } catch (_) {
+      // The load stays failed, so the message and Retry stay visible.
+    } finally {
+      setRetryingLoad(false);
+    }
+  };
   const showLoadingProgress = isLoading && (loadingScanProgress.requestedTotalBlocks > 0 || isHydratingLoading);
   const showLoadingProgressDetails = !isHydratingLoading || hasHydrateProgressDetails;
   const loadingProgressPercent = isHydratingLoading
@@ -2561,7 +2577,14 @@ export default function PolisReport({
           </div>
         )}
 
-        {isLoading ? (
+        {loadFailed ? (
+          <p className={styles.noData} role="alert">
+            Responses could not be loaded, so the report can&apos;t be shown yet.{' '}
+            <button type="button" className={styles.downloadButton} onClick={retryLoad} disabled={retryingLoad}>
+              {retryingLoad ? 'Retrying…' : 'Retry'}
+            </button>
+          </p>
+        ) : isLoading ? (
           <div className={styles.loadingState}>
             <FontAwesomeIcon
               icon={faSpinner}
