@@ -277,6 +277,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           changedFieldsByQid: getChangedQidsAndFields(surveyIndex)?.changedMap,
           prevAnswers,
           prevBaseline,
+          savedAnswersKnown: !!propsRef.current?.isResponsesCacheReady,
           resolvers: {
             resolveFieldEncryptionAudience: resolveFieldEncryptionAudience,
             resolveFieldEncryptionGateId: resolveFieldEncryptionGateId,

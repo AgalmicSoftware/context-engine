@@ -1,5 +1,6 @@
 import {
   getChangedInterviewConsentQids,
+  keepConsentWithdrawals,
   resolveConsentFlags,
   type InterviewConsentOverrides,
 } from './sessionInterviewConsent';
@@ -2149,46 +2150,6 @@ const INTERVIEW_DRAFT_FIELDS: Record<string, string[]> = {
   conviction: ['conviction'],
   interviewProvenance: [],
 };
-const SAVED_CONSENT_KEYS = ['consentSavedAt', 'consentStorageRefId', 'consentReadAuthority'];
-const AI_ATTRIBUTION_KEYS = ['source', 'promptVersion', 'questionSetHash'];
-const PREDICTION_RESEARCH_KEYS = [
-  'questionId',
-  'selection',
-  'originalPrediction',
-  'predictionRevisions',
-  'userEditedFields',
-  'unselectedDrafts',
-  'submissionValueSnapshot',
-  'predictionComparison',
-];
-
-// Undoing an interview never makes a response more disclosing: a name, AI attribution or
-// research consent the interview withdrew stays withdrawn from the consent it had before.
-const keepInterviewConsentWithdrawals = (before: unknown, attempted: unknown): Record<string, unknown> | null => {
-  const prior = readPlainRecord(before);
-  const tried = readPlainRecord(attempted);
-  if (!Object.keys(prior).length || !Object.keys(tried).length) return null;
-  const priorFlags = resolveConsentFlags(prior);
-  const triedFlags = resolveConsentFlags(tried);
-  const withdrawName = !!prior.responderName && !tried.responderName;
-  const withdrawAi = priorFlags.includeAiProvenance && !triedFlags.includeAiProvenance;
-  const withdrawResearch = priorFlags.includePredictionComparison && !triedFlags.includePredictionComparison;
-  if (!withdrawName && !withdrawAi && !withdrawResearch) return null;
-  const kept: Record<string, unknown> = {
-    ...prior,
-    version: 1,
-    includeAiProvenance: priorFlags.includeAiProvenance && !withdrawAi,
-    includePredictionComparison: priorFlags.includePredictionComparison && !withdrawResearch,
-  };
-  [
-    ...SAVED_CONSENT_KEYS,
-    ...(withdrawName ? ['responderName'] : []),
-    ...(withdrawAi ? AI_ATTRIBUTION_KEYS : []),
-    ...(withdrawResearch ? PREDICTION_RESEARCH_KEYS : []),
-  ].forEach((key) => delete kept[key]);
-  return kept;
-};
-
 // Interview drafts enter the pile only to be uploaded. The returned restore undoes the
 // applied drafts, so one removed or discarded after a failed upload is not sent later.
 export const captureSessionInterviewResponses = (engine: PileViewModeEngine, questionIds: string[]) => {
@@ -2228,7 +2189,7 @@ export const captureSessionInterviewResponses = (engine: PileViewModeEngine, que
               if (!unsaved.has(normalizeQuestionIdKey(id))) return;
               const restored =
                 field === 'interviewProvenance'
-                  ? keepInterviewConsentWithdrawals(had ? value : saved[id], next[id]) || (had ? value : undefined)
+                  ? keepConsentWithdrawals(had ? value : saved[id], next[id]) || (had ? value : undefined)
                   : // An unedited field takes the saved value, which may have loaded during the upload.
                     !pending && Object.hasOwn(saved, id)
                     ? engine.deepClone(saved[id])

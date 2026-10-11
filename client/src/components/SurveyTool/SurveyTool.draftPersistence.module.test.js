@@ -662,24 +662,24 @@ describe('SurveyTool draft persistence', () => {
     expect(hydrated.updates).toEqual({});
   });
 
-  it('skips a draft written against a saved answer that has since changed', () => {
+  it('skips only the draft fields whose saved value has since changed', () => {
     const draft = {
       answers: { q1: { additional: 'draft comment' } },
       baseline: { q1: { value: 'Agree', additional: 'old comment' } },
     };
-    const restore = (savedAnswer) =>
+    const restore = (savedAnswer, savedComment) =>
       buildDraftHydrationState({
         renderedQuestionIds: ['q1'],
         draft,
         prevSlice: {
           answers: { q1: { value: savedAnswer } },
-          additionalComments: { q1: { value: 'old comment' } },
+          additionalComments: { q1: { value: savedComment } },
           importance: {},
           conviction: {},
         },
         prevBaseline: {
           answers: { q1: { value: savedAnswer } },
-          additionalComments: { q1: { value: 'old comment' } },
+          additionalComments: { q1: { value: savedComment } },
           importance: {},
           conviction: {},
         },
@@ -687,11 +687,15 @@ describe('SurveyTool draft persistence', () => {
         applyDraftEntryToSlice,
       });
 
-    expect(restore('Agree').nextSlice.additionalComments.q1.value).toBe('draft comment');
-    const stale = restore('Disagree');
-    expect(stale.changed).toBe(false);
-    expect(stale.nextSlice.answers.q1.value).toBe('Disagree');
-    expect(stale.nextSlice.additionalComments.q1.value).toBe('old comment');
+    expect(restore('Agree', 'old comment').nextSlice.additionalComments.q1.value).toBe('draft comment');
+    // Only the answer changed elsewhere: the comment draft does not conflict with it.
+    const answerChanged = restore('Disagree', 'old comment');
+    expect(answerChanged.nextSlice.answers.q1.value).toBe('Disagree');
+    expect(answerChanged.nextSlice.additionalComments.q1.value).toBe('draft comment');
+    // The comment itself changed elsewhere: its older draft is dropped.
+    const commentChanged = restore('Agree', 'newer comment');
+    expect(commentChanged.changed).toBe(false);
+    expect(commentChanged.nextSlice.additionalComments.q1.value).toBe('newer comment');
   });
 
   it('keeps decrypted-empty answer aligned when masked response has encrypted=true without envelope', () => {

@@ -1,4 +1,4 @@
-import { consentSignature } from './sessionInterviewConsent';
+import { consentSignature, keepConsentWithdrawals } from './sessionInterviewConsent';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
 
@@ -1199,38 +1199,58 @@ export const buildDraftBaselineEntry = (
 };
 
 /**
- * A draft entry is stale when the saved answer it was written against has since
- * changed, for example on another device. Unknown saved answers are not stale.
+ * A draft field is stale when the saved value it was written against has since changed,
+ * for example on another device; only that field is dropped. A draft written while the
+ * saved answers were unknown never conflicts, and a consent withdrawal is never dropped.
  */
-export const isDraftEntryStale = (
+export const withoutStaleDraftFields = (
+  entry: SurveyDraftQuestionEntry,
   storedBaselineEntry: unknown,
   currentBaselineSlice: PersistedDraftSliceLike | null | undefined,
   questionId: unknown,
-): boolean => {
+): SurveyDraftQuestionEntry => {
   const current = buildDraftBaselineEntry(currentBaselineSlice, questionId);
-  if (!current) return false;
-  const stored = isRecord(storedBaselineEntry) ? (storedBaselineEntry as SurveyDraftQuestionEntry) : {};
+  // Nothing to conflict with: the saved answer was unknown when drafted, or is not loaded yet.
+  if (!isRecord(storedBaselineEntry) || !current) return entry;
+  const stored = storedBaselineEntry as SurveyDraftQuestionEntry;
   // A locked field is identified by its envelope; a blank field by having no value.
-  const savedSignature = (entry: SurveyDraftQuestionEntry, valueKey: string, envelopeKey: string) =>
-    entry[envelopeKey]
-      ? `envelope:${String(entry[envelopeKey])}`
-      : hasMeaningfulFieldValue({ value: entry[valueKey] })
-        ? buildStableDraftValueSignature(entry[valueKey])
+  const savedSignature = (source: SurveyDraftQuestionEntry, valueKey: string, envelopeKey: string) =>
+    source[envelopeKey]
+      ? `envelope:${String(source[envelopeKey])}`
+      : hasMeaningfulFieldValue({ value: source[valueKey] })
+        ? buildStableDraftValueSignature(source[valueKey])
         : 'none';
-  return (
-    (
-      [
-        ['value', 'answerEncryptedPortion'],
-        ['additional', 'additionalEncryptedPortion'],
-      ] as const
-    ).some(
-      ([valueKey, envelopeKey]) =>
-        savedSignature(stored, valueKey, envelopeKey) !== savedSignature(current, valueKey, envelopeKey),
-    ) ||
-    (['importance', 'conviction'] as const).some(
-      (key) => stored[key] != null && current[key] != null && Number(stored[key]) !== Number(current[key]),
+  const staleKeys: string[] = [];
+  (
+    [
+      [ANSWER_DRAFT_KEYS, 'value', 'answerEncryptedPortion'],
+      [ADDITIONAL_DRAFT_KEYS, 'additional', 'additionalEncryptedPortion'],
+    ] as const
+  ).forEach(([keys, valueKey, envelopeKey]) => {
+    if (
+      keys.some((key) => key in entry) &&
+      savedSignature(stored, valueKey, envelopeKey) !== savedSignature(current, valueKey, envelopeKey)
     )
-  );
+      staleKeys.push(...keys);
+  });
+  (['importance', 'conviction'] as const).forEach((key) => {
+    if (key in entry && stored[key] != null && current[key] != null && Number(stored[key]) !== Number(current[key]))
+      staleKeys.push(key);
+  });
+  if (!staleKeys.length) return entry;
+  const fresh: SurveyDraftQuestionEntry = { ...entry };
+  staleKeys.forEach((key) => delete fresh[key]);
+  if (isRecord(fresh.interviewProvenance)) {
+    const qid = normalizeQuestionIdKey(questionId);
+    const savedConsent = isRecord(currentBaselineSlice?.interviewProvenance)
+      ? currentBaselineSlice.interviewProvenance[qid]
+      : null;
+    // The rest of the draft may be stale, but a withdrawal it records still applies.
+    const withdrawals = keepConsentWithdrawals(savedConsent, fresh.interviewProvenance);
+    if (withdrawals) fresh.interviewProvenance = withdrawals;
+    else delete fresh.interviewProvenance;
+  }
+  return fresh;
 };
 
 export const buildPersistedDraftMapsForAllowedIds = ({
@@ -1241,6 +1261,7 @@ export const buildPersistedDraftMapsForAllowedIds = ({
   prevAnswers = {},
   prevBaseline = {},
   resolvers = {},
+  savedAnswersKnown = true,
 }: {
   allowedQuestionIds?: unknown[];
   slice?: PersistedDraftSliceLike | null;
@@ -1250,6 +1271,8 @@ export const buildPersistedDraftMapsForAllowedIds = ({
   prevAnswers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   prevBaseline?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   resolvers?: PersistedDraftEntryResolvers;
+  // False while saved answers are still unknown, so their absence is not recorded as "none saved".
+  savedAnswersKnown?: boolean;
 } = {}) => {
   const answersObj = { ...(isRecord(prevAnswers) ? prevAnswers : {}) };
   const baselineObj = { ...(isRecord(prevBaseline) ? prevBaseline : {}) };
@@ -1309,7 +1332,8 @@ export const buildPersistedDraftMapsForAllowedIds = ({
       return;
     }
     answersObj[qid] = entry;
-    const baselineEntry = buildDraftBaselineEntry(normalizedBaselineSlice, qid);
+    // An empty entry records that nothing was saved; no entry means the saved answer was unknown.
+    const baselineEntry = buildDraftBaselineEntry(normalizedBaselineSlice, qid) || (savedAnswersKnown ? {} : null);
     if (baselineEntry) baselineObj[qid] = baselineEntry;
     else delete baselineObj[qid];
   });

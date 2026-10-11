@@ -268,6 +268,10 @@ const fixture = async ({
     listPage,
     engine: () => engine,
     view: () => view,
+    unmount: () => {
+      view?.unmount();
+      view = null;
+    },
   };
 };
 
@@ -477,4 +481,28 @@ it.each([
   await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
   expect(h.listPage.mock.calls.some(([args]) => args.ownResponses?.account === OWNER)).toBe(true);
   expect(h.submitResponses.mock.calls[0][2][0]).toMatchObject({ ...SAVED, additional: { value: 'New comment' } });
+});
+
+it('keeps a comment typed before saved answers loaded when a reload loads them', async () => {
+  let failGlobal = true;
+  const h = await fixture({ failGlobal: () => failGlobal });
+  h.add('responses', SAVED);
+  // First visit: the response listing fails, so this browser does not know the saved answers.
+  await initializeSessionThroughMainSite(h);
+  await h.mount({ cacheInitializationError: true });
+  await act(async () => h.engine().handleAdditionalPile(QID, 'Typed before saved answers loaded'));
+  await settle();
+  h.unmount();
+
+  // Reload: the listing works and the saved answers load before drafts are restored.
+  failGlobal = false;
+  await act(async () => h.sync());
+  expect(h.state.isResponsesCacheReady).toBe(true);
+  await h.mount();
+  await settle();
+
+  const slice = h.engine().state.surveysResponseState[0];
+  expect(slice.answers[QID].value).toBe('Saved answer');
+  expect(slice.additionalComments[QID].value).toBe('Typed before saved answers loaded');
+  expect(h.engine().getPendingEditStats().total).toBe(1);
 });

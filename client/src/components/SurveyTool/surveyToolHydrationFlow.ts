@@ -1,8 +1,8 @@
 import { buildSavedInterviewConsent, consentSignature } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import {
-  isDraftEntryStale,
   shouldForceOverwriteDraftValues,
+  withoutStaleDraftFields,
   withoutUnrestorableUnlocks,
 } from './surveyToolDraftState.js';
 import {
@@ -763,8 +763,10 @@ export const buildDraftHydrationState = ({
     if (!questionId || typeof applyDraftEntryToSlice !== 'function') return;
 
     const storedEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
-    if (!isRecord(storedEntry) || isDraftEntryStale(baseline?.[questionId], prevBaseline, questionId)) return;
-    const { entry: answerEntry, lostUnlocks } = withoutUnrestorableUnlocks(storedEntry);
+    if (!isRecord(storedEntry)) return;
+    const { entry: answerEntry, lostUnlocks } = withoutUnrestorableUnlocks(
+      withoutStaleDraftFields(storedEntry, baseline?.[questionId], prevBaseline, questionId),
+    );
     if (
       applyDraftEntryToSlice({
         targetSlice: nextSlice,

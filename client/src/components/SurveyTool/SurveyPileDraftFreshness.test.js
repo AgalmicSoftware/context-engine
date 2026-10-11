@@ -143,7 +143,7 @@ it('keeps newer saved answers for questions the draft never edited', async () =>
   expect(Array.from(reloaded.engine().getChangedQidsAndFields(0).changedQids)).toEqual(['q1']);
 });
 
-it('drops a draft written against a saved answer that changed elsewhere', async () => {
+it('keeps a comment draft when only the saved answer changed elsewhere', async () => {
   mockCaches();
   const tabA = await mountPile();
   await run(
@@ -158,7 +158,25 @@ it('drops a draft written against a saved answer that changed elsewhere', async 
   const slice = reloaded.engine().state.surveysResponseState[0];
 
   expect(slice.answers.q1.value).toBe('Disagree');
-  expect(slice.additionalComments.q1?.value ?? '').toBe('');
+  expect(slice.additionalComments.q1.value).toBe('Note from tab A');
+  expect(Array.from(reloaded.engine().getChangedQidsAndFields(0).changedQids)).toEqual(['q1']);
+});
+
+it('drops a comment draft when the saved comment changed elsewhere', async () => {
+  mockCaches();
+  const tabA = await mountPile();
+  await run(
+    () =>
+      new Promise((resolve) => tabA.engine().handleAdditionalPile('q1', 'Note from tab A', { afterUpdate: resolve })),
+  );
+  await settle();
+  tabA.view.unmount();
+
+  saved.q1 = { answer: field('Agree'), additional: field('Note from another device') };
+  const reloaded = await mountPile();
+  const slice = reloaded.engine().state.surveysResponseState[0];
+
+  expect(slice.additionalComments.q1.value).toBe('Note from another device');
   expect(reloaded.engine().getPendingEditStats().total).toBe(0);
 });
 
