@@ -50,10 +50,13 @@ test('rejects the retired legacy capture mode', () => withCoveredRepo((repoDir) 
 }));
 
 test('captures the whole-production floor from coverage-final.json', () => withCoveredRepo((repoDir) => {
+  const before = new Date().toISOString().slice(0, 10);
   const result = capture(repoDir, 'full');
+  const after = new Date().toISOString().slice(0, 10);
 
   assert.equal(result.status, 0, result.stderr);
   const baseline = JSON.parse(fs.readFileSync(path.join(repoDir, 'baseline.json'), 'utf8'));
+  assert.ok([before, after].includes(baseline.measuredAt), `unexpected measuredAt ${baseline.measuredAt}`);
   assert.equal(baseline.productionFileCount, 1);
   assert.deepEqual(baseline.zeroHitFiles, []);
   assert.deepEqual(baseline.global, { statements: 100, branches: 100, functions: 100, lines: 100 });
