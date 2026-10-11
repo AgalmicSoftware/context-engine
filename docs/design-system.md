@@ -43,7 +43,8 @@ order is:
 `client/public/theme-bootstrap.js` applies user/deployment state before the app
 bundle runs. `client/src/utilities/ui/themeRuntime.ts` validates and persists
 only a bundled app-theme ID and emits `ce:theme-change` for SVG, canvas, and
-chart consumers. Session metadata is not an app-theme resolution layer. Those
+chart consumers. Both set `<meta name="theme-color">` to the theme's
+`themeColor` from `registry.json`, so the browser bar matches the page. Session metadata is not an app-theme resolution layer. Those
 consumers must call `readThemeToken()` and subscribe with
 `subscribeThemeChanges()` instead of maintaining a JavaScript palette.
 
@@ -72,7 +73,8 @@ Their foreground/background pairs are contrast-tested at 4.5:1.
 ## Adding A Bundled Theme
 
 1. Add a values-only SCSS definition beside the existing theme files.
-2. Add one metadata entry to `registry.json`.
+2. Add one metadata entry to `registry.json`; its `themeColor` must equal the
+   theme's `canvas` token.
 3. Include the definition once in `themes/_index.scss`.
 4. Run the SCSS contract and contrast tests, the literal gate, the client build,
    and the route/viewports Playwright matrix documented below.
