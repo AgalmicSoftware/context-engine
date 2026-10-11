@@ -418,6 +418,45 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
     expect(container.textContent).not.toContain('Generation failed');
   });
 
+  it('lazy-loads the authoring panel after standalone generation instead of importing it back', async () => {
+    const fs = jest.requireActual('fs');
+    const path = jest.requireActual('path');
+    const source = fs.readFileSync(path.join(__dirname, 'SurveyGenerator.tsx'), 'utf8');
+    // CreateQuestionsAndSurveys embeds the generator, so a static import here is a cycle.
+    expect(source).not.toMatch(/^import .* from '\.\.\/CreateQuestionsAndSurveys';$/m);
+
+    mockProcessAdditionalSources.mockResolvedValue(
+      'This additional source content is long enough to drive question generation on its own.',
+    );
+    mockCallAI.mockResolvedValue(
+      JSON.stringify({
+        surveyTitle: 'Standalone generation',
+        questions: [{ prompt: 'Should this load lazily?', questionType: 'binary', tags: [] }],
+      }),
+    );
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />,
+    );
+    await addAdditionalUrl('https://example.com/lazy');
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector('[data-testid="create-questions-and-surveys"]')).not.toBeNull();
+  });
+
   it('blocks question generation when saving queued doc sources fails', async () => {
     mockUploadDocLibraryUrlRecord.mockRejectedValueOnce(new Error('Save failed.'));
     mockProcessAdditionalSources.mockResolvedValue(

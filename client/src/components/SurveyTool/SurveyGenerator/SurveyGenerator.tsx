@@ -32,7 +32,6 @@ import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/w
 import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CompactImageChooser from '../../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
-import CreateQuestionsAndSurveys from '../CreateQuestionsAndSurveys';
 import SBTSelector from '../../SBTs/SBTSelector';
 import DocumentLibraryPanel from '../../DocumentLibrary/DocumentLibraryPanel';
 import SessionChipSelector from '../../Shared/SessionChipSelector';
@@ -342,6 +341,9 @@ const debug = (...args: unknown[]) => {
 };
 
 const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
+// CreateQuestionsAndSurveys embeds this generator, so load it lazily instead of
+// importing it back; it is only needed once questions have been generated.
+const LazyCreateQuestionsAndSurveys = React.lazy(() => import('../CreateQuestionsAndSurveys'));
 
 export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {} as SurveyGeneratorProps) {
   const {
@@ -1406,35 +1408,37 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
     return (
       <div className={styles.createSurveyContainer}>
-        <CreateQuestionsAndSurveys
-          miniaturized={minified}
-          preformedQuestions={statementsToUpload}
-          preformedSurvey={preformedSurvey}
-          account={account}
-          loginComplete={loginComplete}
-          sessionConfig={resolvedSessionConfig}
-          contracts={resolvedContracts}
-          activeSessionSlug={resolvedSessionSlug}
-          provider={provider}
-          network={network}
-          toggleLoginModal={toggleLoginModal}
-          defaultTags={defaultTags as string[] | string | undefined}
-          documentURLs={documentURLs}
-          litHooks={scopedLitHooks}
-          onUploadComplete={(surveyHash: unknown) => {
-            setShowCreateSurvey(false);
-            setStatementsToUpload([]);
-            setSurveyTitle('');
-            setDocumentURLs([]);
-            setPastedText('');
-            setAudioFile(null);
-            if (surveyHash) {
-              alert(`Upload complete! Survey ID: ${surveyHash}`);
-            } else {
-              alert(`Upload complete! Questions added.`);
-            }
-          }}
-        />
+        <Suspense fallback={<div className={styles.viewModeEmptyState}>Loading question authoring...</div>}>
+          <LazyCreateQuestionsAndSurveys
+            miniaturized={minified}
+            preformedQuestions={statementsToUpload}
+            preformedSurvey={preformedSurvey}
+            account={account}
+            loginComplete={loginComplete}
+            sessionConfig={resolvedSessionConfig}
+            contracts={resolvedContracts}
+            activeSessionSlug={resolvedSessionSlug}
+            provider={provider}
+            network={network}
+            toggleLoginModal={toggleLoginModal}
+            defaultTags={defaultTags as string[] | string | undefined}
+            documentURLs={documentURLs}
+            litHooks={scopedLitHooks}
+            onUploadComplete={(surveyHash: unknown) => {
+              setShowCreateSurvey(false);
+              setStatementsToUpload([]);
+              setSurveyTitle('');
+              setDocumentURLs([]);
+              setPastedText('');
+              setAudioFile(null);
+              if (surveyHash) {
+                alert(`Upload complete! Survey ID: ${surveyHash}`);
+              } else {
+                alert(`Upload complete! Questions added.`);
+              }
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
