@@ -217,6 +217,49 @@ describe('WorkerDeploySection', () => {
     expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).not.toHaveTextContent(/revision/i);
   });
 
+  it('remembers generated template setup values for this slug and admin after a remount', async () => {
+    const adminAddress = '0x0000000000000000000000000000000000000001';
+    const onNativeTemplateSetupGenerated = jest.fn();
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: '',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    const props = {
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: adminAddress,
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+      onNativeTemplateSetupGenerated,
+    };
+    const first = renderWorkerDeploySection(props);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    expect(onNativeTemplateSetupGenerated).toHaveBeenCalledWith(`demo-sh\n${adminAddress}`);
+    const marker = onNativeTemplateSetupGenerated.mock.calls[0][0];
+    // Leaving the Worker step unmounts the section and its setup values.
+    first.unmount();
+
+    const remounted = renderWorkerDeploySection({ ...props, nativeTemplateSetupIdentity: marker });
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    await waitFor(() =>
+      expect(verifyNativeWorker).toHaveBeenLastCalledWith(expect.objectContaining({ deployedFromTemplate: true })),
+    );
+    remounted.unmount();
+
+    // A marker for another admin does not apply.
+    renderWorkerDeploySection({
+      ...props,
+      nativeTemplateSetupIdentity: 'demo-sh\n0x00000000000000000000000000000000000000ff',
+    });
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    await waitFor(() =>
+      expect(verifyNativeWorker).toHaveBeenLastCalledWith(expect.objectContaining({ deployedFromTemplate: false })),
+    );
+  });
+
   it('keeps the legacy deployment flow when native verification is not eligible', () => {
     renderWorkerDeploySection({
       allowNativeWorkerVerification: false,

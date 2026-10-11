@@ -103,6 +103,8 @@ export type WorkerPanelProps = {
   sessionModeProfileWorkerControl?: React.ReactNode;
   onNativeWorkerVerified?: (bootstrap: SessionWizardVerifiedWorkerConnection) => void;
   verifyNativeWorker?: WorkerDeploySectionProps['verifyNativeWorker'];
+  nativeTemplateSetupIdentity?: WorkerDeploySectionProps['nativeTemplateSetupIdentity'];
+  onNativeTemplateSetupGenerated?: WorkerDeploySectionProps['onNativeTemplateSetupGenerated'];
 };
 
 const WorkerPanel = ({
@@ -171,6 +173,8 @@ const WorkerPanel = ({
   sessionModeProfileWorkerControl = null,
   onNativeWorkerVerified,
   verifyNativeWorker,
+  nativeTemplateSetupIdentity,
+  onNativeTemplateSetupGenerated,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =
@@ -320,6 +324,8 @@ const WorkerPanel = ({
             displayedWorkerUrl={displayedWorkerUrl}
             onNativeWorkerVerified={onNativeWorkerVerified}
             verifyNativeWorker={verifyNativeWorker}
+            nativeTemplateSetupIdentity={nativeTemplateSetupIdentity}
+            onNativeTemplateSetupGenerated={onNativeTemplateSetupGenerated}
           />
 
           <WorkerConnectionSection

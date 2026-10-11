@@ -87,6 +87,8 @@ export type SessionWizardShellProps = {
   handleGateRemoveSbt: EncryptionPanelBoundaryProps['handleGateRemoveSbt'];
   handleDeployWorker: WorkerPanelProps['handleDeployWorker'];
   verifyNativeWorker?: WorkerPanelProps['verifyNativeWorker'];
+  nativeTemplateSetupIdentity?: WorkerPanelProps['nativeTemplateSetupIdentity'];
+  onNativeTemplateSetupGenerated?: WorkerPanelProps['onNativeTemplateSetupGenerated'];
   handleSavePendingSbtDraft: WizardModalsProps['handleSavePendingSbtDraft'];
   hasSponsoredBundleLink: HeaderProps['hasSponsoredBundleLink'];
   isNormalMode: boolean;
@@ -267,6 +269,8 @@ const SessionWizardShell = ({
   handleGateRemoveSbt,
   handleDeployWorker,
   verifyNativeWorker,
+  nativeTemplateSetupIdentity,
+  onNativeTemplateSetupGenerated,
   handleSavePendingSbtDraft,
   hasSponsoredBundleLink,
   isNormalMode,
@@ -603,6 +607,8 @@ const SessionWizardShell = ({
             sessionModeProfileWorkerControl={isNormalMode ? null : sessionModeProfileWorkerControl}
             onNativeWorkerVerified={onNativeWorkerVerified}
             verifyNativeWorker={verifyNativeWorker}
+            nativeTemplateSetupIdentity={nativeTemplateSetupIdentity}
+            onNativeTemplateSetupGenerated={onNativeTemplateSetupGenerated}
           />
         )}
 

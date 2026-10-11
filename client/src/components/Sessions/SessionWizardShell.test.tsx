@@ -96,9 +96,16 @@ jest.mock('./SessionMetadataEditor', () => (props: any) => (
 ));
 
 jest.mock('./WorkerPanel', () => (props: any) => (
-  <section data-testid="shell-worker" data-worker-url={props.displayedWorkerUrl || ''}>
+  <section
+    data-testid="shell-worker"
+    data-worker-url={props.displayedWorkerUrl || ''}
+    data-native-template-setup={props.nativeTemplateSetupIdentity || ''}
+  >
     {props.sessionModeProfileWorkerControl}
     {props.deployHelperToggle}
+    <button type="button" onClick={() => props.onNativeTemplateSetupGenerated?.('generated-identity')}>
+      generate template setup
+    </button>
     <button type="button" onClick={props.onToggleCollapsed}>
       toggle worker
     </button>
@@ -459,6 +466,21 @@ describe('SessionWizardShell', () => {
     expect(props.closeCreateSbtModal).toHaveBeenCalledTimes(1);
     expect(props.closeContractViewerModal).toHaveBeenCalledTimes(1);
     expect(props.onCloseSessionHeaderPreviewModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the template setup marker and its setter to the Worker panel', () => {
+    const onNativeTemplateSetupGenerated = jest.fn();
+    render(
+      <SessionWizardShell
+        {...baseProps()}
+        nativeTemplateSetupIdentity={'demo-session\n0xabc'}
+        onNativeTemplateSetupGenerated={onNativeTemplateSetupGenerated}
+      />,
+    );
+
+    expect(screen.getByTestId('shell-worker')).toHaveAttribute('data-native-template-setup', 'demo-session\n0xabc');
+    fireEvent.click(screen.getByText('generate template setup'));
+    expect(onNativeTemplateSetupGenerated).toHaveBeenCalledWith('generated-identity');
   });
 
   it('keeps the compact header visible while the profile gates setup sections', () => {

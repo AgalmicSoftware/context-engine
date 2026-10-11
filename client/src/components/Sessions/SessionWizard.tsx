@@ -598,6 +598,8 @@ const SessionWizard = ({
     setWorkerSecrets,
     workerUrlAutoFilled,
     setWorkerUrlAutoFilled,
+    nativeTemplateSetupIdentity,
+    setNativeTemplateSetupIdentity,
     workerAllowOrigins,
     setWorkerAllowOrigins,
     workerLimitPerWallet,
@@ -951,6 +953,7 @@ const SessionWizard = ({
       workerRequirementProof,
       provisionedSponsoredContext,
       pendingWorkerGroupDrafts,
+      nativeTemplateSetupIdentity,
     });
     const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
     if (result.ok && result.status !== 'preserved-foreign-draft') wizardCacheSnapshotRef.current = cachePayload;
@@ -981,6 +984,7 @@ const SessionWizard = ({
     workerRequirementProof,
     provisionedSponsoredContext,
     pendingWorkerGroupDrafts,
+    nativeTemplateSetupIdentity,
     workerCanonicalSettlement.isSettled,
   ]);
 
@@ -2894,6 +2898,8 @@ const SessionWizard = ({
       handleCopyAdminUrl={handleCopyAdminUrl}
       handleDeployWorker={handleDeployWorker}
       verifyNativeWorker={verifyNativeWorker}
+      nativeTemplateSetupIdentity={nativeTemplateSetupIdentity}
+      onNativeTemplateSetupGenerated={setNativeTemplateSetupIdentity}
       handleGateAddSbt={handleGateAddSbt}
       handleGateRemoveSbt={handleGateRemoveSbt}
       handleSavePendingSbtDraft={handleSavePendingSbtDraft}

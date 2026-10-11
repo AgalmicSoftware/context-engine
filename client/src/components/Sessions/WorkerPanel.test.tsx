@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerPanel, { WorkerPanelProps } from './WorkerPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -144,5 +144,35 @@ describe('WorkerPanel', () => {
 
     expect(onWorkerModeChange).toHaveBeenCalledWith('custom');
     expect(setWorkerUrlAutoFilled).toHaveBeenCalledWith(false);
+  });
+
+  it('passes the template setup marker through to native Worker verification', async () => {
+    const adminAddress = '0x0000000000000000000000000000000000000001';
+    const onNativeTemplateSetupGenerated = jest.fn();
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: '',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    renderWorkerPanel({
+      allowNativeWorkerVerification: true,
+      isNormalMode: false,
+      workerMode: 'custom',
+      account: adminAddress,
+      draft: { corsWorkerUrl: '', slug: 'demo-sh' },
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+      nativeTemplateSetupIdentity: `demo-sh\n${adminAddress}`,
+      onNativeTemplateSetupGenerated,
+    });
+
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    await waitFor(() =>
+      expect(verifyNativeWorker).toHaveBeenCalledWith(expect.objectContaining({ deployedFromTemplate: true })),
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    expect(onNativeTemplateSetupGenerated).toHaveBeenCalledWith(`demo-sh\n${adminAddress}`);
   });
 });

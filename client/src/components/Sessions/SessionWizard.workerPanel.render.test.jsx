@@ -96,6 +96,35 @@ describe('SessionWizard worker panel rendering', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the template setup marker in the draft cache across a reload', async () => {
+    const view = renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    const originalConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    try {
+      fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+    } finally {
+      window.confirm = originalConfirm;
+    }
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Template Marker Session' },
+    });
+    selectNormalModeCard('Worker');
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+
+    const readCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+    await waitFor(() => expect(readCache().nativeTemplateSetupIdentity).toBeTruthy());
+    const { draft, nativeTemplateSetupIdentity: marker } = readCache();
+    expect(draft.slug).toBeTruthy();
+    expect(marker).toBe(`${draft.slug}\n${TEST_ADMIN_ADDRESS.toLowerCase()}`);
+
+    view.unmount();
+    renderLoggedInSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await waitFor(() => expect(readCache().nativeTemplateSetupIdentity).toBe(marker));
+  });
+
   it('defaults advanced custom-worker deploys to the configured release bundle URL', async () => {
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
 

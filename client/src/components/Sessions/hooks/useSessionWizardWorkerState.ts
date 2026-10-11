@@ -29,6 +29,7 @@ type CachedWorkerState =
       workerAllowOrigins?: unknown;
       workerLimitPerWallet?: unknown;
       workerLimitPerAnonymousIp?: unknown;
+      nativeTemplateSetupIdentity?: unknown;
     }
   | null
   | undefined;
@@ -126,6 +127,12 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     return sanitizeSessionWizardWorkerSecretsForLitMode(safePublicConfig);
   });
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
+  // Non-secret "template setup values were generated for this slug and admin"
+  // marker. It outlives the Worker step's own state, so a Worker verified after
+  // a step change or reload is still known to come from the Cloudflare template.
+  const [nativeTemplateSetupIdentity, setNativeTemplateSetupIdentity] = useState(() =>
+    typeof cachedWizard?.nativeTemplateSetupIdentity === 'string' ? cachedWizard.nativeTemplateSetupIdentity : '',
+  );
   const [workerAllowOrigins, setWorkerAllowOrigins] = useState(() =>
     typeof cachedWizard?.workerAllowOrigins === 'string' ? cachedWizard.workerAllowOrigins : defaultAllowedOrigins,
   );
@@ -180,6 +187,8 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     setWorkerSecrets,
     workerUrlAutoFilled,
     setWorkerUrlAutoFilled,
+    nativeTemplateSetupIdentity,
+    setNativeTemplateSetupIdentity,
     workerAllowOrigins,
     setWorkerAllowOrigins,
     workerLimitPerWallet,

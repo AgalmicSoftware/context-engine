@@ -826,10 +826,13 @@ High-level flow:
    registry and Arweave records remain canonical. Registry attachment requires
    the connected signer, requested Worker admin, and on-chain session admin to
    match. The template deploys with `DEPLOY_HELPER_ENABLED` set to `"0"`, so
-   when you generated setup values in this tab the wizard records that the
-   Worker has no embedded deploy helper and `/sponsor` does not offer deploy
-   grants from it. An attached existing Worker keeps the draft's
-   embedded deploy-helper setting, because no route reports the binding.
+   when you generated setup values for this session slug and admin, the
+   wizard records that the Worker you verify has no embedded deploy helper
+   and `/sponsor` does not offer deploy grants from it. The wizard remembers
+   that you generated them, but not the values, across step changes and
+   reloads of this tab. An attached existing Worker without generated setup
+   values keeps the draft's embedded deploy-helper setting, because no route
+   reports the binding.
 
 The runtime secrets remain in the current tab and Cloudflare's encrypted
 Worker-secret store. They are not placed in the deployment URL, logs, analytics

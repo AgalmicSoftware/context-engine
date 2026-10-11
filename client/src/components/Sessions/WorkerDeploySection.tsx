@@ -97,6 +97,8 @@ export type WorkerDeploySectionProps = {
     workerQueryValue: unknown;
     deployedFromTemplate?: boolean;
   }) => Promise<SessionWizardVerifiedWorkerConnection>;
+  nativeTemplateSetupIdentity?: string;
+  onNativeTemplateSetupGenerated?: (identity: string) => void;
 };
 
 const WorkerDeploySection = ({
@@ -138,6 +140,8 @@ const WorkerDeploySection = ({
   displayedWorkerUrl = '',
   onNativeWorkerVerified,
   verifyNativeWorker,
+  nativeTemplateSetupIdentity = '',
+  onNativeTemplateSetupGenerated,
 }: WorkerDeploySectionProps) => {
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
     tokenHmacSecret: string;
@@ -236,6 +240,7 @@ const WorkerDeploySection = ({
     try {
       setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
       setNativeSetupSecretsIdentity(nativeSetupIdentity);
+      onNativeTemplateSetupGenerated?.(nativeSetupIdentity);
       setNativeSetupError('');
       setNativeProgress('generated');
       setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
@@ -278,8 +283,11 @@ const WorkerDeploySection = ({
       const bootstrap = await verifyNativeWorker({
         sessionSlug: nativeSessionSlug,
         workerQueryValue: candidate,
-        // Generated setup values mean the Worker comes from the template.
-        deployedFromTemplate: !!currentNativeSetupSecrets,
+        // Setup values generated for this slug and admin, now or before the
+        // Worker step remounted, mean the Worker comes from the template.
+        deployedFromTemplate:
+          !!currentNativeSetupSecrets ||
+          (!!nativeTemplateSetupIdentity && nativeTemplateSetupIdentity === nativeSetupIdentity),
       });
       if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
       const returnedOrigin = normalizeNativeWorkerOrigin(bootstrap.workerOrigin);
