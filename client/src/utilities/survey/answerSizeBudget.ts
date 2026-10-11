@@ -5,8 +5,9 @@ import { STORAGE_RESOURCE_KEYS } from '../storage/storageRefs';
 
 /**
  * The session Worker refuses a stored answer over MAX_STORED_ANSWER_BYTES (its
- * MAX_RESPONSE_ITEM_BYTES). Each stored answer repeats the question prompt, and
- * a locked answer, comment or rating is stored as an encrypted envelope.
+ * MAX_RESPONSE_ITEM_BYTES) and a submission over MAX_SUBMISSION_BYTES (its
+ * responses upload cap). Each stored answer repeats the question prompt, and a
+ * locked answer, comment or rating is stored as an encrypted envelope.
  *
  * Locked answer and comment text also keeps to MAX_LOCKED_TEXT_BYTES, the
  * amount of locked text the Worker's cap was sized to hold (its
@@ -14,6 +15,7 @@ import { STORAGE_RESOURCE_KEYS } from '../storage/storageRefs';
  * unlocked text has no budget of its own.
  */
 export const MAX_STORED_ANSWER_BYTES = 96 * 1024;
+export const MAX_SUBMISSION_BYTES = 2 * 1024 * 1024;
 export const MAX_LOCKED_TEXT_BYTES = 48 * 1024;
 
 // Room for the Worker's session fields, locked-field hashes and other small
@@ -42,6 +44,8 @@ const PROMPT_TOO_LONG_MESSAGE =
   "Answers to this question can't be saved because its prompt is too long. Ask the session admin to shorten it.";
 const LOCKED_ANSWER_TOO_LONG_MESSAGE =
   "This locked answer can't be saved with this question's long prompt. Unlock it, or ask the session admin to shorten the question.";
+const SUBMISSION_TOO_LARGE_MESSAGE =
+  'These answers are too large to save in one submission. Shorten the longest ones and submit again.';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -288,6 +292,23 @@ export const nameQuestionForNotice = (prompt: unknown, questionId: unknown): str
   }
   const id = String(questionId ?? '').trim();
   return id ? `Question ${id.slice(0, 10)}…` : 'A question';
+};
+
+/**
+ * Checks answers exactly as they will be uploaded to the session Worker, and
+ * the submission that bundles them. Returns why the Worker would refuse them,
+ * naming the question, or ''.
+ */
+export const readStoredAnswersUploadProblem = (entries: unknown[] = [], submission: unknown = null): string => {
+  for (const entry of entries) {
+    const overBytes = jsonBytes(entry) - MAX_STORED_ANSWER_BYTES;
+    if (overBytes <= 0) continue;
+    const record = asRecord(entry);
+    const name = nameQuestionForNotice(record.prompt, record.questionID ?? record.questionId);
+    // Each removed character frees at least one stored byte.
+    return `Nothing was submitted: ${name} is too long to save. Shorten its answer or comment by about ${formatCount(overBytes)} and submit again.`;
+  }
+  return submission && jsonBytes(submission) > MAX_SUBMISSION_BYTES ? SUBMISSION_TOO_LARGE_MESSAGE : '';
 };
 
 /** Only answers the session Worker stores have this budget. */

@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 
 import { createContractScriptsSurveyWriteMethods } from './contractScripts.surveyWriteMethods';
 import { hasNonZeroHashValue } from './deterministicFactoryHelpers';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile';
 
 const SURVEYS_ADDRESS = '0x1111111111111111111111111111111111111111';
 const SURVEY_ID = ethers.utils.id('survey-precheck');
@@ -136,5 +137,73 @@ describe('survey write id pre-check', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('Worker answer upload check', () => {
+  const WORKER_SESSION = {
+    slug: 'pilot',
+    sessionId: '0x00112233445566778899aabbccddeeff',
+    corsWorkerUrl: 'https://worker.example',
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    storageProfile: { backend: 'cloudflare' },
+  };
+  const buildSubmit = () => {
+    class MockWeb3Provider {
+      getSigner() {
+        return { getAddress: async () => '0x00000000000000000000000000000000000000aa' };
+      }
+    }
+    const uploadJsonPayloadForContractPointer = jest.fn(async () => {
+      throw new Error('upload reached');
+    });
+    const methods = createContractScriptsSurveyWriteMethods({
+      ARWEAVE_ACTIVE: false,
+      STORAGE_RESOURCE_KEYS: { QUESTIONS: 'questions', SURVEYS: 'surveys', RESPONSES: 'responses' },
+      SURVEYS: [],
+      contractsLog: { warn: jest.fn() },
+      cryptoUtils: null,
+      ethers: { ...ethers, providers: { Web3Provider: MockWeb3Provider } },
+      hasNonZeroHashValue,
+      isCloudflareStorageResource: () => true,
+      normalizeSessionSlug: (value: unknown) => value,
+      resolveArweaveUploadOpts: async () => ({}),
+      resolveSession: () => WORKER_SESSION,
+      resolveStorageSessionSlug: () => 'pilot',
+      uploadJsonPayloadForContractPointer,
+      utils: ethers.utils,
+      validateNoLockedPlaintextInPayload: () => {},
+    });
+    const context = { ...methods, getProviderLocation: () => ({}) };
+    const submit = (response: Record<string, unknown>) =>
+      methods.submitResponses.call(
+        context,
+        'wagmi',
+        [QUESTION_ID],
+        [response],
+        ethers.constants.HashZero,
+        null,
+        WORKER_SESSION,
+      );
+    return { submit, uploadJsonPayloadForContractPointer };
+  };
+  const response = (text: string) => ({
+    questionID: QUESTION_ID,
+    prompt: 'Tell us more',
+    answer: { value: text, encrypted: false, encryptedPortion: '' },
+  });
+
+  it('names an answer the Worker would refuse before anything uploads', async () => {
+    const { submit, uploadJsonPayloadForContractPointer } = buildSubmit();
+    await expect(submit(response('x'.repeat(97 * 1024)))).rejects.toThrow(
+      /^Nothing was submitted: “Tell us more” is too long to save\. Shorten its answer or comment by about [\d,]+ characters and submit again\.$/,
+    );
+    expect(uploadJsonPayloadForContractPointer).not.toHaveBeenCalled();
+  });
+
+  it('uploads an answer that fits', async () => {
+    const { submit, uploadJsonPayloadForContractPointer } = buildSubmit();
+    await expect(submit(response('Yes'))).rejects.toThrow('upload reached');
+    expect(uploadJsonPayloadForContractPointer).toHaveBeenCalledTimes(1);
   });
 });

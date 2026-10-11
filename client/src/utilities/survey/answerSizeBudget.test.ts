@@ -7,8 +7,10 @@ import { validateStorageUploadPayload } from '../../../../workers/sessionCorsWor
 import {
   MAX_LOCKED_TEXT_BYTES,
   MAX_STORED_ANSWER_BYTES,
+  MAX_SUBMISSION_BYTES,
   nameQuestionForNotice,
   readAnswerTooLongMessage,
+  readStoredAnswersUploadProblem,
   sessionStoresAnswersInWorker,
 } from './answerSizeBudget';
 
@@ -148,6 +150,7 @@ const storedEntryBytes = (input: Record<string, any>) => {
 describe('answer size budget', () => {
   it("matches the session Worker's caps", () => {
     expect(MAX_STORED_ANSWER_BYTES).toBe(98_304);
+    expect(MAX_SUBMISSION_BYTES).toBe(2_097_152);
     expect(MAX_LOCKED_TEXT_BYTES).toBe(49_152);
   });
 
@@ -390,5 +393,34 @@ describe('naming questions in notices', () => {
     expect(nameQuestionForNotice('q'.repeat(80), QUESTION_ID)).toBe(`“${'q'.repeat(57)}…”`);
     expect(nameQuestionForNotice('[encrypted]', QUESTION_ID)).toBe('Question 0x5d5d5d5d…');
     expect(nameQuestionForNotice('', '')).toBe('A question');
+  });
+});
+
+describe('the final check on the answers as uploaded', () => {
+  const row = (prompt: string, text: string) => ({
+    questionID: QUESTION_ID,
+    prompt,
+    answer: { value: text, encrypted: false, encryptedPortion: '' },
+  });
+
+  it('names the first answer the Worker would refuse and how much to cut', () => {
+    const fits = row('Fits', 'Yes');
+    const tooLong = row('Tell us more', textOfBytes(97 * KIB));
+    const overBytes = new TextEncoder().encode(JSON.stringify(tooLong)).byteLength - MAX_STORED_ANSWER_BYTES;
+    expect(readStoredAnswersUploadProblem([fits, tooLong])).toBe(
+      `Nothing was submitted: “Tell us more” is too long to save. Shorten its answer or comment by about ${overBytes.toLocaleString('en-US')} characters and submit again.`,
+    );
+    expect(readStoredAnswersUploadProblem([row('[encrypted]', textOfBytes(97 * KIB))])).toMatch(
+      /^Nothing was submitted: Question 0x5d5d5d5d… is too long to save\./,
+    );
+    expect(readStoredAnswersUploadProblem([fits])).toBe('');
+  });
+
+  it('refuses a submission over the Worker cap even when each answer fits', () => {
+    const rows = Array.from({ length: 24 }, () => row('Fits', textOfBytes(90 * KIB)));
+    expect(readStoredAnswersUploadProblem(rows, { responses: rows })).toBe(
+      'These answers are too large to save in one submission. Shorten the longest ones and submit again.',
+    );
+    expect(readStoredAnswersUploadProblem(rows.slice(0, 2), { responses: rows.slice(0, 2) })).toBe('');
   });
 });

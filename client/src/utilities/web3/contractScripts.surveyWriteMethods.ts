@@ -1,6 +1,7 @@
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
+import { readStoredAnswersUploadProblem } from '../survey/answerSizeBudget';
 
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
@@ -592,6 +593,19 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           ...resolvedArweaveOpts,
           context: uploadContext,
         };
+        if (canUseSessionStorage) {
+          // The answers exactly as the Worker will store them: a refusal names the
+          // question here, before anything uploads, instead of failing with a 413.
+          const uploadProblem = readStoredAnswersUploadProblem(
+            questionResponses.map((response) =>
+              workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response,
+            ),
+            surveyResponse && workerResponseIdentity
+              ? { ...surveyResponse, ...workerResponseIdentity }
+              : surveyResponse,
+          );
+          if (uploadProblem) throw new Error(uploadProblem);
+        }
         if (surveyResponse) {
           const surveyResponsePayload = workerResponseIdentity
             ? { ...surveyResponse, ...workerResponseIdentity }
