@@ -2117,7 +2117,8 @@ class QuestionFilter extends React.Component<any, any> {
       // wallet or passkey prompt: only a local key or anonymous Worker AI.
       const canRerankWithoutSignIn = aiAccess.localKeyAvailable || aiAccess.workerAnonymousAvailable === true;
       if (!USER_FILTER_REFRESH_SOURCES.has(String(source)) || !canRerankWithoutSignIn) {
-        if (this.state.aiFilterApplied && this.state.aiCombineWithOtherFilters) {
+        // In both AI views, say the shown ranking no longer covers the current questions.
+        if (this.state.aiFilterApplied) {
           this.setState(buildQuestionFilterAiApplyErrorPatch(AI_RERANK_HINT));
         }
         return false;

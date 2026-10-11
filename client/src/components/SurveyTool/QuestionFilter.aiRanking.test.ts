@@ -845,7 +845,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(second.state.aiRankedQuestionIds).toEqual(['q1']);
   });
 
-  it('keeps the applied ranking instead of re-ranking by itself when the questions change', async () => {
+  it('keeps the applied ranking and asks for Apply when the questions change', async () => {
     jest.useFakeTimers();
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
@@ -905,11 +905,13 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     jest.runAllTimers();
     await Promise.resolve();
 
-    // New questions stay out of the ranking until the user clicks Apply again.
+    // New questions stay out of the ranking until the user clicks Apply again,
+    // and the AI-only view says so as the combined view does.
+    expect(instance.state.aiCombineWithOtherFilters).toBe(false);
     expect(rankSpy).toHaveBeenCalledTimes(1);
     expect(instance.state.aiFilterApplied).toBe(true);
     expect(instance.state.aiRankedQuestionIds).toEqual(['q1']);
-    expect(instance.state.aiApplyError).toBe('');
+    expect(instance.state.aiApplyError).toBe('Click Apply to update the AI ranking for the current questions.');
 
     gateSpy.mockRestore();
     localSpy.mockRestore();
