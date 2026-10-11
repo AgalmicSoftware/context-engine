@@ -219,6 +219,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-text:prepared', 'scripts/verify-prepared-public-text.sh');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('verify:release-version', 'scripts/release-version.mjs verify-worktree');
+  expectScriptContains('release:worker-pin', 'scripts/release-version.mjs pin-worker-release');
   expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
   expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');

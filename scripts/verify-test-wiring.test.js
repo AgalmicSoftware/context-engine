@@ -299,6 +299,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'verify:public-text:prepared': 'bash scripts/verify-prepared-public-text.sh',
           'verify:public-release-pii': 'bash scripts/verify-public-release-pii.sh',
           'verify:release-version': 'node scripts/release-version.mjs verify-worktree',
+          'release:worker-pin': 'node scripts/release-version.mjs pin-worker-release',
           'verify:release': 'node scripts/run-ci-gates.mjs --profile release',
         },
       }),
