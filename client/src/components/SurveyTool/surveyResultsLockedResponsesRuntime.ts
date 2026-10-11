@@ -92,6 +92,13 @@ type SurveyResultsLockedResponsesModelMemo = {
 
 type SurveyResultsDecryptFieldResult = { ok: true; value: unknown } | { ok: false; error?: unknown };
 
+// Me + admin and Session fields unwrap their key through the session Worker,
+// which needs the verified session context.
+type SurveyResultsDecryptOptions = CryptoGateDecryptOptions & {
+  sessionConfig?: unknown;
+  sessionSlug?: string;
+};
+
 type SurveyResultsLitHooks = SurveyResultsRecord & {
   getKey?: (...args: unknown[]) => unknown;
 };
@@ -127,7 +134,7 @@ export type SurveyResultsLockedResponsesRuntimeInstance = {
 
 export type SurveyResultsLockedResponsesRuntimePorts = {
   applyStatePatch: (patch: unknown, afterApply?: () => void) => void;
-  decryptEnvelopeValue: (envelope: unknown, options: CryptoGateDecryptOptions) => Promise<unknown>;
+  decryptEnvelopeValue: (envelope: unknown, options: SurveyResultsDecryptOptions) => Promise<unknown>;
   getEffectiveSessionContext: () => { sessionConfig?: unknown; sessionSlug?: string };
   getEffectiveSlug: () => string;
   getNetworkQuestionsForCurrentContext: () => Record<string, SurveyResultsQuestionWithEncryption>;
@@ -379,14 +386,17 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     return result;
   };
 
-  const getCryptoGateDecryptOptions = (): CryptoGateDecryptOptions => {
+  const getCryptoGateDecryptOptions = (): SurveyResultsDecryptOptions => {
     const props = ports.getProps();
     const litHooks = getDecryptLitHooks();
     const litOpts = litHooks && typeof litHooks.getKey === 'function' ? { getKey: litHooks.getKey } : undefined;
+    const { sessionConfig, sessionSlug } = ports.getEffectiveSessionContext();
     return {
       account: props.account,
       chainId: props.network?.id || props.networkChainId || null,
       providerLike: props.provider,
+      sessionConfig: sessionConfig || undefined,
+      sessionSlug,
       ...(litOpts ? { litOpts } : {}),
     };
   };
