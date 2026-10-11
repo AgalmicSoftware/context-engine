@@ -1,28 +1,27 @@
 {
   "schemaVersion": 1,
-  "measuredAt": "2026-08-03",
+  "measuredAt": "2026-10-11",
   "source": "npm --prefix client run test:coverage:full-universe",
   "denominator": "Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.",
-  "productionFileCount": 1110,
-  "zeroHitFileCount": 11,
+  "productionFileCount": 1230,
+  "zeroHitFileCount": 10,
   "zeroHitFiles": [
     "client/src/components/Account/LoginSettingsAiConfigContent.tsx",
-    "client/src/components/DemoViews/DemoAnalysis/IndicatorHeatmap.tsx",
     "client/src/components/DemoViews/DemosIndex.tsx",
     "client/src/components/DemoViews/RiskMatrixDemo.tsx",
     "client/src/components/OnePageSession/telegram/TelegramDebateMapPanel.tsx",
-    "client/src/utilities/crypto/litChipotlePolicy.ts",
+    "client/src/test-smoke/generatedResultsSmokeEntry.tsx",
+    "client/src/test-smoke/workerGroupAutoJoinSmokeEntry.tsx",
     "client/src/utilities/e2eTestIds.ts",
     "client/src/variables/rpcDefaults.ts",
-    "client/src/viteEntry.ts",
     "client/src/wallet/session/sessionWorker.ts",
     "client/src/wallet/session/sessionWorkerFactory.ts"
   ],
   "measured": {
-    "statements": 78.55,
-    "branches": 63.81,
-    "functions": 79.71,
-    "lines": 81.43
+    "statements": 82.17,
+    "branches": 68.04,
+    "functions": 83.65,
+    "lines": 85.01
   },
   "global": {
     "statements": 78.5,
