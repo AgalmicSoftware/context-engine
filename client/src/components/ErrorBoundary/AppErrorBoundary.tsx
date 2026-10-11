@@ -1,6 +1,6 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
-import { isStaleChunkLoadError, recoverFromStaleChunkLoadError, reloadForStaleChunk } from '../../bootRecovery.js';
+import { recoverFromStaleChunkLoadError } from '../../bootRecovery.js';
 
 type AppErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -9,7 +9,6 @@ type AppErrorBoundaryProps = {
 type AppErrorBoundaryState = {
   hasError: boolean;
   errorMessage: string;
-  staleChunkError: Error | null;
 };
 
 class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
@@ -18,7 +17,6 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
     this.state = {
       hasError: false,
       errorMessage: '',
-      staleChunkError: null,
     };
   }
 
@@ -26,7 +24,6 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
     return {
       hasError: true,
       errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
-      staleChunkError: isStaleChunkLoadError(error) ? error : null,
     };
   }
 
@@ -34,15 +31,6 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
     console.error('AppErrorBoundary caught an error:', error, errorInfo && errorInfo.componentStack);
     recoverFromStaleChunkLoadError(error);
   }
-
-  handleReload = () => {
-    // A stale chunk needs its cached copy refreshed; a plain reload would reuse it.
-    if (this.state.staleChunkError) {
-      reloadForStaleChunk(this.state.staleChunkError);
-      return;
-    }
-    window.location.reload();
-  };
 
   render() {
     if (this.state.hasError) {
@@ -73,7 +61,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
             <p style={{ margin: '0 0 20px 0', color: 'var(--ce-panel-text-muted)' }}>{this.state.errorMessage}</p>
             <button
               type="button"
-              onClick={this.handleReload}
+              onClick={() => window.location.reload()}
               style={{
                 background: 'var(--ce-action-accent)',
                 border: 'none',

@@ -10,7 +10,7 @@ type RouteErrorBoundaryProps = {
 type RouteErrorBoundaryState = {
   hasError: boolean;
   errorMessage: string;
-  staleChunkError: Error | null;
+  staleChunk: boolean;
 };
 
 class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
@@ -19,7 +19,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
     this.state = {
       hasError: false,
       errorMessage: '',
-      staleChunkError: null,
+      staleChunk: false,
     };
   }
 
@@ -27,7 +27,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
     return {
       hasError: true,
       errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
-      staleChunkError: isStaleChunkLoadError(error) ? error : null,
+      staleChunk: isStaleChunkLoadError(error),
     };
   }
 
@@ -38,21 +38,21 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
 
   componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
     if (this.state.hasError && this.props.resetKey && this.props.resetKey !== prevProps.resetKey) {
-      this.setState({ hasError: false, errorMessage: '', staleChunkError: null });
+      this.setState({ hasError: false, errorMessage: '', staleChunk: false });
     }
   }
 
   handleTryAgain = () => {
     // Regression guard: React.lazy caches a rejected chunk import, so a re-render
     // cannot recover from a deploy; reload the page to fetch the new chunks.
-    if (this.state.staleChunkError) {
-      reloadForStaleChunk(this.state.staleChunkError);
+    if (this.state.staleChunk) {
+      reloadForStaleChunk();
       return;
     }
     this.setState({
       hasError: false,
       errorMessage: '',
-      staleChunkError: null,
+      staleChunk: false,
     });
   };
 

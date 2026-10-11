@@ -81,27 +81,7 @@ describe('Error boundaries', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
 
-    // The failed URL travels with the error so the reload can refresh its cached copy.
     expect(reloadSpy).toHaveBeenCalledTimes(1);
-    expect(reloadSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Unable to preload CSS for /assets/OnePageSession-00000000.css' }),
-    );
-    recoverSpy.mockRestore();
-    reloadSpy.mockRestore();
-  });
-
-  it('refreshes a stale chunk before the app-wide Reload', () => {
-    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
-    const reloadSpy = jest.spyOn(bootRecovery, 'reloadForStaleChunk').mockImplementation(() => undefined);
-
-    render(
-      <AppErrorBoundary>
-        <StaleChunkThrower />
-      </AppErrorBoundary>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
-
-    expect(reloadSpy).toHaveBeenCalledWith(expect.any(TypeError));
     recoverSpy.mockRestore();
     reloadSpy.mockRestore();
   });
