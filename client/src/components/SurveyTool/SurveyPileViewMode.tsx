@@ -90,6 +90,7 @@ import {
   buildPileFilterResultPlan,
   buildPileLoadResultPlan,
   buildPileQuestionPipelineState,
+  keepReachedPileCards,
 } from './surveyPileQuestionFlow';
 import { arePileQuestionListsEquivalent } from './surveyPileQuestionListEquivalence';
 import { buildPileVisibleResponseSignature as buildPileVisibleResponseSignatureHelper } from './surveyPileResponseSignature';
@@ -1978,7 +1979,9 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
       previousHasHiddenGatedQuestions: engine.state.hasHiddenGatedQuestions,
       previousLoading: engine.state.loading,
       sortedQuestions: sorted,
-      sortedVisibleQuestions: sortedVisible,
+      sortedVisibleQuestions: isFilterActive
+        ? sortedVisible
+        : keepReachedPileCards(sortedVisible, engine.state.pileQuestions, engine.state.activePileIndex),
       hiddenQuestions: hiddenGated,
       hasHiddenGatedQuestions: nextHidden,
       isFilterActive,
@@ -2533,6 +2536,8 @@ const handleFilter = (engine: PileViewModeEngine, filteredQsOrCombined: any, new
   const nextFilterState = normalizeSurveyToolFilterState(newFilterState || engine.state.filterState);
   const filterResultPlan = buildPileFilterResultPlan({
     currentVisibleSignature: engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions || []),
+    currentPileQuestions: engine.state.pileQuestions,
+    currentActivePileIndex: engine.state.activePileIndex,
     nextVisibleQuestions: sortedFilteredVisible,
     currentFilterState: engine.state.filterState,
     nextFilterState,
