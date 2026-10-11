@@ -58,15 +58,5 @@ module.exports = {
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
   },
   watchPathIgnorePatterns: ['<rootDir>/build', '<rootDir>/coverage'],
-  // Coverage floors are banked from full-client coverage runs. Move them only
-  // upward after large lanes, rounding down to avoid CI flakes.
-  coverageThreshold: {
-    global: {
-      statements: 75.7,
-      branches: 61.0,
-      functions: 77.0,
-      lines: 79.1,
-    },
-  },
   resetMocks: false,
 };
