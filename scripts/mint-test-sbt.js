@@ -15,9 +15,12 @@ const DEFAULT_SESSION_BASE_URL = "http://127.0.0.1:3000/session";
 const DEFAULT_GAS_PRICE_WEI = "2000000"; // 0.002 gwei
 const DEFAULT_GAS_LIMIT_MULTIPLIER_BPS = 12000; // 120%
 
+// Group password hashes are scoped to the SBT address, so deploy deterministically:
+// predict the address, derive the hash for it, then let the factory set it once.
 const factoryAbi = [
   "function sbtCount() view returns (uint256)",
-  "function createSBT(string name,string symbol,uint256 limitedNumber,address adminAddress,uint256 mintingEndTime,bool hasPasswordMint,uint8 burnAuth,bytes32[] hashedPasswords,string tokenURI,bytes32 groupPasswordHash)",
+  "function predictConfiguredSBTAddress(bytes32 salt,string name,string symbol,uint256 limitedNumber,address adminAddress,uint256 mintingEndTime,bool hasPasswordMint,uint8 burnAuth,bytes32[] hashedPasswords,bool initializeGroupPasswordHash) view returns (address)",
+  "function createSBTDeterministicConfigured(bytes32 salt,string name,string symbol,uint256 limitedNumber,address adminAddress,uint256 mintingEndTime,bool hasPasswordMint,uint8 burnAuth,bytes32[] hashedPasswords,string finalTokenURI,bytes32 finalGroupPasswordHash,bool initializeGroupPasswordHash) returns (address)",
   "event SBTCreated(address indexed sbtAddress)",
 ];
 
@@ -60,7 +63,7 @@ const normalizeGroupPasswordInput = (raw) => {
   return compact;
 };
 
-const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
+const groupPasswordDerivation = createGroupPasswordDerivation(ethers);
 
 const parseCreatedAddress = (receipt) => {
   const iface = new ethers.utils.Interface(factoryAbi);
@@ -140,11 +143,9 @@ async function main() {
   const symbol =
     process.env.SBT_SYMBOL ||
     `BUSBT${String(beforeCount.toNumber() + 1).padStart(2, "0")}`;
-  const groupPasswordHash = computeGroupPasswordHash({
-    password: groupPassword,
-    sbtAddress: "",
-  });
-  const createArgs = [
+  const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  const deployShape = [
+    create2Salt,
     name,
     symbol,
     limitedNumber,
@@ -153,11 +154,20 @@ async function main() {
     hasPasswordMint,
     burnAuth,
     [],
-    tokenURI,
-    groupPasswordHash,
   ];
+  const predictedSbtAddress = await factory.predictConfiguredSBTAddress(
+    ...deployShape,
+    true,
+  );
+  const groupPasswordHash =
+    await groupPasswordDerivation.computeGroupPasswordHash({
+      password: groupPassword,
+      sbtAddress: predictedSbtAddress,
+    });
+  const createArgs = [...deployShape, tokenURI, groupPasswordHash, true];
 
-  const estimatedGas = await factory.estimateGas.createSBT(...createArgs);
+  const estimatedGas =
+    await factory.estimateGas.createSBTDeterministicConfigured(...createArgs);
   const gasLimit = estimatedGas.mul(gasLimitMultiplierBps).div(10000);
   const maxCostWei = gasLimit.mul(gasPrice);
 
@@ -170,9 +180,10 @@ async function main() {
     name,
     symbol,
     metadataUri: tokenURI,
+    predictedSbtAddress,
     groupPasswordHash,
-    groupPasswordDerivation: "sbt-group-password-v3",
-    groupPasswordScope: "zero-address",
+    groupPasswordDerivation: groupPasswordDerivation.derivation,
+    groupPasswordScope: predictedSbtAddress,
     estimatedGas: estimatedGas.toString(),
     gasLimit: gasLimit.toString(),
     gasPrice: gasPrice.toString(),
@@ -203,7 +214,7 @@ async function main() {
     return;
   }
 
-  const tx = await factory.createSBT(...createArgs, {
+  const tx = await factory.createSBTDeterministicConfigured(...createArgs, {
     gasLimit,
     gasPrice,
   });
@@ -213,13 +224,20 @@ async function main() {
 
   const receipt = await tx.wait();
   if (receipt.status !== 1) {
-    throw new Error(`createSBT reverted (tx: ${tx.hash})`);
+    throw new Error(
+      `createSBTDeterministicConfigured reverted (tx: ${tx.hash})`,
+    );
   }
 
   const sbtAddress = parseCreatedAddress(receipt);
   if (!sbtAddress) {
     throw new Error(
-      `createSBT mined but SBTCreated event was not found (tx: ${tx.hash})`,
+      `createSBTDeterministicConfigured mined but SBTCreated event was not found (tx: ${tx.hash})`,
+    );
+  }
+  if (sbtAddress.toLowerCase() !== predictedSbtAddress.toLowerCase()) {
+    throw new Error(
+      `Deterministic deploy mismatch: predicted ${predictedSbtAddress}, created ${sbtAddress} (tx: ${tx.hash})`,
     );
   }
 
@@ -250,6 +268,8 @@ async function main() {
       tokenURI: meta.tokenURI_,
     },
     onchainGroupPasswordHash: onchainGroupHash,
+    groupPasswordHashMatches:
+      String(onchainGroupHash).toLowerCase() === groupPasswordHash.toLowerCase(),
     claimUrl,
     claimInstructions:
       "Enter GROUP_PASSWORD separately in the group claim form.",

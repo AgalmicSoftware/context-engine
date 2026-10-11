@@ -276,7 +276,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       { useConfiguredDeterministic: true, initializeGroupPasswordHash: true }
     );
 
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({
+    const groupPasswordHash = await contractScripts.computeGroupPasswordHash({
       password: groupPassword,
       sbtAddress: predictedAddress,
     });

@@ -35,7 +35,7 @@ async function main() {
       entryPoints: [path.join(root, 'client/src/utilities/crypto/sbtAuthorization.ts')],
       outfile: signingModule, bundle: true, platform: 'node', format: 'cjs', target: 'node20', logLevel: 'silent',
     });
-    const { signInvite, signGroupMintAuthorization } = require(signingModule);
+    const { signInvites, signGroupMintAuthorization } = require(signingModule);
     const port = await freePort();
     let startupError;
     anvil = spawn('anvil', ['--silent', '--host', '127.0.0.1', '--port', String(port), '--chain-id', String(chainId)], {
@@ -58,17 +58,25 @@ async function main() {
     const sbtAbi = JSON.parse(fs.readFileSync(path.join(root, 'client/src/contractsABI/CUSTOM_SBT_ABI.json'), 'utf8'));
     const factory = await new ethers.ContractFactory(factoryArtifact.abi, factoryArtifact.bytecode.object, admin).deploy();
     await factory.deployed();
-    const signerHash = createGroupPasswordDerivation(ethers).computeGroupPasswordHash({ password, sbtAddress: '' });
-    const create = async (count, limited) => {
-      const receipt = await (await factory.createSBT('Local membership', 'LOCAL', count, await admin.getAddress(),
-        0, limited, 3, [], '', signerHash)).wait();
+    // Group password hashes are scoped to the collection address, so predict it before deploying.
+    const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
+    const create = async (label, count, limited) => {
+      const shape = [ethers.utils.id(`sbt-authorization-smoke/${label}`), 'Local membership', 'LOCAL', count,
+        await admin.getAddress(), 0, limited, 3, []];
+      const predicted = await factory.predictConfiguredSBTAddress(...shape, true);
+      const signerHash = await computeGroupPasswordHash({ password, sbtAddress: predicted });
+      const receipt = await (await factory.createSBTDeterministicConfigured(...shape, 'ar://local-smoke', signerHash,
+        true)).wait();
       const event = receipt.events.find((entry) => entry.event === 'SBTCreated');
       assert.ok(event, 'factory must identify the created collection');
-      return new ethers.Contract(event.args.sbtAddress, sbtAbi, admin);
+      assert.equal(event.args.sbtAddress, predicted, 'the collection must deploy to its predicted address');
+      const collection = new ethers.Contract(event.args.sbtAddress, sbtAbi, admin);
+      assert.equal(await collection.groupPasswordHash(), signerHash, 'the factory sets the scoped signer hash once');
+      return collection;
     };
-    const group = await create(0, false);
-    const slots = await create(3, true);
-    const signingInput = { password, chainId, walletScopeSbtAddress: '' };
+    const group = await create('group', 0, false);
+    const slots = await create('slots', 3, true);
+    const signingInput = { password, chainId };
     const groupSignature = await signGroupMintAuthorization({ ...signingInput, sbtAddress: group.address, userAddress: firstAddress });
     await assert.rejects(group.connect(second).callStatic.mintWithGroupSignature(groupSignature));
     const wrongChainGroup = await signGroupMintAuthorization({ ...signingInput, chainId: chainId + 1,
@@ -76,7 +84,8 @@ async function main() {
     await assert.rejects(group.connect(first).callStatic.mintWithGroupSignature(wrongChainGroup));
     await (await group.connect(first).mintWithGroupSignature(groupSignature)).wait();
 
-    const signSlot = (nonce, overrides = {}) => signInvite({ ...signingInput, sbtAddress: slots.address, nonce, ...overrides });
+    const signSlot = async (nonce, overrides = {}) =>
+      (await signInvites({ ...signingInput, sbtAddress: slots.address, nonces: [nonce], ...overrides }))[0];
     const slotTwo = await signSlot('2');
     await assert.rejects(slots.connect(first).callStatic.claimWithInvite('2', await signSlot('2', { chainId: chainId + 1 })));
     await assert.rejects(slots.connect(first).callStatic.claimWithInvite('1', slotTwo));
@@ -100,7 +109,7 @@ async function main() {
     await assert.rejects(slots.connect(newAdmin).callStatic.changeAdmin(await newAdmin.getAddress()));
     await assert.rejects(slots.connect(first).callStatic.burn(await slots.getTokenIdByOwner(firstAddress)));
     assert.equal(sbtAbi.some((entry) => entry.type === 'function' && ['owner', 'transferOwnership', 'renounceOwnership'].includes(entry.name)), false);
-    console.log('SBT authorization smoke passed: client signatures, chain/collection/claimant binding, independent one-use slots, collection-local membership and admin retirement.');
+    console.log('SBT authorization smoke passed: address-scoped v4 group passwords, client signatures, chain/collection/claimant binding, independent one-use slots, collection-local membership and admin retirement.');
   } finally {
     if (provider) provider.removeAllListeners();
     if (anvil && anvil.exitCode === null && anvil.pid) {
