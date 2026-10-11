@@ -32,7 +32,7 @@ const createHost = (loadResponses: () => Promise<void>) => {
       callback?.();
     }),
     checkAllCachesReady: jest.fn(),
-    initializeQuestionCacheForGroup: jest.fn(async () => {}),
+    initializeQuestionCacheForGroup: jest.fn(async (_slug: string) => {}),
     initializeSbtCacheForGroup: jest.fn(async () => {}),
     initializeSurveyCacheForGroup: jest.fn(async () => {}),
     startSbtEventListenerForGroup: jest.fn(),
