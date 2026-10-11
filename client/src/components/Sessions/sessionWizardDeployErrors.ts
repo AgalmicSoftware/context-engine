@@ -183,6 +183,25 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
 };
 
+// The sponsoring Worker refuses a grant, before using it, when no Worker
+// release is configured on it (its bundle and manifest URL variables).
+const SPONSOR_RELEASE_NOT_CONFIGURED_PATTERN =
+  /^Sponsored (?:Agents HTTP )?deploys need [A-Z0-9_]+ and [A-Z0-9_]+ on the sponsoring Worker\.?$/;
+
+export const describeSessionWizardSponsoredDeployFailure = ({
+  status,
+  error,
+}: {
+  status: number;
+  error?: unknown;
+}): string => {
+  const message = toStr(error).trim();
+  if (status === 400 && SPONSOR_RELEASE_NOT_CONFIGURED_PATTERN.test(message)) {
+    return `${message} Your deploy grant was not used. It will work once the sponsor sets these on their Worker.`;
+  }
+  return message || `Worker deploy failed (${status}).`;
+};
+
 export const normalizeSessionWizardDeployErrorMessage = ({
   err,
   helperBase,

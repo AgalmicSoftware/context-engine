@@ -1,6 +1,7 @@
 import {
   buildSessionWizardDeployHelperCorsMessage,
   buildSessionWizardDeployHelperWorkersDevStatusMessage,
+  describeSessionWizardSponsoredDeployFailure,
   formatSessionWizardDeployBundleDiagnostics,
   formatSessionWizardDeployOrphanResources,
   normalizeSessionWizardDeployErrorMessage,
@@ -198,6 +199,22 @@ describe('sessionWizardDeployErrors', () => {
     ).toBe(
       'This deployment request is already bound to a different Cloudflare account. Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.',
     );
+  });
+
+  it('explains that a deploy grant was not used when the sponsor has no Worker release set', () => {
+    expect(
+      describeSessionWizardSponsoredDeployFailure({
+        status: 400,
+        error:
+          'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker.',
+      }),
+    ).toBe(
+      'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker. Your deploy grant was not used. It will work once the sponsor sets these on their Worker.',
+    );
+    expect(describeSessionWizardSponsoredDeployFailure({ status: 400, error: 'Missing deployPayload.' })).toBe(
+      'Missing deployPayload.',
+    );
+    expect(describeSessionWizardSponsoredDeployFailure({ status: 502 })).toBe('Worker deploy failed (502).');
   });
 
   it('keeps session Worker verification failures out of deploy-helper hints', async () => {

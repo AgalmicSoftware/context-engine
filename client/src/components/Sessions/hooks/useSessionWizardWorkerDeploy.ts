@@ -28,6 +28,7 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from '../sessionWizardPublishFlow';
 import {
+  describeSessionWizardSponsoredDeployFailure,
   normalizeSessionWizardDeployErrorMessage,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from '../sessionWizardDeployErrors';
@@ -183,6 +184,7 @@ const useSessionWizardWorkerDeploy = ({
       let helperBase = '';
       const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
       let effectiveBundleMode = 'upload';
+      let usesSponsoredDeploy = false;
       try {
         const runtime = readRuntime(runtimeRef);
         const currentDraft = runtime.draft && typeof runtime.draft === 'object' ? runtime.draft : {};
@@ -272,7 +274,16 @@ const useSessionWizardWorkerDeploy = ({
           hasBundleFile: !!runtime.bundleFile,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        if (effectiveBundleMode === 'upload' && !runtime.bundleFile) {
+        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+          sponsoredBundleAppliedBundleRef?.current,
+        );
+        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
+        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
+        usesSponsoredDeploy =
+          (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
+          !!sponsoredDeployGrantToken &&
+          !!sponsoredBootstrapWorkerUrl;
+        if (!usesSponsoredDeploy && effectiveBundleMode === 'upload' && !runtime.bundleFile) {
           throw new Error(
             effectiveBundleMode === 'upload' && runtime.wizardMode === 'normal'
               ? 'Upload a worker bundle file before deploy.'
@@ -284,12 +295,15 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } =
-          await resolveSessionWizardDeployBundlePayload({
-            effectiveBundleMode,
-            bundleFile: runtime.bundleFile,
-            bundleUrl: requestedBundleUrl,
-          });
+        // A deploy grant deploys only the release the sponsoring Worker is
+        // configured with and ignores bundle fields, so a grant sends none.
+        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = usesSponsoredDeploy
+          ? { bundleText: '', bundleUrl: undefined, bundleManifestUrl: undefined, bundleSha256: undefined }
+          : await resolveSessionWizardDeployBundlePayload({
+              effectiveBundleMode,
+              bundleFile: runtime.bundleFile,
+              bundleUrl: requestedBundleUrl,
+            });
         const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
         const { selectedSecrets: deploySecrets, requiredSecretFields: requiredWorkerSecretFields } =
           resolveSessionWizardWorkerSecretSelection({
@@ -299,15 +313,6 @@ const useSessionWizardWorkerDeploy = ({
           });
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildSessionWizardDeployStorageProfilePayload(currentDraft, {});
-        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
-          sponsoredBundleAppliedBundleRef?.current,
-        );
-        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
-        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
-        const usesSponsoredDeploy =
-          (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
-          !!sponsoredDeployGrantToken &&
-          !!sponsoredBootstrapWorkerUrl;
         // Persist only a digest-keyed generation counter. The scope deliberately
         // excludes tokens, secrets, and mutable config so an ambiguous response
         // cannot become a second deployment merely because the draft was edited.
@@ -367,6 +372,10 @@ const useSessionWizardWorkerDeploy = ({
           slug,
         });
         Object.assign(payload, agentSessionWrappedDeployment.payload);
+        if (usesSponsoredDeploy) {
+          delete payload.agentBridgeBundleUrl;
+          delete payload.agentBridgeBundleManifestUrl;
+        }
         const canonicalSeedConfig = buildSessionWizardWorkerConfigPayload({
           slug,
           draft: currentDraft,
@@ -424,11 +433,7 @@ const useSessionWizardWorkerDeploy = ({
           payload.secrets = deploySecrets;
         }
         const submitDeployPayload = async (deployPayload: AnyRecord) => {
-          if (
-            (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
-            sponsoredDeployGrantToken &&
-            sponsoredBootstrapWorkerUrl
-          ) {
+          if (usesSponsoredDeploy) {
             helperBase = sponsoredBootstrapWorkerUrl;
             const sponsoredDeployRes = await fetch(`${sponsoredBootstrapWorkerUrl}/sponsored/redeem-deploy`, {
               method: 'POST',
@@ -449,7 +454,10 @@ const useSessionWizardWorkerDeploy = ({
                 });
               }
               const err = new Error(
-                nextData?.error || `Worker deploy failed (${sponsoredDeployRes.status}).`,
+                describeSessionWizardSponsoredDeployFailure({
+                  status: sponsoredDeployRes.status,
+                  error: nextData?.error,
+                }),
               ) as Error & AnyRecord;
               err.statusCode = sponsoredDeployRes.status;
               err.responseError = nextData?.error || '';
@@ -886,7 +894,10 @@ const useSessionWizardWorkerDeploy = ({
         };
       } catch (err) {
         const runtime = readRuntime(runtimeRef);
+        // A grant never uses this browser's bundle, so a manual bundle cannot
+        // help a failed sponsored deploy.
         if (
+          !usesSponsoredDeploy &&
           shouldForceSessionWizardNormalModeManualBundleRetry({
             err,
             wizardMode: runtime.wizardMode,

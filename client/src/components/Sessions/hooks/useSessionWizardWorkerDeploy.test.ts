@@ -406,6 +406,58 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
   });
 
+  it('redeems a deploy grant without bundle fields and explains an unconfigured sponsor release', async () => {
+    const options = buildDeployHookOptions();
+    const runtime = options.refs.runtimeRef.current as SessionWizardWorkerDeployRuntime;
+    runtime.wizardMode = 'normal';
+    runtime.forceManualBundleFile = true;
+    runtime.bundleFile = { name: 'sessionCorsWorker.bundle.js', text: async () => 'unused' } as unknown as File;
+    runtime.draft = {
+      ...runtime.draft,
+      sessionModeProfile: (() => {
+        const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+        profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+        profile.surfaces.agentHttp = true;
+        return profile;
+      })(),
+    };
+    (options.refs.sponsoredBundleAppliedBundleRef as { current: Record<string, unknown> | null }).current = {
+      deployGrantToken: 'sponsored-deploy-grant',
+      bootstrapWorkerUrl: 'https://sponsor-worker.example.test',
+    };
+    const workerError =
+      'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.';
+    const fetchMock = jest.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
+      String(url).endsWith('/sponsored/redeem-deploy')
+        ? ({ ok: false, status: 400, json: async () => ({ error: workerError }) } as Response)
+        : ({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response),
+    );
+    global.fetch = fetchMock;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
+    });
+
+    const redeemCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/sponsored/redeem-deploy'));
+    const { deployPayload } = JSON.parse(String(redeemCall?.[1]?.body || '{}'));
+    [
+      'bundleText',
+      'bundleUrl',
+      'bundleSha256',
+      'bundleManifestUrl',
+      'agentBridgeBundleUrl',
+      'agentBridgeBundleManifestUrl',
+    ].forEach((field) => expect(deployPayload).not.toHaveProperty(field));
+    expect(deployPayload.agentSessionWrappedDeploymentIdentity).toEqual(expect.any(String));
+    expect(deployResult).toEqual({
+      ok: false,
+      error: `${workerError} Your deploy grant was not used. It will work once the sponsor sets these on their Worker.`,
+    });
+    expect(options.updateDeploymentState).not.toHaveBeenCalledWith({ forceManualBundleFile: true });
+  });
+
   it('reports infrastructure-only completion when public config readback is not verified', async () => {
     const options = buildDeployHookOptions();
     mockSuccessfulWorkerDeployFetch();

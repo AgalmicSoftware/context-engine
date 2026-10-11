@@ -49,7 +49,7 @@ const createPublicWorkerVerificationResponder = () => {
 describe('SessionWizard worker panel rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('keeps sponsored publish on the hosted bundle URL after a prior hosted-bundle fetch failure', async () => {
+  it('redeems the sponsor release without a client bundle after a hosted-bundle fetch failure', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
@@ -83,7 +83,8 @@ describe('SessionWizard worker panel rendering', () => {
       }
       if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
         const payload = JSON.parse(options.body);
-        expect(payload.deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        // A grant deploys only the release configured on the sponsoring Worker.
+        expect(payload.deployPayload.bundleUrl).toBeUndefined();
         expect(payload.deployPayload.bundleText).toBeUndefined();
         return {
           ok: true,
@@ -222,7 +223,7 @@ describe('SessionWizard worker panel rendering', () => {
     }
   });
 
-  it('retries sponsored publish with an uploaded fallback bundle file after a hosted-bundle fetch failure', async () => {
+  it('does not send an uploaded fallback bundle file with a sponsored retry', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
@@ -262,7 +263,7 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
         const payload = JSON.parse(options.body);
         expect(payload.deployPayload.bundleUrl).toBeUndefined();
-        expect(payload.deployPayload.bundleText).toContain('new Response("publish-ok")');
+        expect(payload.deployPayload.bundleText).toBeUndefined();
         return {
           ok: true,
           json: async () => ({
@@ -388,7 +389,7 @@ describe('SessionWizard worker panel rendering', () => {
     }
   });
 
-  it('retries sponsored publish with a manual bundle URL override after a hosted-bundle fetch failure', async () => {
+  it('does not send a manual bundle URL override with a sponsored retry', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
@@ -423,7 +424,7 @@ describe('SessionWizard worker panel rendering', () => {
       }
       if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
         const payload = JSON.parse(options.body);
-        expect(payload.deployPayload.bundleUrl).toBe(manualBundleUrl);
+        expect(payload.deployPayload.bundleUrl).toBeUndefined();
         expect(payload.deployPayload.bundleText).toBeUndefined();
         return {
           ok: true,
