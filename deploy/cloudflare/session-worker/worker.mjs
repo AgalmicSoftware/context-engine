@@ -2621,7 +2621,7 @@ var init_workerConfigModeValidation = __esm({
 });
 
 // workers/shared/deployHelperCore.mjs
-var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr10, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, buildFreshDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
+var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr10, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret2, sha256Hex2, canonicalizeJsonValue, stableCanonicalSerialize, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, buildFreshDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, normalizeAgentBridgeBundleUrl, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_artifactFetch();
@@ -3694,6 +3694,15 @@ var init_deployHelperCore = __esm({
       ].map((value) => toStr10(value).trim()).filter(Boolean);
       return publicRpcUrls.includes(customRpcUrl) ? "The custom RPC secret must not be duplicated into public config." : "";
     };
+    normalizeAgentBridgeBundleUrl = (value) => {
+      try {
+        const parsed = new URL(toStr10(value).trim());
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) return "";
+        return parsed.toString();
+      } catch {
+        return "";
+      }
+    };
     executeDeployHelperRequestCore = async ({
       body,
       env,
@@ -4101,7 +4110,7 @@ var init_deployHelperCore = __esm({
         }
       }
       const agentHttpRequested = body?.sessionModeProfile?.surfaces?.agentHttp === true;
-      const agentBridgeBundleUrl = toStr10(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL).trim();
+      const agentBridgeBundleUrl = normalizeAgentBridgeBundleUrl(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
       const agentBridgeBundleManifestUrl = toStr10(body?.agentBridgeBundleManifestUrl).trim();
       const agentBridgeManifestSha256 = agentBridgeBundleManifestUrl ? normalizeWorkerBundleSha256(body?.agentBridgeBundleSha256) : "";
       let agentBridgeReleaseVerified = false;
@@ -4115,18 +4124,23 @@ var init_deployHelperCore = __esm({
           });
         }
         if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
+          const bridgeCheckFailure = (status, error, options) => kvId ? buildDeploymentFailure(status, {
+            error,
+            deploymentRequestPending: true,
+            orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: "retained-upload-pending", workerName }
+          }, options) : buildFailure(status, { error }, options);
           let agentBridgeSource = "";
           try {
             agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
           } catch (error) {
-            return buildFailure(502, {
-              error: `Failed to fetch Agent Bridge bundle: ${toStr10(error?.message || error).trim() || "Unknown error."}`
-            }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
+            return bridgeCheckFailure(
+              502,
+              `Failed to fetch Agent Bridge bundle: ${toStr10(error?.message || error).trim() || "Unknown error."}`,
+              { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) }
+            );
           }
           if (await sha256Hex2(agentBridgeSource) !== agentBridgeManifestSha256) {
-            return buildFailure(409, {
-              error: "Agent Bridge bundle SHA-256 does not match the verified release manifest."
-            });
+            return bridgeCheckFailure(409, "Agent Bridge bundle SHA-256 does not match the verified release manifest.");
           }
           agentBridgeReleaseVerified = true;
         }
