@@ -120,11 +120,13 @@ describe('ToolExplorer session propagation', () => {
     renderToolExplorer();
     fireEvent.click(screen.getByText('Debate Map', { exact: true }));
     await screen.findByTestId('mock-debate-map');
-    const { onModalClose } = mockDebateMap.mock.calls.at(-1)[0];
+    const call = mockDebateMap.mock.calls.at(-1);
+    if (!call) throw new Error('Expected the embedded Debate Map to render');
+    const { onModalClose } = call[0];
     expect(onModalClose).toEqual(expect.any(Function));
     onModalClose();
     expect(screen.getByTestId('mock-debate-map')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '← Back', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '← Back' }));
     expect(screen.queryByTestId('mock-debate-map')).not.toBeInTheDocument();
     expect(screen.getByText('Debate Map', { exact: true })).toBeInTheDocument();
   });

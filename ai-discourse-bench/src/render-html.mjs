@@ -3703,6 +3703,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .ce-session-results-section > .sectionHeaderRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; max-width: 100%; min-width: 0; }
     .ce-session-results-section > .sectionHeaderRow > .sectionHeader { display: flex; flex-direction: row; align-items: flex-start; flex-wrap: wrap; gap: 10px; cursor: pointer; font-size: 2rem; margin: 0; font-weight: bold; color: rgba(255, 255, 255, 0.75); flex: 0 1 auto; min-width: 0; line-height: 1.1; }
     .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderText { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; min-width: 0; }
+    .sectionExpanded .sectionHeaderText { align-self: center; }
     .sectionHeaderTitle { display: block; max-width: 100%; line-height: 1; color: rgba(255, 255, 255, 0.5); }
     .sectionHeaderSubtitle { display: block; max-width: 100%; font-size: 0.63em; line-height: 1.12; font-weight: 600; color: rgba(255, 255, 255, 0.25); }
     .tooltip { position: relative; display: inline-block; cursor: pointer; font-size: 1.4em; z-index: 1000; opacity: 1; }
@@ -3720,7 +3721,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader .tooltip .tooltiptext { left: auto; right: -10px; transform: none; text-align: left; }
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader .tooltip .tooltiptext::after { left: auto; right: 15px; margin-left: 0; }
     }
-    .sectionHeaderTooltip { margin-left: 6px; margin-top: 2px; align-self: flex-start; flex: 0 0 auto; }
+    .sectionHeaderTooltip { display: inline-flex; align-items: center; font-size: 1em; line-height: 1; margin-left: 6px; align-self: center; flex: 0 0 auto; }
     .sectionHeaderActionsScroller { box-sizing: border-box; display: flex; flex: 1 1 320px; justify-content: flex-end; max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
     .sectionHeaderActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; min-width: max-content; }
     .sectionContainer { box-sizing: border-box; max-width: 100%; min-width: 0; margin-bottom: 20px; margin-top: 20px; background-color: #5c58a630; border: 0 solid #af95db; padding: 20px; border-radius: var(--ce-radius-6); }
@@ -4847,6 +4848,21 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .participantAddressFull { display: none; }
       .participantAddressShort { display: inline; }
     }
+    @media only screen and (max-width: 767px) {
+      .onePageDemoContainer { padding: 0 6px 20px; }
+      .sectionsGrid { gap: 8px; margin-top: 12px; }
+      .sectionsGrid .ce-session-results-section { min-height: 0; margin: 0; padding: 8px; }
+      .sectionsGrid .ce-session-results-section > .sectionHeaderRow { min-height: 44px; gap: 8px; }
+      .sectionsGrid .ce-session-results-section > .sectionHeaderRow > .sectionHeader { min-height: 44px; padding: 0; align-items: flex-start; }
+      .sectionsGrid .ce-session-results-section > .miniSectionContent { margin-top: 8px; padding: 0; }
+      .sectionsGrid .ce-session-results-section.sectionExpanded .resultsModeActionsScroller { padding: 4px 0; margin-block: -4px; }
+      .ce-session-results-section .resultsModeActions { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+      .ce-session-results-section .resultsModeActions .sectionHeaderViewModeButton { min-height: 44px; padding: 8px 10px; }
+      .ce-polis-report-shell { margin-top: 0; padding: 6px; max-width: 100%; overflow-x: auto; }
+      .ce-polis-report-shell .settingsRow { padding: 6px; gap: 8px; margin-bottom: 8px; }
+      .ce-polis-report-shell .reportInner:not(.pdfDesktopWidth) { padding: 8px; }
+      .ce-polis-report-shell .brandingHeader { margin-bottom: 12px; padding-bottom: 8px; }
+    }
   </style>
 </head>
 <body class="index-page ce-report-viewer aidb-report" data-ce-results-view-mode="report" data-ce-report-style="original">
@@ -4862,7 +4878,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           ${renderFontAwesomeIcon('caret-down', 'sectionToggleIcon sectionToggleIconClosed')}
           <span class="sectionHeaderText">
             <span class="sectionHeaderTitle">Results</span>
-            <span class="sectionHeaderSubtitle">View</span>
+            <span class="sectionHeaderSubtitle" data-ce-results-subtitle hidden>View</span>
           </span>
           <span class="tooltip sectionHeaderTooltip" tabindex="0" aria-label="Results view help" data-ce-results-tooltip>
             ${renderFontAwesomeIcon('question-circle')}
@@ -5469,6 +5485,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var nextOpen = !!isOpen;
         resultsSection.setAttribute('data-ce-results-open', nextOpen ? 'true' : 'false');
         resultsSection.classList.toggle('sectionExpanded', nextOpen);
+        var subtitle = resultsSection.querySelector('[data-ce-results-subtitle]');
+        if (subtitle) subtitle.hidden = nextOpen;
         if (resultsToggle) resultsToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
       }
       function setReportStyle(style) {

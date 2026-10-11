@@ -1523,7 +1523,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.tooltip:hover > svg,\s*\.tooltip:focus-within > svg,\s*\.tooltip:focus > svg \{ opacity: 0\.55; \}/);
   assert.match(html, /@media only screen and \(max-width: 600px\) \{\s*\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \.tooltiptext \{ left: auto; right: -10px; transform: none; text-align: left; \}/);
   assert.match(html, /\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \.tooltiptext::after \{ left: auto; right: 15px; margin-left: 0; \}/);
-  assert.match(html, /\.sectionHeaderTooltip \{ margin-left: 6px; margin-top: 2px; align-self: flex-start; flex: 0 0 auto; \}/);
+  assert.match(html, /\.sectionHeaderTooltip \{ display: inline-flex; align-items: center; font-size: 1em; line-height: 1; margin-left: 6px; align-self: center; flex: 0 0 auto; \}/);
   assert.match(html, /@media only screen and \(max-width: 1024px\)[\s\S]*\.resultsModeActionsScroller/);
   assert.doesNotMatch(html, /@media \(max-width: 1024px\) \{\s*main\.onePageDemoContainer/);
   assert.doesNotMatch(html, /@media \(max-width: 1024px\) \{\s*\.resultsModeActionsScroller/);
@@ -2451,4 +2451,34 @@ test('Summary statistics include an Unsure-only participant as one binary respon
   const html = renderHtmlReport(buildResultsReport({ questionBank, modelRoster, runsFile }));
   assert.match(html, /<span class="statLabel">Participants[\s\S]*?<span class="statValue">1<\/span>/);
   assert.match(html, /<span class="statLabel">Responses[\s\S]*?<span class="statValue">1<\/span>/);
+});
+
+
+test('Results subtitle follows expanded state in the standalone report', async () => {
+  const questionBank = limitQuestionBank(await readJson(new URL('../data/question-bank.sample.json', import.meta.url)), 1);
+  const modelRoster = await readJson(new URL('../data/model-roster.sample.json', import.meta.url));
+  const html = renderHtmlReport(buildResultsReport({ questionBank, modelRoster, runsFile: { schemaVersion: 1, benchmarkId: questionBank.benchmarkId, mode: 'self', runs: [] } }));
+  assert.match(html, /data-ce-results-subtitle hidden>View<\/span>/);
+  const source = html.match(/function setResultsSectionOpen\(isOpen\) \{[\s\S]*?\n      \}/)?.[0];
+  assert.ok(source);
+  const subtitle = { hidden: true };
+  const attributes = {};
+  const classes = new Set(['sectionExpanded']);
+  const context = {
+    resultsSection: {
+      setAttribute: (key, value) => { attributes[key] = value; },
+      classList: { toggle: (key, enabled) => enabled ? classes.add(key) : classes.delete(key) },
+      querySelector: (selector) => selector === '[data-ce-results-subtitle]' ? subtitle : null,
+    },
+    resultsToggle: { setAttribute: (key, value) => { attributes[key] = value; } },
+  };
+  vm.createContext(context);
+  vm.runInContext(source + '; setResultsSectionOpen(false);', context);
+  assert.equal(subtitle.hidden, false);
+  assert.equal(attributes['aria-expanded'], 'false');
+  assert.equal(classes.has('sectionExpanded'), false);
+  vm.runInContext('setResultsSectionOpen(true);', context);
+  assert.equal(subtitle.hidden, true);
+  assert.equal(attributes['aria-expanded'], 'true');
+  assert.equal(classes.has('sectionExpanded'), true);
 });

@@ -2737,7 +2737,7 @@ const renderPileResponseInput = (
             max={ratingScale.max}
             step={1}
             value={ratingValue}
-            onChange={(val: any, event: any) => {
+            onChange={(val: number, event: Event) => {
               changedDuringInteraction = true;
               if (onAnswerChange) onAnswerChange(val);
               else engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event));

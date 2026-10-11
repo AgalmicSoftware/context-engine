@@ -4,8 +4,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import SessionWizardInfoTooltip from './SessionWizardInfoTooltip';
 
 describe('SessionWizardInfoTooltip interaction', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
   it('keeps help open across focus and click, dismisses with Escape, and opens again on click', async () => {
     const props = {

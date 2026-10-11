@@ -24,7 +24,7 @@ function Fixture() {
   return (
     <main style={{ maxWidth: 640, margin: '2rem auto', fontFamily: 'var(--ce-font-body)', lineHeight: 1.5, color: 'var(--ce-panel-text)' }}>
       <style>{'body { background: var(--ce-color-canvas); }'}</style>
-      <label>Theme <select value={theme} onChange={event => setTheme(event.target.value)}><option value="context-engine">Context Engine</option><option value="classic-95">Classic 95</option></select></label>
+      <label>Theme <select value={theme} onChange={event => setTheme(event.target.value)}><option value="context-engine">Context Engine</option><option value="classic-95">Classic 95</option><option value="civic">Minimal</option></select></label>
       <label>Voice credits <select value={voiceCredits} onChange={event => { setVoiceCredits(Number(event.target.value)); setValue(question.options.map(() => 0)); }}><option value="99">99</option><option value="999">999</option><option value="1000000">1000000 (legacy)</option></select></label>
       <label style={{ display: 'block' }}><input type="checkbox" checked={deferDragUpdates} onChange={event => setDeferDragUpdates(event.target.checked)} /> Deferred drag compatibility</label>
       <label><input type="checkbox" checked={manyOptions} onChange={event => { setManyOptions(event.target.checked); setValue(Array(event.target.checked ? 8 : 3).fill(0)); }} /> Many options</label>

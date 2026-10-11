@@ -25,7 +25,9 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     { version: 1, participantScopes: [], anonymousScopes: ['ai'] },
     { version: 1, participantScopes: [' AI '], anonymousScopes: [] },
   ])('enables Worker AI without an on-chain gate for policy %j', (workerAuthority) => {
-    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
     try {
       const instance = new QuestionFilter({
         activeSessionSlug: 'worker-ai',
@@ -45,7 +47,9 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     { corsWorkerUrl: '' },
     { sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
   ])('does not infer Worker AI access from an incomplete or disabled policy %j', (overrides) => {
-    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
     try {
       const instance = new QuestionFilter({
         activeSessionSlug: 'worker-ai',
@@ -59,7 +63,9 @@ describe('QuestionFilter AI ranking lifecycle', () => {
 
   it('ranks through the active Worker session without requiring registry gate metadata', async () => {
     const sessionConfig = workerAiConfig();
-    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
     const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q2', 'q1']);
     try {
       const questions = [
@@ -74,8 +80,11 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       });
       instance._isMounted = true;
       instance.handleApplyFilters = jest.fn();
-      instance.setState = (next, cb) => {
-        instance.state = { ...instance.state, ...(typeof next === 'function' ? next(instance.state) : next) };
+      instance.setState = (next: Parameters<QuestionFilterComponent['setState']>[0], cb?: () => void) => {
+        instance.state = {
+          ...instance.state,
+          ...(typeof next === 'function' ? next(instance.state, instance.props) : next),
+        };
         cb?.();
       };
       instance.state = { ...instance.state, mergedQuestions: questions, aiDraftQuery: 'governance', aiRankingCount: 2 };

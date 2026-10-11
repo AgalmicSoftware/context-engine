@@ -343,7 +343,7 @@ describe('SessionModeProfileSections', () => {
       ['Telegram Mini App', /requires Telegram/i],
       ['Agents (HTTP API)', /without Telegram/i],
     ] as const) {
-      const help = screen.getByRole('button', { name: `About ${name}`, exact: true });
+      const help = screen.getByRole('button', { name: `About ${name}` });
       expect(help).toHaveTextContent(explanation);
       fireEvent.click(help);
     }
@@ -367,8 +367,8 @@ describe('SessionModeProfileSections', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Agent API access: On after deployment');
       expect(screen.getByRole('status')).toHaveTextContent(/authorized agents.*HTTP API/i);
       expect(screen.getByRole('status')).toHaveTextContent(/deployed and verified/i);
-      expect(screen.getByRole('checkbox', { name: 'Telegram', exact: true })).not.toBeChecked();
-      expect(screen.getByRole('checkbox', { name: 'Telegram Mini App', exact: true })).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Telegram' })).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Telegram Mini App' })).not.toBeChecked();
 
       fireEvent.click(agents);
       expect(screen.getByRole('status')).toHaveTextContent('Agent API access: Off');

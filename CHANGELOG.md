@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Keep standalone benchmark Results headings, help controls, and mobile spacing
+  aligned with session reports.
+
 - Make Minimal the default light theme with readable controls, dialogs, response
   cards, reports, and article charts. Preserve saved theme selections and binary
   answer colors.
@@ -15,6 +18,97 @@ All notable changes to this project will be documented in this file.
 - Enable the AI question filter for Worker sessions with configured AI access.
 - Rename the Tools entry to Debate Map, retain its embedded view when a detail
   closes, and remove the disabled Suggest Tool card.
+
+## [0.6.7] - 2026-10-09
+
+### Client — available when the site deploys
+
+- Combine RxC context and topic navigation in one compact section. Start with
+  three area circles, zoom into a group or topic in place, and use Back to return
+  without scrolling past the full topic list. Related topic links omit the extra
+  heading, and the introduction omits the repeated “More context” topic summary.
+- Temporarily hide Debate Map for `rxc-ra-test`, keeping Report, Raw Results, and
+  the Context guide available.
+- Omit retired participation instructions from the `rxc-ra-test` report description,
+  including when older session metadata is cached.
+
+These client changes do not require updating existing session Workers. The known
+issues listed for 0.6.5 remain unchanged.
+
+## [0.6.6] - 2026-10-08
+
+### Client — available when the site deploys
+
+- Reuse cached user analysis when visible profile inputs are unchanged, including
+  hosted profiles and the default session. Opening Analyze no longer forces a
+  refresh; changed inputs, explicit Refresh and the existing 24-hour expiry still
+  generate fresh analysis.
+- Open Reverse Alignment focus areas in place of the topic list, with Back and
+  previous/next controls at the top for easier navigation on mobile.
+- Remove the decorative atlas image and redundant debate-map preview text.
+
+These client changes do not require updating existing session Workers. The known
+issues listed for 0.6.5 remain unchanged.
+
+## [0.6.5] - 2026-10-04
+
+### Client — available when the site deploys
+
+- Update the legacy Axios dependency to fix inherited request-method and form-data option handling.
+- Make quadratic allocation easier to answer: each option has − and + buttons, a block of squares showing what its votes cost, and a bar showing where your credits have gone. The question-type tile shows a matching compact preview.
+- Keep group details inside session pages, simplify interview review controls,
+  and improve help controls, documentation contrast and mobile atlas layout.
+  Results now separates Report, Debate Map and Raw Results for RxC sessions.
+- Make the pile and editing-card decrypt buttons open saved locked fields.
+  Preserve audience changes made before or during decryption. Decrypt saved
+  ratings with the answer so audience changes re-encrypt all three, and retain
+  encrypted importance and conviction across successive locked edits.
+- Wait for saved responses to load before uploading changes from a new device.
+  Show loading and retry feedback, recover after a failed refresh, and read the
+  participant's own saved answers when a complete public listing is unavailable.
+  Keep completed submissions readable and preserve untouched answers, comments
+  and ratings across sittings.
+- Keep locks chosen on blank answers and comments while saved answers load.
+  Allow navigation during that read, clear stale loading feedback after account
+  changes, and let a completed sync supersede a stalled read on the next Submit.
+- Make interview name and AI-attribution choices agree with the uploaded record
+  after a failed submission, reopening or reload. Show the name actually being
+  sent, retain consent per question, and keep withdrawals when moving between
+  pile and full-survey editing.
+- Let interview Apply finish after its own-answer read while public results
+  are still loading, and clear read failures after a successful retry.
+- Avoid repeated session initialization when the live URL changes between
+  sessions before router props catch up.
+- Preserve valid group joins through same-content configuration refreshes, while
+  cancelling joins when their destination changes or authentication fails.
+- Keep decrypted drafts with their owning account, mask retained locked values
+  in uploads, and pad encrypted choices to avoid revealing their selected length.
+- Bind sign-in messages to the intended Worker and session, improve rating
+  keyboard controls, and reduce unused code and eager imports.
+
+### Worker — requires a session Worker update
+
+- Reject sign-ins and upload authorizations bound to another Worker or session,
+  and validate signed destination Resources before accepting uploads.
+- Count public answers with locked notes accurately in Results, while keeping
+  encrypted ratings and note contents out of public analysis.
+- Pin downloaded Worker packages to the client build's release. Updating the
+  client does not automatically update an existing session Worker.
+
+### Known issues
+
+- In full-survey editing, saved per-question name and AI-attribution choices
+  arriving after the editor mounts can be omitted from a later edit.
+- Production SBT detail pages can lack the current block number because the
+  subscription depends on a component name changed by minification.
+- Simultaneous consent changes with equal timestamps and reloads against a
+  lagging response cache still need stronger conflict-resolution guarantees.
+- On a new device, leaving a question while saved answers load can leave its
+  saved answer blank in the editor. A later comment-only submission can then
+  overwrite that saved answer with an empty value.
+- If the response listing lags immediately after a submission, loading saved
+  answers can briefly revert a just-saved answer in the editor.
+- On a new device, an interview prefill can clear a previously saved comment.
 
 ## [0.6.4] - 2026-09-28
 
