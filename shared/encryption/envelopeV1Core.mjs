@@ -500,16 +500,28 @@ export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId, ex
 
 /* ---------------------------- Self-recipient wrap -------------------------- */
 
+// The key-wrap `types` carry no EIP712Domain entry. ethers hashes the domain
+// fields anyway, but MetaMask (eth-sig-util) then signs over an empty domain.
+// Changing the payload would change the signature and so the derived key.
+const EMPTY_EIP712_DOMAIN_SEPARATOR = utils.keccak256(utils.id('EIP712Domain()'));
+
+const recoverKeyWrapSigners = (typed, signature) => {
+  const signers = [];
+  try {
+    signers.push(utils.verifyTypedData(typed.domain, typed.types, typed.message, signature));
+  } catch (_) {}
+  try {
+    const structHash = utils._TypedDataEncoder.from(typed.types).hash(typed.message);
+    const digest = utils.keccak256(utils.concat(['0x1901', EMPTY_EIP712_DOMAIN_SEPARATOR, structHash]));
+    signers.push(utils.recoverAddress(digest, signature));
+  } catch (_) {}
+  return signers.map((signer) => signer.toLowerCase());
+};
+
 // The KEK comes from this signature. One from any other wallet would store a
 // key the account owner can never unwrap, so check the signer before HKDF.
 export const assertKeyWrapSigner = (typed, signature, account) => {
-  let recovered = '';
-  try {
-    recovered = utils.verifyTypedData(typed.domain, typed.types, typed.message, signature);
-  } catch (_) {
-    recovered = '';
-  }
-  if (!recovered || recovered.toLowerCase() !== safeLower(String(account || ''))) {
+  if (!recoverKeyWrapSigners(typed, signature).includes(safeLower(String(account || '')))) {
     throw new Error('Key-wrap signature does not match the account. Reconnect the wallet and try again.');
   }
 };
