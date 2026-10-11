@@ -210,10 +210,6 @@ export interface BuildResponsePayloadOptions {
 }
 
 export const buildResponsePayload = (opts: BuildResponsePayloadOptions): ResponsePayload => {
-  let surveyIndex = opts.surveyIndex;
-  surveyIndex = opts.isStandalone || opts.singleQuestionMode ? 0 : surveyIndex;
-  void surveyIndex;
-
   const surveyHash = opts.isStandalone || opts.singleQuestionMode ? undefined : opts.surveyId;
 
   const surveyResponseState = opts.surveyResponseState as SurveyResponsePayloadState | null;

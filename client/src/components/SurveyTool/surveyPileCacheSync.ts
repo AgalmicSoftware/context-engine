@@ -77,41 +77,6 @@ export const buildPileCacheUpdatePlan = ({
 const asPileBaselineSlice = (value: unknown): PileBaselineSlice =>
   value && typeof value === 'object' ? (value as PileBaselineSlice) : {};
 
-export const hasAnyPileBaselineInput = (slice: unknown = {}): boolean => {
-  const baselineSlice = asPileBaselineSlice(slice);
-  const hasVal = (value: unknown) =>
-    value !== undefined && value !== null && (Array.isArray(value) ? value.length > 0 : String(value).length > 0);
-
-  for (const qid in baselineSlice.answers || {}) {
-    if (hasVal(baselineSlice.answers?.[qid]?.value)) return true;
-  }
-  for (const qid in baselineSlice.additionalComments || {}) {
-    if (hasVal(baselineSlice.additionalComments?.[qid]?.value)) return true;
-  }
-  for (const qid in baselineSlice.importance || {}) {
-    if (Object.prototype.hasOwnProperty.call(baselineSlice.importance || {}, qid)) return true;
-  }
-  for (const qid in baselineSlice.conviction || {}) {
-    if (Object.prototype.hasOwnProperty.call(baselineSlice.conviction || {}, qid)) return true;
-  }
-
-  return false;
-};
-
-export const shouldSeedPileBaselineFromPrefill = ({
-  editBaseline = null,
-  currentSlice = null,
-  pendingTotal = 0,
-}: {
-  editBaseline?: unknown;
-  currentSlice?: unknown;
-  pendingTotal?: number | null;
-} = {}): boolean => {
-  if (editBaseline) return false;
-  if (hasAnyPileBaselineInput(currentSlice || {})) return false;
-  return Number(pendingTotal || 0) <= 0;
-};
-
 const defaultValuesEqual = (left: unknown, right: unknown): boolean => {
   if (Array.isArray(left) || Array.isArray(right)) {
     return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);

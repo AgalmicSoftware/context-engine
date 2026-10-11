@@ -1,9 +1,4 @@
-import {
-  buildPileCacheUpdatePlan,
-  hasAnyPileBaselineInput,
-  isPileCacheConsistentWithBaseline,
-  shouldSeedPileBaselineFromPrefill,
-} from './surveyPileCacheSync.js';
+import { buildPileCacheUpdatePlan, isPileCacheConsistentWithBaseline } from './surveyPileCacheSync.js';
 
 describe('surveyPileCacheSync', () => {
   it('builds pile cache update plans for optimistic, reload, live-edit, and loading cases', () => {
@@ -51,89 +46,6 @@ describe('surveyPileCacheSync', () => {
       action: 'show-loading',
       delayMs: 80,
     });
-  });
-
-  it('detects whether a pile slice already contains baseline input', () => {
-    expect(
-      hasAnyPileBaselineInput({
-        answers: { q1: { value: '' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      }),
-    ).toBe(false);
-
-    expect(
-      hasAnyPileBaselineInput({
-        answers: { q1: { value: 'Answer' } },
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      }),
-    ).toBe(true);
-
-    expect(
-      hasAnyPileBaselineInput({
-        answers: {},
-        additionalComments: {},
-        importance: { q1: 5 },
-        conviction: {},
-      }),
-    ).toBe(true);
-  });
-
-  it('seeds pile baseline from prefill only when no baseline, no existing input, and no pending edits exist', () => {
-    expect(
-      shouldSeedPileBaselineFromPrefill({
-        editBaseline: null,
-        currentSlice: {
-          answers: {},
-          additionalComments: {},
-          importance: {},
-          conviction: {},
-        },
-        pendingTotal: 0,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldSeedPileBaselineFromPrefill({
-        editBaseline: { answers: {} },
-        currentSlice: {
-          answers: {},
-          additionalComments: {},
-          importance: {},
-          conviction: {},
-        },
-        pendingTotal: 0,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldSeedPileBaselineFromPrefill({
-        editBaseline: null,
-        currentSlice: {
-          answers: { q1: { value: 'Draft' } },
-          additionalComments: {},
-          importance: {},
-          conviction: {},
-        },
-        pendingTotal: 0,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldSeedPileBaselineFromPrefill({
-        editBaseline: null,
-        currentSlice: {
-          answers: {},
-          additionalComments: {},
-          importance: {},
-          conviction: {},
-        },
-        pendingTotal: 1,
-      }),
-    ).toBe(false);
   });
 
   it('treats matching optimistic pile cache as consistent, including encrypted rating gaps', () => {

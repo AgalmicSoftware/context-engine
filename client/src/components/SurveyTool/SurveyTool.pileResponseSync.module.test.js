@@ -13,10 +13,8 @@ import {
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
-  buildPilePrefillReadPlan,
   readPileScopedQuestionResponses,
 } from './surveyPileBaselineSync';
-import { buildPileCachePrefillStatePlan } from './surveyPileResponseController';
 import { buildDraftHydrationRunPlan } from './surveyToolHydrationFlow.js';
 
 const cloneValue = (value) => JSON.parse(JSON.stringify(value));
@@ -34,18 +32,6 @@ const createResponseSlice = (overrides = {}) => ({
   additionalComments: {},
   ...overrides,
 });
-
-const applyCachedResponseEntryToSlice = ({ targetSlice, questionId, response }) => {
-  targetSlice.answers[questionId] = {
-    value: response?.answer?.value || '',
-    encrypted: !!response?.answer?.encrypted,
-  };
-  targetSlice.additionalComments[questionId] = {
-    value: response?.additional?.value || '',
-    encrypted: !!response?.additional?.encrypted,
-  };
-  return true;
-};
 
 const applyDraftEntryToSlice = ({ targetSlice, questionId, draftEntry }) => {
   targetSlice.answers[questionId] = {
@@ -318,12 +304,7 @@ describe('SurveyTool pile response sync and JSON controls', () => {
     });
   });
 
-  it('does not prefill pile answers from a borrowed general response cache when the slug is unresolved', () => {
-    const prefillPlan = buildPilePrefillReadPlan({
-      account: '0xabc',
-      networkIdStr: '',
-      pileQuestions: [createQuestion('q1')],
-    });
+  it('does not read pile answers from a borrowed general response cache when the slug is unresolved', () => {
     const readQuestionsCache = jest.fn(() => ({
       84532: {
         questionResponses: {
@@ -343,68 +324,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       mergeQuestionResponses: mergeScopedQuestionResponses,
     });
 
-    expect(prefillPlan).toEqual({
-      shouldSkip: true,
-      shouldBumpNoop: false,
-      reason: 'missing-network',
-    });
     expect(scopedResponses).toEqual({});
     expect(readQuestionsCache).not.toHaveBeenCalled();
-  });
-
-  it('patches live pile survey state from cache prefill without overwriting an existing edit baseline', () => {
-    const plan = buildPileCachePrefillStatePlan({
-      pileQuestions: [createQuestion('q1')],
-      questionResponsesByQuestionId: {
-        q1: {
-          '0xabc': {
-            answer: { value: 'cached-answer', encrypted: false },
-            additional: { value: '', encrypted: false },
-          },
-        },
-      },
-      account: '0xabc',
-      currentSlice: createResponseSlice(),
-      editBaseline: createResponseSlice({
-        answers: { q1: { value: '', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-      }),
-      pendingTotal: 0,
-      cloneValue,
-      applyCachedResponseEntryToSlice,
-    });
-
-    expect(plan.reason).toBe('patch-live');
-    expect(plan.nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
-    expect(plan.nextState).not.toHaveProperty('editBaseline');
-    expect(plan.nextState).not.toHaveProperty('baselineResponses');
-  });
-
-  it('seeds an empty pile baseline from cache prefill when no edit baseline exists yet', () => {
-    const plan = buildPileCachePrefillStatePlan({
-      pileQuestions: [createQuestion('q1')],
-      questionResponsesByQuestionId: {
-        q1: {
-          '0xabc': {
-            answer: { value: 'cached-answer', encrypted: false },
-            additional: { value: '', encrypted: false },
-          },
-        },
-      },
-      account: '0xabc',
-      currentSlice: createResponseSlice(),
-      editBaseline: null,
-      pendingTotal: 0,
-      cloneValue,
-      applyCachedResponseEntryToSlice,
-    });
-
-    expect(plan.reason).toBe('seed-baseline');
-    expect(plan.nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
-    expect(plan.nextState.editBaseline?.answers?.q1?.value).toBe('cached-answer');
-    expect(plan.nextState.baselineResponses?.answers?.q1?.value).toBe('cached-answer');
-    expect(plan.nextState.modifiedCount).toBe(0);
-    expect(plan.nextState.isDirty).toBe(false);
   });
 
   it('hydrates off-screen pile draft answers so submit count stays aligned with full mode', () => {

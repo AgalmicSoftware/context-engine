@@ -56,7 +56,6 @@ import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
-  buildPilePrefillReadPlan,
   readPileScopedQuestionResponses,
 } from './surveyPileBaselineSync';
 import {
@@ -96,7 +95,6 @@ import { arePileQuestionListsEquivalent } from './surveyPileQuestionListEquivale
 import { buildPileVisibleResponseSignature as buildPileVisibleResponseSignatureHelper } from './surveyPileResponseSignature';
 import { buildPileVisibleQuestionIds } from './surveyPileVisibleQuestionIds';
 import {
-  buildPileCachePrefillStatePlan,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
@@ -104,7 +102,6 @@ import {
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
 import { selectSurveyDraftKeysForAccount } from './surveyToolDraftState';
-import type { PileResponseSlice } from './surveyPileResponseWindow';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -447,7 +444,6 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     toggleConviction: bindPileEngineMethod(engine, toggleConviction),
     openConvictionSlider: bindPileEngineMethod(engine, openConvictionSlider),
     checkCacheAgainstBaseline: bindPileEngineMethod(engine, checkCacheAgainstBaseline),
-    prefillUserAnswersFromCache: bindPileEngineMethod(engine, prefillUserAnswersFromCache),
     buildSessionInterviewSubmitContextToken,
     getSessionInterviewResponseReadinessToken: bindPileEngineMethod(engine, getSessionInterviewResponseReadinessToken),
     loadAndSortQuestions: bindPileEngineMethod(engine, loadAndSortQuestions),
@@ -1745,66 +1741,6 @@ const checkCacheAgainstBaseline = (engine: PileViewModeEngine) => {
   } else {
     surveyLog.log('PileViewMode: Ignoring stale cache. Maintaining optimistic state.');
   }
-};
-
-const prefillUserAnswersFromCache = (engine: PileViewModeEngine) => {
-  const slug = resolveEffectiveSlug(engine.props);
-  const pileResponseReadContext = resolvePileResponseReadContext(engine.props, slug);
-  const effectiveSlug = pileResponseReadContext.sessionSlug || slug;
-  const networkID = pileResponseReadContext.networkIdStr;
-  const prefillReadPlan = buildPilePrefillReadPlan({
-    account: engine.props.account,
-    isDirty: engine.state.isDirty,
-    modifiedCount: engine.state.modifiedCount,
-    networkIdStr: networkID,
-    pileQuestions: engine.state.pileQuestions,
-  });
-  if (prefillReadPlan.shouldSkip) {
-    if (prefillReadPlan.shouldBumpNoop) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      surveyLog.debug('baseline-guard: skipped rebuild');
-    }
-    return;
-  }
-
-  const acctLower = (engine.props.account || '').toLowerCase();
-  const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(engine.props, effectiveSlug)];
-  const qRespMap = readPileScopedQuestionResponses({
-    scopeSlugs,
-    networkIdStr: networkID,
-    readQuestionsCache,
-    mergeQuestionResponses: mergeQuestionResponsesForPile,
-  });
-
-  const pendingStats = (typeof engine.getPendingEditStats === 'function' && engine.getPendingEditStats()) || {
-    total: engine.state.modifiedCount || 0,
-  };
-  const prefillPlan = buildPileCachePrefillStatePlan({
-    pileQuestions: engine.state.pileQuestions,
-    questionResponsesByQuestionId: qRespMap,
-    account: acctLower,
-    currentSlice: engine.state.surveysResponseState?.[0] as Partial<PileResponseSlice> | null | undefined,
-    editBaseline: engine.state.editBaseline,
-    pendingTotal: pendingStats.total,
-    cloneValue: engine.deepClone,
-    applyCachedResponseEntryToSlice: ({
-      targetSlice,
-      questionId,
-      response,
-    }: {
-      targetSlice: PileResponseSlice;
-      questionId: string;
-      response: Record<string, unknown>;
-    }) =>
-      engine._applyCachedResponseEntryToSlice({
-        targetSlice,
-        questionId,
-        response,
-        parseValue: engine.parseAnswerValue,
-      }),
-  });
-
-  engine.setState(prefillPlan.nextState, () => engine.updateJsonPreview());
 };
 
 const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
