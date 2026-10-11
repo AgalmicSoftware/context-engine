@@ -588,12 +588,24 @@ Admin test panel:
   Legacy configurations without a group policy retain their previous behavior.
   Older artifacts with truncated membership citations may need regeneration to
   show a group above the former 16-citation limit.
-- Canonical generated-analysis input validates readable answers against the full
-  stored question before counting them: rating bounds, exact choice options and
-  selection limits, and signed quadratic allocations within the question budget.
-  Invalid answers are excluded even when accompanied by a comment; genuinely
+- Generated-analysis input, canonical or admin snapshot, validates readable
+  answers against the full question before counting them: rating bounds, exact
+  choice options and selection limits, and signed quadratic allocations within
+  the question budget, which reach the model with option labels. Invalid
+  answers are excluded even when accompanied by a comment; genuinely
   unanswered comment-only rows remain supported. This does not change opaque
   storage admission or the historical admin-snapshot format.
+- Only each participant's latest row per question is analysed, ordered by
+  Worker time and then storage id, as the client orders them. A newer locked,
+  cleared, or invalid answer therefore withdraws an older public one, and
+  superseded rows are not counted as excluded or locked. Canonical questions
+  are keyed by the id the upload route checked for ownership.
+- Only encryption flags and envelopes lock an answer or comment. Public text
+  such as "Locked", "Redacted", or "***" is analysed like any other answer; a
+  `*` or `[encrypted]` mask without its encryption flag reads as no answer.
+- Importance and conviction follow the client's stored-rating rule: unrated
+  values are omitted rather than published as `0`, and interview ratings saved
+  on the old 0-100 scale are read on the 0-10 scale.
 - The Worker source snapshot keeps the full submitted-response counts distinct
   from the bounded AI input counts. The AI input keeps rating endpoint metadata
   (`scale.min`/`max` and endpoint labels) and quadratic `voiceCredits`, then
