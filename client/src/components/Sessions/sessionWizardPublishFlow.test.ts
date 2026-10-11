@@ -9,6 +9,7 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardSponsoredReleaseBundlePayload,
   resolveSessionWizardPublishProgressDisplayState,
   resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
@@ -473,6 +474,26 @@ describe('sessionWizardPublishFlow', () => {
         showNormalModeWorkerStep: false,
       }),
     );
+  });
+
+  it('gives deploy grants only the complete configured release', () => {
+    expect(
+      resolveSessionWizardSponsoredReleaseBundlePayload({
+        releaseBundleUrl: ' https://releases.example.test/sessionCorsWorker.bundle.js ',
+        releaseManifestUrl: 'https://releases.example.test/worker-release-manifest.json',
+      }),
+    ).toEqual({
+      bundleText: '',
+      bundleUrl: 'https://releases.example.test/sessionCorsWorker.bundle.js',
+      bundleManifestUrl: 'https://releases.example.test/worker-release-manifest.json',
+      bundleSha256: undefined,
+    });
+    expect(
+      resolveSessionWizardSponsoredReleaseBundlePayload({
+        releaseBundleUrl: 'https://releases.example.test/sessionCorsWorker.bundle.js',
+        releaseManifestUrl: '',
+      }),
+    ).toEqual({ bundleText: '', bundleUrl: undefined, bundleManifestUrl: undefined, bundleSha256: undefined });
   });
 
   it('resolves deploy bundle payloads for URL and validated upload modes', async () => {

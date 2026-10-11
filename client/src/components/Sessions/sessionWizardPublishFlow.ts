@@ -441,6 +441,27 @@ export const resolveSessionWizardDeployBundlePayload = async ({
   };
 };
 
+// A deploy grant sends this build's configured release, never an uploaded
+// file or a manual URL. A sponsoring Worker running 0.6.8 or later code ignores
+// it and deploys the release recorded on itself; an older one deploys it.
+export const resolveSessionWizardSponsoredReleaseBundlePayload = ({
+  releaseBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+  releaseManifestUrl = CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL,
+}: {
+  releaseBundleUrl?: unknown;
+  releaseManifestUrl?: unknown;
+} = {}) => {
+  const bundleUrl = toStr(releaseBundleUrl).trim();
+  const bundleManifestUrl = toStr(releaseManifestUrl).trim();
+  const complete = !!bundleUrl && !!bundleManifestUrl;
+  return {
+    bundleText: '',
+    bundleUrl: complete ? bundleUrl : undefined,
+    bundleManifestUrl: complete ? bundleManifestUrl : undefined,
+    bundleSha256: undefined,
+  };
+};
+
 const hasSessionWizardBundleDiagnostics = (bundleDiagnostics: unknown = null): boolean =>
   !!bundleDiagnostics && typeof bundleDiagnostics === 'object' && Object.keys(bundleDiagnostics).length > 0;
 

@@ -211,6 +211,14 @@ describe('sessionWizardDeployErrors', () => {
     ).toBe(
       'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker. Your deploy grant was not used. It will work once the sponsor sets these on their Worker.',
     );
+    expect(
+      describeSessionWizardSponsoredDeployFailure({
+        status: 400,
+        error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).',
+      }),
+    ).toBe(
+      'The sponsoring Worker has no Worker release to deploy. Your deploy grant was not used. It will work once the sponsor sets WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on their Worker.',
+    );
     expect(describeSessionWizardSponsoredDeployFailure({ status: 400, error: 'Missing deployPayload.' })).toBe(
       'Missing deployPayload.',
     );

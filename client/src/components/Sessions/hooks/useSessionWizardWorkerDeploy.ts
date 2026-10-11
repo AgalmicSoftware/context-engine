@@ -24,6 +24,7 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardSponsoredReleaseBundlePayload,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from '../sessionWizardPublishFlow';
@@ -289,10 +290,8 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        // A deploy grant deploys only the release the sponsoring Worker is
-        // configured with and ignores bundle fields, so a grant sends none.
         const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = usesSponsoredDeploy
-          ? { bundleText: '', bundleUrl: undefined, bundleManifestUrl: undefined, bundleSha256: undefined }
+          ? resolveSessionWizardSponsoredReleaseBundlePayload()
           : await resolveSessionWizardDeployBundlePayload({
               effectiveBundleMode,
               bundleFile: runtime.bundleFile,
@@ -366,10 +365,6 @@ const useSessionWizardWorkerDeploy = ({
           slug,
         });
         Object.assign(payload, agentSessionWrappedDeployment.payload);
-        if (usesSponsoredDeploy) {
-          delete payload.agentBridgeBundleUrl;
-          delete payload.agentBridgeBundleManifestUrl;
-        }
         const canonicalSeedConfig = buildSessionWizardWorkerConfigPayload({
           slug,
           draft: currentDraft,

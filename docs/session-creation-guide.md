@@ -178,11 +178,14 @@ What it does not send directly:
 
 When a sponsored bundle is deploy-ready, the normal-mode wizard can skip the manual Worker step and go straight from Privacy to Deploy Session.
 
-A deploy grant deploys only the Worker release configured on the sponsoring
-Worker (its `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL`), so the wizard
-sends no bundle with it. If the sponsoring Worker has no release configured,
-the wizard shows the Worker's message: the grant was not used and works once
-the sponsor sets both values.
+A sponsoring Worker running 0.6.8 or later code deploys only the Worker
+release configured on it (its `WORKER_BUNDLE_URL` and
+`WORKER_BUNDLE_MANIFEST_URL`). The wizard still sends this build's configured
+release with a grant, never an uploaded file or a manual bundle URL, so
+sponsoring Workers running older code, which deploy the release a request
+names, keep working. If the sponsoring Worker has no release to deploy, the
+wizard says so: the grant was not used and works once the sponsor sets both
+values.
 
 ### Temporary standard sponsored links fixture
 

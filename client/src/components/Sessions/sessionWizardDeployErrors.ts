@@ -187,6 +187,10 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
 // release is configured on it (its bundle and manifest URL variables).
 const SPONSOR_RELEASE_NOT_CONFIGURED_PATTERN =
   /^Sponsored (?:Agents HTTP )?deploys need [A-Z0-9_]+ and [A-Z0-9_]+ on the sponsoring Worker\.?$/;
+// A sponsoring Worker running code older than 0.6.8 deploys the bundle the
+// request names, else its own WORKER_BUNDLE_URL; with neither it refuses the
+// grant before using it, and its wording tells the redeemer to pass a bundle.
+const OLDER_SPONSOR_WITHOUT_BUNDLE_PATTERN = /^Missing bundleText or bundleUrl\b/;
 
 export const describeSessionWizardSponsoredDeployFailure = ({
   status,
@@ -198,6 +202,12 @@ export const describeSessionWizardSponsoredDeployFailure = ({
   const message = toStr(error).trim();
   if (status === 400 && SPONSOR_RELEASE_NOT_CONFIGURED_PATTERN.test(message)) {
     return `${message} Your deploy grant was not used. It will work once the sponsor sets these on their Worker.`;
+  }
+  if (status === 400 && OLDER_SPONSOR_WITHOUT_BUNDLE_PATTERN.test(message)) {
+    return (
+      'The sponsoring Worker has no Worker release to deploy. Your deploy grant was not used. It will work once ' +
+      'the sponsor sets WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on their Worker.'
+    );
   }
   return message || `Worker deploy failed (${status}).`;
 };

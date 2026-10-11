@@ -323,7 +323,11 @@ deploy to the release recorded on that Worker, never code chosen by the person
 who redeems the grant. The pinning is in the Worker's code, not in its
 settings: a sponsoring Worker running code older than 0.6.8 still deploys
 whatever bundle the redeemer sends, whether or not the variables below are
-set. Before issuing deploy grants from such a Worker, update it to 0.6.8 or
+set. The first-party wizard sends its own build's release with each grant (the
+Worker bundle URL and manifest, plus the Agent Bridge pair for Agents HTTP
+sessions), never an uploaded file or a manual bundle URL. Older sponsoring
+Workers deploy that release; 0.6.8 or later code ignores it. Before issuing
+deploy grants from such a Worker, update it to 0.6.8 or
 later code: replace only its code with a 0.6.8 or later release's
 `sessionCorsWorker.bundle.js` and keep its bindings, variables and secrets.
 The deploy helper cannot do this, because it only creates new Workers
@@ -447,7 +451,10 @@ variables once:
     digest. Without these vars the route returns `400` before the grant is used.
     This pinning is the sponsoring Worker's own code from 0.6.8; a sponsoring
     Worker running older code still deploys the redeemer's bundle, so update
-    it first. See [Sponsored deploy release](#sponsored-deploy-release) for
+    it first. The first-party wizard sends its configured release for such
+    Workers and never an uploaded file or manual bundle URL; when an older
+    Worker has no bundle to deploy, the wizard says the grant was not used.
+    See [Sponsored deploy release](#sponsored-deploy-release) for
     how the vars are recorded and how to set missing ones.
   - In that deploy-ready state, Publish deploys the worker first. A
     worker-canonical profile then persists and verifies Worker KV config; a

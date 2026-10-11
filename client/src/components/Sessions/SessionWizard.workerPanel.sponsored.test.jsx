@@ -49,9 +49,9 @@ const createPublicWorkerVerificationResponder = () => {
 describe('SessionWizard worker panel rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('redeems the sponsor release without a client bundle after a hosted-bundle fetch failure', async () => {
+  it('redeems with the configured release after a hosted-bundle fetch failure', async () => {
     const originalFetch = global.fetch;
-    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const { WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } = require('../../variables/publicDeploymentConfig.js');
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalUploadDataToArweave = arweaveClient.uploadDataToArweave.getMockImplementation();
@@ -83,8 +83,9 @@ describe('SessionWizard worker panel rendering', () => {
       }
       if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
         const payload = JSON.parse(options.body);
-        // A grant deploys only the release configured on the sponsoring Worker.
-        expect(payload.deployPayload.bundleUrl).toBeUndefined();
+        // Sponsors running code older than 0.6.8 deploy the release a grant names.
+        expect(payload.deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.deployPayload.bundleManifestUrl).toBe(WORKER_RELEASE_MANIFEST_URL);
         expect(payload.deployPayload.bundleText).toBeUndefined();
         return {
           ok: true,
@@ -219,7 +220,7 @@ describe('SessionWizard worker panel rendering', () => {
     }
   });
 
-  it('does not send an uploaded fallback bundle file with a sponsored retry', async () => {
+  it('sends the configured release, not an uploaded file, with a sponsored retry', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
@@ -258,8 +259,9 @@ describe('SessionWizard worker panel rendering', () => {
       }
       if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
         const payload = JSON.parse(options.body);
-        expect(payload.deployPayload.bundleUrl).toBeUndefined();
+        expect(payload.deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
         expect(payload.deployPayload.bundleText).toBeUndefined();
+        expect(payload.deployPayload.bundleSha256).toBeUndefined();
         return {
           ok: true,
           json: async () => ({
@@ -379,7 +381,7 @@ describe('SessionWizard worker panel rendering', () => {
     }
   });
 
-  it('does not send a manual bundle URL override with a sponsored retry', async () => {
+  it('sends the configured release, not a manual URL override, with a sponsored retry', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
@@ -414,7 +416,8 @@ describe('SessionWizard worker panel rendering', () => {
       }
       if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
         const payload = JSON.parse(options.body);
-        expect(payload.deployPayload.bundleUrl).toBeUndefined();
+        expect(payload.deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.deployPayload.bundleUrl).not.toBe(manualBundleUrl);
         expect(payload.deployPayload.bundleText).toBeUndefined();
         return {
           ok: true,

@@ -406,12 +406,14 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
   });
 
-  it('redeems a deploy grant without bundle fields and explains an unconfigured sponsor release', async () => {
+  const prepareSponsoredAgentsHttpRedeem = (redeemResponse: { status: number; body: Record<string, unknown> }) => {
     const options = buildDeployHookOptions();
     const runtime = options.refs.runtimeRef.current as SessionWizardWorkerDeployRuntime;
     runtime.wizardMode = 'normal';
+    // A manual retry source stays out of grants: only the configured release goes.
     runtime.forceManualBundleFile = true;
     runtime.bundleFile = { name: 'sessionCorsWorker.bundle.js', text: async () => 'unused' } as unknown as File;
+    runtime.normalModeBundleUrlOverride = 'https://manual.example.test/sessionCorsWorker.bundle.js';
     runtime.draft = {
       ...runtime.draft,
       sessionModeProfile: (() => {
@@ -425,37 +427,80 @@ describe('useSessionWizardWorkerDeploy', () => {
       deployGrantToken: 'sponsored-deploy-grant',
       bootstrapWorkerUrl: 'https://sponsor-worker.example.test',
     };
-    const workerError =
-      'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.';
     const fetchMock = jest.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
       String(url).endsWith('/sponsored/redeem-deploy')
-        ? ({ ok: false, status: 400, json: async () => ({ error: workerError }) } as Response)
+        ? ({
+            ok: redeemResponse.status === 200,
+            status: redeemResponse.status,
+            json: async () => redeemResponse.body,
+          } as Response)
         : ({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response),
     );
     global.fetch = fetchMock;
+    const readRedeemPayload = () => {
+      const redeemCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/sponsored/redeem-deploy'));
+      return JSON.parse(String(redeemCall?.[1]?.body || '{}')).deployPayload;
+    };
+    return { options, readRedeemPayload };
+  };
+
+  const redeemSponsoredDeploy = async (options: ReturnType<typeof buildDeployHookOptions>) => {
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
     let deployResult;
-
     await act(async () => {
       deployResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
     });
+    return deployResult;
+  };
 
-    const redeemCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/sponsored/redeem-deploy'));
-    const { deployPayload } = JSON.parse(String(redeemCall?.[1]?.body || '{}'));
-    [
-      'bundleText',
-      'bundleUrl',
-      'bundleSha256',
-      'bundleManifestUrl',
-      'agentBridgeBundleUrl',
-      'agentBridgeBundleManifestUrl',
-    ].forEach((field) => expect(deployPayload).not.toHaveProperty(field));
-    expect(deployPayload.agentSessionWrappedDeploymentIdentity).toEqual(expect.any(String));
+  it('redeems a deploy grant with only the configured release and explains an unconfigured sponsor', async () => {
+    const workerError =
+      'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.';
+    const { options, readRedeemPayload } = prepareSponsoredAgentsHttpRedeem({
+      status: 400,
+      body: { error: workerError },
+    });
+    const {
+      AGENT_BRIDGE_WORKER_BUNDLE_URL,
+      WORKER_BUNDLE_URL,
+      WORKER_RELEASE_MANIFEST_URL,
+    } = require('../../../variables/publicDeploymentConfig.js');
+
+    const deployResult = await redeemSponsoredDeploy(options);
+
+    const deployPayload = readRedeemPayload();
+    // Sponsors running code older than 0.6.8 deploy this release; newer ones ignore it.
+    expect(WORKER_BUNDLE_URL).toMatch(/^https:\/\//);
+    expect(deployPayload).toEqual(
+      expect.objectContaining({
+        bundleUrl: WORKER_BUNDLE_URL,
+        bundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
+        agentBridgeBundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,
+        agentBridgeBundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
+        agentSessionWrappedDeploymentIdentity: expect.any(String),
+      }),
+    );
+    expect(deployPayload).not.toHaveProperty('bundleText');
+    expect(deployPayload).not.toHaveProperty('bundleSha256');
     expect(deployResult).toEqual({
       ok: false,
       error: `${workerError} Your deploy grant was not used. It will work once the sponsor sets these on their Worker.`,
     });
     expect(options.updateDeploymentState).not.toHaveBeenCalledWith({ forceManualBundleFile: true });
+  });
+
+  it('explains that a sponsor running older code left the grant unused when it has no bundle', async () => {
+    const { options } = prepareSponsoredAgentsHttpRedeem({
+      status: 400,
+      body: { error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).' },
+    });
+
+    await expect(redeemSponsoredDeploy(options)).resolves.toEqual({
+      ok: false,
+      error:
+        'The sponsoring Worker has no Worker release to deploy. Your deploy grant was not used. It will work ' +
+        'once the sponsor sets WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on their Worker.',
+    });
   });
 
   it('reports infrastructure-only completion when public config readback is not verified', async () => {
