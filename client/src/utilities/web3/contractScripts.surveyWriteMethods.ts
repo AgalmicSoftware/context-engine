@@ -112,7 +112,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     try {
       const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chainId);
       if (!provider) return;
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
       [surveyHash, questionHashes] = await Promise.race([
         Promise.all([
           surveyId ? SurveyContract.surveyHashes(surveyId) : null,
