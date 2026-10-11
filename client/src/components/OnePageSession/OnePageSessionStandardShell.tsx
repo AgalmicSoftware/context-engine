@@ -82,6 +82,7 @@ type OnePageSessionStandardShellProps = {
   autoOpenResults: boolean;
   blockLimits: UnknownRecord | null;
   cacheHasLoaded: unknown;
+  cacheInitializationError?: unknown;
   contracts: UnknownRecord | null;
   corpusViewerLoadRequestNonce: number;
   corpusViewerLoadState: CorpusViewerLoadState;
@@ -278,6 +279,7 @@ export default function OnePageSessionStandardShell({
   autoOpenResults,
   blockLimits,
   cacheHasLoaded,
+  cacheInitializationError,
   contracts,
   corpusViewerLoadRequestNonce,
   corpusViewerLoadState,
@@ -534,6 +536,7 @@ export default function OnePageSessionStandardShell({
               isQuestionCacheReady={isQuestionCacheReady}
               isResponsesCacheReady={isResponsesCacheReady}
               cacheHasLoaded={cacheHasLoaded}
+              cacheInitializationError={cacheInitializationError}
               sbtCacheRevision={sbtCacheRevision}
               questionResponsesNonce={questionResponsesNonce}
               questionScanProgress={questionScanProgress}
@@ -597,6 +600,7 @@ export default function OnePageSessionStandardShell({
                 isSurveyCacheReady={isSurveyCacheReady}
                 isResponsesCacheReady={isResponsesCacheReady}
                 cacheHasLoaded={cacheHasLoaded}
+                cacheInitializationError={cacheInitializationError}
                 onFilterChange={onFilterChange}
                 filterState={filterState}
                 hideSessionSelector={true}

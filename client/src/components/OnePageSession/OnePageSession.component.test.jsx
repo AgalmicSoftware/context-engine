@@ -768,6 +768,24 @@ describe('OnePageSession view gating', () => {
     expect(fullCalls[fullCalls.length - 1]?.sessionSlugPinned).toBe(true);
   });
 
+  it('passes a failed saved-answer load to both embedded SurveyPage modes', async () => {
+    render(<OnePageSession {...buildProps()} cacheInitializationError />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('pile-view-all'));
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+    });
+
+    const calls = mockSurveyPage.mock.calls.map((args) => args[0]);
+    expect(calls.filter((childProps) => childProps?.minifiedMode === 'pile').at(-1)?.cacheInitializationError).toBe(
+      true,
+    );
+    expect(calls.filter((childProps) => childProps?.miniMode === true).at(-1)?.cacheInitializationError).toBe(true);
+  });
+
   it('passes slug-scoped Polis demo data through to the embedded report', async () => {
     const customEdgeData = {
       edge: {

@@ -2378,6 +2378,7 @@ class OnePageSession extends Component<any, any> {
         autoOpenResults={this.state.autoOpenResults}
         blockLimits={blockLimits}
         cacheHasLoaded={this.props.cacheHasLoaded}
+        cacheInitializationError={this.props.cacheInitializationError}
         contracts={contracts}
         corpusViewerLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
         corpusViewerLoadState={corpusViewerLoadState}
