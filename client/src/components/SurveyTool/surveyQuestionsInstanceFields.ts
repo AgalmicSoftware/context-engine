@@ -40,6 +40,7 @@ type SurveyQuestionsPolicyCache = {
 type SurveyQuestionsLookupCache = {
   stateQuestionPool: unknown[] | null;
   statePileQuestions: unknown[] | null;
+  stateFilterQuestions?: unknown[] | null;
   propsQuestionPool: unknown[] | null;
   value: Map<string, unknown> | null;
 };

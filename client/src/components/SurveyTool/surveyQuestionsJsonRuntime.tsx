@@ -5,6 +5,7 @@ import type {
 } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsSubmitPendingStats } from './surveyQuestionsSubmitController.js';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
+import { resolveEditableQuestionList } from './surveyToolResponsePayloadController';
 
 export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyRecord) => {
   const {
@@ -126,7 +127,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       surveyResponseState,
       savedInterviewProvenance: stateRef.current.editBaseline?.interviewProvenance,
       questionPool: Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : [],
-      pileQuestions: Array.isArray(stateRef.current.pileQuestions) ? stateRef.current.pileQuestions : [],
+      pileQuestions: resolveEditableQuestionList(stateRef.current),
       resolveFieldEncryptionAudience: (
         field: SurveyQuestionsLegacyValue,
         qid: SurveyQuestionsLegacyValue,

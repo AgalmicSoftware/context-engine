@@ -2,9 +2,29 @@ import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 import { buildSelectedInterviewResearch, buildUnselectedInterviewResearch } from './sessionInterviewResearch';
 import { resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
+import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+
+/**
+ * Every question a responder can have edited. The pile filter narrows only what is
+ * shown, so payloads and lookups must also see questions hidden by the filter.
+ */
+export const resolveEditableQuestionList = (state: {
+  pileQuestions?: unknown;
+  allQuestionsForFilter?: unknown;
+}): UnknownRecord[] => {
+  const seen = new Set<string>();
+  return [state?.pileQuestions, state?.allQuestionsForFilter].flatMap((list) =>
+    (Array.isArray(list) ? list : []).filter((question) => {
+      const id = normalizeQuestionIdKey(asRecord(question).id);
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }),
+  );
+};
 
 const hasOwn = (value: UnknownRecord, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
 

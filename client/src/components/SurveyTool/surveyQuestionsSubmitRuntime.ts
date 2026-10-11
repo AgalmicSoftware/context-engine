@@ -15,7 +15,10 @@ import type {
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
 import { remaskUnchangedEncryptedFields } from './surveyToolSubmitPrepController.js';
 import { shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState.js';
-import { captureInterviewPredictionComparisonSubmissions } from './surveyToolResponsePayloadController.js';
+import {
+  captureInterviewPredictionComparisonSubmissions,
+  resolveEditableQuestionList,
+} from './surveyToolResponsePayloadController.js';
 
 export type SurveyQuestionsSubmitRuntime = SurveyQuestionsLegacyRecord;
 
@@ -44,6 +47,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     normalizeSessionSlugValue,
     prepareJsonAndHash,
     propsRef,
+    resolveDiffBaselineSlice,
     resolveEffectiveSlug,
     resolveEffectiveResponseGateConfig,
     resolveFieldEncryptionAudience,
@@ -307,9 +311,10 @@ export const createSurveyQuestionsSubmitRuntime = (
         importance: {},
         conviction: {},
       };
-      for (const question of (stateRef.current.questionPool?.length
+      const submitQuestionPool: SurveyQuestionsLegacyValue = stateRef.current.questionPool?.length
         ? stateRef.current.questionPool
-        : stateRef.current.pileQuestions) || []) {
+        : resolveEditableQuestionList(stateRef.current);
+      for (const question of submitQuestionPool) {
         if (question.type !== 'quadratic' || !changedQids.has(question.id)) continue;
         // The diff stores per-field flags, not a list of field names.
         if (changedMap?.[question.id] && !changedMap[question.id].answer) continue;
@@ -345,12 +350,6 @@ export const createSurveyQuestionsSubmitRuntime = (
           const surveyId: SurveyQuestionsLegacyValue = submitContext.singleQuestionMode
             ? ethers.constants.HashZero
             : submitContext.surveyId;
-          const poolForCommit: SurveyQuestionsLegacyValue =
-            Array.isArray(stateRef.current.questionPool) && stateRef.current.questionPool.length > 0
-              ? stateRef.current.questionPool
-              : Array.isArray(stateRef.current.pileQuestions)
-                ? stateRef.current.pileQuestions
-                : [];
           const encState: SurveyQuestionsLegacyValue = await encryptFieldWorkGroups({
             workGroups,
             baseOpts: {
@@ -361,7 +360,7 @@ export const createSurveyQuestionsSubmitRuntime = (
               sessionSlug: submitContext.effectiveDraftSlug,
               sessionConfig: resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
               surveyId,
-              questionPool: poolForCommit,
+              questionPool: submitQuestionPool,
               hasher: stateRef.current.hasher,
             },
           });
@@ -410,7 +409,15 @@ export const createSurveyQuestionsSubmitRuntime = (
       }
       surveyLog.log('Submission receipt received', receipt?.blockNumber || 'unknown block');
 
-      // Success path
+      // Success path. Only rows that reached storage are saved; any other change
+      // keeps its draft and stays pending against the previous baseline.
+      const uploadedQids = new Set<string>(
+        (Array.isArray(receipt?.__ceQuestionResponses) ? receipt.__ceQuestionResponses : [])
+          .map((response: SurveyQuestionsLegacyValue) =>
+            normalizeQuestionIdKey(response?.questionID || response?.questionId),
+          )
+          .filter(Boolean),
+      );
 
       // 1. STOP any pending draft saves immediately
       if (inst._persistTimer) {
@@ -418,12 +425,10 @@ export const createSurveyQuestionsSubmitRuntime = (
         inst._persistTimer = null;
       }
 
-      // 2. Clear drafts for changed QIDs
-      surveyLog.log('Clearing drafts for QIDs:', Array.from(changedQids));
+      // 2. Clear drafts for uploaded QIDs
+      surveyLog.log('Clearing drafts for QIDs:', Array.from(uploadedQids));
       try {
-        Array.from(changedQids).forEach(
-          (qid: SurveyQuestionsLegacyValue) => clearDraftFor && clearDraftFor(String(qid)),
-        );
+        Array.from(uploadedQids).forEach((qid: string) => clearDraftFor && clearDraftFor(qid));
       } catch (_: any) {
         if (propsRef.current.singleQuestionMode && propsRef.current.questionID) {
           clearDraftFor(propsRef.current.questionID.toLowerCase());
@@ -451,10 +456,19 @@ export const createSurveyQuestionsSubmitRuntime = (
       // 4. UPDATE BASELINE & OPTIMISTIC STATE
       surveyLog.log('Setting new Baseline');
 
-      // Ensure surveysResponseState and editBaseline are mathematically identical
+      // Uploaded questions match their saved rows exactly; the rest keep the old baseline.
       // We clone activeSlice (which holds the final encrypted/plaintext state)
       const finalSlice: SurveyQuestionsLegacyValue = deepClone(activeSlice);
-      const nextBaseline: SurveyQuestionsLegacyValue = deepClone(finalSlice);
+      const nextBaseline: SurveyQuestionsLegacyValue = deepClone(resolveDiffBaselineSlice(false) || {});
+      for (const field of ['answers', 'additionalComments', 'importance', 'conviction']) {
+        const merged: SurveyQuestionsLegacyValue = Object.fromEntries(
+          Object.entries(nextBaseline[field] || {}).filter(([qid]) => !uploadedQids.has(normalizeQuestionIdKey(qid))),
+        );
+        Object.entries(finalSlice[field] || {}).forEach(([qid, value]) => {
+          if (uploadedQids.has(normalizeQuestionIdKey(qid))) merged[qid] = deepClone(value);
+        });
+        nextBaseline[field] = merged;
+      }
 
       // Construct the explicit new state array to prevent any diff artifacts
       const nextSurveysResponseState: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
@@ -468,7 +482,9 @@ export const createSurveyQuestionsSubmitRuntime = (
         ...Object.fromEntries(
           (optimisticUserAnswers.responses || (optimisticUserAnswers.questionID ? [optimisticUserAnswers] : []))
             // Only an uploaded question acquires a new saved-consent version.
-            .filter((response: SurveyQuestionsLegacyValue) => changedQids.has(response.questionID))
+            .filter((response: SurveyQuestionsLegacyValue) =>
+              uploadedQids.has(normalizeQuestionIdKey(response.questionID)),
+            )
             .map((response: SurveyQuestionsLegacyValue) => [
               response.questionID,
               buildSavedInterviewConsent(response, getSubmittedWorkerResponseRecency(receipt, response.questionID)),
@@ -523,9 +539,7 @@ export const createSurveyQuestionsSubmitRuntime = (
             const shouldRefreshQuestionResponses =
               !cacheWriteResult?.questionCacheWritten || !!submitContext.workerTargetKey;
             if (shouldRefreshQuestionResponses && typeof propsRef.current.refreshQuestionResponses === 'function') {
-              const ids: SurveyQuestionsLegacyValue = Array.from(changedQids)
-                .map((id: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(id))
-                .filter(Boolean);
+              const ids: SurveyQuestionsLegacyValue = Array.from(uploadedQids);
               if (ids.length > 0 && isSubmitContextCurrent(submitContext)) {
                 await propsRef.current.refreshQuestionResponses(ids, {
                   slug: submittedCacheSlug,

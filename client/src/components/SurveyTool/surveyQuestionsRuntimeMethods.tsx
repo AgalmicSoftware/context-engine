@@ -1965,6 +1965,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     isQuestionLockedForResponse,
     maybeBlockSubmitUntilQuestionPoolComplete,
     prepareJsonAndHash,
+    resolveDiffBaselineSlice,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
     resolveEffectiveResponseGateConfig,
@@ -2120,6 +2121,24 @@ export const createSurveyQuestionsRuntimeMethods = (
     }
 
     const { questionIds, questionResponses, surveyId, surveyResponse }: SurveyQuestionsLegacyValue = filtered;
+
+    // Fail closed: a changed answer left out of the payload would otherwise be marked saved.
+    const includedQids = new Set(questionIds.map((qid: string) => normalizeQuestionIdKey(qid)));
+    const submitSlice: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState?.[idx] || {};
+    const omittedQids = Array.from(changedSet as Set<string>).filter(
+      (qid) =>
+        !includedQids.has(normalizeQuestionIdKey(qid)) &&
+        (hasMeaningfulFieldValue(submitSlice.answers?.[qid]) ||
+          hasMeaningfulFieldValue(submitSlice.additionalComments?.[qid]) ||
+          submitSlice.importance?.[qid] != null ||
+          submitSlice.conviction?.[qid] != null),
+    );
+    if (omittedQids.length > 0) {
+      const message = 'Some changed answers could not be included in this submission. Reload the page and try again.';
+      inst._submitGuard = false;
+      setState(buildSubmitPreparationErrorState(message));
+      throw new Error(message);
+    }
 
     const submissionContext: SurveyQuestionsLegacyValue = resolveSubmissionGroupContext({
       questionIds,

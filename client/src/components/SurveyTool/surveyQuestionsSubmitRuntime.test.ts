@@ -95,6 +95,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
       toggleLoginModal: jest.fn(),
     },
   },
+  resolveDiffBaselineSlice: jest.fn(() => ({ answers: {}, additionalComments: {}, importance: {}, conviction: {} })),
   resolveEffectiveSlug: jest.fn(() => 'route-edge'),
   resolveEffectiveResponseGateConfig: jest.fn((_slug, props) => props?.sessionConfig || {}),
   resolveFieldEncryptionAudience: jest.fn(),
@@ -142,7 +143,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
     },
   },
   submitSurveyResponse: jest.fn(async () => ({
-    __ceQuestionResponses: [],
+    __ceQuestionResponses: [{ questionID: 'q1' }],
     __ceSubmissionGroupKey: 'draft-edge',
     __ceSurveyId: 'survey-1',
     __ceSurveyResponse: {},
@@ -420,6 +421,7 @@ it('ranks submitted consent using the Worker receipt instead of the browser cloc
     responses: [{ questionID: 'q1', responderName: 'Participant' }],
   });
   context.submitSurveyResponse.mockResolvedValue({
+    __ceQuestionResponses: [{ questionID: 'q1' }],
     questionResponseRefs: [
       { questionId: 'q1', storageRef: { id: 'server-ref', createdAt: '2026-10-02T10:00:00.000Z' } },
     ],
@@ -430,4 +432,32 @@ it('ranks submitted consent using the Worker receipt instead of the browser cloc
     consentSavedAt: Date.parse('2026-10-02T10:00:00.000Z'),
     consentStorageRefId: 'server-ref',
   });
+});
+
+it('marks only the uploaded questions saved and keeps other changes drafted', async () => {
+  const context = createContext();
+  context.getChangedQidsAndFields.mockReturnValue({
+    changedQids: new Set(['q1', 'q2']),
+    changedMap: { q1: { answer: 1 }, q2: { answer: 1 } },
+  });
+  context.resolveDiffBaselineSlice.mockReturnValue({
+    answers: { q1: { value: 'Old' }, q2: { value: 'Saved' } },
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  });
+  context.stateRef.current.surveysResponseState[2] = {
+    answers: { q1: { value: 'Yes' }, q2: { value: '' } },
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  };
+
+  await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+    status: 'submitted',
+  });
+
+  expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
+  const { editBaseline } = context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0];
+  expect(editBaseline.answers).toEqual({ q1: { value: 'Yes' }, q2: { value: 'Saved' } });
 });
