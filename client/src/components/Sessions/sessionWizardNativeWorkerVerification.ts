@@ -58,6 +58,14 @@ const readRuntime = (
   return current && typeof current === 'object' ? current : {};
 };
 
+// The Cloudflare template sets DEPLOY_HELPER_ENABLED to "0", so a native
+// Worker cannot run sponsored deploys. Say so in its config; otherwise the
+// sponsor page offers deploy grants that this Worker rejects.
+const withoutEmbeddedDeployHelper = (runtime: SessionWizardWorkerDeployRuntime): SessionWizardWorkerDeployRuntime => ({
+  ...runtime,
+  embeddedDeployHelperEnabled: false,
+});
+
 export const verifyNativeSessionWorker = async ({
   runtimeRef,
   sessionSlug,
@@ -138,7 +146,7 @@ export const verifyNativeSessionWorker = async ({
         ? parseAllowOriginsInput()
         : parseSessionWizardAllowOriginsInput(runtime.workerAllowOrigins);
     const workerConfig = buildSessionWizardWorkerVerificationConfig({
-      runtime,
+      runtime: withoutEmbeddedDeployHelper(runtime),
       draft: currentDraft,
       adminAddress: resolvedAdmin,
       workerUrl,
@@ -225,7 +233,7 @@ export const verifyNativeSessionWorker = async ({
         : parseSessionWizardAllowOriginsInput(liveRuntime.workerAllowOrigins);
     const liveWorkerSecrets = getCurrentWorkerSecrets();
     const liveWorkerConfig = buildSessionWizardWorkerVerificationConfig({
-      runtime: liveRuntime,
+      runtime: withoutEmbeddedDeployHelper(liveRuntime),
       draft: liveDraft,
       adminAddress: liveAdminAddress,
       workerUrl,
@@ -254,7 +262,13 @@ export const verifyNativeSessionWorker = async ({
     }
 
     updateDraftValue(['corsWorkerUrl'], bootstrap.workerOrigin);
-    publishVerifiedRuntime(runtimeRef, currentDraft, bootstrap.workerOrigin, bootstrap.workerOrigin, true, proof);
+    // Publication rebuilds this config from the draft; keep it matching the
+    // verified one.
+    updateDraftValue(['embeddedDeployHelperEnabled'], false);
+    publishVerifiedRuntime(runtimeRef, currentDraft, bootstrap.workerOrigin, bootstrap.workerOrigin, true, proof, {
+      embeddedDeployHelperEnabled: false,
+    });
+    if (runtimeRef?.current) runtimeRef.current = withoutEmbeddedDeployHelper(runtimeRef.current);
     updateDeploymentState({
       deployStatus: bootstrap.configRevision
         ? `Session Worker verified at canonical config revision ${bootstrap.configRevision}.`

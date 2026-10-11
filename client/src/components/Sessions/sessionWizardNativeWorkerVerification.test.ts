@@ -1,5 +1,6 @@
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { verifyNativeSessionWorker } from './sessionWizardNativeWorkerVerification';
+import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import type { SessionWizardWorkerDeployRuntime } from './hooks/useSessionWizardWorkerDeploy';
 
 type VerifyNativeSessionWorkerInput = Parameters<typeof verifyNativeSessionWorker>[0];
@@ -244,6 +245,57 @@ describe('verifyNativeSessionWorker', () => {
         deployStatus: 'Session Worker verified.',
         workerRequirementProof: expect.objectContaining({ version: 1 }),
       }),
+    );
+  });
+
+  it('advertises no embedded deploy helper and keeps publication on the same config', async () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const workerSecrets = { openaiKey: 'test-ai-key', arweaveJwk: '{"kty":"RSA"}' };
+    const runtimeRef = {
+      current: {
+        account: '0x00000000000000000000000000000000000000aa',
+        draft: {
+          slug: 'registry-session',
+          sessionModeProfile: profile,
+          embeddedDeployHelperEnabled: true,
+          ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
+        },
+        embeddedDeployHelperEnabled: true,
+        loginComplete: true,
+        workerAllowOrigins: 'http://localhost',
+        workerMode: 'custom',
+        workerSecretsEnabled: true,
+        registryChainId: 11155420,
+        sessionIdHex: '0x00000000000000000000000000000001',
+      } as SessionWizardWorkerDeployRuntime,
+    };
+    global.fetch = jest.fn(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    ) as unknown as typeof fetch;
+    const updateDraftValue = jest.fn();
+    const signTypedAdminAction = jest.fn<ReturnType<SignTypedAdminAction>, Parameters<SignTypedAdminAction>>(
+      async () => ({ address: '0x00000000000000000000000000000000000000aa', signature: '0xsigned' }),
+    );
+
+    await verifyNativeSessionWorker({
+      runtimeRef,
+      sessionSlug: 'registry-session',
+      workerQueryValue: 'https://registry-session.example.test',
+      getCurrentWorkerSecrets: () => workerSecrets,
+      getMissingWorkerSecretsForDeploy: () => [],
+      parseAllowOriginsInput: () => ['http://localhost'],
+      resolveConnectedAdminAddress: async () => '0x00000000000000000000000000000000000000aa',
+      resolveWorkerFaucetConfig: () => ({}),
+      signTypedAdminAction,
+      updateDeploymentState: jest.fn(),
+      updateDraftValue,
+    });
+
+    const configSignInput = signTypedAdminAction.mock.calls.find(([input]) => input?.action === 'set-config')?.[0];
+    expect(configSignInput?.body?.config?.embeddedDeployHelperEnabled).toBe(false);
+    expect(updateDraftValue).toHaveBeenCalledWith(['embeddedDeployHelperEnabled'], false);
+    expect(resolveSessionWizardWorkerPublishEvidence({ runtime: runtimeRef.current, workerSecrets })).toEqual(
+      expect.objectContaining({ verified: true }),
     );
   });
 
