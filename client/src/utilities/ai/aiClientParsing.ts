@@ -10,9 +10,6 @@ const asRecord = (value: unknown): UnknownRecord =>
 export const asParsedJsonRecord = (value: unknown): UnknownRecord | null =>
   !!value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : null;
 
-export const readParsedString = (record: UnknownRecord | null | undefined, key: string): string =>
-  typeof record?.[key] === 'string' ? String(record[key]) : '';
-
 export const readParsedLegacyString = (record: UnknownRecord | null | undefined, key: string): string =>
   String(record?.[key] || '');
 
