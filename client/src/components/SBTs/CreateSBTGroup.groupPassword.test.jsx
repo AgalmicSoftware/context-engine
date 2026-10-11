@@ -9,6 +9,7 @@ import {
   render,
   screen,
   setupCreateSBTGroupTestLifecycle,
+  within,
 } from './CreateSBTGroup.testUtils';
 
 const PASSPHRASE_PATTERN = /^[a-z]+(-[a-z]+){4}$/;
@@ -42,6 +43,27 @@ const stubCreateUploads = (instance) => {
   instance.uploadImageToArweave = jest.fn(async () => null);
   instance.uploadTokenUriToArweave = jest.fn(async () => null);
   instance.mintSBT = jest.fn(async () => null);
+};
+
+const PASSPHRASE = 'orbit-maple-signal-tunnel-quartz';
+const PREDICTED = '0x00000000000000000000000000000000000000c9';
+
+// A full create: only the uploads, the address prediction and the deploy are stubbed.
+const makeCreatingInstance = (stateOverrides = {}, props = {}) => {
+  const instance = makeGroupPasswordInstance({ groupPassword: PASSPHRASE, ...stateOverrides }, props);
+  instance.persistFormCache = jest.fn();
+  instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
+  instance.commitPendingDocumentUrl = jest.fn(async () => false);
+  instance.uploadImageToArweave = jest.fn(async () => null);
+  instance.uploadTokenUriToArweave = jest.fn(async () => {
+    instance.state = { ...instance.state, tokenURI: 'ar://metadata' };
+    return 'ar://metadata';
+  });
+  jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(PREDICTED);
+  jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+    logs: [makeFactoryReceiptLog('SBTCreated', [PREDICTED])],
+  });
+  return instance;
 };
 
 describe('CreateSBTGroup group password', () => {
@@ -187,26 +209,6 @@ describe('CreateSBTGroup group password', () => {
   });
 
   describe('while a create is in flight', () => {
-    const PASSPHRASE = 'orbit-maple-signal-tunnel-quartz';
-    const PREDICTED = '0x00000000000000000000000000000000000000c9';
-
-    const makeCreatingInstance = (stateOverrides = {}, props = {}) => {
-      const instance = makeGroupPasswordInstance({ groupPassword: PASSPHRASE, ...stateOverrides }, props);
-      instance.persistFormCache = jest.fn();
-      instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
-      instance.commitPendingDocumentUrl = jest.fn(async () => false);
-      instance.uploadImageToArweave = jest.fn(async () => null);
-      instance.uploadTokenUriToArweave = jest.fn(async () => {
-        instance.state = { ...instance.state, tokenURI: 'ar://metadata' };
-        return 'ar://metadata';
-      });
-      jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(PREDICTED);
-      jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
-        logs: [makeFactoryReceiptLog('SBTCreated', [PREDICTED])],
-      });
-      return instance;
-    };
-
     it.each([
       ['while "Securing password…" shows', 'computeGroupPasswordHash'],
       ['while the wallet prompt is open', 'createSBT'],
@@ -279,6 +281,79 @@ describe('CreateSBTGroup group password', () => {
         expect.objectContaining({ groupPassword: PASSPHRASE, finalGroupPasswordHash: `0x${'77'.repeat(32)}` }),
       );
       expect(instance.state.groupPassword).toBe(PASSPHRASE);
+    });
+  });
+
+  describe('after a successful create', () => {
+    const createGroup = async () => {
+      const instance = makeCreatingInstance();
+      jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'66'.repeat(32)}`);
+      await act(async () => {
+        await instance.handleMintClick();
+      });
+      expect(instance.state.sbtMinted).toBe(true);
+      return instance;
+    };
+
+    it('keeps the deployed password locked and shows it in the success panel to share', async () => {
+      const instance = await createGroup();
+      const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      const writeText = jest.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+
+      try {
+        const view = render(instance.render());
+        const generate = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE);
+        expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT)).toBeDisabled();
+        expect(generate).toBeDisabled();
+        fireEvent.click(generate);
+        instance.handleGenerateGroupPassword();
+        view.rerender(instance.render());
+
+        expect(instance.state.groupPassword).toBe(PASSPHRASE);
+        const success = within(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_SUCCESS));
+        expect(success.getByText(PASSPHRASE)).toBeInTheDocument();
+        expect(success.getByText(/Share it separately from the claim link/)).toBeInTheDocument();
+        fireEvent.click(success.getByRole('button', { name: 'Copy group password' }));
+        expect(writeText).toHaveBeenCalledWith(PASSPHRASE);
+      } finally {
+        if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard);
+        else delete navigator.clipboard;
+      }
+    });
+
+    it('unlocks the password once the creator edits the form or starts fresh', async () => {
+      const edited = await createGroup();
+      edited.handleInputChange({ target: { name: 'sbtName', type: 'text', value: 'Next Group' } });
+      render(edited.render());
+      expect(screen.queryByTestId(E2E_TESTIDS.SBT_CREATE_SUCCESS)).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT)).toBeEnabled();
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT)).toHaveValue(PASSPHRASE);
+
+      const fresh = await createGroup();
+      fresh.resetForm();
+      expect(fresh.state.sbtMinted).toBe(false);
+      expect(fresh.isGroupPasswordLocked()).toBe(false);
+    });
+
+    it('does not offer a limited group password for sharing, since it signs invite codes', () => {
+      const instance = makeGroupPasswordInstance({
+        groupPassword: PASSPHRASE,
+        sbtMinted: true,
+        sbtAddress: PREDICTED,
+        sbtDistribution: {
+          ...makeGroupPasswordInstance().state.sbtDistribution,
+          isLimited: true,
+          limitedNumber: 2,
+        },
+      });
+
+      render(instance.render());
+
+      const success = within(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_SUCCESS));
+      expect(success.queryByText(PASSPHRASE)).not.toBeInTheDocument();
+      expect(success.queryByRole('button', { name: 'Copy group password' })).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE)).toBeDisabled();
     });
   });
 

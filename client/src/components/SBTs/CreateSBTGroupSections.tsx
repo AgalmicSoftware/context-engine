@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faClipboard, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './CreateSBTGroup.module.scss';
 import CEDateTimeInput from '../Shared/CEDateTimeInput';
@@ -317,7 +317,8 @@ type RenderCreateSbtDistributionOptionsSectionArgs = {
   actionDisplayState: ActionDisplayState;
   groupPassword: string;
   groupPasswordIsShort: boolean;
-  // Locked while a create is in flight: it uses the password captured when Create was clicked.
+  // Locked while a create runs (it uses the password captured at Create) and after it succeeds (the field then
+  // holds the only copy of the deployed password).
   groupPasswordLocked: boolean;
   groupPasswordRestoreNotice: boolean;
   groupPasswordWeakConfirmed: boolean;
@@ -448,5 +449,34 @@ export const renderCreateSbtDistributionOptionsSection = ({
         </CETooltip>
       </span>
     </label>
+  </div>
+);
+
+type RenderCreateSbtCreatedGroupPasswordArgs = {
+  copied: boolean;
+  groupPassword: string;
+  onCopy: () => void;
+};
+
+// Shown after an unlimited group-password create: nothing else keeps a copy of the password members join with.
+export const renderCreateSbtCreatedGroupPassword = ({
+  copied,
+  groupPassword,
+  onCopy,
+}: RenderCreateSbtCreatedGroupPasswordArgs) => (
+  <div className={styles.shareableBlock}>
+    <div className={styles.leftCol}>
+      <h3 className={styles.blockTitle}>Group password</h3>
+      <div className={styles.groupPasswordRow}>
+        <code className={styles.addressPreviewValue}>{groupPassword}</code>
+        <button type="button" onClick={onCopy} className={styles.exportButton} aria-label="Copy group password">
+          <FontAwesomeIcon icon={copied ? faCheck : faClipboard} /> {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className={styles.fieldHelpText}>
+        Members join with this password. Share it separately from the claim link, and keep a copy: it isn&apos;t saved
+        anywhere.
+      </p>
+    </div>
   </div>
 );

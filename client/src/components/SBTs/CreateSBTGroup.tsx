@@ -68,7 +68,11 @@ import {
 } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
-import { renderCreateSbtDistributionOptionsSection, renderCreateSbtMintOptionsSection } from './CreateSBTGroupSections';
+import {
+  renderCreateSbtCreatedGroupPassword,
+  renderCreateSbtDistributionOptionsSection,
+  renderCreateSbtMintOptionsSection,
+} from './CreateSBTGroupSections';
 import {
   areMetadataLockGateMapsEqual,
   buildCreateSbtAutoCreate2SaltSource,
@@ -262,6 +266,7 @@ const buildDeferredDraftCreate2Salt = () =>
     randomBytes: ethers.utils.randomBytes,
   });
 const LOCKED_FIELD_MASK = '[encrypted]';
+const CREATED_GROUP_PASSWORD_COPY_KEY = 'created_group_password';
 const DEFERRED_MODAL_SURFACE_BG = 'var(--ce-overlay-surface)';
 const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   {
@@ -1589,12 +1594,16 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   handleGenerateGroupPassword = (): void => {
-    if (this.isCreateInFlight()) return;
+    if (this.isGroupPasswordLocked()) return;
     this.setGeneratedGroupPassword({ groupPasswordRestoreNotice: false });
   };
 
   // A create uses the password captured when Create was clicked, so the field stays locked until it ends.
   isCreateInFlight = (): boolean => !!this.state.startedMinting && !this.state.sbtMinted && !this.state.mintingFailed;
+
+  // After a create, the field holds the only copy of the deployed password. It stays locked until the creator
+  // edits the form or starts fresh, which both close the success view.
+  isGroupPasswordLocked = (): boolean => this.isCreateInFlight() || !!this.state.sbtMinted;
 
   // After a create, the field shows exactly the password the group was created with.
   buildCreatedGroupPasswordPatch = (distributionOption: unknown, groupPassword: string): Record<string, unknown> =>
@@ -4394,7 +4403,7 @@ class CreateSBTGroup extends Component<any, any> {
               groupPasswordIsShort: isShortCreateSbtGroupPassword(
                 cryptoUtils.normalizeGroupPasswordInput(groupPassword),
               ),
-              groupPasswordLocked: this.isCreateInFlight(),
+              groupPasswordLocked: this.isGroupPasswordLocked(),
               groupPasswordRestoreNotice: groupPasswordRestoreNotice === true,
               groupPasswordWeakConfirmed: groupPasswordWeakConfirmed === true,
               sbtDistribution,
@@ -4615,6 +4624,14 @@ class CreateSBTGroup extends Component<any, any> {
                   'qr-code-one-click',
                   'oneclick',
                 )}
+                {/* Members join an unlimited group with its password. A limited group's password signs invite codes,
+                    so it is not offered for sharing. */}
+                {!sbtDistribution.isLimited &&
+                  renderCreateSbtCreatedGroupPassword({
+                    copied: copiedLinkIndex === CREATED_GROUP_PASSWORD_COPY_KEY,
+                    groupPassword: String(groupPassword || ''),
+                    onCopy: () => this.copyToClipboard(groupPassword, CREATED_GROUP_PASSWORD_COPY_KEY),
+                  })}
               </>
             )}
 
