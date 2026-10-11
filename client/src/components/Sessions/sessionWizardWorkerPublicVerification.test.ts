@@ -1,5 +1,8 @@
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
-import { verifySessionWizardWorkerPublicDeployment } from './sessionWizardWorkerPublicVerification';
+import {
+  completeSessionWizardWorkerPublicDeployment,
+  verifySessionWizardWorkerPublicDeployment,
+} from './sessionWizardWorkerPublicVerification';
 
 const SESSION_ID = '0x00000000000000000000000000000001';
 const ADMIN = '0x00000000000000000000000000000000000000aa';
@@ -196,5 +199,54 @@ describe('verifySessionWizardWorkerPublicDeployment', () => {
     ).rejects.toThrow(/signer.*session admin/i);
 
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("reports the Worker's reason when it rejects the signed config write", async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Registry-canonical session identity cannot be changed.' }), {
+          status: 409,
+        }),
+      );
+
+    await expect(
+      verifySessionWizardWorkerPublicDeployment({
+        workerUrl: WORKER_URL,
+        slug: 'registry-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN,
+        config: buildRegistryWorkerConfig(),
+        isWorkerCanonical: false,
+        signAdminAction: async () => ({ address: ADMIN, signature: '0xsigned' }),
+        fetchImpl,
+        browserOrigin: BROWSER_ORIGIN,
+      }),
+    ).rejects.toThrow(
+      'Public Worker config write failed (409): Registry-canonical session identity cannot be changed.',
+    );
+  });
+});
+
+describe('completeSessionWizardWorkerPublicDeployment', () => {
+  it('keeps the verification failure reason in the pending message', async () => {
+    const verify = jest.fn(async () => {
+      throw new Error('Worker config write failed (409): Worker-canonical publication is already finalized.');
+    });
+
+    await expect(
+      completeSessionWizardWorkerPublicDeployment({
+        workerUrl: WORKER_URL,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN,
+        config: {},
+        isWorkerCanonical: true,
+        signAdminAction: async () => ({}),
+        verify,
+      }),
+    ).rejects.toThrow(
+      'Worker infrastructure was created, but public config readback and browser-origin verification are still pending. Last error: Worker config write failed (409): Worker-canonical publication is already finalized.',
+    );
   });
 });

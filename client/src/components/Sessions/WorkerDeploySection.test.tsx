@@ -385,6 +385,27 @@ describe('WorkerDeploySection', () => {
     expect(screen.getByTestId('ce-wizard-cloudflare-native-verify')).toHaveTextContent('Verify Session Worker');
   });
 
+  it('shows why the Worker rejected verification', async () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('Worker config write failed (409): Worker-canonical session identity cannot be changed.'),
+        ),
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    expect(await screen.findByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      'Worker verification failed: Worker config write failed (409): Worker-canonical session identity cannot be changed. Check the Worker URL and session identity, then retry.',
+    );
+  });
+
   it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {
     renderWorkerDeploySection({
       isNormalMode: true,

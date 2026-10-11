@@ -302,10 +302,13 @@ const WorkerDeploySection = ({
       if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
       setVerifiedNativeIdentity('');
       setNativeProgress('opened');
+      // Show the Worker's reason (a rejected write, a readback mismatch) so
+      // the user can tell what to fix.
+      const detail = error instanceof Error ? error.message.trim().replace(/\.$/, '') : '';
       setNativeStatus(
         error instanceof TypeError
           ? 'The Worker could not be reached, or its CORS policy rejected this browser origin. Check Cloudflare and retry.'
-          : 'Worker verification failed. Check the Worker URL and session identity, then retry.',
+          : `Worker verification failed${detail ? `: ${detail}` : ''}. Check the Worker URL and session identity, then retry.`,
       );
     }
   };

@@ -125,7 +125,8 @@ export const verifySessionWizardWorkerPublicDeployment = async ({
   });
   const writeBody = await readJsonRecord(writeResponse);
   if (!writeResponse.ok) {
-    throw new Error(`Public Worker config write failed (${writeResponse.status}).`);
+    const detail = toStr(writeBody.error || writeBody.message).trim();
+    throw new Error(`Public Worker config write failed (${writeResponse.status})${detail ? `: ${detail}` : '.'}`);
   }
   if (writeBody.ok !== true) throw new Error('Public Worker config write did not confirm acceptance.');
 
@@ -155,11 +156,13 @@ export const completeSessionWizardWorkerPublicDeployment = async ({
         : 'Signed Worker config acceptance and browser-origin access verified.',
       synced: true,
     };
-  } catch (_) {
-    throw new Error(
-      input.isWorkerCanonical
-        ? 'Worker infrastructure was created, but public config readback and browser-origin verification are still pending.'
-        : 'Worker infrastructure was created, but signed config acceptance and browser-origin verification are still pending.',
-    );
+  } catch (error) {
+    const pendingMessage = input.isWorkerCanonical
+      ? 'Worker infrastructure was created, but public config readback and browser-origin verification are still pending.'
+      : 'Worker infrastructure was created, but signed config acceptance and browser-origin verification are still pending.';
+    // Keep the cause: a rejected write (such as a 409) or a readback mismatch
+    // needs a different fix than a Worker that is still starting.
+    const detail = toStr(error instanceof Error ? error.message : error).trim();
+    throw new Error(detail ? `${pendingMessage} Last error: ${detail}` : pendingMessage);
   }
 };
