@@ -2215,6 +2215,8 @@ export const captureSessionInterviewResponses = (engine: PileViewModeEngine, que
       // A reset for another account or session already discarded the applied drafts.
       if (!engine._isMounted || readContext() !== context) return resolve();
       engine.invalidateDiffCaches();
+      // A question that was uploaded after all is saved; only unsaved drafts are undone.
+      const unsaved = new Set<string>(engine.getChangedQidsAndFields?.(0)?.changedQids || []);
       engine.setState(
         (prev: SurveyQuestionsState) => {
           const states = [...(prev.surveysResponseState || [])];
@@ -2223,6 +2225,7 @@ export const captureSessionInterviewResponses = (engine: PileViewModeEngine, que
             const next = { ...readPlainRecord(current[field]) };
             const saved = readPlainRecord(readPlainRecord(prev.editBaseline)[field]);
             entries.forEach(({ id, had, value, pending }) => {
+              if (!unsaved.has(normalizeQuestionIdKey(id))) return;
               const restored =
                 field === 'interviewProvenance'
                   ? keepInterviewConsentWithdrawals(had ? value : saved[id], next[id]) || (had ? value : undefined)
@@ -2431,6 +2434,19 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   // Use the same complete own-answer baseline as manual Submit while the
   // public listing is pending or capped; never bypass the saved-answer read.
   const result = await handlePileSubmitWithOwnAnswers(engine);
+  // An interview answer held back from the upload is reported, so its draft can be removed.
+  const heldBack = new Set<string>(Array.isArray(engine._heldBackSubmitQids) ? engine._heldBackSubmitQids : []);
+  if (
+    result &&
+    typeof result === 'object' &&
+    result.status === 'submitted' &&
+    questionIds.some((id) => heldBack.has(normalizeQuestionIdKey(id)))
+  ) {
+    return {
+      status: 'failed' as const,
+      message: String(engine._heldBackSubmitMessage || 'Some answers were not submitted.'),
+    };
+  }
   if (result && typeof result === 'object' && 'status' in result) return result;
   if (!engine.props.loginComplete) return { status: 'login-required' as const };
   return { status: 'failed' as const, message: 'Submission did not complete.' };
@@ -2600,6 +2616,14 @@ const notifyPileSubmitRailVisibility = (engine: PileViewModeEngine) => {
   }
 };
 
+// A restored draft could not keep this field's unlock, because drafts never store a locked value's plaintext.
+const renderUnlockNotKeptNote = (field: any, label: 'answer' | 'comment') =>
+  field?.unlockLostFor && field.unlockLostFor === field.encryptedPortion ? (
+    <p className={styles.answerTooLongNotice} role="status">
+      {`Your unlock of this ${label} wasn't kept after the page reloaded. Decrypt it and unlock it again.`}
+    </p>
+  ) : null;
+
 const renderPileResponseInput = (
   engine: PileViewModeEngine,
   {
@@ -2618,16 +2642,21 @@ const renderPileResponseInput = (
 ) => {
   const updateAnswer = onAnswerChange || ((value: unknown) => engine.handleAnswerPile(question.id, value));
   if (maskedAnswer) {
-    return engine.renderQuestionFieldDecryptControl({
-      questionId: question.id,
-      fieldKey: 'answer',
-      allowDecrypt: allowDecryptAnswer,
-      decryptTooltip,
-      actionLabel: 'Decrypt Answer',
-      busy: isAnswerDecrypting,
-      showBusySpinnerWhenAutoDecryptEnabled: true,
-      wrapperStyle: { marginBottom: 8 },
-    });
+    return (
+      <>
+        {engine.renderQuestionFieldDecryptControl({
+          questionId: question.id,
+          fieldKey: 'answer',
+          allowDecrypt: allowDecryptAnswer,
+          decryptTooltip,
+          actionLabel: 'Decrypt Answer',
+          busy: isAnswerDecrypting,
+          showBusySpinnerWhenAutoDecryptEnabled: true,
+          wrapperStyle: { marginBottom: 8 },
+        })}
+        {renderUnlockNotKeptNote(answer, 'answer')}
+      </>
+    );
   }
 
   switch (normalizePileQuestionInputType(question)) {
@@ -2835,15 +2864,20 @@ const renderPileCommentsSection = (
   return renderPileCommentsSectionView({
     showComments,
     maskedAdditional,
-    decryptAdditionalControl: engine.renderQuestionFieldDecryptControl({
-      questionId,
-      fieldKey: 'additional',
-      allowDecrypt: allowDecryptAdditional,
-      decryptTooltip,
-      actionLabel: 'Decrypt Comments',
-      busy: isAdditionalDecrypting,
-      showBusySpinnerWhenAutoDecryptEnabled: true,
-    }),
+    decryptAdditionalControl: (
+      <>
+        {engine.renderQuestionFieldDecryptControl({
+          questionId,
+          fieldKey: 'additional',
+          allowDecrypt: allowDecryptAdditional,
+          decryptTooltip,
+          actionLabel: 'Decrypt Comments',
+          busy: isAdditionalDecrypting,
+          showBusySpinnerWhenAutoDecryptEnabled: true,
+        })}
+        {renderUnlockNotKeptNote(additional, 'comment')}
+      </>
+    ),
     additionalEditorRow: engine.renderPileAdditionalEditorRow({
       questionId,
       additional,

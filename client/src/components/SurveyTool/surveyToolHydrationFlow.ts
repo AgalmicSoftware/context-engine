@@ -1,6 +1,10 @@
 import { buildSavedInterviewConsent, consentSignature } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
-import { isDraftEntryStale, shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
+import {
+  isDraftEntryStale,
+  shouldForceOverwriteDraftValues,
+  withoutUnrestorableUnlocks,
+} from './surveyToolDraftState.js';
 import {
   buildEmptyResponseSlice,
   isSurveyToolRecord as isRecord,
@@ -758,10 +762,10 @@ export const buildDraftHydrationState = ({
     const questionId = normalizeQuestionIdKey(rawQuestionId);
     if (!questionId || typeof applyDraftEntryToSlice !== 'function') return;
 
-    const answerEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
+    const storedEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
+    if (!isRecord(storedEntry) || isDraftEntryStale(baseline?.[questionId], prevBaseline, questionId)) return;
+    const { entry: answerEntry, lostUnlocks } = withoutUnrestorableUnlocks(storedEntry);
     if (
-      answerEntry &&
-      !isDraftEntryStale(baseline?.[questionId], prevBaseline, questionId) &&
       applyDraftEntryToSlice({
         targetSlice: nextSlice,
         questionId,
@@ -771,6 +775,17 @@ export const buildDraftHydrationState = ({
     ) {
       changed = true;
     }
+    // The field stays locked as saved; mark it so the view can say the unlock was not kept.
+    lostUnlocks.forEach((field) => {
+      const fields = (field === 'answer' ? nextSlice.answers : nextSlice.additionalComments) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const current = fields[questionId];
+      if (!current?.encrypted || !current.encryptedPortion) return;
+      fields[questionId] = { ...current, unlockLostFor: current.encryptedPortion };
+      changed = true;
+    });
   });
 
   return {

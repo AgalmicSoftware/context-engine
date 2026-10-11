@@ -26,6 +26,8 @@ import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRunti
 import { createSurveyQuestionsRuntimeStateRuntime } from './surveyQuestionsRuntimeStateRuntime.js';
 import { readQuestionsCache } from './surveyToolCacheState.js';
 import { resolveQuestionReadCacheContext } from './surveyToolScope.js';
+import { resolveEditableQuestionList } from './surveyToolResponsePayloadController.js';
+import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads';
 
 export type SurveyQuestionsRuntimeMethods = SurveyQuestionsLegacyRecord;
 
@@ -2095,6 +2097,50 @@ export const createSurveyQuestionsRuntimeMethods = (
     // Changed questions upload even when blank: clearing a saved answer is an edit.
     const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet);
 
+    // A changed question that cannot be uploaded as it is stays unsaved and is named; it never
+    // holds back the other edits, and only rows that reach storage are marked saved.
+    inst._heldBackSubmitQids = [];
+    inst._heldBackSubmitMessage = '';
+    const payloadQids = new Set(
+      (context.singleQuestionMode ? [data] : Array.isArray(data?.responses) ? data.responses : []).map(
+        (response: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(response?.questionID),
+      ),
+    );
+    const submitSlice: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState?.[idx] || {};
+    const heldBack = new Map<string, 'unlisted' | 'locked'>();
+    Array.from(changedSet as Set<string>).forEach((qid) => {
+      if (
+        !payloadQids.has(normalizeQuestionIdKey(qid)) &&
+        (hasMeaningfulFieldValue(submitSlice.answers?.[qid]) ||
+          hasMeaningfulFieldValue(submitSlice.additionalComments?.[qid]) ||
+          submitSlice.importance?.[qid] != null ||
+          submitSlice.conviction?.[qid] != null)
+      )
+        heldBack.set(normalizeQuestionIdKey(qid), 'unlisted');
+    });
+    const describeHeldBack = () => {
+      const questions = [
+        ...resolveEditableQuestionList(stateRef.current),
+        ...(Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : []),
+        ...(Array.isArray(propsRef.current.questionPool) ? propsRef.current.questionPool : []),
+      ];
+      return Array.from(heldBack, ([qid, reason]) => {
+        const prompt = String(
+          questions.find((question: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(question?.id) === qid)
+            ?.prompt || '',
+        ).trim();
+        const name = prompt && !isMaskedPromptText(prompt) ? `“${prompt}”` : `Question ${qid.slice(0, 10)}…`;
+        return reason === 'locked'
+          ? `${name} still holds a locked value that can't be sent as it is, so it wasn't submitted. Decrypt it, set its lock again and submit.`
+          : `${name} isn't in this page's question list, so its change wasn't submitted. If it came from an interview, remove that draft; otherwise reload the page and submit again.`;
+      }).join(' ');
+    };
+    const failPreparation = (message: string): never => {
+      inst._submitGuard = false;
+      setState(buildSubmitPreparationErrorState(message));
+      throw new Error(message);
+    };
+
     let filtered: SurveyQuestionsLegacyValue;
     try {
       filtered = filterChangedResponsesForSubmit({
@@ -2106,30 +2152,11 @@ export const createSurveyQuestionsRuntimeMethods = (
         HashZero: ethers.constants.HashZero,
       });
     } catch (e: any) {
-      inst._submitGuard = false;
-      setState(buildSubmitPreparationErrorState(e.message || 'No new or changed responses to submit.'));
-      throw e;
+      failPreparation(heldBack.size ? describeHeldBack() : e.message || 'No new or changed responses to submit.');
     }
 
-    const { questionIds, questionResponses, surveyId, surveyResponse }: SurveyQuestionsLegacyValue = filtered;
-
-    // Fail closed: a changed answer left out of the payload would otherwise be marked saved.
-    const includedQids = new Set(questionIds.map((qid: string) => normalizeQuestionIdKey(qid)));
-    const submitSlice: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState?.[idx] || {};
-    const omittedQids = Array.from(changedSet as Set<string>).filter(
-      (qid) =>
-        !includedQids.has(normalizeQuestionIdKey(qid)) &&
-        (hasMeaningfulFieldValue(submitSlice.answers?.[qid]) ||
-          hasMeaningfulFieldValue(submitSlice.additionalComments?.[qid]) ||
-          submitSlice.importance?.[qid] != null ||
-          submitSlice.conviction?.[qid] != null),
-    );
-    if (omittedQids.length > 0) {
-      const message = 'Some changed answers could not be included in this submission. Reload the page and try again.';
-      inst._submitGuard = false;
-      setState(buildSubmitPreparationErrorState(message));
-      throw new Error(message);
-    }
+    const { surveyId }: SurveyQuestionsLegacyValue = filtered;
+    let { questionIds, questionResponses, surveyResponse }: SurveyQuestionsLegacyValue = filtered;
 
     const submissionContext: SurveyQuestionsLegacyValue = resolveSubmissionGroupContext({
       questionIds,
@@ -2244,6 +2271,23 @@ export const createSurveyQuestionsRuntimeMethods = (
       throw new Error('Submission context changed before broadcast.');
     }
 
+    // The upload guard refuses a payload with a locked-value mismatch; hold back only that question.
+    questionResponses = questionResponses.filter((response: SurveyQuestionsLegacyValue) => {
+      try {
+        validateNoLockedPlaintextInPayload(response, {
+          family: 'question_response_payload',
+          path: 'question response',
+        });
+        return true;
+      } catch (_) {
+        heldBack.set(normalizeQuestionIdKey(response?.questionID), 'locked');
+        return false;
+      }
+    });
+    if (!questionResponses.length) failPreparation(describeHeldBack());
+    questionIds = questionResponses.map((response: SurveyQuestionsLegacyValue) => response.questionID);
+    if (surveyResponse) surveyResponse = { ...surveyResponse, responses: questionResponses };
+
     const hashDeps: SurveyQuestionsLegacyValue = {
       hashIdentifier: cryptoUtils?.hashIdentifier?.bind(cryptoUtils),
       isHexString: utils.isHexString,
@@ -2274,6 +2318,11 @@ export const createSurveyQuestionsRuntimeMethods = (
       submissionTarget,
     );
 
+    if (heldBack.size) {
+      inst._heldBackSubmitQids = Array.from(heldBack.keys());
+      inst._heldBackSubmitMessage = describeHeldBack();
+      setState({ submissionError: inst._heldBackSubmitMessage });
+    }
     return normalizeSubmitReceipt(tx, {
       questionResponses,
       surveyResponse,

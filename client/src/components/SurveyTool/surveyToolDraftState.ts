@@ -1139,6 +1139,28 @@ const ADDITIONAL_DRAFT_KEYS = [
   'additionalEncryptedPortion',
 ] as const;
 
+/**
+ * Drafts never hold a locked value's plaintext, so an unlock stored with the masked
+ * value cannot be restored: applying it would make "*" public. Such fields stay locked
+ * as saved, and the caller is told which ones lost their unlock.
+ */
+export const withoutUnrestorableUnlocks = (entry: SurveyDraftQuestionEntry) => {
+  let restorable = entry;
+  const lostUnlocks: Array<'answer' | 'additional'> = [];
+  (
+    [
+      ['answer', 'value', 'answerEncrypted', ANSWER_DRAFT_KEYS],
+      ['additional', 'additional', 'additionalEncrypted', ADDITIONAL_DRAFT_KEYS],
+    ] as const
+  ).forEach(([field, valueKey, lockKey, keys]) => {
+    if (restorable[valueKey] !== '*' || restorable[lockKey]) return;
+    restorable = { ...restorable };
+    keys.forEach((key) => delete restorable[key]);
+    lostUnlocks.push(field);
+  });
+  return { entry: restorable, lostUnlocks };
+};
+
 const readSliceQuestion = (slice: PersistedDraftSliceLike, qid: string) => {
   const readNumber = (map: Record<string, unknown> | null | undefined) =>
     map && Object.prototype.hasOwnProperty.call(map, qid) ? map[qid] : null;

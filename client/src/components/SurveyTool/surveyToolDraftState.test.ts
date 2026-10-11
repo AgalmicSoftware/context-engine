@@ -18,6 +18,7 @@ import {
   buildPersistedDraftQuestionEntry,
   isDraftEntryStale,
   selectSurveyDraftKeysForAccount,
+  withoutUnrestorableUnlocks,
   removeQuestionFromPersistedDraftPayload,
   buildSurveyDraftCompatScope,
   buildSurveyDraftStorageKey,
@@ -1327,5 +1328,27 @@ describe('surveyToolDraftState', () => {
     };
 
     expect(buildSurveyDraftSemanticSignature(next)).not.toBe(buildSurveyDraftSemanticSignature(base));
+  });
+});
+
+describe('withoutUnrestorableUnlocks', () => {
+  it('drops an unlock stored with the masked value and keeps every other draft field', () => {
+    const { entry, lostUnlocks } = withoutUnrestorableUnlocks({
+      value: '*',
+      answerEncrypted: false,
+      answerEncryptedPortion: 'answer-envelope',
+      additional: '*',
+      additionalEncrypted: false,
+      importance: 7,
+    });
+    expect(entry).toEqual({ importance: 7 });
+    expect(lostUnlocks).toEqual(['answer', 'additional']);
+  });
+
+  it('keeps a masked value that stays locked and an unlocked value with text', () => {
+    const lockedAudienceChange = { value: '*', answerEncrypted: true, answerEncryptionAudience: 'self_admin' };
+    const publicComment = { additional: 'Public note', additionalEncrypted: false };
+    expect(withoutUnrestorableUnlocks(lockedAudienceChange)).toEqual({ entry: lockedAudienceChange, lostUnlocks: [] });
+    expect(withoutUnrestorableUnlocks(publicComment)).toEqual({ entry: publicComment, lostUnlocks: [] });
   });
 });

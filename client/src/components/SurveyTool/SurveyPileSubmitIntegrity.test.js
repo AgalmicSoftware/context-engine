@@ -213,6 +213,7 @@ const fixture = async () => {
     add,
     sync: () => controller.fetchQuestionResponsesChunkedForGroup(SLUG),
     mount,
+    unmount: () => view?.unmount(),
     click,
     submitResponses,
     savedRows,
@@ -255,7 +256,7 @@ it('uploads an edit hidden by the active filter instead of marking it saved', as
   expect(engine().getPendingEditStats().total).toBe(0);
 });
 
-it('refuses to upload when a changed answer cannot be included, keeping it pending and drafted', async () => {
+it('uploads the other edits and names a changed answer that cannot be included', async () => {
   const h = await fixture();
   await act(async () => h.sync());
   await h.mount();
@@ -268,12 +269,88 @@ it('refuses to upload when a changed answer cannot be included, keeping it pendi
   expect(engine().getPendingEditStats().total).toBe(2);
 
   await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
   await settle();
 
-  expect(h.submitResponses).not.toHaveBeenCalled();
-  expect(engine().state.submissionError).toMatch(/could not be included/i);
-  expect(engine().getPendingEditStats().total).toBe(2);
+  expect(h.submitResponses.mock.calls[0][2].map((row) => row.questionID)).toEqual([FREEFORM_QID]);
+  expect(engine().state.submissionError).toMatch(
+    /Question 0xefefefef… isn't in this page's question list, so its change wasn't submitted\. If it came from an interview, remove that draft/,
+  );
+  expect(engine().getPendingEditStats().total).toBe(1);
   expect(draftHolds(unknownQid)).toBe(true);
+});
+
+it('names an interview answer held back from the upload and undoes only its draft', async () => {
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  const unknownQid = `0x${'ef'.repeat(32)}`;
+  const { captureSessionInterviewResponses } = require('./SurveyPileViewMode');
+  const restore = captureSessionInterviewResponses(engine(), [unknownQid, FREEFORM_QID]);
+  await run(() => applySessionInterviewAnswer(engine(), unknownQid, 'Interview answer for an unlisted question'));
+  await run(() => applySessionInterviewAnswer(engine(), FREEFORM_QID, 'Interview answer'));
+
+  const outcome = await run(() => submitSessionInterviewResponses(engine(), [unknownQid, FREEFORM_QID]));
+  await settle();
+
+  expect(outcome).toEqual({
+    status: 'failed',
+    message: expect.stringMatching(/Question 0xefefefef… isn't in this page's question list/),
+  });
+  expect(h.savedRows(FREEFORM_QID).map((row) => row.answer.value)).toEqual(['Interview answer']);
+  await run(() => restore());
+  const slice = engine().state.surveysResponseState[0];
+  expect(slice.answers[FREEFORM_QID].value).toBe('Interview answer');
+  expect(slice.answers[unknownQid]?.value ?? '').toBe('');
+  expect(engine().getPendingEditStats().total).toBe(0);
+});
+
+it('holds back only a question whose locked value cannot be sent and names it', async () => {
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'old-secret' });
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+  // A masked value without its lock can never be uploaded.
+  await run(
+    () =>
+      new Promise((resolve) =>
+        engine().setState((prev) => {
+          const slice = prev.surveysResponseState[0];
+          return {
+            surveysResponseState: [
+              {
+                ...slice,
+                answers: {
+                  ...slice.answers,
+                  [FREEFORM_QID]: {
+                    value: '*',
+                    encrypted: false,
+                    encryptedPortion: envelope,
+                    audienceMode: 'explicit',
+                  },
+                },
+              },
+            ],
+          };
+        }, resolve),
+      ),
+  );
+  await settle();
+
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  await settle();
+
+  expect(h.submitResponses.mock.calls[0][2].map((row) => [row.questionID, row.answer.value])).toEqual([
+    [BINARY_QID, 'Yes'],
+  ]);
+  expect(engine().state.submissionError).toMatch(
+    /“Freeform question” still holds a locked value that can't be sent as it is, so it wasn't submitted\. Decrypt it, set its lock again and submit\./,
+  );
+  expect(JSON.stringify(h.submitResponses.mock.calls)).not.toContain('old-secret');
 });
 
 it('uploads an interview answer for a question hidden by the active filter', async () => {
@@ -426,4 +503,101 @@ it('keeps the lock when a decrypted answer would publish its still-masked Match 
   expect(slice.answers[FREEFORM_QID]).toMatchObject({ value: 'Decrypted answer', encrypted: true });
   expect(slice.additionalComments[FREEFORM_QID]).toMatchObject({ value: '*', encrypted: true });
   expect(engine().state.submissionError).toMatch(/decrypt the locked answer and comment/i);
+});
+
+const decryptSavedFreeform = (engine, decrypted) => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  return run(
+    () =>
+      new Promise((resolve) =>
+        engine().setState(
+          (prev) =>
+            buildSelfQuestionDecryptSuccessState(
+              prev,
+              {
+                surveyIndex: 0,
+                questionId: FREEFORM_QID,
+                clearMode: 'both',
+                didUpdate: true,
+                baselineSlice: prev.editBaseline,
+                decryptedStateSlice: {
+                  answers: { [FREEFORM_QID]: { value: decrypted.answer } },
+                  additionalComments: decrypted.comment ? { [FREEFORM_QID]: { value: decrypted.comment } } : {},
+                },
+              },
+              (value) => JSON.parse(JSON.stringify(value)),
+            ),
+          resolve,
+        ),
+      ),
+  );
+};
+
+it.each([
+  ['an answer', { value: 'Public note', encrypted: false, audienceMode: 'explicit' }],
+  ['an answer and its Match Answer comment', 'locked comment'],
+])('keeps %s unlocked after Decrypt locked after a reload, without blocking other edits', async (_label, comment) => {
+  const envelope = (tag) => JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: tag });
+  const lockedComment =
+    comment === 'locked comment'
+      ? {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: envelope('comment'),
+          encryptionAudience: 'self',
+          audienceMode: 'inherit',
+        }
+      : comment;
+  const h = await fixture();
+  h.add(
+    'responses',
+    savedFreeform(
+      {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: envelope('answer'),
+        encryptionAudience: 'self',
+        audienceMode: 'explicit',
+        hash: '0xsalted',
+      },
+      lockedComment,
+    ),
+  );
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  await decryptSavedFreeform(engine, {
+    answer: 'Old secret',
+    comment: comment === 'locked comment' ? 'Old note' : '',
+  });
+  await act(async () => engine().toggleAnswerEncryption(0, FREEFORM_QID, false));
+  await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+  await settle();
+  expect(engine().getPendingEditStats().total).toBe(2);
+
+  // Reloading restores drafts, which never hold the decrypted value.
+  h.unmount();
+  await h.mount();
+  await settle();
+  const slice = engine().state.surveysResponseState[0];
+  expect(slice.answers[FREEFORM_QID]).toMatchObject({ value: '*', encrypted: true });
+  if (comment === 'locked comment') {
+    expect(slice.additionalComments[FREEFORM_QID]).toMatchObject({ value: '*', encrypted: true });
+  }
+  expect(engine().getPendingEditStats().total).toBe(1);
+  for (
+    let step = 0;
+    step < 2 && engine().state.pileQuestions[engine().state.activePileIndex]?.id !== FREEFORM_QID;
+    step += 1
+  ) {
+    await act(async () => engine().handleNext());
+    await settle();
+  }
+  expect(screen.getAllByText(/Your unlock of this answer wasn't kept after the page reloaded/)).not.toHaveLength(0);
+
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  const rows = h.submitResponses.mock.calls[0][2];
+  expect(rows.map((row) => [row.questionID, row.answer.value])).toEqual([[BINARY_QID, 'Yes']]);
+  expect(engine().state.submissionError || '').toBe('');
 });
