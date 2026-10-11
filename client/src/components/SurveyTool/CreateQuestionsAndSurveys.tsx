@@ -1073,6 +1073,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
     if (shouldAppendPreformedQuestions && prevProps.preformedQuestions !== this.props.preformedQuestions) {
       const previousIds = new Set(
@@ -1632,15 +1633,22 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.setState(buildCreateSurveyBookmarkedSurveysSetPatch(set));
   };
 
-  updateSurveyHash: () => void = () => {
+  computeSurveyHash = (): string => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
-    const newHash = buildCreateSurveyHashValue({
+    const projection = resolveSessionCapabilityProjection(this.getResolvedSessionConfig());
+    return buildCreateSurveyHashValue({
+      // Session Workers let only an id's first author reuse it, so new Worker
+      // survey ids include the author. Registry ids stay content hashes.
+      author: projection.profileValid && projection.isWorkerCanonical ? this.props.account : '',
       digest: createSurveySha256,
       documentURLs,
       isStandaloneQuestion,
       title,
     });
-    this.setState(buildCreateSurveyHashPatch(newHash));
+  };
+
+  updateSurveyHash: () => void = () => {
+    this.setState(buildCreateSurveyHashPatch(this.computeSurveyHash()));
   };
 
   toggleStandaloneQuestion: () => void = () => {
@@ -2497,7 +2505,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           this.setState(buildCreateSurveySubmitResetPatch());
           return;
         }
-        const surveyIDForUpload = this.state.surveyHash;
+        // Worker ids carry the uploading account, so recompute them at submit.
+        const surveyIDForUpload = isWorkerCanonicalAuthoring ? this.computeSurveyHash() : this.state.surveyHash;
         if (!surveyIDForUpload) {
           this.setState(buildCreateSurveySubmitBlockingErrorPatch('Internal error: Survey ID could not be generated.'));
           return;
@@ -2779,12 +2788,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           this.setState(
             buildCreateSurveySurveySubmitSuccessPatch({
               surveyArweaveTxId: submittedSurveyArweaveTxId,
-              surveyId: this.state.surveyHash,
+              surveyId: surveyIDForUpload,
             }),
             () => {
               this.startCacheWatch();
               if (this.props.miniaturized && this.props.onUploadComplete) {
-                this.props.onUploadComplete(this.state.surveyHash);
+                this.props.onUploadComplete(surveyIDForUpload);
               }
             },
           );

@@ -9,6 +9,8 @@ import {
   writeCacheOptimisticMock,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
 import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
+import { sha256Utf8 } from '../../utilities/crypto/sha256';
+import { buildCreateSurveyHashValue } from './createQuestionsAndSurveysSignatureHelpers';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import {
   resolveWorkerCanonicalCacheIdentity,
@@ -527,6 +529,17 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
 
     await instance.createSurvey();
 
+    // Worker survey ids include the author, so another author's survey with the
+    // same title and documents never collides with this one.
+    const authorScopedSurveyId = buildCreateSurveyHashValue({
+      author: '0x1111111111111111111111111111111111111111',
+      digest: sha256Utf8,
+      documentURLs: [],
+      title: 'Worker survey',
+    });
+    expect(authorScopedSurveyId).not.toBe(
+      buildCreateSurveyHashValue({ digest: sha256Utf8, documentURLs: [], title: 'Worker survey' }),
+    );
     expect(publishSurvey).toHaveBeenCalledWith(
       expect.objectContaining({
         providerLike: 'passkey_eoa',
@@ -537,11 +550,12 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
         sessionSlug: 'worker-session',
         survey: expect.objectContaining({
           creationBlock: 0,
-          surveyID: '0xsurvey',
+          surveyID: authorScopedSurveyId,
           title: 'Worker survey',
         }),
       }),
     );
+    expect(instance.state.lastSubmittedSurveyId).toBe(authorScopedSurveyId);
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.getWalletChainId).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).not.toHaveBeenCalled();

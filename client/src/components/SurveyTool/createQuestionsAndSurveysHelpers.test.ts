@@ -475,6 +475,24 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
     );
   });
 
+  it('scopes new survey ids to their author and keeps the legacy id without one', () => {
+    const digest = (value: string) => `digest:${value}`;
+    const base = { digest, documentURLs: ['https://docs.example/a'], title: 'Survey title' };
+    const authorA = `0x${'Ab'.repeat(20)}`;
+    const authorB = `0x${'cd'.repeat(20)}`;
+
+    const idA = buildCreateSurveyHashValue({ ...base, author: authorA });
+    expect(idA).toBe(
+      `0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a"],"author":"${authorA.toLowerCase()}"}`,
+    );
+    // The same author re-publishing keeps one id; another author never shares it.
+    expect(buildCreateSurveyHashValue({ ...base, author: authorA.toLowerCase() })).toBe(idA);
+    expect(buildCreateSurveyHashValue({ ...base, author: authorB })).not.toBe(idA);
+    expect(buildCreateSurveyHashValue({ ...base, author: '' })).toBe(
+      '0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a"]}',
+    );
+  });
+
   it('keeps standalone question mode hashless without calling the digest', () => {
     const digest = jest.fn((value: unknown) => `digest:${value}`);
 
