@@ -7,10 +7,19 @@ type SbtAuthorizationInput = {
   sbtAddress?: unknown;
   userAddress?: unknown;
   nonce?: unknown;
-  walletScopeSbtAddress?: unknown;
+  // The on-chain hash. When set, signing stops with a mismatch error unless the password derives it.
+  groupPasswordHash?: unknown;
+};
+type SbtInviteSigningInput = Omit<SbtAuthorizationInput, 'nonce' | 'userAddress'> & {
+  nonces?: unknown;
 };
 
+const GROUP_PASSWORD_MISMATCH = 'GROUP_PASSWORD_MISMATCH';
+
 const { deriveGroupPasswordWallet } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+
+export const isGroupPasswordMismatchError = (error: unknown): boolean =>
+  !!error && typeof error === 'object' && (error as { code?: unknown }).code === GROUP_PASSWORD_MISMATCH;
 
 export const positiveSbtUint = (value: unknown): string => {
   if (typeof value !== 'string' && typeof value !== 'number' && !ethers.BigNumber.isBigNumber(value)) {
@@ -51,6 +60,20 @@ const hashSbtAuthorization = (
   );
 };
 
+// The slow KDF runs once per call; callers validate everything else first.
+const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: SbtAuthorizationInput) => {
+  const signer = await deriveGroupPasswordWallet({ password, sbtAddress });
+  if (groupPasswordHash != null) {
+    const signerHash = ethers.utils.solidityKeccak256(['address'], [signer.address]);
+    if (signerHash !== String(groupPasswordHash).trim().toLowerCase()) {
+      throw Object.assign(new Error('The group password does not match this group.'), {
+        code: GROUP_PASSWORD_MISMATCH,
+      });
+    }
+  }
+  return signer;
+};
+
 export const computeGroupMintMessageHash = (sbtAddress: string, userAddress: string, chainId: unknown) =>
   hashSbtAuthorization('GroupMint', chainId, sbtAddress, userAddress);
 
@@ -59,24 +82,31 @@ export const signGroupMintAuthorization = async ({
   sbtAddress,
   userAddress,
   chainId,
-  walletScopeSbtAddress = sbtAddress,
+  groupPasswordHash,
 }: SbtAuthorizationInput) => {
   const messageHash = computeGroupMintMessageHash(String(sbtAddress || ''), String(userAddress || ''), chainId);
-  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
-  return tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
+  const signer = await deriveGroupSigner({ password, sbtAddress, groupPasswordHash });
+  return signer.signMessage(ethers.utils.arrayify(messageHash));
 };
 
 export const buildInviteMessageHash = ({ sbtAddress, nonce, chainId }: SbtAuthorizationInput) =>
   hashSbtAuthorization('Invite', chainId, sbtAddress, nonce);
 
-export const signInvite = async ({
+export const signInvites = async ({
   password,
   sbtAddress,
-  nonce,
+  nonces,
   chainId,
-  walletScopeSbtAddress = sbtAddress,
-}: SbtAuthorizationInput) => {
-  const messageHash = buildInviteMessageHash({ sbtAddress, nonce, chainId });
-  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
-  return tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
+  groupPasswordHash,
+}: SbtInviteSigningInput): Promise<string[]> => {
+  if (!Array.isArray(nonces) || nonces.length === 0) {
+    throw new Error('Invite signing requires at least one slot');
+  }
+  const messageHashes = nonces.map((nonce) => buildInviteMessageHash({ sbtAddress, nonce, chainId }));
+  const signer = await deriveGroupSigner({ password, sbtAddress, groupPasswordHash });
+  const signatures: string[] = [];
+  for (const messageHash of messageHashes) {
+    signatures.push(await signer.signMessage(ethers.utils.arrayify(messageHash)));
+  }
+  return signatures;
 };

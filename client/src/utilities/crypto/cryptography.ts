@@ -33,9 +33,10 @@
 import {
   positiveSbtUint,
   computeGroupMintMessageHash,
+  isGroupPasswordMismatchError,
   signGroupMintAuthorization,
   buildInviteMessageHash,
-  signInvite,
+  signInvites,
 } from './sbtAuthorization';
 import { Buffer } from 'buffer';
 import { assertResponseFieldAudience } from '@ce-shared/encryption/responseFieldPolicy.mjs';
@@ -179,7 +180,6 @@ type InviteInput = GroupPasswordInput & {
   chainId?: unknown;
   nonce?: unknown;
   signature?: unknown;
-  walletScopeSbtAddress?: unknown;
 };
 type InviteSignatureVerificationResult = {
   ok: boolean;
@@ -360,12 +360,12 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {(encryptedData: string | { iv?: string, salt?: string, ciphertext?: string }, password: string) => Promise<unknown>} decryptWithPassword
  * @property {(value: unknown, opts?: CryptoEncryptOptions) => Promise<string>} encryptEnvelopeValue
  * @property {(envelopeJson: string | Record<string, unknown>, opts?: CryptoDecryptOptions) => Promise<unknown>} decryptEnvelopeValue
- * @property {(input: { password?: string, sbtAddress?: string }) => string} computeGroupPasswordHash
- * @property {(input: { password?: string, sbtAddress?: string, groupPasswordHash?: string }) => string | null} resolveGroupPasswordWalletScopeAddress
+ * @property {(input: { password?: string, sbtAddress?: string }) => Promise<string>} computeGroupPasswordHash
+ * @property {(error: unknown) => boolean} isGroupPasswordMismatchError
  * @property {(sbtAddress: string, userAddress: string, chainId: unknown) => string} computeGroupMintMessageHash
- * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, walletScopeSbtAddress?: string }) => Promise<string>} signGroupMintAuthorization
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, groupPasswordHash?: string }) => Promise<string>} signGroupMintAuthorization
  * @property {(input: { chainId?: unknown, sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
- * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonce?: string | number, walletScopeSbtAddress?: string }) => Promise<string>} signInvite
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonces?: Array<string | number>, groupPasswordHash?: string }) => Promise<string[]>} signInvites
  * @property {(payload: Record<string, unknown>) => string} encodeInvite
  * @property {(inviteCode: string) => ({ chainId: string, sbtAddress: string, nonce: string, signature: string } | null)} decodeInvite
  * @property {() => string} generateInviteNonce
@@ -411,8 +411,7 @@ const decodeBase64Field = (value: unknown, fieldName: string): Uint8Array => {
   return new Uint8Array(Buffer.from(value, 'base64'));
 };
 
-const { buildGroupPasswordSalt, computeGroupPasswordHash, resolveGroupPasswordWalletScopeAddress } =
-  groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+const { computeGroupPasswordHash } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
 const encodeInvite = (payload: UnknownRecord) => {
   const json = JSON.stringify(payload || {});
@@ -2063,16 +2062,16 @@ export const cryptoUtils = {
   decryptEnvelopeValue,
   /** @type {CryptoUtilsApi['computeGroupPasswordHash']} */
   computeGroupPasswordHash,
-  /** @type {CryptoUtilsApi['resolveGroupPasswordWalletScopeAddress']} */
-  resolveGroupPasswordWalletScopeAddress,
+  /** @type {CryptoUtilsApi['isGroupPasswordMismatchError']} */
+  isGroupPasswordMismatchError,
   /** @type {CryptoUtilsApi['computeGroupMintMessageHash']} */
   computeGroupMintMessageHash,
   /** @type {CryptoUtilsApi['signGroupMintAuthorization']} */
   signGroupMintAuthorization,
   /** @type {CryptoUtilsApi['buildInviteMessageHash']} */
   buildInviteMessageHash,
-  /** @type {CryptoUtilsApi['signInvite']} */
-  signInvite,
+  /** @type {CryptoUtilsApi['signInvites']} */
+  signInvites,
   /** @type {CryptoUtilsApi['encodeInvite']} */
   encodeInvite,
   /** @type {CryptoUtilsApi['decodeInvite']} */
