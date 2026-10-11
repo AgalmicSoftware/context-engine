@@ -76,6 +76,23 @@ type UserPageSurveySectionProps = {
   surveysCreatedSectionToggleState: UserPageSectionToggleState;
 };
 
+// Survey metadata comes from any uploader, so unsafe document URLs stay plain text.
+const renderSurveyDocumentLinks = (documentURLs: string[]): React.ReactNode[] =>
+  documentURLs.map((url: string, urlIndex: number) => {
+    const text = String(url ?? '');
+    const label = text.length > 60 ? text.slice(0, 57) + '...' : text;
+    const href = toSafeLinkHref(text, { contextLabel: 'survey_document' });
+    return href ? (
+      <a key={urlIndex} href={href} target="_blank" rel="noopener noreferrer" className={styles.surveyDocLink}>
+        {label}
+      </a>
+    ) : (
+      <span key={urlIndex} className={styles.surveyDocLink}>
+        {label}
+      </span>
+    );
+  });
+
 const UserPageSurveySection = ({
   detailedSurveyResponseMap,
   expandedSurveyCreatedMap,
@@ -187,26 +204,7 @@ const UserPageSurveySection = ({
                     {surveyResponseCardState.hasDocURLs && (
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Documents:</span>
-                        {survey.documentURLs.map((url: string, urlIndex: number) => {
-                          const text = String(url ?? '');
-                          const label = text.length > 60 ? text.slice(0, 57) + '...' : text;
-                          const href = toSafeLinkHref(text, { contextLabel: 'survey_document' });
-                          return href ? (
-                            <a
-                              key={urlIndex}
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={styles.surveyDocLink}
-                            >
-                              {label}
-                            </a>
-                          ) : (
-                            <span key={urlIndex} className={styles.surveyDocLink}>
-                              {label}
-                            </span>
-                          );
-                        })}
+                        {renderSurveyDocumentLinks(survey.documentURLs)}
                       </div>
                     )}
                     {questionArray.map((questionResponse, questionIndex: number) => (
@@ -332,17 +330,7 @@ const UserPageSurveySection = ({
                     {hasDocURLs && (
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Documents:</span>
-                        {survey.documentURLs.map((url: string, urlIndex: number) => (
-                          <a
-                            key={urlIndex}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.surveyDocLink}
-                          >
-                            {url.length > 60 ? url.slice(0, 57) + '...' : url}
-                          </a>
-                        ))}
+                        {renderSurveyDocumentLinks(survey.documentURLs)}
                       </div>
                     )}
                     {hasQuestionIDs && (

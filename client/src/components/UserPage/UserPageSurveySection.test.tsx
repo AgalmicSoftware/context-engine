@@ -204,14 +204,27 @@ describe('UserPageSurveySection', () => {
     expect(onSurveyResponsesSectionToggle).toHaveBeenCalledTimes(1);
   });
 
-  it('links survey documents only through http, https, or Arweave hrefs', () => {
+  it('links survey documents in both cards only through safe hrefs', () => {
     const unsafeUrl = 'javascript:alert(document.domain)';
-    render(
+    const protocolRelativeUrl = '//evil.example/phish';
+    const { container } = render(
       <UserPageSurveySection
         {...createProps({
+          surveyCreationEntries: [
+            {
+              documentURLs: [unsafeUrl, protocolRelativeUrl, 'https://docs.example.test/created'],
+              id: 'survey-created',
+              questionIDs: [],
+              questionPreviews: [],
+              questionsCount: 1,
+              slug: 'alpha',
+              tags: [],
+              title: 'Created survey',
+            },
+          ],
           surveyResponseEntries: [
             {
-              documentURLs: [unsafeUrl, 'https://docs.example.test/response'],
+              documentURLs: [unsafeUrl, protocolRelativeUrl, 'https://docs.example.test/response'],
               id: 'survey-response',
               questionsCount: 1,
               slug: 'beta',
@@ -223,7 +236,16 @@ describe('UserPageSurveySection', () => {
       />,
     );
 
-    expect(screen.getByText(unsafeUrl).closest('a')).toBeNull();
+    const hrefs = Array.from(container.querySelectorAll('a')).map((anchor) => anchor.getAttribute('href'));
+    expect(hrefs).not.toContain(unsafeUrl);
+    expect(hrefs).not.toContain(protocolRelativeUrl);
+    expect(screen.getAllByText(unsafeUrl)).toHaveLength(2);
+    screen.getAllByText(unsafeUrl).forEach((node) => expect(node.closest('a')).toBeNull());
+    screen.getAllByText(protocolRelativeUrl).forEach((node) => expect(node.closest('a')).toBeNull());
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/created' })).toHaveAttribute(
+      'href',
+      'https://docs.example.test/created',
+    );
     expect(screen.getByRole('link', { name: 'https://docs.example.test/response' })).toHaveAttribute(
       'href',
       'https://docs.example.test/response',

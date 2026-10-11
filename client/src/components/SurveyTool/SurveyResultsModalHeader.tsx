@@ -3,6 +3,8 @@ import { ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
+
 export type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
@@ -83,19 +85,28 @@ const SurveyResultsModalHeader = ({
       )}
       {viewMode === 'survey' && surveyDocumentURLs.length > 0 && (
         <div className={styleMap.surveyDocUrls}>
-          {surveyDocumentURLs.map((url: string, idx: number) => (
-            <a
-              key={idx}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styleMap.surveyDocUrlLink}
-              title={url}
-            >
-              <FontAwesomeIcon icon={faExternalLinkAlt} style={documentLinkIconStyle} />
-              {url.length > 50 ? `${url.slice(0, 47)}...` : url}
-            </a>
-          ))}
+          {surveyDocumentURLs.map((url: string, idx: number) => {
+            const label = url.length > 50 ? `${url.slice(0, 47)}...` : url;
+            // Survey metadata comes from any uploader, so unsafe URLs stay plain text.
+            const href = toSafeLinkHref(url, { contextLabel: 'survey_results_document' });
+            return href ? (
+              <a
+                key={idx}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styleMap.surveyDocUrlLink}
+                title={url}
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} style={documentLinkIconStyle} />
+                {label}
+              </a>
+            ) : (
+              <span key={idx} className={styleMap.surveyDocUrlLink} title={url}>
+                {label}
+              </span>
+            );
+          })}
         </div>
       )}
     </div>
