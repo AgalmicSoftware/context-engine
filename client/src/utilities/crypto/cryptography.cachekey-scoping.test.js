@@ -156,7 +156,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         surveyId: SURVEY_ID,
         throwOnError: true,
       }),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
   });
 
   it('rejects decrypted envelopes when the caller expects a different survey id', async () => {
@@ -186,7 +186,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         surveyId: OTHER_SURVEY_ID,
         throwOnError: true,
       }),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
   });
 
   it('rejects decrypted envelopes transplanted between answer and additional fields', async () => {
@@ -229,7 +229,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
           throwOnError: true,
         },
       ),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
 
     await expect(
       cryptoUtils.decryptSingleField(
@@ -250,7 +250,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
           throwOnError: true,
         },
       ),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
   });
 });
 
@@ -273,9 +273,9 @@ it('checks the expected survey and question bindings on envelope values', async 
       ...binding,
     });
 
-  await expect(decrypt({ expectedQId: 'conviction:q1' })).rejects.toThrow(/bound to a different survey field/);
-  await expect(decrypt({ expectedQId: 'importance:q2' })).rejects.toThrow(/bound to a different survey field/);
-  await expect(decrypt({ expectedSurveyId: OTHER_SURVEY_ID })).rejects.toThrow(/bound to a different survey field/);
+  await expect(decrypt({ expectedQId: 'conviction:q1' })).rejects.toThrow(/envelope binding mismatch/);
+  await expect(decrypt({ expectedQId: 'importance:q2' })).rejects.toThrow(/envelope binding mismatch/);
+  await expect(decrypt({ expectedSurveyId: OTHER_SURVEY_ID })).rejects.toThrow(/envelope binding mismatch/);
   await expect(decrypt({ expectedQId: 'IMPORTANCE:Q1', expectedSurveyId: SURVEY_ID })).resolves.toBe(4);
 });
 

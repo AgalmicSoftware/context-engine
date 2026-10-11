@@ -44,6 +44,7 @@ import { ethers, utils } from 'ethers';
 import {
   aesGcmDecrypt,
   aesGcmEncrypt,
+  assertBytes32Hex,
   assertKeyWrapSigner,
   buildCommitDomainBytes,
   buildEip712KeyWrap,
@@ -59,12 +60,14 @@ import {
   hexToBytes,
   importAesGcmKey,
   normalizePoseidonHashOutput,
+  parseEnvelope,
   requireBigInt,
   safeLower,
   stableStringify,
   toField,
   utf8d,
   utf8e,
+  validateEnvelopeBinding,
   wrapCekWithSelfRecipient as wrapCekWithSharedSelfRecipient,
 } from '@ce-shared/encryption/envelopeV1Core.mjs';
 import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
@@ -975,12 +978,6 @@ const computeSaltedCommitments = async ({
 
 /* -------------------------- v1 envelope utilities ------------------------- */
 
-function assertBytes32Hex(hex: unknown): asserts hex is string {
-  if (typeof hex !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error('context must be 32-byte hex (0x + 64 hex chars)');
-  }
-}
-
 const isObj = (x: unknown): x is UnknownRecord => isRecord(x);
 
 const wrapCekWithSelfRecipient = async ({
@@ -996,7 +993,7 @@ const wrapCekWithSelfRecipient = async ({
   contextHex: string;
   cekRaw: Uint8Array;
 }) => {
-  assertBytes32Hex(contextHex);
+  assertBytes32Hex(contextHex, 'context');
   const provider = _getProvider(providerLike);
   if (!provider || typeof provider.request !== 'function') {
     throw new Error('No EIP-1193 provider available for self recipient.');
@@ -1159,94 +1156,6 @@ const buildEnvelope = ({
     kind,
   }) as Envelope;
 
-/**
- * Validate envelope shape and return parsed object.
- * Throws descriptive errors on malformed cases.
- */
-const parseEnvelope = (jsonStr: string): Envelope => {
-  let env: unknown = null;
-  try {
-    env = JSON.parse(jsonStr);
-  } catch (e) {
-    throw new Error('Encrypted payload is not valid JSON.');
-  }
-  if (!isObj(env)) throw new Error('Encrypted payload malformed.');
-  if (env.v !== 1) throw new Error('Unsupported envelope version (only v1 is accepted).');
-  if (env.cipher !== 'aes-gcm-256') throw new Error('Unsupported cipher (expected aes-gcm-256).');
-  if (!env.iv || !env.ciphertext || !isObj(env.aad) || !Array.isArray(env.recipients)) {
-    throw new Error('Envelope missing required fields.');
-  }
-  if (!isObj(env.commitments) || !env.commitments.keccak256) {
-    throw new Error('Envelope commitments missing.');
-  }
-  const ivBytes = b64decode(env.iv);
-  if (ivBytes.length !== 12) throw new Error('Envelope IV must be exactly 12 bytes (got ' + ivBytes.length + ').');
-  const ctBytes = b64decode(env.ciphertext);
-  if (!ctBytes || ctBytes.length === 0) throw new Error('Envelope ciphertext is empty after decode.');
-  for (const r of env.recipients) {
-    if (!r || !r.type) throw new Error('Envelope recipient missing type.');
-    if (r.type === 'lit-sbt-v1' && (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))) {
-      throw new Error('Lit recipient missing ciphertext or encryptedSymmetricKey.');
-    }
-    if (r.type === 'self-eip712-v1' && (!r.wrap_iv || !r.wrapped_cek)) {
-      throw new Error('Self-EIP712 recipient missing wrap_iv or wrapped_cek.');
-    }
-  }
-  if (!/^0x[0-9a-fA-F]{64}$/.test(String(env.commitments.keccak256 || ''))) {
-    throw new Error('Envelope keccak256 commitment has invalid format.');
-  }
-  if (env.commitments.poseidon && !/^0x[0-9a-fA-F]{64}$/.test(String(env.commitments.poseidon || ''))) {
-    throw new Error('Envelope poseidon commitment has invalid format.');
-  }
-  return env as Envelope;
-};
-
-const normalizeBindingValue = (value: unknown) => safeLower(value == null ? '' : String(value));
-
-const validateEnvelopeBinding = (
-  env: Envelope,
-  {
-    expectedSurveyId,
-    expectedQId,
-    expectedFieldKey,
-  }: {
-    expectedSurveyId?: unknown;
-    expectedQId?: unknown;
-    expectedFieldKey?: unknown;
-  } = {},
-) => {
-  if (!env || !isObj(env.aad)) return;
-
-  if (expectedSurveyId !== undefined && expectedSurveyId !== null) {
-    const actualSurveyId = normalizeBindingValue(env.aad.surveyId);
-    const boundSurveyId = normalizeBindingValue(expectedSurveyId);
-    if (actualSurveyId !== boundSurveyId) {
-      throw new Error('Encrypted payload is bound to a different survey field.');
-    }
-  }
-
-  if (expectedQId !== undefined && expectedQId !== null) {
-    const actualQId = normalizeBindingValue(env.aad.qId);
-    const boundQId = normalizeBindingValue(expectedQId);
-    if (actualQId !== boundQId) {
-      throw new Error('Encrypted payload is bound to a different survey field.');
-    }
-  }
-
-  if (
-    expectedFieldKey !== undefined &&
-    expectedFieldKey !== null &&
-    env.aad.fieldKey !== undefined &&
-    env.aad.fieldKey !== null
-  ) {
-    const actualFieldKey = normalizeBindingValue(env.aad.fieldKey);
-    const boundFieldKey = normalizeBindingValue(expectedFieldKey);
-    if (actualFieldKey !== boundFieldKey) {
-      throw new Error('Encrypted payload is bound to a different survey field.');
-    }
-  }
-};
-
 /* ------------------------- field encryption (v1) -------------------------- */
 
 /**
@@ -1295,7 +1204,7 @@ const encryptField = async ({
     account = identity.from;
   }
   const contextHex = computeContext({ chainId, account, surveyId, qId, fieldKey });
-  assertBytes32Hex(contextHex);
+  assertBytes32Hex(contextHex, 'context');
   const aadObj = buildAAD({ contextHex, chainId, surveyId, qId, fieldKey });
   const aadBytes = utf8e(stableStringify(aadObj));
 
@@ -1386,7 +1295,7 @@ const unwrapCekFromRecipients = async ({
   preferLitRecipients?: boolean;
 }) => {
   const contextHex = env?.aad?.context;
-  assertBytes32Hex(contextHex);
+  assertBytes32Hex(contextHex, 'context');
   const contextBytes = getContextBytes(contextHex);
   let lastErr = null;
 
@@ -1591,7 +1500,7 @@ const decryptEnvelopeToValue = async ({
 }): Promise<DecryptEnvelopeResult> => {
   perfDebugDecryptEnvelope('attempt');
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
-  const env = parseEnvelope(jsonStr);
+  const env = parseEnvelope(jsonStr) as Envelope;
   validateEnvelopeBinding(env, { expectedSurveyId, expectedQId, expectedFieldKey });
   // Reuse the authenticated envelope domain when the session has no chain;
   // switching the wallet's current network must not change its wrapping key.

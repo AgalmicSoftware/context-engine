@@ -405,7 +405,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     const envelopeJson = await makeEnvelopeJson({ iv: 'AQIDBAUGBwg=' });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope IV must be exactly 12 bytes (got 8).',
+      'envelope iv must decode to exactly 12 bytes (got 8)',
     );
   });
 
@@ -413,7 +413,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     const envelopeJson = await makeEnvelopeJson({ ciphertext: '====' });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope ciphertext is empty after decode.',
+      'envelope ciphertext must decode to non-empty bytes',
     );
   });
 
@@ -425,7 +425,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(litEnvelope))).rejects.toThrow(
-      'Lit recipient missing ciphertext or encryptedSymmetricKey.',
+      'Unable to unwrap CEK (self and lit paths failed).',
     );
 
     const selfEnvelope = {
@@ -434,7 +434,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(selfEnvelope))).rejects.toThrow(
-      'Self-EIP712 recipient missing wrap_iv or wrapped_cek.',
+      'envelope recipient[0] self-eip712-v1 is missing wrap_iv',
     );
   });
 
@@ -475,7 +475,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope keccak256 commitment has invalid format.',
+      'envelope commitments.keccak256 must be 32-byte hex',
     );
   });
 });

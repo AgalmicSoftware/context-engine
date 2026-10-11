@@ -437,8 +437,10 @@ export const parseEnvelope = (jsonStr) => {
       if (wrappedCekBytes.length === 0) {
         throw new Error(`${prefix} wrapped_cek must decode to non-empty bytes`);
       }
+      // A null nonce, like a missing one, means the key wrap signed no nonce.
       if (
-        Object.prototype.hasOwnProperty.call(recipient, 'nonce') &&
+        recipient.nonce !== undefined &&
+        recipient.nonce !== null &&
         (typeof recipient.nonce !== 'string' || recipient.nonce.length === 0)
       ) {
         throw new Error(`${prefix} nonce must be a non-empty string`);
@@ -465,7 +467,7 @@ export const parseEnvelope = (jsonStr) => {
 
 export const normalizeBindingValue = (value) => safeLower(value == null ? '' : String(value));
 
-export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } = {}) => {
+export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId, expectedFieldKey } = {}) => {
   if (!env || !isObj(env.aad)) return;
 
   if (expectedSurveyId !== undefined && expectedSurveyId !== null) {
@@ -482,6 +484,17 @@ export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } =
     if (actualQId !== boundQId) {
       throw new Error('envelope binding mismatch: qId');
     }
+  }
+
+  // CE-CC envelopes carry no field slot; check it only when the AAD has one.
+  if (
+    expectedFieldKey !== undefined &&
+    expectedFieldKey !== null &&
+    env.aad.fieldKey !== undefined &&
+    env.aad.fieldKey !== null &&
+    normalizeBindingValue(env.aad.fieldKey) !== normalizeBindingValue(expectedFieldKey)
+  ) {
+    throw new Error('envelope binding mismatch: fieldKey');
   }
 };
 

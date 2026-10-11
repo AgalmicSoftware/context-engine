@@ -20,6 +20,7 @@ export function encodePaddedEnvelopePlaintext(
   value: Record<string, unknown>,
   question?: Record<string, unknown>,
 ): Uint8Array;
+export function assertBytes32Hex(value: unknown, label?: string): asserts value is string;
 export function getContextBytes(contextHex: string): Uint8Array;
 export function importAesGcmKey(raw32: BufferSource): Promise<CryptoKey>;
 export function aesGcmEncrypt(
@@ -78,6 +79,11 @@ export function buildEnvelopeObject(input: {
   commitments: { keccak256: string; poseidon?: string | null };
   kind: unknown;
 }): Record<string, unknown>;
+export function parseEnvelope(jsonStr: string): Record<string, unknown>;
+export function validateEnvelopeBinding(
+  env: unknown,
+  expected?: { expectedSurveyId?: unknown; expectedQId?: unknown; expectedFieldKey?: unknown },
+): void;
 export function wrapCekWithSelfRecipient(input: {
   signTypedData: (
     domain: Record<string, unknown>,
