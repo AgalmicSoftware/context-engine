@@ -139,8 +139,9 @@ export const createSessionCacheReadinessController = (
       if (flags.needsSbtRevision) {
         next.sbtCacheRevision = Number(prev.sbtCacheRevision ?? 0) + 1;
       }
+      // A cache write from another tab or writer does not prove this tab finished
+      // loading saved answers; only the response loader may mark them ready.
       if (flags.needsQuestionResponsesNonce) {
-        next.isResponsesCacheReady = true;
         next.questionResponsesNonce = Number(prev.questionResponsesNonce ?? 0) + 1;
       }
       return next;

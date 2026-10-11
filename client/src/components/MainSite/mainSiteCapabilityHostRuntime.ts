@@ -105,12 +105,13 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
   } catch (error: unknown) {
     if (isCurrent()) {
       logError('[WorkerCanonical] Cache initialization failed:', error);
+      // Response readiness belongs to the response hydration controller: a failed
+      // load proves nothing about saved answers, so uploads must keep waiting.
       host.setReadinessStateIfChanged(
         {
           isSBTCacheReady: true,
           isSurveyCacheReady: true,
           isQuestionCacheReady: true,
-          isResponsesCacheReady: true,
           surveyCacheInitializationError: true,
           questionCacheInitializationError: true,
         },

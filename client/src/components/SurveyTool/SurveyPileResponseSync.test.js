@@ -11,6 +11,7 @@ import { loadWorkerCanonicalQuestions } from '../../domains/surveys/workerCanoni
 import { loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { createSessionResponseHydrationController } from '../../utilities/survey/sessionResponseHydrationController';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { initializeMainSiteWorkerCanonicalCachesForGroup } from '../MainSite/mainSiteCapabilityHostRuntime';
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
@@ -363,4 +364,56 @@ it.each(['account', 'worker'])('discards a pending own-answer read after the %s 
   await act(async () => ownGate.resolve());
   await settle();
   expect(h.submitResponses).not.toHaveBeenCalled();
+});
+
+// The session shell runs the Worker load through MainSite; a failed listing must not
+// mark saved answers ready, so the next upload still reads the responder's own rows.
+const initializeSessionThroughMainSite = (h) =>
+  act(async () => {
+    await initializeMainSiteWorkerCanonicalCachesForGroup(
+      {
+        getCacheSessionCfg: () => CONFIG,
+        startCacheReinitRun: () => 1,
+        isCacheReinitRunActive: () => true,
+        setReadinessStateIfChanged: (patch, callback) => h.host.setState(patch, callback),
+        checkAllCachesReady: () => {},
+        initializeQuestionCacheForGroup: async () => {},
+        initializeSbtCacheForGroup: async () => {},
+        initializeSurveyCacheForGroup: async () => {},
+        startSbtEventListenerForGroup: () => {},
+        fetchQuestionResponsesChunkedForGroup: () => h.sync(),
+      },
+      SLUG,
+      { resetReadiness: true },
+      () => {},
+    );
+  });
+
+it('reads own answers before uploading after the MainSite Worker load fails', async () => {
+  const h = await fixture({ failGlobal: () => true });
+  h.add('responses', SAVED);
+  await initializeSessionThroughMainSite(h);
+  expect(h.state.isResponsesCacheReady).toBe(false);
+  await h.mount({ cacheInitializationError: true });
+  await act(async () => h.engine().handleAdditionalPile(QID, 'New comment'));
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  expect(h.listPage.mock.calls.some(([args]) => args.ownResponses?.account === OWNER)).toBe(true);
+  expect(h.submitResponses.mock.calls[0][2][0]).toMatchObject({ ...SAVED, additional: { value: 'New comment' } });
+});
+
+it('tells the responder saved answers did not load and retries the load', async () => {
+  let failGlobal = true;
+  const h = await fixture({ failGlobal: () => failGlobal });
+  h.add('responses', SAVED);
+  await initializeSessionThroughMainSite(h);
+  await h.mount({ cacheInitializationError: true });
+  expect(screen.getByText(/your saved answers did not load/i)).toBeInTheDocument();
+
+  failGlobal = false;
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry' })));
+  await waitFor(() => expect(h.state.isResponsesCacheReady).toBe(true));
+  await settle();
+  expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
+  expect(h.engine().state.surveysResponseState[0].additionalComments[QID].value).toBe('Saved comment');
 });

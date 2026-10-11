@@ -1116,6 +1116,7 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
 
 const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, prevState: any) => {
   consumeInterviewPrefillHashIfPresent(engine);
+  if (engine.props.isResponsesCacheReady) engine._savedAnswersSeenReady = true;
   const diffInputsChanged = engine.didEditDiffInputsChange(prevProps, prevState);
   if (diffInputsChanged) {
     engine.invalidateDiffCaches();
@@ -1224,6 +1225,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;
     engine._sessionInterviewResponseReadyToken = '';
+    engine._savedAnswersSeenReady = !!engine.props.isResponsesCacheReady;
     engine._pileOwnAnswersSubmitController?.abort();
     engine._pileOwnAnswersSubmitController = null;
 
@@ -2254,6 +2256,27 @@ const getSessionInterviewResponseReadinessToken = (engine: PileViewModeEngine, b
   return engine._sessionInterviewResponseReadyToken === activeToken ? activeToken : '';
 };
 
+// A failed session load leaves saved answers unknown; Submit stays gated by the
+// own-answer read, and this notice lets the responder reload them before editing.
+const buildSavedAnswersNotice = (engine: PileViewModeEngine, hasQuestions: boolean) => {
+  const { props } = engine;
+  if (!props.cacheInitializationError || !props.loginComplete || !props.account || !hasQuestions) return null;
+  if (props.isResponsesCacheReady || engine._savedAnswersSeenReady) return null;
+  return { retrying: !!engine.state.savedAnswersRetrying, onRetry: () => void retrySavedAnswersLoad(engine) };
+};
+
+const retrySavedAnswersLoad = async (engine: PileViewModeEngine) => {
+  if (engine.state.savedAnswersRetrying || typeof engine.props.refreshQuestionResponses !== 'function') return;
+  engine.setState({ savedAnswersRetrying: true });
+  try {
+    await engine.props.refreshQuestionResponses(null, { slug: resolveEffectiveSlug(engine.props) });
+  } catch (e) {
+    surveyLog.warn('PileViewMode: saved answers are still unavailable', e);
+  } finally {
+    if (engine._isMounted) engine.setState({ savedAnswersRetrying: false });
+  }
+};
+
 const getSubmitCount = (engine: PileViewModeEngine) => {
   const stats = engine.getPendingEditStats?.() || engine.computePendingEditStatsAtIndex?.(0) || { total: 0 };
   return Number(stats.total || 0);
@@ -3231,6 +3254,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({
             submissionError: String(engine.state.submissionError || ''),
+            savedAnswersNotice: buildSavedAnswersNotice(engine, pileQuestions.length > 0),
             showHologramAssistant,
             toggleHologramAssistant: engine.toggleHologramAssistant,
             showMiniBackgroundSpinner,
