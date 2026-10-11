@@ -287,10 +287,14 @@ export class PasskeyEoaWalletClient {
 
       const salt = randomBase64Url(32);
       const saltBytes = new Uint8Array(base64URLToBuffer(salt));
+      // This mode keeps the only copy of a wallet's key in the saved record,
+      // so never mint a replacement passkey on the device that holds it.
+      const savedRecord = await this.storage.read();
       const credential = await createPasskeyCredential({
         config: this.config,
         salt: saltBytes,
         credentials: this.credentials,
+        excludeCredentialIds: savedRecord?.rpId === this.config.rpId ? [savedRecord.credentialId] : [],
       });
       const credentialId = bufferToBase64URL(credential.rawId);
       const prfOutput = await resolveCreatedCredentialPrfOutput({

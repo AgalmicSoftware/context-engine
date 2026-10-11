@@ -153,6 +153,32 @@ describe('PasskeyEoaWalletClient', () => {
     expect(credentials.get).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['encrypted private-key', config, true],
+    ['passkey-derived', derivedConfig, false],
+  ])('creates a second %s wallet with the saved passkey excluded: %s', async (_label, walletConfig, excluded) => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const createClient = () =>
+      new PasskeyEoaWalletClient({
+        config: walletConfig,
+        storage,
+        credentials,
+        sessionClient: makeSessionClient(),
+        privateKeyFactory: () => PRIVATE_KEY,
+      });
+    await createClient().createWallet();
+    const saved = await storage.read();
+    await createClient().createWallet();
+
+    const [firstCall, secondCall] = (credentials.create as jest.Mock).mock.calls;
+    expect(firstCall[0].publicKey).not.toHaveProperty('excludeCredentials');
+    const secondExclusions = secondCall[0].publicKey.excludeCredentials || [];
+    expect(secondExclusions.map(({ id }: { id: ArrayBuffer }) => bufferToBase64URL(id))).toEqual(
+      excluded ? [saved?.credentialId] : [],
+    );
+  });
+
   it('falls back to one assertion when registration reports PRF support without returning output', async () => {
     const credentials = makeCredentials({ createPrfOutput: null });
     const client = new PasskeyEoaWalletClient({
