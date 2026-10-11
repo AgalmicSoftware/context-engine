@@ -957,7 +957,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(invites[0].nonce),
         invites[0].signature
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow('Invite claim preflight failed.');
 
     const minted = await contractScripts.getMintedTokens('none', sbtAddress, groupCfg);
     expect(Number(minted)).toBe(0);
@@ -1047,7 +1047,9 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     });
 
     await expectSbtCallRejection(sbtAddress, 'claimWithPassword', [password], /Claim not started/);
-    await expect(contractScripts.claimWithPassword('wagmi', sbtAddress, password)).rejects.toThrow();
+    await expect(contractScripts.claimWithPassword('wagmi', sbtAddress, password)).rejects.toThrow(
+      'claimWithPassword transaction reverted on-chain.'
+    );
   });
 
   it('rejects group signature mint outside group-signature mode', async () => {
@@ -1072,7 +1074,9 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     });
 
     await expectSbtCallRejection(sbtAddress, 'mintWithGroupSignature', ['0x'], /Group signature mint not enabled/);
-    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, '0x')).rejects.toThrow();
+    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, '0x')).rejects.toThrow(
+      'mintWithGroupSignature transaction reverted on-chain.'
+    );
   });
 
   it('rejects group signature mint with wrong password', async () => {
@@ -1106,7 +1110,9 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     const signature = await contractScripts.signGroupMintAuthorization({ ...wrongInput, groupPasswordHash: wrongHash });
 
     await expectSbtCallRejection(sbtAddress, 'mintWithGroupSignature', [signature], /Invalid signature/);
-    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signature)).rejects.toThrow();
+    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signature)).rejects.toThrow(
+      'mintWithGroupSignature transaction reverted on-chain.'
+    );
   });
 
   it('enforces maxTokens for group signature mints', async () => {
@@ -1142,7 +1148,9 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       groupPasswordHash,
     });
     await expectSbtCallRejection(sbtAddress, 'mintWithGroupSignature', [signatureTwo], /Max tokens reached/);
-    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signatureTwo)).rejects.toThrow();
+    await expect(contractScripts.mintWithGroupSignature('wagmi', sbtAddress, signatureTwo)).rejects.toThrow(
+      'mintWithGroupSignature transaction reverted on-chain.'
+    );
   });
 
   it('rejects invite with wrong signature', async () => {
@@ -1182,7 +1190,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(invites[0].nonce),
         invites[0].signature
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow('Invite claim preflight failed.');
   });
 
   it('rejects invite when maxTokens is reached', async () => {
@@ -1238,7 +1246,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(inviteTwo[0].nonce),
         inviteTwo[0].signature
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow('Invite claim preflight failed.');
   });
 
   it('rejects invite when address already owns an SBT', async () => {
@@ -1293,7 +1301,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
         Number(inviteTwo[0].nonce),
         inviteTwo[0].signature
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow('Invite claim preflight failed.');
   });
 
   it('rejects addHashedPasswords from non-admin', async () => {
@@ -1320,7 +1328,9 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     const hashed = utils.keccak256(utils.toUtf8Bytes('new-pass'));
     setActiveAccount(1);
     await expectSbtCallRejection(sbtAddress, 'addHashedPasswords', [[hashed]], /Not admin/);
-    await expect(contractScripts.addHashedPasswords('wagmi', sbtAddress, [hashed])).rejects.toThrow();
+    await expect(contractScripts.addHashedPasswords('wagmi', sbtAddress, [hashed])).rejects.toThrow(
+      'addHashedPasswords transaction reverted on-chain.'
+    );
   });
 
   it('enforces burn auth: OwnerOnly', async () => {
