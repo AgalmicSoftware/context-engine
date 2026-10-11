@@ -159,6 +159,8 @@ export type QuestionFilterAiAccessState = {
   sponsoredAvailable: boolean;
   localKeyAvailable: boolean;
   sponsoredStatus: string;
+  // The Worker grants AI to signed-out visitors, so a run needs no sign-in.
+  workerAnonymousAvailable?: boolean;
 };
 export type QuestionFilterGateTooltipProps = {
   gateId: string | null;

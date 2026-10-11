@@ -173,9 +173,36 @@ export {
 const questionFilterLog = createLogger('questionFilter');
 let QUESTION_FILTER_INSTANCE_SEQ = 0;
 
+// AI rankings already paid for in this tab, keyed by apply signature (slug,
+// query, and candidate ids and prompts). Remounts and restored filters reuse
+// them; without one, a restored filter waits for the user to click Apply.
+const AI_RANKING_CACHE_LIMIT = 50;
+const aiRankingCache = new Map<string, string[]>();
+const rememberAiRanking = (signature: string, rankedIds: string[]): void => {
+  if (!signature) return;
+  aiRankingCache.delete(signature);
+  aiRankingCache.set(signature, rankedIds);
+  const oldest = aiRankingCache.size > AI_RANKING_CACHE_LIMIT ? aiRankingCache.keys().next().value : undefined;
+  if (oldest !== undefined) aiRankingCache.delete(oldest);
+};
+
+// Filter clicks that re-rank an active combined AI filter. Only these
+// automatic runs may call the AI service, and only without a sign-in prompt.
+const USER_FILTER_REFRESH_SOURCES = new Set([
+  'ai-combine-toggle',
+  'response-status-filter-change',
+  'tag-filter-change',
+  'tag-filter-remove',
+  'type-filter-change',
+  'type-filter-remove',
+]);
+const AI_RERANK_HINT = 'Click Apply to update the AI ranking for the current questions.';
+
 export { shouldEnableQuestionFilterSbt };
 
 class QuestionFilter extends React.Component<any, any> {
+  static clearAiRankingCache = (): void => aiRankingCache.clear();
+
   private _tagsTooltipId: string;
   private _isMounted: boolean;
   private _loadingFilterStateFromCache: boolean;
@@ -421,14 +448,18 @@ class QuestionFilter extends React.Component<any, any> {
             .trim()
             .toLowerCase() === 'ai',
       );
-    // Worker sessions have no registry SBT gate. Offer their configured AI route;
-    // the Worker still enforces login, scopes, and resource availability on use.
-    const workerAvailable =
+    // Worker sessions have no registry SBT gate. Offer their configured AI route
+    // to anyone the policy lets in: signed-out visitors only with an anonymous
+    // ai scope. The Worker still enforces login, scopes, and resources on use.
+    const workerPolicyAllowsAi =
       capabilities.isWorkerCanonical &&
       Number(workerPolicy.version) === 1 &&
       !!String(cfg.corsWorkerUrl || '').trim() &&
-      toUnknownRecord(cfg.scopes).ai !== false &&
-      (hasAiScope(workerPolicy.participantScopes) || hasAiScope(workerPolicy.anonymousScopes));
+      toUnknownRecord(cfg.scopes).ai !== false;
+    const workerAnonymousAvailable = workerPolicyAllowsAi && hasAiScope(workerPolicy.anonymousScopes);
+    const workerAvailable =
+      workerAnonymousAvailable ||
+      (workerPolicyAllowsAi && !!toStr(propsIn.account).trim() && hasAiScope(workerPolicy.participantScopes));
     const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
     const sponsoredStatus = String(gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE);
     const sponsoredAvailable =
@@ -440,6 +471,7 @@ class QuestionFilter extends React.Component<any, any> {
       sponsoredAvailable,
       localKeyAvailable,
       sponsoredStatus,
+      workerAnonymousAvailable,
     };
   };
 
@@ -558,7 +590,11 @@ class QuestionFilter extends React.Component<any, any> {
       candidateQuestions,
     });
     if (!signature) return;
-    if (this.state.aiFilterApplied && this.state.aiLastAppliedSignature === signature) return;
+    if (this.state.aiFilterApplied && this.state.aiLastAppliedSignature === signature) {
+      // The applied ranking fits again (for example, a filter was undone).
+      if (this.state.aiApplyError === AI_RERANK_HINT) this.setState(buildQuestionFilterAiApplyErrorPatch(''));
+      return;
+    }
     if (this._aiAutoApplyInFlightSignature === signature) return;
     if (this._aiAutoApplyQueuedSignature === signature) return;
 
@@ -2063,6 +2099,30 @@ class QuestionFilter extends React.Component<any, any> {
       return true;
     }
 
+    if (auto) {
+      // Automatic runs never start a paid ranking on their own: reuse a ranking
+      // for exactly this query and question set, or wait for a click on Apply.
+      const cachedRankedIds = aiRankingCache.get(applySignature);
+      if (cachedRankedIds) {
+        this.setState(
+          buildQuestionFilterAiApplySuccessPatch({ applySignature, rankedQuestionIds: cachedRankedIds, query, topN }),
+          () => {
+            this.handleApplyFilters(true);
+          },
+        );
+        return true;
+      }
+      // A filter click may re-rank a combined AI filter, but never through a
+      // wallet or passkey prompt: only a local key or anonymous Worker AI.
+      const canRerankWithoutSignIn = aiAccess.localKeyAvailable || aiAccess.workerAnonymousAvailable === true;
+      if (!USER_FILTER_REFRESH_SOURCES.has(String(source)) || !canRerankWithoutSignIn) {
+        if (this.state.aiFilterApplied && this.state.aiCombineWithOtherFilters) {
+          this.setState(buildQuestionFilterAiApplyErrorPatch(AI_RERANK_HINT));
+        }
+        return false;
+      }
+    }
+
     const requestSeq = this._aiApplyRequestSeq + 1;
     this._aiApplyRequestSeq = requestSeq;
     this._aiLatestRequestSeq = requestSeq;
@@ -2075,11 +2135,13 @@ class QuestionFilter extends React.Component<any, any> {
     try {
       const rankedIds = await rankQuestionsAI(query, candidateQuestions, Math.max(topN, candidateQuestions.length), {
         ...this.buildAiRequestOptions(),
+        ...(auto ? { anonymousOnly: true } : {}),
         throwOnError: true,
       });
       if (!this._isMounted) return false;
       if (requestSeq !== this._aiLatestRequestSeq) return false;
       const normalizedRankedIds = normalizeAiIdList(rankedIds);
+      rememberAiRanking(applySignature, normalizedRankedIds);
       this.setState(
         buildQuestionFilterAiApplySuccessPatch({
           applySignature,
