@@ -238,6 +238,47 @@ describe('SBT authorization signing', () => {
     expect(importKey).not.toHaveBeenCalled();
   });
 
+  it('keeps a WebCrypto failure classified, with a plain message and the original error as its cause', async () => {
+    // A DOMException's `code` is read-only, so the classification must travel on a new error.
+    const failure = new DOMException('The operation failed for an operation-specific reason', 'OperationError');
+    jest.spyOn(globalThis.crypto.subtle, 'deriveBits').mockRejectedValue(failure);
+
+    const error = await cryptoUtils
+      .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash: `0x${'11'.repeat(32)}` })
+      .catch((caught) => caught);
+
+    expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+    expect(error.message).toBe('This browser could not check the group password. Try again, or use another browser.');
+    expect(error.cause).toBe(failure);
+  });
+
+  it('names an unencodable password character instead of showing the encoder error', async () => {
+    const { importKey } = useFastKdf();
+    const emojiPassword = 'pass\u{1F511}word';
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash({
+      password: emojiPassword,
+      sbtAddress: SBT_A,
+    });
+    importKey.mockClear();
+
+    const error = await cryptoUtils
+      .signGroupMintAuthorization({ ...input, password: 'pass\uD83Dword', userAddress: USER, groupPasswordHash })
+      .catch((caught) => caught);
+
+    expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+    expect(error.message).toBe('The group password contains an invalid character. Retype it and try again.');
+    expect(importKey).not.toHaveBeenCalled();
+    // A complete surrogate pair, such as this emoji, is an ordinary character.
+    await expect(
+      cryptoUtils.signGroupMintAuthorization({
+        ...input,
+        password: emojiPassword,
+        userAddress: USER,
+        groupPasswordHash,
+      }),
+    ).resolves.toMatch(/^0x/);
+  });
+
   it('reports missing WebCrypto as a clear error, not a wrong password, when signing', async () => {
     const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
     Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });

@@ -146,6 +146,19 @@ describe('CreateSBTGroup group password', () => {
     expect(instance.mintSBT).toHaveBeenCalledTimes(1);
   });
 
+  it('names an invalid password character before uploading anything', async () => {
+    const instance = makeGroupPasswordInstance({ groupPassword: 'orbit-maple-signal-tunnel-\uD83D' });
+    stubCreateUploads(instance);
+
+    await act(async () => {
+      await instance.handleMintClick();
+    });
+
+    expect(instance.uploadImageToArweave).not.toHaveBeenCalled();
+    expect(instance.mintSBT).not.toHaveBeenCalled();
+    expect(instance.state.error).toBe('The group password contains an invalid character. Retype it and try again.');
+  });
+
   it('clears the short-password confirmation when the password changes', () => {
     const instance = makeGroupPasswordInstance({ groupPassword: 'short-secret', groupPasswordWeakConfirmed: true });
     instance.persistFormCache = jest.fn();

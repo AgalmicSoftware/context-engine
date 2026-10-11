@@ -46,6 +46,10 @@ import { SbtEncryptedRecoveryControl, selectCreateEncryptedRecovery } from './Sb
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort';
 import { getGlobalLitHooks, uploadEncryptedArweaveData } from '../../utilities/crypto/litProtocol.js';
+import {
+  GROUP_PASSWORD_INVALID_CHARACTER_MESSAGE,
+  hasInvalidGroupPasswordCharacter,
+} from '../../utilities/crypto/sbtAuthorization';
 import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -3666,6 +3670,10 @@ class CreateSBTGroup extends Component<any, any> {
     if (usesGroupPassword) {
       if (!groupPassword) {
         this.setState(buildCreateSbtErrorPatch({ error: 'Group password is required for group minting.' }));
+        return;
+      }
+      if (hasInvalidGroupPasswordCharacter(groupPassword)) {
+        this.setState(buildCreateSbtErrorPatch({ error: GROUP_PASSWORD_INVALID_CHARACTER_MESSAGE }));
         return;
       }
       if (isShortCreateSbtGroupPassword(groupPassword) && !this.state.groupPasswordWeakConfirmed) {

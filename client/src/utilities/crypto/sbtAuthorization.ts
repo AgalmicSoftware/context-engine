@@ -20,11 +20,26 @@ const GROUP_PASSWORD_MISMATCH = 'GROUP_PASSWORD_MISMATCH';
 // The password could not be checked at all, e.g. without WebCrypto or without the on-chain hash.
 const GROUP_PASSWORD_UNVERIFIABLE = 'GROUP_PASSWORD_UNVERIFIABLE';
 const BYTES32_HEX = /^0x[0-9a-f]{64}$/;
+// ethers cannot encode a high surrogate without its low half; it would throw "invalid utf-8 string".
+const UNPAIRED_HIGH_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/;
+
+export const GROUP_PASSWORD_INVALID_CHARACTER_MESSAGE =
+  'The group password contains an invalid character. Retype it and try again.';
 
 const { deriveGroupPasswordWallet } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
-const withGroupPasswordCode = (error: unknown, code: string): Error =>
-  Object.assign(error instanceof Error ? error : new Error(String(error)), { code });
+// Always a new Error: some errors, such as WebCrypto's DOMException, have a read-only `code`.
+const groupPasswordError = (message: string, code: string, cause?: unknown): Error =>
+  Object.assign(new Error(message, cause === undefined ? undefined : { cause }), { code });
+
+// The derivation's own errors (no WebCrypto, empty password) are written for users; WebCrypto's are not.
+const describeDerivationFailure = (error: unknown): string =>
+  error instanceof Error && !(typeof DOMException !== 'undefined' && error instanceof DOMException)
+    ? error.message
+    : 'This browser could not check the group password. Try again, or use another browser.';
+
+export const hasInvalidGroupPasswordCharacter = (password: unknown): boolean =>
+  typeof password === 'string' && UNPAIRED_HIGH_SURROGATE.test(password);
 
 const hasGroupPasswordCode = (error: unknown, code: string): boolean =>
   !!error && typeof error === 'object' && (error as { code?: unknown }).code === code;
@@ -81,23 +96,26 @@ const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: Sb
     .trim()
     .toLowerCase();
   if (!BYTES32_HEX.test(expectedHash)) {
-    throw withGroupPasswordCode(
-      new Error("Could not read this group's password check from the chain. Check the network and try again."),
+    throw groupPasswordError(
+      "Could not read this group's password check from the chain. Check the network and try again.",
       GROUP_PASSWORD_UNVERIFIABLE,
     );
   }
   // A zero hash means the group has no group password: no password can match, so skip the slow KDF.
   if (expectedHash === ethers.constants.HashZero) {
-    throw withGroupPasswordCode(
-      new Error("This group has no group password, so it can't be joined with one."),
+    throw groupPasswordError(
+      "This group has no group password, so it can't be joined with one.",
       GROUP_PASSWORD_UNVERIFIABLE,
     );
   }
+  if (hasInvalidGroupPasswordCharacter(password)) {
+    throw groupPasswordError(GROUP_PASSWORD_INVALID_CHARACTER_MESSAGE, GROUP_PASSWORD_UNVERIFIABLE);
+  }
   const signer = await deriveGroupPasswordWallet({ password, sbtAddress }).catch((error: unknown) => {
-    throw withGroupPasswordCode(error, GROUP_PASSWORD_UNVERIFIABLE);
+    throw groupPasswordError(describeDerivationFailure(error), GROUP_PASSWORD_UNVERIFIABLE, error);
   });
   if (ethers.utils.solidityKeccak256(['address'], [signer.address]) !== expectedHash) {
-    throw withGroupPasswordCode(new Error('The group password does not match this group.'), GROUP_PASSWORD_MISMATCH);
+    throw groupPasswordError('The group password does not match this group.', GROUP_PASSWORD_MISMATCH);
   }
   return signer;
 };
