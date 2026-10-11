@@ -267,6 +267,48 @@ test('worker-canonical source breaks equal-time ties by storage id, not list ord
   assert.deepEqual(queued.snapshot.responses.map((row) => row.answer), ['from ref-c']);
 });
 
+test('worker-canonical source lets a newer locked, cleared or invalid answer withdraw an older public one', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Agree?', type: 'binary' },
+  });
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'AAAA', iv: 'BBBB' });
+  const base = { sessionSlug: 'session-a', sessionId, questionId: 'q1', type: 'binary', additional: { value: '', encrypted: false } };
+  const putAnswer = (id, responder, createdAt, answer) => putPayload({
+    kv, resource: 'responses', id, metadata: { responder, createdAt }, payload: { ...base, answer },
+  });
+  const [A, B, C, D] = ['1', '2', '3', '4'].map((digit) => `0x${digit.repeat(40)}`);
+  const before = '2026-09-17T00:00:00.000Z';
+  const after = '2026-09-18T00:00:00.000Z';
+  // A answers in public, then locks the answer.
+  await putAnswer('a0', A, before, { value: 'Agree', encrypted: false });
+  await putAnswer('a1', A, after, { value: '*', encrypted: true, encryptedPortion: envelope });
+  // B answers in public, then clears the answer.
+  await putAnswer('b0', B, before, { value: 'Disagree', encrypted: false });
+  await putAnswer('b1', B, after, { value: '', encrypted: false });
+  // C answers once in public.
+  await putAnswer('c0', C, before, { value: 'Agree', encrypted: false });
+  // D answers in public, then submits an answer the question does not allow.
+  await putAnswer('d0', D, before, { value: 'Agree', encrypted: false });
+  await putAnswer('d1', D, after, { value: 'invented', encrypted: false });
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.responses.map(({ answer, submittedAt }) => ({ answer, submittedAt })), [
+    { answer: 'Agree', submittedAt: before },
+  ]);
+  assert.equal(source.aiSnapshot.responses.length, 1);
+  // Superseded rows are not counted; each participant's latest row is.
+  assert.deepEqual(
+    [source.counts.responseCount, source.counts.participantCount, source.counts.lockedCount, source.counts.excludedCount],
+    [1, 1, 1, 3],
+  );
+});
+
 test('worker-canonical source keeps the first or admin version of each question and skips hidden ids', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };

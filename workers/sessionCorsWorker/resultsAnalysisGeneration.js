@@ -386,8 +386,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     if (normalized) questionMap.set(normalized.questionId, normalized);
   });
 
-  const responseByQuestionParticipant = new Map();
-  const participantDigests = new Set();
+  // Each participant's latest row per question wins before any filter, so a
+  // newer locked, cleared or invalid answer withdraws an older public one.
+  // Superseded rows are not counted as excluded or locked.
+  const latestByQuestionParticipant = new Map();
   let excludedCount = 0;
   let lockedCount = 0;
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -399,15 +401,37 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       excludedCount += 1;
       continue;
     }
-    if (rowLooksLocked(row)) {
-      excludedCount += 1;
-      lockedCount += 1;
-      if (strictLocked) return { ok: false, status: 400, error: 'Encrypted or locked response rows cannot be used for admin snapshot generation.' };
-      continue;
+    if (strictLocked && rowLooksLocked(row)) {
+      return { ok: false, status: 400, error: 'Encrypted or locked response rows cannot be used for admin snapshot generation.' };
     }
     const questionId = normalizeQuestionId(row.questionId || row.questionID || row.id);
     if (!questionId || (requireKnownQuestion && !questionMap.has(questionId))) {
       excludedCount += 1;
+      continue;
+    }
+    const participantSource = trim(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || '');
+    if (!participantSource) {
+      excludedCount += 1;
+      continue;
+    }
+    const candidate = {
+      row,
+      questionId,
+      participantKey: await participantDigest(participantSource),
+      rowTime: Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0,
+      storageRefId: trim(row.__storageRefId),
+    };
+    const dedupeKey = `${questionId}:${candidate.participantKey}`;
+    const existing = latestByQuestionParticipant.get(dedupeKey);
+    if (!existing || isNewerResponseRow(candidate, existing)) latestByQuestionParticipant.set(dedupeKey, candidate);
+  }
+
+  const includedRows = [];
+  const participantDigests = new Set();
+  for (const { row, questionId, participantKey } of latestByQuestionParticipant.values()) {
+    if (rowLooksLocked(row)) {
+      excludedCount += 1;
+      lockedCount += 1;
       continue;
     }
     if (!questionMap.has(questionId)) {
@@ -418,12 +442,6 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       });
       if (inferred) questionMap.set(questionId, inferred);
     }
-    const participantSource = trim(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || '');
-    if (!participantSource) {
-      excludedCount += 1;
-      continue;
-    }
-    const digest = await participantDigest(participantSource);
     const answerValue = hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response);
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
     const knownQuestion = questionMap.get(questionId) || {};
@@ -440,13 +458,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       if (additionalLocked) lockedCount += 1;
       continue;
     }
-    participantDigests.add(digest);
-    const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0;
-    const storageRefId = trim(row.__storageRefId);
-    const dedupeKey = `${questionId}:${digest}`;
-    const candidate = {
+    participantDigests.add(participantKey);
+    includedRows.push({
       questionId,
-      participantKey: digest,
+      participantKey,
       answer,
       additionalComments,
       importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : safeNumber(row.importance),
@@ -454,16 +469,12 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       submittedAt: normalizeSubmittedAt(row.submittedAt || row.createdAt || row.timestamp),
       questionPrompt: knownQuestion.prompt || '',
       questionType: knownQuestion.type || 'text',
-      rowTime,
-      storageRefId,
-    };
-    const existing = responseByQuestionParticipant.get(dedupeKey);
-    if (!existing || isNewerResponseRow(candidate, existing)) responseByQuestionParticipant.set(dedupeKey, candidate);
+    });
   }
   const sortedParticipantDigests = [...participantDigests].sort();
   const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, '0')}`]));
   const participants = sortedParticipantDigests.map((digest) => ({ syntheticId: participantLabels.get(digest) }));
-  const responseRows = [...responseByQuestionParticipant.values()]
+  const responseRows = includedRows
     .sort((a, b) => a.questionId.localeCompare(b.questionId) || (participantLabels.get(a.participantKey) || '').localeCompare(participantLabels.get(b.participantKey) || ''));
   const sanitizedResponses = responseRows.map((row, index) => ({
     responseId: `r${index + 1}`,
