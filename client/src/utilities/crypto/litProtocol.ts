@@ -8,7 +8,7 @@
  */
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
-import { cryptoUtils } from './cryptography.js';
+import { cryptoUtils, getDecryptCacheGeneration } from './cryptography.js';
 import { DEFAULT_CHIPOTLE_ACTION_CODE } from './litChipotleCatalog.js';
 import {
   buildLitChipotlePolicy,
@@ -888,6 +888,7 @@ const wrapLitGetKeyWithCache = (
   const inflight = new Map<string, Promise<unknown>>(); // key -> Promise
 
   let opCount = 0;
+  let cacheGeneration = getDecryptCacheGeneration();
 
   const clearCache = () => {
     successCache.clear();
@@ -898,6 +899,12 @@ const wrapLitGetKeyWithCache = (
 
   const getKey = async (opts: LitHookOptions = {}) => {
     perfDebugLitGetKey('attempt');
+    // clearDecryptCaches (sign-out, account change) drops every cached key.
+    const generation = getDecryptCacheGeneration();
+    if (generation !== cacheGeneration) {
+      clearCache();
+      cacheGeneration = generation;
+    }
 
     const requester = toStr(opts.requesterAddress || opts.account || context.account || '').trim();
 
@@ -982,6 +989,7 @@ const wrapLitGetKeyWithCache = (
 
     try {
       const value = await run;
+      if (generation !== getDecryptCacheGeneration()) return value;
       const settledAt = Date.now();
       cacheLruSet(
         successCache,
@@ -997,7 +1005,7 @@ const wrapLitGetKeyWithCache = (
       const accFail = isAccFailure(err);
       const transient = isTransientLitError(err);
       const ttl = transient ? LIT_GETKEY_NEG_TTL_MS : accFail ? LIT_GETKEY_ACC_NEG_TTL_MS : 0;
-      if (ttl > 0) {
+      if (ttl > 0 && generation === getDecryptCacheGeneration()) {
         cacheLruSet(
           negativeCache,
           key,

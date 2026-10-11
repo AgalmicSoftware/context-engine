@@ -1,6 +1,6 @@
 import { webcrypto } from 'crypto';
 import { ethers } from 'ethers';
-import { cryptoUtils } from './cryptography.js';
+import { clearDecryptCaches, cryptoUtils } from './cryptography.js';
 
 const SIG_A = new ethers.Wallet(`0x${'11'.repeat(32)}`);
 const ACCOUNT = SIG_A.address;
@@ -277,6 +277,36 @@ it('checks the expected survey and question bindings on envelope values', async 
   await expect(decrypt({ expectedQId: 'importance:q2' })).rejects.toThrow(/bound to a different survey field/);
   await expect(decrypt({ expectedSurveyId: OTHER_SURVEY_ID })).rejects.toThrow(/bound to a different survey field/);
   await expect(decrypt({ expectedQId: 'IMPORTANCE:Q1', expectedSurveyId: SURVEY_ID })).resolves.toBe(4);
+});
+
+it('drops cached plaintext, including decrypts still in flight, when caches are cleared', async () => {
+  Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  const provider = makeProvider(SIG_A);
+  const envelope = await cryptoUtils.encryptEnvelopeValue('cached secret', {
+    providerKind: provider,
+    account: ACCOUNT,
+    chainId: CHAIN_ID,
+    qId: 'cache-clear',
+  });
+  const decrypt = () => cryptoUtils.decryptEnvelopeValue(envelope, { providerLike: provider, account: ACCOUNT });
+  const signCount = () =>
+    provider.request.mock.calls.filter(([payload]) => payload?.method === 'eth_signTypedData_v4').length;
+  const signsBeforeDecrypt = signCount();
+
+  await expect(decrypt()).resolves.toBe('cached secret');
+  await expect(decrypt()).resolves.toBe('cached secret');
+  expect(signCount() - signsBeforeDecrypt).toBe(1);
+
+  clearDecryptCaches();
+  await expect(decrypt()).resolves.toBe('cached secret');
+  expect(signCount() - signsBeforeDecrypt).toBe(2);
+
+  clearDecryptCaches();
+  const inFlight = decrypt();
+  clearDecryptCaches();
+  await expect(inFlight).resolves.toBe('cached secret');
+  await expect(decrypt()).resolves.toBe('cached secret');
+  expect(signCount() - signsBeforeDecrypt).toBe(4);
 });
 
 it('round-trips signed quadratic allocations through self-encrypted response envelopes', async () => {

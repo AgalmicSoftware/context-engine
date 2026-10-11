@@ -1474,6 +1474,30 @@ const DECRYPT_ENVELOPE_FAIL_TTL_MS = 3000;
 const DECRYPT_ENVELOPE_SUCCESS_TTL_MS = 1000 * 60 * 10;
 const _decryptEnvelopeCache = new Map<string, DecryptCacheEntry>(); // key -> { ok, ts, value? , errMsg? }
 const _decryptEnvelopeInFlight = new Map<string, Promise<DecryptEnvelopeResult>>(); // key -> Promise<{ value, kind, zkSalt }>
+// Bumped by clearDecryptCaches; a decrypt or Lit key fetch that started
+// before the bump never writes its result into a cache.
+let decryptCacheGeneration = 0;
+
+export const getDecryptCacheGeneration = (): number => decryptCacheGeneration;
+
+/**
+ * Drops decrypted plaintext and unwrapped content keys held in memory. Call
+ * on sign-out and on account change.
+ */
+export const clearDecryptCaches = (): void => {
+  decryptCacheGeneration += 1;
+  _decryptEnvelopeCache.clear();
+  _decryptEnvelopeInFlight.clear();
+  if (typeof window === 'undefined') return;
+  // Other Lit hook sets drop their keys on next use (see the generation).
+  [window.__litHooks, window.litHooks].forEach((hooks) => {
+    try {
+      hooks?.clearCache?.();
+    } catch (e) {
+      logCryptoFallback(e);
+    }
+  });
+};
 
 const normalizeEnvelopeJsonToString = (envelopeJson: unknown) =>
   typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
@@ -1609,6 +1633,7 @@ const decryptEnvelopeToValue = async ({
     return await inFlight;
   }
 
+  const generation = decryptCacheGeneration;
   const run = (async () => {
     const cekRaw = await unwrapCekFromRecipients({
       env,
@@ -1642,12 +1667,13 @@ const decryptEnvelopeToValue = async ({
   })();
 
   if (useCache) _decryptEnvelopeInFlight.set(cacheKey, run);
+  const canCache = () => useCache && generation === decryptCacheGeneration;
   try {
     const result = await run;
-    if (useCache) decryptCacheLruSet(cacheKey, { ok: true, ts: Date.now(), value: result });
+    if (canCache()) decryptCacheLruSet(cacheKey, { ok: true, ts: Date.now(), value: result });
     return { ...(result || {}) };
   } catch (err) {
-    if (useCache)
+    if (canCache())
       decryptCacheLruSet(cacheKey, { ok: false, ts: Date.now(), errMsg: toErrorMessage(err, 'Decryption failed.') });
     perfDebugDecryptEnvelope('error');
     throw err;
