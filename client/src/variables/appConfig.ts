@@ -32,8 +32,8 @@ export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SU
 // Bundled runtime theme selected when no explicit user preference is stored.
 // Unknown values fall back to Minimal (`civic`) in the theme registry.
 export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'civic');
-// Opt-in exposure gate. Keep false until the deployment's route and
-// accessibility matrix has passed for every bundled app theme.
+// Shows the bundled app-theme selector in Settings. Set false only when a
+// deployment intentionally hides user theme selection.
 export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', true);
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
 // Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
@@ -157,7 +157,7 @@ export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv('REACT_APP_POLIS
 ]);
 // One-shot testing flag: clamps cross-session fanout defaults to general/list.
 export const CE_RPC_TESTING_MODE = readPublicBoolEnv('REACT_APP_CE_RPC_TESTING_MODE', false);
-// On-chain session registry (kept off by default during the migration).
+// Resolve sessions through the on-chain SessionRegistry (the normal runtime path).
 export const USE_ONCHAIN_SESSION_REGISTRY = readPublicBoolEnv('REACT_APP_USE_ONCHAIN_SESSION_REGISTRY', true);
 // When true, CE_SESSION_SCAN_SLUGS list entries can resolve through demoSessions aliases
 // (session key, session slug, or sessionName) before scope checks.
