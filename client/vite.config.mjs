@@ -225,6 +225,8 @@ export const resolveManualChunk = (id) => {
   if (normalizedId.includes('/src/variables/demo/demo_polis_data.json')) {
     return 'demo-polis-data';
   }
+  // Test IDs are shared static data; keep them cacheable and out of the AppShell budget.
+  if (normalizedId.includes('/src/utilities/e2eTestIds.json')) return 'e2e-test-ids';
   if (!normalizedId.includes('/node_modules/')) return undefined;
   // Preserve import() boundaries for document export and its dependencies.
   if (isDocumentExportModule(normalizedId)) return undefined;
