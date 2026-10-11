@@ -318,10 +318,17 @@ deleted speculatively.
 
 ### Sponsored deploy release
 
-A grant-backed sponsored deploy installs the release recorded on the
-sponsoring session Worker, never code chosen by the person who redeems the
-grant. The Worker keeps that release in four plain-text variables, where
-`<release>` is
+From 0.6.8, a sponsoring session Worker's own code pins every grant-backed
+deploy to the release recorded on that Worker, never code chosen by the person
+who redeems the grant. The pinning is in the Worker's code, not in its
+settings: a sponsoring Worker running code older than 0.6.8 still deploys
+whatever bundle the redeemer sends, whether or not the variables below are
+set. Update such a Worker to 0.6.8 or later code first, for example by
+uploading a 0.6.8 or later release's `sessionCorsWorker.bundle.js` as its code
+while keeping its bindings and secrets (see [Self-deploy](#self-deploy)).
+
+The Worker keeps its release in four plain-text variables, where `<release>`
+is
 `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>`:
 
 | Variable                           | Value                                                                      |
@@ -334,8 +341,8 @@ grant. The Worker keeps that release in four plain-text variables, where
 Each sponsored deploy downloads the manifest and bundles again and stops if a
 bundle's SHA-256 differs from the digest the manifest lists.
 
-Session Workers deployed by the 0.6.8 or later deploy helper record their
-release automatically:
+The 0.6.8 or later deploy helper records these variables on each new session
+Worker it deploys:
 
 - The helper sets `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` only
   when it downloaded the Worker bundle from a URL and the bundle matched its
@@ -343,39 +350,42 @@ release automatically:
   without a manifest, records nothing.
 - It sets the Agent Bridge pair only when the new session enables Agents HTTP
   and the bridge bundle matched its manifest. The helper checks that bundle
-  before it creates the session's KV namespace and Worker, so a bad bridge
-  release stops the deploy early.
+  before it uploads the session Worker: a first attempt stops before creating
+  anything, and a retry that already staged resources stays pending.
 - The recorded URLs are the ones that deploy used. A release named in the
   deploy request takes precedence over the helper's own `WORKER_BUNDLE_URL`
   and `WORKER_BUNDLE_MANIFEST_URL` defaults. A sponsored deploy always uses
   the sponsoring Worker's variables, so each new Worker records its sponsor's
-  release and can sponsor that release in turn.
+  release.
 - The helper writes these variables only into the upload of a Worker it is
   creating. It never changes an existing Worker, so values set by hand stay
   as they are.
+- Recording does not change the code a Worker runs. The variables pin grant
+  deploys only once the Worker runs 0.6.8 or later code. Local and self-hosted
+  client builds deploy the release pinned in
+  `client/src/variables/workerReleasePin.json` by default, which can be older
+  (see [Release bundle](#release-bundle)).
 
-Workers deployed before 0.6.8, or from an uploaded bundle file, have no
-recorded release, and a Worker records the Agent Bridge pair only when its own
-session enabled Agents HTTP at deploy time. To add missing variables, set them
-once:
+A Worker running 0.6.8 or later code can still lack the variables: it was
+deployed by an older deploy helper, from an uploaded bundle file, or from a
+bundle URL without a manifest. It also records the Agent Bridge pair only when
+its own session enabled Agents HTTP at deploy time. Such a Worker refuses
+grant deploys with `400` before using the grant, and refuses Agents HTTP grant
+deploys the same way without the bridge pair, until you set the missing
+variables once:
 
-1. Choose the release new sessions should run, normally the commit pinned in
-   `client/src/variables/workerReleasePin.json` (see
-   [Release bundle](#release-bundle)). Check it with
-   `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. The GitHub
-   release page
+1. Choose the release new sessions should run, usually the
+   `worker-bundles-<commit>` release the sponsoring Worker itself runs. Check
+   it with `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. Its
+   GitHub release page
    `https://github.com/AgalmicSoftware/context-engine/releases/tag/worker-bundles-<commit>`
-   lists its assets.
+   lists the assets.
 2. In the Cloudflare dashboard, open the sponsoring Worker's **Settings** >
    **Variables and Secrets**, add `WORKER_BUNDLE_URL` and
    `WORKER_BUNDLE_MANIFEST_URL` as **Text** variables with the values above,
    and deploy. If you sponsor sessions that enable Agents HTTP, add the Agent
    Bridge pair too; both manifest variables use the same
    `worker-release-manifest.json`, which lists both bundles.
-
-Until the Worker pair is set, `POST /sponsored/redeem-deploy` returns `400`
-before the grant is used. An Agents HTTP deploy without the Agent Bridge pair
-returns `400` the same way.
 
 ## Sponsored bundle flow (`/sponsor` -> `/new?sponsored=<txId>` + separate key handoff)
 
@@ -432,9 +442,10 @@ returns `400` the same way.
     `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when the
     new session enables the Agents HTTP surface. The manifest pins the bundle
     digest. Without these vars the route returns `400` before the grant is used.
-    Workers deployed by the 0.6.8 or later deploy helper record them
-    automatically; set them once on older Workers, as described in
-    [Sponsored deploy release](#sponsored-deploy-release).
+    This pinning is the sponsoring Worker's own code from 0.6.8; a sponsoring
+    Worker running older code still deploys the redeemer's bundle, so update
+    it first. See [Sponsored deploy release](#sponsored-deploy-release) for
+    how the vars are recorded and how to set missing ones.
   - In that deploy-ready state, Publish deploys the worker first. A
     worker-canonical profile then persists and verifies Worker KV config; a
     decentralized profile keeps the existing metadata upload and on-chain
