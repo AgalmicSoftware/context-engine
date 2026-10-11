@@ -1,8 +1,9 @@
 # Interview Research Diagram Provenance
 
 Both diagrams were generated on September 19, 2026 with the built-in image generation tool for use in public Context Engine documentation. The diagrams were then checked visually for legibility and consistency with `docs/session-interview-research.md`, `client/src/components/SurveyTool/SessionInterviewResearchConsent.tsx`, `client/src/components/SurveyTool/sessionInterviewResearch.ts`, and `client/src/components/SurveyTool/surveyToolResponsePayloadController.ts`.
+On October 11, 2026 both were re-encoded from PNG to JPEG to cut their size.
 
-## `session-interview-overview.png`
+## `session-interview-overview.jpg`
 
 Initial generation prompt:
 
@@ -65,7 +66,7 @@ Primary changes:
 Do not add new claims, fields, metrics, names, addresses, screenshots, logos, or fake pseudo-text. The final image should feel like a clean public technical README diagram, not a marketing poster.
 ```
 
-## `interview-research-record.png`
+## `interview-research-record.jpg`
 
 Generation prompt:
 
