@@ -73,6 +73,23 @@ describe('theme runtime', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  test('sets the browser theme-color to each theme page background', () => {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#000000';
+    document.head.appendChild(meta);
+    try {
+      initializeThemeRuntime();
+      expect(meta.content).toBe('#ffffff');
+      setStoredThemePreference('context-engine');
+      expect(meta.content).toBe('#20204e');
+      setStoredThemePreference('classic-95');
+      expect(meta.content).toBe('#008080');
+    } finally {
+      meta.remove();
+    }
+  });
+
   test('initializes Minimal for fresh users and preserves saved themes', () => {
     initializeThemeRuntime();
     expect(document.documentElement.dataset.ceTheme).toBe('civic');

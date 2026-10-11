@@ -6,6 +6,8 @@ export interface CeThemeMetadata {
   id: CeThemeId;
   label: string;
   colorScheme: 'dark' | 'light';
+  // The theme's page background (its canvas token) for the browser's theme-color.
+  themeColor: string;
   layoutProfile?: 'standard-app' | 'desktop-window' | 'minimal-app';
 }
 
