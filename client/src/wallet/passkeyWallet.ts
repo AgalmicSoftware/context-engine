@@ -122,6 +122,10 @@ const normalizeAccount = (value: unknown): string => {
   }
 };
 
+// EIP-1193 4901: the provider is no longer on the chain the request was for.
+const networkChangedError = (): Error & { code: number } =>
+  Object.assign(new Error('The network changed while signing; try again.'), { code: 4901 });
+
 const assertExpectedAccount = (expectedAddress: unknown, address: unknown): void => {
   if (!expectedAddress || normalizeAccount(address) === normalizeAccount(expectedAddress)) return;
   throw unauthorizedAccountError('The passkey wallet in this browser changed to another account. Log in again.');
@@ -208,6 +212,8 @@ export class PasskeyEoaWalletClient {
   private lockTimer: ReturnType<typeof setTimeout> | null = null;
   private transitionInProgress = false;
   private sessionChainId = 0;
+  // Bumped on every chain change; a request that sees it move never retries.
+  private chainEpoch = 0;
 
   constructor(deps: PasskeyWalletClientDeps = {}) {
     this.config = deps.config || getPasskeyWalletConfig();
@@ -222,7 +228,9 @@ export class PasskeyEoaWalletClient {
 
   setChain(chainOrId: unknown): ChainLike {
     const wasUnlocked = this.isUnlocked();
+    const previousChainId = chainIdOf(this.activeChain);
     this.activeChain = normalizeChain(chainOrId);
+    if (chainIdOf(this.activeChain) !== previousChainId) this.chainEpoch += 1;
     // The signer stays bound to the chain it unlocked on. Lock it when the app
     // switches chains so the next signature re-unlocks on the new chain.
     if (wasUnlocked && !this.isUnlocked() && !this.transitionInProgress) {
@@ -594,15 +602,24 @@ export class PasskeyEoaWalletClient {
     buildArgs: () => { method: string; params?: unknown[] },
     requestedAccount?: unknown,
   ): Promise<unknown> {
+    // A request belongs to the chain it started on: never send or replay it on
+    // another chain. A lock from TTL or idle expiry still re-unlocks and retries.
+    const chainEpoch = this.chainEpoch;
+    const assertSameChain = (): void => {
+      if (this.chainEpoch !== chainEpoch) throw networkChangedError();
+    };
     this.assertRequestedAccount(requestedAccount);
     if (!this.isUnlocked()) await this.relockAndUnlock(requestedAccount);
+    assertSameChain();
     this.assertRequestedAccount(requestedAccount);
     try {
       return await this.sessionClient.request(buildArgs());
     } catch (error) {
       if (!isPasskeyWalletLockedError(error)) throw error;
+      assertSameChain();
 
       await this.relockAndUnlock(requestedAccount);
+      assertSameChain();
       return this.sessionClient.request(buildArgs());
     }
   }

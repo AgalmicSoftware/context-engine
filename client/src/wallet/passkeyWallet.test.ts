@@ -744,6 +744,48 @@ describe('PasskeyEoaWalletClient account binding', () => {
     await client.lock();
   });
 
+  it('fails a transaction a chain switch interrupts instead of resending it on the new chain', async () => {
+    const broadcasts: number[] = [];
+    // Like the worker session client: lock() rejects requests still in flight.
+    const makeWorkerLikeSession = (): SoftSessionClient => {
+      let chainId = 0;
+      const pending: Array<(error: Error) => void> = [];
+      return {
+        async init(options) {
+          chainId = options.chainId;
+          return ADDRESS;
+        },
+        request({ method }) {
+          if (method !== 'eth_sendTransaction') return Promise.resolve(null);
+          broadcasts.push(chainId);
+          if (chainId !== 11155420) return Promise.resolve(`0xhash-on-${chainId}`);
+          return new Promise((_resolve, reject) => pending.push(reject));
+        },
+        async lock() {
+          pending.splice(0).forEach((reject) => reject(new Error('Passkey wallet is locked.')));
+        },
+      };
+    };
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: makeWorkerLikeSession(),
+      sessionClientFactory: makeWorkerLikeSession,
+    });
+    const address = await client.createWallet();
+    const tx = client.sendTransaction({ from: address, to: address, value: '0x0' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    client.setChain(84532);
+
+    await expect(tx).rejects.toMatchObject({ code: 4901, message: expect.stringMatching(/network changed/i) });
+    expect(broadcasts).toEqual([11155420]);
+    expect(credentials.get).not.toHaveBeenCalled();
+    await client.lock();
+  });
+
   it('unlocks only the requested account when the app has no active wallet yet', async () => {
     const storage = createMemoryWalletStorage();
     const creator = new PasskeyEoaWalletClient({
