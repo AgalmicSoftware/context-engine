@@ -363,11 +363,19 @@ deleted speculatively.
   - and `getMissingWorkerSecretsForDeploy(...)` is empty for the current session config.
 - Sponsored deploy grants now keep only the Cloudflare API token plus the source worker bootstrap context on the sponsoring worker; the encrypted bundle itself carries only the resulting `deployGrantToken` and bootstrap worker URL. Grants do not snapshot account ID or a standalone helper URL.
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
+  - A grant lends the sponsor's Cloudflare token, not a code upload. The
+    sponsoring Worker ignores the redeemer's `bundleText`, `bundleUrl`,
+    `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent-bridge
+    bundle fields, and deploys only its own configured release: the
+    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars, plus
+    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when the
+    new session enables the Agents HTTP surface. The manifest pins the bundle
+    digest. Without these vars the route returns `400` before the grant is used;
+    set them on the sponsoring Worker to enable grant-backed deploys.
   - In that deploy-ready state, Publish deploys the worker first. A
     worker-canonical profile then persists and verifies Worker KV config; a
     decentralized profile keeps the existing metadata upload and on-chain
-    registration steps. Both paths default to the hosted GitHub release asset
-    URL.
+    registration steps.
 - `POST /sponsored/redeem-faucet` accepts the one-time `faucetGrantToken` plus
   a recipient address, validates the grant and the source session's CORS
   policy, and reserves the transfer in `SessionWriteCoordinator` before calling

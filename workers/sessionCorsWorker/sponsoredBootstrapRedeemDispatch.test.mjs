@@ -5,6 +5,12 @@ import { dispatchSponsoredBootstrapRedeem } from './sponsoredBootstrapRedeemDisp
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
+// The release bundle a sponsoring Worker is configured to deploy.
+const SPONSOR_RELEASE_ENV = Object.freeze({
+  WORKER_BUNDLE_URL: 'https://releases.example.test/r1/sessionCorsWorker.bundle.js',
+  WORKER_BUNDLE_MANIFEST_URL: 'https://releases.example.test/r1/worker-release-manifest.json',
+});
+
 const createKvEnv = (record = null, envOverrides = {}) => {
   const deletes = [];
   const store = new Map();
@@ -29,6 +35,7 @@ const createKvEnv = (record = null, envOverrides = {}) => {
           store.delete(key);
         },
       },
+      ...SPONSOR_RELEASE_ENV,
       ...envOverrides,
     },
   };
@@ -166,6 +173,8 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
       workerName: 'new-worker',
       sessionSlug: 'fresh-session',
       embeddedDeployHelperEnabled: true,
+      bundleUrl: SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL,
+      bundleManifestUrl: SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL,
       apiToken: 'cf-sponsored-token',
     },
     env,
@@ -178,6 +187,91 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchSponsoredBootstrapRedeem deploys only the sponsor-configured release, never redeemer bundles', async () => {
+  const bridgeRelease = {
+    AGENT_BRIDGE_BUNDLE_URL: 'https://releases.example.test/r1/agentBridgeWorker.bundle.js',
+    AGENT_BRIDGE_BUNDLE_MANIFEST_URL: 'https://releases.example.test/r1/worker-release-manifest.json',
+  };
+  const { env } = createKvEnv({
+    type: 'deploy-worker',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    cloudflareApiToken: 'cf-sponsored-token',
+  }, { DEPLOY_HELPER_ENABLED: '1', ...bridgeRelease });
+  const deployBodies = [];
+  const result = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest({
+      deployGrantToken: 'deploy-grant-code',
+      deployPayload: {
+        workerName: 'new-worker',
+        sessionSlug: 'fresh-session',
+        sessionModeProfile: { surfaces: { agentHttp: true } },
+        deploymentKind: 'agent_session_wrapped',
+        bundleText: 'export default { fetch() { return new Response("not Context Engine"); } };',
+        bundleUrl: 'https://attacker.example.test/worker.js',
+        bundleSha256: 'a'.repeat(64),
+        bundleManifestUrl: 'https://attacker.example.test/worker-release-manifest.json',
+        agentBridgeBundleUrl: 'https://attacker.example.test/bridge.js',
+        agentBridgeBundleManifestUrl: 'https://attacker.example.test/worker-release-manifest.json',
+        agentBridgeBundleSha256: 'b'.repeat(64),
+      },
+    }),
+    env,
+    baseHeaders: {},
+    action: 'deploy',
+    deps: createDeployDeps({
+      executeCoordinatedSponsoredDeploy: async ({ deployBody }) => {
+        deployBodies.push(deployBody);
+        return { ok: true, status: 200, body: { ok: true } };
+      },
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(deployBodies.length, 1);
+  const deployed = deployBodies[0];
+  assert.equal(JSON.stringify(deployed).includes('attacker'), false);
+  for (const field of ['deploymentKind', 'bundleText', 'bundleSha256', 'agentBridgeBundleSha256']) {
+    assert.equal(Object.hasOwn(deployed, field), false, field);
+  }
+  assert.equal(deployed.bundleUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL);
+  assert.equal(deployed.bundleManifestUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL);
+  assert.equal(deployed.agentBridgeBundleUrl, bridgeRelease.AGENT_BRIDGE_BUNDLE_URL);
+  assert.equal(deployed.agentBridgeBundleManifestUrl, bridgeRelease.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+});
+
+test('dispatchSponsoredBootstrapRedeem refuses deploys before using the grant when no release is configured', async () => {
+  const grant = {
+    type: 'deploy-worker',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    cloudflareApiToken: 'cf-sponsored-token',
+  };
+  const attempt = async (envOverrides, deployPayload) => {
+    const { env, store } = createKvEnv(grant, { DEPLOY_HELPER_ENABLED: '1', ...envOverrides });
+    const result = await dispatchSponsoredBootstrapRedeem({
+      request: createDeployRequest({ deployGrantToken: 'deploy-grant-unconfigured', deployPayload }),
+      env,
+      baseHeaders: {},
+      action: 'deploy',
+      deps: createDeployDeps({
+        executeCoordinatedSponsoredDeploy: async () => assert.fail('no deploy without a configured release'),
+      }),
+    });
+    assert.deepEqual(JSON.parse([...store.values()][0]), grant);
+    return result;
+  };
+  const payload = { workerName: 'new-worker', sessionSlug: 'fresh-session', bundleUrl: 'https://caller.example.test/worker.js' };
+  for (const missing of ['WORKER_BUNDLE_URL', 'WORKER_BUNDLE_MANIFEST_URL']) {
+    const result = await attempt({ [missing]: '' }, payload);
+    assert.equal(result.status, 400);
+    assert.match(result.body.error, /WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL/);
+  }
+  const bridge = await attempt({}, { ...payload, sessionModeProfile: { surfaces: { agentHttp: true } } });
+  assert.equal(bridge.status, 400);
+  assert.match(bridge.body.error, /AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL/);
 });
 
 test('dispatchSponsoredBootstrapRedeem returns retryable embedded deploy failures directly and keeps the grant', async () => {
