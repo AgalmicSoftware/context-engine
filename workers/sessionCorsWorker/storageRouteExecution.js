@@ -1981,20 +1981,16 @@ const readStoredPayloadJson = async ({ env, index, slug, config, metadata, deps 
   }
 };
 
-// The questions or surveys id of an index row. Rows stored before resourceId
-// was recorded need one payload read; their id is then written back, so later
-// scans read only the index. Returns null when the payload cannot be read and
-// '' when it has no valid id.
+// The questions or surveys id of an index row: its recorded resourceId, else
+// the id in the payload of a row stored before resourceId was recorded.
+// Returns null when that payload cannot be read and '' when it has no valid id.
 const readIndexRowResourceId = async ({ env, index, slug, config, resource, row, deps }) => {
   const recorded = normalizeAddress(row.metadata?.resourceId);
   if (recorded) return recorded;
   const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
   if (!payload) return null;
   const resourceId = readStoragePayloadResourceId(resource, payload);
-  if (!isStorageResourceId(resourceId)) return '';
-  row.metadata = { ...row.metadata, resourceId };
-  await index.put(row.key, JSON.stringify(row.metadata));
-  return resourceId;
+  return isStorageResourceId(resourceId) ? resourceId : '';
 };
 
 // Questions and surveys stored before first-writer records existed have no
@@ -2075,7 +2071,9 @@ export const setCloudflareStorageResourceHidden = async ({ env, config, slug, bo
     index, slug, resource, resourceId, hidden, actor, updatedAt: new Date(deps?.now?.() || Date.now()).toISOString(),
   });
   // Mark every stored version so lists can skip them from index metadata.
-  // Uploads from before this release lack resourceId; read those once here.
+  // Uploads from before this release lack resourceId; read those once here and
+  // record it, so later scans read only the index. KV takes one write per key
+  // per second, so each row gets a single put carrying both changes.
   let matchedRows = 0;
   let unreadableRows = 0;
   for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
@@ -2088,11 +2086,15 @@ export const setCloudflareStorageResourceHidden = async ({ env, config, slug, bo
       unreadableRows += 1;
       continue;
     }
-    if (rowResourceId !== resourceId) continue;
-    matchedRows += 1;
-    const next = { ...row.metadata, resourceId };
-    if (hidden) next.hidden = true;
-    else delete next.hidden;
+    const matched = rowResourceId === resourceId;
+    const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
+    if (!matched && !recordsId) continue;
+    const next = { ...row.metadata, resourceId: rowResourceId };
+    if (matched) {
+      matchedRows += 1;
+      if (hidden) next.hidden = true;
+      else delete next.hidden;
+    }
     await index.put(row.key, JSON.stringify(next));
   }
   const hiddenIds = [...await listHiddenStorageResourceIds({ index, slug, resource })].sort();

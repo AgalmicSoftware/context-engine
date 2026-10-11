@@ -105,17 +105,31 @@ const createMockR2 = () => {
 	};
 };
 
-const createMockKv = () => {
+// Cloudflare KV takes one write per key per second and fails others with 429.
+// Given a request clock that tests advance between requests, the mock enforces
+// that, so a request that writes one key twice fails here as it would live.
+const createMockKv = ({ requestClock } = {}) => {
 	const store = new Map();
+	const lastWriteMs = new Map();
+	const recordWrite = (key) => {
+		if (!requestClock) return;
+		const nowMs = requestClock();
+		if (lastWriteMs.has(key) && nowMs - lastWriteMs.get(key) < 1_000) {
+			throw new Error('KV PUT failed: 429 Too Many Requests');
+		}
+		lastWriteMs.set(key, nowMs);
+	};
 	return {
 		store,
 		async put(key, value) {
+			recordWrite(key);
 			store.set(key, value);
 		},
 		async get(key) {
 			return store.get(key) || null;
 		},
 		async delete(key) {
+			recordWrite(key);
 			store.delete(key);
 		},
 		async list({ prefix = '' } = {}) {
@@ -4291,8 +4305,13 @@ const OWNERSHIP_ADMIN = '0x00000000000000000000000000000000000000aa';
 const OWNERSHIP_AUTHOR = '0x00000000000000000000000000000000000000bb';
 const OWNERSHIP_OTHER = '0x00000000000000000000000000000000000000cc';
 
-const createOwnershipHarness = () => {
-	const kv = createMockKv();
+const createOwnershipHarness = ({ enforceKvWriteRate = true } = {}) => {
+	// Each harness call is a separate request at least a second after the last.
+	let requestMs = Date.parse('2026-10-10T00:00:00.000Z');
+	const nextRequest = () => {
+		requestMs += 1_000;
+	};
+	const kv = createMockKv(enforceKvWriteRate ? { requestClock: () => requestMs } : {});
 	let clock = Date.parse('2026-10-10T00:00:00.000Z');
 	const common = {
 		env: { CE_STORAGE_INDEX_KV: kv },
@@ -4305,6 +4324,7 @@ const createOwnershipHarness = () => {
 		deps: { json, randomBytes: createSequenceRandomBytes(), now: () => (clock += 1_000) },
 	};
 	const upload = async (uploaderAddress, data, resource = 'questions') => {
+		nextRequest();
 		const response = await storageRoute({
 			...common,
 			uploaderAddress,
@@ -4318,21 +4338,31 @@ const createOwnershipHarness = () => {
 		});
 		return { status: response.status, body: await readJson(response) };
 	};
-	const list = async (resource = 'questions') => readJson(await storageRoute({
-		...common,
-		uploaderAddress: '',
-		path: '/storage/list',
-		method: 'GET',
-		request: new Request(`https://worker.example/storage/list?resource=${resource}`),
-	}));
-	const read = async (id) => storageRoute({
-		...common,
-		uploaderAddress: '',
-		path: '/storage/read',
-		method: 'GET',
-		request: new Request(`https://worker.example/storage/read?id=${id}`),
-	});
-	return { common, kv, upload, list, read };
+	const list = async (resource = 'questions') => {
+		nextRequest();
+		return readJson(await storageRoute({
+			...common,
+			uploaderAddress: '',
+			path: '/storage/list',
+			method: 'GET',
+			request: new Request(`https://worker.example/storage/list?resource=${resource}`),
+		}));
+	};
+	const read = async (id) => {
+		nextRequest();
+		return storageRoute({
+			...common,
+			uploaderAddress: '',
+			path: '/storage/read',
+			method: 'GET',
+			request: new Request(`https://worker.example/storage/read?id=${id}`),
+		});
+	};
+	const hide = async (id, hidden = true, resource = 'questions') => {
+		nextRequest();
+		return setCloudflareStorageResourceHidden({ ...common, body: { resource, id, hidden }, actor: OWNERSHIP_ADMIN });
+	};
+	return { common, kv, upload, list, read, hide };
 };
 
 const ownedQuestion = (prompt, id = '0xQ1') => ({ id, type: 'binary', prompt, sessionSlug: 'session-a' });
@@ -4408,7 +4438,8 @@ const countIndexScans = (kv, resource) => {
 
 for (const coordinated of [false, true]) {
 	test(`ids stored before first-writer records are admin-only after an update (${coordinated ? 'coordinator' : 'inline'})`, async () => {
-		const { common, kv, upload } = createOwnershipHarness();
+		// Racing inline scans (no coordinator) still write the same owner keys.
+		const { common, kv, upload } = createOwnershipHarness({ enforceKvWriteRate: coordinated });
 		if (coordinated) attachSessionCoordinator(common.env, () => {});
 		// Rows the previous release stored (an admin upload never starts the backfill).
 		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Original?', '0xq1'))).status, 200);
@@ -4439,7 +4470,7 @@ for (const coordinated of [false, true]) {
 }
 
 test('admins hide a question id without deleting it, and unhide restores it', async () => {
-	const { common, kv, upload, list, read } = createOwnershipHarness();
+	const { kv, upload, list, read, hide: setHidden } = createOwnershipHarness();
 	const first = await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'));
 	await upload(OWNERSHIP_AUTHOR, ownedQuestion('Kept?', '0xq2'));
 	// An upload from before this release has no resourceId in its index row.
@@ -4449,9 +4480,7 @@ test('admins hide a question id without deleting it, and unhide restores it', as
 	delete legacyMetadata.uploader;
 	kv.store.set(legacyKey, JSON.stringify(legacyMetadata));
 
-	const hide = await setCloudflareStorageResourceHidden({
-		...common, body: { resource: 'questions', id: '0xQ9', hidden: true }, actor: OWNERSHIP_ADMIN,
-	});
+	const hide = await setHidden('0xQ9');
 	assert.deepEqual(hide.body, {
 		ok: true, resource: 'questions', id: '0xq9', hidden: true, matchedRows: 1, unreadableRows: 0, hiddenIds: ['0xq9'],
 	});
@@ -4478,9 +4507,7 @@ test('admins hide a question id without deleting it, and unhide restores it', as
 	kv.store.set(missedKey, JSON.stringify(missed));
 	assert.deepEqual((await list()).items.filter((item) => item.storageRef).map((item) => item.metadata.resourceId), ['0xq2']);
 
-	const unhide = await setCloudflareStorageResourceHidden({
-		...common, body: { resource: 'questions', id: '0xq9', hidden: false }, actor: OWNERSHIP_ADMIN,
-	});
+	const unhide = await setHidden('0xq9', false);
 	assert.equal(unhide.body.matchedRows, 2);
 	assert.deepEqual(unhide.body.hiddenIds, []);
 	assert.equal((await list()).items.filter((item) => item.storageRef).length, 3);
@@ -4488,7 +4515,7 @@ test('admins hide a question id without deleting it, and unhide restores it', as
 });
 
 test('hiding reads each legacy payload once and records its id for later scans', async () => {
-	const { common, kv, upload } = createOwnershipHarness();
+	const { kv, upload, hide } = createOwnershipHarness();
 	const stored = [];
 	for (const id of ['0xq1', '0xq2', '0xq3']) stored.push((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Legacy?', id))).body.id);
 	// Uploads from before this release have no resourceId in their index row.
@@ -4505,9 +4532,8 @@ test('hiding reads each legacy payload once and records its id for later scans',
 		if (key.startsWith('ce-storage-payload:')) payloadReads.push(key);
 		return get(key);
 	};
-	const hide = (id, hidden = true) => setCloudflareStorageResourceHidden({
-		...common, body: { resource: 'questions', id, hidden }, actor: OWNERSHIP_ADMIN,
-	});
+	// One request writes each row once: KV refuses a second write of a key
+	// within a second, which the harness's KV enforces.
 	assert.equal((await hide('0xq1')).body.matchedRows, 1);
 	assert.equal(payloadReads.length, 3);
 	assert.deepEqual(stored.map((storageId) => JSON.parse(kv.store.get(`ce-storage:session-a:questions:${storageId}`)).resourceId),
