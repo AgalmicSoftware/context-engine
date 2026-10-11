@@ -1,4 +1,4 @@
-// Document types come from uploaders, and the Worker passes parameters such as
+// File types come from uploaders, and the Worker passes parameters such as
 // ";charset=utf-8" through, so every check reads the base type only.
 export const readBaseMimeType = (mime: unknown): string =>
   typeof mime === 'string' ? mime.split(';')[0].trim().toLowerCase() : '';

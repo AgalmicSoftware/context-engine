@@ -20,10 +20,10 @@ import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { toViewerBlob } from '../../utilities/ui/viewerMime';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
 import SBTSelector from '../SBTs/SBTSelector';
-import { toViewerBlob } from './documentLibraryViewerMime';
 
 const log = createLogger('DocumentLibraryPanelViews');
 

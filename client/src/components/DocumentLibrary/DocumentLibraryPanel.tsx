@@ -35,6 +35,7 @@ import {
   uploadDocLibraryUrlRecord,
 } from '../../utilities/docLibrary/uploads.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { isTextLikeMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 import { createLogger } from '../../utilities/logging.js';
 import {
   DocumentLibraryList,
@@ -49,7 +50,6 @@ import {
   type SessionConfig,
 } from './documentLibraryCapabilityRouting';
 import { resolveDocumentLibraryAutoOpenDoc } from './documentLibraryAutoOpen';
-import { isTextLikeMime, toViewerBlob } from './documentLibraryViewerMime';
 import { buildSbtListFilters, buildSessionListFilters } from './documentLibraryListFilters';
 
 const log = createLogger('DocumentLibraryPanel');

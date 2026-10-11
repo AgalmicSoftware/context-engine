@@ -1,6 +1,6 @@
-import { isInertViewerMime, isTextLikeMime, readBaseMimeType, toViewerBlob } from './documentLibraryViewerMime';
+import { isInertViewerMime, isTextLikeMime, readBaseMimeType, toViewerBlob } from './viewerMime';
 
-describe('documentLibraryViewerMime', () => {
+describe('viewerMime', () => {
   it('reads the base type without parameters, case or padding', () => {
     expect(readBaseMimeType(' Image/SVG+XML ; charset=utf-8')).toBe('image/svg+xml');
     expect(readBaseMimeType('text/plain')).toBe('text/plain');
