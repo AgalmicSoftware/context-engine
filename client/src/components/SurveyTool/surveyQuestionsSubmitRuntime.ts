@@ -315,10 +315,12 @@ export const createSurveyQuestionsSubmitRuntime = (
         ? stateRef.current.questionPool
         : resolveEditableQuestionList(stateRef.current);
       for (const question of submitQuestionPool) {
-        if (question.type !== 'quadratic' || !changedQids.has(question.id)) continue;
+        // The diff and the slice use normalized ids; pool ids may differ in case.
+        const qid = normalizeQuestionIdKey(question.id);
+        if (question.type !== 'quadratic' || !changedQids.has(qid)) continue;
         // The diff stores per-field flags, not a list of field names.
-        if (changedMap?.[question.id] && !changedMap[question.id].answer) continue;
-        const value = activeSlice.answers?.[question.id]?.value;
+        if (changedMap?.[qid] && !changedMap[qid].answer) continue;
+        const value = activeSlice.answers?.[qid]?.value;
         if (value === '' || value === undefined || value === null) continue;
         const error = validateQuadraticAllocation(value, question);
         if (error) throw new Error(error);

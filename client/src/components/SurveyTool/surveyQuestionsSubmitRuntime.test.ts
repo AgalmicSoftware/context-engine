@@ -397,6 +397,17 @@ describe('quadratic submission boundary', () => {
     expect(context.runSurveyQuestionsSubmitFailureController).not.toHaveBeenCalled();
   });
 
+  it('validates a quadratic answer whose pool id differs in case from the edited key', async () => {
+    const context = createContext();
+    context.stateRef.current.questionPool = [
+      { id: 'Q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 99 },
+    ];
+    context.stateRef.current.surveysResponseState[2].answers.q1.value = [8, -6];
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+    expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalled();
+  });
+
   it('allows a comment-only edit while the existing allocation remains encrypted', async () => {
     const context = createContext();
     context.stateRef.current.questionPool = [{ id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'] }];
