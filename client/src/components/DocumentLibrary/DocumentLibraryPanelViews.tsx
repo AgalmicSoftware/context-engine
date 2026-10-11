@@ -15,6 +15,7 @@ import { Button, Input } from 'reactstrap';
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
@@ -107,18 +108,6 @@ const copyToClipboard = async (text: unknown): Promise<boolean> => {
     return true;
   } catch (_) {
     return false;
-  }
-};
-
-const sanitizeHttpUrl = (raw: unknown): string => {
-  const value = toStr(raw).trim();
-  if (!value) return '';
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-    return parsed.toString();
-  } catch (_) {
-    return '';
   }
 };
 
@@ -272,7 +261,7 @@ export const DocumentLibraryViewerBody = ({
       try {
         const parsed = JSON.parse(viewerText);
         if (parsed && parsed.kind === 'link' && parsed.url) {
-          const safeUrl = sanitizeHttpUrl(parsed.url);
+          const safeUrl = toSafeLinkHref(parsed.url, { contextLabel: 'doc_library_link' });
           return (
             <div className={styles.viewerLink}>
               <div className={styles.viewerLinkTitle}>{toStr(parsed.title).trim() || 'Link'}</div>

@@ -1,7 +1,8 @@
-import type {
-  WorkerGroup,
-  WorkerGroupJoinMode,
-  WorkerGroupMemberVisibility,
+import {
+  isSafeHttpsUrl,
+  type WorkerGroup,
+  type WorkerGroupJoinMode,
+  type WorkerGroupMemberVisibility,
 } from '../../domains/worker/workerGroupPorts';
 import { validateWorkerGroupImageFile } from '../../domains/worker/workerGroupImageUpload';
 import { generateSessionId } from './sessionWizardCoreUtils';
@@ -26,15 +27,6 @@ export type PendingWorkerGroupDraft = {
 const toText = (value: unknown): string => String(value ?? '').trim();
 
 const isBlob = (value: unknown): value is Blob => typeof Blob !== 'undefined' && value instanceof Blob;
-
-const isSafeHttpsUrl = (value: string): boolean => {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && value.length <= 2048;
-  } catch {
-    return false;
-  }
-};
 
 const normalizeTags = (value: unknown): string[] => {
   const seen = new Set<string>();

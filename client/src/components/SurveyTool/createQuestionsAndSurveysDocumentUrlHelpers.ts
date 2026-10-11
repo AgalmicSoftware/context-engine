@@ -1,4 +1,4 @@
-import { parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { litStorage } from '../../utilities/crypto/litProtocol.js';
 
 export const buildCreateSurveyDocUrlInputPatch = (docURLInput: unknown) => ({
@@ -23,19 +23,11 @@ const normalizeDocumentUrl = (value: unknown) => {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
   if (litStorage.isLitArweaveUrl(trimmed)) return trimmed;
-  if (trimmed.startsWith('ar://')) {
-    return parseArweaveTxId(trimmed) ? trimmed : '';
-  }
   if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
     return trimmed;
   }
-  try {
-    const parsed = new URL(trimmed);
-    const protocol = String(parsed.protocol || '').toLowerCase();
-    return protocol === 'http:' || protocol === 'https:' ? trimmed : '';
-  } catch (_) {
-    return '';
-  }
+  // Store the author's text; the shared render-time check decides what is linkable.
+  return toSafeLinkHref(trimmed) ? trimmed : '';
 };
 
 export const sanitizeDocumentUrls = (values: unknown[] = []) => {
