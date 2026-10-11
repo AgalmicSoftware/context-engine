@@ -76,6 +76,27 @@ describe('no-leak Arweave payload guards', () => {
     ).not.toThrow();
   });
 
+  it.each([
+    ['a public mask', { value: '*', encrypted: false, encryptedPortion: '' }, 'is masked but not encrypted'],
+    [
+      'a stale envelope on a cleared value',
+      { value: '', encrypted: true, encryptedPortion: 'old-cipher' },
+      'needs a masked value',
+    ],
+    [
+      'a stale envelope on a public value',
+      { value: '', encrypted: false, encryptedPortion: 'old-cipher' },
+      'needs a masked value',
+    ],
+  ])('rejects %s in a response field', (_label, additional, message) => {
+    expect(() =>
+      validateNoLockedPlaintextInPayload(
+        { questionID: 'q1', answer: { value: 'Agree', encrypted: false, encryptedPortion: '' }, additional },
+        { family: 'question_response_payload' },
+      ),
+    ).toThrow(`payload.additional.${message.startsWith('needs') ? 'encryptedPortion' : 'value'} ${message}`);
+  });
+
   it('rejects locked SBT tokenURI fields with plaintext aliases', () => {
     expect(() =>
       validateNoLockedPlaintextInPayload(

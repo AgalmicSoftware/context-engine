@@ -76,10 +76,19 @@ const assertNeutralWhenLocked = ({
 
 const assertResponseFieldNoLeak = (field: unknown, path: string): void => {
   if (!isObj(field)) return;
-  const encrypted = field.encrypted === true || hasEnvelope(field.encryptedPortion);
-  if (!encrypted) return;
-  if (!isNeutralLockedValue(field.value)) {
+  const withEnvelope = hasEnvelope(field.encryptedPortion);
+  const encrypted = field.encrypted === true || withEnvelope;
+  if (encrypted && !isNeutralLockedValue(field.value)) {
     throw buildLeakError(path, 'value');
+  }
+  const masked = typeof field.value === 'string' && field.value.trim() === '*';
+  // A public mask would publish "*" as the answer, and an envelope beside any other
+  // value is a stale copy of text the responder replaced or removed.
+  if (masked && field.encrypted !== true) {
+    throw new Error(`Locked payload mismatch: ${formatPath(path, 'value')} is masked but not encrypted.`);
+  }
+  if (withEnvelope && !masked) {
+    throw new Error(`Locked payload mismatch: ${formatPath(path, 'encryptedPortion')} needs a masked value.`);
   }
 };
 
