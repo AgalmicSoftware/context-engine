@@ -135,7 +135,6 @@ const manualChunkGroups = [
     patterns: [
       '/node_modules/d3',
       '/node_modules/delaunator/',
-      '/node_modules/dijkstrajs/',
       '/node_modules/internmap/',
       '/node_modules/java-random/',
       '/node_modules/ml-',
@@ -185,8 +184,6 @@ const manualChunkGroups = [
       '/node_modules/clsx/',
       '/node_modules/copy-to-clipboard/',
       '/node_modules/get-nonce/',
-      '/node_modules/qrcode/',
-      '/node_modules/qrcode.react/',
       '/node_modules/react-fast-compare/',
       '/node_modules/react-popper/',
       '/node_modules/react-remove-scroll',
@@ -197,6 +194,15 @@ const manualChunkGroups = [
       '/node_modules/use-callback-ref/',
       '/node_modules/use-sidecar/',
       '/node_modules/warning/',
+    ],
+  },
+  {
+    // Only lazy routes render QR codes, so keep them out of vendor-ui, which loads with AppShell.
+    name: 'vendor-qrcode',
+    patterns: [
+      '/node_modules/dijkstrajs/',
+      '/node_modules/qrcode/',
+      '/node_modules/qrcode.react/',
     ],
   },
   {
