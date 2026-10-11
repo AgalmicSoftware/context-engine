@@ -5,27 +5,6 @@ import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDisc
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SignGroupMintAuthorizationInput = {
-  password?: unknown;
-  sbtAddress?: string | null;
-  userAddress?: string | null;
-  walletScopeSbtAddress?: string | null;
-};
-type GenerateInvitePayloadsInput = {
-  password?: unknown;
-  sbtAddress?: string | null;
-  nonces?: Array<string | number>;
-  walletScopeSbtAddress?: string | null;
-};
-type InvitePayloadResult = {
-  nonce: string;
-  signature: string;
-  inviteCode: string;
-};
-type EncodedInvitePayload = {
-  n: string;
-  s: string;
-};
 type SbtMintBurnCountsByAddressResult = {
   mintedCountByAddress: Record<string, number>;
   burnedCountByAddress: Record<string, number>;
