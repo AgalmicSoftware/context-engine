@@ -690,6 +690,51 @@ describe('answer size budget', () => {
     });
   });
 
+  it('counts saved rating envelopes kept under a blank locked comment', async () => {
+    // The comment's lock still covers the ratings, so the upload keeps their
+    // saved envelopes even though the comment itself is sent empty.
+    const savedEnvelope = 'e'.repeat(3 * KIB);
+    const answerText = fill(93 * KIB);
+    const run = async (commentLocked: boolean) => {
+      const context = prepare('cloudflare', answerText, {
+        value: '',
+        ...(commentLocked ? { encrypted: true, encryptionAudience: 'self_admin' } : {}),
+      });
+      const slice = context.stateRef.current.surveysResponseState[2];
+      slice.importance = { q1: 4 };
+      slice.conviction = { q1: 7 };
+      context.stateRef.current.userAnswers = {
+        responses: [
+          {
+            questionID: 'q1',
+            importance: null,
+            conviction: null,
+            importanceEncrypted: savedEnvelope,
+            convictionEncrypted: savedEnvelope,
+          },
+        ],
+      };
+      // The built answer sends a blank comment unlocked.
+      context.prepareJsonAndHash.mockReturnValue({
+        responses: [
+          {
+            questionID: 'q1',
+            prompt: 'Tell us more',
+            importance: 4,
+            conviction: 7,
+            answer: { value: answerText, encrypted: false, encryptedPortion: '' },
+            additional: { value: '', encrypted: false, encryptionAudience: 'self_admin', encryptedPortion: '' },
+          },
+        ],
+      });
+      return createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    };
+
+    await expect(run(true)).resolves.toEqual({ status: 'failed', message: expect.stringMatching(TOO_LONG) });
+    // Unlocked, the known ratings go public and their envelopes are dropped.
+    await expect(run(false)).resolves.toEqual({ status: 'submitted' });
+  });
+
   it('sizes a gate lock by the SBTs its recipients list', async () => {
     const gateRecipient = (sbtCount: number) => ({
       chain: 'optimismSepolia',

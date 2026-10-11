@@ -365,12 +365,14 @@ export const createSurveyQuestionsSubmitRuntime = (
           { value: sizeSlice.importance?.[qid] ?? null, savedEnvelope: saved.importance },
           { value: sizeSlice.conviction?.[qid] ?? null, savedEnvelope: saved.conviction },
         ],
-        // As the rating step decides: the answer's lock, or a comment lock with text or saved ratings.
+        // As the rating step decides: the answer's lock, or a comment lock with text or
+        // saved ratings. A blank comment is sent unlocked, but its lock still counts here.
         ratingsLocked:
           !!isQuestionLockedForResponse(qid) ||
           !!sizeSlice.answers?.[qid]?.encrypted ||
           !!answer.encrypted ||
-          (!!comment.encrypted && (!!saved.importance || !!saved.conviction || hasText(comment))),
+          ((!!sizeSlice.additionalComments?.[qid]?.encrypted || !!comment.encrypted) &&
+            (!!saved.importance || !!saved.conviction || hasText(comment))),
       });
       if (message) oversize.set(qid, message);
     }
