@@ -291,7 +291,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       'AI title',
     );
 
-    expect(instance.state.questions.map((question: { prompt: string }) => question.prompt)).toEqual([
+    expect(instance.state.questions.map((question) => question.prompt)).toEqual([
       'My own question',
       'Generated question?',
     ]);
