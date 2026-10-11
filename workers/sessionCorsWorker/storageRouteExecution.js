@@ -43,6 +43,7 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+import { validateStorageUploadPayload } from './storageUploadValidation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -2040,6 +2041,12 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || 'Invalid storage upload payload.' }, uploadPayload?.status || 400, baseHeaders);
     const payload = uploadPayload.payload || {};
     if (!isStorageResource(payload.resource)) return responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders);
+    const checked = validateStorageUploadPayload({
+      resource: trim(payload.resource),
+      bytes: payload.bytes,
+      payloadEncrypted: payload.payloadEncrypted === true,
+    });
+    if (!checked.ok) return responseJson(deps, { error: checked.error }, checked.status, baseHeaders);
     const backend = resolveConfiguredStorageBackend({
       config,
       requestedBackend: payload.backend,

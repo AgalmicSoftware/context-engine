@@ -198,3 +198,44 @@ test('a stranger requesting a nonce for a wallet does not cancel the owner pendi
 	assert.equal(login.status, 200, JSON.stringify(login.body));
 	assert.equal(typeof login.body.token, 'string');
 });
+
+const login = async ({ env, wallet }) => {
+	const nonce = await requestNonce({ env, address: wallet.address });
+	assert.equal(nonce.status, 200, JSON.stringify(nonce.body));
+	const result = await loginWithMessage({
+		env,
+		wallet,
+		message: buildClientSiweMessage({ address: wallet.address, nonce: nonce.body.nonce }),
+	});
+	assert.equal(result.status, 200, JSON.stringify(result.body));
+	return result.body.token;
+};
+
+const uploadJson = async ({ env, token, resource, data }) =>
+	readJson(await fetchWorker(makeRequest('/storage/upload', {
+		method: 'POST',
+		token,
+		body: { data, contentType: 'application/json', resource },
+	}), env));
+
+const listResource = async ({ env, resource }) =>
+	readJson(await fetchWorker(new Request(`${WORKER_ORIGIN}/storage/list?resource=${resource}`), env));
+
+test('a participant cannot store a 15 MiB answer that every results viewer would download', async () => {
+	const { env } = createSessionEnv();
+	const token = await login({ env, wallet: Wallet.createRandom() });
+
+	const upload = await uploadJson({
+		env,
+		token,
+		resource: 'responses',
+		data: { questionID: 'q-official-1', answer: 'Agree', comment: 'x'.repeat(15 * 1024 * 1024), sessionId: SESSION_ID, sessionSlug: SLUG },
+	});
+	assert.equal(upload.status, 413, JSON.stringify(upload.body).slice(0, 200));
+	assert.deepEqual((await listResource({ env, resource: 'responses' })).body.items, []);
+
+	const shapeless = await uploadJson({ env, token, resource: 'responses', data: { comment: 'no question' } });
+	assert.equal(shapeless.status, 400);
+	const accepted = await uploadJson({ env, token, resource: 'responses', data: { questionID: 'q-official-1', answer: 'Agree' } });
+	assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+});

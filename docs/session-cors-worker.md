@@ -670,6 +670,20 @@ Authenticated clients can use the worker as the session storage boundary:
     behind another supplied policy. Omitted, null, or blank optional policies
     retain the existing fallback behavior.
   - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
+  - Questions, surveys, and responses are small JSON records that every
+    reader downloads, so they also have tighter caps: 128 KiB per question,
+    256 KiB per survey, and 2 MiB per response upload, with at most 64 KiB per
+    answer. A survey submission bundles its answers in a `responses` list, and
+    each bundled answer has the same 64 KiB cap. Oversized uploads return
+    `413`. These records must be JSON objects with a basic shape, or the
+    upload returns `400`: a question needs a string `id` (or `questionId` /
+    `questionID`) of up to 128 `a-z`, `0-9`, `.`, `_`, `:`, or `-`
+    characters and a string `type`, with a text `prompt` and a list of
+    `options` when present; a survey needs a string `surveyID` (or `id`) and a
+    string `title`, with `questionIDs` as a list of strings when present; each
+    answer needs a `questionID`. Client-encrypted (`payloadEncrypted=true`)
+    responses are only size-checked; questions and surveys must be plaintext
+    JSON so the Worker can check their ids.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
     encoding: the serialized value must be at most 24 MiB, leaving 1 MiB below

@@ -15,6 +15,7 @@ import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+const QUESTION_FIXTURE = Object.freeze({ id: 'q-fixture', type: 'binary', prompt: 'Should the pilot continue?' });
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
 const WORKER_GROUP_SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const CLOUDFLARE_WORKER_GATE_CONFIG = {
@@ -574,7 +575,7 @@ test('private response reads separate participant submission scope from non-owne
 			const upload = async (address, authScopes, extra = {}) => {
 				const response = await route('/storage/upload', new Request('https://worker.example/storage/upload', {
 					method: 'POST', headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ data: { answer: { value: `private answer from ${address}` }, responder: first }, resource: 'responses', ...extra }),
+					body: JSON.stringify({ data: { questionID: '0xq1', answer: { value: `private answer from ${address}` }, responder: first }, resource: 'responses', ...extra }),
 				}), address, authScopes);
 				assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
 				return (await response.json()).storageRef.id;
@@ -649,7 +650,7 @@ test('storageRoute delegates Arweave uploads and returns storageRef compatibilit
 	const request = new Request('https://worker.example/storage/upload', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ data: { ok: true }, contentType: 'application/json', resource: 'questions' }),
+		body: JSON.stringify({ data: QUESTION_FIXTURE, contentType: 'application/json', resource: 'questions' }),
 	});
 	let uploadContext = null;
 
@@ -757,7 +758,7 @@ test('authenticated storage binding loads production session secrets with env an
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: { ok: true }, resource: 'questions' }),
+			body: JSON.stringify({ data: QUESTION_FIXTURE, resource: 'questions' }),
 		}),
 		env,
 		config: { storageProfile: { backend: 'arweave' } },
@@ -818,7 +819,7 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'too-large', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'too-large', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: CLOUDFLARE_WORKER_GATE_CONFIG,
@@ -843,7 +844,7 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'ok', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'ok', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: CLOUDFLARE_WORKER_GATE_CONFIG,
@@ -866,7 +867,7 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 for (const resource of ['questions', 'surveys', 'responses']) {
   const question = { id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
   const response = { questionID: 'q1', type: 'quadratic', answer: { value: [3, -4], encrypted: false } };
-  const payload = resource === 'questions' ? question : resource === 'responses' ? response : { title: 'Quadratic survey', questions: [question] };
+  const payload = resource === 'questions' ? question : resource === 'responses' ? response : { surveyID: 's1', title: 'Quadratic survey', questions: [question] };
 
 	test(`storageRoute round-trips quadratic ${resource} payloads through Cloudflare behind opaque refs`, async () => {
 		const r2 = createMockR2();
@@ -1012,7 +1013,7 @@ for (const contentType of ['application/json; charset=utf-8', 'application/ld+js
 				body: JSON.stringify({
 					data: { title: 'JSON payload', count: 1 },
 					contentType,
-					resource: 'questions',
+					resource: 'docsContext',
 				}),
 			}),
 			env,
@@ -1058,7 +1059,7 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question from KV storage?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question from KV storage?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1097,7 +1098,7 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
 	assert.equal(readResponse.status, 200);
 	assert.equal(readResponse.headers.get('Access-Control-Allow-Origin'), 'https://contextengine.sh');
 	assert.equal(readResponse.headers.get('X-CE-Storage-Backend'), 'cloudflare');
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Question from KV storage?', ok: true });
+	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Question from KV storage?', ok: true });
 
 	const listResponse = await storageRoute({
 		path: '/storage/list',
@@ -1286,7 +1287,7 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Aliased KV storage works', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Aliased KV storage works', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1321,7 +1322,7 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 	});
 
 	assert.equal(readResponse.status, 200);
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Aliased KV storage works', ok: true });
+	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Aliased KV storage works', ok: true });
 });
 
 test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs when randomBytes is absent', async () => {
@@ -1334,7 +1335,7 @@ test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs w
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question from Web Crypto entropy?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question from Web Crypto entropy?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1369,7 +1370,7 @@ test('storageRoute fails closed when Cloudflare storage ref entropy is unavailab
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question without entropy?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question without entropy?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1403,7 +1404,7 @@ test('storageRoute rejects short injected Cloudflare storage ref entropy without
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question with short entropy?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question with short entropy?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1437,7 +1438,7 @@ test('storageRoute reads Cloudflare list resource from POST JSON body', async ()
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question body resource', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question body resource', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1488,7 +1489,7 @@ test('storageRoute gives Cloudflare list query resource precedence over POST bod
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question query resource', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question query resource', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1560,7 +1561,7 @@ test('storageRoute reads legacy KV payloads after an R2 binding is added', async
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Still in KV after R2 attach', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Still in KV after R2 attach', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1591,7 +1592,7 @@ test('storageRoute reads legacy KV payloads after an R2 binding is added', async
 	});
 
 	assert.equal(readResponse.status, 200);
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Still in KV after R2 attach', ok: true });
+	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Still in KV after R2 attach', ok: true });
 });
 
 test('storageRoute rejects Cloudflare storage when neither R2 nor KV payload storage is configured', async () => {
@@ -1601,7 +1602,7 @@ test('storageRoute rejects Cloudflare storage when neither R2 nor KV payload sto
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'missing storage', resource: 'questions' }),
+			body: JSON.stringify({ data: 'missing storage', resource: 'docsContext' }),
 		}),
 		env: {},
 		config: CLOUDFLARE_WORKER_GATE_CONFIG,
@@ -2654,7 +2655,7 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'public question', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'public question', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: publicConfig,
@@ -2695,7 +2696,7 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
 	const listResponse = await storageRoute({
 		path: '/storage/list',
 		method: 'GET',
-		request: new Request('https://worker.example/storage/list?resource=questions'),
+		request: new Request('https://worker.example/storage/list?resource=docsContext'),
 		env,
 		config: publicConfig,
 		slug: 'session-a',
@@ -3015,7 +3016,7 @@ test('storageRoute accepts v2 public-read payload access while preserving legacy
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'public v2', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'public v2', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: publicV2Config,
@@ -3049,7 +3050,7 @@ test('storageRoute accepts v2 public-read payload access while preserving legacy
 	const listResponse = await storageRoute({
 		path: '/storage/list',
 		method: 'GET',
-		request: new Request('https://worker.example/storage/list?resource=questions'),
+		request: new Request('https://worker.example/storage/list?resource=docsContext'),
 		env,
 		config: publicV2Config,
 		slug: 'session-a',
@@ -4178,7 +4179,7 @@ for (const gate of ['role_gate', 'group_gate']) {
         baseHeaders: {}, deps: { json, randomBytes: fixedRandomBytes },
         request: new Request('https://worker.example/storage/upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: 'synthetic', resource: 'questions', ...extra }),
+          body: JSON.stringify({ data: QUESTION_FIXTURE, resource: 'questions', ...extra }),
         }),
       });
       assert.equal(response.status, 403);
@@ -4252,7 +4253,7 @@ test('own-response listing uses authenticated ownership, preserves public rows, 
   for (const uploaderAddress of [account, other]) {
     const uploaded = await storageRoute({ ...common, uploaderAddress, path: '/storage/upload', method: 'POST',
       request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resource: 'responses', data: { answer: 'yes', responder: other } }),
+        body: JSON.stringify({ resource: 'responses', data: { questionID: '0xq1', answer: 'yes', responder: other } }),
       }),
     });
     assert.equal(uploaded.status, 200);
