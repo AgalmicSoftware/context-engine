@@ -24,7 +24,6 @@ export async function inspectWorkerAiFilter(page, { capture } = {}) {
     .getByText(`Active: "${query}" • Top 3 • Override`, { exact: true })
     .waitFor({
       state: "visible",
-      timeoutMs: 60_000,
       timeout: 60_000,
     });
   assert(
