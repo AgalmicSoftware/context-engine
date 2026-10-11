@@ -22,7 +22,6 @@ const ENV_KEYS = [
   'REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS',
   'REACT_APP_USE_ONCHAIN_SESSION_REGISTRY',
   'REACT_APP_CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES',
-  'REACT_APP_SERVER',
   'REACT_APP_ARWEAVE_GATEWAY_URL',
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
   'REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
@@ -129,7 +128,6 @@ describe('appConfig env-backed config', () => {
     process.env.REACT_APP_CE_DEMO_SESSION_SLUGS = 'demo-1,demo-3,demo-2,demo';
     process.env.REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS = 'demo,edge';
     process.env.REACT_APP_USE_ONCHAIN_SESSION_REGISTRY = 'false';
-    process.env.REACT_APP_SERVER = 'https://api.example.test';
     process.env.REACT_APP_ARWEAVE_GATEWAY_URL = 'https://gateway.example.test';
     process.env.REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO = 'false';
     process.env.REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA = 'true';
@@ -160,7 +158,6 @@ describe('appConfig env-backed config', () => {
       expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo', 'edge']);
       expect(config.USE_ONCHAIN_SESSION_REGISTRY).toBe(false);
       expect(config.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES).toBe(true);
-      expect(config.SERVER).toBe('https://api.example.test');
       expect(config.ARWEAVE_GATEWAY_URL).toBe('https://gateway.example.test');
       expect(config.CE_ARWEAVE_DIRECT_TO_AR_IO).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(true);

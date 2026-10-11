@@ -169,7 +169,6 @@ export const CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES = readPublicBoolEnv(
 export const DEFAULT_SESSION_SLUG = readPublicEnv('REACT_APP_DEFAULT_SESSION_SLUG', '');
 // URL/on-chain alias used when the slug is empty.
 export const DEFAULT_SESSION_SLUG_ALIAS = readPublicEnv('REACT_APP_DEFAULT_SESSION_SLUG_ALIAS', 'general');
-export const SERVER = readPublicEnv('REACT_APP_SERVER', 'http://localhost:5000');
 
 export const ARWEAVE_ACTIVE = readPublicBoolEnv('REACT_APP_ARWEAVE_ACTIVE', true);
 // Preferred Arweave gateway for user-facing links and normalized tx URLs.
@@ -213,5 +212,3 @@ export const CLOUDFLARE_DEPLOY_HELPER_URL = DEPLOY_HELPER_URL;
 export const CLOUDFLARE_WORKER_BUNDLE_URL = WORKER_BUNDLE_URL;
 export const CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL = WORKER_RELEASE_MANIFEST_URL;
 export const CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED;
-// WALLECT CONNECT PROJECT ID (ReOwn - needed if upgrading rainbowkit / wagmi)
-// export const WALLETCONNECT_PROJECT_ID = "13b8465ab2e356ef5cf655f6a9061738";
