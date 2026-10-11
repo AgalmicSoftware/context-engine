@@ -162,6 +162,14 @@ describe('PolisReport session description', () => {
   });
 });
 
+describe('PolisReport retired settings', () => {
+  it('no longer writes the removed address-label toggle to local storage', () => {
+    localStorage.removeItem('ceReport_showAddresses');
+    render(<PolisReport {...baseReportProps} slug="edge" questionResponses={seededQuestionResponses} />);
+    expect(localStorage.getItem('ceReport_showAddresses')).toBeNull();
+  });
+});
+
 describe('PolisReport report palette', () => {
   it('shares runtime categorical colors with other report charts', () => {
     expect(POLIS_CLUSTER_COLORS).toBe(CHART_SERIES_COLORS);

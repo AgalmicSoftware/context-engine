@@ -180,10 +180,8 @@ export default function PolisReport({
   sessionHeader = null, // --> NEW: Optional header image path
   sessionInfo = null, // Optional session info (string or object)
   onePageDemo = false, // whether we are embedded in demo page
-  demoMode = false, // optional: external demo flag
   demoDataFirstLoad = false,
   demoDataBySlug = null,
-  miniMode = false,
   // NEW: loading flag – default true to preserve existing behavior where this prop isn't passed
   isQuestionCacheReady = false,
   isResponsesCacheReady = false,
@@ -423,23 +421,6 @@ export default function PolisReport({
   const [showComments, setShowComments] = useState<boolean>(false);
   const [showParticipants, setShowParticipants] = useState<boolean>(true);
   const [showGroupOutline, setShowGroupOutline] = useState<boolean>(true);
-
-  // NEW: toggle for showing Ethereum addresses in participant graph (non-demo only)
-  const [showAddresses, setShowAddresses] = useState<boolean>(() => {
-    try {
-      localStorage.setItem('ceReport_showAddresses', localStorage.getItem('ceReport_showAddresses') || 'false');
-      return localStorage.getItem('ceReport_showAddresses') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('ceReport_showAddresses', showAddresses ? 'true' : 'false');
-    } catch (e) {
-      surveyLog.warn('PolisReport: fallback', e);
-    }
-  }, [showAddresses]);
 
   // PDF capture ref
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -1865,7 +1846,7 @@ export default function PolisReport({
   }
 
   /***************************************************************
-   * renderParticipantGraph (UPDATED hover + links + showAddresses)
+   * renderParticipantGraph (UPDATED hover + links)
    ***************************************************************/
   function renderParticipantGraph() {
     try {
@@ -1909,8 +1890,6 @@ export default function PolisReport({
 
       const centerX = w / 2;
       const centerY = h / 2;
-
-      const isDemoLike = effectiveUseDemoData || onePageDemo || demoMode;
 
       return (
         <div className={styles.graphItem}>
@@ -1991,7 +1970,6 @@ export default function PolisReport({
                   const px = xScale(d.x);
                   const py = yScale(d.y);
                   const addr = allResponders?.[d.index];
-                  const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
                   const displayName = demoDisplayNames?.[addr];
                   const linkHref = buildPolisParticipantProfileHref({
                     address: addr,
@@ -2003,14 +1981,6 @@ export default function PolisReport({
                   const linkLabel = displayName || getShortenedAddress(addr, false);
                   const historicalAvatar =
                     usesSimulatedProfiles && displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
-
-                  const textShort = displayName
-                    ? showAddresses
-                      ? displayName
-                      : null
-                    : isEth && showAddresses
-                      ? getShortenedAddress(addr, false)
-                      : null;
 
                   return (
                     <g key={i}>
@@ -2071,12 +2041,6 @@ export default function PolisReport({
                           fontWeight="600"
                         >
                           {d.index + 1}
-                        </text>
-                      )}
-                      {/* Optional text labels below points when not miniMode */}
-                      {!miniMode && textShort && (
-                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="var(--ce-document-text)">
-                          {textShort}
                         </text>
                       )}
                     </g>
@@ -2885,18 +2849,6 @@ export default function PolisReport({
                             />
                             Participants
                           </label>
-
-                          {/* NEW: toggle for addresses (disabled in demo) */}
-                          {/* <label style={{ cursor: (useDemoData || onePageDemo || demoMode) ? 'not-allowed' : 'pointer', opacity: (useDemoData || onePageDemo || demoMode) ? 0.6 : 1 }}>
-                        <input
-                          type="checkbox"
-                          checked={showAddresses && !(useDemoData || onePageDemo || demoMode)}
-                          onChange={(e) => setShowAddresses(e.target.checked)}
-                          disabled={useDemoData || onePageDemo || demoMode}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Show addresses
-                      </label> */}
 
                           <label style={{ cursor: 'pointer' }}>
                             <input
