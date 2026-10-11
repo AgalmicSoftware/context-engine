@@ -8,6 +8,7 @@ import {
 import type { RatingEnvelopeContext, RatingEnvelopeDeps } from './surveyToolRatingEnvelopeSubmitController';
 
 type TestFieldState = {
+  value?: string;
   encrypted?: boolean;
   encryptionAudience?: string;
 };
@@ -239,7 +240,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     it('returns gate when additional field is encrypted with gate audience', () => {
       const slice = makeSlice({
         additionalComments: {
-          q1: { encrypted: true, encryptionAudience: 'gate' },
+          q1: { value: 'Locked note', encrypted: true, encryptionAudience: 'gate' },
         },
       });
 
@@ -302,19 +303,34 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
       expect(result).toBe(true);
     });
 
-    it('returns true when additional state has encrypted flag', () => {
+    it('returns true when a comment with text is encrypted', () => {
       const result = shouldEncryptRatingForQid(
         'Q1',
         {},
         makeSlice({
           additionalComments: {
-            q1: { encrypted: true },
+            q1: { value: 'Locked note', encrypted: true },
           },
         }),
         buildMockDeps(),
       );
 
       expect(result).toBe(true);
+    });
+
+    it('returns false when only a blank comment carries a lock', () => {
+      const result = shouldEncryptRatingForQid(
+        'Q1',
+        { additional: { value: '', encrypted: true } },
+        makeSlice({
+          additionalComments: {
+            q1: { value: '', encrypted: true },
+          },
+        }),
+        buildMockDeps(),
+      );
+
+      expect(result).toBe(false);
     });
 
     it('returns true when payload answer is encrypted', () => {
@@ -632,4 +648,103 @@ it('re-encrypts ratings when the selected audience changes instead of retaining 
   expect(context.questionResponses[0].importance).toBeNull();
   context.questionResponses[0].importanceEncrypted = oldEnvelope;
   await expect(processRatingEnvelopesForSubmit(context, deps)).rejects.toThrow('Decrypt the ratings');
+});
+
+describe('ratings after the answer and comment locks change', () => {
+  const envelope = (audience: string) =>
+    JSON.stringify({
+      v: 1,
+      recipients:
+        audience === 'self_admin'
+          ? [{ type: 'self-eip712-v1' }, { type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }]
+          : [{ type: 'self-eip712-v1' }],
+      ciphertext: 'rating',
+    });
+  const unlockedSlice = (ratings: { importance?: number; conviction?: number } = {}) => ({
+    answers: { q1: { value: 'Agree', encrypted: false, encryptionAudience: 'self' } },
+    additionalComments: { q1: { value: '', encrypted: false } },
+    importance: ratings.importance === undefined ? {} : { q1: ratings.importance },
+    conviction: ratings.conviction === undefined ? {} : { q1: ratings.conviction },
+  });
+  const savedRow = {
+    questionID: 'q1',
+    importanceEncrypted: envelope('self_admin'),
+    convictionEncrypted: envelope('self_admin'),
+  };
+
+  it('publishes decrypted ratings once neither the answer nor the comment is locked', async () => {
+    const encryptEnvelopeValue = jest.fn(async (value: unknown) => `encrypted:${value}`);
+    const respObj: TestRatingResponse = {
+      questionID: 'q1',
+      importance: 7,
+      conviction: 3,
+      answer: { encrypted: false },
+    };
+
+    await processRatingEnvelopesForSubmit(
+      makeContext({
+        sliceForSubmit: unlockedSlice({ importance: 7, conviction: 3 }),
+        userAnswersSource: { responses: [savedRow] },
+        questionResponses: [respObj],
+        changedMapForSubmit: { q1: { encryptedAnswer: true } },
+      }),
+      buildMockDeps({ encryptEnvelopeValue }),
+    );
+
+    expect(respObj).toMatchObject({ importance: 7, conviction: 3, importanceEncrypted: '', convictionEncrypted: '' });
+    expect(encryptEnvelopeValue).not.toHaveBeenCalled();
+  });
+
+  it('keeps ratings it never decrypted locked instead of narrowing or guessing them', async () => {
+    const encryptEnvelopeValue = jest.fn(async (value: unknown) => `encrypted:${value}`);
+    const respObj: TestRatingResponse = {
+      questionID: 'q1',
+      importance: null,
+      conviction: null,
+      answer: { encrypted: false },
+    };
+
+    await processRatingEnvelopesForSubmit(
+      makeContext({
+        sliceForSubmit: unlockedSlice(),
+        userAnswersSource: { responses: [savedRow] },
+        questionResponses: [respObj],
+        changedMapForSubmit: { q1: { encryptedAnswer: true } },
+      }),
+      buildMockDeps({ encryptEnvelopeValue }),
+    );
+
+    expect(respObj).toMatchObject({
+      importance: null,
+      conviction: null,
+      importanceEncrypted: savedRow.importanceEncrypted,
+      convictionEncrypted: savedRow.convictionEncrypted,
+    });
+    expect(encryptEnvelopeValue).not.toHaveBeenCalled();
+  });
+
+  it('leaves ratings public when only a blank comment is locked', async () => {
+    const encryptEnvelopeValue = jest.fn(async (value: unknown) => `encrypted:${value}`);
+    const respObj: TestRatingResponse = {
+      questionID: 'q1',
+      importance: 6,
+      conviction: 4,
+      answer: { encrypted: false },
+    };
+
+    await processRatingEnvelopesForSubmit(
+      makeContext({
+        sliceForSubmit: {
+          ...unlockedSlice({ importance: 6, conviction: 4 }),
+          additionalComments: { q1: { value: '', encrypted: true, encryptionAudience: 'self' } },
+        },
+        questionResponses: [respObj],
+        changedMapForSubmit: { q1: { importance: true, conviction: true } },
+      }),
+      buildMockDeps({ encryptEnvelopeValue }),
+    );
+
+    expect(respObj).toMatchObject({ importance: 6, conviction: 4 });
+    expect(encryptEnvelopeValue).not.toHaveBeenCalled();
+  });
 });

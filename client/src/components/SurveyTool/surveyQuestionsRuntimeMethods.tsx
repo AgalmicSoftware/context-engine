@@ -2153,8 +2153,8 @@ export const createSurveyQuestionsRuntimeMethods = (
 
     // Rating encryption (importance/conviction):
     // - Preserve existing rating envelopes on non-rating edits (prevents wiping encrypted ratings).
-    // - When the response is encrypted (or rating already encrypted), ensure ratings are stored in envelopes
-    //   and remove plaintext copies from the uploaded payload.
+    // - When the answer or a non-blank comment is locked, ratings are stored in envelopes with the
+    //   plaintext removed; otherwise known ratings go public and undecrypted ones keep their envelope.
     try {
       const savedSource = stateRef.current.userAnswers;
       const savedResponses: SurveyQuestionsLegacyValue[] = Array.isArray(savedSource?.responses)
