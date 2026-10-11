@@ -72,8 +72,7 @@ Primary storage and authority split:
 - Worker token: A short-lived session token minted after login; it encodes
   scopes granted by the selected session authority.
 - Metadata URI: An Arweave JSON payload containing session content/config (non-authoritative for gates).
-- Lit encryption: Client-side encryption where decryption access is controlled by programmable conditions (in this app, typically SBT ownership) via Lit Protocol.
-- Lit payment delegation: A bootstrap mechanism allowing session admins to delegate Lit Protocol capacity credits without a logged-in session.
+- Lit encryption: The browser encrypts content locally; a registered Lit Action, called through the session Worker, wraps the content key and releases it after an SBT ownership check. The Worker operator and anyone holding the session's Lit API key can also obtain the key, so it is not end-to-end encryption.
 
 ## User Roles
 
@@ -204,7 +203,7 @@ What the system does:
 - Applies the same group-creation choice to Context Engine's session-bound
   on-chain SBT creation controls. This is not factory-level authorization:
   public SBT factory methods remain independently callable on-chain.
-- Uses SBT ownership for worker auth gating (scopes for AI/Arweave/transcribe/faucet/fetch/Lit delegation).
+- Uses SBT ownership for worker auth gating (scopes for AI/Arweave/transcribe/faucet/fetch/Lit).
 - Uses SBT ownership for Lit encryption access control (decrypting gated metadata and responses).
 
 Deep-dive docs:

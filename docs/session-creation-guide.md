@@ -490,7 +490,9 @@ What gets stored where:
   storage permanent.
 - Each **Session encryption** option has its own help tooltip. Advanced options
   are `none` (payload bytes are stored as provided), `lit` (data is encrypted
-  before upload and decryption follows on-chain access conditions), and
+  before upload and a Lit Action releases its key after an on-chain SBT check;
+  the key passes through the session worker, so the worker operator and anyone
+  holding the session's Lit API key can decrypt, and it is not end-to-end), and
   Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it,
   and the session worker decrypts only after checking access. `lit` requires a
   registry network, RPC connection, and Lit credentials. `worker_envelope` is

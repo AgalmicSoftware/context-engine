@@ -80,8 +80,10 @@ roles or conditions. The operator and Cloudflare runtime remain inside that
 trust boundary.
 
 The stock Trustless & Slower profile defaults to no payload encryption. Lit is
-an implemented opt-in when public-chain access conditions and client-side
-decrypt are desired; selecting it adds Lit and chain/RPC requirements.
+an implemented opt-in when SBT-gated key release is desired; selecting it adds
+Lit and chain/RPC requirements. Content keys pass through the session Worker,
+and holders of the session's Lit API key can request them, so it is not
+end-to-end encryption.
 
 Company-Operated encryption and private compute remain planned. Intended
 adapters include passkey-backed or organizational identity, KMS/Vault/OpenBao
@@ -91,7 +93,7 @@ not shipped packages.
 | Mode | Availability | Trust model | Best fit |
 | --- | --- | --- | --- |
 | `worker_envelope` | Implemented default for Hosted & Fast | Session operator and Cloudflare worker runtime | Cloudflare-backed private sessions |
-| `lit` | Implemented opt-in | Public Lit network plus selected EVM access conditions | Decentralized gated data |
+| `lit` | Implemented opt-in | Session Worker operator, holders of the session's Lit API key, and Lit's Chipotle service checking SBT ownership on the selected EVM chain | SBT-gated data in Arweave-backed sessions |
 | `none` | Implemented; decentralized preset default | Storage visibility and session policy | Intentionally public data |
 | Organizational KMS/key release | Planned | Customer IAM and key-service policy | Company-operated environments |
 | TEE or permissioned threshold compute | Planned research | Attested operator or permissioned threshold trust | Advanced private query and compute |

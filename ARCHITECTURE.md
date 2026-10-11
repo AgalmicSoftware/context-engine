@@ -153,7 +153,8 @@ Lit opt-in:
   Client encrypts content locally with a fresh content key
   Session Worker asks a registered Lit Action to wrap that key for the SBT gate
   On read, the Lit Action checks the SBT gate and the Worker returns the key
-  The Worker sees the content key, so this is not end-to-end encryption
+  The Worker sees the content key, and holders of the session's Lit API key
+  can request keys directly, so this is not end-to-end encryption
   Arweave or Cloudflare stores the resulting ciphertext according to the profile
 ```
 

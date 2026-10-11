@@ -38,7 +38,7 @@ const ARWEAVE_STORAGE_TOOLTIP =
 const NO_ENCRYPTION_TOOLTIP =
   'This setting adds no encryption layer: payload bytes are stored as provided. Access and visibility controls do not turn unencrypted payloads into encrypted data.';
 const LIT_ENCRYPTION_TOOLTIP =
-  'Lit encrypts data before upload and uses on-chain access conditions to control decryption. It requires a registry network, an RPC connection, and Lit credentials.';
+  "Lit encrypts data before upload, and a Lit Action releases the key only after on-chain access conditions (SBT ownership) pass. The key passes through the session worker, so the worker operator and anyone holding the session's Lit API key can decrypt; this is not end-to-end encryption. It requires a registry network, an RPC connection, and Lit credentials.";
 const CLOUDFLARE_ENCRYPTION_TOOLTIP =
   'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
 const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =

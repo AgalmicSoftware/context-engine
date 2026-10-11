@@ -3,9 +3,10 @@
 Context Engine installs no Lit SDK packages. When a session selects Lit
 encryption, the browser encrypts content locally with a fresh content key, and
 the session Worker calls Lit's Chipotle REST API to wrap and release that key
-behind an SBT gate. The Worker sees the content key in plaintext, so Lit-gated
-content is not end-to-end encrypted; see [`lit-v3-design.md`](lit-v3-design.md)
-for the trust boundary.
+behind an SBT gate. Lit-gated content is not end-to-end encrypted: the Worker
+sees the content key in plaintext, and anyone holding the session's Lit account
+or usage API key can request content keys directly. See
+[`lit-v3-design.md`](lit-v3-design.md) for the trust boundary.
 
 This file records the current wiring plus platform background from the move
 off the former Naga-era browser SDK. It does not imply that any older hosted
@@ -38,6 +39,7 @@ Primary docs:
   - `litUsageApiKey` is a secret
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
   - the real security boundary is still API-key scope + group membership + Lit Action code; hiding IDs alone is not a sufficient protection model
+  - the Lit Action trusts the `requesterAddress` and `rpcUrl` it receives and checks no signature, so anyone holding the session's Lit account or usage API key (for example a sponsor who supplied it in a sponsored bundle) can call the Lit API directly with any SBT holder's address and receive gate content keys
 - Current Chipotle endpoints/source-of-truth:
   - prod API: `https://api.chipotle.litprotocol.com`
   - prod dashboard: `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`

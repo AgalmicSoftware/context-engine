@@ -60,7 +60,9 @@ So the exact v2 contract `browser -> Lit ACC encrypt/decrypt APIs` is not the ri
 
 ## Minimum viable v3 design
 
-The smallest design that preserves "only holders of this SBT can decrypt" is:
+The smallest design that keeps key release gated on SBT ownership is below. It
+does not hide keys from the session Worker or from Lit API key holders; see the
+v3 trust boundary.
 
 1. Keep CE's existing local content encryption shape.
 2. Move Lit key release / decrypt authority behind the session worker.
@@ -101,9 +103,17 @@ Lit Action / PKP:
 - returns the plaintext CEK to the Worker, which relays it to the requester
 
 What this means for the `gate` audience: content wrapped for `lit-sbt-v1`
-recipients can be read by SBT holders who pass the gate and by whoever operates
-the session Worker (normally the session admin). Lit enforces who gets the key,
-but this is not end-to-end encryption between SBT holders.
+recipients can be read by:
+
+- SBT holders who pass the gate;
+- whoever operates the session Worker (normally the session admin);
+- anyone holding the session's Lit account or usage API key, such as a sponsor
+  who supplied it in a sponsored bundle. The Lit Action trusts the
+  `requesterAddress` and `rpcUrl` it is given and checks no signature, so a key
+  holder can call the Lit API directly with any SBT holder's address and
+  receive the content key, without going through the Worker.
+
+This is SBT-gated key release, not end-to-end encryption between SBT holders.
 
 ## Proposed v3 envelope direction
 
