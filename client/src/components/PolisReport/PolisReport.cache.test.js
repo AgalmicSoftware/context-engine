@@ -451,6 +451,68 @@ describe('PolisReport cache read options', () => {
     expect(JSON.stringify(result)).not.toContain('test-2');
   });
 
+  it('takes binary question prompts and types from metadata before participant payloads', () => {
+    const row = (responder, payload) => ({ responder, questionId: 'q1', response: JSON.stringify(payload) });
+    const honest = (value) => ({ type: 'binary', prompt: 'Canonical prompt', answer: { value, encrypted: false } });
+    const metadata = { q1: { type: 'binary', prompt: 'Canonical prompt' } };
+
+    const spoofedPrompt = buildRatingMatrixFromRealData(
+      {
+        q1: [
+          row('0xa', { type: 'binary', prompt: 'Attacker headline', answer: { value: 'Agree' } }),
+          row('0xb', honest('Disagree')),
+        ],
+      },
+      { metadata },
+    );
+    expect(spoofedPrompt.promptsMap).toEqual({ q1: 'Canonical prompt' });
+
+    const spoofedType = buildRatingMatrixFromRealData(
+      {
+        q1: [
+          row('0xa', { type: 'freeform', prompt: 'Canonical prompt', answer: { value: 'whatever' } }),
+          row('0xb', honest('Agree')),
+          row('0xc', honest('Disagree')),
+        ],
+      },
+      { metadata },
+    );
+    expect(spoofedType.questions).toEqual(['q1']);
+    expect(spoofedType.matrix[0].filter((vote) => vote !== null)).toEqual([1, -1]);
+  });
+
+  it('passes cached question metadata into the binary report', async () => {
+    cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+      namespace === 'questionsCache'
+        ? { 84532: { questions: { q1: { type: 'binary', prompt: 'Canonical prompt' } } } }
+        : {},
+    );
+    const responses = {
+      q1: ['Agree', 'Disagree'].map((value, index) => ({
+        responder: `0x${String(index + 1).repeat(40)}`,
+        response: JSON.stringify({
+          type: 'binary',
+          prompt: index ? 'Canonical prompt' : 'Attacker headline',
+          answer: { value },
+        }),
+      })),
+    };
+    try {
+      render(<PolisReport {...baseReportProps} slug="metadata-report" questionResponses={responses} />);
+      await waitFor(() => {
+        expect(computePolisConversationMath).toHaveBeenCalledWith(
+          expect.any(Array),
+          { q1: 'Canonical prompt' },
+          ['q1'],
+          expect.objectContaining({ randomSeed: 42 }),
+        );
+      });
+      expect(screen.queryByText(/Attacker headline/)).not.toBeInTheDocument();
+    } finally {
+      cacheScripts.peekCacheSync.mockImplementation(() => ({}));
+    }
+  });
+
   it('reads question and sbt caches with clone disabled during filter application', () => {
     const out = applyFilterStateToAggregator({ q1: [] }, { id: 84532 }, {}, 'edge');
 

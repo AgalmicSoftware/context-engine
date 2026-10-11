@@ -359,6 +359,21 @@ describe('surveyResultsExportPlans', () => {
     expect(cells[columns.indexOf('conviction')]).toBe('"2"');
   });
 
+  it('prefers question metadata over the prompt and type a participant payload claims', () => {
+    const csv = buildSurveyResultsResponsesCsvExport({
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0x1111111111111111111111111111111111111111',
+            response: { questionID: 'q1', prompt: 'Spoofed headline', type: 'freeform', answer: { value: 'Agree' } },
+          },
+        ],
+      },
+      networkQuestions: { q1: { prompt: 'Canonical prompt', type: 'binary' } },
+    });
+    expect(csv.split('\n')[1]).toMatch(/^"q1","Canonical prompt","binary",/);
+  });
+
   it('keeps formula-like participant text from running in spreadsheets', () => {
     const csv = buildSurveyResultsResponsesCsvExport({
       aggregatorQuestionResponses: {

@@ -72,13 +72,14 @@ const defaultGetQuestionId = (response: unknown): string => {
   return String(record.questionID || record.questionId || '').trim();
 };
 
+// Question metadata wins; a participant's payload only fills gaps.
 const defaultGetQuestionPrompt = (
   response: unknown,
   questionData: SurveyResultsAnalysisRecord | null = null,
 ): unknown => {
   const responseRecord = toRecord(response);
   const questionRecord = toRecord(questionData);
-  return responseRecord.prompt || questionRecord.prompt || '';
+  return questionRecord.prompt || responseRecord.prompt || '';
 };
 
 const defaultGetQuestionType = (
@@ -87,7 +88,7 @@ const defaultGetQuestionType = (
 ): unknown => {
   const responseRecord = toRecord(response);
   const questionRecord = toRecord(questionData);
-  return responseRecord.type || questionRecord.type || questionRecord.questionType || '';
+  return questionRecord.type || questionRecord.questionType || responseRecord.type || '';
 };
 
 const isSurveyIndividualsMode = (viewMode: unknown, surveyViewMode: unknown): boolean =>

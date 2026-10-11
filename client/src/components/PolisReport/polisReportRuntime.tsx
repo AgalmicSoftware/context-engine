@@ -820,7 +820,7 @@ function isPolisRealRowAllowedForSession(
 
 export function buildRatingMatrixFromRealData(
   realQR: PolisQuestionResponses | UnknownRecord,
-  options: { sessionSlug?: unknown; allowDemo?: boolean } = {},
+  options: { sessionSlug?: unknown; allowDemo?: boolean; metadata?: Record<string, unknown> } = {},
 ): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
     return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
@@ -836,23 +836,21 @@ export function buildRatingMatrixFromRealData(
   Object.entries(realQR).forEach(([qId, arr]) => {
     if (!Array.isArray(arr) || arr.length === 0) return;
 
-    // Find the first parsed response with a declared type to decide if it's binary
-    let firstType: unknown = null;
-    let firstPrompt: unknown = null;
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (parsed && typeof parsed === 'object' && parsed.type) {
-        firstType = parsed.type;
-        firstPrompt = parsed.prompt || '(No prompt)';
-        break;
-      }
-    }
-    if (firstType !== 'binary') return; // we only include binary questions
+    // Question metadata decides the type and prompt. A participant payload only
+    // fills gaps, as in the answer sections and the summary statistics.
+    const firstPayload = (arr as PolisResponseRow[])
+      .map((r) => ({ r, parsed: safeJsonParse(r?.response) }))
+      .find(
+        ({ r, parsed }) =>
+          (options.allowDemo || !isPolisDemoFixturePayload(parsed)) &&
+          isPolisRealRowAllowedForSession(r, parsed, sessionSlug),
+      )?.parsed;
+    const question = reportQuestionMetadata(options.metadata?.[qId.toLowerCase()], firstPayload || {});
+    if ((question.type || question.questionType) !== 'binary') return; // we only include binary questions
+    const prompt = String(question.prompt || '').trim() || '(No prompt)';
 
-    binaryQuestions.push({ qId, prompt: String(firstPrompt || '(No prompt)') });
-    promptsMap[qId] = String(firstPrompt || '(No prompt)');
+    binaryQuestions.push({ qId, prompt });
+    promptsMap[qId] = prompt;
 
     // Gather participants who answered this (binary) question
     for (const r of arr) {
@@ -903,7 +901,8 @@ export function buildRatingMatrixFromRealData(
     const arr = Array.isArray(realQR[qId]) ? (realQR[qId] as PolisResponseRow[]) : [];
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
-      if (!parsed || parsed.type !== 'binary') continue;
+      // Skip a row whose payload claims another question type.
+      if (!parsed || (parsed.type && parsed.type !== 'binary')) continue;
       if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       const answer = asRecord(parsed.answer);

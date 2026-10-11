@@ -112,6 +112,26 @@ describe('surveyResultsAnalysisDataModel', () => {
     ]);
   });
 
+  it('prefers question metadata over the prompt and type a participant payload claims', () => {
+    const rows = buildSurveyResultsAnalysisResponsesForExport({
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xAAA',
+            response: { answer: { value: 'Agree' }, prompt: 'Spoofed headline', type: 'freeform' },
+          },
+        ],
+        q2: [{ responder: '0xAAA', response: { answer: { value: 'Text' }, prompt: 'Payload-only prompt' } }],
+      },
+      networkQuestions: { q1: { prompt: 'Canonical prompt', type: 'binary' } },
+    });
+
+    expect(rows.map(({ questionPrompt, questionType }) => ({ questionPrompt, questionType }))).toEqual([
+      { questionPrompt: 'Canonical prompt', questionType: 'binary' },
+      { questionPrompt: 'Payload-only prompt', questionType: '' },
+    ]);
+  });
+
   it('uses injected parse and question metadata ports without owning lookup semantics', () => {
     const rows = buildSurveyResultsAnalysisResponsesForExport({
       aggregatorQuestionResponses: {

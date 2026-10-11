@@ -789,6 +789,7 @@ export default function PolisReport({
     );
     return {
       filtered,
+      metadata,
       responseStats: buildReportResponseStats(filtered, metadata, {
         sessionSlug: activeReportSlug,
         allowDemo: effectiveUseDemoData,
@@ -823,12 +824,19 @@ export default function PolisReport({
     let buildResult: RatingMatrixBuildResult;
     try {
       if (!effectiveUseDemoData) {
-        buildResult = buildRatingMatrixFromRealData(reportData.filtered, { sessionSlug: activeReportSlug });
+        buildResult = buildRatingMatrixFromRealData(reportData.filtered, {
+          sessionSlug: activeReportSlug,
+          metadata: reportData.metadata,
+        });
       } else {
         const demoResult = buildRatingMatrixFromDemo(activeDemoData);
         buildResult = hasActiveReportFilters
           ? {
-              ...buildRatingMatrixFromRealData(reportData.filtered, { sessionSlug: activeReportSlug, allowDemo: true }),
+              ...buildRatingMatrixFromRealData(reportData.filtered, {
+                sessionSlug: activeReportSlug,
+                allowDemo: true,
+                metadata: reportData.metadata,
+              }),
               displayNamesMap: demoResult.displayNamesMap,
             }
           : demoResult;

@@ -342,11 +342,12 @@ const defaultParseResponseForCsv = (response: unknown): unknown => {
 const getResponseQuestionIdForCsv = (response: SurveyResultsRecord): string =>
   String(response.questionID || response.questionId || '').trim();
 
+// Question metadata wins; a participant's payload only fills gaps.
 const getResponseQuestionPromptForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
-  response.prompt || questionData.prompt || '';
+  questionData.prompt || response.prompt || '';
 
 const getResponseQuestionTypeForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
-  response.type || questionData.type || '';
+  questionData.type || response.type || '';
 
 const getImportanceValueForCsv = (response: SurveyResultsRecord): unknown =>
   readStoredRating(response.importance) ?? readStoredRating(response.conviction) ?? '';

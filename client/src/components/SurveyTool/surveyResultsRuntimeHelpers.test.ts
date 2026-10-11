@@ -83,10 +83,10 @@ describe('surveyResultsRuntimeHelpers', () => {
     expect(getResponseQuestionId({ questionID: ' q1 ' })).toBe('q1');
     expect(getResponseQuestionId({ questionId: ' q2 ' })).toBe('q2');
     expect(getResponseQuestionPrompt({ prompt: 'Response prompt' }, { prompt: 'Question prompt' })).toBe(
-      'Response prompt',
+      'Question prompt',
     );
-    expect(getResponseQuestionPrompt({}, { prompt: 'Question prompt' })).toBe('Question prompt');
-    expect(getResponseQuestionType({ type: 'binary' }, { type: 'freeform' })).toBe('binary');
-    expect(getResponseQuestionType({}, { type: 'freeform' })).toBe('freeform');
+    expect(getResponseQuestionPrompt({ prompt: 'Response prompt' }, {})).toBe('Response prompt');
+    expect(getResponseQuestionType({ type: 'binary' }, { type: 'freeform' })).toBe('freeform');
+    expect(getResponseQuestionType({ type: 'binary' }, null)).toBe('binary');
   });
 });
