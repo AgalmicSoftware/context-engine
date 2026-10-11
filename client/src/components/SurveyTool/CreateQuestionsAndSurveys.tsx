@@ -1740,7 +1740,19 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           return compatible as CreateQuestionsSeededQuestionRow;
         })
         .filter((row): row is CreateQuestionsSeededQuestionRow => !!row);
-      if (!normalizedRows.length) return false;
+      // Another author already published these exact questions. Never seed this
+      // author's lock, tags, or creator onto them; hydration reads theirs.
+      const alreadyPublishedIds = new Set(
+        uploadedRows
+          .filter((row) => row?.alreadyPublished === true)
+          .map((row) =>
+            String(row?.questionId || row?.id || '')
+              .trim()
+              .toLowerCase(),
+          ),
+      );
+      const seededRows = normalizedRows.filter((row) => !alreadyPublishedIds.has(row.id));
+      if (!seededRows.length) return false;
 
       const sourceRows: CreateQuestionsCacheQuestionRow[] = Array.isArray(sourceQuestions)
         ? (sourceQuestions as CreateQuestionsCacheQuestionRow[])
@@ -1787,6 +1799,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           });
 
           recentRows.forEach((row) => {
+            if (alreadyPublishedIds.has(row.id)) return;
             nextRecent[row.id] = {
               ...row,
               id: row.id,
@@ -1820,12 +1833,21 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         canReuseNetBucket && isObjectLikeRecord(existingNetBucket) ? { ...(existingNetBucket as UnknownRecord) } : {};
       const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions) ? { ...netBucket.questions } : {};
 
-      normalizedRows.forEach((row) => {
+      seededRows.forEach((row) => {
         questions[row.id] = { ...((questions[row.id] as UnknownRecord) || {}), ...row };
+      });
+      // A seeded row is a local copy. Drop its Worker version ref so the next
+      // hydration rereads the canonical blob instead of skipping it as cached.
+      const workerQuestionMetadataRefs = isObjectLikeRecord(netBucket.workerQuestionMetadataRefs)
+        ? { ...(netBucket.workerQuestionMetadataRefs as UnknownRecord) }
+        : null;
+      seededRows.forEach((row) => {
+        if (workerQuestionMetadataRefs) delete workerQuestionMetadataRefs[row.id];
       });
 
       const nextNetBucket: ManagedCacheBucket = {
         ...netBucket,
+        ...(workerQuestionMetadataRefs ? { workerQuestionMetadataRefs } : {}),
         questionsLatestBlock: Number(netBucket.questionsLatestBlock || 0) || 0,
         questions,
         questionResponses:

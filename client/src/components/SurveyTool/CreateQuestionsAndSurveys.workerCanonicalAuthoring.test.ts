@@ -392,6 +392,63 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
     expect(surveysWorkerNode?.surveys).not.toHaveProperty('survey-a');
   });
 
+  it('lets the next hydration reread the canonical blob for seeded ids and skips already-published questions', async () => {
+    const sessionConfig = buildWorkerSessionConfig();
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+    const canonicalRef = { admin: false, createdAtMs: 1, storageRefId: 'cf_canonical', verified: true };
+    peekCacheSyncMock.mockImplementation((...args: unknown[]) => {
+      if (args[0] === 'questionsCache') {
+        return {
+          worker: withWorkerCanonicalCacheIdentity(
+            {
+              questions: {
+                '0xmine': { id: '0xmine', prompt: 'Canonical text', type: 'freeform' },
+                '0xshared': { id: '0xshared', prompt: 'Shared question', type: 'freeform', tags: ['theirs'] },
+              },
+              questionResponses: {},
+              workerQuestionMetadataRefs: { '0xmine': canonicalRef, '0xshared': { ...canonicalRef } },
+            },
+            identity,
+          ),
+        };
+      }
+      return null;
+    });
+    const instance = makeInstance({
+      account: '0x1111111111111111111111111111111111111111',
+      activeSessionSlug: 'worker-session',
+      sessionSlug: 'worker-session',
+      sessionConfig,
+    });
+
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [
+          { id: '0xmine', prompt: 'Canonical text', type: 'freeform', tags: ['mine'] },
+          { id: '0xshared', prompt: 'Shared question', type: 'freeform', tags: ['mine'], encryption: { mode: 'lit' } },
+        ],
+        uploadedQuestions: [
+          { questionId: '0xmine', resource: 'questions', storageRef: { backend: 'cloudflare', id: 'cf_mine' } },
+          { questionId: '0xshared', resource: 'questions', alreadyPublished: true },
+        ],
+        sourceQuestions: [],
+      }),
+    ).resolves.toBe(true);
+    const questionsNode = (
+      writeCacheOptimisticMock.mock.calls.find(([namespace]) => namespace === 'questionsCache')?.[2] as any
+    )?.worker;
+    // The seeded row stays until hydration, which now rereads its canonical blob.
+    expect(questionsNode.questions['0xmine'].tags).toEqual(['mine']);
+    expect(questionsNode.workerQuestionMetadataRefs).not.toHaveProperty('0xmine');
+    // Another author's question keeps their copy and its ref untouched.
+    expect(questionsNode.questions['0xshared']).toEqual(
+      expect.objectContaining({ tags: ['theirs'], prompt: 'Shared question' }),
+    );
+    expect(questionsNode.questions['0xshared']).not.toHaveProperty('alreadyPublished');
+    expect(questionsNode.questions['0xshared']).not.toHaveProperty('encryption');
+    expect(questionsNode.workerQuestionMetadataRefs['0xshared']).toEqual(canonicalRef);
+  });
+
   it('publishes standalone questions through Worker storage without registry, contract, or chain calls', async () => {
     const sessionConfig = buildWorkerSessionConfig();
     const publishQuestions = jest.spyOn(workerCanonicalAuthoringPort, 'publishQuestions').mockResolvedValue({
