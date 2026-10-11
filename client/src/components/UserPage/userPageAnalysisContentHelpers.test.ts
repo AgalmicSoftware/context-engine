@@ -266,7 +266,7 @@ it('keeps locked answers out of profile analysis after this browser decrypts the
   });
   expect(decrypted?.answer).toMatchObject({ value: 'only-me answer', encrypted: true, decryptedLocally: true });
 
-  const responses = {
+  const responses: Record<string, unknown> = {
     q1: decrypted,
     q2: { answer: { value: 'admin answer', encryptionAudience: 'self_admin' } },
     q3: { answer: { value: 'gated answer', encrypted: true } },
