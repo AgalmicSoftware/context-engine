@@ -145,12 +145,15 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     questionId,
     decryptedStateSlice,
     baselineSlice = null,
+    pendingBaseline = null,
     decryptedImportance = null,
     decryptedConviction = null,
   }: {
     questionId?: unknown;
     decryptedStateSlice?: unknown;
     baselineSlice?: unknown;
+    // The edit baseline; a rating that differs from it is a pending edit to keep.
+    pendingBaseline?: unknown;
     decryptedImportance?: unknown;
     decryptedConviction?: unknown;
   } = {},
@@ -212,13 +215,20 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     };
   }
 
-  if (decryptedImportance !== null && decryptedImportance !== undefined) {
-    nextTargetStateSlice.importance = nextTargetStateSlice.importance || {};
-    asRecord(nextTargetStateSlice.importance)[qid] = decryptedImportance;
-  }
-  if (decryptedConviction !== null && decryptedConviction !== undefined) {
-    nextTargetStateSlice.conviction = nextTargetStateSlice.conviction || {};
-    asRecord(nextTargetStateSlice.conviction)[qid] = decryptedConviction;
+  const ratings = [
+    ['importance', decryptedImportance],
+    ['conviction', decryptedConviction],
+  ] as const;
+  for (const [ratingKey, decryptedValue] of ratings) {
+    if (decryptedValue === null || decryptedValue === undefined) continue;
+    const current = asRecord(nextTargetStateSlice[ratingKey]);
+    const pending =
+      !!pendingBaseline &&
+      current[qid] !== null &&
+      current[qid] !== undefined &&
+      current[qid] !== asRecord(asRecord(pendingBaseline)[ratingKey])[qid];
+    // Copy the map: it is shared with the previous React state.
+    if (!pending) nextTargetStateSlice[ratingKey] = { ...current, [qid]: decryptedValue };
   }
 
   return nextTargetStateSlice;
@@ -258,6 +268,7 @@ export const buildSelfQuestionDecryptSuccessState = (
         questionId,
         decryptedStateSlice,
         baselineSlice,
+        pendingBaseline: previous.editBaseline,
         decryptedImportance,
         decryptedConviction,
       },

@@ -8,6 +8,7 @@ import { ethers } from 'ethers';
 import { cryptoUtils } from '../../utilities/crypto/cryptography';
 import { wrapWorkerResponseFieldKey } from '../../utilities/crypto/workerResponseFieldKeys';
 import {
+  buildSelfQuestionDecryptSuccessState,
   buildSurveyDecryptSuccessState,
   normalizeBulkDecryptedSliceForSurveyState,
 } from './surveyToolDecryptSliceState';
@@ -182,4 +183,40 @@ it('preserves answer and comment audience metadata when decrypting the survey', 
   };
   expect(slice.answers.q1).toEqual({ ...field, value: 'answer' });
   expect(slice.additionalComments.q1).toEqual({ ...field, value: 'comment' });
+});
+
+it('keeps a rating edited before Decrypt Answer pending and leaves the previous state untouched', () => {
+  const qid = '0xq1';
+  const masked = {
+    answers: { [qid]: { value: '*', encrypted: true, encryptionAudience: 'self', encryptedPortion: 'answer-env' } },
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  };
+  const edited = { ...masked, conviction: { [qid]: 9 } };
+  const previous = { surveysResponseState: [edited], editBaseline: JSON.parse(JSON.stringify(masked)) };
+  const clone = (value: unknown) => JSON.parse(JSON.stringify(value));
+
+  const next = buildSelfQuestionDecryptSuccessState(
+    previous,
+    {
+      surveyIndex: 0,
+      questionId: qid,
+      clearMode: 'answer',
+      didUpdate: true,
+      baselineSlice: clone(edited),
+      decryptedStateSlice: { answers: { [qid]: { value: 'Agree' } } },
+      decryptedImportance: 6,
+      decryptedConviction: 4,
+    },
+    clone,
+  ) as Record<string, any>;
+
+  expect(next.surveysResponseState[0].answers[qid].value).toBe('Agree');
+  expect(next.surveysResponseState[0].importance[qid]).toBe(6);
+  expect(next.surveysResponseState[0].conviction[qid]).toBe(9);
+  expect(next.editBaseline.conviction[qid]).toBe(4);
+  expect(next.editBaseline.importance[qid]).toBe(6);
+  expect(edited.conviction).toEqual({ [qid]: 9 });
+  expect(edited.importance).toEqual({});
 });
