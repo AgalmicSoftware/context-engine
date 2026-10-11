@@ -280,23 +280,25 @@ it.each([
   [false, 'name', true],
   [true, 'AI attribution', true],
 ])(
-  'keeps a pending withdrawal with own listing %s for %s after a rejected apply (reload: %s)',
+  'shows the saved choice again once a rejected withdrawal is closed (own listing %s, %s, reload: %s)',
   async (listingAvailable, choice, reload) => {
     mockCaches();
     mockOwnAnswerListing(listingAvailable);
     const submitResponses = mockSubmit();
     let getEngine = await mountPileEngine();
     await openReplacementDraft(getEngine, 'Disagree');
-    const checkbox =
+    const checkbox = () =>
       choice === 'name'
         ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
         : screen.getByLabelText(/Include platform\/model provenance/i);
-    expect(checkbox).toBeChecked();
-    fireEvent.click(checkbox);
+    expect(checkbox()).toBeChecked();
+    fireEvent.click(checkbox());
     submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
     await settle();
+    // The failed upload leaves neither the draft nor the withdrawal pending in the pile.
+    expect(getEngine().getPendingEditStats().total).toBe(0);
     if (reload) {
       getEngine.view.unmount();
       getEngine = await mountPileEngine();
@@ -305,23 +307,43 @@ it.each([
       await settle(300);
     }
     await openReplacementDraft(getEngine, 'Unsure');
-    if (choice === 'name') {
-      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
-    } else {
-      expect(screen.getByLabelText(/Include platform\/model provenance/i)).not.toBeChecked();
-    }
+    expect(checkbox()).toBeChecked();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(2));
     await settle();
     const uploaded = submitResponses.mock.calls[1][2][0];
     expect(uploaded.answer.value).toBe('Unsure');
+    expect(uploaded.responderName).toBe('Participant A');
+    expect(uploaded.interviewProvenance).toMatchObject({ source: { modelId: 'new-model' } });
+  },
+  40000,
+);
+
+it.each(['name', 'AI attribution'])(
+  'keeps a %s withdrawal when Submit is retried after a rejection',
+  async (choice) => {
+    mockCaches();
+    mockOwnAnswerListing(true);
+    const submitResponses = mockSubmit();
+    const getEngine = await mountPileEngine();
+    await openReplacementDraft(getEngine, 'Disagree');
+    fireEvent.click(
+      choice === 'name'
+        ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
+        : screen.getByLabelText(/Include platform\/model provenance/i),
+    );
+    submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
+    await settle();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(2));
+    await settle();
+    const uploaded = submitResponses.mock.calls[1][2][0];
+    expect(uploaded.answer.value).toBe('Disagree');
     if (choice === 'name') {
       expect(uploaded).not.toHaveProperty('responderName');
-      expect(uploaded.interviewProvenance).toMatchObject({
-        source: { modelId: 'new-model' },
-        promptVersion: 'ce-interview-brief-v5',
-        questionSetHash: 'a'.repeat(64),
-      });
+      expect(uploaded.interviewProvenance).toMatchObject({ source: { modelId: 'new-model' } });
     } else {
       expect(uploaded).not.toHaveProperty('interviewProvenance');
       expect(uploaded.responderName).toBe('Participant A');

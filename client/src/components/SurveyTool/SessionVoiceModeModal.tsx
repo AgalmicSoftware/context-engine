@@ -74,6 +74,7 @@ type InterviewDraftApplicationProps = InterviewQuestionControls & {
   onApplyAdditional: (questionId: string, comments: string) => void | Promise<void>;
   onApplyImportance: (questionId: string, importance: number) => void | Promise<void>;
   onApplyConviction: (questionId: string, conviction: number) => void | Promise<void>;
+  onCaptureResponses?: (questionIds: string[]) => () => void | Promise<void>;
   onRecordProvenance?: (
     drafts: InterviewDraftResponse[],
     source: InterviewPrefillPacket['source'] | null,
@@ -144,6 +145,7 @@ function SessionInterviewPanel({
   onApplyAdditional,
   onApplyImportance,
   onApplyConviction,
+  onCaptureResponses,
   onRecordProvenance,
   onSubmitResponses,
   onViewResults,
@@ -699,6 +701,7 @@ function SessionInterviewPanel({
       onApplyAnswer,
       onApplyConviction,
       onApplyImportance,
+      onCaptureResponses,
       onRecordProvenance,
       onSubmitResponses,
       onSubmitted: () => {
@@ -732,6 +735,7 @@ function SessionInterviewPanel({
     onApplyAnswer,
     onApplyConviction,
     onApplyImportance,
+    onCaptureResponses,
     onRecordProvenance,
     onSubmitResponses,
     prefillPacket,

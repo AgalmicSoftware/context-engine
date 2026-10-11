@@ -37,6 +37,7 @@ type RunInterviewDraftSubmitInput = {
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
   onApplyConviction: (questionId: string, conviction: number) => void | Promise<void>;
   onApplyImportance: (questionId: string, importance: number) => void | Promise<void>;
+  onCaptureResponses?: (questionIds: string[]) => () => void | Promise<void>;
   onRecordProvenance?: (
     drafts: InterviewDraftResponse[],
     source: InterviewPrefillPacket['source'] | null,
@@ -97,6 +98,7 @@ export const runInterviewDraftSubmit = async ({
   onApplyAnswer,
   onApplyConviction,
   onApplyImportance,
+  onCaptureResponses,
   onRecordProvenance,
   onSubmitResponses,
   onSubmitted,
@@ -151,6 +153,9 @@ export const runInterviewDraftSubmit = async ({
   }
 
   setStatus('Preparing submission…');
+  // Applied drafts stay in the form only once saved; any other outcome restores what it held.
+  const restoreResponses = onCaptureResponses?.(applied.map((draft) => draft.questionId));
+  let saved = false;
   try {
     for (const original of applied) {
       if (!isSubmitContextCurrent(attemptToken)) return;
@@ -192,6 +197,10 @@ export const runInterviewDraftSubmit = async ({
 
     if (!isSubmitContextCurrent(attemptToken)) return;
     const submitResult = await onSubmitResponses?.(applied.map((draft) => draft.questionId));
+    saved =
+      !!submitResult &&
+      typeof submitResult === 'object' &&
+      ['submitted', 'already-saved'].includes(submitResult.status);
     if (!isSubmitContextCurrent(attemptToken)) return;
     if (submitResult && typeof submitResult === 'object' && submitResult.status === 'login-required') {
       pendingSubmitBaseContextRef.current = baseSubmitContextToken;
@@ -200,11 +209,7 @@ export const runInterviewDraftSubmit = async ({
       setStatus('Log in to submit…');
       return;
     }
-    if (
-      !submitResult ||
-      typeof submitResult !== 'object' ||
-      !['submitted', 'already-saved'].includes(submitResult.status)
-    ) {
+    if (!saved) {
       const message =
         submitResult && typeof submitResult === 'object' && 'message' in submitResult
           ? String(submitResult.message || '')
@@ -216,7 +221,7 @@ export const runInterviewDraftSubmit = async ({
       pendingSubmitBaseContextRef,
       setPendingSubmitAfterLogin,
     });
-    setStatus(submitResult.status === 'already-saved' ? 'Responses already saved' : 'Responses submitted');
+    setStatus(submitResult?.status === 'already-saved' ? 'Responses already saved' : 'Responses submitted');
     onSubmitted?.();
   } catch (applyError) {
     if (disposedRef.current) return;
@@ -228,6 +233,7 @@ export const runInterviewDraftSubmit = async ({
     setError(applyError instanceof Error ? applyError.message : 'Could not apply the selected drafts.');
     setStatus('Draft submission failed');
   } finally {
+    if (!saved) await restoreResponses?.();
     applyingRef.current = false;
     if (!disposedRef.current) setApplying(false);
   }

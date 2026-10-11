@@ -2197,6 +2197,50 @@ export const applySessionInterviewAnswer = (engine: PileViewModeEngine, question
     engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
   });
 
+const INTERVIEW_RESPONSE_FIELDS = ['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'];
+
+// Interview drafts enter the pile only to be uploaded. The returned restore puts back
+// what the pile held, so a draft removed or discarded after a failed upload is not sent later.
+export const captureSessionInterviewResponses = (engine: PileViewModeEngine, questionIds: string[]) => {
+  const readContext = () =>
+    buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const context = readContext();
+  const ids = [...new Set(questionIds.flatMap((id) => [String(id), normalizeQuestionIdKey(id)]))].filter(Boolean);
+  const slice = readPlainRecord(engine.state.surveysResponseState?.[0]);
+  const before = INTERVIEW_RESPONSE_FIELDS.map((field) => {
+    const entries = readPlainRecord(slice[field]);
+    return { field, entries: ids.map((id) => ({ id, had: Object.hasOwn(entries, id), value: entries[id] })) };
+  });
+  return () =>
+    new Promise<void>((resolve) => {
+      // A reset for another account or session already discarded the applied drafts.
+      if (!engine._isMounted || readContext() !== context) return resolve();
+      engine.invalidateDiffCaches();
+      engine.setState(
+        (prev: SurveyQuestionsState) => {
+          const states = [...(prev.surveysResponseState || [])];
+          const current: Record<string, unknown> = { ...states[0] };
+          before.forEach(({ field, entries }) => {
+            const next = { ...readPlainRecord(current[field]) };
+            entries.forEach(({ id, had, value }) => {
+              if (had) next[id] = value;
+              else delete next[id];
+            });
+            if (current[field] !== undefined || Object.keys(next).length) current[field] = next;
+          });
+          states[0] = current as (typeof states)[number];
+          return { surveysResponseState: states };
+        },
+        () => {
+          // Drop the applied drafts from storage too, so a reload cannot bring them back.
+          ids.forEach((id) => engine._draftDirtyQids?.add(normalizeQuestionIdKey(id)));
+          engine.persistDraft?.();
+          resolve();
+        },
+      );
+    });
+};
+
 const markSessionInterviewResponsesReady = (engine: PileViewModeEngine, baseToken: string) => {
   engine._sessionInterviewResponseReadyToken = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
 };
@@ -3253,6 +3297,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   })
                 }
                 onRecordProvenance={engine.recordInterviewProvenance}
+                onCaptureResponses={(questionIds: string[]) => captureSessionInterviewResponses(engine, questionIds)}
                 onLoadSavedResponses={(questionIds, signal) =>
                   loadSessionInterviewOwnAnswers(engine, questionIds, signal)
                 }
