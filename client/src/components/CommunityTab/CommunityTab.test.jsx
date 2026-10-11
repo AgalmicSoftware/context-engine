@@ -387,6 +387,24 @@ describe('CommunityTab helpers', () => {
     expect(instance._communityScopeLabel()).toBe('All sessions');
   });
 
+  it('reuses the scope label until its session inputs change', () => {
+    const configLookup = jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
+    const instance = new CommunityTab({ activeSessionSlug: 'alpha' });
+    instance._getSelectedSessionSlugs = jest.fn(() => ['alpha']);
+
+    expect(instance._communityScopeLabel()).toBe('Session: alpha');
+    expect(instance._communityScopeLabel()).toBe('Session: alpha');
+    expect(instance._getSelectedSessionSlugs).toHaveBeenCalledTimes(1);
+    expect(configLookup).toHaveBeenCalledTimes(1);
+
+    // A refreshed session catalog (registry or Worker records changed) recomputes it.
+    instance.state.sessions = [...instance.state.sessions];
+    configLookup.mockReturnValue({ slug: 'alpha', sessionName: 'Alpha forum' });
+    expect(instance._communityScopeLabel()).toBe('Session: Alpha forum (alpha)');
+    expect(instance._getSelectedSessionSlugs).toHaveBeenCalledTimes(2);
+  });
+
   it('labels bundled demo fallback separately from the selected live session', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'cloud' });
     instance._shouldUseDemoBeeswarmData = jest.fn(() => false);

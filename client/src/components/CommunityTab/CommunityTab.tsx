@@ -209,6 +209,7 @@ class CommunityTab extends Component<any, any> {
     this._holdersHydrationPromise = null;
     this._cacheRefIds = new WeakMap();
     this._nextCacheRefId = 1;
+    this._scopeLabelMemo = null;
     this._latestCacheSignature = '';
     this._latestCoarseCacheSignature = '';
     this._statsPollTimer = null;
@@ -337,11 +338,30 @@ class CommunityTab extends Component<any, any> {
     return name && name.toLowerCase() !== slugLabel.toLowerCase() ? `${name} (${slugLabel})` : slugLabel;
   };
 
+  // Render calls this every time, and each display name re-reads the session
+  // registry and Worker caches. Recompute only when one of its inputs changes;
+  // the catalog in state changes whenever the registry or Worker records do.
   _communityScopeLabel = () => {
-    if (this._isUniverseEnabled()) return 'All sessions';
-    const slugs = this._getSelectedSessionSlugs();
-    const selected = slugs.length ? slugs : [this._currentSlug()];
-    return `${selected.length === 1 ? 'Session' : 'Sessions'}: ${selected.map(this._sessionDisplayName).join(', ')}`;
+    const universe = this._isUniverseEnabled();
+    const key = JSON.stringify([
+      universe,
+      this._readGlobalSelection(),
+      readSessionScanScope(),
+      readSessionScanSlugs(),
+      typeof window !== 'undefined' ? window.location.pathname : '',
+      this.props.activeSessionSlug ?? null,
+      this._getObjectRefId(this.props.sessionConfig),
+      this._getObjectRefId(this.state.sessions),
+    ]);
+    if (this._scopeLabelMemo?.key === key) return this._scopeLabelMemo.label;
+    let label = 'All sessions';
+    if (!universe) {
+      const slugs = this._getSelectedSessionSlugs();
+      const selected = slugs.length ? slugs : [this._currentSlug()];
+      label = `${selected.length === 1 ? 'Session' : 'Sessions'}: ${selected.map(this._sessionDisplayName).join(', ')}`;
+    }
+    this._scopeLabelMemo = { key, label };
+    return label;
   };
 
   _getDefaultSelectedSessionSlugs = () => {
