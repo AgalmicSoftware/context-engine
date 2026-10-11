@@ -609,7 +609,8 @@ describe('sessionCorsWorker auth routes', () => {
   });
 
   it('does not treat eventually consistent KV nonce markers as the consume authority', async () => {
-    const nonce = 'reused-auth-nonce';
+    // EIP-4361 nonces are letters and digits only.
+    const nonce = 'reusedAuthNonce1';
     const fetchMock = buildRpcFetchMock({
       rpcUrl,
       registryAddress,
