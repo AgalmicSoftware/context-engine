@@ -90,6 +90,8 @@ const useSessionWizardIdentityEffects = <TDraft extends DraftWithIdentity>({
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '')
+      // Participant links open only slugs that start with a letter or digit.
+      .replace(/^-+/, '')
       .slice(0, 48);
     if (!autoSlug) return;
     const currentSlug = toStr(draftSlug).trim();
