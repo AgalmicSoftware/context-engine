@@ -104,8 +104,6 @@ For a custom-domain self-host, the values to check first are:
   default bundle downloads are disabled rather than falling back to `latest`.
 - `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own
   deploy-helper for the explicit legacy fallback.
-- `REACT_APP_CE_HEALTHCHECK_WORKER_URL` when worker diagnostics should target a
-  specific worker.
 - `REACT_APP_CE_WORKER_BUNDLE_URL` and `REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL`
   only when deploy flows should fetch Worker bundles from non-default URLs.
 - `REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL` alongside any Worker bundle URL
