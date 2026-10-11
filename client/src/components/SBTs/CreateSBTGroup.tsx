@@ -1598,7 +1598,8 @@ class CreateSBTGroup extends Component<any, any> {
     this.setGeneratedGroupPassword({ groupPasswordRestoreNotice: false });
   };
 
-  // A create uses the password captured when Create was clicked, so the field stays locked until it ends.
+  // While a create runs, the password, the distribution mode and Clear stay locked: the create uses the password
+  // captured when Create was clicked and reads the mode as it goes.
   isCreateInFlight = (): boolean => !!this.state.startedMinting && !this.state.sbtMinted && !this.state.mintingFailed;
 
   // After a create, the field holds the only copy of the deployed password. It stays locked until the creator
@@ -4181,6 +4182,7 @@ class CreateSBTGroup extends Component<any, any> {
               onClick={this.resetForm}
               className={styles.clearFormButton}
               title="Clear all fields and reset to defaults"
+              disabled={this.isCreateInFlight()}
             >
               <FontAwesomeIcon icon={faEraser} /> Clear
             </button>
@@ -4398,6 +4400,7 @@ class CreateSBTGroup extends Component<any, any> {
           {!distributionOptionsCollapsed &&
             renderCreateSbtDistributionOptionsSection({
               distributionOptions,
+              distributionLocked: this.isCreateInFlight(),
               actionDisplayState,
               groupPassword,
               groupPasswordIsShort: isShortCreateSbtGroupPassword(

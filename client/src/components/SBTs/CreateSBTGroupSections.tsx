@@ -314,6 +314,8 @@ export const renderCreateSbtMintOptionsSection = ({
 
 type RenderCreateSbtDistributionOptionsSectionArgs = {
   distributionOptions: SelectableDistributionOptionConfig[];
+  // Locked while a create runs, because the create reads the chosen mode as it goes.
+  distributionLocked: boolean;
   actionDisplayState: ActionDisplayState;
   groupPassword: string;
   groupPasswordIsShort: boolean;
@@ -329,6 +331,7 @@ type RenderCreateSbtDistributionOptionsSectionArgs = {
 
 export const renderCreateSbtDistributionOptionsSection = ({
   distributionOptions,
+  distributionLocked,
   actionDisplayState,
   groupPassword,
   groupPasswordIsShort,
@@ -357,6 +360,7 @@ export const renderCreateSbtDistributionOptionsSection = ({
                 name="sbtDistribution.distributionOption"
                 value={option.value}
                 checked={option.selected}
+                disabled={distributionLocked}
                 onChange={handleInputChange}
               />
               <span>{option.label}</span>

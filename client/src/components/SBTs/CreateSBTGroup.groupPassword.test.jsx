@@ -245,6 +245,29 @@ describe('CreateSBTGroup group password', () => {
       expect(instance.state.groupPassword).toBe(PASSPHRASE);
     });
 
+    it('locks the distribution choice and Clear, since the create reads them as it runs', async () => {
+      const instance = makeCreatingInstance();
+      jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(`0x${'66'.repeat(32)}`);
+      let controlsDuringCreate = null;
+      contractScripts.createSBT.mockImplementation(async () => {
+        const view = render(instance.render());
+        controlsDuringCreate = {
+          modes: [...view.container.querySelectorAll('input[name="sbtDistribution.distributionOption"]')].map(
+            (radio) => radio.disabled,
+          ),
+          clear: screen.getByTitle('Clear all fields and reset to defaults').disabled,
+        };
+        view.unmount();
+        return { logs: [makeFactoryReceiptLog('SBTCreated', [PREDICTED])] };
+      });
+
+      await instance.handleMintClick();
+
+      expect(controlsDuringCreate).toEqual({ modes: [true, true, true], clear: true });
+      expect(instance.state.sbtMinted).toBe(true);
+      expect(instance.state.sbtDistribution.distributionOption).toBe('groupPassword');
+    });
+
     it('deploys the password captured at Create even if the field changes during the upload', async () => {
       const instance = makeCreatingInstance();
       instance.uploadImageToArweave = jest.fn(async () => {
