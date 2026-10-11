@@ -588,3 +588,64 @@ it('takes a missing rating envelope from the cache even when the saved row has t
   expect(row.convictionEncrypted).toBe(prior.convictionEncrypted);
   expect(registry.get(row.convictionEncrypted)).toBe(4);
 }, 60000);
+
+it('keeps ratings protected by a locked comment encrypted after its text is deleted', async () => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await act(async () => h.engine().handleAnswerPile(qid(2), 'public answer'));
+  await act(async () => h.engine().handleAdditionalPile(qid(2), 'secret comment'));
+  await act(async () => h.engine().applyAdditionalEncryptionAudience(0, qid(2), 'self'));
+  await act(async () => h.engine().handleImportance(0, qid(2), 6));
+  await act(async () => h.engine().handleConviction(0, qid(2), 5));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const prior = h.uploads[0].questionResponses.find((row) => row.questionID === qid(2));
+  expect(prior.importanceEncrypted).toBeTruthy();
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  await goTo(h, 2);
+
+  // Decrypting the comment also reveals the ratings it protected.
+  let decrypted;
+  await act(async () => {
+    decrypted = new Promise((resolve) =>
+      h.engine().setState(
+        (prev) =>
+          buildSelfQuestionDecryptSuccessState(
+            prev,
+            {
+              surveyIndex: 0,
+              questionId: qid(2),
+              clearMode: 'additional',
+              didUpdate: true,
+              baselineSlice: prev.editBaseline,
+              decryptedStateSlice: { answers: {}, additionalComments: { [qid(2)]: { value: 'secret comment' } } },
+              decryptedImportance: 6,
+              decryptedConviction: 5,
+            },
+            (value) => JSON.parse(JSON.stringify(value)),
+          ),
+        resolve,
+      ),
+    );
+  });
+  await act(async () => {
+    await decrypted;
+  });
+  // Deleting the comment text leaves its lock on.
+  await act(async () => h.engine().handleAdditionalPile(qid(2), ''));
+  expect(h.engine().state.surveysResponseState[0].additionalComments[qid(2)].encrypted).toBe(true);
+
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(2));
+  expect(row.additional.value).toBe('');
+  expect(row.importanceEncrypted).toBe(prior.importanceEncrypted);
+  expect(row.convictionEncrypted).toBe(prior.convictionEncrypted);
+  expect(row.importance == null && row.conviction == null).toBe(true);
+  expect(guard(h.uploads.at(-1))).toBe('passed');
+}, 60000);

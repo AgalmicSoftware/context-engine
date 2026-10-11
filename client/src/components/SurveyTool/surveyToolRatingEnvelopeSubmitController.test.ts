@@ -672,6 +672,39 @@ describe('ratings after the answer and comment locks change', () => {
     convictionEncrypted: envelope('self_admin'),
   };
 
+  it('keeps stored rating envelopes while a comment whose text was deleted is still locked', async () => {
+    const encryptEnvelopeValue = jest.fn(async (value: unknown) => `encrypted:${value}`);
+    const selfRow = { questionID: 'q1', importanceEncrypted: envelope('self'), convictionEncrypted: envelope('self') };
+    const respObj: TestRatingResponse = {
+      questionID: 'q1',
+      importance: 6,
+      conviction: 5,
+      answer: { encrypted: false },
+      additional: { value: '', encrypted: false },
+    };
+
+    await processRatingEnvelopesForSubmit(
+      makeContext({
+        sliceForSubmit: {
+          ...unlockedSlice({ importance: 6, conviction: 5 }),
+          additionalComments: { q1: { value: '', encrypted: true, encryptionAudience: 'self' } },
+        },
+        userAnswersSource: { responses: [selfRow] },
+        questionResponses: [respObj],
+        changedMapForSubmit: { q1: { additional: true } },
+      }),
+      buildMockDeps({ encryptEnvelopeValue }),
+    );
+
+    expect(respObj).toMatchObject({
+      importance: null,
+      conviction: null,
+      importanceEncrypted: selfRow.importanceEncrypted,
+      convictionEncrypted: selfRow.convictionEncrypted,
+    });
+    expect(encryptEnvelopeValue).not.toHaveBeenCalled();
+  });
+
   it('publishes decrypted ratings once neither the answer nor the comment is locked', async () => {
     const encryptEnvelopeValue = jest.fn(async (value: unknown) => `encrypted:${value}`);
     const respObj: TestRatingResponse = {

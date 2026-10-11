@@ -21,7 +21,7 @@ type RatingSliceForSubmit = {
   conviction?: Record<string, unknown>;
 };
 
-// A blank comment protects nothing, so only a comment with text can lock its ratings.
+// A lock on a comment that has no text protects nothing new, so it does not encrypt fresh ratings.
 const hasCommentText = (field: ResponseFieldState | undefined): boolean =>
   typeof field?.value === 'string' ? field.value.trim().length > 0 : field?.value != null;
 
@@ -183,7 +183,7 @@ export function pickAudienceForRatingEncryption(
     if (['self', 'self_admin', 'session'].includes(audience)) return { audience, recipients: [] };
   }
 
-  if (additionalField?.encrypted && hasCommentText(additionalField)) {
+  if (additionalField?.encrypted) {
     const audience = deps.resolveFieldEncryptionAudience(additionalField, qLower, 'additional');
     if (audience === 'gate') {
       return {
@@ -214,16 +214,13 @@ export function shouldEncryptRatingForQid(
   const qLower = String(qid || '')
     .trim()
     .toLowerCase();
-  const locked = deps.isQuestionLockedForResponse(qLower);
   const answerState = sliceForSubmit?.answers?.[qLower];
   const additionalState = sliceForSubmit?.additionalComments?.[qLower];
-  // Ratings follow the answer's lock and a comment's lock when it has text.
-  const encryptedState =
-    !!locked || !!answerState?.encrypted || (!!additionalState?.encrypted && hasCommentText(additionalState));
-  const encryptedPayload =
-    !!respObj?.answer?.encrypted || (!!respObj?.additional?.encrypted && hasCommentText(respObj.additional));
-
-  return encryptedState || encryptedPayload;
+  if (deps.isQuestionLockedForResponse(qLower) || answerState?.encrypted || respObj?.answer?.encrypted) return true;
+  if (!additionalState?.encrypted && !respObj?.additional?.encrypted) return false;
+  // Ratings stored encrypted stay encrypted while a comment lock is on, even once its text is deleted.
+  const storedEncrypted = RATING_FIELD_SPECS.some(({ envelopeKey }) => !!respObj?.[envelopeKey]);
+  return storedEncrypted || hasCommentText(additionalState) || hasCommentText(respObj?.additional);
 }
 
 export async function processRatingEnvelopesForSubmit(
@@ -266,7 +263,7 @@ export async function processRatingEnvelopesForSubmit(
       }
     });
 
-    // Ratings follow the answer and comment locks; an earlier envelope does not keep them locked.
+    // Ratings follow the answer and comment locks; with every lock off, known ratings go public.
     if (!shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps)) {
       RATING_FIELD_SPECS.forEach(({ fieldKey, envelopeKey }) => {
         if (!respObj[envelopeKey]) return;
