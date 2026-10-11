@@ -1,3 +1,4 @@
+import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
@@ -13,6 +14,7 @@ import { resolveWorkerCanonicalStorageTarget } from './workerCanonicalAuthoringP
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
   type WorkerCanonicalCacheIdentity,
+  resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
   workerCanonicalCacheIdentityMatches,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
@@ -89,6 +91,16 @@ const readString = (value: unknown): string => String(value || '').trim();
 const isHiddenEntry = (entry: WorkerCanonicalMetadataEntry): entry is WorkerCanonicalHiddenMetadataRow =>
   (entry as WorkerCanonicalHiddenMetadataRow).hidden === true;
 
+const METADATA_CACHE_NAMESPACES = {
+  [STORAGE_RESOURCE_KEYS.QUESTIONS]: 'questionsCache',
+  [STORAGE_RESOURCE_KEYS.SURVEYS]: 'surveysCache',
+} as const;
+
+const METADATA_REFS_FIELDS = {
+  [STORAGE_RESOURCE_KEYS.QUESTIONS]: 'workerQuestionMetadataRefs',
+  [STORAGE_RESOURCE_KEYS.SURVEYS]: 'workerSurveyMetadataRefs',
+} as const;
+
 const listAddresses = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.flatMap(listAddresses);
   if (isRecord(value)) return listAddresses(value.addresses);
@@ -130,6 +142,43 @@ const isPreferredVersion = (candidate: CachedVersion, current: CachedVersion | n
   if (candidate.admin) return age > 0;
   if (candidate.verified !== current.verified) return candidate.verified;
   return age < 0;
+};
+
+// Storage refs are immutable, so blobs already merged into the managed cache
+// never need another read. The hydration merge writes that same cache.
+const readCachedStorageRefIds = (
+  resource: WorkerCanonicalMetadataResource,
+  sessionSlug: unknown,
+  identity: WorkerCanonicalCacheIdentity,
+): Set<string> => {
+  const cache = peekCacheSync<UnknownRecord>(METADATA_CACHE_NAMESPACES[resource], readString(sessionSlug), {
+    clone: false,
+  });
+  const node = isRecord(cache) ? cache[WORKER_CANONICAL_CACHE_SCOPE_KEY] : null;
+  if (!isRecord(node) || !workerCanonicalCacheIdentityMatches(node, identity)) return new Set();
+  const items = node[resource === STORAGE_RESOURCE_KEYS.QUESTIONS ? 'questions' : 'surveys'];
+  const refs = node[METADATA_REFS_FIELDS[resource]];
+  if (!isRecord(items) || !isRecord(refs)) return new Set();
+  return new Set(
+    Object.entries(refs)
+      .filter(([id, ref]) => isRecord(items[id]) && isRecord(ref))
+      .map(([, ref]) => readString((ref as UnknownRecord).storageRefId))
+      .filter(Boolean),
+  );
+};
+
+const mapWithConcurrency = async <T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> => {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  const runWorker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await task(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runWorker));
+  return results;
 };
 
 const readPayloadResourceId = (payload: UnknownRecord, resource: WorkerCanonicalMetadataResource): string => {
@@ -246,6 +295,11 @@ const loadWorkerCanonicalMetadata = async (
     }
   }
 
+  const cachedStorageRefIds = readCachedStorageRefIds(
+    resource,
+    input.sessionSlug,
+    resolveWorkerCanonicalCacheIdentity({ sessionConfig: target.sessionConfig, sessionSlug: target.sessionSlug }),
+  );
   const admins = resolveSessionAdminAddresses(target.sessionConfig);
   const hiddenIds = new Set<string>();
   const uniqueItems: Array<{ createdAtMs: number; storageRef: StorageRef; uploader: string }> = [];
@@ -260,7 +314,7 @@ const loadWorkerCanonicalMetadata = async (
     const storageRefId = readString(normalized?.storageRef.id);
     if (!normalized || !storageRefId || seenStorageRefs.has(storageRefId)) return;
     seenStorageRefs.add(storageRefId);
-    uniqueItems.push(normalized);
+    if (!cachedStorageRefIds.has(storageRefId)) uniqueItems.push(normalized);
   });
 
   const readRow = async ({
@@ -303,10 +357,7 @@ const loadWorkerCanonicalMetadata = async (
       ...(uploader && admins.has(uploader) ? { uploaderIsAdmin: true } : {}),
     };
   };
-  const readRows: Array<WorkerCanonicalMetadataRow | null> = [];
-  for (let offset = 0; offset < uniqueItems.length; offset += METADATA_READ_CONCURRENCY) {
-    readRows.push(...(await Promise.all(uniqueItems.slice(offset, offset + METADATA_READ_CONCURRENCY).map(readRow))));
-  }
+  const readRows = await mapWithConcurrency(uniqueItems, METADATA_READ_CONCURRENCY, readRow);
   const rows = readRows
     .filter((row): row is WorkerCanonicalMetadataRow => !!row)
     .sort(

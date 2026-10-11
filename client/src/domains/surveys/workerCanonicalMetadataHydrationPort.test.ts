@@ -5,8 +5,11 @@ import {
   mergeWorkerCanonicalSurveyMetadata,
   type WorkerCanonicalMetadataEntry,
 } from './workerCanonicalMetadataHydrationPort';
+import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { resolveWorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
+
+jest.mock('../../utilities/cache/cacheScripts', () => ({ peekCacheSync: jest.fn(() => null) }));
 
 const SESSION_ID = `0x${'2'.repeat(32)}`;
 const WORKER_URL = 'https://metadata-worker.example.test';
@@ -461,6 +464,11 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       return { rows, readSessionStorageBlob };
     };
 
+    afterEach(() => {
+      (peekCacheSync as jest.Mock).mockReset();
+      (peekCacheSync as jest.Mock).mockReturnValue(null);
+    });
+
     it('keeps the first upload of a question id when someone uploads it again later', async () => {
       const { rows } = await loadFrom(
         [
@@ -523,14 +531,12 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         createdAtMs: Date.parse('2026-10-02T00:00:00.000Z'),
         storageRefId: 'cf_attacker',
       };
+      (peekCacheSync as jest.Mock).mockReturnValue(staleCache);
       const { rows, readSessionStorageBlob } = await loadFrom(
         [listedItem('cf_attacker', '2026-10-02T00:00:00.000Z'), listedItem('cf_official', '2026-10-01T00:00:00.000Z')],
         { cf_official: question(), cf_attacker: question({ prompt: 'ATTACKER rewrite' }) },
       );
-      expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual([
-        'cf_attacker',
-        'cf_official',
-      ]);
+      expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual(['cf_official']);
       const cache = mergeWorkerCanonicalQuestionMetadata(staleCache, rows, identity) as any;
       expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
       expect(cache.worker.questions[QUESTION_ID].voiceCredits).toBeUndefined();
@@ -577,6 +583,52 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       ).toEqual(['cf_text_title']);
       const cache = mergeWorkerCanonicalSurveyMetadata(null, rows, identity) as any;
       expect(cache.worker.surveys['0xsurvey'].title).toBe('Readable survey');
+    });
+
+    it('rereads only storage refs the cache does not already hold, through a rolling pool', async () => {
+      const items = Array.from({ length: 20 }, (_, index) =>
+        listedItem(`cf_q_${index}`, `2026-10-01T00:00:${String(index).padStart(2, '0')}.000Z`),
+      );
+      const cachedCache = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
+      cachedCache.worker.questions['0xq0'] = question({ id: '0xq0' });
+      cachedCache.worker.workerQuestionMetadataRefs['0xq0'] = { createdAtMs: 1, storageRefId: 'cf_q_0' };
+      cachedCache.worker.workerQuestionMetadataRefs['0xorphan'] = { createdAtMs: 1, storageRefId: 'cf_q_1' };
+      (peekCacheSync as jest.Mock).mockReturnValue(cachedCache);
+
+      let active = 0;
+      let maxActive = 0;
+      let releaseSlowRead: () => void = () => {};
+      const slowRead = new Promise<void>((resolve) => {
+        releaseSlowRead = resolve;
+      });
+      const started: string[] = [];
+      const readSessionStorageBlob = jest.fn(async ({ storageRef }: any) => {
+        started.push(storageRef.id);
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        if (storageRef.id === 'cf_q_2') await slowRead;
+        else await new Promise((resolve) => setTimeout(resolve, 0));
+        if (started.length === 18) releaseSlowRead();
+        active -= 1;
+        const index = Number(storageRef.id.split('_').pop());
+        return { json: async () => question({ id: `0xq${index}`, prompt: `Question ${index}` }) } as Response;
+      });
+
+      const rows = await loadWorkerCanonicalQuestions(
+        { sessionConfig, sessionSlug: 'worker-session' },
+        {
+          listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+          readSessionStorageBlob,
+        },
+      );
+      expect(peekCacheSync).toHaveBeenCalledWith('questionsCache', 'worker-session', { clone: false });
+      // cf_q_0 is cached; cf_q_1's ref has no cached question, so it is read.
+      expect(started).toHaveLength(19);
+      expect(started).not.toContain('cf_q_0');
+      // One slow read did not hold back the rest: later reads started first.
+      expect(started.indexOf('cf_q_19')).toBeGreaterThan(-1);
+      expect(maxActive).toBeLessThanOrEqual(8);
+      expect(rows).toHaveLength(19);
     });
 
     it('marks rows from a listed session admin uploader', async () => {
