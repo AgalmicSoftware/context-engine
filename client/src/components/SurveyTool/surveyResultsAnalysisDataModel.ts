@@ -1,4 +1,5 @@
 import { GROUP_FILTER_ROLES } from '../../domains/worker/workerGroupResultsFilter';
+import { readReportAnswer } from '../PolisReport/polisReportAnswers';
 import type { SessionResultsAnalysisResponseInput } from '../../utilities/sessionResultsExport';
 
 type SurveyResultsAnalysisRecord = Record<string, unknown>;
@@ -108,6 +109,17 @@ export const readSurveyResultsAnalysisTextField = (field: unknown): string => {
   return '';
 };
 
+// Multiple-choice picks are validated as in the Report and the Worker analysis,
+// then joined with '; ' as the Worker formats them.
+const readMultichoiceAnalysisAnswer = (
+  response: SurveyResultsAnalysisRecord,
+  questionData: SurveyResultsAnalysisRecord,
+): string => {
+  const payload = Array.isArray(response.answer) ? { answer: { value: response.answer } } : response;
+  const picks = readReportAnswer(payload, { ...questionData, type: 'multichoice' });
+  return Array.isArray(picks) ? picks.join('; ') : '';
+};
+
 export const readSurveyResultsAnalysisSafeLabel = (value: unknown): string => {
   const text = String(value || '')
     .replace(/\s+/g, ' ')
@@ -149,7 +161,9 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
         ? Array.isArray(rawAnswer)
           ? rawAnswer
           : ''
-        : readSurveyResultsAnalysisTextField(response.answer);
+        : questionType === 'multichoice'
+          ? readMultichoiceAnalysisAnswer(response, questionData)
+          : readSurveyResultsAnalysisTextField(response.answer);
     const additional = readSurveyResultsAnalysisTextField(response.additional);
     if (!answer && !additional) return;
     rows.push({

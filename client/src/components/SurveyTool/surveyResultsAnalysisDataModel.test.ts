@@ -132,6 +132,43 @@ describe('surveyResultsAnalysisDataModel', () => {
     ]);
   });
 
+  it('keeps valid multiple-choice answers for the AI analysis', () => {
+    const row = (responder: string, questionId: string, value: unknown, additional = '') => ({
+      responder,
+      response: { questionID: questionId, answer: { value }, additional: { value: additional } },
+    });
+    const rows = buildSurveyResultsAnalysisResponsesForExport({
+      aggregatorQuestionResponses: {
+        mc: [
+          row('0x1', 'mc', ['Option A', 'option b']),
+          row('0x2', 'mc', ['Option C'], 'why C'),
+          row('0x3', 'mc', ['Option A', 'Unknown'], 'partly unknown'),
+          row('0x4', 'mc', ['Unknown']),
+        ],
+        single: [row('0x1', 'single', ['Yes', 'No'], 'two picks'), row('0x2', 'single', 'Yes')],
+      },
+      networkQuestions: {
+        mc: { type: 'multichoice', options: ['Option A', 'Option B', 'Option C'] },
+        single: { type: 'multichoice', options: ['Yes', 'No'], singleSelect: true },
+      },
+    });
+
+    expect(
+      rows.map(({ participantAddress, questionId, answer, additional }) => [
+        participantAddress,
+        questionId,
+        answer,
+        additional,
+      ]),
+    ).toEqual([
+      ['0x1', 'mc', 'Option A; Option B', ''],
+      ['0x2', 'mc', 'Option C', 'why C'],
+      ['0x3', 'mc', '', 'partly unknown'],
+      ['0x1', 'single', '', 'two picks'],
+      ['0x2', 'single', 'Yes', ''],
+    ]);
+  });
+
   it('uses injected parse and question metadata ports without owning lookup semantics', () => {
     const rows = buildSurveyResultsAnalysisResponsesForExport({
       aggregatorQuestionResponses: {
