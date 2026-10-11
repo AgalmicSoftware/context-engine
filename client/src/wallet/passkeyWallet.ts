@@ -72,6 +72,9 @@ type RestoreOptions = {
 
 type UnlockOptions = {
   selectCredential?: boolean;
+  // Background re-unlocks must restore this account or fail; they never
+  // adopt a different wallet saved by another tab.
+  expectedAddress?: string | null;
 };
 
 type PasskeyWalletClientDeps = {
@@ -106,6 +109,23 @@ const isPasskeyWalletLockedError = (error: unknown): boolean =>
   error instanceof Error
     ? error.message === PASSKEY_WALLET_LOCKED_MESSAGE
     : String((error as { message?: unknown })?.message || error || '') === PASSKEY_WALLET_LOCKED_MESSAGE;
+
+// EIP-1193 4100: the requested account has not been authorized.
+const unauthorizedAccountError = (message: string): Error & { code: number } =>
+  Object.assign(new Error(message), { code: 4100 });
+
+const normalizeAccount = (value: unknown): string => {
+  try {
+    return ethers.utils.getAddress(String(value || '')).toLowerCase();
+  } catch (_) {
+    return '';
+  }
+};
+
+const assertExpectedAccount = (expectedAddress: unknown, address: unknown): void => {
+  if (!expectedAddress || normalizeAccount(address) === normalizeAccount(expectedAddress)) return;
+  throw unauthorizedAccountError('The passkey wallet in this browser changed to another account. Log in again.');
+};
 
 const defaultChain = (): ChainLike =>
   getChainById(getDefaultChainId()) ||
@@ -301,6 +321,7 @@ export class PasskeyEoaWalletClient {
         if (storedRecord && !isPasskeyDerivedWalletRecord(storedRecord)) {
           throw new Error('Stored wallet metadata is not a passkey-derived wallet.');
         }
+        if (storedRecord) assertExpectedAccount(options.expectedAddress, storedRecord.evmAddress);
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
         const selectCredential = options.selectCredential === true;
         const { credential, prfOutput } = await authenticatePasskeyCredential({
@@ -320,6 +341,7 @@ export class PasskeyEoaWalletClient {
         if (!selectCredential && storedRecord && address.toLowerCase() !== storedRecord.evmAddress.toLowerCase()) {
           throw new Error('Passkey-derived wallet address does not match stored metadata.');
         }
+        assertExpectedAccount(options.expectedAddress, address);
         const record = createPasskeyDerivedWalletRecord({
           config: this.config,
           credentialId,
@@ -339,6 +361,7 @@ export class PasskeyEoaWalletClient {
       if (!isEncryptedWalletRecord(record)) {
         throw new Error('Stored wallet metadata is not an encrypted private-key wallet.');
       }
+      assertExpectedAccount(options.expectedAddress, record.evmAddress);
       const saltBytes = new Uint8Array(base64URLToBuffer(record.salt));
       const { prfOutput } = await authenticatePasskeyCredential({
         config: this.config,
@@ -374,42 +397,56 @@ export class PasskeyEoaWalletClient {
       this.unlockExpiresAt = 0;
       return record.evmAddress;
     }
-    return this.unlockWallet();
+    return this.unlockWallet({ expectedAddress: this.activeAddress });
   }
 
-  async signMessage(message: unknown): Promise<HexString> {
+  // `account` is the address the caller asked to sign with; a different
+  // address is rejected instead of signing as the unlocked wallet.
+  async signMessage(message: unknown, account?: unknown): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'personal_sign',
-        params: [message, this.activeAddress],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'personal_sign',
+          params: [message, this.activeAddress],
+        }),
+        account,
+      ),
     );
   }
 
-  async signTypedData(typedData: unknown): Promise<HexString> {
+  async signTypedData(typedData: unknown, account?: unknown): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'eth_signTypedData_v4',
-        params: [this.activeAddress, normalizeTypedData(typedData)],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'eth_signTypedData_v4',
+          params: [this.activeAddress, normalizeTypedData(typedData)],
+        }),
+        account,
+      ),
     );
   }
 
   async sendTransaction(tx: Record<string, unknown>): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'eth_sendTransaction',
-        params: [{ ...tx, from: tx.from || this.activeAddress }],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'eth_sendTransaction',
+          params: [{ ...tx, from: tx.from || this.activeAddress }],
+        }),
+        tx.from,
+      ),
     );
   }
 
   async signTransaction(tx: Record<string, unknown>): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'eth_signTransaction',
-        params: [{ ...tx, from: tx.from || this.activeAddress }],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'eth_signTransaction',
+          params: [{ ...tx, from: tx.from || this.activeAddress }],
+        }),
+        tx.from,
+      ),
     );
   }
 
@@ -428,9 +465,9 @@ export class PasskeyEoaWalletClient {
       case 'net_version':
         return String(Number(this.activeChain?.id || this.activeChain?.chainId || 0));
       case 'personal_sign':
-        return this.signMessage(params[0]);
+        return this.signMessage(params[0], params[1]);
       case 'eth_signTypedData_v4':
-        return this.signTypedData(params[1] ?? params[0]);
+        return params[1] == null ? this.signTypedData(params[0]) : this.signTypedData(params[1], params[0]);
       case 'eth_sendTransaction':
         return this.sendTransaction((params[0] || {}) as Record<string, unknown>);
       case 'eth_signTransaction':
@@ -523,24 +560,33 @@ export class PasskeyEoaWalletClient {
     );
   }
 
-  private async ensureUnlocked(): Promise<void> {
-    if (this.isUnlocked()) return;
-    if (this.activeAddress) {
-      await this.lock();
-    }
-    await this.unlockWallet();
+  private assertRequestedAccount(requestedAccount: unknown): void {
+    if (requestedAccount == null || requestedAccount === '' || !this.activeAddress) return;
+    if (normalizeAccount(requestedAccount) === normalizeAccount(this.activeAddress)) return;
+    throw unauthorizedAccountError('The passkey wallet is unlocked for a different account than the request.');
   }
 
-  private async requestUnlocked(buildArgs: () => { method: string; params?: unknown[] }): Promise<unknown> {
-    await this.ensureUnlocked();
-    const args = buildArgs();
+  // Re-unlocking keeps the account the app already uses; a request naming an
+  // account unlocks only that account.
+  private async relockAndUnlock(requestedAccount: unknown): Promise<void> {
+    const expectedAddress = this.activeAddress || (requestedAccount ? String(requestedAccount) : null);
+    if (this.activeAddress) await this.lock();
+    await this.unlockWallet({ expectedAddress });
+  }
+
+  private async requestUnlocked(
+    buildArgs: () => { method: string; params?: unknown[] },
+    requestedAccount?: unknown,
+  ): Promise<unknown> {
+    this.assertRequestedAccount(requestedAccount);
+    if (!this.isUnlocked()) await this.relockAndUnlock(requestedAccount);
+    this.assertRequestedAccount(requestedAccount);
     try {
-      return await this.sessionClient.request(args);
+      return await this.sessionClient.request(buildArgs());
     } catch (error) {
       if (!isPasskeyWalletLockedError(error)) throw error;
 
-      await this.lock();
-      await this.unlockWallet();
+      await this.relockAndUnlock(requestedAccount);
       return this.sessionClient.request(buildArgs());
     }
   }
