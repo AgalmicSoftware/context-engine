@@ -290,7 +290,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', 
           '0xabc',
           'nonce-built',
           300,
-          { now: 'now' },
+          { now: 'now', caller: 'anon:203.0.113.7' },
         ]);
         return { ok: true };
       },
@@ -315,7 +315,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', 
         assert.equal(value.deps.NONCE_RATE_LIMIT_WINDOW_MS, 60000);
         assert.equal(value.deps.NONCE_RATE_LIMIT_TTL_SECONDS, 60);
         assert.equal(value.deps.buildNonce(), 'nonce-built');
-        await value.deps.issueNonce(env, 'session-a', '0xabc', 'nonce-built', 300);
+        await value.deps.issueNonce(env, 'session-a', '0xabc', 'nonce-built', 300, 'anon:203.0.113.7');
         return response;
       },
     },

@@ -57,6 +57,7 @@ export const issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {
     ttlSeconds,
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
     now: deps?.now,
+    caller: deps?.caller,
   });
   if (!result?.ok) {
     return {

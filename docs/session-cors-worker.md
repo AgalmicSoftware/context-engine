@@ -1736,11 +1736,16 @@ login, and signed admin request bodies must carry that config's canonical
      300 requests per minute. Because the strict bucket includes the caller,
      someone who only knows a wallet address cannot use up its owner's budget.
      In native Cloudflare runtime the caller network is the platform
-     `CF-Connecting-IP`; outside that runtime, forwarded IP headers are ignored
-     and requests fall back to the bounded `anon:unknown` bucket.
-   - Each address may hold up to 16 unexpired nonces at once. Issuing a new
-     nonce never cancels an earlier pending one; past the cap the oldest is
-     dropped, and each nonce is consumed at most once.
+     `CF-Connecting-IP`, with an IPv6 address counted as its `/64` and an
+     IPv4-mapped address as its IPv4 address; outside that runtime, forwarded
+     IP headers are ignored and requests fall back to the bounded
+     `anon:unknown` bucket.
+   - Each address may hold up to 16 unexpired nonces at once, each tagged with
+     a hash of the caller network that requested it. Issuing a new nonce never
+     cancels an earlier pending one. Past the cap a new nonce replaces the
+     requesting caller's own oldest one, else the oldest of the caller holding
+     the most; another caller's only pending nonce is never dropped, so the
+     request gets `429` instead. Each nonce is consumed at most once.
 2. Build a SIWE message client-side and sign with `personal_sign`.
    The Worker parses it as strict EIP-4361 so that wallets recognize every
    accepted message as a sign-in request: the header, the address, a blank

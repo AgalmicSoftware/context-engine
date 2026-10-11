@@ -472,6 +472,44 @@ test('dispatchAuthNonceRequest does not use caller-controlled ids for auth nonce
 });
 
 
+test('dispatchAuthNonceRequest treats one IPv6 /64 as one caller for limits and nonce ownership', async () => {
+  const identities = [];
+  const callers = [];
+  const deps = createNonceDeps({
+    checkNonceRateLimit: async (value) => {
+      identities.push(value.identity);
+      return { ok: true };
+    },
+    issueNonce: async (...args) => {
+      callers.push(args[5]);
+      return { ok: true };
+    },
+  });
+  for (const ip of ['2001:db8:1:2:aaaa::1', '2001:0DB8:0001:0002:ffff:ffff:ffff:ffff', '2001:db8:1:3::1', '203.0.113.7', '::ffff:203.0.113.7', 'not-an-ip']) {
+    const result = await dispatchAuthNonceRequest({
+      request: {
+        json: async () => createNonceBody(),
+        headers: new Headers({ Origin: 'https://allowed.example', 'CF-Connecting-IP': ip }),
+        cf: {},
+      },
+      env: {},
+      baseHeaders: {},
+      slug: '',
+      deps,
+    });
+    assert.equal(result.status, 200);
+  }
+  assert.deepEqual(identities, [
+    'anon:2001:db8:1:2::/64',
+    'anon:2001:db8:1:2::/64',
+    'anon:2001:db8:1:3::/64',
+    'anon:203.0.113.7',
+    'anon:203.0.113.7',
+    'anon:not-an-ip',
+  ]);
+  assert.deepEqual(callers, identities);
+});
+
 test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and nonce storage', async () => {
   let corsCalled = false;
   let issueNonceCalled = false;
@@ -579,6 +617,7 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
     '0xabcdef',
     'nonce-success',
     123,
+    'anon:unknown',
   ]]);
   assert.deepEqual(result, {
     body: {
@@ -632,6 +671,7 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
     '0xabc',
     'nonce-general',
     300,
+    'anon:unknown',
   ]]);
   assert.deepEqual(result, {
     body: { nonce: 'nonce-general' },

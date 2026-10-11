@@ -237,7 +237,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             buildNonce: () => deps?.buildNonce?.({
               base64UrlEncode: deps?.base64UrlEncode,
             }),
-            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (
+            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl, caller) => (
               deps?.issueNonce || issueNonceBoundary
             )(
               currentEnv,
@@ -247,6 +247,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
               ttl,
               {
                 now: deps?.now,
+                caller,
               },
             ),
             MISSING_SLUG_ERROR: constants?.missingSlugError,

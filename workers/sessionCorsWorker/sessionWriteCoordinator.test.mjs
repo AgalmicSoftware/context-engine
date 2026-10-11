@@ -215,6 +215,46 @@ test('SessionWriteCoordinator caps outstanding nonces per address and drops the 
 	assert.deepEqual(await consumeAuthNonce(coordinator, 'nonce-16'), { ok: true });
 });
 
+test('SessionWriteCoordinator never lets other callers evict a pending nonce', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const issueFrom = (caller, nonce) => coordinator.fetch(createCoordinatorRequest('/auth-state/nonce/issue', {
+		slug: 'session-a', address: '0xabc', nonce, caller, expiresAtMs: 301_000, usedExpiresAtMs: 601_000,
+	}));
+	assert.equal((await issueFrom('victim', 'victim-nonce')).status, 200);
+	for (const nonce of ['busy-1', 'busy-2']) assert.equal((await issueFrom('busy', nonce)).status, 200);
+	for (let index = 0; index < 13; index += 1) assert.equal((await issueFrom(`caller-${index}`, `nonce-${index}`)).status, 200);
+	assert.equal(store.get('auth-nonce-active').entries.length, 16);
+	// In a full list a caller's new nonce replaces its own oldest one.
+	assert.equal((await issueFrom('caller-0', 'nonce-0b')).status, 200);
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'nonce-0'), { ok: false, error: 'Nonce mismatch or expired.' });
+	// A new caller displaces only a caller that holds several.
+	assert.equal((await issueFrom('newcomer', 'newcomer-1')).status, 200);
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'busy-1'), { ok: false, error: 'Nonce mismatch or expired.' });
+	const refused = await issueFrom('newcomer-2', 'newcomer-2');
+	assert.equal(refused.status, 429);
+	assert.match((await refused.json()).error, /Too many pending sign-ins/);
+	assert.equal(store.get('auth-nonce-active').entries.length, 16);
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'victim-nonce'), { ok: true });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'busy-2'), { ok: true });
+});
+
+test('issueCoordinatedAuthNonce sends a hash of the caller, not its address', async () => {
+	let sent;
+	const env = { CE_SESSION_COORDINATOR: {
+		idFromName: (name) => name,
+		get: () => ({ fetch: async (_url, init) => { sent = JSON.parse(init.body); return Response.json({ ok: true }); } }),
+	} };
+	const issue = (caller) => issueCoordinatedAuthNonce({ env, slug: 'session-a', address: '0xabc', nonce: 'n', ttlSeconds: 300, caller });
+	await issue('anon:203.0.113.7');
+	const first = sent.caller;
+	assert.match(first, /^[0-9a-f]{32}$/);
+	await issue('anon:203.0.113.7');
+	assert.equal(sent.caller, first);
+	await issue('anon:203.0.113.8');
+	assert.notEqual(sent.caller, first);
+});
+
 test('SessionWriteCoordinator expires outstanding nonces and accepts a pre-upgrade nonce', async () => {
 	const { state, store } = createTransactionalState();
 	let nowMs = 1_000;

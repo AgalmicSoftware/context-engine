@@ -99,8 +99,35 @@ const readActiveAuthNonces = (record, nowMs) => {
     ? record.entries
     : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
   return entries
-    .map((entry) => ({ nonce: toTrimmedString(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) }))
+    .map((entry) => ({
+      nonce: toTrimmedString(entry?.nonce),
+      expiresAtMs: Number(entry?.expiresAtMs || 0),
+      caller: toTrimmedString(entry?.caller),
+    }))
     .filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
+};
+
+// Anyone can request a nonce for any address. When the list is full, a new
+// nonce replaces the requesting caller's own oldest one, else the oldest of the
+// caller holding the most; another caller's only pending nonce is never
+// dropped, so the request is refused instead (null).
+const admitActiveAuthNonce = (active, entry) => {
+  if (active.length < MAX_ACTIVE_AUTH_NONCES) return [...active, entry];
+  const counts = new Map();
+  active.forEach((item) => counts.set(item.caller, (counts.get(item.caller) || 0) + 1));
+  let evicted = counts.has(entry.caller) ? entry.caller : null;
+  if (evicted === null) {
+    let most = 1;
+    counts.forEach((count, caller) => {
+      if (count > most) {
+        most = count;
+        evicted = caller;
+      }
+    });
+  }
+  if (evicted === null) return null;
+  const oldest = active.findIndex((item) => item.caller === evicted);
+  return [...active.slice(0, oldest), ...active.slice(oldest + 1), entry];
 };
 
 const putActiveAuthNonces = async (transaction, entries) => {
@@ -1879,6 +1906,7 @@ export class SessionWriteCoordinator {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString(payload?.address).toLowerCase();
     const nonce = toTrimmedString(payload?.nonce);
+    const caller = toTrimmedString(payload?.caller).slice(0, 128);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.expiresAtMs,
       nowMs,
@@ -1893,19 +1921,23 @@ export class SessionWriteCoordinator {
       return jsonResponse({ error: 'Invalid auth nonce issuance request.' }, 400);
     }
 
-    await this.state.storage.transaction(async (transaction) => {
+    const admitted = await this.state.storage.transaction(async (transaction) => {
       const used = await transaction.get(AUTH_NONCE_USED_KEY);
       const entries = Array.isArray(used?.entries)
         ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs)
         : [];
       await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-      // Anyone can request a nonce for any address, so a new nonce must not
-      // cancel the owner's pending one. Keep a few, dropping the oldest.
+      // A new nonce must not cancel the owner's pending one.
       const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs)
         .filter((entry) => entry.nonce !== nonce);
-      await putActiveAuthNonces(transaction, [...active, { nonce, expiresAtMs }].slice(-MAX_ACTIVE_AUTH_NONCES));
+      const next = admitActiveAuthNonce(active, { nonce, expiresAtMs, caller });
+      if (!next) return false;
+      await putActiveAuthNonces(transaction, next);
+      return true;
     });
-    return jsonResponse({ ok: true });
+    return admitted
+      ? jsonResponse({ ok: true })
+      : jsonResponse({ ok: false, error: 'Too many pending sign-ins for this wallet. Try again shortly.' }, 429);
   }
 
   async executeAuthNonceConsume(payload) {
@@ -2520,8 +2552,13 @@ export const issueCoordinatedAuthNonce = async ({
   ttlSeconds,
   usedNonceTtlSeconds = 600,
   now = Date.now,
+  caller = '',
 } = {}) => {
   const nowMs = Number(typeof now === 'function' ? now() : now) || Date.now();
+  // Durable state keeps only a hash of the requesting network.
+  const callerKey = toTrimmedString(caller)
+    ? (await sha256Hex(`auth-nonce-caller:${toTrimmedString(caller).toLowerCase()}`)).slice(0, 32)
+    : '';
   return callAuthStateCoordinator({
     env,
     identity: `auth-nonce:${toTrimmedString(slug)}:${toTrimmedString(address).toLowerCase()}`,
@@ -2530,6 +2567,7 @@ export const issueCoordinatedAuthNonce = async ({
       slug,
       address,
       nonce,
+      ...(callerKey ? { caller: callerKey } : {}),
       expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1000,
       usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1000,
     },
