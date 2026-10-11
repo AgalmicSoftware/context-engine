@@ -372,7 +372,7 @@ describe('sessionCorsWorker admin routes', () => {
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual(existingConfig);
   });
 
-  it('merges set-config updates without dropping existing limits or scopes branches', async () => {
+  it('merges set-config scopes and replaces limits with the supplied set', async () => {
     const existingConfig = {
       adminAddress: adminWallet.address,
       sessionName: 'Existing Session',
@@ -422,9 +422,9 @@ describe('sessionCorsWorker admin routes', () => {
       sessionName: 'Updated Session',
       registryAddress: '0x0000000000000000000000000000000000000001',
       allowOrigins: ['https://next.example'],
+      // A supplied limits object is the complete set; /admin/set-limits merges.
       limits: {
         perWalletPerDay: 5,
-        perIpPerHour: 8,
       },
       scopes: {
         ai: true,
