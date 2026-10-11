@@ -446,7 +446,7 @@ export function buildClusterAnalysisDataKey({
   let promptsHash = 0;
   promptEntries.forEach(([key, value]) => {
     const text = `${key}:${value || ''}`;
-    for (let i = 0; i < text.length; i += 31) {
+    for (let i = 0; i < text.length; i += 1) {
       promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
     }
   });

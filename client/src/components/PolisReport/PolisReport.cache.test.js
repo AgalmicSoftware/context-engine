@@ -1349,6 +1349,13 @@ describe('PolisReport demo data defaults', () => {
     expect(first).toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x111', '0x222'] }));
   });
 
+  it('keys cluster summaries on every character of the question prompts', () => {
+    const common = { activeClusterAssignments: [0, 1], allQuestions: ['q1'], allResponders: ['0x1', '0x2'] };
+    expect(buildClusterAnalysisDataKey({ ...common, questionPrompts: { q1: 'Raise taxes' } })).not.toBe(
+      buildClusterAnalysisDataKey({ ...common, questionPrompts: { q1: 'Lower taxes' } }),
+    );
+  });
+
   it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
     const sharedArgs = {
       activeClusterAssignments: [0, 1, 1, 0],
