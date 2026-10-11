@@ -508,6 +508,7 @@ export function QuestionFilterSbtSection({
 type AiSectionProps = {
   activeAiTopN: number;
   aiAccessEnabled: boolean;
+  aiAccessNeedsSignIn?: boolean;
   aiApplyButtonLabel: string;
   aiApplyError: string;
   aiApplying: boolean;
@@ -530,6 +531,7 @@ type AiSectionProps = {
 export function QuestionFilterAiSection({
   activeAiTopN,
   aiAccessEnabled,
+  aiAccessNeedsSignIn = false,
   aiApplyButtonLabel,
   aiApplyError,
   aiApplying,
@@ -563,7 +565,9 @@ export function QuestionFilterAiSection({
         <FormGroup>
           {!aiAccessEnabled && (
             <p className={styles.disabledText} style={QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE}>
-              AI filter unavailable. Configure AI access for this session or add a local API key.
+              {aiAccessNeedsSignIn
+                ? 'Sign in to use the AI filter.'
+                : 'AI filter unavailable. Configure AI access for this session or add a local API key.'}
             </p>
           )}
           {isTopQuestionsModeActive && (

@@ -161,6 +161,8 @@ export type QuestionFilterAiAccessState = {
   sponsoredStatus: string;
   // The Worker grants AI to signed-out visitors, so a run needs no sign-in.
   workerAnonymousAvailable?: boolean;
+  // The Worker grants AI to participants only and the visitor is signed out.
+  needsSignIn?: boolean;
 };
 export type QuestionFilterGateTooltipProps = {
   gateId: string | null;

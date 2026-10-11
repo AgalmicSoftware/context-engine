@@ -67,6 +67,29 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(anonymous.getAiAccessState()).toMatchObject({ enabled: true, workerAnonymousAvailable: true });
   });
 
+  it('flags participant-only Worker AI as needing sign-in for signed-out visitors', () => {
+    jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    const signedOut = new QuestionFilter({ activeSessionSlug: 'worker-ai', sessionConfig: workerAiConfig() });
+    expect(signedOut.getAiAccessState()).toMatchObject({ enabled: false, needsSignIn: true });
+
+    const signedIn = new QuestionFilter({
+      activeSessionSlug: 'worker-ai',
+      account: PARTICIPANT,
+      sessionConfig: workerAiConfig(),
+    });
+    expect(signedIn.getAiAccessState()).toMatchObject({ enabled: true, needsSignIn: false });
+
+    // Signing in would not help when participants lack the ai scope too.
+    const noAiScope = new QuestionFilter({
+      activeSessionSlug: 'worker-ai',
+      sessionConfig: {
+        ...workerAiConfig(),
+        workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] },
+      },
+    });
+    expect(noAiScope.getAiAccessState()).toMatchObject({ enabled: false, needsSignIn: false });
+  });
+
   it.each([
     { workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] } },
     { workerAuthority: { participantScopes: ['ai'] } },

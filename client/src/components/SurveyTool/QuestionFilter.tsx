@@ -457,9 +457,9 @@ class QuestionFilter extends React.Component<any, any> {
       !!String(cfg.corsWorkerUrl || '').trim() &&
       toUnknownRecord(cfg.scopes).ai !== false;
     const workerAnonymousAvailable = workerPolicyAllowsAi && hasAiScope(workerPolicy.anonymousScopes);
-    const workerAvailable =
-      workerAnonymousAvailable ||
-      (workerPolicyAllowsAi && !!toStr(propsIn.account).trim() && hasAiScope(workerPolicy.participantScopes));
+    const workerParticipantAi = workerPolicyAllowsAi && hasAiScope(workerPolicy.participantScopes);
+    const signedIn = !!toStr(propsIn.account).trim();
+    const workerAvailable = workerAnonymousAvailable || (signedIn && workerParticipantAi);
     const gateState = resolveSponsoredGateStateForResource(cfg, 'ai');
     const sponsoredStatus = String(gateState?.status || SPONSORED_GATE_STATES.UNAVAILABLE);
     const sponsoredAvailable =
@@ -472,6 +472,7 @@ class QuestionFilter extends React.Component<any, any> {
       localKeyAvailable,
       sponsoredStatus,
       workerAnonymousAvailable,
+      needsSignIn: !enabled && !signedIn && workerParticipantAi,
     };
   };
 
@@ -3013,6 +3014,7 @@ class QuestionFilter extends React.Component<any, any> {
           <QuestionFilterAiSection
             activeAiTopN={activeAiTopN}
             aiAccessEnabled={aiAccessState.enabled}
+            aiAccessNeedsSignIn={!!aiAccessState.needsSignIn}
             aiApplyButtonLabel={aiApplyButtonLabel}
             aiApplyError={aiApplyError}
             aiApplying={aiApplying}
