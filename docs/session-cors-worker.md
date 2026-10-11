@@ -1874,8 +1874,11 @@ token):
 - The signed body adds `{ "resource": "questions" | "surveys", "id": "<payload id>", "hidden": true | false }`.
 - It is a soft hide. Every stored version stays readable by its storage id,
   but `/storage/list` returns only a hidden marker for it, and the interview
-  catalog and results analysis skip the id. Later uploads of a hidden id start
-  hidden. Unhiding restores all versions.
+  catalog and results analysis skip the id. Only a session admin can upload a
+  hidden id again (anyone else gets `409` with
+  `reason: "storage_resource_id_hidden"`), and that upload starts hidden.
+  Lists also check the hide records, so a version stored while a hide was in
+  progress is listed only as a marker too. Unhiding restores all versions.
 - The Worker marks every stored version of the id. Versions stored before this
   release have no `resourceId` in their index row, so the first hide reads
   those payloads once to match them.

@@ -1411,6 +1411,14 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       }, 409, baseHeaders);
     }
     hidden = await isStorageResourceHidden({ index, slug, resource, resourceId });
+    // A hidden id stays hidden: only an admin can upload it again, and that
+    // upload starts hidden too.
+    if (hidden && !resolveSessionAdminAddresses(config).has(uploader)) {
+      return responseJson(deps, {
+        error: `A session admin hid this ${resource === 'questions' ? 'question' : 'survey'} id, so it cannot be uploaded again.`,
+        reason: 'storage_resource_id_hidden',
+      }, 409, baseHeaders);
+    }
   }
 
   let id = '';
@@ -1807,7 +1815,11 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   }
   const keys = Array.isArray(listed?.keys) ? listed.keys : [];
   const rows = [];
+  let hiddenIds = null;
   try {
+    // Hidden markers also cover a version whose own flag a hide has not
+    // written yet, such as one uploaded in another region during the hide.
+    if (isOwnedStorageResource(resource)) hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource });
     for (let offset = 0; offset < keys.length; offset += 8) {
       rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
         const name = trim(keyEntry?.name || keyEntry);
@@ -1855,7 +1867,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     }
     const owned = isOwnedStorageResource(storageRef.resource);
     const resourceId = owned ? normalizeAddress(metadata?.resourceId) : '';
-    if (owned && metadata?.hidden === true) {
+    if (owned && (metadata?.hidden === true || hiddenIds?.has(resourceId))) {
       // An admin hid this id. List no reference to the stored record, only a
       // marker so clients can drop a copy they cached before the hide.
       if (resourceId) items.push({ hidden: true, metadata: { resource: storageRef.resource, resourceId, hidden: true } });

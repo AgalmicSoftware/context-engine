@@ -3204,6 +3204,7 @@ test('storageRoute returns bounded cursor pages and filters every page independe
 	const listCalls = [];
 	const index = {
 		async list(options) {
+			if (options.prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
 			listCalls.push(options);
 			if (!options.cursor) {
 				return {
@@ -3269,6 +3270,7 @@ test('storageRoute accepts POST list cursors and gives query paging values prece
 	const listCalls = [];
 	const index = {
 		async list(options) {
+			if (options.prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
 			listCalls.push(options);
 			return { keys: [], list_complete: true };
 		},
@@ -4226,7 +4228,11 @@ test('storage lists read index rows concurrently with a bounded batch', async ()
   let listCalls = 0;
   const keys = Array.from({ length: 24 }, (_, i) => ({ name: `ce-storage:session-a:questions:${i}` }));
   const env = { CE_STORAGE_INDEX_KV: {
-    list: async () => { listCalls += 1; return { keys, list_complete: true }; },
+    list: async ({ prefix }) => {
+      if (prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
+      listCalls += 1;
+      return { keys, list_complete: true };
+    },
     get: async () => {
       active += 1;
       maximum = Math.max(active, maximum);
@@ -4388,9 +4394,19 @@ test('admins hide a question id without deleting it, and unhide restores it', as
 	assert.deepEqual(listed.filter((item) => item.storageRef).map((item) => item.metadata.resourceId), ['0xq2']);
 	// Soft hide: the stored record is still readable by its storage id.
 	assert.equal((await read(first.body.id)).status, 200);
-	// A later upload of the hidden id by its author starts hidden too.
-	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
+	// The author cannot re-upload a hidden id; an admin can, and it starts hidden.
+	const reupload = await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'));
+	assert.equal(reupload.status, 409);
+	assert.equal(reupload.body.reason, 'storage_resource_id_hidden');
+	assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Spam?', '0xq9'))).status, 200);
 	assert.equal((await list()).items.filter((item) => item.hidden).length, 2);
+	// A version whose own flag the hide missed is still listed only as a marker.
+	const missedKey = [...kv.store.keys()].find((key) => key.startsWith('ce-storage:session-a:questions:') &&
+		JSON.parse(kv.store.get(key)).resourceId === '0xq9' && JSON.parse(kv.store.get(key)).uploader === OWNERSHIP_ADMIN);
+	const missed = JSON.parse(kv.store.get(missedKey));
+	delete missed.hidden;
+	kv.store.set(missedKey, JSON.stringify(missed));
+	assert.deepEqual((await list()).items.filter((item) => item.storageRef).map((item) => item.metadata.resourceId), ['0xq2']);
 
 	const unhide = await setCloudflareStorageResourceHidden({
 		...common, body: { resource: 'questions', id: '0xq9', hidden: false }, actor: OWNERSHIP_ADMIN,
@@ -4398,6 +4414,7 @@ test('admins hide a question id without deleting it, and unhide restores it', as
 	assert.equal(unhide.body.matchedRows, 2);
 	assert.deepEqual(unhide.body.hiddenIds, []);
 	assert.equal((await list()).items.filter((item) => item.storageRef).length, 3);
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
 });
 
 test('hide requests validate the resource, id, and flag', async () => {
