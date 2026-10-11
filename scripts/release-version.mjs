@@ -320,7 +320,7 @@ export const verifyWorkerReleasePin = ({ repoRoot, candidateRef, baselineRef }) 
   if (!published.includes(pinCommit)) {
     throw new Error(
       `Worker release pin ${pinCommit} is not a published worker-bundles release in ${baselineRef}; `
-        + `fetch release tags (git fetch --tags origin) or run ${PIN_COMMAND}`,
+        + `fetch release tags (git fetch --tags --force origin) or run ${PIN_COMMAND}`,
     );
   }
   const newestRelease = published[0];
@@ -348,7 +348,15 @@ export const pinWorkerRelease = async ({
 }) => {
   const pinPath = path.join(repoRoot, WORKER_RELEASE_PIN_PATH);
   if (!fs.existsSync(pinPath)) throw new Error(`${WORKER_RELEASE_PIN_PATH} was not found in ${repoRoot}`);
-  if (fetchRemote) git(repoRoot, ['fetch', '--quiet', '--tags', fetchRemote, 'main']);
+  if (fetchRemote) {
+    // --force: promotion moves the worker-bundles-stable and -previous tags.
+    try {
+      git(repoRoot, ['fetch', '--tags', '--force', fetchRemote, 'main']);
+    } catch (error) {
+      const detail = String(error?.stderr || error?.message || '').trim();
+      throw new Error(`Fetching release tags from ${fetchRemote} failed: ${detail || 'git fetch exited with an error'}`);
+    }
+  }
   const published = listPublishedWorkerReleases({ repoRoot, baselineRef: mainRef });
   const selected = String(commit || published[0] || '').trim().toLowerCase();
   if (!published.includes(selected)) {

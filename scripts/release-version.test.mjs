@@ -369,6 +369,29 @@ test('pin-worker-release pins the newest verified release and its deploy-helper 
   }
 });
 
+test('pin-worker-release fetches moved release channel tags and reports git failures', async () => {
+  const { rootDir: publicDir, releaseB, releaseC } = createPublishedReleaseHistory();
+  const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-pin-clone-'));
+  try {
+    git(cloneDir, ['clone', '--quiet', publicDir, '.']);
+    // Promote Worker Bundles moves worker-bundles-stable after this clone fetched it.
+    git(publicDir, ['tag', '-f', 'worker-bundles-stable', releaseB]);
+    writePin(cloneDir, releaseB);
+    const verifyRelease = async () => ({ ok: true, failures: [], manifestSha256: 'c'.repeat(64) });
+
+    const pin = await pinWorkerRelease({ repoRoot: cloneDir, mainRef: 'origin/main', verifyRelease });
+
+    assert.equal(pin.commit, releaseC);
+    await assert.rejects(
+      pinWorkerRelease({ repoRoot: cloneDir, mainRef: 'origin/main', fetchRemote: 'missing-remote', verifyRelease }),
+      /Fetching release tags from missing-remote failed: .*missing-remote/s,
+    );
+  } finally {
+    fs.rmSync(publicDir, { recursive: true, force: true });
+    fs.rmSync(cloneDir, { recursive: true, force: true });
+  }
+});
+
 const releaseGuideUrl = new URL('../docs/releasing.md', import.meta.url);
 const releaseGuideIsPresent = fs.existsSync(releaseGuideUrl);
 
