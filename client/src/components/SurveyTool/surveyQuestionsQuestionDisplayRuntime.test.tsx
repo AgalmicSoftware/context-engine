@@ -161,13 +161,19 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
       storageProfile: { backend: 'cloudflare' },
     }));
     const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext({ resolveEffectiveResponseGateConfig }));
-    // 49,160 bytes as a JSON string, plus 2 for the empty comment: 10 over.
-    const responseSlice = { answers: { q1: { value: 'x'.repeat(49_158) } }, additionalComments: {} };
+    // A locked answer of 49,162 bytes as a JSON string: 10 over the locked-text budget.
+    const responseSlice = { answers: { q1: { value: 'x'.repeat(49_160), encrypted: true } }, additionalComments: {} };
 
     expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe(
       'This answer is too long to save. Shorten it by about 10 characters.',
     );
     expect(resolveEffectiveResponseGateConfig).toHaveBeenCalledWith('edge', expect.any(Object));
+
+    // Unlocked, the same text fits the stored answer.
+    const unlockedSlice = { answers: { q1: { value: 'x'.repeat(49_160) } }, additionalComments: {} };
+    expect(
+      runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice: unlockedSlice }).answerTooLongMessage,
+    ).toBe('');
 
     resolveEffectiveResponseGateConfig.mockReturnValue({ storageProfile: { backend: 'arweave' } });
     expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe('');

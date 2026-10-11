@@ -1,6 +1,10 @@
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
-import { readAnswerTooLongMessage, sessionStoresAnswersInWorker } from '../../utilities/survey/answerSizeBudget';
+import {
+  nameQuestionForNotice,
+  readAnswerTooLongMessage,
+  sessionStoresAnswersInWorker,
+} from '../../utilities/survey/answerSizeBudget';
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type {
   SurveyQuestionsLegacyRecord,
@@ -17,6 +21,8 @@ import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheI
 import { remaskUnchangedEncryptedFields } from './surveyToolSubmitPrepController.js';
 import { shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState.js';
 import { getQuestionEncryptionGates } from './surveyToolAudienceDerivationController.js';
+import { readQuestionsCacheRef } from './surveyToolCacheState.js';
+import { resolveQuestionReadCacheContext } from './surveyToolScope.js';
 import {
   captureInterviewPredictionComparisonSubmissions,
   resolveEditableQuestionList,
@@ -261,8 +267,119 @@ export const createSurveyQuestionsSubmitRuntime = (
     });
   };
 
+  // A rating keeps its saved envelope while it stays locked or this browser never
+  // decrypted it. Read the saved answer and the cached one, as the upload does.
+  const readSavedRatingEnvelopes = (submitContext: SurveyQuestionsLegacyValue, qid: string) => {
+    const saved: SurveyQuestionsLegacyValue = stateRef.current.userAnswers;
+    const savedRows: SurveyQuestionsLegacyValue[] = Array.isArray(saved?.responses)
+      ? saved.responses
+      : saved
+        ? [saved]
+        : [];
+    let cachedRow: SurveyQuestionsLegacyValue = null;
+    try {
+      const slug = submitContext.effectiveDraftSlug;
+      const scope = resolveQuestionReadCacheContext(submitContext.props || propsRef.current, slug);
+      const raw = (
+        readQuestionsCacheRef(slug)?.[scope.networkIdStr]?.questionResponses as SurveyQuestionsLegacyValue
+      )?.[qid]?.[String(submitContext.account || '').toLowerCase()];
+      cachedRow = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (_) {
+      cachedRow = null;
+    }
+    const rows = [
+      savedRows.find((row) => normalizeQuestionIdKey(row?.questionID || row?.questionId) === qid),
+      cachedRow,
+    ].filter((row) => row && typeof row === 'object');
+    const envelopeOf = (fieldKey: string, envelopeKey: string): string => {
+      const row = rows.find((candidate) => !!candidate[envelopeKey] || candidate[fieldKey] != null);
+      return typeof row?.[envelopeKey] === 'string' ? row[envelopeKey] : '';
+    };
+    return {
+      importance: envelopeOf('importance', 'importanceEncrypted'),
+      conviction: envelopeOf('conviction', 'convictionEncrypted'),
+    };
+  };
+
+  // Why the session Worker would refuse each changed answer as it will be
+  // stored: built like the upload, with the fields and ratings it will lock.
+  const readOversizeAnswers = (
+    submitContext: SurveyQuestionsLegacyValue,
+    slice: SurveyQuestionsLegacyValue,
+    changedQids: Set<string>,
+    questionPool: SurveyQuestionsLegacyValue[],
+  ): Map<string, string> => {
+    const oversize = new Map<string, string>();
+    if (
+      !changedQids.size ||
+      !sessionStoresAnswersInWorker(
+        resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
+      )
+    ) {
+      return oversize;
+    }
+    const sizeSlice: SurveyQuestionsLegacyValue = remaskUnchangedEncryptedFields(
+      captureInterviewPredictionComparisonSubmissions(slice, changedQids) as SurveyQuestionsLegacyValue,
+      stateRef.current.editBaseline,
+      changedQids,
+    );
+    const built: SurveyQuestionsLegacyValue = prepareJsonAndHash(
+      submitContext.surveyIndex,
+      undefined,
+      sizeSlice,
+      changedQids,
+    );
+    const rows: SurveyQuestionsLegacyValue[] = Array.isArray(built?.responses)
+      ? built.responses
+      : built?.questionID
+        ? [built]
+        : [];
+    const lockedBy = new Map<string, SurveyQuestionsLegacyValue[]>();
+    buildFieldEncryptionWorkGroups(sizeSlice, changedQids).groups.forEach((group: SurveyQuestionsLegacyValue) =>
+      (group.qids || []).forEach((qid: string) => {
+        if (group.slice?.answers?.[qid]) lockedBy.set(`answers:${qid}`, group.recipients || []);
+        if (group.slice?.additionalComments?.[qid]) lockedBy.set(`additionalComments:${qid}`, group.recipients || []);
+      }),
+    );
+    const hasText = (field: SurveyQuestionsLegacyValue) => typeof field?.value === 'string' && !!field.value.trim();
+    for (const qid of changedQids) {
+      const question = questionPool.find((entry) => normalizeQuestionIdKey(entry?.id) === qid) || null;
+      const row = rows.find((entry) => normalizeQuestionIdKey(entry?.questionID ?? entry?.questionId) === qid) || null;
+      const asStored = (bucket: 'answers' | 'additionalComments', rowField: SurveyQuestionsLegacyValue) => {
+        const field = { ...(sizeSlice[bucket]?.[qid] || {}), ...(rowField || {}) };
+        const recipients = lockedBy.get(`${bucket}:${qid}`);
+        if (!recipients) return field;
+        const audience = recipients.length ? 'gate' : field.encryptionAudience;
+        return { ...field, encrypted: true, encryptionAudience: audience, gateRecipients: recipients };
+      };
+      const answer = asStored('answers', row?.answer);
+      const comment = asStored('additionalComments', row?.additional);
+      const saved = readSavedRatingEnvelopes(submitContext, qid);
+      const message = readAnswerTooLongMessage({
+        question,
+        promptLocked: getQuestionEncryptionGates(question).length > 0,
+        entry: row,
+        answer,
+        comment,
+        ratings: [
+          { value: sizeSlice.importance?.[qid] ?? null, savedEnvelope: saved.importance },
+          { value: sizeSlice.conviction?.[qid] ?? null, savedEnvelope: saved.conviction },
+        ],
+        // As the rating step decides: the answer's lock, or a comment lock with text or saved ratings.
+        ratingsLocked:
+          !!isQuestionLockedForResponse(qid) ||
+          !!sizeSlice.answers?.[qid]?.encrypted ||
+          !!answer.encrypted ||
+          (!!comment.encrypted && (!!saved.importance || !!saved.conviction || hasText(comment))),
+      });
+      if (message) oversize.set(qid, message);
+    }
+    return oversize;
+  };
+
   const encryptAndUpload = async () => {
     let submitContext: SurveyQuestionsLegacyValue = null;
+    let heldBackNotice = '';
     try {
       if (!propsRef.current.loginComplete) {
         inst._submitGuard = false;
@@ -327,32 +444,25 @@ export const createSurveyQuestionsSubmitRuntime = (
         const error = validateQuadraticAllocation(value, question);
         if (error) throw new Error(error);
       }
-      // The Worker refuses an oversized answer entry; check it before locking or upload.
-      if (
-        sessionStoresAnswersInWorker(
-          resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
-        )
-      ) {
-        for (const qid of changedQids as Set<string>) {
-          const question: SurveyQuestionsLegacyValue =
-            submitQuestionPool.find(
-              (entry: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(entry?.id) === normalizeQuestionIdKey(qid),
-            ) || null;
-          const tooLong = readAnswerTooLongMessage({
-            question,
-            promptLocked: getQuestionEncryptionGates(question).length > 0,
-            answer: activeSlice.answers?.[qid],
-            comment: activeSlice.additionalComments?.[qid],
-            ratingCount: [activeSlice.importance?.[qid], activeSlice.conviction?.[qid]].filter((value) => value != null)
-              .length,
-          });
-          if (tooLong) throw new Error(tooLong);
-        }
-      }
-      activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, changedQids);
+      // The Worker refuses an answer too large to store. Before locking or upload,
+      // hold back and name each one; the other changes still submit.
+      const oversize = readOversizeAnswers(submitContext, activeSlice, changedQids, submitQuestionPool);
+      heldBackNotice = Array.from(oversize, ([qid, message]) =>
+        submitContext.singleQuestionMode
+          ? message
+          : `${nameQuestionForNotice(
+              submitQuestionPool.find((entry: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(entry?.id) === qid)
+                ?.prompt,
+              qid,
+            )} wasn't submitted. ${message}`,
+      ).join(' ');
+      const submitQids = new Set<string>(Array.from(changedQids as Set<string>).filter((qid) => !oversize.has(qid)));
+      if (oversize.size && !submitQids.size) throw new Error(heldBackNotice);
 
-      activeSlice = remaskUnchangedEncryptedFields(activeSlice, stateRef.current.editBaseline, changedQids);
-      const shouldEncrypt = Array.from(changedQids as Set<string>).some(
+      activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, submitQids);
+
+      activeSlice = remaskUnchangedEncryptedFields(activeSlice, stateRef.current.editBaseline, submitQids);
+      const shouldEncrypt = Array.from(submitQids).some(
         (qid) =>
           shouldEncryptResponseFieldForSubmit(activeSlice.answers?.[qid]) ||
           shouldEncryptResponseFieldForSubmit(activeSlice.additionalComments?.[qid]),
@@ -361,7 +471,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       if (shouldEncrypt) {
         const { groups: workGroups, missingRecipients }: SurveyQuestionsLegacyValue = buildFieldEncryptionWorkGroups(
           activeSlice,
-          changedQids,
+          submitQids,
         );
         const hasWork: SurveyQuestionsLegacyValue = workGroups.some(
           (group: SurveyQuestionsLegacyValue) =>
@@ -424,14 +534,21 @@ export const createSurveyQuestionsSubmitRuntime = (
 
       // Check even when no new encryption ran: an audience-only edit must not
       // reuse masked ciphertext whose recipients still grant the old audience.
-      await verifyEncryption(changedQids, activeSlice);
+      await verifyEncryption(submitQids, activeSlice);
       setState(buildCurrentStepState(2));
 
       // Await the receipt to ensure transaction is confirmed before optimistic update
-      const receipt: SurveyQuestionsLegacyValue = await submitSurveyResponse(activeSlice, changedQids, submitContext);
+      const receipt: SurveyQuestionsLegacyValue = await submitSurveyResponse(activeSlice, submitQids, submitContext);
       if (!isSubmitContextCurrent(submitContext)) {
         handleStaleSubmitContext(submitContext);
         return { status: 'stale', message: 'Submission context changed before upload completed.' };
+      }
+      if (oversize.size) {
+        // Listed with any answers the upload itself held back, so callers report them too.
+        const heldBackQids = Array.isArray(inst._heldBackSubmitQids) ? inst._heldBackSubmitQids : [];
+        inst._heldBackSubmitQids = Array.from(new Set([...heldBackQids, ...oversize.keys()]));
+        inst._heldBackSubmitMessage = [inst._heldBackSubmitMessage, heldBackNotice].filter(Boolean).join(' ');
+        setState(buildSubmissionErrorState(inst._heldBackSubmitMessage));
       }
       surveyLog.log('Submission receipt received', receipt?.blockNumber || 'unknown block');
 
@@ -617,8 +734,13 @@ export const createSurveyQuestionsSubmitRuntime = (
         handleStaleSubmitContext(submitContext);
         return { status: 'stale', message: 'Submission context changed before failure handling completed.' };
       }
+      // An answer held back for size stays named when the rest then fails.
+      const reportedError =
+        heldBackNotice && !String(error?.message || '').includes(heldBackNotice)
+          ? new Error([error?.message, heldBackNotice].filter(Boolean).join(' '))
+          : error;
       runSurveyQuestionsSubmitFailureController({
-        error,
+        error: reportedError,
         submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,
         submitAttemptId: submitContext?.submitAttemptId,
         ports: {
@@ -629,7 +751,7 @@ export const createSurveyQuestionsSubmitRuntime = (
           setSubmitFailureState: (statePatch: SurveySubmitFailureStatePatch) => setState(statePatch),
         },
       });
-      return { status: 'failed', message: error?.message || 'Submission failed.' };
+      return { status: 'failed', message: reportedError?.message || 'Submission failed.' };
     }
   };
   return {
