@@ -74,11 +74,39 @@ const createProps = (
   onMiniBurn: jest.fn(),
   onMiniMint: jest.fn(),
   onMintUnlimitedWithGroupPassword: jest.fn(),
+  onRetryGroupPasswordCheck: jest.fn(),
   onShowMiniPasswordInput: jest.fn(),
   ...overrides,
 });
 
 describe('SbtPageMiniActionArea', () => {
+  it('offers Retry, not Join, while the group password check could not be read', () => {
+    const onMiniMint = jest.fn();
+    const onRetryGroupPasswordCheck = jest.fn();
+    render(
+      <SbtPageMiniActionArea
+        {...createProps({
+          miniMintActionPlan: createMiniMintActionPlan({
+            handlerKind: 'retry-group-password-check',
+            labelKind: 'retry',
+            viewKind: 'group-password-check-retry',
+          }),
+          onMiniMint,
+          onRetryGroupPasswordCheck,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'title',
+      "Could not read this group's password check from the chain. Check the network and try again.",
+    );
+    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetryGroupPasswordCheck).toHaveBeenCalledTimes(1);
+    expect(onMiniMint).not.toHaveBeenCalled();
+  });
+
   it('routes disclosure, group-password, invite, and manual claim controls through explicit callbacks', () => {
     const onShowMiniPasswordInput = jest.fn();
     const onMintUnlimitedWithGroupPassword = jest.fn();

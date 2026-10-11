@@ -22,7 +22,7 @@ export const resolveSbtGroupPasswordFailureMessage = (error: unknown): string =>
 };
 
 // The on-chain mint mode carried by SBT metadata, or null when it is missing or invalid.
-const readKnownSbtMintMode = (sbtInfo: unknown): number | null => {
+export const readKnownSbtMintMode = (sbtInfo: unknown): number | null => {
   const mintMode = sbtInfo && typeof sbtInfo === 'object' ? (sbtInfo as { mintMode?: unknown }).mintMode : null;
   if (mintMode === null || mintMode === undefined || mintMode === '') return null;
   const mode = normalizeSbtMintMode(mintMode, -1);

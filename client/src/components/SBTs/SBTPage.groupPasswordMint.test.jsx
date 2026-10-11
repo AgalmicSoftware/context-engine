@@ -1,5 +1,12 @@
+import { ethers } from 'ethers';
 import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import {
+  createReadCachePayload,
+  createSubject as createLoadingSubject,
+  setupSBTPageTestLifecycle,
+} from './SBTPage.testUtils';
 import { notify } from '../../utilities/ui/notify.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { useFastGroupPasswordKdf } from '../../utilities/crypto/groupPasswordKdf.testUtils';
@@ -155,5 +162,51 @@ describe('SBTPage group-password mint', () => {
 
     expect(subject.state.error).not.toBe(SBT_GROUP_PASSWORD_MISMATCH_MESSAGE);
     expect(subject.state.groupPasswordChecking).toBe(false);
+  });
+});
+
+describe('SBTPage group-password check on load', () => {
+  setupSBTPageTestLifecycle();
+
+  it('keeps a failed hash read unknown, never open, and reads it again on Retry', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000c1';
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(
+      createReadCachePayload({
+        sbtAddress,
+        countsLoaded: true,
+        sbtInfoOverrides: { name: 'Password Badge', sessionSlug: 'edge', sessionSlugExplicit: true },
+      }),
+    );
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue(null);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
+    const read = jest
+      .spyOn(contractScripts, 'getGroupPasswordHash')
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(ethers.constants.HashZero);
+    const subject = createLoadingSubject({
+      SBTAddress: sbtAddress,
+      isSBTCacheReady: true,
+      refreshSbtData: jest.fn().mockResolvedValue(undefined),
+      sessionSlug: 'edge',
+    });
+    subject.state = { ...subject.state, network: { id: 84532, name: 'Base Sepolia' } };
+    subject.fetchHolderAddressesByTokenOwnership = jest.fn();
+
+    await subject.loadSBTInfo({ preferCountsOnly: true });
+
+    expect(subject.state).toMatchObject({
+      groupPasswordCheckUnreadable: true,
+      groupPasswordHashLoaded: false,
+      hasGroupPasswordMint: true,
+    });
+
+    await subject.retryGroupPasswordCheck();
+
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(subject.state).toMatchObject({
+      groupPasswordCheckUnreadable: false,
+      groupPasswordHashLoaded: true,
+      hasGroupPasswordMint: false,
+    });
   });
 });

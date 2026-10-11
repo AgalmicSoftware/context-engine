@@ -125,7 +125,9 @@ export const getNextDisplayImageFallbackState = (
 };
 
 export const normalizeSbtPageCanonicalMetadataHref = (candidateRaw: unknown): string => {
-  const candidate = String(candidateRaw || '').trim();
+  // Token metadata is creator-supplied JSON; a non-text field could even throw on conversion.
+  if (typeof candidateRaw !== 'string') return '';
+  const candidate = candidateRaw.trim();
   if (!candidate) return '';
   // The SBT creator sets the token URI, so only a safe link may come back.
   const normalized = toSafeArweaveLinkHref(candidate, { contextLabel: 'sbt_page_token_uri' });
@@ -135,7 +137,7 @@ export const normalizeSbtPageCanonicalMetadataHref = (candidateRaw: unknown): st
 };
 
 export const resolveSbtPageTokenMetadataHref = (tokenUriRaw: unknown): string => {
-  const raw = String(tokenUriRaw || '').trim();
+  const raw = typeof tokenUriRaw === 'string' ? tokenUriRaw.trim() : '';
   if (!raw) return '';
 
   const normalizedDirect = normalizeSbtPageCanonicalMetadataHref(raw);

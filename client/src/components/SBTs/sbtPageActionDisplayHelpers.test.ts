@@ -1176,4 +1176,40 @@ describe('sbtPageActionDisplayHelpers', () => {
     expect(mini.miniPasswordJoinButtonState.isPending).toBe(true);
     expect(mini.miniPasswordJoinContentState.pendingLabel).toBe('Checking password…');
   });
+
+  it('offers Retry instead of any join while the group password check could not be read', () => {
+    const unknown = { groupPasswordCheckUnreadable: true, hasGroupPasswordMint: true };
+
+    const mini = resolveSbtPageMiniCardDisplayState({
+      ...unknown,
+      miniMintable: true,
+      mintingStatus: 'idle',
+      sbtAddress: '0xABC',
+      sbtInfo: { mintingEndTime: 0 },
+    });
+    expect(mini.miniMintActionPlan).toMatchObject({
+      handlerKind: 'retry-group-password-check',
+      isInteractive: true,
+      viewKind: 'group-password-check-retry',
+    });
+    expect(
+      resolveSbtPageMiniMintFlowDisplayState({ ...unknown, isMintingActive: true, miniMintable: true }),
+    ).toMatchObject({
+      shouldRenderGroupPasswordCheckRetry: true,
+      shouldRenderGroupPasswordDisclosureButton: false,
+      shouldRenderOpenMintButton: false,
+    });
+
+    const full = resolveSbtPageFullActionDisplayPlan({ ...unknown, mintingStatus: 'idle', sbtInfo: {} });
+    expect(full.mintButtonDisplayState.mintFlowDisplayState).toMatchObject({
+      shouldRenderGroupPasswordCheckRetry: true,
+      shouldRenderGroupPasswordJoin: false,
+      shouldRenderOpenMintButton: false,
+    });
+    // A user who already holds the token sees no Retry.
+    expect(
+      resolveSbtPageMiniCardDisplayState({ ...unknown, miniMintable: true, userHasSBT: true }).miniMintActionPlan
+        .viewKind,
+    ).toBe('hidden');
+  });
 });

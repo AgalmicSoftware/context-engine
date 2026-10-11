@@ -429,6 +429,24 @@ describe('SBTPage mini-card', () => {
     expect(mintUnlimitedWithGroupPassword).not.toHaveBeenCalled();
   });
 
+  it('offers Retry instead of Join while the group password check could not be read', () => {
+    const loadSBTInfo = jest.fn().mockResolvedValue(undefined);
+    const { cardNode } = renderMiniCardNode(
+      {},
+      { groupPasswordCheckUnreadable: true, hasGroupPasswordMint: true },
+      (subject) => {
+        subject.loadSBTInfo = loadSBTInfo;
+      },
+    );
+    const cardText = flattenText(SbtPageMiniCard(cardNode.props));
+
+    expect(cardNode.props.miniMintActionPlan.viewKind).toBe('group-password-check-retry');
+    expect(cardText).toContain('Retry');
+    expect(cardText).not.toContain('Join');
+    cardNode.props.onRetryGroupPasswordCheck({ preventDefault: jest.fn() });
+    expect(loadSBTInfo).toHaveBeenCalledWith({ preferCountsOnly: true });
+  });
+
   it('routes mini-card disclosure clicks through the parent password input action', () => {
     const { cardNode, subject } = renderMiniCardNode(
       {},

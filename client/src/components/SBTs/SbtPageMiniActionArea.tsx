@@ -2,6 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 
+import { GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE } from '../../utilities/crypto/sbtAuthorization';
 import styles from './SBTPage.module.scss';
 import {
   resolveSbtPageStatusButtonContentState,
@@ -70,6 +71,7 @@ export type SbtPageMiniActionAreaProps = {
   onMiniBurn: React.MouseEventHandler<HTMLButtonElement>;
   onMiniMint: React.MouseEventHandler<HTMLButtonElement>;
   onMintUnlimitedWithGroupPassword: React.MouseEventHandler<HTMLButtonElement>;
+  onRetryGroupPasswordCheck: React.MouseEventHandler<HTMLButtonElement>;
   onShowMiniPasswordInput: React.MouseEventHandler<HTMLButtonElement>;
 };
 
@@ -121,6 +123,7 @@ const SbtPageMiniActionArea = ({
   onMiniBurn,
   onMiniMint,
   onMintUnlimitedWithGroupPassword,
+  onRetryGroupPasswordCheck,
   onShowMiniPasswordInput,
 }: SbtPageMiniActionAreaProps): React.ReactElement => {
   let miniMintArea: React.ReactNode = null;
@@ -134,7 +137,18 @@ const SbtPageMiniActionArea = ({
   });
 
   if (!hasTokenMini && miniMintActionPlan.shouldRenderMintArea) {
-    if (
+    if (miniMintActionPlan.viewKind === 'group-password-check-retry') {
+      miniMintArea = (
+        <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
+          <span className={styles.miniActionStatus} role="status" title={GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE}>
+            Couldn&apos;t read this group&apos;s password check.
+          </span>
+          <button onClick={onRetryGroupPasswordCheck} className={miniMintActionButtonClassName}>
+            Retry
+          </button>
+        </div>
+      );
+    } else if (
       miniMintActionPlan.viewKind === 'group-password-disclosure' ||
       miniMintActionPlan.viewKind === 'invite-disclosure' ||
       miniMintActionPlan.viewKind === 'manual-password-disclosure'

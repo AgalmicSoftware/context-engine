@@ -58,6 +58,7 @@ const SbtPageMiniCard = ({
   onMiniBurn,
   onMiniMint,
   onMintUnlimitedWithGroupPassword,
+  onRetryGroupPasswordCheck,
   onShowMiniPasswordInput,
   sbtAddress,
   sbtName,
@@ -116,6 +117,7 @@ const SbtPageMiniCard = ({
       onMiniBurn={onMiniBurn}
       onMiniMint={onMiniMint}
       onMintUnlimitedWithGroupPassword={onMintUnlimitedWithGroupPassword}
+      onRetryGroupPasswordCheck={onRetryGroupPasswordCheck}
       onShowMiniPasswordInput={onShowMiniPasswordInput}
     />
   </div>

@@ -180,6 +180,7 @@ import {
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
   isKnownOpenSbt,
+  readKnownSbtMintMode,
   resolveSbtGroupPasswordFailureMessage,
 } from './sbtPageHelpers';
 import type {
@@ -388,6 +389,8 @@ type SbtPageState = Record<string, unknown> & {
   filteredMintedUsers: unknown[];
   groupPasswordHash: unknown;
   groupPasswordHashLoaded: boolean;
+  // The last hash read failed and the mint mode is unknown: the card offers Retry instead of a join.
+  groupPasswordCheckUnreadable?: boolean;
   groupPasswordChecking: boolean;
   groupPasswordInput: string;
   hasGroupPasswordMint: boolean;
@@ -2445,11 +2448,13 @@ class SBTPage extends Component<any, any> {
         ? cachedGroupPasswordHash
         : await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
       if (!isCurrentLoad()) return;
-      const { hasGroupHash, hasInviteMint, hasGroupPasswordMint } = resolveSbtPageGroupPasswordMintState({
-        groupPasswordHash,
-        hashZero: ethers.constants.HashZero,
-        hasPasswordMint: sbtInfo?.hasPasswordMint,
-      });
+      const { groupPasswordCheckUnreadable, hasInviteMint, hasGroupPasswordMint } =
+        resolveSbtPageGroupPasswordMintState({
+          groupPasswordHash,
+          hashZero: ethers.constants.HashZero,
+          hasPasswordMint: sbtInfo?.hasPasswordMint,
+          mintMode: readKnownSbtMintMode(sbtInfo),
+        });
 
       let historySummary = normalizeSbtPageHistorySummary(entry?.historySummary);
       let mintedAddresses = expandSbtPageAddressListFromCountMap(entry?.mintedCountByAddress, entry?.mintedAddresses);
@@ -2656,7 +2661,9 @@ class SBTPage extends Component<any, any> {
               userHasSBT: holderState.userHasSBT,
               userIsSbtAdmin,
               groupPasswordHash: groupPasswordHash || null,
-              groupPasswordHashLoaded: true,
+              // A failed read is not kept, so the next load (or Retry) reads the hash again.
+              groupPasswordHashLoaded: !!groupPasswordHash,
+              groupPasswordCheckUnreadable,
               hasInviteMint,
               hasGroupPasswordMint,
               filteredMintedUsers: holderState.filteredMintedUsers,
@@ -2875,6 +2882,14 @@ class SBTPage extends Component<any, any> {
     } else if (!finalPasswordToUse && (this.state.mintPassword || this.state.manualPasswordInput) && this._isMounted) {
       this.setState(buildSbtPageMintPasswordClearPatch());
     }
+  };
+
+  // Reads the group's password check again after a failed read, so the card can offer the right join.
+  retryGroupPasswordCheck = (): Promise<void> => this.loadSBTInfo({ preferCountsOnly: true });
+
+  handleMiniRetryGroupPasswordCheck = (event: React.MouseEvent<HTMLButtonElement>): void => {
+    event.preventDefault();
+    void this.retryGroupPasswordCheck();
   };
 
   async mintUnlimitedWithGroupPassword(options: SbtPageManualMintOptions = {}): Promise<boolean> {
@@ -3715,6 +3730,7 @@ class SBTPage extends Component<any, any> {
       burnButtonClassName: styles.burnButton,
       burnLabel: t('burn'),
       claimCountdown,
+      groupPasswordCheckUnreadable: this.state.groupPasswordCheckUnreadable === true,
       groupPasswordChecking: this.state.groupPasswordChecking,
       groupPasswordInput,
       hasGroupPasswordMint: this.state.hasGroupPasswordMint,
@@ -3750,6 +3766,7 @@ class SBTPage extends Component<any, any> {
         onManualPasswordInputChange: this.handleManualPasswordInputChange,
         onMint: this.handleMint,
         onMintUnlimitedWithGroupPassword: this.mintUnlimitedWithGroupPassword,
+        onRetryGroupPasswordCheck: this.retryGroupPasswordCheck,
         onOpenMintTransaction: () => window.open(this.getExplorerLink(lastMintTxHash), '_blank', 'noopener,noreferrer'),
       },
     });
@@ -4059,6 +4076,7 @@ class SBTPage extends Component<any, any> {
         burnLabel: t('burn'),
         burningStatus,
         claimCountdown,
+        groupPasswordCheckUnreadable: this.state.groupPasswordCheckUnreadable === true,
         groupPasswordChecking: this.state.groupPasswordChecking,
         groupPasswordInput: this.state.groupPasswordInput,
         hasGroupPasswordMint: this.state.hasGroupPasswordMint,
@@ -4141,6 +4159,7 @@ class SBTPage extends Component<any, any> {
           onMiniBurn={miniCardActionHandlers.onMiniBurn}
           onMiniMint={miniCardActionHandlers.onMiniMint}
           onMintUnlimitedWithGroupPassword={miniCardActionHandlers.onMintUnlimitedWithGroupPassword}
+          onRetryGroupPasswordCheck={this.handleMiniRetryGroupPasswordCheck}
           onShowMiniPasswordInput={miniCardActionHandlers.onShowMiniPasswordInput}
           sbtAddress={sbtAddressForDisplay}
           sbtName={sbtNameText}

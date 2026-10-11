@@ -63,6 +63,10 @@ describe('sbtPageMediaHelpers', () => {
     });
     const embedded = encodeURIComponent(JSON.stringify({ tokenURI: 'javascript:alert(1)' }));
     expect(resolveSbtPageTokenMetadataHref(`data:application/json,${embedded}`)).toBe('');
+    // A token URI field holding an object whose text conversion throws gives no link.
+    const hostile = encodeURIComponent(JSON.stringify({ tokenURI: { toString: 1 } }));
+    expect(resolveSbtPageTokenMetadataHref(`data:application/json,${hostile}`)).toBe('');
+    expect(normalizeSbtPageCanonicalMetadataHref(JSON.parse('{"toString":1}'))).toBe('');
   });
 
   it('resolves embedded token metadata links by SBT-specific field precedence', () => {

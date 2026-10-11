@@ -1,4 +1,5 @@
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { SBT_MINT_MODE } from '../../utilities/sbt/sbtMintMode.js';
 import { ethers } from 'ethers';
 import {
   buildSbtPageHolderListSignature,
@@ -36,6 +37,7 @@ export {
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
   isKnownOpenSbt,
+  readKnownSbtMintMode,
   resolveSbtGroupPasswordFailureMessage,
   resolveSbtPageMintFailure,
 } from './sbtClaimUrlSafety';
@@ -431,8 +433,11 @@ type ResolveSbtPageGroupPasswordMintStateArgs = {
   groupPasswordHash?: unknown;
   hashZero?: unknown;
   hasPasswordMint?: unknown;
+  // The on-chain mint mode from the metadata, or null when unknown.
+  mintMode?: number | null;
 };
 type SbtPageGroupPasswordMintState = {
+  groupPasswordCheckUnreadable: boolean;
   hasGroupHash: boolean;
   hasGroupPasswordMint: boolean;
   hasInviteMint: boolean;
@@ -696,9 +701,19 @@ export const resolveSbtPageGroupPasswordMintState = ({
   groupPasswordHash = null,
   hashZero = '',
   hasPasswordMint = false,
+  mintMode = null,
 }: ResolveSbtPageGroupPasswordMintStateArgs = {}): SbtPageGroupPasswordMintState => {
-  const hasGroupHash = !!groupPasswordHash && groupPasswordHash !== hashZero;
+  // A failed read (null) is not "no group password". A known mint mode still says which join applies; without
+  // one the check is unknown, so the card offers Retry and nothing treats the group as open.
+  const hashUnreadable = !groupPasswordHash;
+  const groupPasswordCheckUnreadable = hashUnreadable && mintMode == null;
+  const hasGroupHash = hashUnreadable
+    ? groupPasswordCheckUnreadable ||
+      mintMode === SBT_MINT_MODE.UNLIMITED_GROUP_SIGNATURE ||
+      mintMode === SBT_MINT_MODE.LIMITED_INVITE_SIGNATURE
+    : groupPasswordHash !== hashZero;
   return {
+    groupPasswordCheckUnreadable,
     hasGroupHash,
     hasInviteMint: hasGroupHash && !!hasPasswordMint,
     hasGroupPasswordMint: hasGroupHash && !hasPasswordMint,
