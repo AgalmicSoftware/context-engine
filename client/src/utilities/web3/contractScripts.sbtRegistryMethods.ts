@@ -188,7 +188,7 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
       // A group password hash is bound to the predicted SBT address. Any other
       // deploy's address depends on the hash itself, so the hash cannot be valid.
       if (!useConfiguredDeterministic && hasNonZeroHashValue(groupPasswordHash)) {
-        throw new Error('Group passwords need the predicted-address deploy.');
+        throw new Error("This group can't be created with a password. Remove the group password and try again.");
       }
       if (useConfiguredDeterministic) {
         if (!ethers.utils.isAddress(String(adminAddress || ''))) {

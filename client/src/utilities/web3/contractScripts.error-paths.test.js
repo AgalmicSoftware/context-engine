@@ -890,7 +890,7 @@ describe('error paths', () => {
         salt,
         createOptions,
       ),
-    ).rejects.toThrow('Group passwords need the predicted-address deploy.');
+    ).rejects.toThrow("This group can't be created with a password. Remove the group password and try again.");
 
     expect(mockFactory.estimateGas.createSBT).not.toHaveBeenCalled();
     expect(mockFactory.estimateGas.createSBTDeterministic).not.toHaveBeenCalled();
