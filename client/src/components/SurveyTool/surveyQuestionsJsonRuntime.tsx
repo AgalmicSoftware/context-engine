@@ -5,7 +5,9 @@ import type {
 } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsSubmitPendingStats } from './surveyQuestionsSubmitController.js';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
+import { collectSubmitQuestionIds, readOwnAnswersBeforeUpload } from './surveySavedAnswerGate';
 import { resolveEditableQuestionList } from './surveyToolResponsePayloadController';
+import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
 
 export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyRecord) => {
   const {
@@ -173,6 +175,41 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
     />
   );
 
+  // Like the pile, a Worker session whose response listing is incomplete reads the
+  // responder's own saved answers first, so an edit can never blank saved fields.
+  const submitWithSavedAnswers = async () => {
+    const props = propsRef.current;
+    if (
+      props.loginComplete &&
+      props.account &&
+      !props.isResponsesCacheReady &&
+      isWorkerCanonicalSessionConfig(props.sessionConfig)
+    ) {
+      const surveyIndex = props.isStandalone || props.singleQuestionMode ? 0 : Number(props.surveyIndex || 0);
+      setState({ isSubmitting: true, submissionError: '' });
+      const outcome = await readOwnAnswersBeforeUpload(
+        engine,
+        () =>
+          collectSubmitQuestionIds(
+            [
+              ...(props.singleQuestionMode && props.questionID ? [{ id: props.questionID }] : []),
+              ...(Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : []),
+            ],
+            stateRef.current.surveysResponseState?.[surveyIndex],
+          ),
+        new AbortController().signal,
+      );
+      if (inst._isMounted) {
+        setState({ isSubmitting: false, ...('message' in outcome ? { submissionError: outcome.message } : {}) });
+      }
+      if (outcome.status !== 'ready') {
+        inst._submitGuard = false;
+        return outcome;
+      }
+    }
+    return encryptAndUpload();
+  };
+
   const handlePrimarySubmitClick = () => {
     const inFlightPlan: SurveyQuestionsPrimarySubmitPlan = buildSurveyQuestionsPrimarySubmitPlan({
       isSubmitting: stateRef.current.isSubmitting,
@@ -222,7 +259,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
           inst._submitGuard = true;
         },
         dispatchSubmit: () => {
-          encryptAndUpload();
+          void submitWithSavedAnswers();
         },
       },
     });

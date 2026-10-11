@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { renderSurveyPileViewMode, renderSurveyQuestions } from './surveyQuestionsTestHarness';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -231,7 +231,44 @@ const fixture = async ({
   const click = async () => {
     await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)));
   };
-  return { add, state, host, sync, mount, click, submitResponses, listPage, engine: () => engine, view: () => view };
+  // The "View all" editor: the same Worker session rendered as the full question list.
+  const mountEditor = async () => {
+    renderSurveyQuestions({
+      isStandalone: true,
+      surveyIndex: 0,
+      account: OWNER,
+      loginComplete: true,
+      provider: { request: jest.fn() },
+      network: { id: 11155420 },
+      networkChainId: 11155420,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: state.isResponsesCacheReady,
+      questionResponsesNonce: state.questionResponsesNonce,
+      questionsCacheNonce: state.questionResponsesNonce,
+      sessionSlug: SLUG,
+      activeSessionSlug: SLUG,
+      sessionSlugPinned: true,
+      sessionConfig: CONFIG,
+      questionPool: [{ id: QID, type: 'freeform', prompt: 'Example question' }],
+      refreshQuestionResponses: (ids, opts) => controller.refreshQuestionResponses(ids, opts),
+      toggleLoginModal: jest.fn(),
+    });
+    await settle();
+  };
+  return {
+    add,
+    state,
+    host,
+    sync,
+    mount,
+    mountEditor,
+    click,
+    submitResponses,
+    listPage,
+    engine: () => engine,
+    view: () => view,
+  };
 };
 
 it('shows feedback while the first sync and own-answer read are pending, then preserves saved fields', async () => {
@@ -416,4 +453,28 @@ it('tells the responder saved answers did not load and retries the load', async 
   await settle();
   expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
   expect(h.engine().state.surveysResponseState[0].additionalComments[QID].value).toBe('Saved comment');
+});
+
+it.each([
+  ['a capped listing', { capped: true }],
+  ['a failed listing', { failGlobal: () => true }],
+])('reads own answers before the View all editor uploads over %s', async (_label, options) => {
+  const h = await fixture(options);
+  h.add('responses', SAVED, OWNER, !!options.capped);
+  await act(async () => {
+    await h.sync().catch(() => {});
+  });
+  expect(h.state.isResponsesCacheReady).toBe(false);
+  await h.mountEditor();
+  if (!screen.queryByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT)) {
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE));
+  }
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT), {
+    target: { value: 'New comment' },
+  });
+  await settle();
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  expect(h.listPage.mock.calls.some(([args]) => args.ownResponses?.account === OWNER)).toBe(true);
+  expect(h.submitResponses.mock.calls[0][2][0]).toMatchObject({ ...SAVED, additional: { value: 'New comment' } });
 });

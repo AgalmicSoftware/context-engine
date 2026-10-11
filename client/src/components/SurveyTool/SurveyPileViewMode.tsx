@@ -4,10 +4,12 @@ import {
   type InterviewConsentOverrides,
 } from './sessionInterviewConsent';
 import {
-  loadSessionInterviewSavedAnswers,
-  mergeInterviewSavedAnswerBaseline,
-  type InterviewSavedSlice,
-} from './sessionInterviewSavedAnswers';
+  buildSessionInterviewActiveSubmitContextToken,
+  buildSessionInterviewSubmitContextToken,
+  collectSubmitQuestionIds,
+  loadSessionInterviewOwnAnswers,
+  readOwnAnswersBeforeUpload,
+} from './surveySavedAnswerGate';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
@@ -123,11 +125,6 @@ import {
   type SessionVoiceMode,
 } from './sessionInterview';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
-import {
-  getUsableSessionWorkerUrl,
-  resolveConfiguredSessionWorkerUrlFromConfig,
-} from '../../utilities/session/sessionWorkerAvailability';
-import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 
 // Crypto and contract utilities
 import { utils } from 'ethers';
@@ -144,7 +141,6 @@ import {
   resolveSponsoredGateStateForResource,
 } from '../../utilities/web3/sponsoredAccess.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
-import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 import { resolvePayloadStorageRef } from '../../utilities/storage/storageRefs.js';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue.js';
 
@@ -154,7 +150,6 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionScanProgressDisplay,
   resolveRevertPendingAnswerValue,
-  buildRatingEnvelopeQidSetFromUserAnswers,
   buildSliderPersistOptions,
   buildSliceToken,
   computeSubmitLabel,
@@ -2202,58 +2197,6 @@ export const applySessionInterviewAnswer = (engine: PileViewModeEngine, question
     engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
   });
 
-export const buildSessionInterviewSubmitContextToken = (props: Record<string, unknown> = {}) => {
-  const sessionConfig = readPlainRecord(props.sessionConfig);
-  const sessionModeProfile = readPlainRecord(sessionConfig.sessionModeProfile);
-  const sessionAuthority = readPlainRecord(sessionModeProfile.authority);
-  const sessionStorage = readPlainRecord(sessionModeProfile.storage);
-  const storageProfile = readPlainRecord(sessionConfig.storageProfile);
-  const storageResources = readPlainRecord(storageProfile.resources);
-  const slug = String(resolveEffectiveSlug(props) || sessionConfig.slug || '').trim();
-  const network = readPlainRecord(props.network);
-  const networkId = String(network.id || network.chainId || sessionConfig.networkChainId || '').trim();
-  const workerUrl =
-    getUsableSessionWorkerUrl({
-      slug,
-      sessionConfig,
-      allowSharedFallback: false,
-      requireExactWorkerSession: true,
-    }) ||
-    getUsableSessionWorkerUrl({
-      slug,
-      sessionConfig,
-      allowSharedFallback: false,
-    }) ||
-    resolveConfiguredSessionWorkerUrlFromConfig(sessionConfig);
-  const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
-  const responseContract = resolveSessionContractRef({ sessionConfig, contractKey: 'surveys' });
-  const identityParts = [
-    slug,
-    networkId,
-    sessionId,
-    workerUrl,
-    String(sessionConfig.metadataURI || ''),
-    String(sessionModeProfile.preset || ''),
-    String(sessionAuthority.mode || ''),
-    String(sessionStorage.backend || storageProfile.backend || ''),
-    String(storageResources.questions || ''),
-    String(storageResources.surveys || ''),
-    String(storageResources.responses || ''),
-    String(responseContract.address || '').toLowerCase(),
-    String(responseContract.chainId || ''),
-  ];
-  return identityParts.join('|');
-};
-
-const buildSessionInterviewActiveSubmitContextToken = (engine: PileViewModeEngine, baseToken: string) =>
-  [
-    baseToken,
-    String(engine.props.account || '')
-      .trim()
-      .toLowerCase(),
-    String(Boolean(engine.props.loginComplete)),
-  ].join('|');
-
 const markSessionInterviewResponsesReady = (engine: PileViewModeEngine, baseToken: string) => {
   engine._sessionInterviewResponseReadyToken = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
 };
@@ -2373,47 +2316,23 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
   ) {
     return engine.handlePileSubmitClick();
   }
-  const token = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
   const controller = new AbortController();
   engine._pileOwnAnswersSubmitController = controller;
-  const isCurrent = () =>
-    engine._isMounted &&
-    !controller.signal.aborted &&
-    token ===
-      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
-  const answerIds = () => {
-    const slice = engine.state.surveysResponseState?.[0] || {};
-    return [
-      ...new Set([
-        // Navigation can initialize another card while the read is in flight.
-        ...engine.state.pileQuestions
-          .map((question: { id: string }) => normalizeQuestionIdKey(question.id))
-          .filter(Boolean),
-        ...['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
-          Object.keys(slice[key] || {}),
-        ),
-      ]),
-    ];
-  };
-  const questionIds = answerIds();
   engine.setState({ pileSubmitTempText: 'Loading your saved answers…', submissionError: null });
   try {
-    // A capped public listing cannot prove that a blank answer is new. The
-    // existing strict own read covers all submitted fields and preserves edits.
-    const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, controller.signal);
-    if (!isCurrent()) return { status: 'stale' as const };
-    if (saved === null || answerIds().some((id) => !questionIds.includes(id))) {
-      const message = 'Your saved answers are still loading. Try Submit again when the sync completes.';
-      engine.setState({ pileSubmitTempText: '', submissionError: message });
-      return { status: 'pending' as const, message };
+    const outcome = await readOwnAnswersBeforeUpload(
+      engine,
+      // Navigation can initialize another card while the read is in flight.
+      () => collectSubmitQuestionIds(engine.state.pileQuestions, engine.state.surveysResponseState?.[0]),
+      controller.signal,
+    );
+    if (outcome.status === 'stale') return outcome;
+    if (outcome.status !== 'ready') {
+      engine.setState({ pileSubmitTempText: '', submissionError: outcome.message });
+      return outcome;
     }
     engine.setState({ pileSubmitTempText: '' });
     return await engine.encryptAndUpload();
-  } catch {
-    if (!isCurrent()) return { status: 'stale' as const };
-    const message = 'Could not load your saved answers. Try Submit again to retry.';
-    engine.setState({ pileSubmitTempText: '', submissionError: message });
-    return { status: 'failed' as const, message };
   } finally {
     if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
     // A context reset may have cleared this controller; a later request still
@@ -2425,61 +2344,6 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
     )
       engine.setState({ pileSubmitTempText: '' });
   }
-};
-
-export const loadSessionInterviewOwnAnswers = async (
-  engine: PileViewModeEngine,
-  questionIds: string[],
-  signal: AbortSignal,
-): Promise<InterviewSavedSlice | null> => {
-  const props = engine.props;
-  const token = buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(props));
-  const isCurrent = () =>
-    !signal.aborted &&
-    token ===
-      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
-  const responses = await loadSessionInterviewSavedAnswers({
-    questionIds,
-    account: String(props.account || '')
-      .trim()
-      .toLowerCase(),
-    provider: props.provider,
-    sessionSlug: resolveEffectiveSlug(props),
-    sessionConfig: props.sessionConfig || {},
-    signal,
-  });
-  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
-  if (responses === null) return null;
-  const userAnswers = { responses };
-  const saved = engine.buildSliceFromUserAnswers(userAnswers);
-  await new Promise<void>((resolve) =>
-    engine.setState((previous: PileViewModeEngine['state']) => {
-      if (!isCurrent()) return null;
-      const merged = mergeInterviewSavedAnswerBaseline(
-        previous.surveysResponseState?.[0],
-        previous.editBaseline,
-        saved,
-        questionIds,
-        {
-          normalizeQuestionIdKey,
-          valuesEqual: engine.valuesEqual,
-          ratingEnvelopeQids: buildRatingEnvelopeQidSetFromUserAnswers(previous.userAnswers),
-          getDefaultResponseEncryptionAudience: engine.getDefaultResponseEncryptionAudience,
-          normalizeResponseEncryptionAudience: engine.normalizeResponseEncryptionAudience,
-          getDefaultResponseEncryptionAudienceForQid: engine.getDefaultResponseEncryptionAudienceForQid,
-          resolveFieldEncryptionGateId: engine.resolveFieldEncryptionGateId,
-          normalizeFieldAudienceMode: engine.normalizeFieldAudienceMode,
-        },
-      );
-      return {
-        userAnswers,
-        editBaseline: merged.baseline,
-        surveysResponseState: [merged.slice, ...(previous.surveysResponseState || []).slice(1)],
-      };
-    }, resolve),
-  );
-  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
-  return saved || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
 };
 
 export const submitSessionInterviewResponses = async (engine: PileViewModeEngine, questionIds: string[] = []) => {

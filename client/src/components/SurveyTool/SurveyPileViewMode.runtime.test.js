@@ -7,12 +7,11 @@ import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
   buildPileRuntimeInitialState,
-  buildSessionInterviewSubmitContextToken,
   createPileViewRuntimeStrategy,
   recordInterviewProvenance,
   submitSessionInterviewResponses,
-  loadSessionInterviewOwnAnswers,
 } from './SurveyPileViewMode';
+import { buildSessionInterviewSubmitContextToken, loadSessionInterviewOwnAnswers } from './surveySavedAnswerGate';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
   buildNoPendingPileSubmitFeedbackPlan,

@@ -1,0 +1,184 @@
+import {
+  getUsableSessionWorkerUrl,
+  resolveConfiguredSessionWorkerUrlFromConfig,
+} from '../../utilities/session/sessionWorkerAvailability';
+import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
+import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
+import {
+  loadSessionInterviewSavedAnswers,
+  mergeInterviewSavedAnswerBaseline,
+  type InterviewSavedSlice,
+} from './sessionInterviewSavedAnswers';
+import type { SurveyQuestionsRuntimeEngine } from './surveyQuestionsTypes';
+import { buildRatingEnvelopeQidSetFromUserAnswers } from './surveyToolResponseState';
+import { resolveEffectiveSlug } from './surveyToolScope';
+import { normalizeQuestionIdKey } from './surveyToolSignatures';
+
+type RecordValue = Record<string, unknown>;
+
+const readPlainRecord = (value: unknown): RecordValue =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : {};
+
+/** The session and Worker an upload belongs to; any change makes an in-flight read stale. */
+export const buildSessionInterviewSubmitContextToken = (props: RecordValue = {}) => {
+  const sessionConfig = readPlainRecord(props.sessionConfig);
+  const sessionModeProfile = readPlainRecord(sessionConfig.sessionModeProfile);
+  const sessionAuthority = readPlainRecord(sessionModeProfile.authority);
+  const sessionStorage = readPlainRecord(sessionModeProfile.storage);
+  const storageProfile = readPlainRecord(sessionConfig.storageProfile);
+  const storageResources = readPlainRecord(storageProfile.resources);
+  const slug = String(resolveEffectiveSlug(props) || sessionConfig.slug || '').trim();
+  const network = readPlainRecord(props.network);
+  const networkId = String(network.id || network.chainId || sessionConfig.networkChainId || '').trim();
+  const workerUrl =
+    getUsableSessionWorkerUrl({
+      slug,
+      sessionConfig,
+      allowSharedFallback: false,
+      requireExactWorkerSession: true,
+    }) ||
+    getUsableSessionWorkerUrl({
+      slug,
+      sessionConfig,
+      allowSharedFallback: false,
+    }) ||
+    resolveConfiguredSessionWorkerUrlFromConfig(sessionConfig);
+  const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
+  const responseContract = resolveSessionContractRef({ sessionConfig, contractKey: 'surveys' });
+  const identityParts = [
+    slug,
+    networkId,
+    sessionId,
+    workerUrl,
+    String(sessionConfig.metadataURI || ''),
+    String(sessionModeProfile.preset || ''),
+    String(sessionAuthority.mode || ''),
+    String(sessionStorage.backend || storageProfile.backend || ''),
+    String(storageResources.questions || ''),
+    String(storageResources.surveys || ''),
+    String(storageResources.responses || ''),
+    String(responseContract.address || '').toLowerCase(),
+    String(responseContract.chainId || ''),
+  ];
+  return identityParts.join('|');
+};
+
+/** The session identity plus the signed-in account. */
+export const buildSessionInterviewActiveSubmitContextToken = (
+  engine: SurveyQuestionsRuntimeEngine,
+  baseToken: string,
+) =>
+  [
+    baseToken,
+    String(engine.props.account || '')
+      .trim()
+      .toLowerCase(),
+    String(Boolean(engine.props.loginComplete)),
+  ].join('|');
+
+const readActiveSubmitContextToken = (engine: SurveyQuestionsRuntimeEngine) =>
+  buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+
+export const loadSessionInterviewOwnAnswers = async (
+  engine: SurveyQuestionsRuntimeEngine,
+  questionIds: string[],
+  signal: AbortSignal,
+): Promise<InterviewSavedSlice | null> => {
+  const props = engine.props;
+  const token = readActiveSubmitContextToken(engine);
+  const isCurrent = () => !signal.aborted && token === readActiveSubmitContextToken(engine);
+  // The pile edits slice 0; a survey editor edits its own survey's slice.
+  const sliceIndex = props.isStandalone || props.singleQuestionMode ? 0 : Number(props.surveyIndex || 0);
+  const responses = await loadSessionInterviewSavedAnswers({
+    questionIds,
+    account: String(props.account || '')
+      .trim()
+      .toLowerCase(),
+    provider: props.provider,
+    sessionSlug: resolveEffectiveSlug(props),
+    sessionConfig: props.sessionConfig || {},
+    signal,
+  });
+  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  if (responses === null) return null;
+  const userAnswers = { responses };
+  const saved = engine.buildSliceFromUserAnswers(userAnswers);
+  await new Promise<void>((resolve) =>
+    engine.setState((previous: SurveyQuestionsRuntimeEngine['state']) => {
+      if (!isCurrent()) return null;
+      const merged = mergeInterviewSavedAnswerBaseline(
+        previous.surveysResponseState?.[sliceIndex],
+        previous.editBaseline,
+        saved,
+        questionIds,
+        {
+          normalizeQuestionIdKey,
+          valuesEqual: engine.valuesEqual,
+          ratingEnvelopeQids: buildRatingEnvelopeQidSetFromUserAnswers(previous.userAnswers),
+          getDefaultResponseEncryptionAudience: engine.getDefaultResponseEncryptionAudience,
+          normalizeResponseEncryptionAudience: engine.normalizeResponseEncryptionAudience,
+          getDefaultResponseEncryptionAudienceForQid: engine.getDefaultResponseEncryptionAudienceForQid,
+          resolveFieldEncryptionGateId: engine.resolveFieldEncryptionGateId,
+          normalizeFieldAudienceMode: engine.normalizeFieldAudienceMode,
+        },
+      );
+      const surveysResponseState = [...(previous.surveysResponseState || [])];
+      surveysResponseState[sliceIndex] = merged.slice;
+      return { userAnswers, editBaseline: merged.baseline, surveysResponseState };
+    }, resolve),
+  );
+  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  return saved || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
+};
+
+export type OwnAnswerReadOutcome =
+  { status: 'ready' } | { status: 'pending' | 'failed'; message: string } | { status: 'stale' };
+
+/**
+ * The pre-upload gate shared by the pile and the full editor. While a session's
+ * response listing is incomplete, an upload must first read the responder's own
+ * saved answers, so an edit can never replace saved fields this browser has not seen.
+ */
+export const readOwnAnswersBeforeUpload = async (
+  engine: SurveyQuestionsRuntimeEngine,
+  listQuestionIds: () => string[],
+  signal: AbortSignal,
+): Promise<OwnAnswerReadOutcome> => {
+  const token = readActiveSubmitContextToken(engine);
+  const isCurrent = () =>
+    engine._isMounted !== false && !signal.aborted && token === readActiveSubmitContextToken(engine);
+  const questionIds = listQuestionIds();
+  try {
+    // A capped public listing cannot prove that a blank answer is new. The
+    // strict own read covers all submitted fields and preserves edits.
+    const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, signal);
+    if (!isCurrent()) return { status: 'stale' };
+    if (saved === null || listQuestionIds().some((id) => !questionIds.includes(id))) {
+      return {
+        status: 'pending',
+        message: 'Your saved answers are still loading. Try Submit again when the sync completes.',
+      };
+    }
+    return { status: 'ready' };
+  } catch {
+    if (!isCurrent()) return { status: 'stale' };
+    return { status: 'failed', message: 'Could not load your saved answers. Try Submit again to retry.' };
+  }
+};
+
+/** Question ids an upload can touch: the listed questions plus every edited slice key. */
+export const collectSubmitQuestionIds = (
+  questions: Array<{ id?: unknown }> | null | undefined,
+  slice: RecordValue | null | undefined,
+) => [
+  ...new Set(
+    [
+      ...(Array.isArray(questions) ? questions.map((question) => question?.id) : []),
+      ...['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
+        Object.keys(readPlainRecord(readPlainRecord(slice)[key])),
+      ),
+    ]
+      .map((id) => normalizeQuestionIdKey(id))
+      .filter(Boolean),
+  ),
+];
