@@ -195,9 +195,12 @@ export const refreshSessionMetaFieldsForSlug = async (
   };
 };
 
+const DECRYPTED_OVERRIDE_STATE_KEYS = ['sessionInfoOverrides', 'sessionNameOverrides', 'sessionHeaderOverrides'];
+
 export const createSessionMetaRefreshController = (host: SessionMetaRefreshHost): SessionMetaRefreshController => {
   let sessionMetaAttempts: Record<string, boolean> = {};
   let lastSessionInfoAttempt = '';
+  let overridesAccount: string | null = null;
 
   const warn = (context: string, error: unknown): void => {
     if (typeof host.warn === 'function') {
@@ -205,20 +208,41 @@ export const createSessionMetaRefreshController = (host: SessionMetaRefreshHost)
     }
   };
 
+  // Regression guard: decrypted overrides are keyed by slug only, so a logout or
+  // account switch must drop them before another viewer sees this session.
+  const readAccountAndResetOnChange = (): string => {
+    const account = host.getAccount() || '';
+    if (overridesAccount !== null && overridesAccount !== account) {
+      sessionMetaAttempts = {};
+      lastSessionInfoAttempt = '';
+      host.setState((prev) =>
+        DECRYPTED_OVERRIDE_STATE_KEYS.some((key) => Object.keys((prev[key] || {}) as object).length > 0)
+          ? Object.fromEntries(DECRYPTED_OVERRIDE_STATE_KEYS.map((key) => [key, {}]))
+          : null,
+      );
+    }
+    overridesAccount = account;
+    return account;
+  };
+
+  const isAccountCurrent = (account: string): boolean => (host.getAccount() || '') === account;
+
   const refreshSessionInfo = async (): Promise<void> => {
     const slug = host.getActiveSessionSlug();
     const cfg = host.getSessionConfigBySlugOrDefault(slug) || {};
     const litHooks = host.getGlobalLitHooks();
+    const account = readAccountAndResetOnChange();
     try {
       const result = await refreshSessionInfoForSlug({
         slug,
         cfg,
-        account: host.getAccount() || '',
+        account,
         providerLike: host.getProviderLike(),
         getKey: litHooks?.getKey,
         lastAttemptKey: lastSessionInfoAttempt,
         decryptEnvelopeValue: host.decryptEnvelopeValue,
       });
+      if (!isAccountCurrent(account)) return;
       lastSessionInfoAttempt = result.attemptKey || lastSessionInfoAttempt;
       if (!result.shouldUpdate) return;
       host.setState((prev) => ({
@@ -236,16 +260,18 @@ export const createSessionMetaRefreshController = (host: SessionMetaRefreshHost)
     const slug = host.getActiveSessionSlug();
     const cfg = host.getSessionConfigBySlugOrDefault(slug) || {};
     const litHooks = host.getGlobalLitHooks();
+    const account = readAccountAndResetOnChange();
     try {
       const result = await refreshSessionMetaFieldsForSlug({
         slug,
         cfg,
-        account: host.getAccount() || '',
+        account,
         providerLike: host.getProviderLike(),
         getKey: litHooks?.getKey,
         attempts: sessionMetaAttempts,
         decryptEnvelopeValue: host.decryptEnvelopeValue,
       });
+      if (!isAccountCurrent(account)) return;
 
       sessionMetaAttempts = result.attempts;
       result.errors.forEach(({ error }) => {
@@ -271,6 +297,7 @@ export const createSessionMetaRefreshController = (host: SessionMetaRefreshHost)
   const destroy = (): void => {
     sessionMetaAttempts = {};
     lastSessionInfoAttempt = '';
+    overridesAccount = null;
   };
 
   return {
