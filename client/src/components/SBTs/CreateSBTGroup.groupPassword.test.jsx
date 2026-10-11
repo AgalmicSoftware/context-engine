@@ -267,4 +267,51 @@ describe('CreateSBTGroup group password', () => {
       expect(instance.state.groupPassword).toBe(PASSPHRASE);
     });
   });
+
+  describe('after restoring a cached form', () => {
+    const NOTICE = 'A new passphrase was generated; the previous one was not saved.';
+
+    const restoreGroupPasswordForm = () => {
+      const instance = makeInstance({
+        account: '0x1111111111111111111111111111111111111111',
+        loginComplete: true,
+        network: { id: 84532, name: 'Base Sepolia' },
+        provider: 'mock-provider',
+        sessionSlug: 'test',
+        toggleLoginModal: jest.fn(),
+      });
+      instance.persistFormCache = jest.fn();
+      const prevState = instance.state;
+      instance.applyAuthoringPayload({
+        sbtName: 'Password Group',
+        _sessionSlug: 'test',
+        sbtDistribution: { distributionOption: 'groupPassword' },
+      });
+      instance.componentDidUpdate(instance.props, prevState);
+      instance.state = { ...instance.state, distributionOptionsCollapsed: false };
+      return instance;
+    };
+
+    it('says that a new passphrase was generated because the old one was not saved', () => {
+      const instance = restoreGroupPasswordForm();
+
+      render(instance.render());
+
+      expect(instance.state.groupPassword).toMatch(PASSPHRASE_PATTERN);
+      expect(screen.getByText(NOTICE)).toBeInTheDocument();
+    });
+
+    it('drops the notice once the creator picks or types a password', () => {
+      const generated = restoreGroupPasswordForm();
+      generated.handleGenerateGroupPassword();
+      const typed = restoreGroupPasswordForm();
+      typed.handleInputChange({ target: { name: 'groupPassword', type: 'text', value: 'my-own-long-group-password' } });
+
+      for (const instance of [generated, typed]) {
+        const view = render(instance.render());
+        expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+        view.unmount();
+      }
+    });
+  });
 });

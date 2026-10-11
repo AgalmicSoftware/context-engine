@@ -886,6 +886,8 @@ class CreateSBTGroup extends Component<any, any> {
       }),
       network: restoredAuthoringChain.chainId || '',
       sbtDistribution: nextDist,
+      // Passwords are never cached, so a restored group-password form gets a new passphrase; say so.
+      groupPasswordRestoreNotice: nextDist.distributionOption === 'groupPassword',
       tags: restoredTags,
       documentUrl: this.getNormalizedDocumentUrlDraft(parsed.documentUrl),
       metadataLockGateIds: normalizeCreateSbtMetadataLockGateIdsForValidGates(
@@ -1578,13 +1580,17 @@ class CreateSBTGroup extends Component<any, any> {
       prevState?.sbtDistribution?.distributionOption !== 'groupPassword' &&
       this.state.sbtDistribution?.distributionOption === 'groupPassword';
     if (enteredGroupPassword && !String(this.state.groupPassword || '').trim()) {
-      this.handleGenerateGroupPassword();
+      this.setGeneratedGroupPassword();
     }
+  };
+
+  setGeneratedGroupPassword = (patch: Record<string, unknown> = {}): void => {
+    this.setState({ groupPassword: generateCreateSbtGroupPassphrase(), groupPasswordWeakConfirmed: false, ...patch });
   };
 
   handleGenerateGroupPassword = (): void => {
     if (this.isCreateInFlight()) return;
-    this.setState({ groupPassword: generateCreateSbtGroupPassphrase(), groupPasswordWeakConfirmed: false });
+    this.setGeneratedGroupPassword({ groupPasswordRestoreNotice: false });
   };
 
   // A create uses the password captured when Create was clicked, so the field stays locked until it ends.
@@ -1592,7 +1598,7 @@ class CreateSBTGroup extends Component<any, any> {
 
   // After a create, the field shows exactly the password the group was created with.
   buildCreatedGroupPasswordPatch = (distributionOption: unknown, groupPassword: string): Record<string, unknown> =>
-    distributionOption === 'groupPassword' ? { groupPassword } : {};
+    distributionOption === 'groupPassword' ? { groupPassword, groupPasswordRestoreNotice: false } : {};
 
   // The v4 group password KDF takes up to a couple of seconds, so say so on the create button.
   secureGroupPassword = async (password: string, sbtAddress: string): Promise<string> => {
@@ -3953,6 +3959,7 @@ class CreateSBTGroup extends Component<any, any> {
       documentURLs,
       startedMinting,
       groupPassword,
+      groupPasswordRestoreNotice,
       groupPasswordSecuring,
       groupPasswordWeakConfirmed,
       shareableUrl,
@@ -4388,6 +4395,7 @@ class CreateSBTGroup extends Component<any, any> {
                 cryptoUtils.normalizeGroupPasswordInput(groupPassword),
               ),
               groupPasswordLocked: this.isCreateInFlight(),
+              groupPasswordRestoreNotice: groupPasswordRestoreNotice === true,
               groupPasswordWeakConfirmed: groupPasswordWeakConfirmed === true,
               sbtDistribution,
               handleInputChange: this.handleInputChange,

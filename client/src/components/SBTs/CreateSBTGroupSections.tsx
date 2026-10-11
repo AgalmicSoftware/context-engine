@@ -319,6 +319,7 @@ type RenderCreateSbtDistributionOptionsSectionArgs = {
   groupPasswordIsShort: boolean;
   // Locked while a create is in flight: it uses the password captured when Create was clicked.
   groupPasswordLocked: boolean;
+  groupPasswordRestoreNotice: boolean;
   groupPasswordWeakConfirmed: boolean;
   sbtDistribution: CreateSbtDistributionState;
   handleInputChange: React.ChangeEventHandler<HTMLInputElement>;
@@ -331,6 +332,7 @@ export const renderCreateSbtDistributionOptionsSection = ({
   groupPassword,
   groupPasswordIsShort,
   groupPasswordLocked,
+  groupPasswordRestoreNotice,
   groupPasswordWeakConfirmed,
   sbtDistribution,
   handleInputChange,
@@ -398,6 +400,11 @@ export const renderCreateSbtDistributionOptionsSection = ({
             Generate new
           </button>
         </div>
+        {groupPasswordRestoreNotice && (
+          <p className={styles.fieldHelpText} role="status">
+            A new passphrase was generated; the previous one was not saved.
+          </p>
+        )}
         {groupPasswordIsShort && (
           <div className={styles.groupPasswordWarning} data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_WARNING}>
             <p>

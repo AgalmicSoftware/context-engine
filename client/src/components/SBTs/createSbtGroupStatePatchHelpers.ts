@@ -357,7 +357,7 @@ export const buildCreateSbtInputChangePatch = ({
 }: BuildCreateSbtInputChangePatchArgs = {}): Record<string, unknown> => ({
   [name]: value,
   // A short-password confirmation applies only to the password it was given for.
-  ...(name === 'groupPassword' ? { groupPasswordWeakConfirmed: false } : {}),
+  ...(name === 'groupPassword' ? { groupPasswordWeakConfirmed: false, groupPasswordRestoreNotice: false } : {}),
   ...(name === 'sbtImageUrl' ? { lockedImageAsset: null } : {}),
   ...(name === 'sbtImageUrl' ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' } : {}),
 });

@@ -179,6 +179,7 @@ export const buildCreateSbtResetFormState = ({
   groupPassword: '',
   groupPasswordWeakConfirmed: false,
   groupPasswordSecuring: false,
+  groupPasswordRestoreNotice: false,
   openLockKey: '',
   metadataLockGateIds: createEmptyMetadataLockGateIds(),
   lockedImageAsset: null,

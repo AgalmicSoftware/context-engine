@@ -460,6 +460,7 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     ).toEqual({
       groupPassword: 'new-password',
       groupPasswordWeakConfirmed: false,
+      groupPasswordRestoreNotice: false,
     });
     expect(
       buildCreateSbtInputChangePatch({
