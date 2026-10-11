@@ -103,6 +103,7 @@ import {
   getRenderableParticipantList,
   getUTCDataTimestamp,
   isBuiltInPolisDemoDataset,
+  rememberClusterAnalysis,
   resolveExploratoryClusterCount,
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
@@ -1031,17 +1032,13 @@ export default function PolisReport({
   useEffect(() => {
     if (!shouldUsePrecomputedDemoClusters) return;
     setAnalysisLoadingKey(null);
-    setAnalysisErrorsByKey((prev) => ({
-      ...prev,
-      [currentAnalysisKey]: {},
-    }));
-    setAnalysisCacheByKey((prev) => ({
-      ...prev,
-      [currentAnalysisKey]: {
+    setAnalysisErrorsByKey((prev) => rememberClusterAnalysis(prev, currentAnalysisKey, {}));
+    setAnalysisCacheByKey((prev) =>
+      rememberClusterAnalysis(prev, currentAnalysisKey, {
         ...(prev[currentAnalysisKey] || {}),
         ...precomputedDemoClusterState.analysisCacheByClusterIndex,
-      },
-    }));
+      }),
+    );
   }, [currentAnalysisKey, precomputedDemoClusterState, shouldUsePrecomputedDemoClusters]);
 
   /***************************************************************
@@ -1468,7 +1465,7 @@ export default function PolisReport({
       analysisStartTimesRef.current = {};
 
       // Prepare fresh error bucket and mark as loading for this key
-      setAnalysisErrorsByKey((prev) => ({ ...prev, [key]: {} }));
+      setAnalysisErrorsByKey((prev) => rememberClusterAnalysis(prev, key, {}));
       setAnalysisLoadingKey(key);
 
       // Optional all-clusters context (sizes only) for the template
@@ -1524,25 +1521,23 @@ export default function PolisReport({
           }
           usedNames.push(proposed);
 
-          setAnalysisCacheByKey((prev) => ({
-            ...prev,
-            [key]: {
+          setAnalysisCacheByKey((prev) =>
+            rememberClusterAnalysis(prev, key, {
               ...(prev[key] || {}),
               [clusterKey]: {
                 short: String(aiRes.short || ''),
                 long: String(aiRes.long || ''),
                 name: proposed,
               },
-            },
-          }));
+            }),
+          );
         } catch (err: unknown) {
-          setAnalysisErrorsByKey((prev) => ({
-            ...prev,
-            [key]: {
+          setAnalysisErrorsByKey((prev) =>
+            rememberClusterAnalysis(prev, key, {
               ...(prev[key] || {}),
               [clusterKey]: getErrorMessage(err, 'AI request failed'),
-            },
-          }));
+            }),
+          );
         }
       }
     } catch (e) {

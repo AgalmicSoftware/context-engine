@@ -459,6 +459,17 @@ export function buildClusterAnalysisDataKey({
   return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}-${JSON.stringify(allResponders)}`;
 }
 
+// AI cluster summaries are kept for the few most recent views, so switching
+// back to one does not repeat paid analysis, but the cache cannot grow forever.
+export const POLIS_ANALYSIS_CACHE_KEY_LIMIT = 6;
+
+export function rememberClusterAnalysis<T>(cache: Record<string, T>, key: string, entry: T): Record<string, T> {
+  const recentKeys = Object.keys(cache)
+    .filter((cachedKey) => cachedKey !== key)
+    .slice(1 - POLIS_ANALYSIS_CACHE_KEY_LIMIT);
+  return { ...Object.fromEntries(recentKeys.map((cachedKey) => [cachedKey, cache[cachedKey]])), [key]: entry };
+}
+
 /**************************************************************
  * Helper: applyFilterStateToAggregator
  * Filters the aggregator BEFORE building the rating matrix.

@@ -24,7 +24,7 @@ import PolisReport, {
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { buildReportResponseStats } from './polisReportAnswers';
-import { buildUmapParticipantData } from './polisReportRuntime';
+import { buildUmapParticipantData, rememberClusterAnalysis } from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { doUMAP } from '../../utilities/survey/consensusMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
@@ -1355,6 +1355,19 @@ describe('PolisReport demo data defaults', () => {
     expect(first).not.toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x333', '0x444'] }));
     expect(first).not.toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x222', '0x111'] }));
     expect(first).toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x111', '0x222'] }));
+  });
+
+  it('keeps cluster summaries only for the most recent views', () => {
+    let cache = {};
+    ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].forEach((key) => {
+      cache = rememberClusterAnalysis(cache, key, { 0: { short: key, long: '' } });
+    });
+    expect(Object.keys(cache)).toEqual(['c', 'd', 'e', 'f', 'g', 'h']);
+
+    cache = rememberClusterAnalysis(cache, 'd', { ...cache.d, 1: { short: 'd1', long: '' } });
+    cache = rememberClusterAnalysis(cache, 'i', {});
+    expect(Object.keys(cache)).toEqual(['e', 'f', 'g', 'h', 'd', 'i']);
+    expect(cache.d[1].short).toBe('d1');
   });
 
   it('keys cluster summaries on every character of the question prompts', () => {
