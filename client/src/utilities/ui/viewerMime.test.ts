@@ -14,6 +14,44 @@ describe('viewerMime', () => {
     expect(readBaseMimeType(JSON.parse('{"toString":1}'))).toBe('');
   });
 
+  // Browsers use the LAST type of a comma-separated list, so "image/png,text/html"
+  // would run as HTML. Only a single type/subtype token counts as a type at all.
+  const notOneMediaType = [
+    'image/png,text/html',
+    'audio/mpeg,text/html',
+    'video/mp4,image/svg+xml',
+    'audio/ogg,application/xhtml+xml',
+    'image/png text/html',
+    'image/png\ttext/html',
+    'imagé/png',
+    'image/',
+    '/png',
+    'image',
+    '',
+    ' ',
+  ];
+
+  it('accepts only one type/subtype token as a type', () => {
+    for (const mime of notOneMediaType) {
+      expect(readBaseMimeType(mime)).toBe('');
+      expect(readBaseMimeType(`${mime};charset=utf-8`)).toBe('');
+      expect(isInertViewerMime(mime)).toBe(false);
+      expect(isInertRasterImageMime(mime)).toBe(false);
+      expect(isTextLikeMime(mime)).toBe(false);
+    }
+  });
+
+  it('turns a blob with a type list into a plain download, whatever is declared', () => {
+    for (const mime of notOneMediaType) {
+      const fromBlob = toViewerBlob(new Blob(['<html onload="alert(1)">'], { type: mime }), '');
+      expect(fromBlob.blob.type).toBe('application/octet-stream');
+      expect(fromBlob.mime).toBe('application/octet-stream');
+    }
+    // A valid declared type still rebuilds a blob that carries a list of its own.
+    const declared = toViewerBlob(new Blob(['png'], { type: 'image/png,text/html' }), 'image/png');
+    expect(declared.blob.type).toBe('image/png');
+  });
+
   it('treats markup and script types as text even with parameters', () => {
     for (const mime of [
       'image/svg+xml;charset=utf-8',

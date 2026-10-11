@@ -1,7 +1,15 @@
+// One type/subtype token, as the Worker's MEDIA_TYPE_RE accepts.
+const MEDIA_TYPE_RE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
+
 // File types come from uploaders, and the Worker passes parameters such as
-// ";charset=utf-8" through, so every check reads the base type only.
-export const readBaseMimeType = (mime: unknown): string =>
-  typeof mime === 'string' ? mime.split(';')[0].trim().toLowerCase() : '';
+// ";charset=utf-8" through, so every check reads the base type only. Anything
+// else, such as "image/png,text/html" (browsers use the last type of a list),
+// is no type at all and reads as ''.
+export const readBaseMimeType = (mime: unknown): string => {
+  if (typeof mime !== 'string') return '';
+  const base = mime.split(';')[0].trim().toLowerCase();
+  return MEDIA_TYPE_RE.test(base) ? base : '';
+};
 
 const TEXT_LIKE_MIME_TYPES = new Set([
   'application/json',
@@ -32,8 +40,9 @@ export const isInertViewerMime = (mime: unknown): boolean => {
   );
 };
 
-// The blob behind a viewer link gets an inert type of its own; anything else
-// becomes a plain download (application/octet-stream), never a viewable page.
+// The blob behind a viewer link always carries the validated inert type (the
+// original blob is reused only when its type is exactly that string); anything
+// else becomes a plain download (application/octet-stream), never a viewable page.
 export const toViewerBlob = (blob: Blob, mime: unknown): { blob: Blob; mime: string } => {
   const base = readBaseMimeType(mime || blob.type);
   if (!isInertViewerMime(base)) {
