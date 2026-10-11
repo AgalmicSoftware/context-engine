@@ -60,11 +60,11 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('MainAreaTabs', () => {
-  it('omits the empty Votes tab while keeping the Tool Explorer tab available', async () => {
+  it('shows only Stats, Tools, and Welcome tabs', async () => {
     const { container } = render(<MainAreaTabs {...createProps()} />);
 
     expect(screen.queryByText('Votes')).not.toBeInTheDocument();
-    expect(screen.getByText('Latest')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Latest' })).not.toBeInTheDocument();
     expect(screen.getByText('Stats')).toBeInTheDocument();
     expect(screen.queryByText('Community')).not.toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
@@ -73,11 +73,35 @@ describe('MainAreaTabs', () => {
     expect(container.querySelector('.mainTabsCard')).toBeInTheDocument();
     expect(container.querySelector('.mainTabsCardHeader')).toBeInTheDocument();
     expect(container.querySelector('.mainAreaCardBody')).toBeInTheDocument();
-    expect(container.querySelectorAll('.navTabIcon')).toHaveLength(4);
-    expect(screen.getByRole('tab', { name: 'Latest' })).toHaveAttribute('aria-selected', 'false');
+    expect(container.querySelectorAll('.navTabIcon')).toHaveLength(3);
     expect(screen.getByRole('tab', { name: 'Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
     expect(screen.getByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'true');
+  });
+
+  it('opens Tools for a retained Latest selection without notifying the parent', async () => {
+    const changeFocusedTab = jest.fn();
+    render(<MainAreaTabs {...createProps({ focusedTab: 1, changeFocusedTab })} />);
+
+    expect(screen.getByRole('tab', { name: 'Tools' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByTestId('mock-tool-explorer')).toBeVisible();
+    expect(changeFocusedTab).not.toHaveBeenCalled();
+  });
+
+  it('opens Tools when an external update restores the retired Latest tab', async () => {
+    const changeFocusedTab = jest.fn();
+    const { rerender } = render(
+      <MainAreaTabs {...createProps({ focusedTab: MAIN_AREA_TABS.WELCOME, changeFocusedTab })} />,
+    );
+    expect(await screen.findByTestId('mock-onboarding-walkthrough')).toBeVisible();
+
+    rerender(<MainAreaTabs {...createProps({ focusedTab: 1, changeFocusedTab })} />);
+
+    expect(screen.getByRole('tab', { name: 'Tools' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByTestId('mock-tool-explorer')).toBeVisible();
+    expect(screen.getByTestId('mock-tool-explorer').closest('.tab-pane')).toHaveClass('active');
+    expect(screen.getByTestId('mock-onboarding-walkthrough').closest('.tab-pane')).not.toHaveClass('active');
+    expect(changeFocusedTab).not.toHaveBeenCalled();
   });
 
   it('passes demoSurfaceMode through to ToolExplorer on the Tools tab', async () => {

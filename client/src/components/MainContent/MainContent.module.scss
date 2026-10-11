@@ -704,7 +704,7 @@
 
   .mainTabsCardHeader :global(.nav-tabs) {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
     gap: 3px;
     min-height: 28px;

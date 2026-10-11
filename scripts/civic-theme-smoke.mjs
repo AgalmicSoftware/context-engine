@@ -66,7 +66,10 @@ export async function inspectCivicWelcome(page) {
 }
 
 export async function inspectCivicExplorer(page) {
-  for (const name of ['Latest', 'Stats', 'Tools', 'Welcome']) {
+  await page.getByRole('tablist').waitFor({ state: 'visible' });
+  assert.equal(await page.getByRole('tab', { name: 'Latest', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('tablist').getByRole('tab').count(), 3);
+  for (const name of ['Stats', 'Tools', 'Welcome']) {
     const tab = page.getByRole('tab', { name, exact: true });
     await tab.click();
     assert.equal(await tab.getAttribute('aria-selected'), 'true');

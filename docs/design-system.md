@@ -103,7 +103,9 @@ Civic Welcome slides use a white canvas, opaque artwork, dark copy, and blue nav
 
 The `minimal-app` layout profile centers session titles with the shared five-second fade and hover/focus reveal, presents session
 sections as a single column of compact rows, and removes decorative depth from
-question cards and account controls. Explorer tabs use blue selected/hover text
+question cards and account controls. The home Explorer offers Stats, Tools, and
+Welcome; Tools remains the default, including for a retained Latest-tab selection.
+Explorer tabs use blue selected/hover text
 and dark inactive icons on the light header. Expanded Explorer controls, group
 names, Context corpus cards, Risk Matrix details, and Debate Map labels use
 explicit light-surface text pairs. Stats leaderboard addresses, detail dialogs,
