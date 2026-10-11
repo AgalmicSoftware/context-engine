@@ -1,4 +1,4 @@
-import { loadPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
+import { createLazyPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
 import type {
   SurveyQuestionsLegacyRecord,
   SurveyQuestionsLegacyValue,
@@ -693,21 +693,10 @@ export const createSurveyQuestionsRuntimeMethods = (
       setState(buildAutoDecryptDisabledState());
     }
 
-    // Lazy-load only the two Poseidon arities used by commitment serialization.
+    // Poseidon commitments load poseidon-lite when the first one is computed.
     inst._isMounted = true;
     inst._hasMounted = true;
-    const loadHasher: SurveyQuestionsLegacyValue = async () => {
-      try {
-        const poseidonHasher = await loadPoseidonHasher();
-        if (inst._isMounted) {
-          setState(buildHasherState(poseidonHasher));
-          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite arities 2/3)');
-        }
-      } catch (e: any) {
-        surveyLog.warn('⚠️ Poseidon commitments unavailable; Keccak commitments remain enabled.', e);
-      }
-    };
-    loadHasher();
+    setState(buildHasherState(createLazyPoseidonHasher()));
 
     loadBookmarks();
     hydrateGateSbtLabels();
