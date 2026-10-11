@@ -6,7 +6,7 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
-import { backfillLegacyStorageOwners } from './storageRouteExecution.js';
+import { scanLegacyStorageOwnerIds } from './storageRouteExecution.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
@@ -32,7 +32,13 @@ import {
 } from './workerGroups.js';
 
 const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
-const STORAGE_LEGACY_OWNERS_KEY_PREFIX = 'storage-legacy-owners:';
+const STORAGE_LEGACY_SCAN_KEY_PREFIX = 'storage-legacy-scan:';
+const STORAGE_LEGACY_OWNER_KEY_PREFIX = 'storage-legacy-owner:';
+// About two KV reads per row, so one step stays far below per-invocation limits.
+const LEGACY_SCAN_ROWS_PER_STEP = 200;
+const LEGACY_SCAN_STEPS_PER_UPLOAD = 4;
+const LEGACY_SCAN_PENDING_ERROR = 'Existing questions and surveys are still being indexed; retry shortly.';
+const LEGACY_SCAN_FAILED_ERROR = 'Recording the owners of existing questions and surveys failed; retry.';
 const DIRECT_DEPLOY_RECORD_KEY = 'direct-deploy';
 const SPONSORED_FAUCET_RECORD_KEY = 'sponsored-faucet';
 const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
@@ -341,7 +347,8 @@ export class SessionWriteCoordinator {
     this.workerGroupTail = Promise.resolve();
     this.resultsAnalysisTail = Promise.resolve();
     this.storageOwnerTail = Promise.resolve();
-    this.backfillLegacyStorageOwners = deps.backfillLegacyStorageOwners || backfillLegacyStorageOwners;
+    this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
+    this.legacyScanRowsPerStep = deps.legacyScanRowsPerStep || LEGACY_SCAN_ROWS_PER_STEP;
   }
 
   serializeSessionConfigOperation(operation) {
@@ -363,8 +370,9 @@ export class SessionWriteCoordinator {
   }
 
   // Answers whether a question or survey id was stored before first-writer
-  // records existed. The scan runs once per resource; racing first uploads
-  // wait for it and then read the same stored answer.
+  // records existed. The scan runs in bounded steps and keeps its progress and
+  // the ids found, so it finishes however large the session is; racing
+  // uploads wait their turn and read the same answers.
   async executeStorageLegacyOwner(payload) {
     const resource = toTrimmedString(payload?.resource);
     const resourceId = toTrimmedString(payload?.resourceId).toLowerCase();
@@ -372,22 +380,38 @@ export class SessionWriteCoordinator {
       return jsonResponse({ ok: false, error: 'Invalid legacy owner request.' }, 400);
     }
     return this.serializeStorageOwnerOperation(async () => {
-      const key = `${STORAGE_LEGACY_OWNERS_KEY_PREFIX}${resource}`;
-      let record = await this.state.storage.get(key);
-      if (!Array.isArray(record?.ids)) {
-        try {
-          const { ids } = await this.backfillLegacyStorageOwners({
-            env: this.env, config: payload?.config, slug: payload?.slug, resource,
-          });
-          record = { version: 1, ids, completedAtMs: Number(this.now()) || Date.now() };
-        } catch {
-          return jsonResponse({ ok: false, error: 'Recording the owners of existing questions and surveys failed; retry.' }, 503);
-        }
-        await this.state.storage.transaction(async (transaction) => {
-          await transaction.put(key, record);
+      const ownerKey = (id) => `${STORAGE_LEGACY_OWNER_KEY_PREFIX}${resource}:${id}`;
+      if (await this.state.storage.get(ownerKey(resourceId))) return jsonResponse({ ok: true, adminOnly: true }, 200);
+      const scanKey = `${STORAGE_LEGACY_SCAN_KEY_PREFIX}${resource}`;
+      const scan = await this.state.storage.get(scanKey);
+      if (scan?.done === true) return jsonResponse({ ok: true, adminOnly: false }, 200);
+      let step;
+      try {
+        step = await this.scanLegacyStorageOwnerIds({
+          env: this.env,
+          config: payload?.config,
+          slug: payload?.slug,
+          resource,
+          cursor: toTrimmedString(scan?.cursor),
+          lastKey: toTrimmedString(scan?.lastKey),
+          maxRows: this.legacyScanRowsPerStep,
         });
+      } catch {
+        return jsonResponse({ ok: false, error: LEGACY_SCAN_FAILED_ERROR }, 503);
       }
-      return jsonResponse({ ok: true, adminOnly: record.ids.includes(resourceId) }, 200);
+      await this.state.storage.transaction(async (transaction) => {
+        for (const id of step.ids) await transaction.put(ownerKey(id), true);
+        await transaction.put(scanKey, {
+          version: 1,
+          cursor: step.cursor,
+          lastKey: step.lastKey,
+          done: step.done === true,
+          updatedAtMs: Number(this.now()) || Date.now(),
+        });
+      });
+      if (step.ids.includes(resourceId)) return jsonResponse({ ok: true, adminOnly: true }, 200);
+      if (step.done === true) return jsonResponse({ ok: true, adminOnly: false }, 200);
+      return jsonResponse({ ok: false, pending: true, error: LEGACY_SCAN_PENDING_ERROR }, 503);
     });
   }
 
@@ -2745,19 +2769,25 @@ export const finalizeCoordinatedSponsoredFaucet = async ({
 
 
 // Returns null when there is no coordinator binding, so callers can fall back.
+// Each coordinator call scans a bounded step; a few per upload finish most
+// sessions, and later uploads continue an unfinished scan.
 export const checkCoordinatedLegacyStorageOwner = async ({ env, config, slug, resource, resourceId } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return null;
-  const unavailable = { ok: false, status: 503, error: 'Recording the owners of existing questions and surveys failed; retry.' };
+  const unavailable = { ok: false, status: 503, error: LEGACY_SCAN_FAILED_ERROR };
   try {
-    const response = await stub.fetch('https://session-coordinator.internal/storage/legacy-owner', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, config, resource, resourceId }),
-    });
-    const result = await response.json().catch(() => ({}));
-    return response.ok && result?.ok === true ? { ok: true, adminOnly: result.adminOnly === true } : unavailable;
+    for (let step = 0; step < LEGACY_SCAN_STEPS_PER_UPLOAD; step += 1) {
+      const response = await stub.fetch('https://session-coordinator.internal/storage/legacy-owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, config, resource, resourceId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result?.ok === true) return { ok: true, adminOnly: result.adminOnly === true };
+      if (result?.pending !== true) return unavailable;
+    }
+    return { ok: false, status: 503, error: LEGACY_SCAN_PENDING_ERROR };
   } catch {
     return unavailable;
   }

@@ -53,7 +53,6 @@ import {
   isOwnedStorageResource,
   isStorageResourceHidden,
   LEGACY_STORAGE_OWNER,
-  legacyStorageOwnersMarkerKey,
   listHiddenStorageResourceIds,
   readStorageResourceOwner,
   writeStorageResourceHidden,
@@ -1995,51 +1994,65 @@ const readIndexRowResourceId = async ({ env, index, slug, config, resource, row,
 
 // Questions and surveys stored before first-writer records existed have no
 // owner, so the first upload of such an id after an update would claim it.
-// One scan per session and resource gives each of those ids an admin-only
-// owner. Ids with a recorded uploader already have their first writer.
-export const backfillLegacyStorageOwners = async ({ env, config, slug, resource, deps } = {}) => {
+// The ids of rows without a recorded uploader are admin-only instead. This is
+// one bounded step of that scan: it reads up to maxRows index rows after
+// (cursor, lastKey), and the payloads of those stored before resourceId was
+// recorded, so callers can spread a large session over several invocations.
+// It writes nothing.
+export const scanLegacyStorageOwnerIds = async ({
+  env, config, slug, resource, cursor = '', lastKey = '', maxRows = Infinity, deps,
+} = {}) => {
   const index = getStorageIndexBinding(env);
-  if (!index || ['get', 'put', 'list'].some((method) => typeof index[method] !== 'function')) {
+  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
     throw new Error('Cloudflare storage index binding not configured.');
   }
-  const recorded = new Set();
-  const legacy = new Set();
-  const rows = await listCloudflareMetadataRows({ index, slug, resource });
-  for (const row of rows) {
-    if (!row.metadata) continue;
-    const resourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
-    if (resourceId) (normalizeAddress(row.metadata.uploader) ? recorded : legacy).add(resourceId);
+  const prefix = buildIndexPrefix({ slug, resource });
+  const ids = new Set();
+  let rows = 0;
+  let pageCursor = trim(cursor);
+  let after = trim(lastKey);
+  for (;;) {
+    const listed = await index.list({ prefix, ...(pageCursor ? { cursor: pageCursor } : {}) });
+    const nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && !nextCursor) throw new Error('Cloudflare storage list cursor is unavailable.');
+    // KV lists keys in order, so (page cursor, last key read) resumes a page.
+    const names = (Array.isArray(listed?.keys) ? listed.keys : [])
+      .map((entry) => trim(entry?.name || entry))
+      .filter((name) => name && (!after || name > after))
+      .sort();
+    for (const name of names) {
+      if (rows >= maxRows) return { ids: [...ids], cursor: pageCursor, lastKey: after, done: false };
+      rows += 1;
+      after = name;
+      const raw = await index.get(name);
+      let metadata = null;
+      try {
+        metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch {
+        continue;
+      }
+      if (!isObj(metadata) || !trim(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+      const resourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row: { key: name, metadata }, deps });
+      if (resourceId) ids.add(resourceId);
+    }
+    if (!nextCursor) return { ids: [...ids], cursor: '', lastKey: '', done: true };
+    pageCursor = nextCursor;
+    after = '';
   }
-  const ids = [...legacy].filter((resourceId) => !recorded.has(resourceId)).sort();
-  const createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
-  for (const resourceId of ids) {
-    if (await readStorageResourceOwner({ index, slug, resource, resourceId })) continue;
-    await writeStorageResourceOwner({
-      index, slug, resource, resourceId, uploader: LEGACY_STORAGE_OWNER, storageRefId: '', createdAt,
-    });
-  }
-  return { ids, scannedRows: rows.length };
 };
 
 // Whether an id without an owner record was stored before first-writer
-// records existed. The session coordinator runs the scan once and answers from
-// its own storage, so racing first uploads cannot both claim a legacy id.
-// Without a coordinator binding (local tools and tests) the same idempotent
-// scan runs inline once, marked in KV.
+// records existed. The session coordinator scans in bounded steps, keeps its
+// progress and the ids found, and answers from its own storage, so racing
+// uploads agree. Without a coordinator binding (local tools and tests) the
+// whole scan runs inline for each such upload.
 const LEGACY_OWNER = Object.freeze({ uploader: LEGACY_STORAGE_OWNER });
 
 const resolveLegacyStorageOwner = async ({ env, config, slug, resource, resourceId, deps }) => {
   const coordinated = await checkCoordinatedLegacyStorageOwner({ env, config, slug, resource, resourceId });
   if (coordinated) return coordinated.ok ? { ok: true, owner: coordinated.adminOnly ? LEGACY_OWNER : null } : coordinated;
   try {
-    const index = getStorageIndexBinding(env);
-    const markerKey = legacyStorageOwnersMarkerKey({ slug, resource });
-    // Another upload may have just recorded the owners; read them again.
-    if (await index.get(markerKey)) return { ok: true, owner: await readStorageResourceOwner({ index, slug, resource, resourceId }) };
-    const { ids, scannedRows } = await backfillLegacyStorageOwners({ env, config, slug, resource, deps });
-    // Nothing stored yet means nothing to backfill, since every later row
-    // records its uploader; skip the marker so a failed first upload leaves none.
-    if (scannedRows) await index.put(markerKey, JSON.stringify({ version: 1, count: ids.length }));
+    const { ids } = await scanLegacyStorageOwnerIds({ env, config, slug, resource, deps });
     return { ok: true, owner: ids.includes(resourceId) ? LEGACY_OWNER : null };
   } catch {
     return { ok: false, status: 503, error: 'Recording the owners of existing questions and surveys failed; retry.' };

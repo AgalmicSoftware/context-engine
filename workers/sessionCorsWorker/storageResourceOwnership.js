@@ -26,12 +26,9 @@ const readJsonRecord = async (index, key) => {
   }
 };
 
-// Owner recorded for ids stored before first-writer records existed. Their
-// author was never recorded, so only a session admin may upload them again.
+// Owner of ids stored before first-writer records existed. Their author was
+// never recorded, so only a session admin may upload them again.
 export const LEGACY_STORAGE_OWNER = 'legacy-admin-only';
-
-// Marks that ids stored before first-writer records were given an owner.
-export const legacyStorageOwnersMarkerKey = ({ slug, resource }) => recordKey('owner-backfill', { slug, resource });
 
 // First-writer index: who first uploaded each id. KV is eventually consistent,
 // so this is an early 409 for later uploads; readers still pick the canonical

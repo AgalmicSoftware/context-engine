@@ -138,7 +138,7 @@ const createMockKv = ({ requestClock } = {}) => {
 	};
 };
 
-const attachSessionCoordinator = (env, setConfig) => {
+const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 	env.__testProjectSessionConfig = setConfig;
 	if (env.CE_SESSION_COORDINATOR) return;
 	const instances = new Map();
@@ -169,6 +169,7 @@ const attachSessionCoordinator = (env, setConfig) => {
 				};
 				const coordinator = new SessionWriteCoordinator({ storage }, env, {
 					putSessionConfig: async (_env, _slug, nextConfig) => env.__testProjectSessionConfig(nextConfig),
+					...coordinatorDeps,
 				});
 				instances.set(id, {
 					fetch: (input, init) => coordinator.fetch(input instanceof Request ? input : new Request(input, init)),
@@ -4438,8 +4439,7 @@ const countIndexScans = (kv, resource) => {
 
 for (const coordinated of [false, true]) {
 	test(`ids stored before first-writer records are admin-only after an update (${coordinated ? 'coordinator' : 'inline'})`, async () => {
-		// Racing inline scans (no coordinator) still write the same owner keys.
-		const { common, kv, upload } = createOwnershipHarness({ enforceKvWriteRate: coordinated });
+		const { common, kv, upload } = createOwnershipHarness();
 		if (coordinated) attachSessionCoordinator(common.env, () => {});
 		// Rows the previous release stored (an admin upload never starts the backfill).
 		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Original?', '0xq1'))).status, 200);
@@ -4462,12 +4462,53 @@ for (const coordinated of [false, true]) {
 		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Admin edit', '0xq1'))).status, 200);
 		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Another new question', '0xq3'))).status, 200);
 		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Rewrite of a new one', '0xq2'))).status, 200);
-		// The coordinator scans once; inline, only the two racing first uploads scan.
-		assert.equal(scans.length, coordinated ? 1 : 2);
-		const owner = JSON.parse(kv.store.get('ce-storage-owner:session-a:questions:0xq1'));
-		assert.equal(owner.uploader, 'legacy-admin-only');
+		// The coordinator scans once and keeps the answer. The scan writes no KV,
+		// so the admin's upload became the id's first recorded owner.
+		if (coordinated) assert.equal(scans.length, 1);
+		assert.equal(JSON.parse(kv.store.get('ce-storage-owner:session-a:questions:0xq1')).uploader, OWNERSHIP_ADMIN);
 	});
 }
+
+test('the legacy owner scan advances in bounded steps and keeps its progress', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const legacyIds = Array.from({ length: 30 }, (_, index) => `0xl${String(index).padStart(2, '0')}`);
+	for (const id of legacyIds) assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Legacy?', id))).status, 200);
+	makeLegacyOwnedRows(kv, 'questions', legacyIds);
+	attachSessionCoordinator(common.env, () => {}, { legacyScanRowsPerStep: 4 });
+	// Count the index rows and payloads each coordinator call reads.
+	const reads = { rows: 0, payloads: 0 };
+	const get = kv.get.bind(kv);
+	kv.get = async (key) => {
+		if (key.startsWith('ce-storage:session-a:questions:')) reads.rows += 1;
+		if (key.startsWith('ce-storage-payload:')) reads.payloads += 1;
+		return get(key);
+	};
+	const perCall = [];
+	const namespace = common.env.CE_SESSION_COORDINATOR;
+	const getStub = namespace.get.bind(namespace);
+	namespace.get = (id) => {
+		const stub = getStub(id);
+		return {
+			fetch: async (...args) => {
+				const before = { ...reads };
+				const response = await stub.fetch(...args);
+				perCall.push({ rows: reads.rows - before.rows, payloads: reads.payloads - before.payloads });
+				return response;
+			},
+		};
+	};
+
+	// Each upload asks the coordinator a few times; each call reads at most 4 rows.
+	const first = await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'));
+	assert.equal(first.status, 503);
+	assert.match(first.body.error, /still being indexed/);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Claim', legacyIds[29]))).status, 409);
+	assert.equal(perCall.every((call) => call.rows <= 4 && call.payloads <= 4), true, JSON.stringify(perCall));
+	// Progress is kept: every legacy row is read once in total.
+	assert.equal(reads.rows, 30);
+	assert.equal(reads.payloads, 30);
+});
 
 test('admins hide a question id without deleting it, and unhide restores it', async () => {
 	const { kv, upload, list, read, hide: setHidden } = createOwnershipHarness();
