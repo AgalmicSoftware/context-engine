@@ -1117,6 +1117,85 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
 	assert.doesNotMatch(JSON.stringify(listed), /ce-storage-payload|bucket|token|secret/i);
 });
 
+const PUBLIC_CLOUDFLARE_STORAGE_CONFIG = {
+	storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+};
+
+const uploadAndReadKvPayload = async ({ resource = 'docsContext', contentType, data }) => {
+	const env = { CE_STORAGE_INDEX_KV: createMockKv() };
+	const routeArgs = {
+		env,
+		config: PUBLIC_CLOUDFLARE_STORAGE_CONFIG,
+		slug: 'session-a',
+		uploaderAddress: '0xabc',
+		baseHeaders: {},
+		deps: { json, randomBytes: fixedRandomBytes },
+	};
+	const upload = await storageRoute({
+		...routeArgs,
+		path: '/storage/upload',
+		method: 'POST',
+		request: new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ data, contentType, resource }),
+		}),
+	});
+	assert.equal(upload.status, 200, await upload.clone().text());
+	// Anonymous top-level navigation: no Origin, slug, or Authorization.
+	return storageRoute({
+		...routeArgs,
+		uploaderAddress: '',
+		path: '/storage/read',
+		method: 'GET',
+		request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
+	});
+};
+
+for (const [resource, contentType, data] of [
+	['docsContext', 'text/html', '<!doctype html><script>document.title=location.origin</script>'],
+	['images', 'image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
+	['docsContext', 'application/xhtml+xml', '<html xmlns="http://www.w3.org/1999/xhtml"><script>1</script></html>'],
+	['docsContext', 'text/markdown', '# Notes'],
+]) {
+	test(`storageRoute reads serve uploaded ${contentType} as a sandboxed download`, async () => {
+		const response = await uploadAndReadKvPayload({ resource, contentType, data });
+		assert.equal(response.status, 200);
+		// The declared type stays for fetch-based viewers; navigation downloads.
+		assert.equal(response.headers.get('Content-Type'), contentType);
+		assert.equal(response.headers.get('Content-Disposition'), 'attachment');
+		assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
+		assert.equal(response.headers.get('Content-Security-Policy'), "sandbox; default-src 'none'");
+		assert.equal(await response.text(), data);
+	});
+}
+
+for (const [resource, contentType, data] of [
+	['docsContext', 'application/json', { ok: true }],
+	['docsContext', 'text/plain; charset=utf-8', 'plain notes'],
+	['images', 'image/png', 'png-bytes'],
+	['media', 'audio/mpeg', 'audio-bytes'],
+	['media', 'video/mp4', 'video-bytes'],
+	['docsContext', 'application/pdf', '%PDF-1.7'],
+]) {
+	test(`storageRoute reads serve allow-listed ${contentType} inline with protective headers`, async () => {
+		const response = await uploadAndReadKvPayload({ resource, contentType, data });
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get('Content-Type'), contentType);
+		assert.equal(response.headers.get('Content-Disposition'), null);
+		assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
+		assert.equal(response.headers.get('Content-Security-Policy'), "sandbox; default-src 'none'");
+	});
+}
+
+test('storageRoute reads replace malformed uploaded content types with a download', async () => {
+	const response = await uploadAndReadKvPayload({ contentType: 'text/html, image/png', data: '<b>x</b>' });
+	assert.equal(response.status, 200);
+	assert.equal(response.headers.get('Content-Type'), 'application/octet-stream');
+	assert.equal(response.headers.get('Content-Disposition'), 'attachment');
+	assert.equal(await response.text(), '<b>x</b>');
+});
+
 for (const resource of ['media', 'images']) {
 	test(`storageRoute rejects encoded KV-only ${resource} values before any payload or index write`, async () => {
 		const kv = createMockKv();

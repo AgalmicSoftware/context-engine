@@ -57,6 +57,22 @@ const isJsonContentType = (contentType) => {
   const mediaType = trim(contentType).split(';', 1)[0].trim().toLowerCase();
   return mediaType === 'application/json' || mediaType.endsWith('+json');
 };
+const MEDIA_TYPE_RE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
+const INLINE_MEDIA_TYPE_RE = /^(?:application\/(?:pdf|json|[a-z0-9.-]+\+json)|text\/plain|(?:image|audio|video)\/[a-z0-9.+-]+)$/;
+// Keeps the declared type (fetch-based readers such as the document library
+// rely on it) but serves only JSON, plain text, raster images, audio, video,
+// and PDF inline. SVG, HTML, XML, scripts, and unknown types download.
+const resolveStorageReadContentType = (storedContentType) => {
+  const declared = trim(storedContentType);
+  const mediaType = declared.split(';', 1)[0].trim().toLowerCase();
+  if (!MEDIA_TYPE_RE.test(mediaType) || !/^[ -~]*$/.test(declared) || declared.includes(',')) {
+    return { contentType: 'application/octet-stream', inline: false };
+  }
+  return {
+    contentType: declared,
+    inline: INLINE_MEDIA_TYPE_RE.test(mediaType) && !/svg|xml/.test(mediaType),
+  };
+};
 
 export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
 export const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
@@ -1684,9 +1700,15 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
       return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope decrypt failed.' }, 403, baseHeaders);
     }
   }
-  const contentType = trim(metadata?.contentType) || 'application/octet-stream';
+  const { contentType, inline } = resolveStorageReadContentType(metadata?.contentType);
   const responseHeaders = new Headers(baseHeaders || {});
   responseHeaders.set('Content-Type', contentType);
+  // Uploaders choose the content type, so a read must never run as a page on
+  // the Worker origin: no sniffing, an opaque script-free sandbox, and a
+  // download instead of a render for anything outside the safe inline list.
+  responseHeaders.set('X-Content-Type-Options', 'nosniff');
+  responseHeaders.set('Content-Security-Policy', "sandbox; default-src 'none'");
+  if (!inline) responseHeaders.set('Content-Disposition', 'attachment');
   responseHeaders.set('X-CE-Storage-Backend', STORAGE_BACKENDS.CLOUDFLARE);
   responseHeaders.set('X-CE-Storage-Ref', id);
   responseHeaders.set('X-CE-Payload-Access-Mode', deriveLegacyPayloadAccessMode(resolvedAccess));
