@@ -13,8 +13,10 @@ import {
   parsePersistedDraftStorageValue,
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
+  buildDraftBaselineEntry,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
+  isDraftEntryStale,
   removeQuestionFromPersistedDraftPayload,
   buildSurveyDraftCompatScope,
   buildSurveyDraftStorageKey,
@@ -145,7 +147,7 @@ describe('surveyToolDraftState', () => {
     });
   });
 
-  it('builds persisted draft maps by preserving previous non-rendered entries and replacing allowed ids', () => {
+  it('persists only edited fields, keeps non-rendered entries, and stores the saved baseline', () => {
     const resolvers = {
       resolveFieldEncryptionAudience: jest.fn((_field, qid, fieldKey) =>
         fieldKey === 'additional' ? `${qid}:additional` : `${qid}:answer`,
@@ -160,51 +162,81 @@ describe('surveyToolDraftState', () => {
 
     expect(
       buildPersistedDraftMapsForAllowedIds({
-        allowedQuestionIds: ['q1'],
+        allowedQuestionIds: ['q1', 'q3'],
         slice: {
-          answers: { q1: { value: '' } },
-          additionalComments: { q1: { value: '' } },
-          importance: {},
+          answers: { q1: { value: '' }, q3: { value: 'untouched' } },
+          additionalComments: { q1: { value: 'same comment' } },
+          importance: { q1: 4 },
           conviction: {},
         },
         baselineSlice: {
-          answers: { q1: { value: 'baseline answer' } },
-          additionalComments: {},
-          importance: {},
+          answers: { q1: { value: 'baseline answer' }, q3: { value: 'untouched' } },
+          additionalComments: { q1: { value: 'same comment' } },
+          importance: { q1: 4 },
           conviction: {},
         },
+        changedFieldsByQid: { q1: { answer: 1 } },
         prevAnswers: {
           q1: { value: 'stale rendered answer' },
           q2: { value: 'keep me' },
+          q3: { value: 'stale untouched snapshot' },
         },
         prevBaseline: {
           q1: { value: 'stale baseline' },
           q2: { value: 'keep baseline' },
+          q3: { value: 'stale untouched baseline' },
         },
         resolvers,
       }),
     ).toEqual({
       answersObj: {
-        q2: { value: 'keep me' },
-      },
-      baselineObj: {
+        // A cleared answer is still an edit; the unchanged comment and rating are left out.
         q1: {
-          value: 'baseline answer',
-          answerEncrypted: undefined,
+          value: '',
           answerEncryptionAudience: 'q1:answer',
           answerEncryptionGateId: 'q1:gate:answer',
           answerAudienceMode: 'explicit',
-          additional: undefined,
-          additionalEncrypted: undefined,
-          additionalEncryptionAudience: 'q1:additional',
-          additionalEncryptionGateId: 'q1:gate:add',
-          additionalAudienceMode: 'inherit',
-          importance: null,
-          conviction: null,
         },
+        q2: { value: 'keep me' },
+      },
+      baselineObj: {
+        q1: { value: 'baseline answer', additional: 'same comment', importance: 4 },
         q2: { value: 'keep baseline' },
       },
     });
+  });
+
+  it('flags a draft as stale only when the loaded saved answer differs from its stored baseline', () => {
+    const saved = {
+      answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'env-1' } },
+      additionalComments: { q1: { value: 'note' } },
+      importance: {},
+      conviction: {},
+    };
+    const stored = buildDraftBaselineEntry(saved, 'q1');
+    const decrypted = { ...saved, answers: { q1: { value: 'secret', encrypted: true, encryptedPortion: 'env-1' } } };
+
+    expect(stored).toEqual({ value: '*', answerEncryptedPortion: 'env-1', additional: 'note' });
+    expect(isDraftEntryStale(stored, decrypted, 'q1')).toBe(false);
+    // Drafts saved by earlier releases stored full entries, including decrypted values.
+    expect(
+      isDraftEntryStale(
+        { value: 'secret', answerEncryptedPortion: 'env-1', additional: 'note', importance: null },
+        saved,
+        'q1',
+      ),
+    ).toBe(false);
+    expect(isDraftEntryStale(stored, { answers: {}, additionalComments: {} }, 'q1')).toBe(false);
+    expect(isDraftEntryStale(stored, { ...saved, additionalComments: { q1: { value: 'newer note' } } }, 'q1')).toBe(
+      true,
+    );
+    expect(
+      isDraftEntryStale(
+        stored,
+        { ...saved, answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'env-2' } } },
+        'q1',
+      ),
+    ).toBe(true);
   });
 
   it('round-trips interview model provenance through the anonymous draft entry', () => {
@@ -228,6 +260,7 @@ describe('surveyToolDraftState', () => {
         conviction: {},
         interviewProvenance: { q1: provenance },
       },
+      changedFieldsByQid: { q1: { answer: 1, interviewConsent: 1 } },
     });
 
     expect(answersObj.q1).toMatchObject({

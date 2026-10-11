@@ -439,6 +439,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     persistDraftSafely,
   } = createSurveyQuestionsDraftPersistenceRuntime({
     ...context,
+    getChangedQidsAndFields: (surveyIndex: SurveyQuestionsLegacyValue) => getChangedQidsAndFields(surveyIndex),
     getHydrationQuestionIds: () => getHydrationQuestionIds(),
     normalizeFieldAudienceMode,
     resolveFieldEncryptionAudience,
@@ -457,7 +458,6 @@ export const createSurveyQuestionsRuntimeMethods = (
     resolveSubmissionGroupContext,
   } = createSurveyQuestionsRenderedHydrationRuntime({
     ...context,
-    deepClone: (value: SurveyQuestionsLegacyValue) => deepClone(value),
     getPendingEditStats: () => getPendingEditStats?.() || null,
     loadDraft: () => loadDraft(),
     rehydrateLocalCacheAnswersForRenderedIds: () => rehydrateLocalCacheAnswersForRenderedIds(),
@@ -1663,9 +1663,9 @@ export const createSurveyQuestionsRuntimeMethods = (
           ...(latest ? { userAnswers: deepClone(latest) } : {}),
         }),
         () => {
+          // Decrypting is not an edit: drafts hold only changes, never saved plaintext.
           const jsonPreview: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex);
           setState(buildJsonPreviewState(jsonPreview));
-          persistDraftSafely && persistDraftSafely(0);
         },
       );
     } catch (error: any) {
@@ -1918,8 +1918,8 @@ export const createSurveyQuestionsRuntimeMethods = (
           ratingEnvelopes: latestRatingEnvs,
         },
         onSuccessStateApplied: () => {
+          // Decrypting is not an edit: drafts hold only changes, never saved plaintext.
           updateJsonPreview && updateJsonPreview();
-          persistDraftSafely && persistDraftSafely(0);
         },
       });
       if (completionStatus.shouldReturn) return completionStatus.result;

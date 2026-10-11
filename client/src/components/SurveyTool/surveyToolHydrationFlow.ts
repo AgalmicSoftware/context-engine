@@ -1,6 +1,6 @@
 import { buildSavedInterviewConsent, consentSignature } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
-import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
+import { isDraftEntryStale, shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 import {
   buildEmptyResponseSlice,
   isSurveyToolRecord as isRecord,
@@ -22,7 +22,6 @@ type BuildDraftHydrationStateArgs = {
   prevSlice?: ResponseSlice | null;
   prevBaseline?: ResponseSlice | null;
   allowOverwrite?: boolean;
-  cloneBaseline?: ((baseline: ResponseSlice | null | undefined) => ResponseSlice) | null;
   applyDraftEntryToSlice?: ((args: DraftHydrationApplyArgs) => boolean) | null;
 };
 
@@ -737,7 +736,6 @@ export const buildDraftHydrationState = ({
   prevSlice = null,
   prevBaseline = null,
   allowOverwrite = false,
-  cloneBaseline = null,
   applyDraftEntryToSlice = null,
 }: BuildDraftHydrationStateArgs = {}) => {
   const normalizedPrevSlice = prevSlice && typeof prevSlice === 'object' ? prevSlice : buildEmptyResponseSlice();
@@ -750,14 +748,10 @@ export const buildDraftHydrationState = ({
       ? { interviewProvenance: { ...(normalizedPrevSlice.interviewProvenance as Record<string, unknown>) } }
       : {}),
   };
-  const nextBaseline: ResponseSlice =
-    typeof cloneBaseline === 'function'
-      ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
-      : buildEmptyResponseSlice();
 
   let changed = false;
-  let baselineChanged = false;
   const answers = draft && typeof draft === 'object' ? draft.answers || {} : {};
+  // The stored baseline only detects stale drafts; the loaded saved answers stay the baseline.
   const baseline = draft && typeof draft === 'object' ? draft.baseline || {} : {};
 
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
@@ -767,6 +761,7 @@ export const buildDraftHydrationState = ({
     const answerEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
     if (
       answerEntry &&
+      !isDraftEntryStale(baseline?.[questionId], prevBaseline, questionId) &&
       applyDraftEntryToSlice({
         targetSlice: nextSlice,
         questionId,
@@ -776,26 +771,11 @@ export const buildDraftHydrationState = ({
     ) {
       changed = true;
     }
-
-    const baselineEntry = baseline && typeof baseline === 'object' ? baseline[questionId] : null;
-    if (
-      baselineEntry &&
-      applyDraftEntryToSlice({
-        targetSlice: nextBaseline,
-        questionId,
-        draftEntry: baselineEntry,
-        allowOverwrite,
-      })
-    ) {
-      baselineChanged = true;
-    }
   });
 
   return {
     nextSlice,
-    nextBaseline,
     changed,
-    baselineChanged,
   };
 };
 
@@ -1526,7 +1506,7 @@ export const buildDraftHydrationUpdatePlan = ({
   surveyIndex = 0,
   ...draftArgs
 }: BuildDraftHydrationUpdatePlanArgs = {}) => {
-  const { nextSlice, nextBaseline, changed, baselineChanged } = buildDraftHydrationState(draftArgs);
+  const { nextSlice, changed } = buildDraftHydrationState(draftArgs);
 
   const updates: UnknownRecord = {};
   if (changed) {
@@ -1536,15 +1516,10 @@ export const buildDraftHydrationUpdatePlan = ({
       nextSlice,
     });
   }
-  if (baselineChanged) {
-    updates.editBaseline = nextBaseline;
-  }
 
   return {
     nextSlice,
-    nextBaseline,
     changed,
-    baselineChanged,
     updates,
   };
 };

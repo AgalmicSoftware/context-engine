@@ -1040,6 +1040,7 @@ export const buildPersistedDraftQuestionEntry = ({
   conviction = null,
   interviewProvenance = null,
   resolvers = {},
+  allowEmpty = false,
 }: {
   questionId?: unknown;
   answer?: UnknownRecord | null;
@@ -1048,6 +1049,8 @@ export const buildPersistedDraftQuestionEntry = ({
   conviction?: unknown;
   interviewProvenance?: unknown;
   resolvers?: PersistedDraftEntryResolvers;
+  // Keep field metadata for a cleared answer, which is still an edit.
+  allowEmpty?: boolean;
 } = {}): SurveyDraftQuestionEntry | null => {
   const qid = normalizeQuestionIdKey(questionId);
   const answerField = isRecord(answer) ? answer : {};
@@ -1065,7 +1068,7 @@ export const buildPersistedDraftQuestionEntry = ({
   const hasImp = importance !== null;
   const hasConv = conviction !== null;
 
-  if (!hasVal && !hasAdd && !hasImp && !hasConv) return null;
+  if (!allowEmpty && !hasVal && !hasAdd && !hasImp && !hasConv) return null;
 
   return {
     value: answerField.value,
@@ -1104,10 +1107,100 @@ export const buildPersistedDraftQuestionEntry = ({
   };
 };
 
+const ANSWER_DRAFT_KEYS = [
+  'value',
+  'answerEncrypted',
+  'answerEncryptionAudience',
+  'answerEncryptionGateId',
+  'answerAudienceMode',
+  'answerEncryptedPortion',
+] as const;
+const ADDITIONAL_DRAFT_KEYS = [
+  'additional',
+  'additionalEncrypted',
+  'additionalEncryptionAudience',
+  'additionalEncryptionGateId',
+  'additionalAudienceMode',
+  'additionalEncryptedPortion',
+] as const;
+
+const readSliceQuestion = (slice: PersistedDraftSliceLike, qid: string) => {
+  const readNumber = (map: Record<string, unknown> | null | undefined) =>
+    map && Object.prototype.hasOwnProperty.call(map, qid) ? map[qid] : null;
+  return {
+    answer: isRecord(slice.answers?.[qid]) ? (slice.answers?.[qid] as UnknownRecord) : {},
+    additional: isRecord(slice.additionalComments?.[qid]) ? (slice.additionalComments?.[qid] as UnknownRecord) : {},
+    importance: readNumber(slice.importance),
+    conviction: readNumber(slice.conviction),
+  };
+};
+
+/**
+ * The saved answer a draft was written against. Locked fields keep only their
+ * envelope, so the draft never stores decrypted plaintext of a saved answer.
+ */
+export const buildDraftBaselineEntry = (
+  baselineSlice: PersistedDraftSliceLike | null | undefined,
+  questionId: unknown,
+): SurveyDraftQuestionEntry | null => {
+  const qid = normalizeQuestionIdKey(questionId);
+  if (!qid || !isRecord(baselineSlice)) return null;
+  const { answer, additional, importance, conviction } = readSliceQuestion(baselineSlice, qid);
+  const saved = (field: UnknownRecord) =>
+    field.encryptedPortion ? '*' : hasMeaningfulFieldValue(field) ? field.value : undefined;
+  const locked = !!(answer.encryptedPortion || additional.encryptedPortion);
+  const entry: SurveyDraftQuestionEntry = {
+    ...(saved(answer) !== undefined ? { value: saved(answer) } : {}),
+    ...(answer.encryptedPortion ? { answerEncryptedPortion: answer.encryptedPortion } : {}),
+    ...(saved(additional) !== undefined ? { additional: saved(additional) } : {}),
+    ...(additional.encryptedPortion ? { additionalEncryptedPortion: additional.encryptedPortion } : {}),
+    // A locked response encrypts its ratings too; keep their plaintext out of storage.
+    ...(!locked && importance !== null ? { importance } : {}),
+    ...(!locked && conviction !== null ? { conviction } : {}),
+  };
+  return Object.keys(entry).length ? entry : null;
+};
+
+/**
+ * A draft entry is stale when the saved answer it was written against has since
+ * changed, for example on another device. Unknown saved answers are not stale.
+ */
+export const isDraftEntryStale = (
+  storedBaselineEntry: unknown,
+  currentBaselineSlice: PersistedDraftSliceLike | null | undefined,
+  questionId: unknown,
+): boolean => {
+  const current = buildDraftBaselineEntry(currentBaselineSlice, questionId);
+  if (!current) return false;
+  const stored = isRecord(storedBaselineEntry) ? (storedBaselineEntry as SurveyDraftQuestionEntry) : {};
+  // A locked field is identified by its envelope; a blank field by having no value.
+  const savedSignature = (entry: SurveyDraftQuestionEntry, valueKey: string, envelopeKey: string) =>
+    entry[envelopeKey]
+      ? `envelope:${String(entry[envelopeKey])}`
+      : hasMeaningfulFieldValue({ value: entry[valueKey] })
+        ? buildStableDraftValueSignature(entry[valueKey])
+        : 'none';
+  return (
+    (
+      [
+        ['value', 'answerEncryptedPortion'],
+        ['additional', 'additionalEncryptedPortion'],
+      ] as const
+    ).some(
+      ([valueKey, envelopeKey]) =>
+        savedSignature(stored, valueKey, envelopeKey) !== savedSignature(current, valueKey, envelopeKey),
+    ) ||
+    (['importance', 'conviction'] as const).some(
+      (key) => stored[key] != null && current[key] != null && Number(stored[key]) !== Number(current[key]),
+    )
+  );
+};
+
 export const buildPersistedDraftMapsForAllowedIds = ({
   allowedQuestionIds = [],
   slice = {},
   baselineSlice = {},
+  changedFieldsByQid = {},
   prevAnswers = {},
   prevBaseline = {},
   resolvers = {},
@@ -1115,6 +1208,8 @@ export const buildPersistedDraftMapsForAllowedIds = ({
   allowedQuestionIds?: unknown[];
   slice?: PersistedDraftSliceLike | null;
   baselineSlice?: PersistedDraftSliceLike | null;
+  // Per-question flags from the pending-edit diff (answer, encryptedAnswer, additional, ...).
+  changedFieldsByQid?: Record<string, Record<string, unknown> | undefined> | null;
   prevAnswers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   prevBaseline?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
   resolvers?: PersistedDraftEntryResolvers;
@@ -1128,73 +1223,58 @@ export const buildPersistedDraftMapsForAllowedIds = ({
     const qid = normalizeQuestionIdKey(rawQuestionId);
     if (!qid) return;
 
-    const ans = isRecord(normalizedSlice.answers?.[qid]) ? (normalizedSlice.answers?.[qid] as UnknownRecord) : {};
-    const add = isRecord(normalizedSlice.additionalComments?.[qid])
-      ? (normalizedSlice.additionalComments?.[qid] as UnknownRecord)
-      : {};
-    const imp =
-      normalizedSlice.importance && Object.prototype.hasOwnProperty.call(normalizedSlice.importance, qid)
-        ? normalizedSlice.importance[qid]
-        : null;
-    const conv =
-      normalizedSlice.conviction && Object.prototype.hasOwnProperty.call(normalizedSlice.conviction, qid)
-        ? normalizedSlice.conviction[qid]
-        : null;
+    const { answer, additional, importance, conviction } = readSliceQuestion(normalizedSlice, qid);
     const interviewProvenance = isRecord(normalizedSlice.interviewProvenance?.[qid])
       ? normalizedSlice.interviewProvenance?.[qid]
       : null;
+    const fullEntry =
+      buildPersistedDraftQuestionEntry({
+        questionId: qid,
+        answer,
+        additional,
+        importance,
+        conviction,
+        interviewProvenance,
+        resolvers,
+        allowEmpty: true,
+      }) || {};
 
-    const answerEntry = buildPersistedDraftQuestionEntry({
-      questionId: qid,
-      answer: ans,
-      additional: add,
-      importance: imp,
-      conviction: conv,
-      interviewProvenance,
-      resolvers,
-    });
+    // Only edits belong in a draft. Unchanged fields come from the freshest saved
+    // answer on restore, so an old draft cannot overwrite a newer save.
+    const changed = (isRecord(changedFieldsByQid) && changedFieldsByQid[qid]) || {};
+    const entry: SurveyDraftQuestionEntry = {};
+    const copyGroup = (keys: readonly string[], valueKey: string, valueChanged: unknown, field: UnknownRecord) => {
+      keys.forEach((key) => {
+        if (fullEntry[key] !== undefined) entry[key] = fullEntry[key];
+      });
+      // A lock-only change keeps the saved value masked; a clear is kept as an empty value.
+      entry[valueKey] = !valueChanged && field.encryptedPortion ? '*' : (field.value ?? '');
+    };
+    if (changed.answer || changed.encryptedAnswer) {
+      copyGroup(ANSWER_DRAFT_KEYS, 'value', changed.answer, answer);
+    }
+    if (changed.additional || changed.encryptedAdditional) {
+      copyGroup(ADDITIONAL_DRAFT_KEYS, 'additional', changed.additional, additional);
+    }
+    if (changed.importance && importance !== null) entry.importance = importance;
+    if (changed.conviction && conviction !== null) entry.conviction = conviction;
+    const savedConsent = normalizedBaselineSlice.interviewProvenance?.[qid];
+    if (
+      interviewProvenance &&
+      !(savedConsent && consentSignature(interviewProvenance) === consentSignature(savedConsent))
+    ) {
+      entry.interviewProvenance = { ...interviewProvenance };
+    }
 
-    if (answerEntry) {
-      const savedConsent = normalizedBaselineSlice.interviewProvenance?.[qid];
-      if (savedConsent && consentSignature(interviewProvenance) === consentSignature(savedConsent))
-        delete answerEntry.interviewProvenance;
-      answersObj[qid] = answerEntry;
-    } else if (answersObj[qid]) {
+    if (Object.keys(entry).length === 0) {
       delete answersObj[qid];
-    }
-
-    const bAns = isRecord(normalizedBaselineSlice.answers?.[qid])
-      ? (normalizedBaselineSlice.answers?.[qid] as UnknownRecord)
-      : {};
-    const bAdd = isRecord(normalizedBaselineSlice.additionalComments?.[qid])
-      ? (normalizedBaselineSlice.additionalComments?.[qid] as UnknownRecord)
-      : {};
-    const bImp =
-      normalizedBaselineSlice.importance &&
-      Object.prototype.hasOwnProperty.call(normalizedBaselineSlice.importance, qid)
-        ? normalizedBaselineSlice.importance[qid]
-        : null;
-    const bConv =
-      normalizedBaselineSlice.conviction &&
-      Object.prototype.hasOwnProperty.call(normalizedBaselineSlice.conviction, qid)
-        ? normalizedBaselineSlice.conviction[qid]
-        : null;
-
-    const baselineEntry = buildPersistedDraftQuestionEntry({
-      questionId: qid,
-      answer: bAns,
-      additional: bAdd,
-      importance: bImp,
-      conviction: bConv,
-      interviewProvenance: normalizedBaselineSlice.interviewProvenance?.[qid],
-      resolvers,
-    });
-
-    if (baselineEntry) {
-      baselineObj[qid] = baselineEntry;
-    } else if (baselineObj[qid]) {
       delete baselineObj[qid];
+      return;
     }
+    answersObj[qid] = entry;
+    const baselineEntry = buildDraftBaselineEntry(normalizedBaselineSlice, qid);
+    if (baselineEntry) baselineObj[qid] = baselineEntry;
+    else delete baselineObj[qid];
   });
 
   return { answersObj, baselineObj };

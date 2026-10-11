@@ -21,7 +21,7 @@ const buildEmptySlice = (): ResponseSlice => ({
 });
 
 describe('surveyToolHydration shared contracts', () => {
-  it('hydrates baseline-only draft entries without mutating the live slice', () => {
+  it('never restores a baseline-only draft entry over the loaded baseline', () => {
     const stateRef: any = {
       current: {
         surveysResponseState: [
@@ -82,18 +82,18 @@ describe('surveyToolHydration shared contracts', () => {
         };
         return true;
       },
-      cloneBaseline: (value) => JSON.parse(JSON.stringify(value)),
       setState,
       updateJsonPreview: jest.fn(),
     });
 
+    // A stored draft baseline only detects stale drafts; it never replaces the loaded baseline.
     expect(result).toEqual({
-      reason: 'applied',
-      applied: true,
+      reason: 'no-updates',
+      applied: false,
       renderedQuestionIds: ['q1'],
     });
     expect(stateRef.current.surveysResponseState[0].answers.q1.value).toBe('live-answer');
-    expect(stateRef.current.editBaseline.answers.q1.value).toBe('baseline-answer');
+    expect(stateRef.current.editBaseline.answers.q1?.value).not.toBe('baseline-answer');
   });
 
   it('refreshes the full-mode baseline during shared prefill even when live edits are dirty', () => {

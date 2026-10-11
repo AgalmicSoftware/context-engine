@@ -10,13 +10,10 @@ import {
 } from './surveyToolHydrationFlow.js';
 
 describe('surveyToolHydrationFlow draft hydration helpers', () => {
-  it('builds draft hydration state for live and baseline slices', () => {
-    const cloneBaseline = jest.fn((baseline) => JSON.parse(JSON.stringify(baseline)));
+  it('restores draft edits for rendered questions without touching the loaded baseline', () => {
     const applyDraftEntryToSlice = jest.fn(({ targetSlice, questionId, draftEntry }) => {
       targetSlice.answers[questionId] = { value: draftEntry.value };
-      targetSlice.additionalComments[questionId] = { value: `${draftEntry.value}-notes` };
       targetSlice.importance[questionId] = draftEntry.importance;
-      targetSlice.conviction[questionId] = draftEntry.conviction;
       return true;
     });
 
@@ -25,10 +22,10 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
         renderedQuestionIds: ['Q1', 'q2'],
         draft: {
           answers: {
-            q1: { value: 'answer-1', importance: 4, conviction: 7 },
+            q1: { value: 'answer-1', importance: 4 },
           },
           baseline: {
-            q2: { value: 'baseline-2', importance: 2, conviction: 3 },
+            q2: { value: 'baseline-2' },
           },
         },
         prevSlice: {
@@ -44,7 +41,6 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
           additionalComments: {},
         },
         allowOverwrite: true,
-        cloneBaseline,
         applyDraftEntryToSlice,
       }),
     ).toEqual({
@@ -54,24 +50,13 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
           q1: { value: 'answer-1' },
         },
         importance: { q1: 4 },
-        conviction: { q1: 7 },
-        additionalComments: { q1: { value: 'answer-1-notes' } },
-      },
-      nextBaseline: {
-        answers: {
-          q9: { value: 'baseline-keep' },
-          q2: { value: 'baseline-2' },
-        },
-        importance: { q2: 2 },
-        conviction: { q2: 3 },
-        additionalComments: { q2: { value: 'baseline-2-notes' } },
+        conviction: {},
+        additionalComments: {},
       },
       changed: true,
-      baselineChanged: true,
     });
 
-    expect(cloneBaseline).toHaveBeenCalledTimes(1);
-    expect(applyDraftEntryToSlice).toHaveBeenCalledTimes(2);
+    expect(applyDraftEntryToSlice).toHaveBeenCalledTimes(1);
   });
 
   it('returns unchanged slices when no rendered ids or draft entries apply', () => {
@@ -84,7 +69,6 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
         prevSlice: null,
         prevBaseline: null,
         allowOverwrite: false,
-        cloneBaseline: null,
         applyDraftEntryToSlice,
       }),
     ).toEqual({
@@ -94,14 +78,7 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
         conviction: {},
         additionalComments: {},
       },
-      nextBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
       changed: false,
-      baselineChanged: false,
     });
 
     expect(applyDraftEntryToSlice).not.toHaveBeenCalled();
@@ -265,7 +242,6 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
   });
 
   it('builds draft hydration run plans from rendered ids, overwrite rules, and update plan state', () => {
-    const cloneBaseline = jest.fn((baseline) => JSON.parse(JSON.stringify(baseline)));
     const applyDraftEntryToSlice = jest.fn(({ targetSlice, questionId, draftEntry }) => {
       targetSlice.answers[questionId] = { value: draftEntry.value };
       return true;
@@ -300,7 +276,6 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
           conviction: {},
           additionalComments: {},
         },
-        cloneBaseline,
         applyDraftEntryToSlice,
       }),
     ).toEqual({
@@ -312,14 +287,7 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
         conviction: {},
         additionalComments: {},
       },
-      nextBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
       changed: true,
-      baselineChanged: false,
       updates: {
         surveysResponseState: [
           {
@@ -333,13 +301,10 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
     });
   });
 
-  it('builds draft hydration update plans from slice and baseline changes', () => {
-    const cloneBaseline = jest.fn((baseline) => JSON.parse(JSON.stringify(baseline)));
+  it('builds draft hydration update plans that leave the loaded baseline alone', () => {
     const applyDraftEntryToSlice = jest.fn(({ targetSlice, questionId, draftEntry }) => {
       targetSlice.answers[questionId] = { value: draftEntry.value };
-      targetSlice.additionalComments[questionId] = { value: `${draftEntry.value}-notes` };
       targetSlice.importance[questionId] = draftEntry.importance;
-      targetSlice.conviction[questionId] = draftEntry.conviction;
       return true;
     });
 
@@ -350,10 +315,10 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
         renderedQuestionIds: ['q1'],
         draft: {
           answers: {
-            q1: { value: 'answer-1', importance: 4, conviction: 7 },
+            q1: { value: 'answer-1', importance: 4 },
           },
           baseline: {
-            q1: { value: 'baseline-1', importance: 2, conviction: 3 },
+            q1: { value: 'baseline-1', importance: 2 },
           },
         },
         prevSlice: {
@@ -369,24 +334,16 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
           additionalComments: {},
         },
         allowOverwrite: true,
-        cloneBaseline,
         applyDraftEntryToSlice,
       }),
     ).toEqual({
       nextSlice: {
         answers: { q1: { value: 'answer-1' } },
         importance: { q1: 4 },
-        conviction: { q1: 7 },
-        additionalComments: { q1: { value: 'answer-1-notes' } },
-      },
-      nextBaseline: {
-        answers: { q1: { value: 'baseline-1' } },
-        importance: { q1: 2 },
-        conviction: { q1: 3 },
-        additionalComments: { q1: { value: 'baseline-1-notes' } },
+        conviction: {},
+        additionalComments: {},
       },
       changed: true,
-      baselineChanged: true,
       updates: {
         surveysResponseState: [
           { answers: { keep: { value: 'persisted' } } },
@@ -399,16 +356,10 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
           {
             answers: { q1: { value: 'answer-1' } },
             importance: { q1: 4 },
-            conviction: { q1: 7 },
-            additionalComments: { q1: { value: 'answer-1-notes' } },
+            conviction: {},
+            additionalComments: {},
           },
         ],
-        editBaseline: {
-          answers: { q1: { value: 'baseline-1' } },
-          importance: { q1: 2 },
-          conviction: { q1: 3 },
-          additionalComments: { q1: { value: 'baseline-1-notes' } },
-        },
       },
     });
   });

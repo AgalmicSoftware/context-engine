@@ -160,9 +160,8 @@ it('P1 unchanged answer + unchanged consent: not pending after "already saved" a
   expect(engine.getPendingEditStats().total).toBe(0);
   const result = await run(() => submitSessionInterviewResponses(engine, ['q1']));
   expect(result).toEqual({ status: 'already-saved' });
-  expect(sessionStorage.getItem(`dg:surveyDraft:edge:84532:${ACCOUNT}:questions`)).toContain(
-    '"responderName":"Participant"',
-  );
+  // Nothing differs from the saved version, so there is no draft to restore.
+  expect(sessionStorage.getItem(`dg:surveyDraft:edge:84532:${ACCOUNT}:questions`)).toBeNull();
 
   first.view.unmount();
   const second = mountPile();

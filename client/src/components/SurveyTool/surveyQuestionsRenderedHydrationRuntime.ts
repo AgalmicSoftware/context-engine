@@ -12,7 +12,6 @@ export const createSurveyQuestionsRenderedHydrationRuntime = (
     buildNormalizedRenderedQuestionIds,
     buildRenderedQuestionIdsFromQuestionPools,
     buildSubmissionGroupContext,
-    deepClone,
     engine,
     ensureQuestionsNet,
     executeSurveyDraftHydration,
@@ -236,7 +235,6 @@ export const createSurveyQuestionsRenderedHydrationRuntime = (
       getPendingEditStats: () => getPendingEditStats?.() || null,
       getHydrationQuestionIds: () => getHydrationQuestionIds(),
       applyDraftHydrationEntryToSlice: inst._applyDraftHydrationEntryToSlice,
-      cloneBaseline: deepClone,
       setState: setStateForHydration,
       updateJsonPreview: updateJsonPreview,
       onError: (error: SurveyQuestionsLegacyValue) => {

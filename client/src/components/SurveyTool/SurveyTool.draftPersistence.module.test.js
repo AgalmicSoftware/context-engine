@@ -20,6 +20,7 @@ import {
 import { executeSurveyResponsePrefill, executeSurveySingleQuestionPrefill } from './surveyToolHydrationController';
 import {
   buildDraftHydrationState,
+  buildDraftHydrationUpdatePlan,
   buildHydratedResponseSlice,
   buildMergedSurveyResponseState,
 } from './surveyToolHydrationFlow';
@@ -33,8 +34,6 @@ const buildEmptySlice = () => ({
   conviction: {},
   additionalComments: {},
 });
-
-const cloneValue = (value) => JSON.parse(JSON.stringify(value));
 
 const normalizeResponseEncryptionAudience = (audience) => (audience === 'gate' ? 'self' : audience || 'self');
 
@@ -371,6 +370,7 @@ describe('SurveyTool draft persistence', () => {
         conviction: {},
       },
       baselineSlice: buildEmptySlice(),
+      changedFieldsByQid: { q1: { answer: 1 }, q2: { answer: 1 }, q3: { answer: 1 } },
       prevAnswers: loaded?.answers,
       resolvers: draftEntryResolvers,
     });
@@ -522,33 +522,13 @@ describe('SurveyTool draft persistence', () => {
     expect(JSON.parse(storedRaw).answers.q1.value).toBe('carry-updated');
   });
 
-  it('persists and rehydrates encrypted portions for decrypted empty fields', () => {
+  it('persists edited locked fields with their envelopes and stores the saved baseline masked', () => {
     const { answersObj, baselineObj } = buildPersistedDraftMapsForAllowedIds({
       allowedQuestionIds: ['q1'],
       slice: {
         answers: {
           q1: {
-            value: 'anchor-answer',
-            encrypted: false,
-            encryptionAudience: 'self',
-            encryptedPortion: 'ans-env-1',
-          },
-        },
-        additionalComments: {
-          q1: {
-            value: '',
-            encrypted: true,
-            encryptionAudience: 'gate',
-            encryptedPortion: 'add-env-1',
-          },
-        },
-        importance: {},
-        conviction: {},
-      },
-      baselineSlice: {
-        answers: {
-          q1: {
-            value: 'baseline-answer',
+            value: 'edited answer',
             encrypted: true,
             encryptionAudience: 'gate',
             encryptedPortion: 'ans-base-1',
@@ -556,7 +536,7 @@ describe('SurveyTool draft persistence', () => {
         },
         additionalComments: {
           q1: {
-            value: '',
+            value: 'decrypted comment',
             encrypted: true,
             encryptionAudience: 'gate',
             encryptedPortion: 'add-base-1',
@@ -565,39 +545,63 @@ describe('SurveyTool draft persistence', () => {
         importance: {},
         conviction: {},
       },
+      baselineSlice: {
+        answers: {
+          q1: {
+            value: 'decrypted saved answer',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: 'ans-base-1',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: 'decrypted comment',
+            encrypted: true,
+            encryptionAudience: 'gate',
+            encryptedPortion: 'add-base-1',
+          },
+        },
+        importance: { q1: 6 },
+        conviction: {},
+      },
+      changedFieldsByQid: { q1: { answer: 1 } },
       resolvers: draftEntryResolvers,
     });
-    const draft = buildPersistedDraftPayload({
-      draftContext,
-      answersObj,
-      baselineObj,
-      now: 1000,
-    });
+    const draft = buildPersistedDraftPayload({ draftContext, answersObj, baselineObj, now: 1000 });
     const hydrated = buildDraftHydrationState({
       renderedQuestionIds: ['q1'],
       draft,
       prevSlice: {
-        answers: { q1: { value: '', encrypted: true, encryptionAudience: 'gate' } },
-        additionalComments: { q1: { value: '', encrypted: true, encryptionAudience: 'gate' } },
+        answers: { q1: { value: '*', encrypted: true, encryptionAudience: 'gate', encryptedPortion: 'ans-base-1' } },
+        additionalComments: {
+          q1: { value: '*', encrypted: true, encryptionAudience: 'gate', encryptedPortion: 'add-base-1' },
+        },
         importance: {},
         conviction: {},
       },
-      prevBaseline: buildEmptySlice(),
+      prevBaseline: {
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'ans-base-1' } },
+        additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: 'add-base-1' } },
+        importance: {},
+        conviction: {},
+      },
       allowOverwrite: true,
-      cloneBaseline: cloneValue,
       applyDraftEntryToSlice,
     });
 
-    expect(draft.answers.q1.answerEncryptedPortion).toBe('ans-env-1');
-    expect(draft.answers.q1.additionalEncryptedPortion).toBe('add-env-1');
-    expect(draft.baseline.q1.answerEncryptedPortion).toBe('ans-base-1');
-    expect(draft.baseline.q1.additionalEncryptedPortion).toBe('add-base-1');
-    expect(draft.baseline.q1.value).toBe('baseline-answer');
-    expect(hydrated.nextSlice.answers.q1.encryptedPortion).toBe('ans-env-1');
-    expect(hydrated.nextSlice.additionalComments.q1.encryptedPortion).toBe('add-env-1');
-    expect(hydrated.nextBaseline.answers.q1.encryptedPortion).toBe('ans-base-1');
-    expect(hydrated.nextBaseline.additionalComments.q1.encryptedPortion).toBe('add-base-1');
-    expect(hydrated.nextBaseline.answers.q1.value).toBe('baseline-answer');
+    expect(draft.answers.q1).toMatchObject({ value: 'edited answer', answerEncryptedPortion: 'ans-base-1' });
+    expect(draft.answers.q1).not.toHaveProperty('additional');
+    expect(draft.baseline.q1).toEqual({
+      value: '*',
+      answerEncryptedPortion: 'ans-base-1',
+      additional: '*',
+      additionalEncryptedPortion: 'add-base-1',
+    });
+    expect(JSON.stringify(draft)).not.toContain('decrypted');
+    expect(hydrated.nextSlice.answers.q1.value).toBe('edited answer');
+    expect(hydrated.nextSlice.additionalComments.q1.value).toBe('*');
+    expect(hydrated).not.toHaveProperty('nextBaseline');
   });
 
   it('rewrites draft payload when only baseline changes', () => {
@@ -639,81 +643,55 @@ describe('SurveyTool draft persistence', () => {
     expect(buildSurveyDraftSemanticSignature(secondPayload)).not.toBe(buildSurveyDraftSemanticSignature(firstPayload));
   });
 
-  it('rehydrates baseline from draft even when no answer entry exists', () => {
-    const hydrated = buildDraftHydrationState({
+  it('never restores a stored draft baseline over the loaded saved answers', () => {
+    const hydrated = buildDraftHydrationUpdatePlan({
+      prevSurveysResponseState: [buildEmptySlice()],
+      surveyIndex: 0,
       renderedQuestionIds: ['q1'],
       draft: {
         meta: { networkId: 84532, surveyId: 'questions', ts: 111 },
         answers: {},
-        baseline: {
-          q1: {
-            value: 'baseline-only',
-            answerEncrypted: true,
-            answerEncryptionAudience: 'gate',
-            answerEncryptedPortion: 'ans-base-only',
-            additional: '',
-            additionalEncrypted: false,
-            additionalEncryptionAudience: 'self',
-            importance: null,
-            conviction: null,
-          },
-        },
+        baseline: { q1: { value: 'baseline-only' } },
       },
       prevSlice: buildEmptySlice(),
       prevBaseline: buildEmptySlice(),
       allowOverwrite: true,
-      cloneBaseline: cloneValue,
       applyDraftEntryToSlice,
     });
 
-    expect(hydrated.nextSlice.answers.q1).toBeUndefined();
-    expect(hydrated.nextBaseline.answers.q1.value).toBe('baseline-only');
-    expect(hydrated.nextBaseline.answers.q1.encryptedPortion).toBe('ans-base-only');
+    expect(hydrated.updates).toEqual({});
   });
 
-  it('keeps restored draft baseline aligned after masked prefill on refresh', () => {
+  it('skips a draft written against a saved answer that has since changed', () => {
     const draft = {
-      answers: {
-        q1: {
-          value: 'real text',
-          answerEncrypted: true,
-          answerEncryptionAudience: 'gate',
-          answerEncryptedPortion: 'ans-env-1',
-        },
-      },
-      baseline: {
-        q1: {
-          value: 'real text',
-          answerEncrypted: true,
-          answerEncryptionAudience: 'gate',
-          answerEncryptedPortion: 'ans-env-1',
-        },
-      },
+      answers: { q1: { additional: 'draft comment' } },
+      baseline: { q1: { value: 'Agree', additional: 'old comment' } },
     };
-    const restored = buildDraftHydrationState({
-      renderedQuestionIds: ['q1'],
-      draft,
-      prevSlice: buildEmptySlice(),
-      prevBaseline: buildEmptySlice(),
-      allowOverwrite: true,
-      cloneBaseline: cloneValue,
-      applyDraftEntryToSlice,
-    });
-    const prefilled = executePrefillSurvey({
-      surveysResponseState: [restored.nextSlice],
-      editBaseline: restored.nextBaseline,
-      responses: [
-        {
-          questionID: 'q1',
-          answer: { value: '*', encrypted: true, encryptedPortion: 'ans-env-1' },
-          additional: { value: '', encrypted: false, encryptedPortion: '' },
+    const restore = (savedAnswer) =>
+      buildDraftHydrationState({
+        renderedQuestionIds: ['q1'],
+        draft,
+        prevSlice: {
+          answers: { q1: { value: savedAnswer } },
+          additionalComments: { q1: { value: 'old comment' } },
+          importance: {},
+          conviction: {},
         },
-      ],
-    });
+        prevBaseline: {
+          answers: { q1: { value: savedAnswer } },
+          additionalComments: { q1: { value: 'old comment' } },
+          importance: {},
+          conviction: {},
+        },
+        allowOverwrite: true,
+        applyDraftEntryToSlice,
+      });
 
-    expect(prefilled.surveysResponseState[0].answers.q1.value).toBe('real text');
-    expect(prefilled.editBaseline.answers.q1.value).toBe('real text');
-    expect(prefilled.editBaseline.answers.q1.encryptedPortion).toBe('ans-env-1');
+    expect(restore('Agree').nextSlice.additionalComments.q1.value).toBe('draft comment');
+    const stale = restore('Disagree');
+    expect(stale.changed).toBe(false);
+    expect(stale.nextSlice.answers.q1.value).toBe('Disagree');
+    expect(stale.nextSlice.additionalComments.q1.value).toBe('old comment');
   });
 
   it('keeps decrypted-empty answer aligned when masked response has encrypted=true without envelope', () => {
@@ -994,6 +972,7 @@ describe('SurveyTool draft persistence', () => {
         importance: {},
         conviction: {},
       },
+      changedFieldsByQid: { q1: { answer: 1 } },
       prevAnswers: removalPlan.nextPayload?.answers,
       prevBaseline: removalPlan.nextPayload?.baseline,
       resolvers: draftEntryResolvers,
@@ -1021,26 +1000,4 @@ const applyState = (stateRef) => (update, callback) => {
   stateRef.current = { ...stateRef.current, ...(patch || {}) };
   if (typeof callback === 'function') callback();
   return patch;
-};
-
-const executePrefillSurvey = ({ surveysResponseState = [], editBaseline = buildEmptySlice(), responses = [] } = {}) => {
-  const stateRef = {
-    current: {
-      surveysResponseState,
-      editBaseline,
-      isDirty: false,
-      submissionComplete: false,
-    },
-  };
-  executeSurveyResponsePrefill({
-    state: stateRef.current,
-    surveyIndex: 0,
-    userAnswers: { responses },
-    buildSliceFromUserAnswers,
-    applyResponseHydrationListToSlice,
-    setState: applyState(stateRef),
-    updateJsonPreview: jest.fn(),
-    recalculateEditStats: jest.fn(),
-  });
-  return stateRef.current;
 };

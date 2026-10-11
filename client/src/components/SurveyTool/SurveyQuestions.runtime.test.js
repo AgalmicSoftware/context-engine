@@ -549,12 +549,10 @@ describe('SurveyQuestions runtime helpers', () => {
             answers: { q1: { value: 'drafted' } },
           }),
         ],
-        editBaseline: expect.objectContaining({
-          answers: { q1: { value: 'drafted' } },
-        }),
       }),
       expect.any(Function),
     );
+    expect(setState.mock.calls[0][0]).not.toHaveProperty('editBaseline');
     expect(updateJsonPreview).toHaveBeenCalledTimes(1);
     // port note: the private responseHydrationOwned depth counter is covered here by
     // the extracted draft hydration controller receiving and applying the owned update.

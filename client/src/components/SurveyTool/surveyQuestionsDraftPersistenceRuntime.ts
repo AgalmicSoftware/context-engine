@@ -20,6 +20,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
     buildSurveyDraftSemanticSignature,
     buildSurveyDraftStorageKey,
     buildSurveyDraftStorageVariantKeys,
+    getChangedQidsAndFields,
     getHydrationQuestionIds,
     inst,
     loadPreviousPersistedDraftSnapshot,
@@ -268,11 +269,12 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           additionalComments: {},
         };
         // Start from previous draft answers/baseline so non-rendered QIDs survive,
-        // then overwrite only the currently allowed question set.
+        // then overwrite only the currently allowed question set with its edited fields.
         const { answersObj, baselineObj }: SurveyQuestionsLegacyValue = buildPersistedDraftMapsForAllowedIds({
           allowedQuestionIds: allowed,
           slice,
           baselineSlice,
+          changedFieldsByQid: getChangedQidsAndFields(surveyIndex)?.changedMap,
           prevAnswers,
           prevBaseline,
           resolvers: {

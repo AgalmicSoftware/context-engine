@@ -392,7 +392,6 @@ export const executeSurveyDraftHydration = ({
   getPendingEditStats = null,
   getHydrationQuestionIds = () => [],
   applyDraftHydrationEntryToSlice = () => false,
-  cloneBaseline = ((value: unknown) => value) as CloneValue,
   setState = () => {},
   updateJsonPreview = () => {},
   onError = () => {},
@@ -407,7 +406,6 @@ export const executeSurveyDraftHydration = ({
   getPendingEditStats?: (() => { total?: number | null } | null) | null;
   getHydrationQuestionIds?: () => unknown[];
   applyDraftHydrationEntryToSlice?: (args: Record<string, unknown>) => boolean;
-  cloneBaseline?: CloneValue;
   setState?: SetState;
   updateJsonPreview?: () => void;
   onError?: (error: unknown) => void;
@@ -456,7 +454,6 @@ export const executeSurveyDraftHydration = ({
       draft,
       prevSlice,
       prevBaseline: nextState.editBaseline,
-      cloneBaseline,
       applyDraftEntryToSlice: applyDraftHydrationEntryToSlice,
     });
     const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds) ? draftRunPlan.renderedQuestionIds : [];
