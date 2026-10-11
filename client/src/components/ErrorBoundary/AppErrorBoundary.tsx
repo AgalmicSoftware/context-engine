@@ -1,6 +1,11 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
-import { isStaleChunkLoadError, recoverFromStaleChunkLoadError, reloadForStaleChunk } from '../../bootRecovery.js';
+import {
+  isBrowserOffline,
+  isStaleChunkLoadError,
+  recoverFromStaleChunkLoadError,
+  reloadForStaleChunk,
+} from '../../bootRecovery.js';
 
 type AppErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -10,6 +15,7 @@ type AppErrorBoundaryState = {
   hasError: boolean;
   errorMessage: string;
   staleChunk: boolean;
+  offline: boolean;
 };
 
 class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
@@ -19,14 +25,17 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
       hasError: false,
       errorMessage: '',
       staleChunk: false,
+      offline: false,
     };
   }
 
   static getDerivedStateFromError(error: Error | null): AppErrorBoundaryState {
+    const staleChunk = isStaleChunkLoadError(error);
     return {
       hasError: true,
       errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
-      staleChunk: isStaleChunkLoadError(error),
+      staleChunk,
+      offline: staleChunk && isBrowserOffline(),
     };
   }
 
@@ -45,7 +54,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
 
   render() {
     if (this.state.hasError) {
-      const { staleChunk } = this.state;
+      const { staleChunk, offline } = this.state;
       return (
         <div
           style={{
@@ -69,12 +78,20 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
               padding: '28px',
             }}
           >
-            {/* A stale chunk is a new deploy, not a bug: skip the raw module URL. */}
+            {/* A stale chunk is a new deploy or a lost connection, not a bug: skip the raw module URL. */}
             <h2 style={{ margin: '0 0 12px 0', color: 'var(--ce-panel-text)' }}>
-              {staleChunk ? 'A new version of Context Engine is available' : 'Something went wrong'}
+              {offline
+                ? 'You appear to be offline'
+                : staleChunk
+                  ? 'A new version of Context Engine is available'
+                  : 'Something went wrong'}
             </h2>
             <p style={{ margin: '0 0 20px 0', color: 'var(--ce-panel-text-muted)' }}>
-              {staleChunk ? 'Reload the page to finish loading Context Engine.' : this.state.errorMessage}
+              {offline
+                ? 'Reconnect, then reload Context Engine.'
+                : staleChunk
+                  ? 'Reload the page to finish loading Context Engine.'
+                  : this.state.errorMessage}
             </p>
             <button
               type="button"

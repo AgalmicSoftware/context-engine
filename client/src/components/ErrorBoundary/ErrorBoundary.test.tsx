@@ -90,6 +90,34 @@ describe('Error boundaries', () => {
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('tells an offline reader to reconnect instead of announcing a new version', async () => {
+    const connection: { readonly onLine: boolean } = window.navigator;
+    jest.spyOn(connection, 'onLine', 'get').mockReturnValue(false);
+    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError');
+
+    renderStaleRoute();
+
+    expect(await screen.findByRole('heading', { name: 'You appear to be offline' })).toBeInTheDocument();
+    expect(screen.getByText('Reconnect, then reload the page to finish loading this section.')).toBeInTheDocument();
+    expect(screen.queryByText(/new version/)).not.toBeInTheDocument();
+    expect(recoverSpy).toHaveReturnedWith(false);
+  });
+
+  it('tells an offline reader to reconnect in the app-wide fallback', () => {
+    const connection: { readonly onLine: boolean } = window.navigator;
+    jest.spyOn(connection, 'onLine', 'get').mockReturnValue(false);
+
+    render(
+      <AppErrorBoundary>
+        <StaleChunkThrower />
+      </AppErrorBoundary>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'You appear to be offline' })).toBeInTheDocument();
+    expect(screen.getByText('Reconnect, then reload Context Engine.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+  });
+
   it('re-renders an ordinary route error when the reader tries again', () => {
     const reloadSpy = jest.spyOn(bootRecovery, 'reloadForStaleChunk').mockImplementation(() => undefined);
     let shouldThrow = true;

@@ -1,6 +1,11 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
-import { isStaleChunkLoadError, recoverFromStaleChunkLoadError, reloadForStaleChunk } from '../../bootRecovery.js';
+import {
+  isBrowserOffline,
+  isStaleChunkLoadError,
+  recoverFromStaleChunkLoadError,
+  reloadForStaleChunk,
+} from '../../bootRecovery.js';
 
 type RouteErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -11,6 +16,7 @@ type RouteErrorBoundaryState = {
   hasError: boolean;
   errorMessage: string;
   staleChunk: boolean;
+  offline: boolean;
 };
 
 class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
@@ -20,14 +26,17 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
       hasError: false,
       errorMessage: '',
       staleChunk: false,
+      offline: false,
     };
   }
 
   static getDerivedStateFromError(error: Error | null): RouteErrorBoundaryState {
+    const staleChunk = isStaleChunkLoadError(error);
     return {
       hasError: true,
       errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
-      staleChunk: isStaleChunkLoadError(error),
+      staleChunk,
+      offline: staleChunk && isBrowserOffline(),
     };
   }
 
@@ -38,7 +47,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
 
   componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
     if (this.state.hasError && this.props.resetKey && this.props.resetKey !== prevProps.resetKey) {
-      this.setState({ hasError: false, errorMessage: '', staleChunk: false });
+      this.setState({ hasError: false, errorMessage: '', staleChunk: false, offline: false });
     }
   }
 
@@ -53,12 +62,13 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
       hasError: false,
       errorMessage: '',
       staleChunk: false,
+      offline: false,
     });
   };
 
   render() {
     if (this.state.hasError) {
-      const { staleChunk } = this.state;
+      const { staleChunk, offline } = this.state;
       return (
         <div
           style={{
@@ -79,12 +89,20 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
               padding: '20px',
             }}
           >
-            {/* A stale chunk is a new deploy, not a bug: skip the raw module URL. */}
+            {/* A stale chunk is a new deploy or a lost connection, not a bug: skip the raw module URL. */}
             <h3 style={{ margin: '0 0 10px 0', color: 'var(--ce-panel-text)' }}>
-              {staleChunk ? 'A new version of Context Engine is available' : 'This section encountered an error'}
+              {offline
+                ? 'You appear to be offline'
+                : staleChunk
+                  ? 'A new version of Context Engine is available'
+                  : 'This section encountered an error'}
             </h3>
             <p style={{ margin: '0 0 16px 0', color: 'var(--ce-panel-text-muted)' }}>
-              {staleChunk ? 'Reload the page to finish loading this section.' : this.state.errorMessage}
+              {offline
+                ? 'Reconnect, then reload the page to finish loading this section.'
+                : staleChunk
+                  ? 'Reload the page to finish loading this section.'
+                  : this.state.errorMessage}
             </p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button

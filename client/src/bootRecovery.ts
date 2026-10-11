@@ -221,6 +221,10 @@ const wasRecentlyAutoReloaded = (storage: BootStorage | undefined, storageKey: s
   }
 };
 
+// Only false is reliable: onLine can be true on a network that reaches nothing.
+export const isBrowserOffline = (win: BootWindow | undefined = globalThis.window): boolean =>
+  win?.navigator?.onLine === false;
+
 export const recoverFromStaleChunkLoadError = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
   if (!isStaleChunkLoadError(error)) {
     return false;
@@ -228,7 +232,7 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
 
   const win = options.window || globalThis.window;
   // Offline failures are transient; a reload would only reach the browser's offline page.
-  if (win?.navigator?.onLine === false) return false;
+  if (isBrowserOffline(win)) return false;
 
   const storage = options.storage || readSessionStorage(win);
   const storageKey = options.storageKey || STALE_CHUNK_RELOAD_STORAGE_KEY;
