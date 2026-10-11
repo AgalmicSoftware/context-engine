@@ -341,6 +341,33 @@ test('set-config sets optional field encryption and linked groups on Worker sess
   });
 });
 
+test('set-config lets an edit clear the end time and a limit', () => {
+  const apply = (existingConfig, incomingConfig) => applySessionConfigMutation({
+    existingConfig,
+    mutation: { kind: 'set-config', incomingConfig },
+    slug: 'session-a',
+  });
+  const first = apply(cloneJson(profileBearingConfig), {
+    sessionEndsAt: '2030-01-02T03:04:00Z',
+    limits: { perWalletPerDay: 100, perAnonymousIpPerDay: 5 },
+  });
+  assert.equal(first.ok, true);
+  // A supplied limits object replaces the stored one; an explicit '' clears the end time.
+  const cleared = apply(first.config, { sessionEndsAt: '', limits: { perWalletPerDay: 100 } });
+  assert.equal(cleared.ok, true, JSON.stringify(cleared));
+  assert.equal(cleared.config.sessionEndsAt, '');
+  assert.deepEqual(cleared.config.limits, { perWalletPerDay: 100 });
+  assert.deepEqual(apply(cleared.config, { limits: {} }).config.limits, {});
+  // Patches without limits keep them, and /admin/set-limits still merges.
+  assert.deepEqual(apply(first.config, { sessionName: 'Renamed' }).config.limits, { perWalletPerDay: 100, perAnonymousIpPerDay: 5 });
+  const merged = applySessionConfigMutation({
+    existingConfig: first.config,
+    mutation: { kind: 'set-limits', incomingLimits: { perAnonymousIpPerDay: 7 } },
+    slug: 'session-a',
+  });
+  assert.deepEqual(merged.config.limits, { perWalletPerDay: 100, perAnonymousIpPerDay: 7 });
+});
+
 test('set-config rejects malformed or unsupported interview mode config', () => {
   for (const incomingConfig of [
     { interviewModeEnabled: 'false' },

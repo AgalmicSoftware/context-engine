@@ -116,10 +116,11 @@ export const mergeWorkerConfigRecords = ({
     ...incoming,
   };
 
-  merged.limits = {
-    ...(isObj(existing.limits) ? existing.limits : {}),
-    ...(isObj(incoming.limits) ? cloneValue(incoming.limits) : {}),
-  };
+  // A supplied limits object is the complete set, so a cleared limit is
+  // removed. /admin/set-limits (mergeWorkerLimitRecords) still merges.
+  merged.limits = isObj(incoming.limits)
+    ? cloneValue(incoming.limits)
+    : { ...(isObj(existing.limits) ? existing.limits : {}) };
   merged.scopes = {
     ...(isObj(existing.scopes) ? existing.scopes : {}),
     ...(isObj(incoming.scopes) ? cloneValue(incoming.scopes) : {}),

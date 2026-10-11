@@ -1503,7 +1503,7 @@ Runtime:
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
     - `limits.perWalletPerDay` remains the authenticated per-wallet daily route budget and the legacy anonymous fallback. `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): omitted keeps the legacy `perWalletPerDay` fallback, `0` explicitly makes those anonymous route buckets unlimited, and a positive integer enforces that per-session/per-route anonymous identity budget. Malformed values fall back to `perWalletPerDay` rather than disabling limits.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
-    - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
+    - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes. A supplied `limits` object replaces the stored one.
     - writes fail closed when open config subtrees contain secret-like keys,
       Cloudflare deployment tokens, URL credentials, RPC/faucet values, or
       provider credential aliases.
@@ -1916,7 +1916,11 @@ Never return secrets in responses.
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.
 - Legacy string `allowOrigins` payloads are accepted and normalized into arrays.
-- `limits` and `scopes` only merge from object payloads; malformed non-object patches are ignored rather than corrupting stored branches.
+- A supplied `limits` object replaces the stored one, so leaving a limit out
+  clears it; `/admin/set-limits` still merges limit keys. `scopes` merge from
+  object payloads. Malformed non-object `limits` or `scopes` patches are ignored
+  rather than corrupting stored branches.
+- An explicit `sessionEndsAt: ""` clears a Worker-canonical session's end time.
 - Signed request validation is shared with login/bootstrap flows:
   - the recovered signer must match request `address`
   - the SIWE message address must also match request `address`
