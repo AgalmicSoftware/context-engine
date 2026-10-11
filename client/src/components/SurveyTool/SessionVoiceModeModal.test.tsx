@@ -2373,6 +2373,50 @@ describe('SessionVoiceModeModal', () => {
     expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
   });
 
+  it('checks a prefill link again once a stale cached question set refreshes', async () => {
+    const fresh = [
+      { id: 'q1', prompt: 'What matters?', type: 'freeform' },
+      { id: 'q2', prompt: 'Added since the last visit?', type: 'freeform' },
+    ];
+    mockedHashInterviewQuestions.mockImplementation(async (questions) =>
+      questions.length === 2 ? 'a'.repeat(64) : 'b'.repeat(64),
+    );
+    jest.mocked(globalThis.fetch).mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            type: 'context-engine.interview-question-catalog',
+            version: 1,
+            sessionSlug: 'demo',
+            prefillPromptVersion: 'ce-interview-brief-v5',
+            questionSetHash: 'a'.repeat(64),
+            questions: fresh.map((question) => ({ ...question, options: [] })),
+          }),
+        ),
+    );
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion: 'ce-interview-brief-v5',
+        source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
+        responderContext: {},
+        responses: [{ questionId: 'q2', answer: 'Fresh answer', confidence: 0.8 }],
+      },
+    };
+    // The pile first shows a cached question set that predates the link.
+    const view = render(<SessionVoiceModeModal {...props} questionPool={[fresh[0]]} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/older or different question set/i);
+
+    view.rerender(<SessionVoiceModeModal {...props} questionPool={fresh} />);
+
+    await expectReadableDraftText('Draft answer for Added since the last visit?', 'Fresh answer');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('accepts a fresh bounded Worker catalog when the local session contains 101 questions', async () => {
     const questionPool = Array.from({ length: 101 }, (_, index) => ({
       id: `q${index}`,

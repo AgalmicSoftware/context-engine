@@ -161,6 +161,8 @@ function SessionInterviewPanel({
   const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
   const catalogAbortRef = useRef<AbortController | null>(null);
   const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
+  // The question set a prefill link was last checked against.
+  const checkedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
@@ -452,6 +454,7 @@ function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
+          checkedPrefillQuestionsRef.current = questions;
           catalogAbortRef.current = new AbortController();
           const matchedQuestions = await resolveInterviewPrefillQuestions({
             packet: prefillPacket,
@@ -610,10 +613,16 @@ function SessionInterviewPanel({
   }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, questions, responderContext, transcript]);
 
   useEffect(() => {
-    if (!prefillPacket || importedRef.current || !questions.length) return;
+    if (!prefillPacket || !questions.length || mapping) return;
+    // A link rejected against an older cached question set is checked again once the set refreshes.
+    const recheck =
+      !!prefillPacket.questionSetHash &&
+      validatedPrefillRef.current !== prefillPacket &&
+      checkedPrefillQuestionsRef.current !== questions;
+    if (importedRef.current && !recheck) return;
     importedRef.current = true;
     void runMapping({ nextTranscript: '' });
-  }, [prefillPacket, questions.length, runMapping]);
+  }, [mapping, prefillPacket, questions, runMapping]);
 
   useEffect(() => {
     if (drafts.length && !mapping && !importedRef.current) {
