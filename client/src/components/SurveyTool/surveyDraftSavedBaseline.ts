@@ -121,23 +121,25 @@ export const readSliceQuestion = (slice: PersistedDraftSliceLike, qid: string) =
 /**
  * The saved answer a draft was written against. Locked fields keep only their
  * envelope, so the draft never stores decrypted plaintext of a saved answer.
+ * `ratingsEncrypted` says the saved ratings carry envelopes of their own.
  */
 export const buildDraftBaselineEntry = (
   baselineSlice: PersistedDraftSliceLike | null | undefined,
   questionId: unknown,
+  ratingsEncrypted = false,
 ): SurveyDraftQuestionEntry | null => {
   const qid = normalizeQuestionIdKey(questionId);
   if (!qid || !isRecord(baselineSlice)) return null;
   const { answer, additional, importance, conviction } = readSliceQuestion(baselineSlice, qid);
   const saved = (field: UnknownRecord) =>
     field.encryptedPortion ? '*' : hasMeaningfulFieldValue(field) ? field.value : undefined;
-  const locked = !!(answer.encryptedPortion || additional.encryptedPortion);
+  // Encrypted ratings, or ratings of a locked response, keep their plaintext out of storage.
+  const locked = ratingsEncrypted || !!(answer.encryptedPortion || additional.encryptedPortion);
   const entry: SurveyDraftQuestionEntry = {
     ...(saved(answer) !== undefined ? { value: saved(answer) } : {}),
     ...(answer.encryptedPortion ? { answerEncryptedPortion: answer.encryptedPortion } : {}),
     ...(saved(additional) !== undefined ? { additional: saved(additional) } : {}),
     ...(additional.encryptedPortion ? { additionalEncryptedPortion: additional.encryptedPortion } : {}),
-    // A locked response encrypts its ratings too; keep their plaintext out of storage.
     ...(!locked && importance !== null ? { importance } : {}),
     ...(!locked && conviction !== null ? { conviction } : {}),
   };

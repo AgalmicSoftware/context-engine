@@ -16,6 +16,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
     buildPersistedDraftTrackingClearedState,
     buildPersistedDraftTrackingOnKeyChange,
     buildPersistedDraftWritePlan,
+    buildRatingEnvelopeQidSetFromUserAnswers,
     buildSurveyDraftLoadPlan,
     buildSurveyDraftSemanticSignature,
     buildSurveyDraftStorageKey,
@@ -283,6 +284,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           prevAnswers,
           prevBaseline,
           savedAnswersKnown: !!propsRef.current?.isResponsesCacheReady,
+          encryptedRatingQids: buildRatingEnvelopeQidSetFromUserAnswers(stateRef.current.userAnswers),
           resolvers: {
             resolveFieldEncryptionAudience: resolveFieldEncryptionAudience,
             resolveFieldEncryptionGateId: resolveFieldEncryptionGateId,

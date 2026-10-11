@@ -96,3 +96,16 @@ describe('withoutUnrestorableUnlocks', () => {
     expect(withoutUnrestorableUnlocks(publicComment)).toEqual({ entry: publicComment, lostUnlocks: [] });
   });
 });
+
+describe('buildDraftBaselineEntry', () => {
+  it('keeps decrypted ratings out when the saved ratings are encrypted', () => {
+    const saved = {
+      answers: { q1: { value: 'Public answer' } },
+      additionalComments: { q1: { value: '' } },
+      importance: { q1: 6 },
+      conviction: { q1: 5 },
+    };
+    expect(buildDraftBaselineEntry(saved, 'q1')).toEqual({ value: 'Public answer', importance: 6, conviction: 5 });
+    expect(buildDraftBaselineEntry(saved, 'q1', true)).toEqual({ value: 'Public answer' });
+  });
+});

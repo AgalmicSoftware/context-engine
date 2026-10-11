@@ -1089,6 +1089,7 @@ export const buildPersistedDraftMapsForAllowedIds = ({
   prevBaseline = {},
   resolvers = {},
   savedAnswersKnown = true,
+  encryptedRatingQids = null,
 }: {
   allowedQuestionIds?: unknown[];
   slice?: PersistedDraftSliceLike | null;
@@ -1100,6 +1101,8 @@ export const buildPersistedDraftMapsForAllowedIds = ({
   resolvers?: PersistedDraftEntryResolvers;
   // False while saved answers are still unknown, so their absence is not recorded as "none saved".
   savedAnswersKnown?: boolean;
+  // Questions whose saved ratings are encrypted; their decrypted ratings never enter the baseline.
+  encryptedRatingQids?: Set<string> | null;
 } = {}) => {
   const answersObj = { ...(isRecord(prevAnswers) ? prevAnswers : {}) };
   const baselineObj = { ...(isRecord(prevBaseline) ? prevBaseline : {}) };
@@ -1160,7 +1163,9 @@ export const buildPersistedDraftMapsForAllowedIds = ({
     }
     answersObj[qid] = entry;
     // An empty entry records that nothing was saved; no entry means the saved answer was unknown.
-    const baselineEntry = buildDraftBaselineEntry(normalizedBaselineSlice, qid) || (savedAnswersKnown ? {} : null);
+    const baselineEntry =
+      buildDraftBaselineEntry(normalizedBaselineSlice, qid, !!encryptedRatingQids?.has(qid)) ||
+      (savedAnswersKnown ? {} : null);
     if (baselineEntry) baselineObj[qid] = baselineEntry;
     else delete baselineObj[qid];
   });

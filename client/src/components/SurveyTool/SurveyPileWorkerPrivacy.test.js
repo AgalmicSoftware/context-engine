@@ -589,7 +589,13 @@ it('takes a missing rating envelope from the cache even when the saved row has t
   expect(registry.get(row.convictionEncrypted)).toBe(4);
 }, 60000);
 
-it('keeps ratings protected by a locked comment encrypted after its text is deleted', async () => {
+const draftsText = () =>
+  Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('dg:surveyDraft:'))
+    .map((key) => sessionStorage.getItem(key))
+    .join('\n');
+
+it('keeps ratings protected by a locked comment encrypted after its text is deleted, also in drafts', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
   const store = createWorkerStore();
   seedWorkerCatalog(store);
@@ -648,9 +654,15 @@ it('keeps ratings protected by a locked comment encrypted after its text is dele
   expect(row.convictionEncrypted).toBe(prior.convictionEncrypted);
   expect(row.importance == null && row.conviction == null).toBe(true);
   expect(guard(h.uploads.at(-1))).toBe('passed');
+
+  // A later edit stores a draft; the ratings are still encrypted, so their plaintext stays out of it.
+  await act(async () => h.engine().handleAnswerPile(qid(2), 'public answer v2'));
+  await settle(600);
+  expect(draftsText()).toContain('public answer v2');
+  expect(draftsText()).not.toMatch(/"(importance|conviction)":\d/);
 }, 60000);
 
-it('reloads a cleared locked answer as cleared, not as a locked "*"', async () => {
+it('reloads a cleared locked answer as cleared, not as a locked "*", and keeps its ratings out of drafts', async () => {
   const store = createWorkerStore();
   seedWorkerCatalog(store);
   await syncWorkerMetadata(store);
@@ -669,6 +681,10 @@ it('reloads a cleared locked answer as cleared, not as a locked "*"', async () =
   const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(2));
   expect(row.answer).toMatchObject({ value: '', encrypted: false, encryptedPortion: '' });
   expect(guard(h.uploads.at(-1))).toBe('passed');
+  await act(async () => h.engine().handleAdditionalPile(qid(2), 'a public note'));
+  await settle(600);
+  expect(draftsText()).toContain('a public note');
+  expect(draftsText()).not.toMatch(/"(importance|conviction)":\d/);
 
   h.view.unmount();
   jest.restoreAllMocks();

@@ -16,6 +16,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   buildPersistedDraftTrackingAfterWrite: jest.fn((tracking) => tracking),
   buildPersistedDraftTrackingClearedState: jest.fn(() => ({ cleared: true })),
   buildPersistedDraftTrackingOnKeyChange: jest.fn((tracking) => tracking),
+  buildRatingEnvelopeQidSetFromUserAnswers: jest.fn(() => new Set<string>()),
   buildPersistedDraftWritePlan: jest.fn(() => ({
     compatWriteKey: '',
     staleAnonKeys: [],
