@@ -31,7 +31,22 @@ describe('surveySelectorHelpers document URLs', () => {
       getSurveyDocumentUrls({
         documentURLs: [' https://example.com/one ', '', '   ', 12, 'ar://abc123'],
       }),
-    ).toEqual(['https://example.com/one', 'ar://abc123']);
+    ).toEqual(['https://example.com/one']);
+  });
+
+  it('keeps only http, https, and ar:// document links', () => {
+    const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
+    const urls = getSurveyDocumentUrls({
+      documentURLs: [
+        'javascript:alert(document.domain)',
+        'data:text/html,hi',
+        `ar://${txId}`,
+        'http://example.com/two',
+      ],
+    });
+
+    expect(urls).toEqual([expect.stringMatching(new RegExp(`^https://[^/]+/${txId}$`)), 'http://example.com/two']);
+    expect(getSurveyDocumentLinkTitle({ documentURLs: ['javascript:alert(1)'] })).toBe('');
   });
 
   it('returns an empty list when no document URL array exists', () => {

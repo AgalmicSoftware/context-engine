@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp, faExpand } from '@fortawesome/free-solid-svg-icons';
 import { Collapse } from 'reactstrap';
 
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 import {
   resolveUserPageSectionToggleDisplayState,
@@ -186,17 +187,26 @@ const UserPageSurveySection = ({
                     {surveyResponseCardState.hasDocURLs && (
                       <div className={styles.surveyDetailRow}>
                         <span className={styles.surveyDetailLabel}>Documents:</span>
-                        {survey.documentURLs.map((url: string, urlIndex: number) => (
-                          <a
-                            key={urlIndex}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.surveyDocLink}
-                          >
-                            {url.length > 60 ? url.slice(0, 57) + '...' : url}
-                          </a>
-                        ))}
+                        {survey.documentURLs.map((url: string, urlIndex: number) => {
+                          const text = String(url ?? '');
+                          const label = text.length > 60 ? text.slice(0, 57) + '...' : text;
+                          const href = toSafeLinkHref(text, { contextLabel: 'survey_document' });
+                          return href ? (
+                            <a
+                              key={urlIndex}
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={styles.surveyDocLink}
+                            >
+                              {label}
+                            </a>
+                          ) : (
+                            <span key={urlIndex} className={styles.surveyDocLink}>
+                              {label}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                     {questionArray.map((questionResponse, questionIndex: number) => (

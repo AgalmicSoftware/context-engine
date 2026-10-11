@@ -33,11 +33,24 @@ describe('sbtListCardDetailsHelpers', () => {
     expect(normalizeSbtListTokenUri('ipfs://bafy-image')).toBe('https://ipfs.io/ipfs/bafy-image');
     expect(details.tags).toEqual(['Builder', 'Signal']);
     expect(details.documentUrls).toEqual([
-      { href: 'ar://abc123', label: 'ar://abc123' },
+      { href: '', label: 'ar://abc123' },
       { href: 'https://ipfs.io/ipfs/bafy-doc', label: 'ipfs://bafy-doc' },
       { href: 'https://example.com/readme', label: 'https://example.com/readme' },
     ]);
     expect(details.hasDetails).toBe(true);
+  });
+
+  it('gives card document links an href only for http, https, ipfs, and Arweave values', () => {
+    const txId = 'NMc_EMP1kKWx9hL17XrDhvFBSEnmLIO1DivrOUsBwIE';
+    const details = getSbtCardDetails({
+      documentURLs: ['javascript:alert(document.domain)', 'data:text/html,hi', `ar://${txId}`],
+    });
+
+    expect(details.documentUrls).toEqual([
+      { href: '', label: 'javascript:alert(document.domain)' },
+      { href: '', label: 'data:text/html,hi' },
+      { href: `https://ar-io.dev/${txId}`, label: `ar://${txId}` },
+    ]);
   });
 
   it('uses AR.IO for Arweave-backed list card images while direct routing is enabled', () => {

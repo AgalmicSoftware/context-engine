@@ -1,3 +1,5 @@
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
+
 type SurveyDocumentUrlSource = {
   documentURLs?: unknown;
 };
@@ -35,9 +37,10 @@ type SurveyQuestionsCache = Record<
   | undefined
 >;
 
+// Survey metadata can come from any uploader, so only safe link schemes become hrefs.
 export const getSurveyDocumentUrls = (survey: SurveyDocumentUrlSource | null = null): string[] =>
   (Array.isArray(survey?.documentURLs) ? survey.documentURLs : [])
-    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .map((value) => toSafeLinkHref(value, { contextLabel: 'survey_document' }))
     .filter(Boolean);
 
 export const getSurveyDocumentLinkTitle = (survey: SurveyDocumentUrlSource | null = null): string => {

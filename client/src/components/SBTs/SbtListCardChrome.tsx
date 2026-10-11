@@ -29,18 +29,24 @@ export const SbtListDetailsPanel = ({ details, detailsId, styles }: SbtListDetai
         <div className={styles.sbtDetailsSection}>
           <span className={styles.sbtDetailsHeading}>Documents</span>
           <div className={styles.sbtDocumentList}>
-            {details.documentUrls.map((documentUrl) => (
-              <a
-                key={documentUrl.href}
-                className={styles.sbtDocumentLink}
-                href={documentUrl.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={documentUrl.label}
-              >
-                {documentUrl.label}
-              </a>
-            ))}
+            {details.documentUrls.map((documentUrl, index) =>
+              documentUrl.href ? (
+                <a
+                  key={`${index}:${documentUrl.href}`}
+                  className={styles.sbtDocumentLink}
+                  href={documentUrl.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={documentUrl.label}
+                >
+                  {documentUrl.label}
+                </a>
+              ) : (
+                <span key={`${index}:${documentUrl.label}`} className={styles.sbtDocumentLink}>
+                  {documentUrl.label}
+                </span>
+              ),
+            )}
           </div>
         </div>
       )}

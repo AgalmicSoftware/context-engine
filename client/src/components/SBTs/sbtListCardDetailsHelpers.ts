@@ -1,4 +1,8 @@
-import { buildArweaveGatewayUrlCandidates, normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import {
+  buildArweaveGatewayUrlCandidates,
+  normalizeArweaveUrl,
+  toSafeLinkHref,
+} from '../../utilities/arweave/arweaveUrls.js';
 
 export type SbtListHelperRecord = Record<string, unknown>;
 export type SbtListHelperItem = SbtListHelperRecord & {
@@ -143,7 +147,8 @@ export const getSbtCardDetails = (sbt: unknown): SbtCardDetails => {
     record.docURLs,
     record.documents,
   ).map((rawHref: string) => ({
-    href: normalizeSbtListDocumentHref(rawHref) || rawHref,
+    // Unsafe schemes keep their label but get no href, so the card renders text.
+    href: toSafeLinkHref(normalizeSbtListDocumentHref(rawHref) || rawHref, { contextLabel: 'sbt_list_document' }),
     label: rawHref,
   }));
 

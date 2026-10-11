@@ -66,7 +66,19 @@ describe('SbtPageRelevantInfo', () => {
     );
   });
 
-  it('renders worker-managed document references as public links even when they use a Lit-shaped URL', () => {
+  it('renders stored document URLs with unsafe schemes as plain text', () => {
+    const unsafeUrl = 'javascript:alert(document.domain)';
+    render(<SbtPageRelevantInfo {...createProps({ documentURLs: [unsafeUrl, 'https://doc.example.test/safe'] })} />);
+
+    expect(screen.getByText(unsafeUrl).closest('a')).toBeNull();
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain(unsafeUrl);
+    expect(screen.getByRole('link', { name: 'https://doc.example.test/safe' })).toHaveAttribute(
+      'href',
+      'https://doc.example.test/safe',
+    );
+  });
+
+  it('renders worker-managed document references as public text even when they use a Lit-shaped URL', () => {
     const encryptedUrl = 'lit://arweave/example-tx';
     render(
       <SbtPageRelevantInfo
@@ -84,7 +96,8 @@ describe('SbtPageRelevantInfo', () => {
 
     expect(screen.getByText('Relevant documents and tags for this group.')).toBeInTheDocument();
     expect(screen.getByText('Doc URL')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: encryptedUrl })).toHaveAttribute('href', encryptedUrl);
+    // lit:// is not a browsable scheme, so it stays visible but not clickable.
+    expect(screen.getByText(encryptedUrl).closest('a')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Decrypt and view' })).not.toBeInTheDocument();
   });
 

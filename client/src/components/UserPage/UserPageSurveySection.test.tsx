@@ -204,6 +204,32 @@ describe('UserPageSurveySection', () => {
     expect(onSurveyResponsesSectionToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('links survey documents only through http, https, or Arweave hrefs', () => {
+    const unsafeUrl = 'javascript:alert(document.domain)';
+    render(
+      <UserPageSurveySection
+        {...createProps({
+          surveyResponseEntries: [
+            {
+              documentURLs: [unsafeUrl, 'https://docs.example.test/response'],
+              id: 'survey-response',
+              questionsCount: 1,
+              slug: 'beta',
+              tags: [],
+              title: 'Response survey',
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText(unsafeUrl).closest('a')).toBeNull();
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/response' })).toHaveAttribute(
+      'href',
+      'https://docs.example.test/response',
+    );
+  });
+
   it('keeps gated cached survey responses visible and defers decrypt to the parent handler', () => {
     const onDecryptQuestion = jest.fn();
 

@@ -5,6 +5,7 @@ import {
   isArweaveTxId,
   normalizeArweaveUrl,
   parseArweaveTxId,
+  toSafeLinkHref,
 } from './arweaveUrls';
 
 jest.mock('./arweaveClient.js', () => ({
@@ -65,6 +66,31 @@ describe('arweaveUrls helpers', () => {
     expect(normalizeArweaveUrl(`${subdomainArweaveGateway}/${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(normalizeArweaveUrl('assets/img/ce_header.webp')).toBe('assets/img/ce_header.webp');
     expect(normalizeArweaveUrl('https://example.example.test/foo.png')).toBe('https://example.example.test/foo.png');
+  });
+
+  it('allows only http, https, and ar:// values as link hrefs', () => {
+    expect(toSafeLinkHref(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeLinkHref(`ar://${txId}`, { gateway: testArweaveGateway })).toBe(`${testArweaveGateway}/${txId}`);
+    expect(toSafeLinkHref(' https://example.test/doc ')).toBe('https://example.test/doc');
+    expect(toSafeLinkHref('http://example.test/doc?x=1')).toBe('http://example.test/doc?x=1');
+    // Unlike normalizeArweaveUrl, unsafe or relative values never pass through.
+    expect(normalizeArweaveUrl('javascript:alert(1)')).toBe('javascript:alert(1)');
+    for (const unsafe of [
+      'javascript:alert(1)',
+      ' JavaScript:alert(1)',
+      'data:text/html,<b>x</b>',
+      'vbscript:msgbox(1)',
+      'ar://not-a-tx-id',
+      'ftp://example.test/doc',
+      '/relative/doc',
+      'example.test/doc',
+      txId,
+      '',
+      null,
+      { href: 'https://example.test' },
+    ]) {
+      expect(toSafeLinkHref(unsafe)).toBe('');
+    }
   });
 
   it('defaults to direct AR.IO-only gateway routing', () => {

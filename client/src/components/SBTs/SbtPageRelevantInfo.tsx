@@ -4,6 +4,7 @@ import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 
 import { litStorage } from 'utilities/crypto/litProtocol.js';
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveSbtPageMutedInfoIconStyle } from './sbtPageHelpers';
 import styles from './SBTPage.module.scss';
@@ -46,6 +47,7 @@ const SbtPageRelevantInfo = ({
         <ul className={styles.docUrlList}>
           {documentURLs.map((url, index) => {
             const litDoc = !documentUrlsArePublic && litStorage.isLitArweaveUrl(url);
+            const href = litDoc ? '' : toSafeLinkHref(url, { contextLabel: 'sbt_document' });
             return (
               <li key={index} className={styles.docUrlItem}>
                 <span className={styles.docUrlBadge}>{litDoc ? 'Encrypted Doc' : 'Doc URL'}</span>
@@ -53,10 +55,12 @@ const SbtPageRelevantInfo = ({
                   <button type="button" className={styles.docUrlButton} onClick={() => onOpenEncryptedDoc(url)}>
                     Decrypt and view
                   </button>
-                ) : (
-                  <a href={url} target="_blank" rel="noopener noreferrer">
+                ) : href ? (
+                  <a href={href} target="_blank" rel="noopener noreferrer">
                     {url}
                   </a>
+                ) : (
+                  <span>{url}</span>
                 )}
               </li>
             );
