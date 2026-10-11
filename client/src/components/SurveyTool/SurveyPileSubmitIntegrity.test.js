@@ -370,3 +370,60 @@ it('never re-sends the envelope of a cleared locked answer', async () => {
   expect(row.additional).toMatchObject({ value: 'Public note' });
   expect(JSON.stringify(h.submitResponses.mock.calls[0][2])).not.toContain('old-secret');
 });
+
+it('keeps the lock when a decrypted answer would publish its still-masked Match Answer comment', async () => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  const envelope = (tag) => JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: tag });
+  const h = await fixture();
+  h.add(
+    'responses',
+    savedFreeform(
+      {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: envelope('answer'),
+        encryptionAudience: 'self_admin',
+        audienceMode: 'explicit',
+      },
+      {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: envelope('comment'),
+        encryptionAudience: 'self_admin',
+        audienceMode: 'inherit',
+      },
+    ),
+  );
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  await run(
+    () =>
+      new Promise((resolve) =>
+        engine().setState(
+          (prev) =>
+            buildSelfQuestionDecryptSuccessState(
+              prev,
+              {
+                surveyIndex: 0,
+                questionId: FREEFORM_QID,
+                clearMode: 'answer',
+                didUpdate: true,
+                baselineSlice: prev.editBaseline,
+                decryptedStateSlice: { answers: { [FREEFORM_QID]: { value: 'Decrypted answer' } } },
+              },
+              (value) => JSON.parse(JSON.stringify(value)),
+            ),
+          resolve,
+        ),
+      ),
+  );
+
+  await act(async () => engine().toggleAnswerEncryption(0, FREEFORM_QID, false));
+  await settle();
+
+  const slice = engine().state.surveysResponseState[0];
+  expect(slice.answers[FREEFORM_QID]).toMatchObject({ value: 'Decrypted answer', encrypted: true });
+  expect(slice.additionalComments[FREEFORM_QID]).toMatchObject({ value: '*', encrypted: true });
+  expect(engine().state.submissionError).toMatch(/decrypt the locked answer and comment/i);
+});

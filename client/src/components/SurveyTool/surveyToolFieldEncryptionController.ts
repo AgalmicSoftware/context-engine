@@ -18,7 +18,14 @@ export interface EncryptionTogglePlan {
   nextFieldState: ResponseFieldState;
   nextAdditionalState: ResponseFieldState | null;
   clearMenus: boolean;
+  // Set when the change would publish a still-masked value; nothing changes then.
+  blockedReason?: string;
 }
+
+export const MASKED_FIELD_UNLOCK_MESSAGE = 'Decrypt the locked answer and comment before making them public.';
+
+// "*" is a mask over saved ciphertext, not text; publishing it would replace the answer with "*".
+const isMaskedFieldState = (field: ResponseFieldState): boolean => field?.value === '*';
 
 export interface AudienceSelectionPlan {
   nextAnswerState: ResponseFieldState;
@@ -150,16 +157,28 @@ export const buildEncryptionTogglePlan = (
   deps: FieldEncryptionDeps,
 ): EncryptionTogglePlan => {
   const { nextFieldState, effectiveEncrypted } = buildToggleFieldState(qid, fieldKey, newEncryptedState, slice, deps);
+  const currentAdditionalState = getFieldState(slice, qid, 'additional', deps);
+  const commentFollowsAnswer =
+    fieldKey === 'answer' &&
+    deps.normalizeFieldAudienceMode(currentAdditionalState.audienceMode, 'additional', currentAdditionalState) !==
+      'explicit';
+
+  if (
+    !effectiveEncrypted &&
+    (isMaskedFieldState(getFieldState(slice, qid, fieldKey, deps)) ||
+      (commentFollowsAnswer && isMaskedFieldState(currentAdditionalState)))
+  ) {
+    return {
+      nextFieldState: getFieldState(slice, qid, fieldKey, deps),
+      nextAdditionalState: null,
+      clearMenus: false,
+      blockedReason: MASKED_FIELD_UNLOCK_MESSAGE,
+    };
+  }
 
   let nextAdditionalState: ResponseFieldState | null = null;
-  if (fieldKey === 'answer') {
-    const currentAdditionalState = getFieldState(slice, qid, 'additional', deps);
-    if (
-      deps.normalizeFieldAudienceMode(currentAdditionalState.audienceMode, 'additional', currentAdditionalState) !==
-      'explicit'
-    ) {
-      nextAdditionalState = deps.buildInheritedAdditionalFieldState(currentAdditionalState, nextFieldState, qid);
-    }
+  if (commentFollowsAnswer) {
+    nextAdditionalState = deps.buildInheritedAdditionalFieldState(currentAdditionalState, nextFieldState, qid);
   }
 
   return {
@@ -201,20 +220,30 @@ export const buildAdditionalAudienceSelectionPlan = (
   gateId: string,
   slice: FieldSlice,
   deps: FieldEncryptionDeps,
-): { nextAdditionalState: ResponseFieldState } => {
+): { nextAdditionalState: ResponseFieldState; blockedReason?: string } => {
   const nextAnswerState = getFieldState(slice, qid, 'answer', deps);
   const nextAdditionalState = getFieldState(slice, qid, 'additional', deps);
   const rawAudience = String(audience || '')
     .trim()
     .toLowerCase();
+  const following = rawAudience === 'inherit' || rawAudience === 'follow' || rawAudience === 'follow-answer';
+  const plaintext = rawAudience === 'none' || rawAudience === 'plaintext' || rawAudience === 'not-encrypted';
 
-  if (rawAudience === 'inherit' || rawAudience === 'follow' || rawAudience === 'follow-answer') {
+  if (
+    isMaskedFieldState(nextAdditionalState) &&
+    !deps.isQuestionLockedForResponse(qid) &&
+    (plaintext || (following && !nextAnswerState.encrypted))
+  ) {
+    return { nextAdditionalState, blockedReason: MASKED_FIELD_UNLOCK_MESSAGE };
+  }
+
+  if (following) {
     return {
       nextAdditionalState: deps.buildInheritedAdditionalFieldState(nextAdditionalState, nextAnswerState, qid),
     };
   }
 
-  if (rawAudience === 'none' || rawAudience === 'plaintext' || rawAudience === 'not-encrypted') {
+  if (plaintext) {
     return {
       nextAdditionalState: buildExplicitFieldState({
         baseFieldState: nextAdditionalState,

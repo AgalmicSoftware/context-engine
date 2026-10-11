@@ -94,6 +94,7 @@ import {
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
   toggleShowJsonState,
 } from './surveyQuestionsTypes.js';
+import { buildEncryptionTogglePlan } from './surveyToolFieldEncryptionController';
 
 describe('surveyQuestionsTypes', () => {
   it('builds the default SurveyQuestions state for non-standalone flows', () => {
@@ -2015,4 +2016,46 @@ describe('surveyQuestionsTypes', () => {
       },
     ]);
   });
+});
+
+it('explains instead of publishing a masked comment when the answer lock is removed', () => {
+  const lockedField = (value: string, audienceMode = 'explicit') => ({
+    value,
+    encrypted: true,
+    encryptionAudience: 'self_admin',
+    encryptionGateId: null,
+    audienceMode,
+  });
+  const deps = {
+    isQuestionLockedForResponse: () => false,
+    buildEmptyResponseFieldState: () => ({ value: '', encrypted: false, audienceMode: 'explicit' }),
+    resolveFieldEncryptionAudience: () => 'self_admin',
+    resolveFieldEncryptionGateId: () => null,
+    normalizeFieldAudienceMode: (value: unknown) => String(value || 'explicit'),
+    buildInheritedAdditionalFieldState: (additional: Record<string, unknown>, answer: Record<string, unknown>) => ({
+      ...additional,
+      encrypted: answer.encrypted,
+    }),
+    normalizeResponseEncryptionAudience: (audience: unknown) => String(audience || ''),
+  };
+  const slice = {
+    answers: { q1: lockedField('Decrypted answer') },
+    additionalComments: { q1: lockedField('*', 'inherit') },
+  };
+
+  expect(
+    buildAnswerEncryptionToggleResponseState(
+      { surveysResponseState: [slice] },
+      {
+        // The state builder takes the plan through the runtime's loose record types.
+        buildEncryptionTogglePlan: buildEncryptionTogglePlan as unknown as Parameters<
+          typeof buildAnswerEncryptionToggleResponseState
+        >[1]['buildEncryptionTogglePlan'],
+        deps,
+        newEncryptedState: false,
+        questionId: 'q1',
+        surveyIndex: 0,
+      },
+    ),
+  ).toEqual({ submissionError: 'Decrypt the locked answer and comment before making them public.' });
 });
