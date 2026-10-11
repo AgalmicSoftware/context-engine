@@ -1311,4 +1311,12 @@ $input-border: var(--ce-input-border);
   .sbtItem .miniSbtName {
     color: var(--ce-document-text);
   }
+
+  // The loading screen sits on the white page, not on a dark card.
+  .loadingPage,
+  .loading,
+  .loadingTitle,
+  .loadingSubtitle {
+    color: var(--ce-document-text);
+  }
 }

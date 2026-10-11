@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'fs';
+import path from 'path';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { renderSbtPageFullView } from './SbtPageFullView';
@@ -203,6 +205,14 @@ describe('renderSbtPageFullView', () => {
 
     expect(screen.getByText('Loading SBT Details')).toBeInTheDocument();
     expect(screen.queryByText('SBT list')).toBeNull();
+  });
+
+  it('keeps the loading title readable on the Minimal white page', () => {
+    const stylesheet = fs.readFileSync(path.join(__dirname, 'SBTPage.module.scss'), 'utf8');
+
+    expect(stylesheet).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*minimal-app\)\s*{[\s\S]*?\.loadingTitle,[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
   });
 
   it('wires full-view section handlers without owning side effects', () => {
