@@ -32,7 +32,9 @@ describe('demoSessionFixtureLoader before the fixtures load', () => {
 });
 
 describe('showDemoFixtureLoadError', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('reaches the route boundary from a reducer-state component like SurveyQuestions', async () => {
     const staleChunk = new TypeError(
