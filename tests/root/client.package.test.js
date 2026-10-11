@@ -114,13 +114,36 @@ const readHeaderRules = () => {
   return rules;
 };
 
-test('client static headers deny framing and report broader CSP compatibility', () => {
-  const headers = readText('client/public/_headers');
+test('client static headers enforce the baseline CSP and report a strict-script policy', () => {
+  const headers = readHeaderRules()['/*'];
 
-  assert.match(headers, /Referrer-Policy: strict-origin-when-cross-origin/);
-  assert.match(headers, /Content-Security-Policy: frame-ancestors 'none'/);
-  assert.match(headers, /Content-Security-Policy-Report-Only: default-src 'self'/);
-  assert.match(headers, /connect-src 'self' https: wss: data:/);
+  assert.equal(headers['Referrer-Policy'], 'strict-origin-when-cross-origin');
+  assert.equal(
+    headers['Content-Security-Policy'],
+    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+  );
+  const reportOnly = Object.fromEntries(
+    headers['Content-Security-Policy-Report-Only'].split(';').map((directive) => {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      return [name, sources.join(' ')];
+    }),
+  );
+  assert.deepEqual(reportOnly, {
+    'default-src': "'self'",
+    'script-src': "'self'",
+    'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com",
+    'img-src': "'self' data: blob: https:",
+    'font-src': "'self' data: https://fonts.gstatic.com",
+    'connect-src': "'self' https: wss:",
+    'worker-src': "'self' blob:",
+    // Document Library previews PDFs in a blob: frame.
+    'frame-src': 'https: blob:',
+    'media-src': "'self' data: blob: https:",
+    'object-src': "'none'",
+    'base-uri': "'self'",
+    'form-action': "'self'",
+    'frame-ancestors': "'none'",
+  });
 });
 
 test('client static headers cache only hashed build assets as immutable', () => {

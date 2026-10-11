@@ -243,6 +243,12 @@ rule sets no cache header; overlapping rules could otherwise combine values.
 Keep unhashed public files out of `client/public/assets/`, because anything
 served under `/assets/` is cached as immutable.
 
+The same `_headers` file enforces a baseline Content Security Policy
+(`frame-ancestors`, `object-src`, `base-uri`, and `form-action`). It also sends
+a stricter policy that allows scripts only from this origin as
+`Content-Security-Policy-Report-Only`. That policy has no report endpoint, so
+its violations appear only in the browser console.
+
 This cannot replace already-running JavaScript in an open tab. It makes the
 browser re-check the app shell on the next navigation, reload, or new visit.
 
