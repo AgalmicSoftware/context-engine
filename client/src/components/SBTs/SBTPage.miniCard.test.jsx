@@ -5,6 +5,7 @@ import SbtPageMiniCardDisplay from './SbtPageMiniCardDisplay';
 import styles from './SBTPage.module.scss';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
 
@@ -445,6 +446,34 @@ describe('SBTPage mini-card', () => {
     expect(cardText).not.toContain('Join');
     cardNode.props.onRetryGroupPasswordCheck({ preventDefault: jest.fn() });
     expect(loadSBTInfo).toHaveBeenCalledWith({ preferCountsOnly: true });
+  });
+
+  it('keeps Retry on the mini card when its code-free URL join hits an unreadable check', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f1';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
+    try {
+      const { subject } = renderMiniCardNode({
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+      });
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const claim = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+
+      await subject.handleUrlAutoMintIntent();
+
+      const cardNode = findElementInTree(subject.render(), (element) => element?.type === SbtPageMiniCard);
+      expect(claim).not.toHaveBeenCalled();
+      expect(subject.state.mintingStatus).not.toBe('failure');
+      expect(cardNode.props.miniMintActionPlan.viewKind).toBe('group-password-check-retry');
+      expect(flattenText(SbtPageMiniCard(cardNode.props))).toContain('Retry');
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
   });
 
   it('routes mini-card disclosure clicks through the parent password input action', () => {

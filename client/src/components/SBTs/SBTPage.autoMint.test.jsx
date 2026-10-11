@@ -1088,9 +1088,8 @@ describe('SBTPage auto-mint routing', () => {
 
         expect(claim).toHaveBeenCalledTimes(expectedClaims);
         if (!expectedClaims) {
-          expect(subject.state.error).toBe(
-            "Could not read this group's password check from the chain. Check the network and try again.",
-          );
+          // The card then shows the unreadable check with Retry (see the mini-card and full-card tests).
+          expect(subject.state).toMatchObject({ groupPasswordCheckUnreadable: true, mintingStatus: 'idle' });
         }
       } finally {
         window.history.replaceState({}, '', previousHref);

@@ -22,7 +22,6 @@ import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
-import { GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE } from 'utilities/crypto/sbtAuthorization';
 import { createLogger } from 'utilities/logging.js';
 import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
@@ -1279,9 +1278,23 @@ class SBTPage extends Component<any, any> {
       return false;
     }
     // A failed read (null) may hide a group password, so only metadata that says the group is open lets it claim.
+    // Otherwise record the check as a page load would, so the card offers Retry rather than a failed status.
     if (!onchainGph && !isKnownOpenSbt(sbtInfoRecord)) {
-      if (this._isMounted)
-        this.setState(buildSbtPageMintFailurePatch({ error: GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE }));
+      if (this._isMounted) {
+        const { groupPasswordCheckUnreadable, hasGroupPasswordMint, hasInviteMint } =
+          resolveSbtPageGroupPasswordMintState({
+            groupPasswordHash: null,
+            hashZero: ethers.constants.HashZero,
+            hasPasswordMint: sbtInfoRecord.hasPasswordMint,
+            mintMode: readKnownSbtMintMode(sbtInfoRecord),
+          });
+        this.setState({
+          groupPasswordCheckUnreadable,
+          groupPasswordHashLoaded: false,
+          hasGroupPasswordMint,
+          hasInviteMint,
+        });
+      }
       return false;
     }
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
