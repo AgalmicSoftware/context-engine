@@ -473,6 +473,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     handleRevertPendingChanges,
     prefillSurveyResponses,
     rehydrateLocalCacheAnswersForRenderedIds,
+    rehydrateSavedAnswersThenDraft,
     resetFormStateForAccountChange,
     resolveDiffBaselineSlice,
     valuesEqual,
@@ -487,7 +488,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     initializeSurveyResponseState: () => initializeSurveyResponseState(),
     loadDraft: () => loadDraft(),
     persistDraft: () => persistDraft(),
+    persistDraftSafely: () => persistDraftSafely(),
     recalculateEditStats: () => recalculateEditStats(),
+    rehydrateDraftForRenderedIds,
   });
 
   const {
@@ -790,11 +793,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           ),
           jsonPreview: prepareJsonAndHash(0),
         }),
-        () => {
-          rehydrateDraftForRenderedIds();
-          // Quick local-cache rehydrate for non-encrypted prior answers (standalone list)
-          rehydrateLocalCacheAnswersForRenderedIds();
-        },
+        () => rehydrateSavedAnswersThenDraft(),
       );
     }
   };
@@ -834,6 +833,9 @@ export const createSurveyQuestionsRuntimeMethods = (
           buildQuestionIdScopeSignature(propsRef.current.questionPool);
       if (propsHydrationContextChanged || !inst._responseHydrationStateUpdateDepth) {
         invalidateResponseHydrationRuns();
+        // A draft still waiting for saved answers needs a load that was not cancelled.
+        if (inst._draftRestorePending)
+          void rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
       }
       invalidateDiffCaches();
     }
@@ -1165,8 +1167,7 @@ export const createSurveyQuestionsRuntimeMethods = (
             }),
           () => {
             updateJsonPreview();
-            rehydrateDraftForRenderedIds();
-            rehydrateLocalCacheAnswersForRenderedIds();
+            void rehydrateSavedAnswersThenDraft();
           },
         );
       }
@@ -1181,7 +1182,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         (propsRef.current.isResponsesCacheReady &&
           prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce)
       ) {
-        rehydrateLocalCacheAnswersForRenderedIds();
+        rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
       }
 
       const standaloneAuthBecameReady =
@@ -1192,15 +1193,13 @@ export const createSurveyQuestionsRuntimeMethods = (
       if (propsRef.current.account !== prevProps.account || standaloneAuthBecameReady) {
         // Clear live form state before reacting to new account
         resetFormStateForAccountChange(() => {
+          // Rerun cache/prior-response hydration once the reset form is in place.
           setState(
             buildStandaloneAuthResetState(
               updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             ),
+            () => rehydrateSavedAnswersThenDraft({ restoreAll: true }),
           );
-          // Standalone mode typically relies on local cache or props,
-          // but we should also rerun cache/prior-response hydration when auth becomes ready.
-          rehydrateDraftForRenderedIds();
-          rehydrateLocalCacheAnswersForRenderedIds();
         }, propsRef.current.account === prevProps.account);
       }
     }

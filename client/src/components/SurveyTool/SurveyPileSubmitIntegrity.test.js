@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { renderSurveyPileViewMode, renderSurveyQuestions } from './surveyQuestionsTestHarness';
 import {
   applySessionInterviewAnswer,
   createPileViewRuntimeStrategy,
@@ -27,6 +27,7 @@ const SLUG = 'submit-integrity';
 const OWNER = `0x${'33'.repeat(20)}`;
 const BINARY_QID = `0x${'ab'.repeat(32)}`;
 const FREEFORM_QID = `0x${'cd'.repeat(32)}`;
+const FREEFORM_QUESTION = { id: FREEFORM_QID, type: 'freeform', prompt: 'Freeform question' };
 const SESSION_ID = `0x${'44'.repeat(16)}`;
 const PUBLIC_ACCESS = { gate: 'none', encryption: 'none' };
 const CONFIG = {
@@ -170,6 +171,26 @@ const fixture = async () => {
   };
   const controller = createSessionResponseHydrationController(host);
   controllers.push(controller);
+  const sessionProps = () => ({
+    isStandalone: true,
+    surveyIndex: 0,
+    account: OWNER,
+    loginComplete: true,
+    provider: { request: jest.fn() },
+    network: { id: 11155420 },
+    networkChainId: 11155420,
+    cacheHasLoaded: true,
+    isQuestionCacheReady: true,
+    isResponsesCacheReady: state.isResponsesCacheReady,
+    questionResponsesNonce: state.questionResponsesNonce,
+    questionsCacheNonce: state.questionResponsesNonce,
+    sessionSlug: SLUG,
+    activeSessionSlug: SLUG,
+    sessionSlugPinned: true,
+    sessionConfig: CONFIG,
+    refreshQuestionResponses: (ids, opts) => controller.refreshQuestionResponses(ids, opts),
+    toggleLoginModal: jest.fn(),
+  });
   const mount = async (props = {}) => {
     const strategy = createPileViewRuntimeStrategy();
     const original = strategy.render;
@@ -178,31 +199,18 @@ const fixture = async () => {
       return original(current);
     };
     view = renderSurveyPileViewMode({
+      ...sessionProps(),
       minifiedMode: 'pile',
-      isStandalone: true,
-      surveyIndex: 0,
-      account: OWNER,
-      loginComplete: true,
-      provider: { request: jest.fn() },
-      network: { id: 11155420 },
-      networkChainId: 11155420,
-      cacheHasLoaded: true,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: state.isResponsesCacheReady,
-      questionResponsesNonce: state.questionResponsesNonce,
-      questionsCacheNonce: state.questionResponsesNonce,
-      sessionSlug: SLUG,
-      activeSessionSlug: SLUG,
-      sessionSlugPinned: true,
-      sessionConfig: CONFIG,
       onFilterChange: jest.fn(),
       runtimeStrategy: strategy,
-      refreshQuestionResponses: (ids, opts) => controller.refreshQuestionResponses(ids, opts),
-      toggleLoginModal: jest.fn(),
       ...props,
     });
     await waitFor(() => expect(engine?.state?.pileQuestions?.length).toBe(2));
     await settle();
+  };
+  // The "View all" editor: the same session rendered as the full question list.
+  const renderEditor = (props = {}) => {
+    view = renderSurveyQuestions({ ...sessionProps(), questionPool: [FREEFORM_QUESTION], ...props });
   };
   const click = async () => {
     await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)));
@@ -213,7 +221,16 @@ const fixture = async () => {
     add,
     sync: () => controller.fetchQuestionResponsesChunkedForGroup(SLUG),
     mount,
-    unmount: () => view?.unmount(),
+    renderEditor,
+    mountEditor: async (props = {}) => {
+      renderEditor(props);
+      await settle();
+    },
+    rerender: (props) => view.rerenderSurveyQuestions(props),
+    unmount: () => {
+      view?.unmount();
+      view = null;
+    },
     click,
     submitResponses,
     savedRows,
@@ -600,4 +617,94 @@ it.each([
   const rows = h.submitResponses.mock.calls[0][2];
   expect(rows.map((row) => [row.questionID, row.answer.value])).toEqual([[BINARY_QID, 'Yes']]);
   expect(engine().state.submissionError || '').toBe('');
+});
+
+describe('View all editor after a reload', () => {
+  const SAVED_ANSWER = { value: 'Saved public answer', encrypted: false, audienceMode: 'explicit' };
+  // A comment typed in the pile is kept as a draft, then the page reloads.
+  const draftCommentInPile = async () => {
+    const h = await fixture();
+    h.add('responses', savedFreeform(SAVED_ANSWER));
+    await act(async () => h.sync());
+    await h.mount();
+    await act(async () => h.engine().handleAdditionalPile(FREEFORM_QID, 'Draft comment'));
+    await settle();
+    h.unmount();
+    return h;
+  };
+  const expectUpload = async (h, answer, comment) => {
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+    const row = h.submitResponses.mock.calls[0][2].find((response) => response.questionID === FREEFORM_QID);
+    expect(row).toMatchObject({ answer: { value: answer }, additional: { value: comment } });
+  };
+  const expectSavedAnswerAndDraft = async (h) => {
+    expect(screen.getByDisplayValue('Saved public answer')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Draft comment')).toBeInTheDocument();
+    await expectUpload(h, 'Saved public answer', 'Draft comment');
+  };
+
+  it('shows the saved answer with the restored draft and uploads both', async () => {
+    const h = await draftCommentInPile();
+    await h.mountEditor();
+    await expectSavedAnswerAndDraft(h);
+  });
+
+  it('does the same for a question that joins the list later', async () => {
+    const h = await draftCommentInPile();
+    await h.mountEditor({ questionPool: [] });
+    await act(async () => h.rerender({ questionPool: [FREEFORM_QUESTION] }));
+    await settle();
+    await expectSavedAnswerAndDraft(h);
+  });
+
+  it('does the same again when sign-in completes', async () => {
+    const h = await draftCommentInPile();
+    await h.mountEditor({ loginComplete: false });
+    await act(async () => h.rerender({ loginComplete: true }));
+    await settle();
+    await expectSavedAnswerAndDraft(h);
+  });
+
+  it('keeps an edit made in View all when the question list changes again', async () => {
+    const h = await draftCommentInPile();
+    await h.mountEditor();
+    fireEvent.change(screen.getByDisplayValue('Draft comment'), { target: { value: 'Edited in View all' } });
+    // The input hands the edit to the form on the next frame; the draft is saved 150 ms later.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 40)));
+    // The list is replaced (same questions) before the edit is saved as a draft.
+    await act(async () => h.rerender({ questionPool: [{ ...FREEFORM_QUESTION }] }));
+    await settle();
+    expect(screen.getByDisplayValue('Edited in View all')).toBeInTheDocument();
+    await expectUpload(h, 'Saved public answer', 'Edited in View all');
+  });
+
+  it('restores the draft from a newer load when the first load is superseded', async () => {
+    const h = await draftCommentInPile();
+    h.renderEditor();
+    // A counter change starts a newer saved-answer load before the first one finishes.
+    h.rerender({ questionResponsesNonce: 2, questionsCacheNonce: 2 });
+    await settle();
+    await expectSavedAnswerAndDraft(h);
+  });
+
+  it('keeps a newer saved answer over a draft answer written against an older one', async () => {
+    const h = await fixture();
+    h.add('responses', savedFreeform(SAVED_ANSWER));
+    await act(async () => h.sync());
+    await h.mount();
+    await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Draft answer'));
+    await act(async () => h.engine().handleAdditionalPile(FREEFORM_QID, 'Draft comment'));
+    await settle();
+    h.unmount();
+    // Another device saves a newer answer before this page reloads.
+    h.add('responses', savedFreeform({ ...SAVED_ANSWER, value: 'Newer saved answer' }));
+    await act(async () => h.sync());
+
+    await h.mountEditor();
+    expect(screen.getByDisplayValue('Newer saved answer')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Draft answer')).toBeNull();
+    expect(screen.getByDisplayValue('Draft comment')).toBeInTheDocument();
+    await expectUpload(h, 'Newer saved answer', 'Draft comment');
+  });
 });

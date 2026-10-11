@@ -34,9 +34,11 @@ export const createSurveyQuestionsResponseStateRuntime = (
     normalizeQuestionIdKey,
     normalizeSessionSlugValue,
     persistDraft,
+    persistDraftSafely,
     propsRef,
     readQuestionsCache,
     recalculateEditStats,
+    rehydrateDraftForRenderedIds,
     resolveResponseHydrationContext,
     resolveSurveyBaselineSourceSlice,
     setResponseHydrationState,
@@ -292,6 +294,11 @@ export const createSurveyQuestionsResponseStateRuntime = (
     inst._localCacheRehydrateRunId = runId;
     const isStaleRun: SurveyQuestionsLegacyValue = () =>
       (inst._hasMounted && !inst._isMounted) || inst._localCacheRehydrateRunId !== runId;
+    // The first load to finish restores a waiting draft; a superseded one leaves it to the newer load.
+    const finishRun = () => {
+      if (inst._draftRestorePending && !isStaleRun()) restorePendingDraft();
+      if (typeof finalCallback === 'function') finalCallback();
+    };
     await executeSurveyLocalCacheRehydrate({
       props: propsRef.current,
       state: stateRef.current,
@@ -318,7 +325,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
       ensurePriorResponses: () => {
         void ensurePriorResponsesForRenderedIds();
       },
-      callback: finalCallback,
+      callback: finishRun,
       bumpNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
       onNoChange: () => {
         DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
@@ -330,6 +337,37 @@ export const createSurveyQuestionsResponseStateRuntime = (
     });
   };
 
+  const restorePendingDraft = () => {
+    inst._draftRestorePending = false;
+    // Each question gets its draft once; restoring it again would undo edits made since.
+    const questionIds = (getHydrationQuestionIds() || [])
+      .map((questionId: unknown) => normalizeQuestionIdKey(questionId))
+      .filter((questionId: string) => questionId && !inst._draftRestoredQids.has(questionId));
+    // A form held by a submission error skips restoring, so those questions try again next time.
+    if (!stateRef.current?.submissionError && !stateRef.current?.suppressPrefill) {
+      questionIds.forEach((questionId: string) => inst._draftRestoredQids.add(questionId));
+    }
+    if (questionIds.length) {
+      // Restoring is not an edit, so it must not cancel a saved-answer load that is still running.
+      rehydrateDraftForRenderedIds({ forceOverwrite: true, responseHydrationOwned: true, questionIds });
+    }
+    if (inst._draftPersistDeferred) {
+      inst._draftPersistDeferred = false;
+      persistDraftSafely();
+    }
+  };
+
+  /**
+   * View all editor: load saved answers first, then restore the draft over them, as the pile does.
+   * Restoring it first counted as an edit and cancelled the load, so Submit sent blanks.
+   * `restoreAll` is for a form that was just reset, where every question needs its draft again.
+   */
+  const rehydrateSavedAnswersThenDraft = ({ restoreAll = false } = {}) => {
+    if (restoreAll) inst._draftRestoredQids.clear();
+    inst._draftRestorePending = true;
+    return rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
+  };
+
   return {
     buildSliceFromLocalCache,
     buildSliceFromUserAnswers,
@@ -338,6 +376,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
     handleRevertPendingChanges,
     prefillSurveyResponses,
     rehydrateLocalCacheAnswersForRenderedIds,
+    rehydrateSavedAnswersThenDraft,
     resetFormStateForAccountChange,
     resolveDiffBaselineSlice,
     valuesEqual,

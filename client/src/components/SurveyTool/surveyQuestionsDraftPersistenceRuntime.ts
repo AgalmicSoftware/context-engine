@@ -196,6 +196,11 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
   const persistDraft = () =>
     measureSync('ce.surveyQuestions.persistDraft', () => {
       try {
+        // Saving now would overwrite a draft still waiting to be restored; it is saved after the restore.
+        if (inst._draftRestorePending) {
+          inst._draftPersistDeferred = true;
+          return;
+        }
         const key: SurveyQuestionsLegacyValue = getDraftKey();
 
         // Guard null key and clean up malformed JSON
