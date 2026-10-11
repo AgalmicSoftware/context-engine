@@ -1991,7 +1991,8 @@ export class SessionWriteCoordinator {
         return { ok: false, error: 'Nonce already used.' };
       }
       if (signed) {
-        if (signedExpiresAtMs) entries.push({ nonce, expiresAtMs: signedExpiresAtMs });
+        // Kept past the nonce's own expiry too, for margin, as before.
+        if (signedExpiresAtMs) entries.push({ nonce, expiresAtMs: Math.max(signedExpiresAtMs, usedExpiresAtMs) });
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return signedExpiresAtMs ? { ok: true } : { ok: false, error: 'Nonce mismatch or expired.' };
       }

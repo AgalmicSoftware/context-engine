@@ -223,6 +223,15 @@ test('SessionWriteCoordinator rejects forged, foreign and expired nonces and acc
 	assert.deepEqual(store.get('auth-nonce-used').entries, []);
 });
 
+test('SessionWriteCoordinator remembers a used nonce for at least the used-nonce lifetime', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const issued = (await issueAuthNonce(coordinator, RANDOM_PART('c'), { expiresAtMs: 301_000 })).body.nonce;
+	assert.deepEqual(await consumeAuthNonce(coordinator, issued, '0xabc', 601_000), { ok: true });
+	// Kept until the later of the nonce's expiry and now plus the used-nonce TTL.
+	assert.deepEqual(store.get('auth-nonce-used').entries, [{ nonce: issued, expiresAtMs: 601_000 }]);
+});
+
 test('SessionWriteCoordinator refuses an unsigned or malformed random part', async () => {
 	const { state, store } = createTransactionalState();
 	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
