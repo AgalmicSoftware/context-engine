@@ -1147,4 +1147,33 @@ describe('sbtPageActionDisplayHelpers', () => {
       viewKind: 'manual-claim-success',
     });
   });
+
+  it('shows "Checking password…" on the group-password Join button while the password is checked', () => {
+    const checking = resolveSbtPageMintButtonDisplayState({
+      groupPasswordChecking: true,
+      groupPasswordInput: 'orbit-maple-signal-tunnel-quartz',
+      mintingStatus: 'idle',
+    });
+    expect(checking.passwordJoinButtonState).toEqual({ disabled: true, isPending: true });
+    expect(checking.passwordJoinContentState).toEqual({
+      label: 'Join',
+      pendingLabel: 'Checking password…',
+      shouldRenderLabel: false,
+      shouldRenderPendingIcon: true,
+    });
+
+    const sending = resolveSbtPageMintButtonDisplayState({
+      groupPasswordInput: 'orbit-maple-signal-tunnel-quartz',
+      mintingStatus: 'pending',
+    });
+    expect(sending.passwordJoinContentState).not.toHaveProperty('pendingLabel');
+
+    const mini = resolveSbtPageMiniCardDisplayState({
+      groupPasswordChecking: true,
+      groupPasswordInput: 'orbit-maple-signal-tunnel-quartz',
+      mintingStatus: 'idle',
+    });
+    expect(mini.miniPasswordJoinButtonState.isPending).toBe(true);
+    expect(mini.miniPasswordJoinContentState.pendingLabel).toBe('Checking password…');
+  });
 });

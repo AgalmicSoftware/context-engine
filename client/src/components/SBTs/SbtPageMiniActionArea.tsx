@@ -13,6 +13,7 @@ type SbtPagePendingContentState = {
   failureLabel?: string;
   idleLabel?: string;
   label?: string;
+  pendingLabel?: string;
   shouldRenderFailure?: boolean;
   shouldRenderIdleLabel?: boolean;
   shouldRenderLabel?: boolean;
@@ -76,6 +77,7 @@ const renderPendingButtonContent = (contentState: SbtPagePendingContentState): R
   <>
     {contentState.shouldRenderIdleLabel && contentState.idleLabel}
     {contentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
+    {contentState.pendingLabel && ` ${contentState.pendingLabel}`}
     {contentState.shouldRenderLabel && contentState.label}
     {contentState.shouldRenderFailure && (
       <>

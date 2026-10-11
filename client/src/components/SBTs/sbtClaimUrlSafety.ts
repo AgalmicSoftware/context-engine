@@ -3,6 +3,9 @@ const isCredentialQueryKey = (key: string): boolean => /^(gp|inv|password)\d*$/.
 export const SBT_CLAIM_FAILURE_MESSAGE = 'Claim failed. Verify the credential and network, then retry.';
 export const SBT_ADMIN_INVITE_FAILURE_MESSAGE =
   'Adding invite credentials failed. Verify the network and admin account, then retry.';
+// Pre-0.6.8 groups keep an older on-chain password check that this version cannot derive or replace.
+export const SBT_GROUP_PASSWORD_MISMATCH_MESSAGE =
+  "Incorrect group password. Groups created before Context Engine 0.6.8 use an older password format that this version can't check; the group admin needs to create a new group.";
 
 export const resolveSbtPageMintFailure = ({
   error,

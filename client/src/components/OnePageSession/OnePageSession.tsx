@@ -11,6 +11,7 @@ import {
 } from '../../domains/sessions/sessionBalanceReaders.js';
 import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
+import { SBT_GROUP_PASSWORD_MISMATCH_MESSAGE } from '../SBTs/sbtClaimUrlSafety';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
@@ -327,7 +328,6 @@ class OnePageSession extends Component<any, any> {
     this.parseAutoMintFragment = this.parseAutoMintFragment.bind(this);
     this.kickoffAutoMintIfNeeded = this.kickoffAutoMintIfNeeded.bind(this);
     this.runAutoMintQueue = this.runAutoMintQueue.bind(this);
-    this.verifyGroupPasswordBinding = this.verifyGroupPasswordBinding.bind(this);
     this.prefetchTargetNames = this.prefetchTargetNames.bind(this);
     this.normalizeInviteCode = this.normalizeInviteCode.bind(this);
     this.decodeInviteInput = this.decodeInviteInput.bind(this);
@@ -1346,33 +1346,6 @@ class OnePageSession extends Component<any, any> {
     }
   }
 
-  /* =======================
-   * Verify password ↔ SBT binding (unlimited path)
-   * ======================= */
-  async verifyGroupPasswordBinding(sbtAddress: any, password: any) {
-    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return false;
-    const slug = resolveEffectiveSlug(this.props);
-    try {
-      // Read-only provider internally
-      const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddress, slug);
-      const pw = cryptoUtils.normalizeGroupPasswordInput(password);
-      if (!pw) return false;
-
-      if (!onchainGph || onchainGph === ethers.constants.HashZero) {
-        return false;
-      }
-      return (
-        cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-          password: pw,
-          sbtAddress,
-          groupPasswordHash: onchainGph,
-        }) !== null
-      );
-    } catch (err) {
-      return false;
-    }
-  }
-
   kickoffAutoMintIfNeeded() {
     if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
       this.clearUnsupportedAutoMintState();
@@ -1761,9 +1734,8 @@ class OnePageSession extends Component<any, any> {
               invitePayload = this.decodeInviteInput(t.gp);
               if (!invitePayload) throw new Error('Invite code required for this group');
             } else if (hasGroupPassword) {
+              // The tx phase checks the password with the same slow derivation that signs.
               path = 'unlimited';
-              // Optional: verify binding pre-tx (kept); tx phase will re-check
-              await this.verifyGroupPasswordBinding(sbtAddr, t.gp);
             } else {
               throw new Error('Invite code required for this group');
             }
@@ -1826,7 +1798,10 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
         } else if (path === 'unlimited') {
-          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp, userAddr, autoMintProvider);
+          updateStatus(sbtKey, { status: 'pending', name: `Checking password: ${sbtName}` });
+          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp, userAddr, autoMintProvider, () =>
+            updateStatus(sbtKey, { status: 'pending', name: `Joining Group: ${sbtName}` }),
+          );
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1838,6 +1813,8 @@ class OnePageSession extends Component<any, any> {
 
         if (msg.includes('wallet changed during auto-join')) {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+        } else if (cryptoUtils.isGroupPasswordMismatchError(e)) {
+          updateStatus(sbtKey, { status: 'failed', name: 'Join Failed', error: SBT_GROUP_PASSWORD_MISMATCH_MESSAGE });
         } else if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
           // Graceful handling of "already owned" revert
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
@@ -1874,6 +1851,7 @@ class OnePageSession extends Component<any, any> {
     groupPassword: any,
     expectedAccount: any = this.props.account,
     provider: any = this.props.provider,
+    onPasswordAccepted: () => void = () => {},
   ) {
     if (!this.props.loginComplete) {
       this.props.toggleLoginModal(true);
@@ -1904,34 +1882,19 @@ class OnePageSession extends Component<any, any> {
     );
     if (!onchain || onchain === ethers.constants.HashZero) throw new Error('No group password set on-chain');
 
-    const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-      password: pw,
-      sbtAddress,
-      groupPasswordHash: onchain,
-    });
-    const local =
-      walletScopeSbtAddress === null
-        ? null
-        : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-            password: pw,
-            sbtAddress: walletScopeSbtAddress,
-          });
-    if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
-      throw new Error('Password mismatch');
-    }
-    assertExpectedAccountCurrent();
-
-    this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
-
+    // One slow derivation checks the password against the on-chain hash and signs the claim;
+    // a wrong password throws a group-password mismatch error before anything is sent.
     const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
       userAddress: normalizedExpectedAccount,
       chainId: mintChainId,
-      walletScopeSbtAddress,
+      groupPasswordHash: onchain,
     });
-
+    onPasswordAccepted();
     assertExpectedAccountCurrent();
+
+    this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
     const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''));
 
     this.setState({

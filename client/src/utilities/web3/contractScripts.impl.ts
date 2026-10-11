@@ -33,27 +33,6 @@ import { notify } from '../ui/notify.js';
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SignGroupMintAuthorizationInput = {
-  password?: unknown;
-  sbtAddress?: string | null;
-  userAddress?: string | null;
-  walletScopeSbtAddress?: string | null;
-};
-type GenerateInvitePayloadsInput = {
-  password?: unknown;
-  sbtAddress?: string | null;
-  nonces?: Array<string | number>;
-  walletScopeSbtAddress?: string | null;
-};
-type InvitePayloadResult = {
-  nonce: string;
-  signature: string;
-  inviteCode: string;
-};
-type EncodedInvitePayload = {
-  n: string;
-  s: string;
-};
 type SbtMintBurnCountsByAddressResult = {
   mintedCountByAddress: Record<string, number>;
   burnedCountByAddress: Record<string, number>;
@@ -938,7 +917,6 @@ const contractScriptsRuntimeDeps = {
   questionHashRevertLogged,
   readPayloadPointerTextForGroup,
   recordTerminalArweaveInvalidFailure,
-  resolveGroupPasswordWalletScopeSbtAddress,
   resolveReadContext,
   resolveReadProvider,
   resolveArweaveUploadOpts,
@@ -962,35 +940,6 @@ const contractScriptsRuntimeDeps = {
     return contractMetadataResolutionHelpers;
   },
 };
-
-async function resolveGroupPasswordWalletScopeSbtAddress({
-  password,
-  sbtAddress,
-  walletScopeSbtAddress,
-  getGroupPasswordHashFn,
-}: any) {
-  if (typeof walletScopeSbtAddress !== 'undefined') {
-    return walletScopeSbtAddress;
-  }
-
-  try {
-    const onchainHash = await getGroupPasswordHashFn('none', sbtAddress, null);
-    if (onchainHash && onchainHash !== ethers.constants.HashZero) {
-      const resolved = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-        password,
-        sbtAddress,
-        groupPasswordHash: onchainHash,
-      });
-      if (resolved !== null) {
-        return resolved;
-      }
-    }
-  } catch {
-    // Fall back to SBT-scoped signing below when the hash cannot be read.
-  }
-
-  return sbtAddress;
-}
 
 /* ------------------------------------------------------------------ */
 /* 5.  MAIN LIBRARY                                                   */

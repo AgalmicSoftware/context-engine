@@ -93,6 +93,7 @@ type SbtPageOpenMintReadinessDescriptor = {
   isPending: boolean;
 };
 type ResolveSbtPagePasswordJoinButtonStateArgs = {
+  groupPasswordChecking?: unknown;
   groupPasswordInput?: unknown;
   mintingStatus?: unknown;
 };
@@ -103,9 +104,11 @@ type SbtPagePasswordJoinButtonState = {
 type ResolveSbtPagePendingButtonContentStateArgs = {
   isPending?: unknown;
   label?: unknown;
+  pendingLabel?: unknown;
 };
 export type SbtPagePendingButtonContentState = {
   label: string;
+  pendingLabel?: string;
   shouldRenderLabel: boolean;
   shouldRenderPendingIcon: boolean;
 };
@@ -328,6 +331,7 @@ type ResolveSbtPageMiniCardDisplayStateArgs = {
   burningStatus?: unknown;
   burnButtonClassName?: unknown;
   claimCountdown?: unknown;
+  groupPasswordChecking?: unknown;
   groupPasswordInput?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
@@ -433,6 +437,7 @@ type SbtPageMintActionPlan = {
 };
 type ResolveSbtPageMintButtonDisplayStateArgs = ShouldRenderSbtPageMintButtonArgs & {
   claimCountdown?: unknown;
+  groupPasswordChecking?: unknown;
   groupPasswordInput?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
@@ -857,10 +862,11 @@ export const resolveSbtPageOpenMintButtonState = ({
 };
 
 export const resolveSbtPagePasswordJoinButtonState = ({
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   mintingStatus = '',
 }: ResolveSbtPagePasswordJoinButtonStateArgs = {}): SbtPagePasswordJoinButtonState => {
-  const isPending = mintingStatus === 'pending';
+  const isPending = mintingStatus === 'pending' || groupPasswordChecking === true;
   return {
     disabled: isPending || String(groupPasswordInput || '').trim() === '',
     isPending,
@@ -870,14 +876,19 @@ export const resolveSbtPagePasswordJoinButtonState = ({
 export const resolveSbtPagePendingButtonContentState = ({
   isPending = false,
   label = '',
+  pendingLabel = '',
 }: ResolveSbtPagePendingButtonContentStateArgs = {}): SbtPagePendingButtonContentState => {
   const pending = !!isPending;
   return {
     label: String(label || ''),
+    ...(pending && pendingLabel ? { pendingLabel: String(pendingLabel) } : {}),
     shouldRenderLabel: !pending,
     shouldRenderPendingIcon: pending,
   };
 };
+
+// The group password KDF takes about a second, so say what the spinner is waiting on.
+const GROUP_PASSWORD_CHECKING_LABEL = 'Checking password…';
 
 export const resolveSbtPageStatusButtonContentState = ({
   failureLabel = 'Failed',
@@ -1017,6 +1028,7 @@ export const resolveSbtPageManualClaimActionRequest = ({
 export const resolveSbtPageMintButtonDisplayState = ({
   burningStatus = '',
   claimCountdown = '',
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1038,12 +1050,14 @@ export const resolveSbtPageMintButtonDisplayState = ({
     userHasSBT,
   });
   const passwordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
+    groupPasswordChecking,
     groupPasswordInput,
     mintingStatus,
   });
   const passwordJoinContentState = resolveSbtPagePendingButtonContentState({
     isPending: passwordJoinButtonState.isPending,
     label: 'Join',
+    pendingLabel: groupPasswordChecking === true ? GROUP_PASSWORD_CHECKING_LABEL : '',
   });
   const mintFlowDisplayState = resolveSbtPageMintFlowDisplayState({
     hasGroupPasswordMint,
@@ -1093,6 +1107,7 @@ export const resolveSbtPageFullActionDisplayPlan = ({
   burnButtonClassName = '',
   burnLabel = 'Burn',
   claimCountdown = '',
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1111,6 +1126,7 @@ export const resolveSbtPageFullActionDisplayPlan = ({
   const mintButtonDisplayState = resolveSbtPageMintButtonDisplayState({
     burningStatus,
     claimCountdown,
+    groupPasswordChecking,
     groupPasswordInput,
     hasGroupPasswordMint,
     hasInviteMint,
@@ -1301,6 +1317,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
   burningStatus = '',
   burnButtonClassName = '',
   claimCountdown = '',
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1328,6 +1345,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     userHasSBT,
   });
   const miniPasswordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
+    groupPasswordChecking,
     groupPasswordInput,
     mintingStatus,
   });
@@ -1428,6 +1446,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     miniPasswordJoinContentState: resolveSbtPagePendingButtonContentState({
       isPending: miniPasswordJoinButtonState.isPending,
       label: 'Join',
+      pendingLabel: groupPasswordChecking === true ? GROUP_PASSWORD_CHECKING_LABEL : '',
     }),
     miniTokenActionDisplayState,
   };

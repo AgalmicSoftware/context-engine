@@ -14,6 +14,8 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { SBT_GROUP_PASSWORD_MISMATCH_MESSAGE } from '../SBTs/sbtClaimUrlSafety';
+import { useFastGroupPasswordKdf } from '../../utilities/crypto/groupPasswordKdf.testUtils';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -863,8 +865,12 @@ describe('OnePageSession auto-mint queue', () => {
       autoMintTargets: [{ sbt: sbtAddress, gp: 'shared-secret' }],
     };
     subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
-    subject.verifyGroupPasswordBinding = jest.fn().mockResolvedValue(true);
-    subject.mintUnlimitedSBTWithGroupPassword = jest.fn().mockResolvedValue(undefined);
+    const statusesDuringMint = [];
+    subject.mintUnlimitedSBTWithGroupPassword = jest.fn(async (...args) => {
+      statusesDuringMint.push(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]?.name);
+      args[4]();
+      statusesDuringMint.push(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]?.name);
+    });
 
     jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
@@ -880,17 +886,86 @@ describe('OnePageSession auto-mint queue', () => {
 
     await subject.runAutoMintQueue();
 
-    expect(subject.verifyGroupPasswordBinding).toHaveBeenCalledWith(sbtAddress, 'shared-secret');
+    expect(subject.mintUnlimitedSBTWithGroupPassword).toHaveBeenCalledTimes(1);
     expect(subject.mintUnlimitedSBTWithGroupPassword).toHaveBeenCalledWith(
       sbtAddress,
       'shared-secret',
       subject.props.account.toLowerCase(),
       'wagmi',
+      expect.any(Function),
     );
+    expect(statusesDuringMint).toEqual(['Checking password: Unlimited Badge', 'Joining Group: Unlimited Badge']);
     expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
       status: 'success',
       name: 'Joined: Unlimited Badge',
     });
+  });
+
+  it('fails the join with the pre-0.6.8 hint when the group password does not match', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000e3';
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000e4',
+      loginComplete: true,
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress, gp: 'wrong-password' }],
+    };
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+    useFastGroupPasswordKdf();
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Older Badge',
+      tokenURI: 'ar://older-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(`0x${'11'.repeat(32)}`);
+    const sendSpy = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+
+    await subject.runAutoMintQueue();
+
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toEqual({
+      status: 'failed',
+      name: 'Join Failed',
+      error: SBT_GROUP_PASSWORD_MISMATCH_MESSAGE,
+    });
+  });
+
+  it('checks the group password and signs the claim in one derivation before sending', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000e5';
+    const account = '0x00000000000000000000000000000000000000e6';
+    const subject = createSubject({ account, loginComplete: true, slug: 'edge' });
+    const onchainHash = `0x${'44'.repeat(32)}`;
+    const order = [];
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(onchainHash);
+    const signSpy = jest.spyOn(contractScripts, 'signGroupMintAuthorization').mockImplementation(async () => {
+      order.push('sign');
+      return '0xsig';
+    });
+    const sendSpy = jest.spyOn(contractScripts, 'mintWithGroupSignature').mockImplementation(async () => {
+      order.push('send');
+      return { transactionHash: '0xjoin' };
+    });
+
+    await subject.mintUnlimitedSBTWithGroupPassword(sbtAddress, ' shared-secret ', account, 'wagmi', () =>
+      order.push('accepted'),
+    );
+
+    expect(signSpy).toHaveBeenCalledTimes(1);
+    expect(signSpy).toHaveBeenCalledWith({
+      password: 'shared-secret',
+      sbtAddress,
+      userAddress: account.toLowerCase(),
+      chainId: 84532,
+      groupPasswordHash: onchainHash,
+    });
+    expect(sendSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '0xsig');
+    expect(order).toEqual(['sign', 'accepted', 'send']);
+    expect(subject.state.mintingStatus).toBe('success');
   });
 
   it('treats positive count-map ownership as already joined during auto mint preflight', async () => {

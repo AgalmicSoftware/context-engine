@@ -2,7 +2,6 @@ import SBTPage from './SBTPage';
 import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import { ethers } from 'ethers';
-import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
 const RESOLVABLE_TREE_COMPONENTS = new Set([SbtPageAdminSection]);
@@ -275,7 +274,6 @@ describe('SBTPage admin open-mint URL', () => {
   it('hides the admin open-mint URL card when the SBT has an on-chain group password hash', () => {
     const account = '0x00000000000000000000000000000000000000a2';
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
-    const password = 'shared-secret';
     const subject = createSubject({
       SBTAddress: sbtAddress,
       account,
@@ -298,7 +296,7 @@ describe('SBTPage admin open-mint URL', () => {
       showAdminSection: true,
       hasInviteMint: false,
       hasGroupPasswordMint: false,
-      groupPasswordHash: cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' }),
+      groupPasswordHash: `0x${'ab'.repeat(32)}`,
     };
 
     const tree = subject.render();

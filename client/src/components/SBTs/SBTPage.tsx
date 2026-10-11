@@ -178,6 +178,7 @@ import {
   shouldRunSbtPagePropPasswordAutoMint,
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
+  SBT_GROUP_PASSWORD_MISMATCH_MESSAGE,
 } from './sbtPageHelpers';
 import type {
   ReconcileSbtPageHolderRefreshStateArgs,
@@ -385,6 +386,7 @@ type SbtPageState = Record<string, unknown> & {
   filteredMintedUsers: unknown[];
   groupPasswordHash: unknown;
   groupPasswordHashLoaded: boolean;
+  groupPasswordChecking: boolean;
   groupPasswordInput: string;
   hasGroupPasswordMint: boolean;
   hasInviteMint: boolean;
@@ -2936,19 +2938,20 @@ class SBTPage extends Component<any, any> {
         return false;
       }
 
-      const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-        password,
-        sbtAddress: sbt,
-        groupPasswordHash: onchain,
-      });
-      const local =
-        walletScopeSbtAddress === null
-          ? null
-          : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-              password,
-              sbtAddress: walletScopeSbtAddress,
-            });
-      if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
+      // The slow password check and the signature share one derivation.
+      sbtLog.log('[MANUAL-MINT] Checking password and signing authorization...');
+      this.setState({ groupPasswordChecking: true });
+      let sig = '';
+      try {
+        sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
+          password,
+          sbtAddress: sbt,
+          userAddress: String(mintAccount || ''),
+          chainId: mintChainId,
+          groupPasswordHash: onchain,
+        });
+      } catch (error) {
+        if (!cryptoUtils.isGroupPasswordMismatchError(error)) throw error;
         sbtLog.error('[MANUAL-MINT] Credential check failed.');
         if (
           !this.isMintTargetContextCurrent({
@@ -2960,8 +2963,12 @@ class SBTPage extends Component<any, any> {
         ) {
           return false;
         }
-        this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
+        this.setState(buildSbtPageMintFailurePatch({ error: SBT_GROUP_PASSWORD_MISMATCH_MESSAGE }));
+        // The mini card shows only "failed", so surface the reason as a toast there.
+        if (this.props.miniaturized) notify.error(SBT_GROUP_PASSWORD_MISMATCH_MESSAGE);
         return false;
+      } finally {
+        if (this._isMounted) this.setState({ groupPasswordChecking: false });
       }
 
       if (
@@ -2981,25 +2988,6 @@ class SBTPage extends Component<any, any> {
         sessionSlug: slug,
       });
 
-      sbtLog.log('[MANUAL-MINT] Signing authorization...');
-      const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
-        password,
-        sbtAddress: sbt,
-        userAddress: String(mintAccount || ''),
-        chainId: mintChainId,
-        walletScopeSbtAddress,
-      });
-
-      if (
-        !this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        return false;
-      }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
       const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbt, String(sig || ''));
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
@@ -3715,6 +3703,7 @@ class SBTPage extends Component<any, any> {
       burnButtonClassName: styles.burnButton,
       burnLabel: t('burn'),
       claimCountdown,
+      groupPasswordChecking: this.state.groupPasswordChecking,
       groupPasswordInput,
       hasGroupPasswordMint: this.state.hasGroupPasswordMint,
       hasInviteMint: this.state.hasInviteMint,
@@ -4058,6 +4047,7 @@ class SBTPage extends Component<any, any> {
         burnLabel: t('burn'),
         burningStatus,
         claimCountdown,
+        groupPasswordChecking: this.state.groupPasswordChecking,
         groupPasswordInput: this.state.groupPasswordInput,
         hasGroupPasswordMint: this.state.hasGroupPasswordMint,
         hasInviteMint: this.state.hasInviteMint,

@@ -1,6 +1,5 @@
 import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';
 
@@ -43,8 +42,7 @@ describe('SBTPage auto-mint routing', () => {
     subject.completeMintSuccessForTarget = jest.fn();
     const hash = `0x${'22'.repeat(32)}`;
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(hash);
-    jest.spyOn(cryptoUtils, 'resolveGroupPasswordWalletScopeAddress').mockReturnValue(sbtAddress);
-    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(hash);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(hash);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
     const generate = jest
       .spyOn(contractScripts, 'generateInvitePayloads')
@@ -417,8 +415,6 @@ describe('SBTPage auto-mint routing', () => {
           return onchainHash;
         })
         .mockResolvedValue(onchainHash);
-      jest.spyOn(cryptoUtils, 'resolveGroupPasswordWalletScopeAddress').mockReturnValue(sbtAddress);
-      jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(onchainHash);
       jest.spyOn(contractScripts, 'signGroupMintAuthorization').mockResolvedValue('0xsig');
       jest.spyOn(contractScripts, 'mintWithGroupSignature').mockResolvedValue({ transactionHash: '0xgroupmint' });
       const loadSpy = jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);

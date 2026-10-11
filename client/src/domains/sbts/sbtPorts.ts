@@ -157,12 +157,7 @@ export type SbtOwnershipReadsPort = {
 
 export type SbtGroupPasswordHashInput = {
   password: string;
-  sbtAddress: string | null;
-  adminAddress?: string;
-  chainId?: string | number;
-  name?: string;
-  symbol?: string;
-  tokenURI?: string;
+  sbtAddress: string;
 };
 
 export type SbtGroupMintAuthorizationInput = {
@@ -170,7 +165,8 @@ export type SbtGroupMintAuthorizationInput = {
   password: string;
   sbtAddress: string;
   userAddress: string;
-  walletScopeSbtAddress?: string | null;
+  // The on-chain hash; signing stops with a mismatch error when the password does not derive it.
+  groupPasswordHash?: string | null;
 };
 
 export type SbtInvitePayload = {
@@ -186,11 +182,11 @@ export type SbtInvitePayloadsInput = {
   password: string;
   sbtAddress: string;
   nonces: Array<string | number>;
-  walletScopeSbtAddress?: string | null;
+  groupPasswordHash?: string | null;
 };
 
 export type SbtGroupMintAuthorizationPort = {
-  computeGroupPasswordHash: (input: SbtGroupPasswordHashInput) => string;
+  computeGroupPasswordHash: (input: SbtGroupPasswordHashInput) => Promise<string>;
   signGroupMintAuthorization: (input: SbtGroupMintAuthorizationInput) => Promise<string>;
   generateInvitePayloads: (input: SbtInvitePayloadsInput) => Promise<SbtInvitePayload[]>;
 };
