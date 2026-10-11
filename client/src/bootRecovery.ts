@@ -6,6 +6,9 @@ export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v202
 // every load reloads at most once per window instead of looping.
 export const STALE_CHUNK_RELOAD_AT_STORAGE_KEY = 'ce:staleChunkReloadAt:v20261011';
 export const STALE_CHUNK_RELOAD_WINDOW_MS = 60_000;
+const STALE_ASSET_REFRESH_TIMEOUT_MS = 2000;
+const MAX_STALE_ASSET_URLS = 4;
+const STALE_ASSET_URL_RE = /(?:https?:\/\/[^\s'"<>]+|\/[^\s'"<>]+)\.(?:css|m?js)\b/gi;
 
 type BootStorage = {
   clear?: () => void;
@@ -40,10 +43,17 @@ type BootWindow = {
   setTimeout?: (handler: TimerHandler, timeout?: number, ...args: unknown[]) => unknown;
 };
 
+type BootFetch = (
+  url: string,
+  init: { cache: 'reload'; credentials: 'same-origin'; signal?: AbortSignal },
+) => Promise<{ arrayBuffer?: () => Promise<unknown> }>;
+
 type BootRecoveryOptions = {
   autoRefreshDelayMs?: number;
   clearCaches?: () => Promise<void> | void;
   document?: Document;
+  fetchImpl?: BootFetch;
+  refreshTimeoutMs?: number;
   reload?: () => void;
   reloadParam?: string;
   root?: HTMLElement | null;
@@ -161,6 +171,71 @@ export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window)
   return storageAvailable ? clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM) : false;
 };
 
+// Same-origin JS and CSS URLs named in a chunk-load error, such as Vite's
+// "Unable to preload CSS for /assets/x.css" or Chrome's dynamic import message.
+export const readStaleChunkAssetUrls = (error: unknown, win: BootWindow | undefined = globalThis.window): string[] => {
+  const href = win?.location?.href;
+  if (!href) return [];
+  const urls = new Set<string>();
+  const text = `${readErrorField(error, 'message')}\n${typeof error === 'string' ? error : ''}`;
+  for (const match of text.match(STALE_ASSET_URL_RE) || []) {
+    try {
+      const url = new URL(match, href);
+      if (url.origin === new URL(href).origin) urls.add(url.href);
+    } catch {
+      // Ignore text that only looks like a URL.
+    }
+  }
+  return [...urls].slice(0, MAX_STALE_ASSET_URLS);
+};
+
+// A missing chunk can be cached as SPA HTML or a 404 with the year-long asset header,
+// and a page reload does not revalidate subresources. Refetching with cache: 'reload'
+// replaces that entry. Best effort and bounded: callers reload either way.
+export const refreshStaleChunkAssets = async (urls: string[], options: BootRecoveryOptions = {}): Promise<void> => {
+  const fetchImpl =
+    options.fetchImpl ||
+    (typeof globalThis.fetch === 'function' ? (url: string, init: RequestInit) => globalThis.fetch(url, init) : null);
+  if (!urls.length || !fetchImpl) return;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      controller?.abort();
+      resolve();
+    }, options.refreshTimeoutMs ?? STALE_ASSET_REFRESH_TIMEOUT_MS);
+  });
+  const refreshes = Promise.allSettled(
+    urls.map(async (url) => {
+      const response = await fetchImpl(url, {
+        cache: 'reload',
+        credentials: 'same-origin',
+        signal: controller?.signal,
+      });
+      await response.arrayBuffer?.();
+    }),
+  );
+  try {
+    await Promise.race([refreshes, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const refreshThenReload = (
+  error: unknown,
+  win: BootWindow | undefined,
+  reload: () => void,
+  options: BootRecoveryOptions,
+) => {
+  const urls = readStaleChunkAssetUrls(error, win);
+  if (!urls.length) {
+    reload();
+    return;
+  }
+  void refreshStaleChunkAssets(urls, options).then(reload, reload);
+};
+
 const wasRecentlyAutoReloaded = (storage: BootStorage | undefined, storageKey: string, now: number): boolean => {
   try {
     if (storage?.getItem?.(storageKey) === 'true') return true;
@@ -199,13 +274,21 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   } catch {
     // Best-effort loop guard; reloadWithCacheBuster also marks the URL.
   }
-  reload();
+  refreshThenReload(error, win, reload, options);
   return true;
 };
 
-// React.lazy caches a rejected chunk import, so only a fresh page load can pick up a newer deploy.
-export const reloadForStaleChunk = (win: BootWindow = globalThis.window): void =>
-  reloadWithCacheBuster(win, STALE_CHUNK_RELOAD_PARAM);
+// React.lazy caches a rejected chunk import, so only a fresh page load can pick up a
+// newer deploy. Callers use this for an explicit user action, so no window applies.
+export const reloadForStaleChunk = (error?: unknown, options: BootRecoveryOptions = {}): void => {
+  const win = options.window || globalThis.window;
+  refreshThenReload(
+    error,
+    win,
+    options.reload || (() => reloadWithCacheBuster(win, STALE_CHUNK_RELOAD_PARAM)),
+    options,
+  );
+};
 
 const appendTextNode = (
   doc: Document,
@@ -274,7 +357,11 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
       button.textContent = 'Refreshing...';
     }
     try {
-      if (staleChunk) await clearCaches();
+      if (staleChunk) {
+        await clearCaches();
+        const staleAssetUrls = readStaleChunkAssetUrls(error, win);
+        if (staleAssetUrls.length) await refreshStaleChunkAssets(staleAssetUrls, options);
+      }
     } finally {
       reload();
     }

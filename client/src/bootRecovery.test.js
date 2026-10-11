@@ -4,6 +4,7 @@ import {
   clearBootCaches,
   clearStaleChunkReloadMarker,
   isStaleChunkLoadError,
+  readStaleChunkAssetUrls,
   reloadForStaleChunk,
   reloadWithCacheBuster,
   recoverFromStaleChunkLoadError,
@@ -18,6 +19,8 @@ const createMemoryStorage = () => {
     removeItem: jest.fn((key) => values.delete(key)),
   };
 };
+
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const screenButton = (label) =>
   Array.from(document.querySelectorAll('button')).find((button) => button.textContent === label);
@@ -317,11 +320,100 @@ describe('bootRecovery', () => {
     expect(replaceState).not.toHaveBeenCalled();
   });
 
+  it('names only same-origin script and style URLs from a chunk-load error', () => {
+    const fakeWindow = { location: { href: 'https://app.example.test/session/alpha' } };
+
+    expect(
+      readStaleChunkAssetUrls(new Error('Unable to preload CSS for /assets/Panel-00000000.css'), fakeWindow),
+    ).toEqual(['https://app.example.test/assets/Panel-00000000.css']);
+    expect(
+      readStaleChunkAssetUrls(
+        new TypeError('error loading dynamically imported module: https://app.example.test/assets/Report-00000000.js'),
+        fakeWindow,
+      ),
+    ).toEqual(['https://app.example.test/assets/Report-00000000.js']);
+    expect(
+      readStaleChunkAssetUrls(
+        new TypeError('Failed to fetch dynamically imported module: https://cdn.example.test/assets/Other.js'),
+        fakeWindow,
+      ),
+    ).toEqual([]);
+    expect(readStaleChunkAssetUrls(new TypeError('Importing a module script failed.'), fakeWindow)).toEqual([]);
+  });
+
+  it('refetches the failed asset with cache: reload before the automatic reload', async () => {
+    const reload = jest.fn();
+    const storage = createMemoryStorage();
+    const fetchImpl = jest.fn(async () => ({ arrayBuffer: async () => new ArrayBuffer(0) }));
+    const fakeWindow = { location: { href: 'https://app.example.test/session/alpha' }, sessionStorage: storage };
+
+    expect(
+      recoverFromStaleChunkLoadError(new Error('Unable to preload CSS for /assets/OnePageSession-00000000.css'), {
+        window: fakeWindow,
+        storage,
+        reload,
+        fetchImpl,
+      }),
+    ).toBe(true);
+    expect(reload).not.toHaveBeenCalled();
+    await flushPromises();
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://app.example.test/assets/OnePageSession-00000000.css',
+      expect.objectContaining({ cache: 'reload', credentials: 'same-origin' }),
+    );
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads after a short timeout when the asset refetch hangs', async () => {
+    jest.useFakeTimers();
+    const reload = jest.fn();
+    const fetchImpl = jest.fn(() => new Promise(() => {}));
+    const fakeWindow = { location: { href: 'https://app.example.test/session/alpha' } };
+
+    reloadForStaleChunk(
+      new TypeError('Failed to fetch dynamically imported module: https://app.example.test/assets/A.js'),
+      {
+        window: fakeWindow,
+        reload,
+        fetchImpl,
+      },
+    );
+    await jest.advanceTimersByTimeAsync(1999);
+    expect(reload).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches the failed entry chunk before the boot failure reload', async () => {
+    const reload = jest.fn();
+    const clearCaches = jest.fn().mockResolvedValue(undefined);
+    const fetchImpl = jest.fn(async () => ({}));
+    const fakeWindow = { location: { href: 'https://app.example.test/session/alpha' } };
+
+    renderBootFailure(
+      new TypeError('Failed to fetch dynamically imported module: https://app.example.test/assets/index-00000000.js'),
+      { window: fakeWindow, reload, clearCaches, fetchImpl, autoRefreshDelayMs: -1 },
+    );
+    screenButton('Reload').click();
+    await flushPromises();
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://app.example.test/assets/index-00000000.js',
+      expect.objectContaining({ cache: 'reload' }),
+    );
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it('reloads a stale route through the chunk recovery marker', () => {
     jest.spyOn(Date, 'now').mockReturnValue(123456);
     const assign = jest.fn();
 
-    reloadForStaleChunk({ location: { href: 'http://localhost:3000/session/demo-1?existing=1', assign } });
+    reloadForStaleChunk(new TypeError('Importing a module script failed.'), {
+      window: { location: { href: 'http://localhost:3000/session/demo-1?existing=1', assign } },
+    });
 
     expect(assign).toHaveBeenCalledWith('http://localhost:3000/session/demo-1?existing=1&ceChunkReload=123456');
     Date.now.mockRestore();
