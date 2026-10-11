@@ -15,6 +15,8 @@ import {
   normalizePayloadAccessControl,
 } from './payloadAccessControl.js';
 import {
+  base64urlToBytes,
+  bytesToBase64url,
   decryptPayloadWithStorageEnvelope,
   encryptPayloadWithStorageEnvelope,
   toUint8Array,
@@ -72,14 +74,6 @@ const DEFAULT_RESOURCE_GATES = Object.freeze({
 
 const isStorageResource = (resource) => Object.hasOwn(DEFAULT_RESOURCE_GATES, trim(resource) || 'docsContext');
 
-const bytesToBase64url = (bytes) => {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  }
-  let binary = '';
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-};
 const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValuesDep } = {}) => {
   const bytes = new Uint8Array(32);
   const suppliedBytes = typeof randomBytes === 'function' ? randomBytes(32) : null;
@@ -124,15 +118,6 @@ const readKvPayloadEnvelope = async ({ index, slug, id }) => {
     return null;
   }
 };
-export const base64urlToBytes = (value) => {
-  const text = trim(value);
-  if (!text) return new Uint8Array();
-  const base64 = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
-  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(base64, 'base64'));
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-};
-
 const normalizeTagsForMetadata = (tagsInput) => {
   let tags = tagsInput;
   if (typeof tagsInput === 'string' && tagsInput.trim()) {
