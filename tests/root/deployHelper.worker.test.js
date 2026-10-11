@@ -5262,6 +5262,111 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.getScriptUploadCount()).toBe(1);
     });
 
+    it('does not resume an uploaded Worker whose bytes a newly pinned digest rejects', async () => {
+      const release = makeWorkerRelease('2');
+      const fetchMock = makeReleaseFetch(release);
+      global.fetch = fetchMock;
+      const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+      const body = {
+        deploymentRequestId: 'pin-change-request-0001',
+        workerName: 'pin-change-worker',
+        sessionSlug: 'pin-change-session',
+        bundleUrl: release.workerBundleUrl,
+      };
+      // An unpinned upload lands, then the first runtime-secret write is ambiguous.
+      fetchMock.cloudflare.workerSecretPutResponses.push(cfFailure(500, 'Secret write response lost.'));
+      const first = await deploySessionWorker(body, env);
+      expect(first.payload.deploymentRequestPending).toBe(true);
+      const secretWritesBeforeRetry = fetchMock.cloudflare.workerSecretBodies.length;
+
+      const retry = await deploySessionWorker({ ...body, bundleSha256: 'a'.repeat(64) }, env);
+
+      expect(retry.status).toBe(409);
+      expect(retry.payload).toEqual(expect.objectContaining({
+        error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
+        deploymentRequestPending: true,
+      }));
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.cloudflare.workerSecretBodies).toHaveLength(secretWritesBeforeRetry);
+    });
+
+    it('keeps a rejected-bundle retry pending with its resources while the bundle host is down', async () => {
+      const release = makeWorkerRelease('6');
+      const fetchMock = makeReleaseFetch(release);
+      fetchMock.cloudflare.scriptUploadResponses.push(
+        cfFailure(400, 'The uploaded script has no registered event handlers.'),
+      );
+      global.fetch = fetchMock;
+      const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+      const body = {
+        deploymentRequestId: 'rejected-down-request-0001',
+        workerName: 'rejected-down-worker',
+        sessionSlug: 'rejected-down-session',
+        bundleUrl: release.workerBundleUrl,
+        bundleManifestUrl: release.manifestUrl,
+      };
+      const rejected = await deploySessionWorker(body, env);
+      expect(rejected.payload.deploymentRequestPending).toBe(true);
+      const { kvNamespaceId, workerName } = rejected.payload.orphanResources;
+      // An older bundle of this exact deployment is still visible.
+      fetchMock.cloudflare.workerBindings.set(workerName, fetchMock.cloudflare.scriptUploadMetadata[0].bindings
+        .map((binding) => (binding.name === 'CE_BUNDLE_SHA256' ? { ...binding, text: 'f'.repeat(64) } : binding)));
+
+      const sessionBundle = release.sessionBundle;
+      release.sessionBundle = null;
+      const down = await deploySessionWorker(body, env);
+
+      expect(down.status).toBe(502);
+      expect(down.payload).toEqual(expect.objectContaining({
+        error: 'Failed to fetch bundle: Artifact fetch failed (404).',
+        deploymentRequestPending: true,
+        orphanResources: { kvNamespaceId, kvCleanupStatus: 'retained-upload-pending', workerName },
+      }));
+
+      release.sessionBundle = sessionBundle;
+      const replaced = await deploySessionWorker(body, env);
+
+      expect(replaced.status).toBe(200);
+      const uploads = fetchMock.cloudflare.scriptUploadMetadata;
+      expect(uploads[uploads.length - 1].keep_bindings).toEqual(['secret_text']);
+      expect(fetchMock.uploadedModules.get(workerName)).toBe(sessionBundle);
+    });
+
+    it('resumes an uploaded pinned Worker without fetching its bundle again', async () => {
+      const release = makeWorkerRelease('5');
+      const fetchMock = makeReleaseFetch(release);
+      global.fetch = fetchMock;
+      const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+      const body = {
+        deploymentRequestId: 'pinned-resume-request-0001',
+        workerName: 'pinned-resume-worker',
+        sessionSlug: 'pinned-resume-session',
+        bundleUrl: release.workerBundleUrl,
+        bundleManifestUrl: release.manifestUrl,
+      };
+      // The verified upload lands, then the first runtime-secret write is ambiguous.
+      fetchMock.cloudflare.workerSecretPutResponses.push(cfFailure(500, 'Secret write response lost.'));
+      const first = await deploySessionWorker(body, env);
+      expect(first.payload.deploymentRequestPending).toBe(true);
+      const { workerName } = first.payload.orphanResources;
+      const sessionBundle = release.sessionBundle;
+      // The bundle host now serves other bytes; resuming must not need them.
+      release.sessionBundle = 'export default { fetch() { return new Response("tampered session"); } };';
+      const bundleReads = () => fetchMock.releaseReads.filter((href) => href === release.workerBundleUrl).length;
+      const bundleReadsBeforeRetry = bundleReads();
+
+      const resumed = await deploySessionWorker(body, env);
+
+      expect(resumed.status).toBe(200);
+      expect(bundleReads()).toBe(bundleReadsBeforeRetry);
+      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.uploadedModules.get(workerName)).toBe(sessionBundle);
+      expect(recordedRelease(workerVars(fetchMock, workerName))).toEqual({
+        WORKER_BUNDLE_URL: release.workerBundleUrl,
+        WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
+      });
+    });
+
     it('never records an Agent Bridge URL that the bridge deploy would refuse', async () => {
       const release = makeWorkerRelease('9');
       const fetchMock = makeReleaseFetch(release);
