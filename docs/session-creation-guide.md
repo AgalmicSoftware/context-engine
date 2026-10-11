@@ -825,9 +825,11 @@ High-level flow:
    decentralized profiles require signed config acceptance while their EVM
    registry and Arweave records remain canonical. Registry attachment requires
    the connected signer, requested Worker admin, and on-chain session admin to
-   match. The template deploys with `DEPLOY_HELPER_ENABLED` set to `"0"`, so the
-   wizard records that the Worker has no embedded deploy helper and `/sponsor`
-   does not offer deploy grants from it.
+   match. The template deploys with `DEPLOY_HELPER_ENABLED` set to `"0"`, so
+   when you generated setup values in this tab the wizard records that the
+   Worker has no embedded deploy helper and `/sponsor` does not offer deploy
+   grants from it. An attached existing Worker keeps the draft's
+   embedded deploy-helper setting, because no route reports the binding.
 
 The runtime secrets remain in the current tab and Cloudflare's encrypted
 Worker-secret store. They are not placed in the deployment URL, logs, analytics

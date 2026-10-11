@@ -925,11 +925,20 @@ const useSessionWizardWorkerDeploy = ({
   );
 
   const verifyNativeWorker = useCallback(
-    ({ sessionSlug, workerQueryValue }: { sessionSlug: string; workerQueryValue: unknown }) =>
+    ({
+      sessionSlug,
+      workerQueryValue,
+      deployedFromTemplate = false,
+    }: {
+      sessionSlug: string;
+      workerQueryValue: unknown;
+      deployedFromTemplate?: boolean;
+    }) =>
       verifyNativeSessionWorker({
         runtimeRef,
         sessionSlug,
         workerQueryValue,
+        deployedFromTemplate,
         getCurrentWorkerSecrets,
         getMissingWorkerSecretsForDeploy,
         parseAllowOriginsInput,

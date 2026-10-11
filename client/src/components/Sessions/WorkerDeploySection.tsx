@@ -95,6 +95,7 @@ export type WorkerDeploySectionProps = {
   verifyNativeWorker?: (input: {
     sessionSlug: string;
     workerQueryValue: unknown;
+    deployedFromTemplate?: boolean;
   }) => Promise<SessionWizardVerifiedWorkerConnection>;
 };
 
@@ -277,6 +278,8 @@ const WorkerDeploySection = ({
       const bootstrap = await verifyNativeWorker({
         sessionSlug: nativeSessionSlug,
         workerQueryValue: candidate,
+        // Generated setup values mean the Worker comes from the template.
+        deployedFromTemplate: !!currentNativeSetupSecrets,
       });
       if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
       const returnedOrigin = normalizeNativeWorkerOrigin(bootstrap.workerOrigin);

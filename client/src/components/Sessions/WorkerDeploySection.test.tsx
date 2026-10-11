@@ -178,6 +178,7 @@ describe('WorkerDeploySection', () => {
     expect(verifyNativeWorker).toHaveBeenCalledWith({
       sessionSlug: 'demo-sh',
       workerQueryValue: 'https://demo-sh.example.workers.dev',
+      deployedFromTemplate: true,
     });
     expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
       /verified at revision revision-7/i,
@@ -207,6 +208,7 @@ describe('WorkerDeploySection', () => {
       expect(verifyNativeWorker).toHaveBeenCalledWith({
         sessionSlug: 'demo-worker',
         workerQueryValue: 'https://existing.example.workers.dev',
+        deployedFromTemplate: false,
       });
       expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
         'Session Worker verified. You can deploy the session.',
