@@ -3,9 +3,18 @@ import assert from 'node:assert/strict';
 
 import {
   MAX_RESPONSE_ITEM_BYTES,
+  MAX_RESPONSE_PLAINTEXT_BYTES,
   STORAGE_RESOURCE_MAX_BYTES,
   validateStorageUploadPayload,
 } from './storageUploadValidation.js';
+import {
+  aesGcmEncrypt,
+  b64encode,
+  buildEnvelopeObject,
+  buildResponseFieldAAD,
+  encodePaddedEnvelopePlaintext,
+  importAesGcmKey,
+} from '../../shared/encryption/envelopeV1Core.mjs';
 
 const encode = (value) => new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value));
 const check = (resource, value, extra = {}) => validateStorageUploadPayload({ resource, bytes: encode(value), ...extra });
@@ -94,6 +103,53 @@ test('rejects oversized questions, surveys, answers, and bundles with 413', () =
     assert.equal(result.status, 413, `${resource} ${JSON.stringify(result)}`);
     assert.match(result.error, /^Upload payload too large/);
   }
+});
+
+// A locked field is padded, encrypted, base64-encoded and wrapped for its
+// recipients by the client's envelope code; recipients use their longest forms.
+const lockedField = async (value, kind) => {
+  const random = (length) => crypto.getRandomValues(new Uint8Array(length));
+  const hex = (length) => `0x${Buffer.from(random(length)).toString('hex')}`;
+  const context = hex(32);
+  const aad = buildResponseFieldAAD({ contextHex: context, chainId: 11155420, surveyId: hex(32), qId: QUESTION_ID, fieldKey: kind });
+  const plaintext = encodePaddedEnvelopePlaintext({ v: 1, value, kind, salt: hex(16) }, {});
+  const { iv, ciphertext } = await aesGcmEncrypt(await importAesGcmKey(random(32)), plaintext, {
+    aadBytes: new TextEncoder().encode(JSON.stringify(aad)),
+  });
+  const recipients = [
+    { type: 'self-eip712-v1', context, wrap_iv: b64encode(random(12)), wrapped_cek: b64encode(random(48)), nonce: (2n ** 256n - 1n).toString() },
+    {
+      type: 'worker-response-field-v1',
+      policy: { owner: `0x${'ab'.repeat(20)}`, audience: 'self_admin', context, sessionSlug: 's'.repeat(128), sessionId: hex(16) },
+      wrapped: { alg: 'AES-256-GCM', wrapAlg: 'AES-GCM-KW-v1', iv: 'i'.repeat(16), wrappedKey: 'k'.repeat(64) },
+    },
+  ];
+  const envelope = buildEnvelopeObject({
+    iv, ciphertextBytes: ciphertext, aadObj: aad, recipients,
+    commitments: { keccak256: hex(32), poseidon: (2n ** 254n).toString() }, kind,
+  });
+  return JSON.stringify(envelope);
+};
+
+test('an answer within the plaintext budget still fits once its answer, comment and ratings are locked', async () => {
+  // The budget counts the answer and comment as JSON strings in UTF-8.
+  const text = 'x'.repeat(MAX_RESPONSE_PLAINTEXT_BYTES / 2 - 2);
+  const field = async (value, kind) => ({
+    value: '*', encrypted: true, encryptionAudience: 'self_admin', audienceMode: 'explicit',
+    hash: `0x${'1'.repeat(64)}`, encryptedPortion: await lockedField(value, kind),
+  });
+  const locked = clientAnswer({
+    answer: await field(text, 'freeform'),
+    additional: await field(text, 'additional'),
+    importance: null,
+    conviction: null,
+    importanceEncrypted: await lockedField(10, 'rating'),
+    convictionEncrypted: await lockedField(10, 'rating'),
+  });
+  assert.equal(2 * encode(JSON.stringify(text)).length, MAX_RESPONSE_PLAINTEXT_BYTES);
+  assert.equal(check('responses', locked).ok, true, `${encode(locked).length} bytes`);
+  assert.equal(check('responses', { responses: [clientAnswer(), locked] }).ok, true);
+  assert.equal(check('responses', clientAnswer({ answer: { value: text }, additional: { value: text } })).ok, true);
 });
 
 test('keeps encrypted answers opaque but requires readable questions and surveys', () => {

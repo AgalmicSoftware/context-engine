@@ -14,10 +14,14 @@ export const STORAGE_RESOURCE_MAX_BYTES = Object.freeze({
   // than one answer; each bundled answer still has the per-answer cap.
   responses: 2 * 1024 * KIB,
 });
-// One answer, including its encrypted field envelopes and padding. The
-// client's largest answers are free text plus a comment, each in a 128-byte
-// padded envelope with a few recipients.
-export const MAX_RESPONSE_ITEM_BYTES = 64 * KIB;
+// One answer as stored, including its encrypted field envelopes. Locking a
+// field pads it to 128 bytes, base64-encodes it (4/3) and adds about 2 KiB of
+// recipients, so answer and comment text within MAX_RESPONSE_PLAINTEXT_BYTES
+// (their JSON strings in UTF-8) stay under this cap even when both and both
+// ratings are locked: about 72 KiB, leaving room for the copied prompt and Lit
+// recipients. Clients check the plaintext budget before upload.
+export const MAX_RESPONSE_ITEM_BYTES = 96 * KIB;
+export const MAX_RESPONSE_PLAINTEXT_BYTES = 48 * KIB;
 
 // Question ids are keccak hashes and survey ids sha256 hashes (0x + 64 hex);
 // this also admits short fixture ids while keeping index keys bounded.

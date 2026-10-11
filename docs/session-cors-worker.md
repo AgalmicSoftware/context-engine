@@ -697,9 +697,13 @@ Authenticated clients can use the worker as the session storage boundary:
   - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
   - Questions, surveys, and responses are small JSON records that every
     reader downloads, so they also have tighter caps: 128 KiB per question,
-    256 KiB per survey, and 2 MiB per response upload, with at most 64 KiB per
-    answer. A survey submission bundles its answers in a `responses` list, and
-    each bundled answer has the same 64 KiB cap. Oversized uploads return
+    256 KiB per survey, and 2 MiB per response upload, with at most 96 KiB per
+    answer as stored. A survey submission bundles its answers in a `responses`
+    list, and each bundled answer has the same 96 KiB cap. Locking a field
+    pads, base64-encodes and wraps it, so clients keep an answer's text plus
+    its comment within 48 KiB (49,152 bytes, counting each as a JSON string in
+    UTF-8); that stays under the cap even with answer, comment and ratings
+    locked. Oversized uploads return
     `413`. These records must be JSON objects with a basic shape, or the
     upload returns `400`: a question needs a string `id` (or `questionId` /
     `questionID`) of up to 128 `a-z`, `0-9`, `.`, `_`, `:`, or `-`
