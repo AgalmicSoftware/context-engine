@@ -307,6 +307,23 @@ describe('CreateSBTGroup group password', () => {
     });
   });
 
+  describe('when a create stops early', () => {
+    it('unlocks the form and Create when the create stops for a login', async () => {
+      const instance = makeCreatingInstance({}, { loginComplete: false });
+
+      await act(async () => {
+        await instance.handleMintClick();
+      });
+
+      expect(instance.props.toggleLoginModal).toHaveBeenCalledWith(true);
+      expect(contractScripts.createSBT).not.toHaveBeenCalled();
+      render(instance.render());
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT)).toBeEnabled();
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE)).toBeEnabled();
+      expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_SUBMIT)).toBeEnabled();
+    });
+  });
+
   describe('after a successful create', () => {
     const createGroup = async () => {
       const instance = makeCreatingInstance();

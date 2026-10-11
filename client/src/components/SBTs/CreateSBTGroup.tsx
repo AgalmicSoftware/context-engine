@@ -3358,6 +3358,8 @@ class CreateSBTGroup extends Component<any, any> {
 
   async mintSBT({ groupPassword: groupPasswordSnapshot }: { groupPassword?: string } = {}) {
     if (!this.props.loginComplete) {
+      // Nothing has been sent: end this create so the form unlocks and Create works again after login.
+      this.setState({ startedMinting: false, currentStep: 0 });
       this.props.toggleLoginModal(true);
       return;
     }
