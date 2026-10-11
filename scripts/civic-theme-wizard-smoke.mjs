@@ -34,6 +34,33 @@ export async function inspectPublishSummary(page) {
   }
 }
 
+export async function inspectParticipationChannels(page) {
+  const channels = page.getByRole('region', { name: 'Participation channels', exact: true });
+  await channels.waitFor({ state: 'visible' });
+  const checkboxes = channels.locator('input[type="checkbox"]');
+  const before = await checkboxes.evaluateAll((inputs) => inputs.map((input) => input.checked));
+  for (const [id, explanation] of [
+    ['ce-wizard-surface-web-info', /always enabled/i],
+    ['ce-wizard-surface-telegram-info', /also enables its Mini App/i],
+    ['ce-wizard-surface-mini-app-info', /requires Telegram/i],
+    ['ce-wizard-surface-agent-http-info', /without Telegram/i],
+  ]) {
+    const help = channels.getByTestId(id);
+    await help.click();
+    const tooltip = page.getByRole('tooltip').filter({ hasText: explanation });
+    await assertReadable(tooltip);
+    await help.press('Escape');
+    await tooltip.waitFor({ state: 'hidden' });
+  }
+  assert.deepEqual(
+    await checkboxes.evaluateAll((inputs) => inputs.map((input) => input.checked)),
+    before,
+    'Opening channel help does not change participation settings',
+  );
+  assert.match(await channels.getByRole('status').innerText(), /Telegram is not required/);
+  await assertReadable(channels);
+}
+
 // Read-only setup review plus a disposable local group draft. Never generate
 // credentials, deploy a Worker, publish a session, or submit an on-chain action.
 export async function inspectCivicWizard(page) {
@@ -84,6 +111,7 @@ export async function inspectCivicWizard(page) {
     await page.getByRole('button', { name: 'Custom session settings', exact: true }).click();
     await page.getByRole('button', { name: 'Session Information', exact: true }).click();
     await page.getByRole('button', { name: 'Worker deployment & secrets', exact: true }).click();
+    await inspectParticipationChannels(page);
     await assertReadable(body);
     const accessMenu = page.getByRole('button', { name: 'Choose access rule', exact: true }).first();
     await accessMenu.click();

@@ -367,9 +367,13 @@ custom settings in the draft. Profile settings follow the existing stages:
   Admin-only and public-redacted result modes remain visible as unavailable
   until their complete read paths are enforced.
 - Worker owns optional participation channels such as Telegram, Telegram Mini App, and
-  Agent Session Wrapped. The website remains enabled. Wrapped is off by
+  **Agents (HTTP API)** (Agent Session Wrapped). Each channel has a question-mark
+  tooltip explaining its purpose and dependencies. The website remains enabled. Agent access is off by
   default, deploys one additional dedicated per-session Bridge, and does not
-  implicitly enable Telegram. Telegram Mini App is independently selectable but
+  require or implicitly enable Telegram. The **Agent API access** status distinguishes
+  **Off** from **On after deployment**: authorized agents can use the HTTP API
+  once the service is deployed and verified, subject to session access rules.
+  Telegram Mini App is independently selectable but
   requires Telegram; disabling Telegram also disables its Mini App.
 - Deploy owns the export policy. Selected-channel export remains visible as
   unavailable until the export runtime consumes that filter.

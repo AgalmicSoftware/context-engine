@@ -3297,6 +3297,21 @@ $muted-text: var(--ce-panel-text-muted);
   flex: 0 0 auto;
 }
 
+.modeChannelOption .modeCheckboxLabel {
+  flex: 1;
+}
+
+.modeChannelOption .tooltipTrigger {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.modeChannelOption .tooltip {
+  margin: 0;
+  opacity: 1;
+  color: $muted-text;
+}
+
 .modeCheckboxLabel {
   box-sizing: border-box;
   display: flex;

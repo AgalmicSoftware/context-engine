@@ -296,14 +296,15 @@ describe('SessionModeProfileSections', () => {
     expect(
       within(screen.getByRole('group', { name: 'Session participation channels' })).getAllByRole('checkbox'),
     ).toHaveLength(4);
-    for (const label of ['Website', 'Telegram', 'Telegram Mini App', 'Agent Session Wrapped']) {
+    for (const label of ['Website', 'Telegram', 'Telegram Mini App', 'Agents (HTTP API)']) {
       expect(screen.getByRole('checkbox', { name: label })).toHaveAccessibleName(label);
     }
-    const wrapped = screen.getByRole('checkbox', { name: 'Agent Session Wrapped' });
+    const wrapped = screen.getByRole('checkbox', { name: 'Agents (HTTP API)' });
     expect(wrapped).not.toBeChecked();
-    expect(screen.getByText(/additional per-session Worker\/Bridge/i)).toBeInTheDocument();
-    expect(screen.getByText(/Telegram stays optional/i)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Agent API access: Off');
+    expect(screen.getByRole('status')).toHaveTextContent('Telegram is not required');
     fireEvent.click(wrapped);
+    expect(screen.getByRole('status')).toHaveTextContent('Agent API access: On after deployment');
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         preset: 'custom',
@@ -328,6 +329,57 @@ describe('SessionModeProfileSections', () => {
       expect.any(Object),
     );
   });
+
+  it('explains every participation channel without toggling its checkbox when help is opened', () => {
+    const { onChange } = renderSection('worker', undefined, ({ content, ariaLabel }) => (
+      <button type="button" aria-label={ariaLabel}>
+        {content}
+      </button>
+    ));
+
+    for (const [name, explanation] of [
+      ['Website', /always enabled/i],
+      ['Telegram', /also enables its Mini App/i],
+      ['Telegram Mini App', /requires Telegram/i],
+      ['Agents (HTTP API)', /without Telegram/i],
+    ] as const) {
+      const help = screen.getByRole('button', { name: `About ${name}`, exact: true });
+      expect(help).toHaveTextContent(explanation);
+      fireEvent.click(help);
+    }
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('checkbox', { name: 'Website' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Website' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Agents (HTTP API)' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'About Agents (HTTP API)' })).toHaveTextContent(
+      /additional per-session service/i,
+    );
+  });
+
+  it.each([SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE, SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED])(
+    'reports direct agent access separately from Telegram for %s',
+    (preset) => {
+      const { onChange } = renderSection('worker', cloneSessionModePreset(preset));
+      const agents = screen.getByRole('checkbox', { name: 'Agents (HTTP API)' });
+      fireEvent.click(agents);
+
+      expect(screen.getByRole('status')).toHaveTextContent('Agent API access: On after deployment');
+      expect(screen.getByRole('status')).toHaveTextContent(/authorized agents.*HTTP API/i);
+      expect(screen.getByRole('status')).toHaveTextContent(/deployed and verified/i);
+      expect(screen.getByRole('checkbox', { name: 'Telegram', exact: true })).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Telegram Mini App', exact: true })).not.toBeChecked();
+
+      fireEvent.click(agents);
+      expect(screen.getByRole('status')).toHaveTextContent('Agent API access: Off');
+      expect(onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          surfaces: expect.objectContaining({ agentHttp: false, telegram: false, miniApp: false }),
+        }),
+        expect.any(Object),
+      );
+    },
+  );
 
   it('does not offer unenforced selected-channel exports', () => {
     renderSection('publish');

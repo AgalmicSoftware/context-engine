@@ -440,6 +440,8 @@ the directory. About checks cover the hero title and copy against the rendered p
 and the page's 16px of top spacing below the navbar.
 Wizard checks cover both hosting profiles, every setup
 step, custom settings, local group drafts, group selectors, and contract previews.
+Participation-channel checks open each question-mark tooltip and verify that
+help preserves the checkbox states and explains agent access without Telegram.
 The deployment summary uses evenly sized cards on wider screens and full-width
 label-and-value rows at 720px and below. Smoke checks cover its contrast, wrapping,
 and mobile row spacing for both hosting profiles.
