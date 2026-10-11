@@ -182,7 +182,7 @@ on Arweave or in Cloudflare storage, as the session profile decides. Each
 
 ### 2.3 Lit Actions
 - **What it is**: JS code that Lit runs for you; on Chipotle it runs inside a single TEE.
-- **How CE uses it**: the session Worker calls `POST /core/v1/lit_action` with the session's registered action CID (`litActionCid`). The action checks the requester's SBT gate before it wraps or releases a content key.
+- **How CE uses it**: the session Worker calls `POST /core/v1/lit_action` with the session's registered action CID (`litActionCid`). The action wraps a content key for the configured gate, which does not require the author to hold the SBT, and releases a wrapped key only after the requester passes the SBT gate.
 
 ---
 
