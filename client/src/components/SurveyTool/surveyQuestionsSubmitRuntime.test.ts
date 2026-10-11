@@ -576,6 +576,37 @@ describe('answer size budget', () => {
     expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
   });
 
+  it('keeps a held-back answer out of the saved answers it reports', async () => {
+    const context = prepare('cloudflare', 'Yes', '', [
+      { id: 'q1', type: 'freeform', prompt: 'First question' },
+      { id: 'q2', type: 'freeform', prompt: 'Second question' },
+      { id: 'q3', type: 'freeform', prompt: 'Third question' },
+    ]);
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q1', 'q2', 'q3']),
+      changedMap: { q1: { answer: 1 }, q2: { answer: 1 }, q3: { answer: 1 } },
+    });
+    const slice = context.stateRef.current.surveysResponseState[2];
+    slice.answers.q2 = { value: fill(100 * KIB) };
+    slice.answers.q3 = { value: fill(100 * KIB, 'z') };
+    const builtRow = (questionID: string, value: string) => ({ questionID, answer: { value } });
+    context.prepareJsonAndHash.mockImplementation((_index: number, _account: unknown, overrideSlice: any) => ({
+      responses: Object.entries(overrideSlice?.answers || {}).map(([qid, field]: [string, any]) =>
+        builtRow(qid, field.value),
+      ),
+    }));
+    // q2 has a saved answer; q3 was never saved.
+    const savedQ2 = { questionID: 'q2', answer: { value: 'Saved second answer' } };
+    context.stateRef.current.userAnswers = { responses: [savedQ2] };
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+
+    const [{ userAnswers }] = context.runSurveyQuestionsSubmitSuccessController.mock.calls[0];
+    expect(userAnswers.responses).toEqual([expect.objectContaining(builtRow('q1', 'Yes')), savedQ2]);
+  });
+
   it('names every oversized answer when none can be submitted', async () => {
     const context = prepare('cloudflare', fill(100 * KIB), '', [
       { id: 'q1', type: 'freeform', prompt: 'First question' },

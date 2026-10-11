@@ -638,9 +638,22 @@ export const createSurveyQuestionsSubmitRuntime = (
             }
           : row;
       };
+      // A changed question this submit did not upload keeps the saved answer it
+      // had, so views of saved answers never show its unsaved text.
+      const priorAnswers: SurveyQuestionsLegacyValue = stateRef.current.userAnswers;
+      const priorRows = new Map<string, SurveyQuestionsLegacyValue>(
+        (Array.isArray(priorAnswers?.responses) ? priorAnswers.responses : []).map(
+          (row: SurveyQuestionsLegacyValue) => [normalizeQuestionIdKey(row?.questionID || row?.questionId), row],
+        ),
+      );
+      const notUploaded = new Set(Array.from(changedQids as Set<string>).filter((qid) => !uploadedQids.has(qid)));
+      const asSaved = (row: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(row?.questionID);
+        return notUploaded.has(qid) ? priorRows.get(qid) || null : withUploadedRatings(row);
+      };
       const builtUserAnswers: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex, undefined, finalSlice);
       const optimisticUserAnswers: SurveyQuestionsLegacyValue = Array.isArray(builtUserAnswers?.responses)
-        ? { ...builtUserAnswers, responses: builtUserAnswers.responses.map(withUploadedRatings) }
+        ? { ...builtUserAnswers, responses: builtUserAnswers.responses.map(asSaved).filter(Boolean) }
         : withUploadedRatings(builtUserAnswers);
       nextBaseline.interviewProvenance = {
         ...stateRef.current.editBaseline?.interviewProvenance,
