@@ -454,6 +454,40 @@ describe('surveyGeneratorHelpers', () => {
     expect(result.statements.map((statement) => statement.prompt)).toEqual(['First']);
   });
 
+  it('drops malformed AI questions before counting the requested statements', () => {
+    const result = buildGeneratedSurveyStatements({
+      aiData: {
+        questions: [
+          { questionType: 'binary', prompt: { text: 'Not a string' } },
+          { questionType: 'freeform', prompt: '   ' },
+          { questionType: 'multichoice', prompt: 'Options as text', options: 'A, B' },
+          { questionType: 'multichoice', prompt: 'Object options', options: [{ label: 'A' }, { label: 'B' }] },
+          { questionType: 'multichoice', prompt: 'One usable option', options: ['Only', ' '] },
+          { questionType: 'quadratic', prompt: 'No options' },
+          { questionType: 'multichoice', prompt: 'Pick one', options: ['A', 'B'] },
+          { questionType: 'binary', prompt: 'Keep this?' },
+        ],
+      } as unknown as Parameters<typeof buildGeneratedSurveyStatements>[0]['aiData'],
+      questionTypes: { binary: true, freeform: true, multichoice: true, quadratic: true },
+      count: 2,
+    });
+
+    expect(result.statements.map(({ prompt, options }) => ({ prompt, options }))).toEqual([
+      { prompt: 'Pick one', options: ['A', 'B'] },
+      { prompt: 'Keep this?', options: undefined },
+    ]);
+  });
+
+  it('returns no statements when the AI payload has no question array', () => {
+    const result = buildGeneratedSurveyStatements({
+      aiData: { questions: null } as unknown as Parameters<typeof buildGeneratedSurveyStatements>[0]['aiData'],
+      questionTypes: { binary: true },
+      count: 3,
+    });
+
+    expect(result.statements).toEqual([]);
+  });
+
   it('builds generation prompts from selected question types and defaults', () => {
     const prompt = buildSingleGenerationPrompt({
       promptTemplate: [

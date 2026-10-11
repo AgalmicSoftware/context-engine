@@ -539,9 +539,17 @@ export const getCreateSurveyValidationError = ({
     return `Question ${blankQuestionIndex + 1} prompt cannot be blank.`;
   }
   for (const [index, question] of (Array.isArray(questions) ? questions : []).entries()) {
-    if (question?.type !== 'quadratic') continue;
-    const error = validateQuadraticQuestion(question);
-    if (error) return `Question ${index + 1}: ${error}`;
+    if (question?.type === 'quadratic') {
+      const error = validateQuadraticQuestion(question);
+      if (error) return `Question ${index + 1}: ${error}`;
+    }
+    // Blank options are dropped from the payload, so count only what participants would see.
+    if (
+      isMultichoiceQuestionType(question?.type) &&
+      (normalizePayloadQuestionOptions(question?.type, question?.options) || []).length < 2
+    ) {
+      return `Question ${index + 1}: Multichoice questions need at least two non-blank options.`;
+    }
   }
   const duplicateOption = findFirstDuplicateMultichoiceOptionQuestion(questions);
   if (duplicateOption.index !== -1) {
