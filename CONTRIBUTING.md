@@ -80,4 +80,4 @@ By contributing, you agree that your contributions are licensed under the licens
 - Runtime and deployment overview: [docs/architecture-overview.md](docs/architecture-overview.md)
 - Session creation workflow: [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - Survey, question, and storage schemas: [docs/arweave-payloads.md](docs/arweave-payloads.md)
-- Encryption and SBT gates: sensitive fields can be encrypted behind Lit access-control conditions, and SBT ownership is the unlock condition for gated reads. Avoid exposing gated plaintext in docs, screenshots, logs, or fixtures.
+- Encryption and SBT gates: sensitive fields can be encrypted with SBT-gated Lit key release, and SBT ownership is the unlock condition for gated reads. The session Worker operator and anyone holding the session's Lit API key can also read gated data, so it is not end-to-end encrypted. Avoid exposing gated plaintext in docs, screenshots, logs, or fixtures.
