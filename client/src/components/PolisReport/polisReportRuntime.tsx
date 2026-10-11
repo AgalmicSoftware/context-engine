@@ -305,6 +305,11 @@ const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
   ),
 );
 
+// Only the fixtures that ship with the app have simulated-user profile pages.
+export function isBuiltInPolisDemoDataset(dataset: unknown): boolean {
+  return !!dataset && Object.values(BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG).includes(dataset);
+}
+
 export function buildPolisDemoDatasetsBySlug(demoDataBySlug: unknown = null) {
   const out: Record<string, unknown> = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
   if (!demoDataBySlug || typeof demoDataBySlug !== 'object' || Array.isArray(demoDataBySlug)) {

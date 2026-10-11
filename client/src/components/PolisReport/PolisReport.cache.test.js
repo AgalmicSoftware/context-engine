@@ -181,8 +181,59 @@ describe('PolisReport participant profile links', () => {
       buildPolisParticipantProfileHref({
         displayName: 'Ada Lovelace',
         sessionSlug: 'demo-interview',
+        simulated: true,
       }),
     ).toBe('/su/Ada%20Lovelace?session=demo-interview');
+  });
+
+  it('links named real participants to their own profile, not a simulated user', () => {
+    expect(
+      buildPolisParticipantProfileHref({
+        address: '0x1111111111111111111111111111111111111111',
+        displayName: 'Franklin',
+        sessionSlug: 'rxc-ra-test',
+      }),
+    ).toBe('/u/0x1111111111111111111111111111111111111111?session=rxc-ra-test');
+    expect(buildPolisParticipantProfileHref({ displayName: 'Sam Participant', sessionSlug: 'rxc-ra-test' })).toBe('');
+  });
+
+  it('shows named real participants with their address blockie and profile link', async () => {
+    const addresses = ['1', '2', '3'].map((digit) => `0x${digit.repeat(40)}`);
+    const responses = {
+      q1: addresses.map((responder, index) => ({
+        responder,
+        questionId: 'q1',
+        response: JSON.stringify({
+          type: 'binary',
+          prompt: 'Agree?',
+          responderName: index === 0 ? 'Franklin' : '',
+          answer: { value: index ? 'Disagree' : 'Agree' },
+        }),
+      })),
+    };
+
+    render(<PolisReport {...baseReportProps} slug="rxc-ra-test" questionResponses={responses} />);
+
+    const link = await screen.findByRole('link', { name: /Franklin/ });
+    expect(link).toHaveAttribute('href', `/u/${addresses[0]}?session=rxc-ra-test`);
+    expect(link.parentElement.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,mock-blockie');
+    expect(screen.queryByTestId('ce-polis-participant-avatar-Franklin')).not.toBeInTheDocument();
+  });
+
+  it('keeps simulated-user links and portraits for the built-in demo participants', async () => {
+    const participant = getPolisDemoDatasetForSlug('demo').participantsVotes.find((entry) => entry?.xid);
+
+    render(<PolisReport {...baseReportProps} slug="demo" />);
+
+    const item = await screen.findByTitle(participant.xid);
+    expect(within(item).getByRole('link')).toHaveAttribute(
+      'href',
+      `/su/${encodeURIComponent(participant.xid)}?session=demo`,
+    );
+    expect(within(item).getByTestId(`ce-polis-participant-avatar-${participant.xid}`)).toHaveAttribute(
+      'src',
+      'data:image/png;base64,mock-avatar',
+    );
   });
 });
 

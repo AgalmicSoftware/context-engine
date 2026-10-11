@@ -102,6 +102,7 @@ import {
   getPolisHistoricalParticipantBlockie,
   getRenderableParticipantList,
   getUTCDataTimestamp,
+  isBuiltInPolisDemoDataset,
   resolveExploratoryClusterCount,
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
@@ -147,15 +148,19 @@ export const buildPolisParticipantProfileHref = ({
   address = '',
   displayName = '',
   sessionSlug = '',
+  simulated = false,
 }: {
   address?: unknown;
   displayName?: unknown;
   sessionSlug?: unknown;
+  simulated?: boolean;
 } = {}): string => {
   const name = String(displayName || '').trim();
   const addr = String(address || '').trim();
   const isEth = /^0x[0-9a-fA-F]{40}$/.test(addr);
-  const base = name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
+  // Simulated-user pages exist only for built-in demo participants. A real
+  // participant's chosen name is only a label for their own profile.
+  const base = simulated && name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
   if (!base) return '';
   const normalizedSlug = normalizeSessionSlug(sessionSlug || '');
   return normalizedSlug ? `${base}?session=${encodeURIComponent(normalizedSlug)}` : base;
@@ -277,6 +282,7 @@ export default function PolisReport({
   // Toggling between demo data or real data
   const [useDemoData, setUseDemoData] = useState<boolean>(() => autoUseDemoData);
   const effectiveUseDemoData = useDemoData;
+  const usesSimulatedProfiles = effectiveUseDemoData && isBuiltInPolisDemoDataset(activeDemoData);
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
     return doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), reportProgressSlug)
@@ -1316,13 +1322,15 @@ export default function PolisReport({
       <div className={styles.participantsList}>
         {unique.map((addr, idx) => {
           const displayName = demoDisplayNames[addr];
+          const simulatedName = usesSimulatedProfiles ? displayName : '';
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
-          const imgSrc = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : getBlockieFor(addr);
+          const imgSrc = simulatedName ? getPolisHistoricalParticipantAvatar(simulatedName, addr) : getBlockieFor(addr);
           const shortAddr = getShortenedAddress(addr, false) || addr;
           const linkHref = buildPolisParticipantProfileHref({
             address: isEth ? addr : '',
             displayName,
             sessionSlug: resolvedSessionSlug,
+            simulated: usesSimulatedProfiles,
           });
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
@@ -1336,10 +1344,10 @@ export default function PolisReport({
                   width={24}
                   height={24}
                   className={styles.participantBlockie}
-                  data-testid={displayName ? `ce-polis-participant-avatar-${displayName}` : undefined}
+                  data-testid={simulatedName ? `ce-polis-participant-avatar-${simulatedName}` : undefined}
                   onError={(event: React.SyntheticEvent<HTMLImageElement>) => {
-                    const fallbackSrc = displayName
-                      ? getPolisHistoricalParticipantBlockie(displayName, addr)
+                    const fallbackSrc = simulatedName
+                      ? getPolisHistoricalParticipantBlockie(simulatedName, addr)
                       : getBlockieFor(addr);
                     if (fallbackSrc && event.currentTarget.src !== fallbackSrc) {
                       event.currentTarget.src = fallbackSrc;
@@ -1978,14 +1986,16 @@ export default function PolisReport({
                   const addr = allResponders?.[d.index];
                   const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
                   const displayName = demoDisplayNames?.[addr];
-                  const hasLink = isEth || !!displayName;
                   const linkHref = buildPolisParticipantProfileHref({
                     address: addr,
                     displayName,
                     sessionSlug: resolvedSessionSlug,
+                    simulated: usesSimulatedProfiles,
                   });
+                  const hasLink = !!linkHref;
                   const linkLabel = displayName || getShortenedAddress(addr, false);
-                  const historicalAvatar = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
+                  const historicalAvatar =
+                    usesSimulatedProfiles && displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 
                   const textShort = displayName
                     ? showAddresses
