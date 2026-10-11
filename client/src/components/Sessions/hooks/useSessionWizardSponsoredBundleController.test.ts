@@ -84,7 +84,6 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
     setNormalModeBundleUrlOverride: jest.fn(),
     setWorkerUrlAutoFilled: jest.fn(),
     setWorkerSecretsEnabled: jest.fn(),
-    setPersistWorkerSecrets: jest.fn(),
     setBundleFile: jest.fn(),
   };
 

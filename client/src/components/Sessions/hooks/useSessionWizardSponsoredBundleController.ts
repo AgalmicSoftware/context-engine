@@ -29,7 +29,6 @@ type SponsoredBundleDeploymentStatePatch<TDeployForm> = {
 
 type SponsoredBundleWorkerSecretStatePatch = {
   workerSecretsEnabled?: boolean;
-  persistWorkerSecrets?: boolean;
 };
 
 type SponsoredBundleControllerRefs<TDeployForm, TProvisionedSponsoredContext> = {
@@ -70,7 +69,6 @@ type UseSessionWizardSponsoredBundleControllerOptions<
   setNormalModeBundleUrlOverride: Dispatch<SetStateAction<string>>;
   setWorkerUrlAutoFilled: Dispatch<SetStateAction<boolean>>;
   setWorkerSecretsEnabled: Dispatch<SetStateAction<boolean>>;
-  setPersistWorkerSecrets: Dispatch<SetStateAction<boolean>>;
   setBundleFile: Dispatch<SetStateAction<File | null>>;
   buildProvisionedSponsoredContextState: (value: unknown) => TProvisionedSponsoredContext;
 };
@@ -99,7 +97,6 @@ const useSessionWizardSponsoredBundleController = <
   setNormalModeBundleUrlOverride,
   setWorkerUrlAutoFilled,
   setWorkerSecretsEnabled,
-  setPersistWorkerSecrets,
   setBundleFile,
   buildProvisionedSponsoredContextState,
 }: UseSessionWizardSponsoredBundleControllerOptions<TDraft, TDeployForm, TProvisionedSponsoredContext>) => {
@@ -237,18 +234,12 @@ const useSessionWizardSponsoredBundleController = <
   );
 
   const updateSponsoredBundleWorkerSecretState = useCallback(
-    ({
-      workerSecretsEnabled: nextWorkerSecretsEnabled,
-      persistWorkerSecrets: nextPersistWorkerSecrets,
-    }: SponsoredBundleWorkerSecretStatePatch = {}) => {
+    ({ workerSecretsEnabled: nextWorkerSecretsEnabled }: SponsoredBundleWorkerSecretStatePatch = {}) => {
       if (typeof nextWorkerSecretsEnabled === 'boolean') {
         setWorkerSecretsEnabled(nextWorkerSecretsEnabled);
       }
-      if (typeof nextPersistWorkerSecrets === 'boolean') {
-        setPersistWorkerSecrets(nextPersistWorkerSecrets);
-      }
     },
-    [setPersistWorkerSecrets, setWorkerSecretsEnabled],
+    [setWorkerSecretsEnabled],
   );
 
   const sponsoredBundleLifecycle = useSponsoredBundleLifecycle({

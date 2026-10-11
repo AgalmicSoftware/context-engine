@@ -41,6 +41,8 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.workerMode).toBe('default');
     expect(result.current.workerSecretsEnabled).toBe(true);
     expect(result.current.persistWorkerSecrets).toBe(false);
+    // Secret persistence is unsupported, so no setter is offered.
+    expect(result.current).not.toHaveProperty('setPersistWorkerSecrets');
     expect(result.current.deployHelperUrl).toBe('https://deploy-helper.example');
     expect(result.current.deployForm).toEqual({
       apiToken: '',

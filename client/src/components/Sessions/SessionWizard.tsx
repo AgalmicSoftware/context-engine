@@ -571,7 +571,6 @@ const SessionWizard = ({
     workerSecretsEnabled,
     setWorkerSecretsEnabled,
     persistWorkerSecrets,
-    setPersistWorkerSecrets,
     deployHelperUrl,
     setDeployHelperUrl,
     deployForm,
@@ -727,7 +726,6 @@ const SessionWizard = ({
     setNormalModeBundleUrlOverride,
     setWorkerUrlAutoFilled,
     setWorkerSecretsEnabled,
-    setPersistWorkerSecrets,
     setBundleFile,
     buildProvisionedSponsoredContextState,
   });

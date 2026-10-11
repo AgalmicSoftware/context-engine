@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useState } from 'react';
 import type { WorkerPanelProps } from '../WorkerPanel';
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
@@ -85,12 +85,8 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
     typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true,
   );
+  // Secret persistence is intentionally unsupported in every build.
   const persistWorkerSecrets = false;
-  const setPersistWorkerSecrets = useCallback<Dispatch<SetStateAction<boolean>>>((nextValue) => {
-    // Kept as a compatibility callback for sponsored-bundle state restoration.
-    // Secret persistence is intentionally unsupported in every build.
-    void nextValue;
-  }, []);
   const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(deployHelperUrlDefault));
   const [deployForm, setDeployForm] = useState<DeployFormState>({
     // Cloudflare deployment tokens are request-only. Ignore legacy cache values.
@@ -156,7 +152,6 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     workerSecretsEnabled,
     setWorkerSecretsEnabled,
     persistWorkerSecrets,
-    setPersistWorkerSecrets,
     deployHelperUrl,
     setDeployHelperUrl,
     deployForm,
