@@ -148,6 +148,8 @@ const normalizeChain = (chainOrId?: unknown): ChainLike => {
 
 const resolveRpcUrl = (chain: ChainLike): string => chainHttpRpcNoPath(chain) || chainHttpRpc(chain) || '';
 
+const chainIdOf = (chain: ChainLike): number => Number(chain?.id ?? chain?.chainId ?? 0) || 0;
+
 const normalizeTypedData = (payload: unknown): SignTypedDataPayload => {
   const typedData = typeof payload === 'string' ? JSON.parse(payload) : payload;
   const record = (typedData && typeof typedData === 'object' ? typedData : {}) as SignTypedDataPayload;
@@ -205,6 +207,7 @@ export class PasskeyEoaWalletClient {
   private activeChain: ChainLike = defaultChain();
   private lockTimer: ReturnType<typeof setTimeout> | null = null;
   private transitionInProgress = false;
+  private sessionChainId = 0;
 
   constructor(deps: PasskeyWalletClientDeps = {}) {
     this.config = deps.config || getPasskeyWalletConfig();
@@ -218,7 +221,13 @@ export class PasskeyEoaWalletClient {
   }
 
   setChain(chainOrId: unknown): ChainLike {
+    const wasUnlocked = this.isUnlocked();
     this.activeChain = normalizeChain(chainOrId);
+    // The signer stays bound to the chain it unlocked on. Lock it when the app
+    // switches chains so the next signature re-unlocks on the new chain.
+    if (wasUnlocked && !this.isUnlocked() && !this.transitionInProgress) {
+      void this.lock().catch((error) => walletLog.warn('Passkey wallet chain-change lock failed:', error));
+    }
     return this.activeChain;
   }
 
@@ -231,7 +240,9 @@ export class PasskeyEoaWalletClient {
   }
 
   isUnlocked(): boolean {
-    return !!this.activeAddress && this.unlockExpiresAt > this.now();
+    return (
+      !!this.activeAddress && this.unlockExpiresAt > this.now() && this.sessionChainId === chainIdOf(this.activeChain)
+    );
   }
 
   hasSigner(): boolean {
@@ -523,7 +534,7 @@ export class PasskeyEoaWalletClient {
   }
 
   private async activate(record: PasskeyWalletRecord, privateKey: HexString): Promise<void> {
-    const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || 0;
+    const chainId = chainIdOf(this.activeChain);
     const rpcUrl = resolveRpcUrl(this.activeChain);
     if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
     const expiresAt = this.now() + this.config.unlockTtlSeconds * 1000;
@@ -551,6 +562,7 @@ export class PasskeyEoaWalletClient {
     this.activeRecord = record;
     this.activeAddress = record.evmAddress;
     this.unlockExpiresAt = expiresAt;
+    this.sessionChainId = chainId;
     if (this.lockTimer) clearTimeout(this.lockTimer);
     this.lockTimer = setTimeout(
       () => {

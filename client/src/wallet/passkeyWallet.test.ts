@@ -686,6 +686,36 @@ describe('PasskeyEoaWalletClient account binding', () => {
     await first.lock();
   });
 
+  it('locks the signer when the app switches chains and re-unlocks on the new chain', async () => {
+    const credentials = makeCredentials();
+    const firstSession = makeSessionClient();
+    const nextSession = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: firstSession,
+      sessionClientFactory: () => nextSession,
+    });
+    const address = await client.createWallet();
+    expect(firstSession.calls[0].chainId).toBe(11155420);
+
+    client.setChain(11155420);
+    expect(client.isUnlocked()).toBe(true);
+    expect(firstSession.locked).toBe(false);
+
+    client.setChain(84532);
+    expect(client.isUnlocked()).toBe(false);
+    expect(firstSession.locked).toBe(true);
+    await expect(client.request({ method: 'eth_chainId' })).resolves.toBe('0x14a34');
+
+    await expect(client.signMessage('hello', address)).resolves.toMatch(/^0x11/);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(nextSession.calls.map((call) => call.chainId)).toEqual([84532]);
+    expect(client.isUnlocked()).toBe(true);
+    await client.lock();
+  });
+
   it('unlocks only the requested account when the app has no active wallet yet', async () => {
     const storage = createMemoryWalletStorage();
     const creator = new PasskeyEoaWalletClient({
