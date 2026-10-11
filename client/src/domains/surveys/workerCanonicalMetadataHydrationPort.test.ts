@@ -683,6 +683,33 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         ['cf_author', false],
       ]);
     });
+
+    it("prefers the Worker's own admin flag over the session config admin list", async () => {
+      const flagged = (item: ReturnType<typeof listedItem>, uploaderIsAdmin: boolean) => ({
+        ...item,
+        metadata: { ...item.metadata, uploaderIsAdmin },
+      });
+      const { rows } = await loadFrom(
+        [
+          // A Worker role admin who is not named in the public session config.
+          flagged(listedItem('cf_role_admin', '2026-10-01T00:00:00.000Z', AUTHOR), true),
+          // A config-listed address the Worker no longer treats as an admin.
+          flagged(listedItem('cf_former_admin', '2026-10-01T00:00:01.000Z', ADMIN), false),
+          // Older Workers send no flag, so the config list still decides.
+          listedItem('cf_config_admin', '2026-10-01T00:00:02.000Z', ADMIN),
+        ],
+        {
+          cf_role_admin: question({ id: '0xrole' }),
+          cf_former_admin: question({ id: '0xformer' }),
+          cf_config_admin: question({ id: '0xconfig' }),
+        },
+      );
+      expect(rows.map((row: any) => [row.storageRefId, row.uploaderIsAdmin === true])).toEqual([
+        ['cf_role_admin', true],
+        ['cf_former_admin', false],
+        ['cf_config_admin', true],
+      ]);
+    });
   });
 
   it('replaces same-slug question and survey caches when the exact Worker authority changes', () => {

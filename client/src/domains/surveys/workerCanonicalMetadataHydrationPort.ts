@@ -193,10 +193,18 @@ const readPayloadResourceId = (payload: UnknownRecord, resource: WorkerCanonical
   return readString(rawId).toLowerCase();
 };
 
+type ListedStorageRef = {
+  createdAtMs: number;
+  storageRef: StorageRef;
+  uploader: string;
+  // Newer Workers mark admin uploads from their full role set.
+  uploaderIsAdmin: boolean | null;
+};
+
 const normalizeListedStorageRef = (
   item: UnknownRecord,
   resource: WorkerCanonicalMetadataResource,
-): { createdAtMs: number; storageRef: StorageRef; uploader: string } | null => {
+): ListedStorageRef | null => {
   const metadata = isRecord(item.metadata) ? item.metadata : {};
   const listedResource = readString(metadata.resource);
   if (listedResource && listedResource !== resource) return null;
@@ -223,6 +231,7 @@ const normalizeListedStorageRef = (
     createdAtMs: Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs : 0,
     storageRef,
     uploader: readString(metadata.uploader).toLowerCase(),
+    uploaderIsAdmin: typeof metadata.uploaderIsAdmin === 'boolean' ? metadata.uploaderIsAdmin : null,
   };
 };
 
@@ -306,7 +315,7 @@ const loadWorkerCanonicalMetadata = async (
   );
   const admins = resolveSessionAdminAddresses(target.sessionConfig);
   const hiddenIds = new Set<string>();
-  const uniqueItems: Array<{ createdAtMs: number; storageRef: StorageRef; uploader: string }> = [];
+  const uniqueItems: ListedStorageRef[] = [];
   const seenStorageRefs = new Set<string>();
   listedItems.forEach((item) => {
     const hiddenId = readHiddenMarkerId(item, resource);
@@ -325,7 +334,8 @@ const loadWorkerCanonicalMetadata = async (
     createdAtMs,
     storageRef,
     uploader,
-  }: (typeof uniqueItems)[number]): Promise<WorkerCanonicalMetadataRow | null> => {
+    uploaderIsAdmin,
+  }: ListedStorageRef): Promise<WorkerCanonicalMetadataRow | null> => {
     const response = await readBlob({
       storageRef,
       sessionSlug: target.sessionSlug,
@@ -352,13 +362,16 @@ const loadWorkerCanonicalMetadata = async (
       },
       { resource },
     );
+    // Prefer the Worker's own admin flag; older Workers only list the uploader,
+    // so fall back to the admins named in the public session config.
+    const isAdminUpload = uploaderIsAdmin ?? (!!uploader && admins.has(uploader));
     return {
       createdAtMs,
       id,
       payload: compatiblePayload,
       storageRef,
       storageRefId: storageRef.id,
-      ...(uploader && admins.has(uploader) ? { uploaderIsAdmin: true } : {}),
+      ...(isAdminUpload ? { uploaderIsAdmin: true } : {}),
     };
   };
   const readRows = await mapWithConcurrency(uniqueItems, METADATA_READ_CONCURRENCY, readRow);
