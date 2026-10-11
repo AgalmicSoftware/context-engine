@@ -660,7 +660,12 @@ Authenticated clients can use the worker as the session storage boundary:
     hydration, `/agent/interview-catalog`, and results analysis all apply this
     rule, so a later upload by anyone else never replaces a question or survey
     people already answered. Uploads stored before this release have no
-    uploader, so they never count as admin uploads.
+    uploader, so they never count as admin uploads, and their ids have no
+    first-writer record. The first non-admin upload of a question or survey
+    id without one makes the session coordinator scan that resource once:
+    each id stored only by such older uploads gets an admin-only owner, so
+    only a session admin can upload it again (`409`,
+    `reason: "storage_resource_id_owned"`). New ids stay open to anyone.
   - JSON and multipart uploads share per-upload policy validation. Group IDs
     accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
     of precedence, using the first nonempty list. Multipart `groupIds` and

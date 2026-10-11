@@ -6,6 +6,7 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
+import { backfillLegacyStorageOwners } from './storageRouteExecution.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
@@ -31,6 +32,7 @@ import {
 } from './workerGroups.js';
 
 const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
+const STORAGE_LEGACY_OWNERS_KEY_PREFIX = 'storage-legacy-owners:';
 const DIRECT_DEPLOY_RECORD_KEY = 'direct-deploy';
 const SPONSORED_FAUCET_RECORD_KEY = 'sponsored-faucet';
 const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
@@ -311,6 +313,8 @@ export class SessionWriteCoordinator {
     this.sessionConfigTail = Promise.resolve();
     this.workerGroupTail = Promise.resolve();
     this.resultsAnalysisTail = Promise.resolve();
+    this.storageOwnerTail = Promise.resolve();
+    this.backfillLegacyStorageOwners = deps.backfillLegacyStorageOwners || backfillLegacyStorageOwners;
   }
 
   serializeSessionConfigOperation(operation) {
@@ -323,6 +327,41 @@ export class SessionWriteCoordinator {
     const run = this.workerGroupTail.then(operation);
     this.workerGroupTail = run.catch(() => undefined);
     return run;
+  }
+
+  serializeStorageOwnerOperation(operation) {
+    const run = this.storageOwnerTail.then(operation);
+    this.storageOwnerTail = run.catch(() => undefined);
+    return run;
+  }
+
+  // Answers whether a question or survey id was stored before first-writer
+  // records existed. The scan runs once per resource; racing first uploads
+  // wait for it and then read the same stored answer.
+  async executeStorageLegacyOwner(payload) {
+    const resource = toTrimmedString(payload?.resource);
+    const resourceId = toTrimmedString(payload?.resourceId).toLowerCase();
+    if (!['questions', 'surveys'].includes(resource) || !resourceId) {
+      return jsonResponse({ ok: false, error: 'Invalid legacy owner request.' }, 400);
+    }
+    return this.serializeStorageOwnerOperation(async () => {
+      const key = `${STORAGE_LEGACY_OWNERS_KEY_PREFIX}${resource}`;
+      let record = await this.state.storage.get(key);
+      if (!Array.isArray(record?.ids)) {
+        try {
+          const ids = await this.backfillLegacyStorageOwners({
+            env: this.env, config: payload?.config, slug: payload?.slug, resource,
+          });
+          record = { version: 1, ids: [...ids], completedAtMs: Number(this.now()) || Date.now() };
+        } catch {
+          return jsonResponse({ ok: false, error: 'Recording the owners of existing questions and surveys failed; retry.' }, 503);
+        }
+        await this.state.storage.transaction(async (transaction) => {
+          await transaction.put(key, record);
+        });
+      }
+      return jsonResponse({ ok: true, adminOnly: record.ids.includes(resourceId) }, 200);
+    });
   }
 
   serializeResultsAnalysisOperation(operation) {
@@ -2256,6 +2295,9 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/results-analysis/status') {
       return this.executeResultsAnalysisStatus();
     }
+    if (url.pathname === '/storage/legacy-owner') {
+      return this.executeStorageLegacyOwner(payload);
+    }
     if (url.pathname === '/results-analysis/reserve') {
       return this.executeResultsAnalysisReserve(payload);
     }
@@ -2663,6 +2705,25 @@ export const finalizeCoordinatedSponsoredFaucet = async ({
   }
 };
 
+
+// Returns null when there is no coordinator binding, so callers can fall back.
+export const checkCoordinatedLegacyStorageOwner = async ({ env, config, slug, resource, resourceId } = {}) => {
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+  if (!stub) return null;
+  const unavailable = { ok: false, status: 503, error: 'Recording the owners of existing questions and surveys failed; retry.' };
+  try {
+    const response = await stub.fetch('https://session-coordinator.internal/storage/legacy-owner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, config, resource, resourceId }),
+    });
+    const result = await response.json().catch(() => ({}));
+    return response.ok && result?.ok === true ? { ok: true, adminOnly: result.adminOnly === true } : unavailable;
+  } catch {
+    return unavailable;
+  }
+};
 
 export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);

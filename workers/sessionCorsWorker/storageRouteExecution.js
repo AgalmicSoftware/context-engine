@@ -52,11 +52,14 @@ import {
 import {
   isOwnedStorageResource,
   isStorageResourceHidden,
+  LEGACY_STORAGE_OWNER,
+  legacyStorageOwnersMarkerKey,
   listHiddenStorageResourceIds,
   readStorageResourceOwner,
   writeStorageResourceHidden,
   writeStorageResourceOwner,
 } from './storageResourceOwnership.js';
+import { checkCoordinatedLegacyStorageOwner } from './sessionWriteCoordinator.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -1403,10 +1406,19 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
     // Only the id's first author or a session admin may upload it again;
     // anyone else would be rewriting a question or survey people answered.
+    const uploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
     owner = await readStorageResourceOwner({ index, slug, resource, resourceId });
-    if (owner && normalizeAddress(owner.uploader) !== uploader && !resolveSessionAdminAddresses(config).has(uploader)) {
+    if (!owner && !uploaderIsAdmin) {
+      const legacy = await resolveLegacyStorageOwner({ env, config, slug, resource, resourceId, deps });
+      if (!legacy.ok) return responseJson(deps, { error: legacy.error }, legacy.status || 503, baseHeaders);
+      owner = legacy.owner;
+    }
+    if (owner && normalizeAddress(owner.uploader) !== uploader && !uploaderIsAdmin) {
+      const noun = resource === 'questions' ? 'question' : 'survey';
       return responseJson(deps, {
-        error: `This ${resource === 'questions' ? 'question' : 'survey'} id already belongs to another author. Only its first author or a session admin can upload it again.`,
+        error: owner.uploader === LEGACY_STORAGE_OWNER
+          ? `This ${noun} id was stored before authors were recorded, so only a session admin can upload it again.`
+          : `This ${noun} id already belongs to another author. Only its first author or a session admin can upload it again.`,
         reason: 'storage_resource_id_owned',
       }, 409, baseHeaders);
     }
@@ -1983,6 +1995,60 @@ const readIndexRowResourceId = async ({ env, index, slug, config, resource, row,
   row.metadata = { ...row.metadata, resourceId };
   await index.put(row.key, JSON.stringify(row.metadata));
   return resourceId;
+};
+
+// Questions and surveys stored before first-writer records existed have no
+// owner, so the first upload of such an id after an update would claim it.
+// One scan per session and resource gives each of those ids an admin-only
+// owner. Ids with a recorded uploader already have their first writer.
+export const backfillLegacyStorageOwners = async ({ env, config, slug, resource, deps } = {}) => {
+  const index = getStorageIndexBinding(env);
+  if (!index || ['get', 'put', 'list'].some((method) => typeof index[method] !== 'function')) {
+    throw new Error('Cloudflare storage index binding not configured.');
+  }
+  const recorded = new Set();
+  const legacy = new Set();
+  const rows = await listCloudflareMetadataRows({ index, slug, resource });
+  for (const row of rows) {
+    if (!row.metadata) continue;
+    const resourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+    if (resourceId) (normalizeAddress(row.metadata.uploader) ? recorded : legacy).add(resourceId);
+  }
+  const ids = [...legacy].filter((resourceId) => !recorded.has(resourceId)).sort();
+  // Nothing stored yet means nothing to backfill: every later row records its
+  // uploader. Tell the caller, so a failed first upload leaves no marker.
+  ids.scannedRows = rows.length;
+  const createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
+  for (const resourceId of ids) {
+    if (await readStorageResourceOwner({ index, slug, resource, resourceId })) continue;
+    await writeStorageResourceOwner({
+      index, slug, resource, resourceId, uploader: LEGACY_STORAGE_OWNER, storageRefId: '', createdAt,
+    });
+  }
+  return ids;
+};
+
+// Whether an id without an owner record was stored before first-writer
+// records existed. The session coordinator runs the scan once and answers from
+// its own storage, so racing first uploads cannot both claim a legacy id.
+// Without a coordinator binding (local tools and tests) the same idempotent
+// scan runs inline once, marked in KV.
+const LEGACY_OWNER = Object.freeze({ uploader: LEGACY_STORAGE_OWNER });
+
+const resolveLegacyStorageOwner = async ({ env, config, slug, resource, resourceId, deps }) => {
+  const coordinated = await checkCoordinatedLegacyStorageOwner({ env, config, slug, resource, resourceId });
+  if (coordinated) return coordinated.ok ? { ok: true, owner: coordinated.adminOnly ? LEGACY_OWNER : null } : coordinated;
+  try {
+    const index = getStorageIndexBinding(env);
+    const markerKey = legacyStorageOwnersMarkerKey({ slug, resource });
+    // Another upload may have just recorded the owners; read them again.
+    if (await index.get(markerKey)) return { ok: true, owner: await readStorageResourceOwner({ index, slug, resource, resourceId }) };
+    const ids = await backfillLegacyStorageOwners({ env, config, slug, resource, deps });
+    if (ids.scannedRows) await index.put(markerKey, JSON.stringify({ version: 1, count: ids.length }));
+    return { ok: true, owner: ids.includes(resourceId) ? LEGACY_OWNER : null };
+  } catch {
+    return { ok: false, status: 503, error: 'Recording the owners of existing questions and surveys failed; retry.' };
+  }
 };
 
 // Admin soft hide: every stored version stays readable by its storage id, but

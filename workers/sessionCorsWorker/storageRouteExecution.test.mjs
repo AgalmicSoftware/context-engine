@@ -4383,6 +4383,61 @@ test('only the first author or a session admin can upload an existing question o
 	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xq2'))).status, 200);
 });
 
+// Strips what this release records, so the rows look like uploads from before it.
+const makeLegacyOwnedRows = (kv, resource, resourceIds) => {
+	for (const resourceId of resourceIds) kv.store.delete(`ce-storage-owner:session-a:${resource}:${resourceId}`);
+	for (const [key, value] of kv.store) {
+		if (!key.startsWith(`ce-storage:session-a:${resource}:`)) continue;
+		const metadata = JSON.parse(value);
+		if (!resourceIds.includes(metadata.resourceId)) continue;
+		delete metadata.resourceId;
+		delete metadata.uploader;
+		kv.store.set(key, JSON.stringify(metadata));
+	}
+};
+
+const countIndexScans = (kv, resource) => {
+	const scans = [];
+	const list = kv.list.bind(kv);
+	kv.list = async (options = {}) => {
+		if (String(options.prefix).startsWith(`ce-storage:session-a:${resource}:`)) scans.push(options.prefix);
+		return list(options);
+	};
+	return scans;
+};
+
+for (const coordinated of [false, true]) {
+	test(`ids stored before first-writer records are admin-only after an update (${coordinated ? 'coordinator' : 'inline'})`, async () => {
+		const { common, kv, upload } = createOwnershipHarness();
+		if (coordinated) attachSessionCoordinator(common.env, () => {});
+		// Rows the previous release stored (an admin upload never starts the backfill).
+		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Original?', '0xq1'))).status, 200);
+		assert.equal((await upload(OWNERSHIP_ADMIN, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
+		makeLegacyOwnedRows(kv, 'questions', ['0xq1']);
+		makeLegacyOwnedRows(kv, 'surveys', ['0xs1']);
+		const scans = countIndexScans(kv, 'questions');
+
+		const [claim, fresh] = await Promise.all([
+			upload(OWNERSHIP_OTHER, { id: '0xQ1', type: 'binary', prompt: 'Rewritten by M', encryption: {} }),
+			upload(OWNERSHIP_OTHER, ownedQuestion('A new question', '0xq2')),
+		]);
+		assert.equal(claim.status, 409);
+		assert.equal(claim.body.reason, 'storage_resource_id_owned');
+		assert.match(claim.body.error, /only a session admin/);
+		assert.equal(fresh.status, 200);
+		assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xs1', title: 'Hijacked' }, 'surveys')).status, 409);
+		// Its first author was never recorded either.
+		assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Original edit', '0xq1'))).status, 409);
+		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Admin edit', '0xq1'))).status, 200);
+		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Another new question', '0xq3'))).status, 200);
+		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Rewrite of a new one', '0xq2'))).status, 200);
+		// The coordinator scans once; inline, only the two racing first uploads scan.
+		assert.equal(scans.length, coordinated ? 1 : 2);
+		const owner = JSON.parse(kv.store.get('ce-storage-owner:session-a:questions:0xq1'));
+		assert.equal(owner.uploader, 'legacy-admin-only');
+	});
+}
+
 test('admins hide a question id without deleting it, and unhide restores it', async () => {
 	const { common, kv, upload, list, read } = createOwnershipHarness();
 	const first = await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'));
