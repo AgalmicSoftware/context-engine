@@ -1,4 +1,5 @@
 import {
+  STALE_CHUNK_RELOAD_WINDOW_MS,
   clearBootReloadMarker,
   clearBootCaches,
   clearStaleChunkReloadMarker,
@@ -268,6 +269,52 @@ describe('bootRecovery', () => {
     ).toBe(false);
     expect(reload).not.toHaveBeenCalled();
     expect(storage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('reloads automatically at most once per window, even after the reloaded route commits', () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const reload = jest.fn();
+    const storage = createMemoryStorage();
+    const fakeWindow = {
+      history: { replaceState: jest.fn() },
+      location: { href: 'https://app.example.test/session/alpha' },
+      sessionStorage: storage,
+    };
+    const recover = () =>
+      recoverFromStaleChunkLoadError(new TypeError('Failed to fetch dynamically imported module'), {
+        window: fakeWindow,
+        storage,
+        reload,
+      });
+
+    try {
+      expect(recover()).toBe(true);
+      // The reloaded page commits its route, then the same chunk fails again.
+      clearStaleChunkReloadMarker(fakeWindow);
+      now.mockReturnValue(1_000_000 + STALE_CHUNK_RELOAD_WINDOW_MS - 1);
+      expect(recover()).toBe(false);
+      now.mockReturnValue(1_000_000 + STALE_CHUNK_RELOAD_WINDOW_MS);
+      expect(recover()).toBe(true);
+      expect(reload).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('keeps the URL marker as the loop guard when session storage is unavailable', () => {
+    const replaceState = jest.fn();
+    const fakeWindow = {
+      history: { replaceState },
+      location: { href: 'https://app.example.test/session/alpha?ceChunkReload=123' },
+    };
+    Object.defineProperty(fakeWindow, 'sessionStorage', {
+      get() {
+        throw new Error('Storage is disabled');
+      },
+    });
+
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
+    expect(replaceState).not.toHaveBeenCalled();
   });
 
   it('reloads a stale route through the chunk recovery marker', () => {

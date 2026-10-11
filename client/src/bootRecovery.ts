@@ -1,6 +1,11 @@
 const BOOT_RELOAD_PARAM = 'ceBootReload';
 const STALE_CHUNK_RELOAD_PARAM = 'ceChunkReload';
+// Set by an automatic reload and cleared once a primary route commits.
 export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v20260618b';
+// Time of the last automatic reload. Route commits keep it, so a chunk that fails on
+// every load reloads at most once per window instead of looping.
+export const STALE_CHUNK_RELOAD_AT_STORAGE_KEY = 'ce:staleChunkReloadAt:v20261011';
+export const STALE_CHUNK_RELOAD_WINDOW_MS = 60_000;
 
 type BootStorage = {
   clear?: () => void;
@@ -143,15 +148,28 @@ export const clearBootReloadMarker = (
 };
 
 export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window): boolean => {
-  // Regression guard: this loop sentinel must survive until a primary route commits;
-  // clearing it at entry-module load lets a still-stale lazy chunk reload forever.
+  // A primary route committed, so drop the boot-loop flag. The automatic-reload time
+  // stays as the loop guard; without session storage the URL marker is that guard.
+  let storageAvailable = false;
   try {
+    storageAvailable = !!win?.sessionStorage;
     win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
   } catch {
-    // Successful route cleanup is best-effort when storage is unavailable.
+    storageAvailable = false;
   }
 
-  return clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM);
+  return storageAvailable ? clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM) : false;
+};
+
+const wasRecentlyAutoReloaded = (storage: BootStorage | undefined, storageKey: string, now: number): boolean => {
+  try {
+    if (storage?.getItem?.(storageKey) === 'true') return true;
+    const elapsedMs = now - Number(storage?.getItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY) || 0);
+    return elapsedMs >= 0 && elapsedMs < STALE_CHUNK_RELOAD_WINDOW_MS;
+  } catch {
+    // The URL marker still guards reload loops when storage is unavailable.
+    return false;
+  }
 };
 
 export const recoverFromStaleChunkLoadError = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
@@ -167,19 +185,17 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   const storageKey = options.storageKey || STALE_CHUNK_RELOAD_STORAGE_KEY;
   const reloadParam = options.reloadParam || STALE_CHUNK_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
+  const now = Date.now();
 
-  let alreadyAttempted = hasReloadParam(win, reloadParam);
-  try {
-    alreadyAttempted = alreadyAttempted || storage?.getItem?.(storageKey) === 'true';
-  } catch {
-    // URL param guard above still prevents reload loops when storage is unavailable.
-  }
-  if (alreadyAttempted) {
+  // Regression guard: at most one automatic reload per window, even after a route
+  // commits; within it the error boundary stays up and "Try again" reloads by hand.
+  if (hasReloadParam(win, reloadParam) || wasRecentlyAutoReloaded(storage, storageKey, now)) {
     return false;
   }
 
   try {
     storage?.setItem?.(storageKey, 'true');
+    storage?.setItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY, String(now));
   } catch {
     // Best-effort loop guard; reloadWithCacheBuster also marks the URL.
   }
