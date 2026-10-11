@@ -1658,6 +1658,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   seedBuiltInDemoQuestionCache = async (): Promise<boolean> => {
     // The demo question pool ships in its own chunk, so only the built-in demo route loads it.
     const { getPolisDemoQuestionPool } = await import('../SurveyTool/surveyPolisDemoQuestionPool');
+    // The visitor may have left the demo while the chunk loaded; the next
+    // session must not be marked ready by the demo's questions.
+    if (!this._mounted || !this.isBuiltInDemoSessionRoutePath()) return false;
     const questionPool = getPolisDemoQuestionPool();
     if (!Array.isArray(questionPool) || questionPool.length === 0) return false;
 

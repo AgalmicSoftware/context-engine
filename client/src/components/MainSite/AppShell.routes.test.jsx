@@ -904,6 +904,7 @@ describe('AppShell route render smoke', () => {
     const firstQuestion = demoQuestions[0];
     expect(firstQuestion?.id).toBeTruthy();
 
+    subject._mounted = true;
     await expect(subject.seedBuiltInDemoQuestionCache()).resolves.toBe(true);
 
     const generalQuestions = cacheStore['questionsCache:']?.['11155420']?.questions || {};
@@ -931,6 +932,30 @@ describe('AppShell route render smoke', () => {
       }),
       expect.any(Function),
     );
+  });
+
+  it('does not mark the next session ready when the visitor leaves the demo while its questions load', async () => {
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: { slug: 'demo', sessionName: 'Context Engine', networkChainId: 11155420 },
+    });
+    subject._mounted = true;
+    subject.getDisplaySessionChainId = jest.fn(() => 11155420);
+    subject.writeQuestionMetadataToCache = jest.fn(() => true);
+    subject.setReadinessStateIfChanged = jest.fn();
+
+    const leftDemo = subject.seedBuiltInDemoQuestionCache();
+    setRoute('/session/edge');
+    await expect(leftDemo).resolves.toBe(false);
+
+    setRoute('/session/demo');
+    const unmounted = subject.seedBuiltInDemoQuestionCache();
+    subject._mounted = false;
+    await expect(unmounted).resolves.toBe(false);
+
+    expect(subject.writeQuestionMetadataToCache).not.toHaveBeenCalled();
+    expect(subject.setReadinessStateIfChanged).not.toHaveBeenCalled();
   });
 
   it('drops cached decrypts only when the signed-in account really changes', () => {
