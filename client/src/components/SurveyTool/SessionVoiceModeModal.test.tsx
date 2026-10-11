@@ -2075,6 +2075,44 @@ describe('SessionVoiceModeModal', () => {
     expect(prefillPacket?.responderContext).toEqual({ summary: 'Works on local policy' });
   });
 
+  it('offers drafts for a later round whose connection dropped after earlier drafts exist', async () => {
+    const rounds: Array<Parameters<typeof startSessionRealtimeInterview>[0]> = [];
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      rounds.push(options);
+      const text = `Responder: Round ${rounds.length} answer.`;
+      options.onRecordingState?.('recording');
+      options.onTranscript?.(text, []);
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: text, turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => text,
+      };
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Round 1 draft', confidence: 0.8 },
+    ]);
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    await act(async () => {
+      rounds[1].onError?.(new Error('Interview connection lost. Generate drafts from the captured transcript.'));
+      rounds[1].onRecordingState?.('stopped');
+    });
+
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(2));
+    expect(mockedMapInterviewEvidenceToResponses.mock.calls[1][0].transcript).toContain('Round 2 answer.');
+    await waitFor(() => expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument());
+  });
+
   it('uses the pile-view Agree, Unsure, and Disagree control for binary drafts', async () => {
     const prefillPacket = {
       version: 1 as const,

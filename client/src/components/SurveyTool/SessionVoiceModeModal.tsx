@@ -176,6 +176,8 @@ function SessionInterviewPanel({
   const [transcript, setTranscript] = useState('');
   const transcriptRef = useRef('');
   const roundBaseTranscriptRef = useRef('');
+  // The transcript the current drafts came from; a later round that was not mapped can still be.
+  const [mappedTranscript, setMappedTranscript] = useState('');
   const receiveTranscript = (current: string) => {
     const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, current);
     transcriptRef.current = combined;
@@ -544,6 +546,7 @@ function SessionInterviewPanel({
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
+        setMappedTranscript(nextTranscript);
         if (review.drafts.length) {
           setGroupRecommendationRequest({
             requestId: Date.now(),
@@ -886,11 +889,12 @@ function SessionInterviewPanel({
         : 'Start voice interview';
   const canGenerateDrafts = Boolean(
     !isInterviewBusy &&
-    !drafts.length &&
     !mapping &&
     !mappingNotice &&
-    (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
-    (transcript.trim() || prefillPacket || responderContext.trim()),
+    (drafts.length
+      ? transcript.trim() && transcript !== mappedTranscript
+      : (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
+        (transcript.trim() || prefillPacket || responderContext.trim())),
   );
 
   return (
