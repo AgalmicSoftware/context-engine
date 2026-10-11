@@ -118,6 +118,45 @@ describe('sessionResultsGeneratedViewAdapters', () => {
     expect(JSON.stringify(result.analysisData)).not.toContain('missing-question');
   });
 
+  it('counts each multiple-choice pick against responders and skips uncharted answer types', () => {
+    const result = buildGeneratedBreakdownAnalysisData({
+      questions: [
+        { id: 'q1', prompt: 'Pick all that apply', type: 'multichoice', options: ['A', 'B'] },
+        { id: 'q2', prompt: 'Pick with punctuation', type: 'multichoice', options: ['Alpha; Beta', 'Gamma'] },
+        { id: 'q3', prompt: 'Explain', type: 'freeform' },
+        { id: 'q4', prompt: 'Allocate', type: 'quadratic', options: ['A', 'B'] },
+      ],
+      responses: [
+        { questionId: 'q1', participantId: 'participant_001', answer: 'A' },
+        { questionId: 'q1', participantId: 'participant_002', answer: 'A; B' },
+        { questionId: 'q1', participantId: 'participant_003', answer: 'B' },
+        { questionId: 'q2', participantId: 'participant_001', answer: 'Alpha; Beta; Gamma' },
+        { questionId: 'q3', participantId: 'participant_001', answer: 'Some written answer' },
+        { questionId: 'q4', participantId: 'participant_001', answer: 'A: +3; B: -1' },
+      ],
+    });
+    const rows = (questionId: string) =>
+      result.analysisData?.flatResponses
+        .filter((row) => row.questionId === questionId && row.segmentKey === 'All')
+        .map(({ responseText, count, totalVotes }) => [responseText, count, totalVotes]);
+
+    expect(result.analysisData?.questions.map((question) => question.id)).toEqual(['q1', 'q2']);
+    expect(rows('q1')).toEqual([
+      ['A', 2, 3],
+      ['B', 2, 3],
+    ]);
+    expect(rows('q2')).toEqual([
+      ['Alpha; Beta', 1, 1],
+      ['Gamma', 1, 1],
+    ]);
+    expect(
+      buildGeneratedBreakdownAnalysisData({
+        questions: [{ id: 'q3', prompt: 'Explain', type: 'freeform' }],
+        responses: [{ questionId: 'q3', participantId: 'participant_001', answer: 'Text' }],
+      }).unavailableReason,
+    ).toBe('Breakdown charts binary, rating, and multiple-choice questions only.');
+  });
+
   it('rejects generated atlas graphs that would render recursively', () => {
     const result = buildGeneratedDebateMapAdapter(
       buildArtifact({
