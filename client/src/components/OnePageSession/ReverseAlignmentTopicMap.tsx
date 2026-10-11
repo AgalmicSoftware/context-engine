@@ -1,11 +1,23 @@
 import React, { Suspense, useState } from 'react';
 import LazyFallback from '../Shared/LazyFallback';
-import type { DebateNode } from '../DebateMap/debateMapTypes';
-import debateStyles from '../DebateMap/DebateMap.module.scss';
+import type { AtlasViewProps, DebateNode } from '../DebateMap/debateMapTypes';
 import styles from './ReverseAlignmentTopicMap.module.scss';
 import { hasReverseAlignmentContext, reverseAlignmentBranches, reverseAlignmentTopics } from './reverseAlignmentTopics';
 
-const Circles = React.lazy(() => import('../DebateMap/DebateMap').then(({ AtlasView }) => ({ default: AtlasView })));
+// Regression guard: session pages import this preview statically, so DebateMap's
+// large stylesheet must arrive with the lazy circles, not with this module.
+const Circles = React.lazy(async () => {
+  const [{ AtlasView }, { default: debateStyles }] = await Promise.all([
+    import('../DebateMap/DebateMap'),
+    import('../DebateMap/DebateMap.module.scss'),
+  ]);
+  const DebateMapCircles = ({ className, ...atlasProps }: AtlasViewProps & { className: string }) => (
+    <div className={`${debateStyles.debateMap} ${className}`}>
+      <AtlasView {...atlasProps} />
+    </div>
+  );
+  return { default: DebateMapCircles };
+});
 
 // Editorial scaffolding only: no submitted question/response IDs or sample votes.
 const topicTree: DebateNode[] = reverseAlignmentBranches.map((branch, index) => ({
@@ -39,17 +51,22 @@ export default function ReverseAlignmentTopicMap() {
         <span className={styles.preview}>Circles · Preview</span>
       </header>
       <p className={styles.waiting}>Waiting for more data</p>
-      <div className={`${debateStyles.debateMap} ${styles.canvas}`}>
-        <Suspense fallback={<LazyFallback label="Loading topic circles…" minHeight="30vh" />}>
-          <Circles
-            data={topicTree}
-            rootLabel="Reverse Alignment"
-            atlasLayoutMode="packed"
-            readOnly
-            onNodeClick={setSelected}
-          />
-        </Suspense>
-      </div>
+      <Suspense
+        fallback={
+          <div className={styles.canvas}>
+            <LazyFallback label="Loading topic circles…" minHeight="30vh" />
+          </div>
+        }
+      >
+        <Circles
+          className={styles.canvas}
+          data={topicTree}
+          rootLabel="Reverse Alignment"
+          atlasLayoutMode="packed"
+          readOnly
+          onNodeClick={setSelected}
+        />
+      </Suspense>
       <div role="status" aria-live="polite">
         {selected && (
           <div className={styles.empty}>
