@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
+import OnePageSessionAutoMintAlerts from './OnePageSessionAutoMintAlerts';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
@@ -1064,11 +1065,35 @@ describe('OnePageSession auto-mint queue', () => {
 
       expect(claimSpy).not.toHaveBeenCalled();
       expect(sendSpy).not.toHaveBeenCalled();
+      // Marked failed (not info) so the banner offers Retry; nothing was consumed, so Retry reads the hash again.
       expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toEqual({
-        status: 'info',
+        status: 'failed',
         name: 'Skipped (read error)',
         error: UNREADABLE,
       });
+      const onKickoffAutoMintIfNeeded = jest.fn();
+      render(
+        <OnePageSessionAutoMintAlerts
+          autoMintCountdown={null}
+          autoMintStatuses={subject.state.autoMintStatuses}
+          autoMintTargets={[]}
+          basePath=""
+          dismissedLoginBanner
+          dismissedStatusItems={{}}
+          effectiveSlug="edge"
+          expandedImages={{}}
+          needsLoginForAutoMint={false}
+          sbtImages={{}}
+          sbtNames={{}}
+          onCancelAutoMintCountdown={jest.fn()}
+          onDismissLoginBanner={jest.fn()}
+          onDismissStatusItem={jest.fn()}
+          onKickoffAutoMintIfNeeded={onKickoffAutoMintIfNeeded}
+          onToggleStatusImagePreview={jest.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(onKickoffAutoMintIfNeeded).toHaveBeenCalledTimes(1);
     });
 
     it.each([

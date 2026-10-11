@@ -2,7 +2,10 @@
 import React, { Component } from 'react';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
-import { GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE } from '../../utilities/crypto/sbtAuthorization';
+import {
+  createGroupPasswordHashUnreadableError,
+  isGroupPasswordUnverifiableError,
+} from '../../utilities/crypto/sbtAuthorization';
 import { ethers } from 'ethers';
 
 import {
@@ -1749,9 +1752,9 @@ class OnePageSession extends Component<any, any> {
           } else {
             // Password required paths
             if (!t.gp) {
-              throw new Error(
-                mayHaveGroupPassword ? GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE : 'Password required for this group',
-              );
+              throw mayHaveGroupPassword
+                ? createGroupPasswordHashUnreadableError()
+                : new Error('Password required for this group');
             }
 
             let maxTokensLimit: any = null;
@@ -1784,15 +1787,20 @@ class OnePageSession extends Component<any, any> {
               // The tx phase checks the password with the same slow derivation that signs.
               path = 'unlimited';
             } else if (gphUnreadable) {
-              throw new Error(GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE);
+              throw createGroupPasswordHashUnreadableError();
             } else {
               throw new Error('Invite code required for this group');
             }
           }
         }
       } catch (e: any) {
-        // Preflight/read-only error: log diagnostic but do NOT mark as "failed" in UI
-        updateStatus(sbtKey, { status: 'info', name: `Skipped (read error)`, error: getErrorMessage(e, 'Read error') });
+        // Preflight/read-only error: log diagnostic but do NOT mark as "failed" in UI. A password check that could
+        // not be read is the exception: marked failed, its banner offers Retry (the target was not consumed).
+        updateStatus(sbtKey, {
+          status: isGroupPasswordUnverifiableError(e) ? 'failed' : 'info',
+          name: `Skipped (read error)`,
+          error: getErrorMessage(e, 'Read error'),
+        });
         continue;
       }
 

@@ -41,6 +41,11 @@ const describeDerivationFailure = (error: unknown): string =>
     ? error.message
     : 'This browser could not check the group password. Try again, or use another browser.';
 
+// For callers that read the hash themselves: the same "could not read" error signing raises, so the UI can tell
+// it apart and offer Retry.
+export const createGroupPasswordHashUnreadableError = (): Error =>
+  groupPasswordError(GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE, GROUP_PASSWORD_UNVERIFIABLE);
+
 export const hasInvalidGroupPasswordCharacter = (password: unknown): boolean =>
   typeof password === 'string' && UNPAIRED_HIGH_SURROGATE.test(password);
 
@@ -99,7 +104,7 @@ const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: Sb
     .trim()
     .toLowerCase();
   if (!BYTES32_HEX.test(expectedHash)) {
-    throw groupPasswordError(GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE, GROUP_PASSWORD_UNVERIFIABLE);
+    throw createGroupPasswordHashUnreadableError();
   }
   // A zero hash means the group has no group password: no password can match, so skip the slow KDF.
   if (expectedHash === ethers.constants.HashZero) {
