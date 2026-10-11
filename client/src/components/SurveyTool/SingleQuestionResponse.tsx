@@ -22,8 +22,7 @@ import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath, resolveQuestionPayloadDisplayState } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { toSafeArweaveLinkHref } from '../../utilities/arweave/arweaveUrls.js';
-import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
+import { surveyResponseStoragePort } from '../../domains/storage/surveyResponseStoragePort';
 import GateTooltip from '../Gates/GateTooltip';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import {
@@ -64,6 +63,7 @@ import {
 } from './singleQuestionResponseDisplay';
 
 const questionLog = createLogger('questions');
+const ARWEAVE_LINK_OPTIONS = { contextLabel: 'single_question_response_link' };
 
 type SingleQuestionRecord = Record<string, unknown>;
 type SingleQuestionNetworkLike = SingleQuestionRecord & {
@@ -849,10 +849,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     // Stable id + URL
     const qid = this.getQuestionId(questionRecord);
     const url = qid ? buildQuestionRoutePath(qid, { sessionSlug: this.resolveGroupSlug() }) : '/questions';
-    // Question and response records carry uploader data, so only safe gateway links render.
-    const arweaveUrl = toSafeArweaveLinkHref(getLegacyArweaveTxId(questionRecord), {
-      contextLabel: 'single_question_response_link',
-    });
+    // Question and response records carry uploader data, so only real Arweave ids link.
+    const arweaveUrl = surveyResponseStoragePort.buildQuestionArweaveHref(questionRecord, ARWEAVE_LINK_OPTIONS);
     const hasCardActions = Boolean(qid || arweaveUrl);
     const isFullscreen = mode === 'fullscreen';
     const containerClassName = joinClassNames(
@@ -1044,9 +1042,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
 
     const { prompt, type, id } = question;
-    const finalArweaveHref = toSafeArweaveLinkHref(getLegacyArweaveTxId(response) || getLegacyArweaveTxId(question), {
-      contextLabel: 'single_question_response_link',
-    });
+    const finalArweaveHref =
+      surveyResponseStoragePort.buildQuestionArweaveHref(response, ARWEAVE_LINK_OPTIONS) ||
+      surveyResponseStoragePort.buildQuestionArweaveHref(question, ARWEAVE_LINK_OPTIONS);
     const answer = response.answer || {};
     const additional = response.additional || {};
     const conviction = response.conviction !== undefined ? response.conviction : (response.importance ?? null);
@@ -1377,9 +1375,10 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     if (aggregatorResponseMode) {
       const aggregatorQuestion = question || {};
       const aggregatorQuestionId = aggregatorQuestion.id;
-      const aggregatorQuestionArweaveHref = toSafeArweaveLinkHref(getLegacyArweaveTxId(aggregatorQuestion), {
-        contextLabel: 'single_question_response_link',
-      });
+      const aggregatorQuestionArweaveHref = surveyResponseStoragePort.buildQuestionArweaveHref(
+        aggregatorQuestion,
+        ARWEAVE_LINK_OPTIONS,
+      );
       const containerClassName = joinClassNames(styles.fullscreenQuestionContainer, this.props.containerClassName);
       const hasCardActions = Boolean(aggregatorQuestionId || aggregatorQuestionArweaveHref);
       const questionBodyClassName = joinClassNames(

@@ -20,7 +20,16 @@ export const surveyResponseStoragePort: SurveyResponseStoragePort = {
     noLeakPayloads.sanitizeSurveyTitleForResponsePayload(survey, options),
   getLegacyArweaveTxId: (record, options) => storageRefs.getLegacyArweaveTxId(record, options),
   normalizeArweaveUrl: (value, options) => arweaveUrls.normalizeArweaveUrl(value, options),
-  // Question records carry uploader data, so only a safe gateway link may come back.
-  buildQuestionArweaveHref: (question, options) =>
-    arweaveUrls.toSafeArweaveLinkHref(storageRefs.getLegacyArweaveTxId(question), options),
+  // The Arweave link of a question or response record. Records carry uploader
+  // data: a field that is not an Arweave id, or whose text conversion throws,
+  // gives no link.
+  buildQuestionArweaveHref: (question, options) => {
+    let arweaveTxId: string;
+    try {
+      arweaveTxId = storageRefs.getLegacyArweaveTxId(question);
+    } catch {
+      return '';
+    }
+    return arweaveUrls.toSafeArweaveLinkHref(arweaveTxId, options);
+  },
 };

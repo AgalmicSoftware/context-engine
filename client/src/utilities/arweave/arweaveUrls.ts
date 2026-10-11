@@ -271,12 +271,14 @@ export const toSafeLinkHref = (
   }
 };
 
-// Link for a stored Arweave reference (txId, ar://txId or gateway URL), which
-// uploaded records can set to anything; unsafe values return ''.
+// Gateway link for a stored Arweave reference (a txId, ar://txId or a known
+// gateway URL). Uploaded records can set these fields to anything, so every
+// other value, including other web links and same-site paths, returns ''.
 export const toSafeArweaveLinkHref = (
   value: unknown,
   options: { gateway?: unknown; contextLabel?: unknown } = {},
-): string => (typeof value === 'string' ? toSafeLinkHref(normalizeArweaveUrl(value, options)) : '');
+): string =>
+  typeof value === 'string' && parseArweaveTxId(value) ? toSafeLinkHref(normalizeArweaveUrl(value, options)) : '';
 
 export const buildArweaveGatewayUrlCandidates = (
   value: unknown,

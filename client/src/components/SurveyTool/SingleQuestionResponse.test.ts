@@ -224,7 +224,32 @@ describe('SingleQuestionResponse card actions', () => {
 
   it('never turns unsafe Arweave ids from uploaded questions or responses into links', () => {
     const unsafe = 'javascript:alert(document.domain)';
+    const hostile = () => JSON.parse('{"toString":1}');
+    const responseWith = (fields: Record<string, unknown>) =>
+      createSubject({
+        mode: 'fullscreen',
+        question: { id: 'q-unsafe', prompt: 'Prompt', type: 'freeform' },
+        response: {
+          ...fields,
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      }).render();
     const trees = [
+      // Other web links are not Arweave transactions, whatever the link says.
+      responseWith({ arweaveTxId: 'https://arweave-net.example/login?next=wallet' }),
+      // Fields whose text conversion throws must not break the card.
+      responseWith({ txId: hostile() }),
+      responseWith({ storageRef: { backend: 'arweave', id: hostile() } }),
+      createSubject({
+        aggregatorResponseMode: true,
+        question: {
+          id: 'q-unsafe',
+          type: 'binary',
+          storageRef: { backend: 'arweave', id: '/session/demo?worker=https://worker.attacker.example' },
+        },
+        allResponses: [],
+      }).render(),
       createSubject({
         mode: 'mini',
         questionOnly: true,

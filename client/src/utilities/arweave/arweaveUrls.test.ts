@@ -114,6 +114,10 @@ describe('arweaveUrls helpers', () => {
       'javascript:alert(document.domain)',
       '//evil.example/phish',
       'data:text/html,x',
+      // Other web links and same-site paths are not Arweave references.
+      'https://arweave-net.example/login?next=wallet',
+      'https://example.test/doc',
+      '/session/demo?worker=https://worker.attacker.example',
       '',
       null,
       JSON.parse('{"toString":1}'),

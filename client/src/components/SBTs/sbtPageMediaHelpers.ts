@@ -1,4 +1,8 @@
-import { buildArweaveGatewayUrlCandidates, toSafeArweaveLinkHref } from '../../utilities/arweave/arweaveUrls.js';
+import {
+  buildArweaveGatewayUrlCandidates,
+  normalizeArweaveUrl,
+  toSafeLinkHref,
+} from '../../utilities/arweave/arweaveUrls.js';
 import { decodeSbtPageJsonDataUri } from './sbtPagePasswordExportHelpers';
 
 export type SbtPageInfoImageLike = Record<string, unknown> & {
@@ -129,8 +133,9 @@ export const normalizeSbtPageCanonicalMetadataHref = (candidateRaw: unknown): st
   if (typeof candidateRaw !== 'string') return '';
   const candidate = candidateRaw.trim();
   if (!candidate) return '';
-  // The SBT creator sets the token URI, so only a safe link may come back.
-  const normalized = toSafeArweaveLinkHref(candidate, { contextLabel: 'sbt_page_token_uri' });
+  // The SBT creator sets the token URI, so only a safe link may come back. Unlike
+  // View on Arweave links, metadata hosted on any https site is fine here.
+  const normalized = toSafeLinkHref(normalizeArweaveUrl(candidate, { contextLabel: 'sbt_page_token_uri' }));
   if (!normalized) return '';
   if (isSbtPageImageLikeUri(normalized)) return '';
   return normalized;

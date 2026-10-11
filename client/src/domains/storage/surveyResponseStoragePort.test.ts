@@ -82,5 +82,17 @@ describe('survey response storage port', () => {
         storageRef: { backend: 'arweave', id: '//evil.example/phish' },
       }),
     ).toBe('');
+    // Only Arweave transactions link: not other web pages or same-site paths.
+    expect(
+      surveyResponseStoragePort.buildQuestionArweaveHref({ arweaveTxId: 'https://arweave-net.example/login' }),
+    ).toBe('');
+    expect(surveyResponseStoragePort.buildQuestionArweaveHref({ arweaveTxId: '/session/demo?worker=x' })).toBe('');
+    // A field whose text conversion throws gives no link instead of an error.
+    expect(surveyResponseStoragePort.buildQuestionArweaveHref({ txId: JSON.parse('{"toString":1}') })).toBe('');
+    expect(
+      surveyResponseStoragePort.buildQuestionArweaveHref({
+        storageRef: { backend: 'arweave', id: JSON.parse('{"toString":1}') },
+      }),
+    ).toBe('');
   });
 });
