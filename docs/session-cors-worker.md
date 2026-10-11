@@ -2609,6 +2609,11 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   visible and temporarily hidden replacements preserve `secret_text` bindings,
   and any later non-success remains pending. The helper returns/replays success
   only after the terminal receipt commits and the rejection marker is removed.
+- A same-ID retry whose earlier attempt already staged the KV namespace checks
+  the Worker and Agent Bridge bundles just before upload. If a bundle is
+  unavailable or does not match its manifest, the request stays pending (`502`
+  or `409` with `deploymentRequestPending` and the retained `orphanResources`)
+  instead of ending, so a later retry can finish once the bundle is fixed.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
