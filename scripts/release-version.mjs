@@ -245,7 +245,9 @@ const DEPLOY_HELPER_EXAMPLE_CONFIG_PATH = 'workers/deploy-helper/wrangler.exampl
 const WORKER_RELEASE_TAG_RE = /^worker-bundles-([a-f0-9]{40})$/;
 const FULL_COMMIT_RE = /^[a-f0-9]{40}$/;
 const ROOT_LOCKFILE_PATH = 'package-lock.json';
-// What the release bundles are built from (scripts/worker-bundle.mjs).
+// What the release bundles are built from (scripts/worker-bundle.mjs), plus
+// the native Cloudflare template the pin also selects. A test checks that this
+// covers every local input of the real bundles.
 export const WORKER_RELEASE_SOURCE_PATHSPEC = Object.freeze([
   ':(glob)workers/**/*.js',
   ':(glob)workers/**/*.mjs',
@@ -255,7 +257,17 @@ export const WORKER_RELEASE_SOURCE_PATHSPEC = Object.freeze([
   ':(glob)shared/**/*.cjs',
   'workers/sessionCorsWorker/package-lock.json',
   'scripts/worker-bundle.mjs',
+  'deploy/cloudflare/session-worker/worker.mjs',
+  'deploy/cloudflare/session-worker/wrangler.jsonc',
+  'deploy/cloudflare/session-worker/package.json',
+  'scripts/cloudflare-session-template.mjs',
   ':(exclude,glob)**/*.test.*',
+  // Not imported by any bundle.
+  ':(exclude)shared/encryption/envelopeV1Core.mjs',
+  ':(exclude)shared/encryption/envelopeWriterFixtures.mjs',
+  ':(exclude)workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
+  ':(exclude)workers/agentBridgeWorker/deployHelperApply.mjs',
+  ':(exclude)workers/agentBridgeWorker/deployHelperPlan.mjs',
 ]);
 
 const gitOrNull = (repoRoot, args) => {

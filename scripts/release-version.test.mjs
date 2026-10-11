@@ -15,8 +15,10 @@ import {
   planReleaseVersion,
   readVersionSurfaces,
   verifyWorkerReleasePin,
+  WORKER_RELEASE_SOURCE_PATHSPEC,
   writeVersionSurfaces,
 } from './release-version.mjs';
+import { resolveWorkerBundleTargets } from './worker-bundle.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./release-version.mjs', import.meta.url));
 
@@ -389,6 +391,62 @@ test('pin-worker-release fetches moved release channel tags and reports git fail
   } finally {
     fs.rmSync(publicDir, { recursive: true, force: true });
     fs.rmSync(cloneDir, { recursive: true, force: true });
+  }
+});
+
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const repoHasGitHistory = spawnSync('git', ['rev-parse', '--git-dir'], { cwd: REPO_ROOT }).status === 0;
+
+test('the Worker source pathspec covers every local input of the release bundles', {
+  skip: !repoHasGitHistory,
+}, async () => {
+  const { build } = await import('esbuild');
+  const bundleInputs = new Set();
+  for (const target of resolveWorkerBundleTargets({ rootDir: REPO_ROOT })) {
+    // Same entry and options as scripts/worker-bundle.mjs; packages stay
+    // external because the lockfiles in the pathspec cover them.
+    const result = await build({
+      absWorkingDir: REPO_ROOT,
+      entryPoints: [target.entryRelativePath],
+      bundle: true,
+      write: false,
+      metafile: true,
+      platform: 'browser',
+      format: 'esm',
+      preserveSymlinks: true,
+      packages: 'external',
+      logLevel: 'silent',
+      target: [target.target || 'es2020'],
+      ...(target.mainFields ? { mainFields: target.mainFields } : {}),
+    });
+    Object.keys(result.metafile.inputs)
+      .filter((input) => !input.includes('node_modules') && !input.startsWith('('))
+      .forEach((input) => bundleInputs.add(input));
+  }
+  const covered = new Set(
+    git(REPO_ROOT, ['ls-files', '--', ...WORKER_RELEASE_SOURCE_PATHSPEC]).split(/\r?\n/).filter(Boolean),
+  );
+
+  assert.ok(bundleInputs.has('workers/sessionCorsWorker/worker.js'));
+  assert.deepEqual([...bundleInputs].filter((input) => !covered.has(input)), []);
+  // The native Cloudflare template the pin also selects.
+  for (const templateInput of [
+    'deploy/cloudflare/session-worker/worker.mjs',
+    'deploy/cloudflare/session-worker/wrangler.jsonc',
+    'deploy/cloudflare/session-worker/package.json',
+    'scripts/cloudflare-session-template.mjs',
+  ]) {
+    assert.ok(covered.has(templateInput), `${templateInput} is not in the Worker source pathspec`);
+  }
+  // Files no bundle imports would only force needless pin moves.
+  for (const nonInput of [
+    'shared/encryption/envelopeV1Core.mjs',
+    'shared/encryption/envelopeWriterFixtures.mjs',
+    'workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
+    'workers/agentBridgeWorker/deployHelperApply.mjs',
+    'workers/agentBridgeWorker/deployHelperPlan.mjs',
+  ]) {
+    assert.ok(!covered.has(nonInput), `${nonInput} is not a bundle input`);
   }
 });
 
