@@ -1230,9 +1230,12 @@ const SponsorPage = ({
                           {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
                         </div>
                         <div className={styles.statusNote}>
-                          Sponsored deploys use the release recorded on your session Worker. Workers deployed before
-                          0.6.8 need the two release settings (WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL) set
-                          first: see the{' '}
+                          Grant deploys install the release recorded on your session Worker, but only Worker code from
+                          0.6.8 or later enforces this: an older Worker still deploys whatever code the redeemer sends,
+                          so update it first. A 0.6.8 or later Worker without WORKER_BUNDLE_URL and
+                          WORKER_BUNDLE_MANIFEST_URL, plus the Agent Bridge pair (AGENT_BRIDGE_BUNDLE_URL and
+                          AGENT_BRIDGE_BUNDLE_MANIFEST_URL) for Agents HTTP sessions, refuses grant deploys until they
+                          are set: see the{' '}
                           <a href={SPONSORED_DEPLOY_RELEASE_GUIDE_URL} target="_blank" rel="noreferrer">
                             sponsored deploy release guide
                           </a>

@@ -320,7 +320,7 @@ describe('SponsorPage', () => {
     );
     expect(guideLink).toHaveAttribute('target', '_blank');
     expect(guideLink.parentElement).toHaveTextContent(
-      'Sponsored deploys use the release recorded on your session Worker. Workers deployed before 0.6.8 need the two release settings (WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL) set first: see the sponsored deploy release guide.',
+      'Grant deploys install the release recorded on your session Worker, but only Worker code from 0.6.8 or later enforces this: an older Worker still deploys whatever code the redeemer sends, so update it first. A 0.6.8 or later Worker without WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL, plus the Agent Bridge pair (AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL) for Agents HTTP sessions, refuses grant deploys until they are set: see the sponsored deploy release guide.',
     );
   });
 
