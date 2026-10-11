@@ -206,6 +206,11 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
       if (useConfiguredDeterministic && !initializeGroupPasswordHash && hasNonZeroHashValue(groupPasswordHash)) {
         throw new Error('Configured deterministic SBT deployment cannot preinitialize a group password hash.');
       }
+      // A group password hash is bound to the predicted SBT address. Any other
+      // deploy's address depends on the hash itself, so the hash cannot be valid.
+      if (!useConfiguredDeterministic && hasNonZeroHashValue(groupPasswordHash)) {
+        throw new Error('Group passwords need the predicted-address deploy.');
+      }
       if (useConfiguredDeterministic) {
         if (!ethers.utils.isAddress(String(adminAddress || ''))) {
           throw new Error('Configured deterministic SBT deployment requires a valid admin address.');
