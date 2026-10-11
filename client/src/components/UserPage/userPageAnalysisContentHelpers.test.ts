@@ -248,15 +248,30 @@ it('keeps quadratic option order and budgets in profile analysis and excludes ma
   });
 });
 
-it('keeps locked answers out of profile analysis after this browser decrypts them', () => {
-  const lockedField = (audience: string) => ({
-    value: '*',
-    encrypted: true,
-    encryptionAudience: audience,
-    encryptedPortion: '{"v":1}',
-  });
+// Shaped like the answers surveyToolResponsePayloadController stores: the
+// writer stamps every answer with the audience it resolved, public ones too.
+const writerAnswer = (value: unknown, encryptionAudience: string) => ({
+  value,
+  encrypted: false,
+  encryptionAudience,
+  encryptionGateId: null,
+  audienceMode: 'explicit',
+  hash: '',
+  encryptedPortion: '',
+});
+const writerLockedAnswer = (encryptionAudience: string) => ({
+  value: '*',
+  encrypted: true,
+  encryptionAudience,
+  encryptionGateId: null,
+  audienceMode: 'explicit',
+  hash: `0x${'ab'.repeat(32)}`,
+  encryptedPortion: '{"v":1}',
+});
+
+it('sends public answers to profile analysis but never answers this browser decrypted', () => {
   const decrypted = buildUserPageDecryptedResponsePatch({
-    responseObj: { answer: lockedField('self'), additional: lockedField('self') },
+    responseObj: { answer: writerLockedAnswer('self'), additional: writerLockedAnswer('self') },
     questionId: 'q1',
     fieldToDecrypt: 'both',
     decryptedResult: {
@@ -268,11 +283,13 @@ it('keeps locked answers out of profile analysis after this browser decrypts the
 
   const responses: Record<string, unknown> = {
     q1: decrypted,
-    q2: { answer: { value: 'admin answer', encryptionAudience: 'self_admin' } },
-    q3: { answer: { value: 'gated answer', encrypted: true } },
-    q4: { answer: { value: 'public answer' } },
+    q2: { answer: writerAnswer('public under a Me + admin default', 'self_admin') },
+    q3: { answer: writerLockedAnswer('gate') },
+    q4: { answer: writerAnswer('public under an Only me default', 'self') },
+    q5: { answer: writerAnswer('public in a gated session', 'gate') },
+    q6: { answer: { value: 'public from the companion', encrypted: false, encryptionAudience: 'none' } },
   };
-  const questionResponseInfo = ['q1', 'q2', 'q3', 'q4'].map((id) => ({ id, type: 'freeform', prompt: id }));
+  const questionResponseInfo = Object.keys(responses).map((id) => ({ id, type: 'freeform', prompt: id }));
   const questions = buildUserPageAnalysisQuestions({ detailedQuestionResponses: responses, questionResponseInfo });
   const surveys = buildUserPageAnalysisSurveys({
     surveyResponseInfo: [{ id: 's1', title: 'Survey' }],
@@ -281,7 +298,13 @@ it('keeps locked answers out of profile analysis after this browser decrypts the
     },
   });
 
-  expect(questions.map((question) => question.answer)).toEqual(['public answer']);
-  expect(surveys[0]).toMatchObject({ answeredCount: 1, sample: [{ answer: 'public answer' }] });
-  expect(JSON.stringify({ questions, surveys })).not.toMatch(/only-me|admin answer|gated answer/);
+  const publicAnswers = [
+    'public under a Me + admin default',
+    'public under an Only me default',
+    'public in a gated session',
+    'public from the companion',
+  ];
+  expect(questions.map((question) => question.answer)).toEqual(publicAnswers);
+  expect(surveys[0]).toMatchObject({ answeredCount: 4 });
+  expect(JSON.stringify({ questions, surveys })).not.toMatch(/only-me/);
 });

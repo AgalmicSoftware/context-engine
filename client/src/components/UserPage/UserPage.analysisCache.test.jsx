@@ -90,7 +90,16 @@ const makeAnalysisCacheInstance = (props = {}) => {
     ],
     detailedQuestionResponses: {
       q1: {
-        answer: { value: 'A deterministic answer' },
+        // Stored as the response writer stores a public answer.
+        answer: {
+          value: 'A deterministic answer',
+          encrypted: false,
+          encryptionAudience: 'self',
+          encryptionGateId: null,
+          audienceMode: 'explicit',
+          hash: '',
+          encryptedPortion: '',
+        },
         conviction: 4,
       },
     },
@@ -204,12 +213,20 @@ describe('UserPage analysis cache and routing', () => {
     );
   });
 
-  it('never sends or caches an Only me answer that this browser decrypted', async () => {
+  it('sends public answers but never an Only me answer this browser decrypted', async () => {
     const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
     const lockedResponse = {
       questionID: 'q2',
-      answer: { value: '*', encrypted: true, encryptionAudience: 'self', encryptedPortion: '{"v":1}' },
-      additional: { value: '', encrypted: false },
+      answer: {
+        value: '*',
+        encrypted: true,
+        encryptionAudience: 'self',
+        encryptionGateId: null,
+        audienceMode: 'explicit',
+        hash: `0x${'ab'.repeat(32)}`,
+        encryptedPortion: '{"v":1}',
+      },
+      additional: { value: '', encrypted: false, encryptionAudience: 'self', encryptedPortion: '' },
     };
     instance.state = {
       ...instance.state,
@@ -231,7 +248,7 @@ describe('UserPage analysis cache and routing', () => {
 
     expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
     const [userData] = analyzeUserOpinions.mock.calls[0];
-    expect(userData.questions.map((question) => question.id)).toEqual(['q1']);
+    expect(userData.questions).toEqual([expect.objectContaining({ id: 'q1', answer: 'A deterministic answer' })]);
     expect(JSON.stringify(userData)).not.toContain('private plaintext');
     const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
     expect(entry).toBeTruthy();

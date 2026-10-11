@@ -88,18 +88,13 @@ export const isUserPageSbtAggregateEntry = (value: unknown): boolean => {
 const quadraticMetadata = (question: UserPageUnknownRecord): UserPageUnknownRecord =>
   question.type === 'quadratic' ? { options: question.options, voiceCredits: getVoiceCredits(question) } : {};
 
-const LOCKED_RESPONSE_AUDIENCES = new Set(['self', 'self_admin', 'session', 'gate']);
-
 // Analysis sends answers to the session's AI provider and caches the result,
 // so it reads only answers that were public when submitted. An answer the
 // viewer decrypted in this browser stays marked encrypted and is skipped.
+// encryptionAudience is no signal: writers stamp it on public answers too.
 const readUserPageAnalysisPublicValue = (field: unknown): unknown => {
   const record = toAnalysisRecord(field);
   if (record.encrypted || record.decryptedLocally || record.encryptedPortion) return undefined;
-  const audience = String(record.encryptionAudience || '')
-    .trim()
-    .toLowerCase();
-  if (LOCKED_RESPONSE_AUDIENCES.has(audience)) return undefined;
   return record.value === '*' || record.value === '' ? undefined : record.value;
 };
 
