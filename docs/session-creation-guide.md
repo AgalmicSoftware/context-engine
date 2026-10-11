@@ -231,8 +231,10 @@ The deploy URL must pin an exact 40-character commit so the reviewed source is
 immutable. The hosted client uses the public commit it was built from
 (`REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`, set from Netlify's
 `COMMIT_REF`), the same commit whose release the wizard downloads Worker bundles
-from. Builds without it use the release pinned in
-`client/src/variables/workerReleasePin.json`. The private source commit
+from. Builds without it, such as local and self-hosted builds, use the release
+pinned in `client/src/variables/workerReleasePin.json`. Each release moves that
+pin to the newest published Worker release, which is the previous release
+because a release's own bundles are published after its merge. The private source commit
 is not interchangeable with its public replay SHA. Moving branches, tags,
 abbreviated hashes, and non-GitHub sources are rejected. The token-based helper procedure later in this guide applies only
 to the legacy fallback. See
@@ -817,7 +819,9 @@ High-level flow:
    decentralized profiles require signed config acceptance while their EVM
    registry and Arweave records remain canonical. Registry attachment requires
    the connected signer, requested Worker admin, and on-chain session admin to
-   match.
+   match. The template deploys with `DEPLOY_HELPER_ENABLED` set to `"0"`, so the
+   wizard records that the Worker has no embedded deploy helper and `/sponsor`
+   does not offer deploy grants from it.
 
 The runtime secrets remain in the current tab and Cloudflare's encrypted
 Worker-secret store. They are not placed in the deployment URL, logs, analytics
@@ -944,8 +948,8 @@ want to avoid Wrangler and the native Git-template flow.
 
 Recommended source files:
 
-- Bundled release asset from the pinned release: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<pinned commit>/sessionCorsWorker.bundle.js`, where the pinned commit is in `client/src/variables/workerReleasePin.json`
-- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<pinned commit>/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
+- Bundled release asset: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/sessionCorsWorker.bundle.js`. The hosted client uses the commit it was built from (Netlify's `COMMIT_REF`); local and self-hosted builds use the commit in `client/src/variables/workerReleasePin.json`
+- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
 - Generated repo-local fallback bundle after `nvm use 20 && npm run worker:bundle`: `dist/sessionCorsWorker.bundle.js`
 - Canonical worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 
@@ -1126,9 +1130,15 @@ models and local overrides remain available; bundled demo defaults use Terra.
 
 Hosted Worker verification writes and reads back the prepared public configuration
 without finalizing publication. You can edit and verify again; Publish creates
-the final publication revision. The browser compares the shared public fields,
-including session appearance, while excluding the server-managed authorization
-epoch from its comparison.
+the final publication revision. Edits replace what an earlier verification
+stored: a blank end time is sent as `""` and blank request limits as `null`,
+so a cleared value does not stay on the Worker. The browser compares the shared
+public fields, including session appearance and the Worker URL's origin. It
+skips fields the Worker sets itself: the authorization epoch, the publication
+marker, the response field encryption it reports on every read, and, before
+publication, a revision the deploy helper staged. If verification fails, the
+wizard shows the Worker's reason, such as a rejected write or the field that
+did not match.
 
 Retrying queued Group creation compares canonical HTTPS image and document URLs,
 so a host-only URL and the same URL with a trailing slash reuse the saved Group.
