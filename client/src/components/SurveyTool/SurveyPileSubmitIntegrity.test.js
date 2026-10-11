@@ -679,6 +679,19 @@ describe('View all editor after a reload', () => {
     await expectUpload(h, 'Saved public answer', 'Edited in View all');
   });
 
+  it('restores the draft again for a question that leaves the list and returns', async () => {
+    const h = await draftCommentInPile();
+    await h.mountEditor();
+    expect(screen.getByDisplayValue('Draft comment')).toBeInTheDocument();
+    await act(async () =>
+      h.rerender({ questionPool: [{ id: BINARY_QID, type: 'binary', prompt: 'Binary question' }] }),
+    );
+    await settle();
+    await act(async () => h.rerender({ questionPool: [FREEFORM_QUESTION] }));
+    await settle();
+    await expectSavedAnswerAndDraft(h);
+  });
+
   it('restores the draft from a newer load when the first load is superseded', async () => {
     const h = await draftCommentInPile();
     h.renderEditor();

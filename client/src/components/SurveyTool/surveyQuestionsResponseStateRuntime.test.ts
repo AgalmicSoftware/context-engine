@@ -182,6 +182,16 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     );
   });
 
+  it('forgets restored drafts for questions that leave the list', async () => {
+    const context = createContext();
+    (context.stateRef.current as Record<string, unknown>).questionPool = [{ id: 'Q1' }];
+    context.inst._draftRestoredQids = new Set(['q1', 'q9']);
+
+    await createSurveyQuestionsResponseStateRuntime(context).rehydrateSavedAnswersThenDraft();
+
+    expect([...context.inst._draftRestoredQids]).toEqual(['q1']);
+  });
+
   it('retries questions whose draft a submission error held back', async () => {
     const callbacks: Array<() => void> = [];
     const context = createContext({

@@ -363,7 +363,18 @@ export const createSurveyQuestionsResponseStateRuntime = (
    * `restoreAll` is for a form that was just reset, where every question needs its draft again.
    */
   const rehydrateSavedAnswersThenDraft = ({ restoreAll = false } = {}) => {
-    if (restoreAll) inst._draftRestoredQids.clear();
+    const listedQuestions = stateRef.current?.questionPool;
+    if (restoreAll) {
+      inst._draftRestoredQids.clear();
+    } else if (Array.isArray(listedQuestions) && listedQuestions.length) {
+      // A question that leaves the list loses its answers there, so it gets its draft again if it returns.
+      const listed = new Set(
+        listedQuestions.map((question: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(question?.id)),
+      );
+      inst._draftRestoredQids.forEach((questionId: string) => {
+        if (!listed.has(questionId)) inst._draftRestoredQids.delete(questionId);
+      });
+    }
     inst._draftRestorePending = true;
     return rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
   };
