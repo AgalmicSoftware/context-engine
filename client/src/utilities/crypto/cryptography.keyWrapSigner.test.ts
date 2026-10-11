@@ -1,6 +1,5 @@
 import { webcrypto } from 'crypto';
 import { ethers } from 'ethers';
-import ethEip712Util from '@coinbase/wallet-sdk/dist/vendor-js/eth-eip712-util';
 import { clearDecryptCaches, cryptoUtils } from './cryptography';
 
 const owner = new ethers.Wallet(`0x${'71'.repeat(32)}`);
@@ -10,8 +9,30 @@ const questionPool = [{ id: 'q1', type: 'freeform' }];
 
 // MetaMask hashes typed data with eth-sig-util, which signs over an empty
 // domain when `types` has no EIP712Domain entry; ethers hashes the domain
-// fields. The Coinbase wallet SDK vendors the same eth-sig-util code.
+// fields. Built here with plain ABI encoding, not ethers' typed-data encoder.
 type SignStyle = 'ethers' | 'metamask';
+type TypedDataPayload = {
+  types: Record<string, Array<{ name: string; type: string }>>;
+  primaryType: string;
+  message: Record<string, string>;
+};
+
+const EMPTY_EIP712_DOMAIN_SEPARATOR = ethers.utils.keccak256(ethers.utils.id('EIP712Domain()'));
+
+const metamaskTypedDataDigest = ({ types, primaryType, message }: TypedDataPayload): string => {
+  const fields = types[primaryType];
+  const typeHash = ethers.utils.id(`${primaryType}(${fields.map(({ name, type }) => `${type} ${name}`).join(',')})`);
+  const structHash = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ['bytes32', ...fields.map(({ type }) => (type === 'string' ? 'bytes32' : type))],
+      [
+        typeHash,
+        ...fields.map(({ name, type }) => (type === 'string' ? ethers.utils.id(message[name]) : message[name])),
+      ],
+    ),
+  );
+  return ethers.utils.keccak256(ethers.utils.concat(['0x1901', EMPTY_EIP712_DOMAIN_SEPARATOR, structHash]));
+};
 
 // The wallet reports the owner's account but signs with `signingWallet`, like a
 // passkey tab that silently switched wallets.
@@ -21,7 +42,7 @@ const providerSigningAs = (signingWallet: ethers.Wallet, style: SignStyle = 'eth
     if (method === 'eth_accounts') return [owner.address];
     const data = JSON.parse(params[1]);
     if (style === 'metamask') {
-      const digest = ethEip712Util.hashForSignTypedData_v4({ data });
+      const digest = metamaskTypedDataDigest(data);
       return ethers.utils.joinSignature(new ethers.utils.SigningKey(signingWallet.privateKey).signDigest(digest));
     }
     delete data.types.EIP712Domain;
