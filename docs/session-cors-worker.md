@@ -1900,7 +1900,8 @@ Never return secrets in responses.
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
 - After a worker-canonical session is initialized, its slug, worker URL, authority
   mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
-  to retarget that Worker return `409`.
+  to retarget that Worker return `409`. The worker URL is compared as an origin,
+  so a trailing slash, letter case or the default port is not a change.
 - The first signed worker-canonical publish carrying a `configRevision` finalizes
   that publication in the server-managed KV record. A sequential exact
   same-revision retry is an idempotent no-op; a different revision returns

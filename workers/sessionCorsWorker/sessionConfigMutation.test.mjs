@@ -191,6 +191,30 @@ test('set-config preserves legacy registry identity during authority-mode migrat
   });
 });
 
+test('set-config compares the Worker URL identity as an origin', () => {
+  const existingConfig = {
+    ...cloneJson(profileBearingConfig),
+    // The deploy helper used to stage the URL with a trailing slash.
+    corsWorkerUrl: 'https://session-worker.example.test/',
+  };
+  const write = (corsWorkerUrl) => applySessionConfigMutation({
+    existingConfig: cloneJson(existingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { corsWorkerUrl } },
+    slug: 'session-a',
+  });
+  for (const same of ['https://session-worker.example.test', 'HTTPS://Session-Worker.example.test:443/']) {
+    const result = write(same);
+    assert.equal(result.ok, true, `${same}: ${JSON.stringify(result)}`);
+  }
+  for (const other of ['https://other-worker.example.test', 'https://session-worker.example.test/other', 'not a url']) {
+    assert.deepEqual(write(other), {
+      ok: false,
+      status: 409,
+      error: 'Worker-canonical session identity cannot be changed after initialization.',
+    }, other);
+  }
+});
+
 test('set-config rejects caller-controlled authorization epochs', () => {
   const result = applySessionConfigMutation({
     existingConfig: baseConfig,
