@@ -1692,11 +1692,16 @@ login, and signed admin request bodies must carry that config's canonical
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
    - Nonce request rate limiting uses two coordinated fixed-window buckets per
-     session: a strict wallet bucket capped at 5 requests per address per
-     minute, and a shared-network bucket capped at 300 requests per minute.
-     In native Cloudflare runtime the shared-network bucket uses the platform
+     session: a strict bucket capped at 5 requests per minute for each caller
+     network and target address pair, and a shared-network bucket capped at
+     300 requests per minute. Because the strict bucket includes the caller,
+     someone who only knows a wallet address cannot use up its owner's budget.
+     In native Cloudflare runtime the caller network is the platform
      `CF-Connecting-IP`; outside that runtime, forwarded IP headers are ignored
      and requests fall back to the bounded `anon:unknown` bucket.
+   - Each address may hold up to 16 unexpired nonces at once. Issuing a new
+     nonce never cancels an earlier pending one; past the cap the oldest is
+     dropped, and each nonce is consumed at most once.
 2. Build a SIWE message client-side and sign with `personal_sign`.
    Include exactly two `Resources:` URI-list entries with a `- ` prefix: the
    receiving Worker origin and `urn:context-engine:session:id:<encoded-id>` for

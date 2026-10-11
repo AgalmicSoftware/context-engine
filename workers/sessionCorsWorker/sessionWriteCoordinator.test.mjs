@@ -170,6 +170,68 @@ test('SessionWriteCoordinator consumes one issued auth nonce exactly once under 
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /session-a|0xabc/i);
 });
 
+const issueAuthNonce = (coordinator, nonce, expiresAtMs = 301_000) =>
+	coordinator.fetch(
+		createCoordinatorRequest('/auth-state/nonce/issue', {
+			slug: 'session-a',
+			address: '0xabc',
+			nonce,
+			expiresAtMs,
+			usedExpiresAtMs: 601_000,
+		}),
+	);
+const consumeAuthNonce = async (coordinator, nonce) => {
+	const response = await coordinator.fetch(
+		createCoordinatorRequest('/auth-state/nonce/consume', {
+			slug: 'session-a',
+			address: '0xabc',
+			nonce,
+			usedExpiresAtMs: 601_000,
+		}),
+	);
+	return response.json();
+};
+
+test('SessionWriteCoordinator keeps an earlier pending nonce when someone requests another', async () => {
+	const { state } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	assert.equal((await issueAuthNonce(coordinator, 'owner-nonce')).status, 200);
+	// Anyone may ask for a nonce for a public address.
+	assert.equal((await issueAuthNonce(coordinator, 'stranger-nonce')).status, 200);
+
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'owner-nonce'), { ok: true });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'owner-nonce'), { ok: false, error: 'Nonce already used.' });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'stranger-nonce'), { ok: true });
+});
+
+test('SessionWriteCoordinator caps outstanding nonces per address and drops the oldest', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	for (let index = 0; index <= 16; index += 1) await issueAuthNonce(coordinator, `nonce-${index}`);
+
+	assert.equal(store.get('auth-nonce-active').entries.length, 16);
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'nonce-0'), { ok: false, error: 'Nonce mismatch or expired.' });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'nonce-1'), { ok: true });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'nonce-16'), { ok: true });
+});
+
+test('SessionWriteCoordinator expires outstanding nonces and accepts a pre-upgrade nonce', async () => {
+	const { state, store } = createTransactionalState();
+	let nowMs = 1_000;
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => nowMs });
+	await issueAuthNonce(coordinator, 'short-lived', 2_000);
+	await issueAuthNonce(coordinator, 'long-lived', 301_000);
+	// The newest nonce stays in the version-1 fields for a Worker rollback.
+	assert.equal(store.get('auth-nonce-active').nonce, 'long-lived');
+	nowMs = 3_000;
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'short-lived'), { ok: false, error: 'Nonce mismatch or expired.' });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'long-lived'), { ok: true });
+	assert.equal(store.has('auth-nonce-active'), false);
+
+	store.set('auth-nonce-active', { version: 1, nonce: 'issued-before-upgrade', expiresAtMs: 301_000 });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'issued-before-upgrade'), { ok: true });
+});
+
 test('SessionWriteCoordinator rejects malformed slugs before writing durable state', async () => {
 	const { state, store } = createTransactionalState();
 	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });

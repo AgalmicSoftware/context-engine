@@ -52,6 +52,7 @@ const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
 const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
+const MAX_ACTIVE_AUTH_NONCES = 16;
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
 const WRAPPED_SESSION_KEY_FIELDS = [
   'alg',
@@ -87,6 +88,31 @@ const normalizeBoundedFutureTimestamp = (value, nowMs, maxAheadMs) => {
   const numeric = normalizePositiveSafeInteger(value);
   if (!numeric || numeric <= nowMs || numeric > nowMs + maxAheadMs) return 0;
   return numeric;
+};
+
+// Version 1 stored one nonce; version 2 keeps several per address. The newest
+// entry stays in the version-1 fields so a rolled-back Worker still accepts it.
+const readActiveAuthNonces = (record, nowMs) => {
+  const entries = Array.isArray(record?.entries)
+    ? record.entries
+    : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
+  return entries
+    .map((entry) => ({ nonce: toTrimmedString(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) }))
+    .filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
+};
+
+const putActiveAuthNonces = async (transaction, entries) => {
+  if (!entries.length) {
+    await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
+    return;
+  }
+  const newest = entries[entries.length - 1];
+  await transaction.put(AUTH_NONCE_ACTIVE_KEY, {
+    version: 2,
+    nonce: newest.nonce,
+    expiresAtMs: newest.expiresAtMs,
+    entries,
+  });
 };
 
 const isBase64url = (value, length) => (
@@ -1834,11 +1860,11 @@ export class SessionWriteCoordinator {
         ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs)
         : [];
       await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-      await transaction.put(AUTH_NONCE_ACTIVE_KEY, {
-        version: 1,
-        nonce,
-        expiresAtMs,
-      });
+      // Anyone can request a nonce for any address, so a new nonce must not
+      // cancel the owner's pending one. Keep a few, dropping the oldest.
+      const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs)
+        .filter((entry) => entry.nonce !== nonce);
+      await putActiveAuthNonces(transaction, [...active, { nonce, expiresAtMs }].slice(-MAX_ACTIVE_AUTH_NONCES));
     });
     return jsonResponse({ ok: true });
   }
@@ -1867,22 +1893,16 @@ export class SessionWriteCoordinator {
         return { ok: false, error: 'Nonce already used.' };
       }
 
-      const active = await transaction.get(AUTH_NONCE_ACTIVE_KEY);
-      const activeMatches = (
-        active?.nonce === nonce &&
-        Number(active?.expiresAtMs || 0) > nowMs
-      );
-      if (!activeMatches) {
-        if (Number(active?.expiresAtMs || 0) <= nowMs) {
-          await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
-        }
+      const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs);
+      const remaining = active.filter((entry) => entry.nonce !== nonce);
+      await putActiveAuthNonces(transaction, remaining);
+      if (remaining.length === active.length) {
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return { ok: false, error: 'Nonce mismatch or expired.' };
       }
 
       entries.push({ nonce, expiresAtMs: usedExpiresAtMs });
       await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-      await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
       return { ok: true };
     });
     return jsonResponse(result, result.ok ? 200 : 409);

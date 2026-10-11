@@ -155,9 +155,11 @@ export const checkNonceRateLimit = async ({
     return result;
   };
 
+  // The strict bucket belongs to this caller and target wallet together. A
+  // stranger who only knows a wallet address cannot use up its owner's budget.
   const walletResult = await runLimitCheck({
-    route: 'authNonceWallet',
-    rateIdentity: walletIdentity,
+    route: 'authNonceCallerWallet',
+    rateIdentity: `${networkIdentity}|${walletIdentity}`,
     numericLimit: numericWalletLimit,
   });
   if (!walletResult?.ok) return walletResult;
