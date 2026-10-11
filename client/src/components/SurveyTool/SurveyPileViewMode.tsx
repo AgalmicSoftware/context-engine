@@ -2140,19 +2140,74 @@ export const applySessionInterviewAnswer = (engine: PileViewModeEngine, question
     engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
   });
 
-const INTERVIEW_RESPONSE_FIELDS = ['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'];
+// Each draft field with the pending-edit flags that mark it as an unsaved change.
+const INTERVIEW_DRAFT_FIELDS: Record<string, string[]> = {
+  answers: ['answer', 'encryptedAnswer'],
+  additionalComments: ['additional', 'encryptedAdditional'],
+  importance: ['importance'],
+  conviction: ['conviction'],
+  interviewProvenance: [],
+};
+const SAVED_CONSENT_KEYS = ['consentSavedAt', 'consentStorageRefId', 'consentReadAuthority'];
+const AI_ATTRIBUTION_KEYS = ['source', 'promptVersion', 'questionSetHash'];
+const PREDICTION_RESEARCH_KEYS = [
+  'questionId',
+  'selection',
+  'originalPrediction',
+  'predictionRevisions',
+  'userEditedFields',
+  'unselectedDrafts',
+  'submissionValueSnapshot',
+  'predictionComparison',
+];
 
-// Interview drafts enter the pile only to be uploaded. The returned restore puts back
-// what the pile held, so a draft removed or discarded after a failed upload is not sent later.
+// Undoing an interview never makes a response more disclosing: a name, AI attribution or
+// research consent the interview withdrew stays withdrawn from the consent it had before.
+const keepInterviewConsentWithdrawals = (before: unknown, attempted: unknown): Record<string, unknown> | null => {
+  const prior = readPlainRecord(before);
+  const tried = readPlainRecord(attempted);
+  if (!Object.keys(prior).length || !Object.keys(tried).length) return null;
+  const priorFlags = resolveConsentFlags(prior);
+  const triedFlags = resolveConsentFlags(tried);
+  const withdrawName = !!prior.responderName && !tried.responderName;
+  const withdrawAi = priorFlags.includeAiProvenance && !triedFlags.includeAiProvenance;
+  const withdrawResearch = priorFlags.includePredictionComparison && !triedFlags.includePredictionComparison;
+  if (!withdrawName && !withdrawAi && !withdrawResearch) return null;
+  const kept: Record<string, unknown> = {
+    ...prior,
+    version: 1,
+    includeAiProvenance: priorFlags.includeAiProvenance && !withdrawAi,
+    includePredictionComparison: priorFlags.includePredictionComparison && !withdrawResearch,
+  };
+  [
+    ...SAVED_CONSENT_KEYS,
+    ...(withdrawName ? ['responderName'] : []),
+    ...(withdrawAi ? AI_ATTRIBUTION_KEYS : []),
+    ...(withdrawResearch ? PREDICTION_RESEARCH_KEYS : []),
+  ].forEach((key) => delete kept[key]);
+  return kept;
+};
+
+// Interview drafts enter the pile only to be uploaded. The returned restore undoes the
+// applied drafts, so one removed or discarded after a failed upload is not sent later.
 export const captureSessionInterviewResponses = (engine: PileViewModeEngine, questionIds: string[]) => {
   const readContext = () =>
     buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
   const context = readContext();
   const ids = [...new Set(questionIds.flatMap((id) => [String(id), normalizeQuestionIdKey(id)]))].filter(Boolean);
   const slice = readPlainRecord(engine.state.surveysResponseState?.[0]);
-  const before = INTERVIEW_RESPONSE_FIELDS.map((field) => {
+  const pendingFlags = readPlainRecord(engine.getChangedQidsAndFields?.(0)?.changedMap);
+  const before = Object.entries(INTERVIEW_DRAFT_FIELDS).map(([field, flags]) => {
     const entries = readPlainRecord(slice[field]);
-    return { field, entries: ids.map((id) => ({ id, had: Object.hasOwn(entries, id), value: entries[id] })) };
+    return {
+      field,
+      entries: ids.map((id) => ({
+        id,
+        had: Object.hasOwn(entries, id),
+        value: entries[id],
+        pending: flags.some((flag) => !!readPlainRecord(pendingFlags[normalizeQuestionIdKey(id)])[flag]),
+      })),
+    };
   });
   return () =>
     new Promise<void>((resolve) => {
@@ -2165,9 +2220,19 @@ export const captureSessionInterviewResponses = (engine: PileViewModeEngine, que
           const current: Record<string, unknown> = { ...states[0] };
           before.forEach(({ field, entries }) => {
             const next = { ...readPlainRecord(current[field]) };
-            entries.forEach(({ id, had, value }) => {
-              if (had) next[id] = value;
-              else delete next[id];
+            const saved = readPlainRecord(readPlainRecord(prev.editBaseline)[field]);
+            entries.forEach(({ id, had, value, pending }) => {
+              const restored =
+                field === 'interviewProvenance'
+                  ? keepInterviewConsentWithdrawals(had ? value : saved[id], next[id]) || (had ? value : undefined)
+                  : // An unedited field takes the saved value, which may have loaded during the upload.
+                    !pending && Object.hasOwn(saved, id)
+                    ? engine.deepClone(saved[id])
+                    : had
+                      ? value
+                      : undefined;
+              if (restored === undefined) delete next[id];
+              else next[id] = restored;
             });
             if (current[field] !== undefined || Object.keys(next).length) current[field] = next;
           });
@@ -2175,7 +2240,7 @@ export const captureSessionInterviewResponses = (engine: PileViewModeEngine, que
           return { surveysResponseState: states };
         },
         () => {
-          // Drop the applied drafts from storage too, so a reload cannot bring them back.
+          // Undo the applied drafts in storage too, so a reload cannot bring them back.
           ids.forEach((id) => engine._draftDirtyQids?.add(normalizeQuestionIdKey(id)));
           engine.persistDraft?.();
           resolve();

@@ -280,3 +280,53 @@ it('names every submitted response once the saved name box is ticked', async () 
     ['q3', 'Participant A'],
   ]);
 });
+
+it('undoes a rejected draft but keeps its name withdrawal for the next pile Submit', async () => {
+  const upload = mockSession([savedNamedQ1]);
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  fireEvent.click(screen.getByText('AI submission info'));
+  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
+  expect(name).toBeChecked();
+  fireEvent.click(name);
+
+  await submitDrafts();
+  await act(async () => pile.engine().closeSessionVoiceModeModal());
+  await settle(300);
+
+  const slice = pile.engine().state.surveysResponseState[0];
+  // The draft answer is undone; the withdrawal stays and is the only pending change.
+  expect(slice.answers.q1.value).toBe('Agree');
+  expect(slice.interviewProvenance.q1).not.toHaveProperty('responderName');
+  expect(Array.from(pile.engine().getChangedQidsAndFields(0).changedQids)).toEqual(['q1']);
+
+  await act(async () => {
+    await pile.engine().handlePileSubmitClick();
+  });
+  await settle();
+  const [row] = upload.mock.calls.at(-1)[2];
+  expect(row.answer.value).toBe('Agree');
+  expect(row).not.toHaveProperty('responderName');
+});
+
+it('keeps a saved comment that loads during a rejected interview upload', async () => {
+  const saved = { ...savedNamedQ1, responderName: undefined, interviewProvenance: undefined };
+  const upload = mockSession([saved]);
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  // Another device saves a comment while this upload waits for its own-answer read.
+  const newer = { ...saved, additional: field('Note from another device') };
+  workerHydration.loadWorkerResponses.mockResolvedValue([
+    { questionId: 'q1', responder: A, timestamp: 2000, storageRefId: 'ref-q1-b', response: newer },
+  ]);
+  await act(async () => pile.view.rerenderSurveyQuestions({ isResponsesCacheReady: false }));
+
+  await submitDrafts();
+
+  const slice = pile.engine().state.surveysResponseState[0];
+  expect(slice.answers.q1.value).toBe('Agree');
+  expect(slice.additionalComments.q1.value).toBe('Note from another device');
+  expect(pile.engine().getPendingEditStats().total).toBe(0);
+});

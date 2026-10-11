@@ -280,25 +280,23 @@ it.each([
   [false, 'name', true],
   [true, 'AI attribution', true],
 ])(
-  'shows the saved choice again once a rejected withdrawal is closed (own listing %s, %s, reload: %s)',
+  'keeps a pending withdrawal with own listing %s for %s after a rejected apply (reload: %s)',
   async (listingAvailable, choice, reload) => {
     mockCaches();
     mockOwnAnswerListing(listingAvailable);
     const submitResponses = mockSubmit();
     let getEngine = await mountPileEngine();
     await openReplacementDraft(getEngine, 'Disagree');
-    const checkbox = () =>
+    const checkbox =
       choice === 'name'
         ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
         : screen.getByLabelText(/Include platform\/model provenance/i);
-    expect(checkbox()).toBeChecked();
-    fireEvent.click(checkbox());
+    expect(checkbox).toBeChecked();
+    fireEvent.click(checkbox);
     submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
     await settle();
-    // The failed upload leaves neither the draft nor the withdrawal pending in the pile.
-    expect(getEngine().getPendingEditStats().total).toBe(0);
     if (reload) {
       getEngine.view.unmount();
       getEngine = await mountPileEngine();
@@ -307,14 +305,27 @@ it.each([
       await settle(300);
     }
     await openReplacementDraft(getEngine, 'Unsure');
-    expect(checkbox()).toBeChecked();
+    if (choice === 'name') {
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByLabelText(/Include platform\/model provenance/i)).not.toBeChecked();
+    }
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(2));
     await settle();
     const uploaded = submitResponses.mock.calls[1][2][0];
     expect(uploaded.answer.value).toBe('Unsure');
-    expect(uploaded.responderName).toBe('Participant A');
-    expect(uploaded.interviewProvenance).toMatchObject({ source: { modelId: 'new-model' } });
+    if (choice === 'name') {
+      expect(uploaded).not.toHaveProperty('responderName');
+      expect(uploaded.interviewProvenance).toMatchObject({
+        source: { modelId: 'new-model' },
+        promptVersion: 'ce-interview-brief-v5',
+        questionSetHash: 'a'.repeat(64),
+      });
+    } else {
+      expect(uploaded).not.toHaveProperty('interviewProvenance');
+      expect(uploaded.responderName).toBe('Participant A');
+    }
   },
   40000,
 );
