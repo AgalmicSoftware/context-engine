@@ -381,6 +381,24 @@ describe('singleQuestionResponseHelpers aggregator responses', () => {
     });
   });
 
+  it('excludes multichoice answers with unknown or too many picks, as the Report does', () => {
+    expect(
+      buildMultichoiceAggregatorSummary(
+        [
+          { answer: { value: ['Yes', 'Unknown'] } },
+          { answer: { value: ['Yes', 'No'] } },
+          { answer: { value: ['No'] } },
+        ],
+        ['Yes', 'No'],
+        { singleSelect: true },
+      ),
+    ).toEqual({
+      counts: { Yes: 0, No: 1 },
+      options: ['Yes', 'No'],
+      totalResponders: 1,
+    });
+  });
+
   it('derives multichoice options from visible answers when metadata has none', () => {
     expect(
       buildMultichoiceAggregatorSummary([

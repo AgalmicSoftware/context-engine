@@ -572,7 +572,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       allOptions = this.getMultichoiceOptions(aggregatorQuestion);
     }
 
-    const multichoiceSummary = buildMultichoiceAggregatorSummary(parsedResponses, allOptions);
+    const multichoiceSummary = buildMultichoiceAggregatorSummary(parsedResponses, allOptions, aggregatorQuestion);
 
     if (!multichoiceSummary.options.length) {
       return (

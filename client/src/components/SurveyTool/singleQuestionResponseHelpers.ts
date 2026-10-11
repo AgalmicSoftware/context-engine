@@ -1,4 +1,4 @@
-import { normalizePolisBinaryVote } from '../PolisReport/polisReportAnswers';
+import { normalizePolisBinaryVote, readReportAnswer } from '../PolisReport/polisReportAnswers';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { DEFAULT_RATING_SCALE, type RatingScale } from '../../utilities/survey/ratingValue.js';
 
@@ -416,9 +416,26 @@ const getMultichoiceChoiceLabel = (choice: unknown): unknown => {
   return record.label ?? record.text ?? record.name ?? record.value ?? '';
 };
 
+// Picks are validated as in the Report and the Worker analysis: an unknown
+// pick, or more picks than the question allows, excludes the whole answer.
+// Older payloads may store picks as { label } objects.
+export const readSummaryMultichoicePicks = (
+  answer: { encrypted?: unknown; value?: unknown } | null | undefined,
+  options: string[],
+  question: Record<string, unknown> | null = null,
+): string[] | null => {
+  if (!answer || answer.encrypted) return null;
+  const value = Array.isArray(answer.value)
+    ? answer.value.map(getMultichoiceChoiceLabel)
+    : getMultichoiceChoiceLabel(answer.value);
+  const picks = readReportAnswer({ answer: { value } }, { ...question, type: 'multichoice', options });
+  return Array.isArray(picks) ? picks.map(String) : null;
+};
+
 export const buildMultichoiceAggregatorSummary = (
   parsedResponses: unknown = [],
   knownOptions: unknown = [],
+  question: Record<string, unknown> | null = null,
 ): MultichoiceAggregatorSummary => {
   const responses = Array.isArray(parsedResponses) ? parsedResponses : [];
   let allOptions = (Array.isArray(knownOptions) ? knownOptions : [])
@@ -455,30 +472,15 @@ export const buildMultichoiceAggregatorSummary = (
   });
 
   let totalResponders = 0;
+  const options = Object.values(displayByKey);
   responses.forEach((response) => {
     const answer = (response as { answer?: { encrypted?: unknown; value?: unknown } } | null | undefined)?.answer;
-    if (!answer || answer.encrypted) return;
-    const rawValue = answer.value;
-    const picks = new Set<string>();
-    const addPick = (raw: unknown) => {
-      const label = normalizeText(getMultichoiceChoiceLabel(raw));
-      if (!label) return;
-      const displayLabel = displayByKey[label.toLowerCase()];
-      if (displayLabel) picks.add(displayLabel);
-    };
-
-    if (Array.isArray(rawValue)) {
-      rawValue.forEach(addPick);
-    } else if (rawValue != null) {
-      addPick(rawValue);
-    }
-
-    if (picks.size > 0) {
-      totalResponders += 1;
-      picks.forEach((label) => {
-        counts[label] += 1;
-      });
-    }
+    const picks = readSummaryMultichoicePicks(answer, options, question);
+    if (!picks) return;
+    totalResponders += 1;
+    picks.forEach((label) => {
+      counts[label] += 1;
+    });
   });
 
   return {

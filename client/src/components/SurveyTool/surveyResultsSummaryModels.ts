@@ -1,5 +1,6 @@
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { getSurveyResponseAggregateTimestampMs } from './surveyResultsHelpers.js';
+import { readSummaryMultichoicePicks } from './singleQuestionResponseHelpers';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -226,23 +227,13 @@ export const buildSurveyResultsMultichoiceSummaryModel = (
   Array.from(displayByKey.keys()).forEach((key) => countsByKey.set(key, 0));
 
   let totalResponders = 0;
+  const options = Array.from(displayByKey.values());
   latestRows.forEach((row) => {
-    const parsedResponse = row?.response;
-    if (!parsedResponse?.answer || parsedResponse.answer.encrypted === true) return;
-    const value = parsedResponse.answer.value;
-    const items = Array.isArray(value) ? value : value == null ? [] : [value];
-    const picks = new Set<string>();
-    items.forEach((choice) => {
-      const label = String(normalizeChoiceLabel(choice) || '').trim();
-      if (!label) return;
-      const key = label.toLowerCase();
-      if (displayByKey.has(key)) {
-        picks.add(key);
-      }
-    });
-    if (picks.size === 0) return;
+    const picks = readSummaryMultichoicePicks(row?.response?.answer, options, question);
+    if (!picks) return;
     totalResponders += 1;
-    picks.forEach((key) => {
+    picks.forEach((label) => {
+      const key = label.toLowerCase();
       countsByKey.set(key, (countsByKey.get(key) || 0) + 1);
     });
   });
