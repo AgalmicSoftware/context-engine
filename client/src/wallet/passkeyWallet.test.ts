@@ -415,16 +415,16 @@ describe('PasskeyEoaWalletClient', () => {
     }
   });
 
-  it('re-unlocks and retries a transaction once when the soft-session worker has locked', async () => {
+  it('re-unlocks and retries a signature once when the soft-session worker has locked', async () => {
     const storage = createMemoryWalletStorage();
     const credentials = makeCredentials();
     const sessionClient = makeSessionClient();
     const requestSpy = jest.spyOn(sessionClient, 'request');
     requestSpy.mockImplementation(async ({ method }) => {
-      if (method === 'eth_sendTransaction' && requestSpy.mock.calls.length === 1) {
+      if (method === 'personal_sign' && requestSpy.mock.calls.length === 1) {
         throw new Error('Passkey wallet is locked.');
       }
-      if (method === 'eth_sendTransaction') return '0x' + '33'.repeat(32);
+      if (method === 'personal_sign') return '0x' + '11'.repeat(65);
       return null;
     });
     const client = new PasskeyEoaWalletClient({
@@ -441,7 +441,7 @@ describe('PasskeyEoaWalletClient', () => {
     const address = await client.createWallet();
     expect(client.isUnlocked()).toBe(true);
 
-    await expect(client.sendTransaction({ to: address, value: '0x0' })).resolves.toMatch(/^0x33/);
+    await expect(client.signMessage('hello', address)).resolves.toMatch(/^0x11/);
 
     expect(credentials.get).toHaveBeenCalledTimes(1);
     expect(sessionClient.calls).toHaveLength(2);
@@ -863,6 +863,30 @@ describe('PasskeyEoaWalletClient requests in flight', () => {
     await expect(signature).resolves.toBe('personal_sign-on-84532');
     expect(credentials.get).toHaveBeenCalledTimes(1);
     await client.lock();
+  });
+
+  it('never resends a transaction that a lock cut off', async () => {
+    const { address, broadcasts, client, credentials } = await setup();
+    const tx = client.sendTransaction({ from: address, to: address, value: '0x0' });
+    await flush();
+
+    await client.lock(); // e.g. the unlock TTL ends while the transaction is in flight
+
+    await expect(tx).rejects.toThrow(/may already have been sent/);
+    expect(broadcasts).toEqual([11155420]);
+    expect(credentials.get).not.toHaveBeenCalled();
+  });
+
+  it('says a transaction may have been sent when a lock cuts it off after a chain switch', async () => {
+    const { address, broadcasts, client } = await setup();
+    const tx = client.sendTransaction({ from: address, to: address, value: '0x0' });
+    await flush();
+
+    client.setChain(84532);
+    await client.lock(); // e.g. sign-out while the transaction finishes on 11155420
+
+    await expect(tx).rejects.toThrow(/may already have been sent/);
+    expect(broadcasts).toEqual([11155420]);
   });
 
   it('reports a network change when a lock interrupts a retry sent before the switch', async () => {

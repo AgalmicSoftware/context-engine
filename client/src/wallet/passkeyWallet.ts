@@ -126,6 +126,13 @@ const normalizeAccount = (value: unknown): string => {
 const networkChangedError = (): Error & { code: number } =>
   Object.assign(new Error('The network changed while signing; try again.'), { code: 4901 });
 
+// A lock can cut off a transaction after the session broadcast it.
+const TRANSACTION_METHODS = new Set(['eth_sendTransaction', 'eth_sendRawTransaction']);
+const transactionInterruptedError = (): Error =>
+  new Error(
+    'The passkey wallet locked before the transaction finished. It may already have been sent; check before trying again.',
+  );
+
 const assertExpectedAccount = (expectedAddress: unknown, address: unknown): void => {
   if (!expectedAddress || normalizeAccount(address) === normalizeAccount(expectedAddress)) return;
   throw unauthorizedAccountError('The passkey wallet in this browser changed to another account. Log in again.');
@@ -636,8 +643,10 @@ export class PasskeyEoaWalletClient {
     requestedAccount?: unknown,
   ): Promise<unknown> {
     // A request belongs to the chain it started on: never send or replay it on
-    // another chain. A lock from TTL or idle expiry still re-unlocks and retries.
+    // another chain. After a lock from TTL or idle expiry a signature re-unlocks
+    // and retries once; a transaction is never sent again.
     const chainEpoch = this.chainEpoch;
+    const { method } = buildArgs();
     const assertSameChain = (): void => {
       if (this.chainEpoch !== chainEpoch) throw networkChangedError();
     };
@@ -645,7 +654,9 @@ export class PasskeyEoaWalletClient {
       try {
         return await this.sendToSession(buildArgs());
       } catch (error) {
-        if (isPasskeyWalletLockedError(error)) assertSameChain();
+        if (!isPasskeyWalletLockedError(error)) throw error;
+        if (TRANSACTION_METHODS.has(method)) throw transactionInterruptedError();
+        assertSameChain();
         throw error;
       }
     };
