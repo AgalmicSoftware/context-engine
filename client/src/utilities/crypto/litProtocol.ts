@@ -334,15 +334,18 @@ const normalizeConnectTimeout = (value: unknown) => {
   return Math.floor(num);
 };
 
+const isProductionBuild = () => {
+  try {
+    return typeof process !== 'undefined' && !!process.env && process.env.NODE_ENV === 'production';
+  } catch (e) {
+    void e; /* fallback: build mode detection. */
+    return false;
+  }
+};
+
 const isE2eLitMockEnabled = () => {
   // Dev/e2e only: never enable in production builds.
-  try {
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production') {
-      return false;
-    }
-  } catch (e) {
-    void e; /* fallback: lit mock detection. */
-  }
+  if (isProductionBuild()) return false;
 
   if (typeof window === 'undefined') return false;
 
@@ -1554,6 +1557,7 @@ export const getGlobalLitHooks = () => {
 
 /**
  * Attaches lightweight Lit encryption helpers to `window.__litTools` for debugging flows in-browser.
+ * Development builds only; production builds never publish them.
  *
  * @param {{
  *   providerLike?: LitProviderLike,
@@ -1574,7 +1578,7 @@ export const attachLitDevTools = ({
   chainId?: ChainInput;
   litChain?: ChainInput;
 } = {}): LitDevToolsApi | null => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined' || isProductionBuild()) return null;
   const tools = {
     encryptForSbt: async ({ value, sbtAddresses, contextLabel, chain }: UnknownRecord = {}) => {
       const hooks = getGlobalLitHooks();
