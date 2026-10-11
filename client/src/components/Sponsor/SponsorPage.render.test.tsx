@@ -308,6 +308,22 @@ describe('SponsorPage', () => {
     expect(screen.getByDisplayValue('https://edited.example.test')).toBeInTheDocument();
   });
 
+  it('tells sponsors that grant deploys use the release recorded on their session Worker', async () => {
+    await renderSponsorPage();
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+
+    const deployCard = getFieldInputByLabel('Cloudflare API token').closest('.secretOptionCard') as HTMLElement;
+    const guideLink = within(deployCard).getByRole('link', { name: 'sponsored deploy release guide' });
+    expect(guideLink).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#sponsored-deploy-release',
+    );
+    expect(guideLink).toHaveAttribute('target', '_blank');
+    expect(guideLink.parentElement).toHaveTextContent(
+      'Sponsored deploys use the release recorded on your session Worker. Workers deployed before 0.6.8 need the two release settings (WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL) set first: see the sponsored deploy release guide.',
+    );
+  });
+
   it('preselects the requested session using sessionId and chainId props', async () => {
     sessionEntries = [
       [

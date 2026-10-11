@@ -16,7 +16,12 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeSessionSlugToken as normalizeSlug } from '../../utilities/session/sessionSlug';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 import { SponsorHandoffResult } from './SponsorHandoffResult';
+
+const SPONSORED_DEPLOY_RELEASE_GUIDE_URL = buildPublicRepoBlobUrl(
+  'docs/session-cors-worker.md#sponsored-deploy-release',
+);
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1219,10 +1224,21 @@ const SponsorPage = ({
                       );
                     })}
                     {group.key === 'deploy' ? (
-                      <div className={styles.statusNote}>
-                        Uses sponsoring worker:{' '}
-                        {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
-                      </div>
+                      <>
+                        <div className={styles.statusNote}>
+                          Uses sponsoring worker:{' '}
+                          {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
+                        </div>
+                        <div className={styles.statusNote}>
+                          Sponsored deploys use the release recorded on your session Worker. Workers deployed before
+                          0.6.8 need the two release settings (WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL) set
+                          first: see the{' '}
+                          <a href={SPONSORED_DEPLOY_RELEASE_GUIDE_URL} target="_blank" rel="noreferrer">
+                            sponsored deploy release guide
+                          </a>
+                          .
+                        </div>
+                      </>
                     ) : null}
                     {group.notice ? <div className={styles.warningNote}>{group.notice}</div> : null}
                   </div>
