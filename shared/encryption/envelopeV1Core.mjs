@@ -487,6 +487,20 @@ export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } =
 
 /* ---------------------------- Self-recipient wrap -------------------------- */
 
+// The KEK comes from this signature. One from any other wallet would store a
+// key the account owner can never unwrap, so check the signer before HKDF.
+export const assertKeyWrapSigner = (typed, signature, account) => {
+  let recovered = '';
+  try {
+    recovered = utils.verifyTypedData(typed.domain, typed.types, typed.message, signature);
+  } catch (_) {
+    recovered = '';
+  }
+  if (!recovered || recovered.toLowerCase() !== safeLower(String(account || ''))) {
+    throw new Error('Key-wrap signature does not match the account. Reconnect the wallet and try again.');
+  }
+};
+
 export const wrapCekWithSelfRecipient = async ({
   signTypedData,
   account,
@@ -506,6 +520,7 @@ export const wrapCekWithSelfRecipient = async ({
   const nonce = BigInt(bytesToHex(nonceBytes)).toString();
   const typed = buildEip712KeyWrap(account, chainId, contextHex, nonce);
   const sig = await signTypedData(typed.domain, typed.types, typed.message);
+  assertKeyWrapSigner(typed, sig, account);
 
   const contextBytes = getContextBytes(contextHex);
   const kek = await deriveKekFromSig(sig, contextBytes);

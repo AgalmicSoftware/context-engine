@@ -45,6 +45,15 @@ export function buildEip712KeyWrap(
   primaryType: 'KeyDerivation';
   message: Record<string, unknown>;
 };
+export function assertKeyWrapSigner(
+  typed: {
+    domain: Record<string, unknown>;
+    types: Record<string, Array<{ name: string; type: string }>>;
+    message: Record<string, unknown>;
+  },
+  signature: string,
+  account: unknown,
+): void;
 export function computeContext(input: EnvelopeContextInput): string;
 export function computeResponseFieldContext(input: EnvelopeContextInput): string;
 export function buildResponseFieldAAD(input: EnvelopeContextInput & { contextHex: string }): Record<string, unknown>;

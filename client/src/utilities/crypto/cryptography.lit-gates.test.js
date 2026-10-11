@@ -1,20 +1,27 @@
 import { webcrypto } from 'crypto';
+import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
 import { buildSbtAccessControlConditions } from './litProtocol.js';
 
-const ACCOUNT = '0x00000000000000000000000000000000000000aa';
+// SIG_A signs as ACCOUNT. SIG_B is another wallet, so its key-wrap signature
+// fails the signer check and decrypts must use the Lit recipient.
+const SIG_A = new ethers.Wallet(`0x${'11'.repeat(32)}`);
+const SIG_B = new ethers.Wallet(`0x${'22'.repeat(32)}`);
+const ACCOUNT = SIG_A.address;
 const CHAIN_ID = 84532;
 const SURVEY_ID = `0x${'12'.repeat(32)}`;
-const SIG_A = `0x${'11'.repeat(65)}`;
-const SIG_B = `0x${'22'.repeat(65)}`;
 const GATE_A = '0x0000000000000000000000000000000000000101';
 const GATE_B = '0x0000000000000000000000000000000000000102';
 
-const makeProvider = (signatureHex) => ({
-  request: jest.fn(async ({ method }) => {
+const makeProvider = (wallet) => ({
+  request: jest.fn(async ({ method, params }) => {
     if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [ACCOUNT];
     if (method === 'eth_chainId') return '0x14a34';
-    if (method === 'eth_signTypedData_v4') return signatureHex;
+    if (method === 'eth_signTypedData_v4') {
+      const { domain, types, message } = JSON.parse(params[1]);
+      delete types.EIP712Domain;
+      return wallet._signTypedData(domain, types, message);
+    }
     throw new Error(`Unexpected wallet method: ${method}`);
   }),
 });

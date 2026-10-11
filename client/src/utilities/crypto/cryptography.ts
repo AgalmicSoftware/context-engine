@@ -44,6 +44,7 @@ import { ethers, utils } from 'ethers';
 import {
   aesGcmDecrypt,
   aesGcmEncrypt,
+  assertKeyWrapSigner,
   buildCommitDomainBytes,
   buildEip712KeyWrap,
   buildEnvelopeObject,
@@ -1424,6 +1425,7 @@ const unwrapCekFromRecipients = async ({
       const typed = buildEip712KeyWrap(String(account || ''), chainId, contextHex, nonce);
       const provider = _getProvider(providerLike);
       const sig = await signEip712V4(provider, String(account || ''), typed);
+      assertKeyWrapSigner(typed, sig, account);
       const kek = await deriveKekFromSig(sig, contextBytes);
       const wrapIvBytes = b64decode(self.wrap_iv);
       const wrappedBytes = b64decode(self.wrapped_cek);
