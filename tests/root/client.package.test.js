@@ -199,13 +199,14 @@ test('client isolation headers come from the host, not ignored meta tags', () =>
   assert.equal(headers['Cross-Origin-Embedder-Policy'], 'unsafe-none');
 });
 
-test('client static headers cache only hashed build assets as immutable', () => {
+test('client static headers leave immutable caching to the per-file build rules', () => {
   const rules = readHeaderRules();
 
   // Overlapping Netlify rules combine values, so the catch-all rule must not set caching.
   ['Cache-Control', 'Pragma', 'Expires'].forEach((name) => assert.equal(rules['/*'][name], undefined, name));
-  assert.deepEqual(rules['/assets/*'], { 'Cache-Control': 'public, max-age=31536000, immutable' });
-  // Public files are copied unhashed, so none may be served from the immutable /assets path.
+  // A wildcard /assets/* rule would also send the year-long header with a missing file's 404.
+  assert.deepEqual(Object.keys(rules), ['/*']);
+  // Public files are copied unhashed, so none may be served from the /assets path.
   assert.equal(existsSync(resolve(rootDir, 'client/public/assets')), false);
 });
 

@@ -444,6 +444,48 @@ const publicAssetsCompatibilityPlugin = () => ({
   },
 });
 
+const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
+// One exact-path rule per emitted file. A wildcard /assets/* rule would also mark the
+// 404 for a missing file immutable, pinning it in browsers across a rollback.
+export const buildImmutableAssetHeaderRules = (fileNames, { base = '/', assetsDir = 'assets' } = {}) => {
+  if (!String(base).startsWith('/')) return '';
+  const prefix = `${String(base).replace(/\/+$/, '')}/`;
+  return [...fileNames]
+    .filter((fileName) => fileName.startsWith(`${assetsDir}/`))
+    .sort()
+    .map((fileName) => `${prefix}${fileName}\n  Cache-Control: ${IMMUTABLE_CACHE_CONTROL}\n`)
+    .join('');
+};
+
+export const immutableAssetHeadersPlugin = () => {
+  let resolvedConfig = null;
+  return {
+    name: 'ce-immutable-asset-headers',
+    apply: 'build',
+    configResolved(config) {
+      resolvedConfig = config;
+    },
+    // Runs after ce-public-assets-compatibility has copied public/_headers into outDir.
+    writeBundle: {
+      order: 'post',
+      sequential: true,
+      handler(options, bundle) {
+        const rules = buildImmutableAssetHeaderRules(Object.keys(bundle), {
+          base: resolvedConfig?.base,
+          assetsDir: resolvedConfig?.build?.assetsDir,
+        });
+        if (!rules) return;
+        const outDir = options.dir || resolvedConfig?.build?.outDir || path.resolve(__dirname, 'build');
+        fs.appendFileSync(
+          path.join(outDir, '_headers'),
+          `\n# Generated at build: hashed files only, so a missing file is never cached as immutable.\n${rules}`,
+        );
+      },
+    },
+  };
+};
+
 const postsAssetsCompatibilityPlugin = () => ({
   name: 'ce-posts-assets-compatibility',
   configureServer(server) {
@@ -491,6 +533,7 @@ export default defineConfig(({ mode }) => {
         ? [createBundleReportPlugin({ rootDir: __dirname })]
         : []),
       publicAssetsCompatibilityPlugin(),
+      immutableAssetHeadersPlugin(),
       postsAssetsCompatibilityPlugin(),
       {
         name: 'ce-public-url-html-compatibility',

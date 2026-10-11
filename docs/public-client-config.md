@@ -183,10 +183,10 @@ you set in `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`). If a deploy
 looks unstyled or low-contrast, rebuild from `client/` and upload the fresh
 `client/build/` directory.
 
-Because the app uses client-side routing, the root `netlify.toml` owns the Git
-deploy redirects. The matching `client/public/_redirects` file is retained in
-the published bundle for manual deploys and other Netlify-compatible static
-uploads:
+Because the app uses client-side routing, `client/public/_redirects` (copied
+into the published bundle) and the root `netlify.toml` carry the same redirect
+rules. Netlify applies `_redirects` first, so its rules answer in both Git and
+manual deploys; keep the two files identical:
 
 ```text
 /demo/dacc /about 301
@@ -221,9 +221,8 @@ The connected-build equivalent is:
 
 Keep specific legacy redirects above the SPA fallback rule in both files. The
 `/assets/*` rule makes a missing hashed file return 404 (with
-`client/public/404.html`) instead of the SPA HTML, which the year-long asset
-cache header would otherwise pin in browsers across a rollback. It is not
-forced, so files that exist are still served.
+`client/public/404.html`) instead of the SPA HTML. It is not forced, so files
+that exist are still served.
 
 For rollback, use Netlify's deploy history to republish the previous known-good
 production deploy, then correct `main` normally. A frontend rollback does not
@@ -240,20 +239,26 @@ be scoped to the same deployed base path by the hosting platform.
 Relative mount paths are normalized directly; route lookups avoid repeatedly
 parsing them as absolute URLs during question-list rendering.
 
-Cache Vite's content-hashed bundles for a year and let everything else
-revalidate. For manual drag-and-drop deploys, keep the `_headers` file inside
-`client/public/` so Vite copies it into the uploaded `client/build/` directory:
+Cache Vite's content-hashed files for a year and let everything else
+revalidate. `client/public/_headers` sets no cache header itself; the production
+build appends one exact-path rule to `client/build/_headers` for each hashed
+file it emits under `/assets/`:
 
 ```text
-/assets/*
+/assets/AppShell-0123abcd.js
   Cache-Control: public, max-age=31536000, immutable
 ```
 
-Netlify's default `Cache-Control: public, max-age=0, must-revalidate` already
-makes the browser re-check `index.html` and other unhashed files, so the `/*`
-rule sets no cache header; overlapping rules could otherwise combine values.
-Keep unhashed public files out of `client/public/assets/`, because anything
-served under `/assets/` is cached as immutable.
+A wildcard `/assets/*` rule would also send that header with the 404 for a
+missing file, and browsers would keep the 404 for a year, even after a rollback
+or revert brings the file back. With per-file rules, a missing file gets
+Netlify's default `Cache-Control: public, max-age=0, must-revalidate`, which
+also covers `index.html` and other unhashed files; the `/*` rule sets no cache
+header because overlapping rules could combine values. For manual drag-and-drop
+deploys, upload the built `client/build/` directory so its generated `_headers`
+goes with it. Keep unhashed public files out of `client/public/assets/`. After a
+deploy, `curl -sI https://<site>/assets/missing.js` should return 404 without
+`immutable` in `cache-control`.
 
 The same `_headers` file enforces a baseline Content Security Policy
 (`frame-ancestors`, `object-src`, `base-uri`, and `form-action`). It also sends
