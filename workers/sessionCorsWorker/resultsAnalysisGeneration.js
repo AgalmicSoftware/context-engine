@@ -140,14 +140,20 @@ const valueFromAnswerLike = (value) => {
   return '';
 };
 
+// Only encryption flags and envelopes lock a field. The client's masks ('*',
+// '[encrypted]') always carry encrypted:true, so public text that looks like a
+// marker ("Locked", "***") is an answer. A mask without the flag is still a
+// placeholder rather than an answer: it reads as blank, as in the client report.
+const FIELD_MASKS = new Set(['*', '[encrypted]']);
+const withoutFieldMask = (value) => {
+  const raw = isObj(value) && hasOwn(value, 'value') ? value.value : value;
+  return typeof raw === 'string' && FIELD_MASKS.has(raw.trim()) ? '' : value;
+};
+
 const rowLooksLocked = (row) => {
   if (!isObj(row)) return true;
   if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
-  const answer = hasOwn(row, 'answer') ? row.answer : hasOwn(row, 'value') ? row.value : row.response;
-  if (valueLooksEncrypted(answer)) return true;
-  const value = isObj(answer) && hasOwn(answer, 'value') ? answer.value : answer;
-  const text = trim(value);
-  return text === '*' || /^\*+$/.test(text) || /^\[?(encrypted|locked|redacted)\]?$/i.test(text);
+  return valueLooksEncrypted(hasOwn(row, 'answer') ? row.answer : hasOwn(row, 'value') ? row.value : row.response);
 };
 
 const normalizeQuestionId = (value) => trim(value).slice(0, 128);
@@ -442,7 +448,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       });
       if (inferred) questionMap.set(questionId, inferred);
     }
-    const answerValue = hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response);
+    const answerValue = withoutFieldMask(hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response));
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
     const knownQuestion = questionMap.get(questionId) || {};
     const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
@@ -451,8 +457,8 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       continue;
     }
     const answer = validatedAnswer.slice(0, 4000);
-    const additionalLocked = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue));
-    const additionalComments = additionalLocked ? '' : valueFromAnswerLike(additionalValue).slice(0, 2000);
+    const additionalLocked = valueLooksEncrypted(additionalValue);
+    const additionalComments = additionalLocked ? '' : valueFromAnswerLike(withoutFieldMask(additionalValue)).slice(0, 2000);
     if (!answer && !additionalComments) {
       excludedCount += 1;
       if (additionalLocked) lockedCount += 1;

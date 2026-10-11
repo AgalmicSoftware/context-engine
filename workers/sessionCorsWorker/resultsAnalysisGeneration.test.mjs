@@ -229,7 +229,7 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
     resource: 'responses',
     id: 'r4',
     metadata: { responder: '0x3333333333333333333333333333333333333333', createdAt: '2026-09-17T00:03:00.000Z' },
-    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: '*' },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: { value: '*', encrypted: true, encryptedPortion: 'ciphertext' } },
   });
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
   assert.equal(source.ok, true);
@@ -307,6 +307,62 @@ test('worker-canonical source lets a newer locked, cleared or invalid answer wit
     [source.counts.responseCount, source.counts.participantCount, source.counts.lockedCount, source.counts.excludedCount],
     [1, 1, 1, 3],
   );
+});
+
+test('public text that looks like a lock marker is analysed; only encryption flags and envelopes lock', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Thoughts?', type: 'freeform' },
+  });
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qm2',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q2', prompt: 'Pick one', type: 'multichoice', options: ['Locked', 'Open'] },
+  });
+  const rows = [
+    ['q1', { value: 'Redacted', encrypted: false }],
+    ['q1', '***'],
+    ['q1', { value: '[locked]' }],
+    ['q2', { value: ['Locked'] }],
+    ['q1', { value: 'plain' }, { value: '***' }],
+    // A client mask without its encryption flag is a placeholder, not an answer.
+    ['q1', '*'],
+    ['q1', { value: '[encrypted]' }],
+  ];
+  for (const [index, [questionId, answer, additional = '']] of rows.entries()) {
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `r${index}`,
+      metadata: { responder: `0x${String(index + 1).repeat(40)}` },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer, additional },
+    });
+  }
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(
+    source.snapshot.responses.map((row) => [row.questionId, row.answer, row.additional || '']).sort(),
+    [['q1', '***', ''], ['q1', 'Redacted', ''], ['q1', '[locked]', ''], ['q1', 'plain', '***'], ['q2', 'Locked', '']],
+  );
+  assert.deepEqual([source.counts.excludedCount, source.counts.lockedCount], [2, 0]);
+
+  const admin = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'q1', prompt: 'Thoughts?', type: 'freeform' }],
+      responses: [
+        { questionId: 'q1', participantId: 'p1', answer: 'A plain answer' },
+        { questionId: 'q1', participantId: 'p2', answer: 'Locked' },
+      ] } } },
+  });
+  assert.equal(admin.ok, true, JSON.stringify(admin));
+  assert.deepEqual(admin.snapshot.responses.map((row) => row.answer).sort(), ['A plain answer', 'Locked']);
 });
 
 test('worker-canonical source keeps the first or admin version of each question and skips hidden ids', async () => {
