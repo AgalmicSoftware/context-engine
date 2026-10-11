@@ -230,6 +230,56 @@ describe('PolisReport cache read options', () => {
     expect(screen.queryByText('(Not enough participant data to plot.)')).not.toBeInTheDocument();
   });
 
+  const buildBinaryResponses = (flip = false) =>
+    Object.fromEntries(
+      ['q1', 'q2', 'q3'].map((qid) => [
+        qid,
+        ['0x1', '0x2', '0x3', '0x4', '0x5'].map((responder, index) => ({
+          responder,
+          questionId: qid,
+          response: JSON.stringify({
+            type: 'binary',
+            prompt: `Prompt ${qid}`,
+            answer: { value: (index % 2 === 0) !== flip ? 'Agree' : 'Disagree' },
+          }),
+        })),
+      ]),
+    );
+
+  it('runs PCA and UMAP once per data load and skips refreshes that change nothing', async () => {
+    const responses = buildBinaryResponses();
+    const props = { ...baseReportProps, slug: 'umap-refresh', questionResponses: responses };
+    const view = render(<PolisReport {...props} questionResponsesNonce={1} />);
+    await waitFor(() => expect(doUMAP).toHaveBeenCalled());
+    expect(doUMAP).toHaveBeenCalledTimes(1);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(1);
+
+    // A Worker refresh with no new rows: readiness flips and the nonce bumps.
+    view.rerender(<PolisReport {...props} isResponsesCacheReady={false} questionResponsesNonce={1} />);
+    view.rerender(<PolisReport {...props} questionResponses={{ ...responses }} questionResponsesNonce={2} />);
+
+    expect(doUMAP).toHaveBeenCalledTimes(1);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(1);
+  });
+
+  it('computes UMAP only while the UMAP view is shown', async () => {
+    const props = { ...baseReportProps, slug: 'umap-view' };
+    const view = render(<PolisReport {...props} questionResponses={buildBinaryResponses()} />);
+    await waitFor(() => expect(doUMAP).toHaveBeenCalledTimes(1));
+    const select = screen.getByDisplayValue('UMAP');
+
+    fireEvent.change(select, { target: { value: 'POLIS' } });
+    view.rerender(<PolisReport {...props} questionResponses={buildBinaryResponses(true)} />);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(2);
+    expect(doUMAP).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(select, { target: { value: 'UMAP' } });
+    await waitFor(() => expect(doUMAP).toHaveBeenCalledTimes(2));
+    fireEvent.change(select, { target: { value: 'SVD' } });
+    fireEvent.change(select, { target: { value: 'UMAP' } });
+    expect(doUMAP).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps an opened cluster expanded when response data refreshes', () => {
     const math = {
       stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },

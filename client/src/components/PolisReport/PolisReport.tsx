@@ -299,14 +299,9 @@ export default function PolisReport({
   const [embeddingChoice, setEmbeddingChoice] = useState<EmbeddingChoice>(
     () => defaultEmbeddingChoice as EmbeddingChoice,
   );
-  const embeddingChoiceRef = useRef<EmbeddingChoice>(defaultEmbeddingChoice as EmbeddingChoice);
   const [manualClusterCount, setManualClusterCount] = useState<string>(() => defaultManualClusterCount);
   const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<number[]>([]);
   const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState<PolisRepQuestionsMap>({});
-
-  useEffect(() => {
-    embeddingChoiceRef.current = embeddingChoice;
-  }, [embeddingChoice]);
 
   // Representative questions
   const [repQuestions, setRepQuestions] = useState<PolisRepQuestionsMap>({});
@@ -529,7 +524,11 @@ export default function PolisReport({
     manualClusterCountValue === null
   );
   const isExploratoryMode = embeddingChoice !== 'POLIS' || manualClusterCountValue !== null;
-  const activeParticipantCoords = embeddingChoice === 'UMAP' ? umapParticipantCoords : participantCoords;
+  const isUmapView = embeddingChoice === 'UMAP';
+  // UMAP needs two neighbours, fewer than the number of participants, so a pair
+  // keeps the PCA layout.
+  const activeParticipantCoords =
+    isUmapView && (ratingMatrix?.[0]?.length || 0) !== 2 ? umapParticipantCoords : participantCoords;
   const activeStatementCoords = embeddingChoice === 'SVD' ? statementCoords : [];
   const activeClusterCount = useMemo(() => {
     if (manualClusterCountValue !== null) return manualClusterCountValue;
@@ -820,8 +819,8 @@ export default function PolisReport({
   /***************************************************************
    * Build rating matrix from real or demo
    ***************************************************************/
+  const ratingMatrixSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    setErrorMessage(null);
     let buildResult: RatingMatrixBuildResult;
     try {
       if (!effectiveUseDemoData) {
@@ -842,6 +841,12 @@ export default function PolisReport({
             }
           : demoResult;
       }
+      // Refreshes often rebuild identical data. Keeping the same matrix object
+      // skips recomputing PCA, clusters and UMAP for nothing.
+      const signature = JSON.stringify(buildResult);
+      if (signature === ratingMatrixSignatureRef.current) return;
+      ratingMatrixSignatureRef.current = signature;
+      setErrorMessage(null);
       if (!buildResult.matrix || !buildResult.matrix.length) {
         setRatingMatrix(null);
         setAllResponders([]);
@@ -866,6 +871,7 @@ export default function PolisReport({
       const labels = buildResult.questions.map((_q, idx) => `#${idx + 1}`);
       setQuestionLabels(labels);
     } catch (e: unknown) {
+      ratingMatrixSignatureRef.current = null;
       setErrorMessage(`Error building rating matrix: ${getErrorMessage(e)}`);
     }
   }, [
@@ -930,26 +936,18 @@ export default function PolisReport({
     }
   }, [polisMathError, polisMathResult, ratingMatrix, shouldUsePrecomputedDemoClusters]);
 
+  // UMAP is the slowest step: run it only for the UMAP view, once per matrix.
+  const umapMatrixRef = useRef<RatingMatrix | null>(null);
   useEffect(() => {
-    if (!ratingMatrix || !ratingMatrix.length) {
+    if (!isUmapView || umapMatrixRef.current === ratingMatrix) return;
+    umapMatrixRef.current = ratingMatrix;
+    const nParticipants = ratingMatrix?.[0]?.length || 0;
+    if (!ratingMatrix || nParticipants < 3) {
       setUmapParticipantCoords([]);
       return;
     }
 
     try {
-      const nParticipants = ratingMatrix[0]?.length || 0;
-      if (nParticipants < 2) {
-        setUmapParticipantCoords([]);
-        return;
-      }
-
-      if (nParticipants === 2) {
-        // UMAP needs at least two neighbors, fewer than the number of samples.
-        // Use the existing PCA projection for a pair instead of an empty graph.
-        setUmapParticipantCoords(polisMathResult?.participantCoords || []);
-        return;
-      }
-
       const nNeighbors = Math.max(2, Math.min(15, nParticipants - 1));
       const embedding = doUMAPTyped(buildUmapParticipantData(ratingMatrix), nNeighbors, DETERMINISTIC_SEED);
       setUmapParticipantCoords(
@@ -961,12 +959,10 @@ export default function PolisReport({
       );
     } catch (e: unknown) {
       surveyLog.error('UMAP error caught:', e);
-      if (embeddingChoiceRef.current === 'UMAP') {
-        setErrorMessage(`UMAP error: ${getErrorMessage(e)}`);
-      }
+      setErrorMessage(`UMAP error: ${getErrorMessage(e)}`);
       setUmapParticipantCoords([]);
     }
-  }, [DETERMINISTIC_SEED, ratingMatrix, polisMathResult]);
+  }, [DETERMINISTIC_SEED, isUmapView, ratingMatrix]);
 
   useEffect(() => {
     if (!ratingMatrix || !ratingMatrix.length) {
