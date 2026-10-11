@@ -48,6 +48,20 @@ it('reads the resource and id from a pasted survey link when unhiding', async ()
   expect(screen.getByLabelText('Type')).toHaveValue('surveys');
 });
 
+it('sends a malformed link escape as typed instead of failing silently', async () => {
+  const postSignedRequest = jest.fn().mockRejectedValue(new Error('Invalid questions id.'));
+  renderPanel(postSignedRequest);
+  fireEvent.change(screen.getByLabelText('Id or link'), {
+    target: { value: 'https://contextengine.sh/question/0x%E0%A4%A' },
+  });
+  fireEvent.click(screen.getByTestId('ce-admin-storage-visibility-hide'));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Invalid questions id.');
+  expect(postSignedRequest).toHaveBeenCalledWith(
+    expect.objectContaining({ body: expect.objectContaining({ resource: 'questions', id: '0x%e0%a4%a' }) }),
+  );
+});
+
 it('explains when the session Worker predates the hide route', async () => {
   renderPanel(jest.fn().mockRejectedValue(new Error('Unknown admin action.')));
   fireEvent.change(screen.getByLabelText('Id or link'), { target: { value: '0xabc' } });

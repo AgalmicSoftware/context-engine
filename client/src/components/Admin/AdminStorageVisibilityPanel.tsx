@@ -25,8 +25,14 @@ const parseTarget = (
 ): { id: string; resource: StorageVisibilityResource } => {
   const match = value.trim().match(/\/(question|survey)\/([^/?#\s]+)/i);
   if (!match) return { id: value.trim().toLowerCase(), resource: fallbackResource };
+  let id = match[2];
+  try {
+    id = decodeURIComponent(id);
+  } catch {
+    // A malformed escape is left as typed; the Worker rejects an invalid id.
+  }
   return {
-    id: decodeURIComponent(match[2]).toLowerCase(),
+    id: id.toLowerCase(),
     resource: match[1].toLowerCase() === 'survey' ? 'surveys' : 'questions',
   };
 };
