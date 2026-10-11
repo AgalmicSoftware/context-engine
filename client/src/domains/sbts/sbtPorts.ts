@@ -165,8 +165,8 @@ export type SbtGroupMintAuthorizationInput = {
   password: string;
   sbtAddress: string;
   userAddress: string;
-  // The on-chain hash; signing stops with a mismatch error when the password does not derive it.
-  groupPasswordHash?: string | null;
+  // The on-chain hash (required); signing stops with a mismatch error when the password does not derive it.
+  groupPasswordHash: string;
 };
 
 export type SbtInvitePayload = {
@@ -182,7 +182,7 @@ export type SbtInvitePayloadsInput = {
   password: string;
   sbtAddress: string;
   nonces: Array<string | number>;
-  groupPasswordHash?: string | null;
+  groupPasswordHash: string;
 };
 
 export type SbtGroupMintAuthorizationPort = {

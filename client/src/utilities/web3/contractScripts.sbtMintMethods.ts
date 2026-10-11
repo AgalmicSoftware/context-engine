@@ -12,14 +12,14 @@ type SignGroupMintAuthorizationInput = {
   password?: unknown;
   sbtAddress?: string | null;
   userAddress?: string | null;
-  groupPasswordHash?: string | null;
+  groupPasswordHash: string;
 };
 type GenerateInvitePayloadsInput = {
   chainId: string | number;
   password?: unknown;
   sbtAddress?: string | null;
   nonces?: Array<string | number>;
-  groupPasswordHash?: string | null;
+  groupPasswordHash: string;
 };
 type InvitePayloadResult = {
   chainId: string;

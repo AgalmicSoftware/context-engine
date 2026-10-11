@@ -7,19 +7,34 @@ type SbtAuthorizationInput = {
   sbtAddress?: unknown;
   userAddress?: unknown;
   nonce?: unknown;
-  // The on-chain hash. When set, signing stops with a mismatch error unless the password derives it.
-  groupPasswordHash?: unknown;
 };
-type SbtInviteSigningInput = Omit<SbtAuthorizationInput, 'nonce' | 'userAddress'> & {
+type SbtGroupSigningInput = SbtAuthorizationInput & {
+  // The on-chain hash. Required: signing stops unless the password derives it.
+  groupPasswordHash: unknown;
+};
+type SbtInviteSigningInput = Omit<SbtGroupSigningInput, 'nonce' | 'userAddress'> & {
   nonces?: unknown;
 };
 
 const GROUP_PASSWORD_MISMATCH = 'GROUP_PASSWORD_MISMATCH';
+// The password could not be checked at all, e.g. without WebCrypto or without the on-chain hash.
+const GROUP_PASSWORD_UNVERIFIABLE = 'GROUP_PASSWORD_UNVERIFIABLE';
+const BYTES32_HEX = /^0x[0-9a-f]{64}$/;
 
 const { deriveGroupPasswordWallet } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
+const withGroupPasswordCode = (error: unknown, code: string): Error =>
+  Object.assign(error instanceof Error ? error : new Error(String(error)), { code });
+
+const hasGroupPasswordCode = (error: unknown, code: string): boolean =>
+  !!error && typeof error === 'object' && (error as { code?: unknown }).code === code;
+
 export const isGroupPasswordMismatchError = (error: unknown): boolean =>
-  !!error && typeof error === 'object' && (error as { code?: unknown }).code === GROUP_PASSWORD_MISMATCH;
+  hasGroupPasswordCode(error, GROUP_PASSWORD_MISMATCH);
+
+// These errors carry a message users can act on, such as "Group passwords need WebCrypto".
+export const isGroupPasswordUnverifiableError = (error: unknown): boolean =>
+  hasGroupPasswordCode(error, GROUP_PASSWORD_UNVERIFIABLE);
 
 export const positiveSbtUint = (value: unknown): string => {
   if (typeof value !== 'string' && typeof value !== 'number' && !ethers.BigNumber.isBigNumber(value)) {
@@ -60,16 +75,22 @@ const hashSbtAuthorization = (
   );
 };
 
-// The slow KDF runs once per call; callers validate everything else first.
-const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: SbtAuthorizationInput) => {
-  const signer = await deriveGroupPasswordWallet({ password, sbtAddress });
-  if (groupPasswordHash != null) {
-    const signerHash = ethers.utils.solidityKeccak256(['address'], [signer.address]);
-    if (signerHash !== String(groupPasswordHash).trim().toLowerCase()) {
-      throw Object.assign(new Error('The group password does not match this group.'), {
-        code: GROUP_PASSWORD_MISMATCH,
-      });
-    }
+// The slow KDF runs once per call, after everything else is validated.
+const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: SbtGroupSigningInput) => {
+  const expectedHash = String(groupPasswordHash ?? '')
+    .trim()
+    .toLowerCase();
+  if (!BYTES32_HEX.test(expectedHash)) {
+    throw withGroupPasswordCode(
+      new Error("Could not read this group's password check from the chain. Check the network and try again."),
+      GROUP_PASSWORD_UNVERIFIABLE,
+    );
+  }
+  const signer = await deriveGroupPasswordWallet({ password, sbtAddress }).catch((error: unknown) => {
+    throw withGroupPasswordCode(error, GROUP_PASSWORD_UNVERIFIABLE);
+  });
+  if (ethers.utils.solidityKeccak256(['address'], [signer.address]) !== expectedHash) {
+    throw withGroupPasswordCode(new Error('The group password does not match this group.'), GROUP_PASSWORD_MISMATCH);
   }
   return signer;
 };
@@ -83,7 +104,7 @@ export const signGroupMintAuthorization = async ({
   userAddress,
   chainId,
   groupPasswordHash,
-}: SbtAuthorizationInput) => {
+}: SbtGroupSigningInput) => {
   const messageHash = computeGroupMintMessageHash(String(sbtAddress || ''), String(userAddress || ''), chainId);
   const signer = await deriveGroupSigner({ password, sbtAddress, groupPasswordHash });
   return signer.signMessage(ethers.utils.arrayify(messageHash));

@@ -2,6 +2,7 @@ import { pbkdf2Sync } from 'crypto';
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
 import groupPasswordDerivation from './groupPasswordDerivation.cjs';
+import { isGroupPasswordUnverifiableError } from './sbtAuthorization';
 import { useFastGroupPasswordKdf as useFastKdf } from './groupPasswordKdf.testUtils';
 
 const PASSWORD = 'shared-secret';
@@ -51,6 +52,7 @@ describe('group password derivation v4 (real KDF)', () => {
       sbtAddress: SBT_A,
       nonces: ['1'],
       chainId: CHAIN_ID,
+      groupPasswordHash: KAT_HASH,
     });
 
     expect(signerHashOf(cryptoUtils.computeGroupMintMessageHash(SBT_A, USER, CHAIN_ID), mintSignature)).toBe(KAT_HASH);
@@ -181,8 +183,8 @@ describe('SBT authorization signing', () => {
 
   it('binds invite signatures to their chain, collection and independent slot', async () => {
     useFastKdf();
-    const [signature] = await cryptoUtils.signInvites({ ...input, nonces: ['2'] });
     const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    const [signature] = await cryptoUtils.signInvites({ ...input, nonces: ['2'], groupPasswordHash });
     const signed = { ...input, nonce: '2', signature, groupPasswordHash };
     expect(cryptoUtils.verifyInviteSignature(signed).ok).toBe(true);
     for (const change of [{ chainId: CHAIN_ID + 1 }, { sbtAddress: SBT_B }, { nonce: '1' }]) {
@@ -192,14 +194,45 @@ describe('SBT authorization signing', () => {
 
   it('binds group signatures to chain and claimant with an explicit protocol domain', async () => {
     useFastKdf();
-    const signature = await cryptoUtils.signGroupMintAuthorization({ ...input, userAddress: USER });
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    const signature = await cryptoUtils.signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash });
     const expected = ethers.utils.keccak256(
       ethers.utils.defaultAbiCoder.encode(
         ['bytes32', 'uint256', 'address', 'address'],
         [ethers.utils.id('ContextEngine.SBT.GroupMint:1'), CHAIN_ID, SBT_A, USER],
       ),
     );
-    expect(signerHashOf(expected, signature)).toBe(await cryptoUtils.computeGroupPasswordHash(input));
+    expect(signerHashOf(expected, signature)).toBe(groupPasswordHash);
+  });
+
+  it.each([undefined, null, '', '0x1234', 'not-a-hash'])(
+    'requires a readable on-chain hash before deriving (%s)',
+    async (groupPasswordHash) => {
+      const { importKey } = useFastKdf();
+      const error = await cryptoUtils
+        .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash })
+        .catch((caught) => caught);
+
+      expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+      expect(error.message).toMatch(/password check from the chain/);
+      expect(importKey).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reports missing WebCrypto as a clear error, not a wrong password, when signing', async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+    Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });
+    try {
+      const error = await cryptoUtils
+        .signInvites({ ...input, nonces: ['1'], groupPasswordHash: `0x${'11'.repeat(32)}` })
+        .catch((caught) => caught);
+
+      expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+      expect(cryptoUtils.isGroupPasswordMismatchError(error)).toBe(false);
+      expect(error.message).toMatch(/WebCrypto/);
+    } finally {
+      Object.defineProperty(globalThis.crypto, 'subtle', original);
+    }
   });
 
   it('rejects old unscoped invite signatures and separates claim kinds', async () => {
@@ -235,7 +268,8 @@ describe('SBT authorization signing', () => {
 
   it('decodes only scoped signed invite payloads and rejects reusable secrets', async () => {
     useFastKdf();
-    const [signature] = await cryptoUtils.signInvites({ ...input, nonces: ['2'] });
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    const [signature] = await cryptoUtils.signInvites({ ...input, nonces: ['2'], groupPasswordHash });
     const payload = { c: String(CHAIN_ID), a: SBT_A, n: '2', s: signature };
     expect(cryptoUtils.decodeInvite(cryptoUtils.encodeInvite(payload))).toEqual({
       chainId: String(CHAIN_ID),

@@ -60,6 +60,7 @@ async function main() {
     await factory.deployed();
     // Group password hashes are scoped to the collection address, so predict it before deploying.
     const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
+    const signerHashes = new Map();
     const create = async (label, count, limited) => {
       const shape = [ethers.utils.id(`sbt-authorization-smoke/${label}`), 'Local membership', 'LOCAL', count,
         await admin.getAddress(), 0, limited, 3, []];
@@ -72,20 +73,25 @@ async function main() {
       assert.equal(event.args.sbtAddress, predicted, 'the collection must deploy to its predicted address');
       const collection = new ethers.Contract(event.args.sbtAddress, sbtAbi, admin);
       assert.equal(await collection.groupPasswordHash(), signerHash, 'the factory sets the scoped signer hash once');
+      signerHashes.set(collection.address, signerHash);
       return collection;
     };
     const group = await create('group', 0, false);
     const slots = await create('slots', 3, true);
+    // Signing checks the on-chain signer hash first, as the browser does.
     const signingInput = { password, chainId };
-    const groupSignature = await signGroupMintAuthorization({ ...signingInput, sbtAddress: group.address, userAddress: firstAddress });
+    const groupHash = signerHashes.get(group.address);
+    const groupSignature = await signGroupMintAuthorization({ ...signingInput, sbtAddress: group.address,
+      userAddress: firstAddress, groupPasswordHash: groupHash });
     await assert.rejects(group.connect(second).callStatic.mintWithGroupSignature(groupSignature));
     const wrongChainGroup = await signGroupMintAuthorization({ ...signingInput, chainId: chainId + 1,
-      sbtAddress: group.address, userAddress: firstAddress });
+      sbtAddress: group.address, userAddress: firstAddress, groupPasswordHash: groupHash });
     await assert.rejects(group.connect(first).callStatic.mintWithGroupSignature(wrongChainGroup));
     await (await group.connect(first).mintWithGroupSignature(groupSignature)).wait();
 
-    const signSlot = async (nonce, overrides = {}) =>
-      (await signInvites({ ...signingInput, sbtAddress: slots.address, nonces: [nonce], ...overrides }))[0];
+    const signSlot = async (nonce, { sbtAddress = slots.address, ...overrides } = {}) =>
+      (await signInvites({ ...signingInput, sbtAddress, nonces: [nonce], groupPasswordHash: signerHashes.get(sbtAddress),
+        ...overrides }))[0];
     const slotTwo = await signSlot('2');
     await assert.rejects(slots.connect(first).callStatic.claimWithInvite('2', await signSlot('2', { chainId: chainId + 1 })));
     await assert.rejects(slots.connect(first).callStatic.claimWithInvite('1', slotTwo));
