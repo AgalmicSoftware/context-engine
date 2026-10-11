@@ -218,11 +218,23 @@ const commitAll = (rootDir, message) => {
   return git(rootDir, ['rev-parse', 'HEAD']);
 };
 
-const writePin = (rootDir, commit) => writeRepoFile(
+const writePin = (rootDir, commit, manifestSha256 = 'a'.repeat(64)) => writeRepoFile(
   rootDir,
   PIN_PATH,
-  `${JSON.stringify({ commit, manifestSha256: 'a'.repeat(64) }, null, 2)}\n`,
+  `${JSON.stringify({ commit, manifestSha256 }, null, 2)}\n`,
 );
+
+const writeExampleConfig = (rootDir, commit) => writeRepoFile(
+  rootDir,
+  EXAMPLE_CONFIG_PATH,
+  `WORKER_BUNDLE_URL = "https://github.com/o/r/releases/download/worker-bundles-${commit}/sessionCorsWorker.bundle.js"\n`,
+);
+
+// pin-worker-release moves the pin and the deploy-helper example together.
+const writePinnedRelease = (rootDir, commit) => {
+  writePin(rootDir, commit);
+  writeExampleConfig(rootDir, commit);
+};
 
 // Public main with three published releases and an unpublished tip:
 // release B only restamps the version, release C changes Worker code and
@@ -260,7 +272,7 @@ const createPublishedReleaseHistory = () => {
 
 const commitCandidatePin = (rootDir, commit) => {
   git(rootDir, ['checkout', '--quiet', '-B', 'candidate', 'main']);
-  writePin(rootDir, commit);
+  writePinnedRelease(rootDir, commit);
   return commitAll(rootDir, `pin ${commit}`);
 };
 
@@ -298,6 +310,43 @@ test('the Worker release pin must carry the newest published Worker code', () =>
   }
 });
 
+test('the release gate refuses a dropped, malformed or split Worker release pin', () => {
+  const { rootDir, releaseA, releaseC } = createPublishedReleaseHistory();
+  try {
+    // Public main ships the pin from here on.
+    writePinnedRelease(rootDir, releaseC);
+    commitAll(rootDir, 'pin on main');
+    const verifyCandidate = (edit) => {
+      git(rootDir, ['checkout', '--quiet', '-B', 'candidate', 'main']);
+      edit();
+      return verifyWorkerReleasePin({
+        repoRoot: rootDir,
+        candidateRef: commitAll(rootDir, 'candidate'),
+        baselineRef: 'main',
+      });
+    };
+
+    assert.throws(
+      () => verifyCandidate(() => fs.rmSync(path.join(rootDir, PIN_PATH))),
+      /workerReleasePin\.json is missing at [a-f0-9]{40} but present in main/,
+    );
+    assert.throws(
+      () => verifyCandidate(() => writePin(rootDir, releaseC, 'not-a-digest')),
+      /must pin a full lowercase commit and manifest SHA-256/,
+    );
+    assert.throws(
+      () => verifyCandidate(() => writeExampleConfig(rootDir, releaseA)),
+      new RegExp(`wrangler\\.example\\.toml at [a-f0-9]{40} names worker-bundles-${releaseA}, not the pinned ${releaseC}`),
+    );
+    assert.deepEqual(
+      verifyCandidate(() => writeRepoFile(rootDir, 'docs/release.md', 'notes\n')),
+      { pinCommit: releaseC, newestRelease: releaseC },
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
 test('release preparation and release-ref verification refuse a stale Worker pin', () => {
   const { rootDir, releaseA, releaseC } = createPublishedReleaseHistory();
   const run = (args) => spawnSync(process.execPath, [SCRIPT_PATH, ...args, '--repo-root', rootDir], { encoding: 'utf8' });
@@ -316,7 +365,7 @@ test('release preparation and release-ref verification refuse a stale Worker pin
     assert.notEqual(verifyRef.status, 0, `verify-ref accepted a stale pin from ${staleCandidate}`);
     assert.match(verifyRef.stderr, /is stale/);
 
-    writePin(rootDir, releaseC);
+    writePinnedRelease(rootDir, releaseC);
     commitAll(rootDir, 'move pin');
     assert.equal(run(['plan', '--main-ref', 'main']).status, 0);
     const fresh = run(['verify-ref', '--candidate-ref', 'HEAD', '--baseline-ref', 'main']);

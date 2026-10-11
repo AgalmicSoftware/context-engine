@@ -243,7 +243,9 @@ export const readVersionAtRef = (repoRoot, ref) => {
 export const WORKER_RELEASE_PIN_PATH = 'client/src/variables/workerReleasePin.json';
 const DEPLOY_HELPER_EXAMPLE_CONFIG_PATH = 'workers/deploy-helper/wrangler.example.toml';
 const WORKER_RELEASE_TAG_RE = /^worker-bundles-([a-f0-9]{40})$/;
+const WORKER_RELEASE_URL_RE = /worker-bundles-([a-f0-9]{40})\//g;
 const FULL_COMMIT_RE = /^[a-f0-9]{40}$/;
+const SHA256_RE = /^[a-f0-9]{64}$/;
 const ROOT_LOCKFILE_PATH = 'package-lock.json';
 // What the release bundles are built from (scripts/worker-bundle.mjs), plus
 // the native Cloudflare template the pin also selects. A test checks that this
@@ -316,17 +318,38 @@ export const listPublishedWorkerReleases = ({ repoRoot, baselineRef }) => {
 
 const PIN_COMMAND = 'node scripts/release-version.mjs pin-worker-release';
 
+// Offline by design (the pre-push hook and release-staging CI run it), so it
+// checks the digest's form only; pin-worker-release verifies the digest when it
+// writes the pin, and verify:release-assets checks it against the release.
 export const verifyWorkerReleasePin = ({ repoRoot, candidateRef, baselineRef }) => {
   const pinContents = gitOrNull(repoRoot, ['show', `${candidateRef}:${WORKER_RELEASE_PIN_PATH}`]);
-  if (pinContents == null) return null;
-  let pinCommit = '';
-  try {
-    pinCommit = String(JSON.parse(pinContents)?.commit || '');
-  } catch {
-    pinCommit = '';
+  if (pinContents == null) {
+    if (gitOrNull(repoRoot, ['cat-file', '-e', `${baselineRef}:${WORKER_RELEASE_PIN_PATH}`]) != null) {
+      throw new Error(`${WORKER_RELEASE_PIN_PATH} is missing at ${candidateRef} but present in ${baselineRef}`);
+    }
+    return null;
   }
-  if (!FULL_COMMIT_RE.test(pinCommit)) {
-    throw new Error(`${WORKER_RELEASE_PIN_PATH} at ${candidateRef} must pin a full lowercase commit`);
+  let pin = {};
+  try {
+    pin = JSON.parse(pinContents) || {};
+  } catch {
+    pin = {};
+  }
+  const pinCommit = String(pin.commit || '');
+  if (!FULL_COMMIT_RE.test(pinCommit) || !SHA256_RE.test(String(pin.manifestSha256 || ''))) {
+    throw new Error(
+      `${WORKER_RELEASE_PIN_PATH} at ${candidateRef} must pin a full lowercase commit and manifest SHA-256`,
+    );
+  }
+  const exampleConfig = gitOrNull(repoRoot, ['show', `${candidateRef}:${DEPLOY_HELPER_EXAMPLE_CONFIG_PATH}`]) || '';
+  const otherExampleRelease = [...exampleConfig.matchAll(WORKER_RELEASE_URL_RE)]
+    .map((match) => match[1])
+    .find((commit) => commit !== pinCommit);
+  if (otherExampleRelease) {
+    throw new Error(
+      `${DEPLOY_HELPER_EXAMPLE_CONFIG_PATH} at ${candidateRef} names worker-bundles-${otherExampleRelease}, `
+        + `not the pinned ${pinCommit}; run ${PIN_COMMAND}`,
+    );
   }
   const published = listPublishedWorkerReleases({ repoRoot, baselineRef });
   if (!published.includes(pinCommit)) {
@@ -388,10 +411,7 @@ export const pinWorkerRelease = async ({
   const exampleConfigPath = path.join(repoRoot, DEPLOY_HELPER_EXAMPLE_CONFIG_PATH);
   if (fs.existsSync(exampleConfigPath)) {
     const exampleConfig = fs.readFileSync(exampleConfigPath, 'utf8');
-    fs.writeFileSync(
-      exampleConfigPath,
-      exampleConfig.replace(/worker-bundles-[a-f0-9]{40}\//g, `worker-bundles-${selected}/`),
-    );
+    fs.writeFileSync(exampleConfigPath, exampleConfig.replace(WORKER_RELEASE_URL_RE, `worker-bundles-${selected}/`));
   }
   return pin;
 };
