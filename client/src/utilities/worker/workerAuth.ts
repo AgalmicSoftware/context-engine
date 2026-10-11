@@ -777,8 +777,8 @@ export const getWorkerSessionToken = async ({
       } catch (err) {
         if (isAbortError(err)) throw err;
         if (isNonceMismatchError(getErrorMessage(err)) && !retriedNonceMismatch) {
-          // A concurrent auth flow may have rotated nonce for this address.
-          // Retry once with a fresh nonce to recover without user intervention.
+          // The Worker evicted, expired or refused this nonce (another tab may
+          // have filled its pending list). Retry once with a fresh nonce.
           retriedNonceMismatch = true;
           continue;
         }

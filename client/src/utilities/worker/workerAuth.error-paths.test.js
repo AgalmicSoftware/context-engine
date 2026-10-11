@@ -217,4 +217,53 @@ describe('error paths', () => {
     expect(String(error?.message || error)).not.toContain(canarySignature);
     expect(String(error?.message || error)).not.toContain('wants you to sign in');
   });
+
+  it('shows a plain message when the Worker refuses another sign-in nonce', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(429, { error: 'Too many pending sign-ins for this wallet. Try again shortly.' }));
+
+    const error = await getWorkerSessionToken({
+      workerUrl: 'https://worker.example',
+      context: authContext,
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'Too many sign-in attempts. Wait a minute and try again.',
+      reason: 'worker_auth_rate_limited',
+      status: 429,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs in again with a fresh nonce once when the Worker refuses the nonce', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'oldnonce1' }))
+      .mockResolvedValueOnce(jsonResp(400, { error: 'Malformed SIWE message: invalid nonce.' }))
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'freshnonce2' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+
+    await expect(getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext })).resolves.toBe(
+      'token-1',
+    );
+
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+    expect(JSON.parse(global.fetch.mock.calls[3][1].body).message).toContain('Nonce: freshnonce2');
+  });
+
+  it('retries a refused nonce only once', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce1' }))
+      .mockResolvedValueOnce(jsonResp(400, { error: 'Nonce mismatch or expired.' }))
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce2' }))
+      .mockResolvedValueOnce(jsonResp(400, { error: 'Nonce mismatch or expired.' }));
+
+    await expect(
+      getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext }),
+    ).rejects.toMatchObject({ reason: 'worker_auth_nonce_mismatch', status: 400 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+  });
 });
