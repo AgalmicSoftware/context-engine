@@ -1262,8 +1262,9 @@ export default function PolisReport({
       const agrees = votes.filter((v) => v === 1).length;
       const disagrees = votes.filter((v) => v === -1).length;
       const unsures = votes.filter((v) => v === 0).length;
-      const noresp = votes.filter((v) => v === null || v === undefined).length;
-      const total = votes.length;
+      const responses = agrees + unsures + disagrees;
+      // Report participants who voted on other questions but skipped this one.
+      const noResponse = votes.length - responses;
 
       return (
         <div
@@ -1283,7 +1284,13 @@ export default function PolisReport({
           <div className={styles.questionVoteRow}>
             <span style={{ fontSize: '0.8rem', marginRight: '8px' }}>
               <strong>Agree:</strong> {agrees} / <strong>Unsure:</strong> {unsures} / <strong>Disagree:</strong>{' '}
-              {disagrees} / (Total: {total})
+              {disagrees} / <strong>Responses:</strong> {responses}
+              {noResponse > 0 ? (
+                <>
+                  {' '}
+                  / <strong>No response:</strong> {noResponse}
+                </>
+              ) : null}
             </span>
             <QuestionStanceBar votes={votes} />
           </div>

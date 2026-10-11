@@ -1143,6 +1143,27 @@ describe('PolisReport demo data defaults', () => {
     expect(ratings.querySelectorAll('article')).toHaveLength(3);
   });
 
+  it('counts only respondents in each binary question total', () => {
+    const vote = (responder, value) => ({
+      responder,
+      response: { type: 'binary', prompt: value ? 'Everyone voted' : 'One voted', answer: { value: value || 'Agree' } },
+    });
+    const responses = {
+      q1: [vote('person-a', 'Agree'), vote('person-b', 'Agree'), vote('person-c', 'Disagree')],
+      q2: [vote('person-a', '')],
+    };
+
+    render(<PolisReport {...baseReportProps} questionResponses={responses} />);
+
+    const lines = [...screen.getByTestId('ce-polis-answers-binary').querySelectorAll('[data-pdf-keep-together]')].map(
+      (line) => line.textContent,
+    );
+    expect(lines.find((line) => line.includes('Everyone voted'))).toContain('Disagree: 1 / Responses: 3');
+    expect(lines.find((line) => line.includes('Everyone voted'))).not.toContain('No response');
+    expect(lines.find((line) => line.includes('One voted'))).toContain('Responses: 1 / No response: 2');
+    expect(lines.join(' ')).not.toContain('Total');
+  });
+
   it('previews the five most divisive binary questions and expands the remaining questions in score order', () => {
     const scores = [0.1, 0.9, 0.5, 0.8, 0.4, 0.7, 0.3];
     computePolisConversationMath.mockReturnValue({
