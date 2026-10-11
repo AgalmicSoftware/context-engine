@@ -305,8 +305,16 @@ export const buildSurveyResultsExportBaseFileName = ({
   return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
 };
 
-const quoteCsvCell = (value: unknown): string =>
-  `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`;
+// Spreadsheet apps run a cell that starts with one of these characters as a
+// formula. Participant text must stay text, so it gets a leading apostrophe.
+const CSV_FORMULA_START = /^[=+\-@\t\r]/;
+const CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+
+const quoteCsvCell = (value: unknown): string => {
+  const text = String(value !== undefined && value !== null ? value : '');
+  const safeText = CSV_FORMULA_START.test(text) && !CSV_PLAIN_NUMBER.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+};
 
 const quoteResponseCsvCell = (value: unknown): string => {
   const cellValue = Array.isArray(value) ? JSON.stringify(value) : value;
