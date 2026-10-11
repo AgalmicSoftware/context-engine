@@ -3,7 +3,7 @@
  * @description Arweave upload retry and failure-state management — determines terminal vs. retryable
  *              failure states, prunes stale pending metadata, and manages cache branch merging.
  *
- * Key exports: isTerminalArweaveFailureState, shouldStopPendingMetadataRetry, prunePendingMetadataEntries, ensureQuestionArweaveCacheBranches
+ * Key exports: isTerminalArweaveFailureState, shouldStopPendingMetadataRetry, ensureQuestionArweaveCacheBranches
  */
 import { isTerminalArweaveFailureState, normalizeArweaveFailureMeta } from './arweaveFailureClassifiers.js';
 
@@ -38,42 +38,5 @@ export const shouldStopPendingMetadataRetry = ({
     terminal,
     reachedMaxAttempts,
     meta,
-  };
-};
-
-const normalizePendingMetadataKey = (key: unknown): string =>
-  String(key || '')
-    .trim()
-    .toLowerCase();
-
-export const prunePendingMetadataEntries = ({
-  pendingEntries = null,
-  hydratedEntries = null,
-  normalizeKey = normalizePendingMetadataKey,
-}: {
-  pendingEntries?: unknown;
-  hydratedEntries?: unknown;
-  normalizeKey?: ((key: unknown) => string) | null;
-} = {}) => {
-  const normalize = typeof normalizeKey === 'function' ? normalizeKey : normalizePendingMetadataKey;
-  const pending: UnknownRecord = isRecord(pendingEntries) ? pendingEntries : {};
-  const hydrated: UnknownRecord = isRecord(hydratedEntries) ? hydratedEntries : {};
-  const nextPending: UnknownRecord = {};
-  const removedKeys: string[] = [];
-
-  Object.keys(pending).forEach((rawKey) => {
-    const normalizedKey = normalize(rawKey);
-    if (!normalizedKey) return;
-    if (hydrated[normalizedKey]) {
-      removedKeys.push(normalizedKey);
-      return;
-    }
-    nextPending[rawKey] = pending[rawKey];
-  });
-
-  return {
-    nextPending,
-    removedKeys,
-    removedCount: removedKeys.length,
   };
 };

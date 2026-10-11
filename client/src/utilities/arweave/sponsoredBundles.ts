@@ -55,24 +55,6 @@ export const generateSponsoredBundleSecret = (byteLength = SPONSORED_BUNDLE_SECR
   return base64UrlEncode(bytes);
 };
 
-export const normalizeSponsoredBundlePayload = (raw: unknown) => {
-  const payload = isObj(raw) ? raw : {};
-  const next: LooseRecord = {};
-  SPONSORED_BUNDLE_SUPPORTED_FIELDS.forEach((key) => {
-    next[key] = toStr(payload[key] || '').trim();
-  });
-  const meta = isObj(payload.meta) ? payload.meta : {};
-  next.meta = {
-    label: toStr(meta.label || '').trim(),
-    createdAt: toStr(meta.createdAt || '').trim(),
-    createdBy: toStr(meta.createdBy || '').trim(),
-    expiresAt: toStr(meta.expiresAt || '').trim(),
-    sourceSessionSlug: toStr(meta.sourceSessionSlug || '').trim(),
-    sourceWorkerUrl: toStr(meta.sourceWorkerUrl || '').trim(),
-  };
-  return next;
-};
-
 export const normalizeSparseSponsoredBundlePayload = (raw: unknown) => {
   const payload = isObj(raw) ? raw : {};
   const next: LooseRecord = {};

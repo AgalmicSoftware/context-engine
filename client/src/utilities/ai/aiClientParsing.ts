@@ -16,14 +16,6 @@ export const readParsedString = (record: UnknownRecord | null | undefined, key: 
 export const readParsedLegacyString = (record: UnknownRecord | null | undefined, key: string): string =>
   String(record?.[key] || '');
 
-export const pickParsedString = (record: UnknownRecord | null | undefined, keys: readonly string[]): string => {
-  for (const key of keys) {
-    const value = readParsedString(record, key);
-    if (value) return value;
-  }
-  return '';
-};
-
 /**
  * Try to parse JSON from a string that may include ```json code fences
  * or extra text around the JSON object.

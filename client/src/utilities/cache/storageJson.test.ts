@@ -1,4 +1,4 @@
-import { boundedStringify, createStorageNamespace, removeKeys, safeJsonRead, safeJsonWrite } from './storageJson.js';
+import { boundedStringify, removeKeys, safeJsonRead, safeJsonWrite } from './storageJson.js';
 import * as storageJsonModule from './storageJson.js';
 
 it('exports storage primitives without a default convenience object', () => {
@@ -127,13 +127,5 @@ describe('storageJson primitives', () => {
       status: 'ok',
     });
     expect(storage.removed).toBe(true);
-  });
-
-  it('creates stable versioned namespace keys', () => {
-    const namespace = createStorageNamespace({ prefix: 'ce:surveyDraft', version: '2' });
-
-    expect(namespace.base).toBe('ce:surveyDraft:v2');
-    expect(namespace.key()).toBe('ce:surveyDraft:v2');
-    expect(namespace.key(':edge')).toBe('ce:surveyDraft:v2:edge');
   });
 });

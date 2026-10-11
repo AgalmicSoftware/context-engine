@@ -270,16 +270,6 @@ export const usesCloudflareSessionStorage = (
   opts: ResolveSessionStorageBackendOptions = {},
 ): boolean => resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE;
 
-export const usesWorkerSbtGateCloudflareStorage = (
-  sessionConfig: unknown = null,
-  opts: ResolveSessionStorageBackendOptions = {},
-): boolean =>
-  usesCloudflareSessionStorage(sessionConfig, opts) &&
-  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate ===
-    SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE &&
-  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption !==
-    SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT;
-
 export const usesPublicReadCloudflareStorage = (
   sessionConfig: unknown = null,
   opts: ResolveSessionStorageBackendOptions = {},

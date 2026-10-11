@@ -1,21 +1,18 @@
 import {
   STORAGE_BACKENDS,
   attachStorageRefCompatibilityFields,
-  assertNoCloudflarePrivateMaterial,
   deriveStorageRefFromLegacyArweaveTxId,
   getLegacyArweaveTxId,
   isSafeCloudflareStorageRefId,
   normalizeStorageRef,
-  normalizeStorageRefForRecord,
   resolvePayloadStorageRef,
-  withStorageRefCompatibility,
 } from './storageRefs.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 
 describe('storageRefs', () => {
   test('derives Arweave storageRef from legacy arweaveTxId without removing compatibility field', () => {
-    const record = withStorageRefCompatibility({ arweaveTxId: TX_ID, title: 'Question' });
+    const record = attachStorageRefCompatibilityFields({ arweaveTxId: TX_ID, title: 'Question' });
 
     expect(record.arweaveTxId).toBe(TX_ID);
     expect(record.storageRef).toEqual({
@@ -26,7 +23,7 @@ describe('storageRefs', () => {
   });
 
   test('normalizes lit-arweave as encrypted Arweave payload storage', () => {
-    expect(normalizeStorageRefForRecord({ arweaveTxId: TX_ID }, { encrypted: true })).toEqual({
+    expect(resolvePayloadStorageRef({ arweaveTxId: TX_ID }, { encrypted: true })).toEqual({
       backend: STORAGE_BACKENDS.LIT_ARWEAVE,
       id: TX_ID,
       uri: `lit-arweave://${TX_ID}`,
@@ -51,14 +48,12 @@ describe('storageRefs', () => {
       resource: 'docsContext',
     });
     expect(JSON.stringify(ref)).not.toMatch(/account|bucket|r2|token|secret|cloudflarestorage/i);
-    expect(assertNoCloudflarePrivateMaterial(ref)).toBe(true);
   });
 
   test('rejects Cloudflare refs that expose private storage identifiers', () => {
     expect(isSafeCloudflareStorageRefId('r2://bucket/raw-key')).toBe(false);
     expect(isSafeCloudflareStorageRefId('https://worker.example/object')).toBe(false);
     expect(normalizeStorageRef({ backend: 'cloudflare', id: 'r2://bucket/raw-key' })).toBeNull();
-    expect(() => assertNoCloudflarePrivateMaterial({ bucketName: 'private-bucket' })).toThrow(/must not expose/i);
   });
 
   test('prefers storageRef over stale legacy arweaveTxId when resolving payload pointers', () => {
@@ -98,17 +93,11 @@ describe('storageRefs', () => {
     expect(record.arweaveTxId).toBe(TX_ID);
   });
 
-  test('exports canonical dual-field helper names while preserving legacy aliases', () => {
+  test('derives an Arweave storageRef from a legacy transaction id', () => {
     expect(deriveStorageRefFromLegacyArweaveTxId(TX_ID)).toEqual({
       backend: STORAGE_BACKENDS.ARWEAVE,
       id: TX_ID,
       uri: `ar://${TX_ID}`,
     });
-    expect(resolvePayloadStorageRef({ arweaveTxId: TX_ID })).toEqual(
-      normalizeStorageRefForRecord({ arweaveTxId: TX_ID }),
-    );
-    expect(attachStorageRefCompatibilityFields({ arweaveTxId: TX_ID })).toEqual(
-      withStorageRefCompatibility({ arweaveTxId: TX_ID }),
-    );
   });
 });

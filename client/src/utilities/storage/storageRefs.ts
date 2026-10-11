@@ -242,17 +242,3 @@ export const attachStorageRefCompatibilityFields = (
   }
   return source;
 };
-export const normalizeStorageRefForRecord = resolvePayloadStorageRef;
-export const withStorageRefCompatibility = attachStorageRefCompatibilityFields;
-
-export const assertNoCloudflarePrivateMaterial = (value: unknown): true => {
-  const text = typeof value === 'string' ? value : JSON.stringify(value || {});
-  if (
-    /(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(
-      text as string,
-    )
-  ) {
-    throw new Error('Cloudflare storage references must not expose private storage identifiers or credentials.');
-  }
-  return true;
-};

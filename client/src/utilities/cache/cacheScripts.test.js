@@ -203,9 +203,6 @@ describe('cacheScripts', () => {
       ]),
     );
 
-    const report = await cacheScripts.migrateLocalStorageToIDB();
-    expect(report).toMatchObject({ migrated: false, idb: true, moved: 0, removed: 0, failed: 0 });
-
     expect(await cacheScripts.readCache('questionsCache', 'alpha')).toEqual(seed['dg:questionsCache:alpha']);
     expect(idbState.get('dg:questionsCache:alpha')).toEqual(seed['dg:questionsCache:alpha']);
     expect(localStorage.getItem('dg:questionsCache:alpha')).toBeNull();

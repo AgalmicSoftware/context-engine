@@ -1,10 +1,4 @@
-import {
-  asParsedJsonRecord,
-  parseJsonFlexible,
-  pickParsedString,
-  readParsedLegacyString,
-  readParsedString,
-} from './aiClientParsing';
+import { asParsedJsonRecord, parseJsonFlexible, readParsedLegacyString, readParsedString } from './aiClientParsing';
 
 describe('aiClientParsing typed record readers', () => {
   it('narrows parsed JSON objects without accepting arrays or primitives', () => {
@@ -28,16 +22,6 @@ describe('aiClientParsing typed record readers', () => {
     expect(readParsedLegacyString(record, 'count')).toBe('2');
     expect(readParsedLegacyString(record, 'enabled')).toBe('true');
     expect(readParsedLegacyString(record, 'zero')).toBe('');
-  });
-
-  it('picks the first non-empty string from fallback model response keys', () => {
-    const record = asParsedJsonRecord({
-      explanation: '',
-      message: 'Fallback message',
-      text: 42,
-    });
-
-    expect(pickParsedString(record, ['text', 'explanation', 'message'])).toBe('Fallback message');
   });
 
   it('composes with flexible fenced JSON parsing', () => {

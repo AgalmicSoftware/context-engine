@@ -1,9 +1,4 @@
-import {
-  buildArweaveUploadFallbackTelemetryEntry,
-  type ArweaveClientApi,
-  type ArweaveFailureCacheRecord,
-  type ArweaveUploadAttemptInput,
-} from './arweaveClientHostContracts.js';
+import { buildArweaveUploadFallbackTelemetryEntry } from './arweaveClientHostContracts.js';
 
 describe('arweaveClientHostContracts', () => {
   it('builds timestamped fallback telemetry without mutating the payload', () => {
@@ -33,35 +28,5 @@ describe('arweaveClientHostContracts', () => {
       ts: '1970-01-01T00:00:00.000Z',
       value: 'network unavailable',
     });
-  });
-
-  it('keeps the host attempt, failure-cache, and public API contracts compilable', () => {
-    const attempt = {
-      candidate: {
-        allowsArweaveUpload: true,
-        gateStatus: 'open',
-        hasSponsoredArweaveKey: true,
-        order: 0,
-        preferenceRank: 0,
-        reason: 'selected-session',
-        sessionConfig: null,
-        sessionSlug: 'general',
-        workerUrl: 'https://worker.example',
-      },
-      buildRequestInit: () => ({ method: 'POST' }),
-      attemptIndex: 0,
-    } satisfies ArweaveUploadAttemptInput;
-    const failure = {
-      attempts: 1,
-      nextRetryAtMs: 100,
-      status: 503,
-    } satisfies ArweaveFailureCacheRecord;
-    const apiKeys = ['uploadDataToArweave', 'downloadDataFromArweave', 'checkTxExists'] satisfies Array<
-      keyof ArweaveClientApi
-    >;
-
-    expect(attempt.candidate.sessionSlug).toBe('general');
-    expect(failure.status).toBe(503);
-    expect(apiKeys).toHaveLength(3);
   });
 });

@@ -1,7 +1,5 @@
 import type { ArweaveTag } from './arweaveGatewayPayloads.js';
 import type { ArweaveDebugContext } from './arweaveRuntimeDiagnostics.js';
-import type { ArweaveUploadCandidate } from './arweaveUploadCandidates.js';
-import type { FailureCacheEntry } from './arweaveFailureCache.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -102,14 +100,6 @@ export interface ArweaveDirectUploadInput {
   tags: ArweaveTag[] | null;
 }
 
-export interface ArweaveUploadAttemptInput {
-  attemptIndex?: number;
-  bodyBytes?: number | null;
-  buildRequestInit: () => RequestInit;
-  candidate: ArweaveUploadCandidate;
-  hasFormData?: boolean;
-}
-
 export type ArweaveUploadAttemptResult =
   | { id: string; ok: true }
   | {
@@ -138,19 +128,3 @@ export interface ArweaveWalletBalanceResult {
   gatewayBase: string;
   winston: string;
 }
-
-export interface ArweaveClientApi {
-  base64DecodeURL: (value: unknown) => unknown;
-  base64urlToBase64: (value: unknown) => unknown;
-  base64urlToHex: (value: unknown) => unknown;
-  buildArweaveGatewayUrl: (txId: unknown, gateway?: unknown) => string;
-  checkTxExists: (txId: unknown, opts?: ArweaveGraphqlOptions) => Promise<boolean | null>;
-  downloadDataFromArweave: (txId: unknown, opts?: ArweaveDownloadOptions) => Promise<string>;
-  formatWinstonToAr: (winston: unknown, decimals?: number) => string;
-  hexToBase64url: (value: unknown) => unknown;
-  readArweaveWalletBalance: (jwk: unknown, opts?: ArweaveGatewayOptions) => Promise<ArweaveWalletBalanceResult>;
-  registerTxContext: (txId: unknown, context?: UnknownRecord) => void;
-  uploadDataToArweave: (data: unknown, format?: unknown, opts?: ArweaveUploadOptions) => Promise<string>;
-}
-
-export type ArweaveFailureCacheRecord = FailureCacheEntry;
