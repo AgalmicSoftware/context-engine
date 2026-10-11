@@ -326,3 +326,50 @@ test('participants cannot rewrite an official question, and admins can hide one'
 	const afterHide = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: SLUG, config });
 	assert.deepEqual(afterHide.snapshot.questions, []);
 });
+
+test('login accepts the exact client sign-in message and rejects lenient look-alikes', async () => {
+	const { env } = createSessionEnv();
+	const wallet = Wallet.createRandom();
+	const issuedAt = new Date(Date.now() - 5_000).toISOString();
+	const lookAlikes = [
+		// An extra free-text line makes wallets show plain text instead of a sign-in request.
+		(nonce) => [
+			'app.example wants you to sign in with your Ethereum account:',
+			wallet.address,
+			'',
+			'Claim your evaluator reward (no gas).',
+			'',
+			'URI: https://app.example',
+			'Version: 1',
+			'Chain ID: 1',
+			`Nonce: ${nonce}`,
+			`Issued At: ${issuedAt}`,
+			'Reward code: 7731',
+		].join('\n'),
+		// Fields out of order and buried inside prose.
+		(nonce) => [
+			'app.example wants you to sign in with your Ethereum account:',
+			wallet.address,
+			`Issued At: ${issuedAt}`,
+			'To verify your wallet for the giveaway, sign this text.',
+			`Nonce: ${nonce}`,
+			'Chain ID: 1',
+			'URI: https://app.example',
+		].join('\n'),
+	];
+	for (const build of lookAlikes) {
+		const nonce = await requestNonce({ env, address: wallet.address });
+		const login = await loginWithMessage({ env, wallet, message: build(nonce.body.nonce) });
+		assert.equal(login.status, 400, JSON.stringify(login.body));
+		assert.match(login.body.error, /^Malformed SIWE message/);
+		assert.equal(login.body.token, undefined);
+	}
+
+	const nonce = await requestNonce({ env, address: wallet.address });
+	const login = await loginWithMessage({
+		env,
+		wallet,
+		message: buildClientSiweMessage({ address: wallet.address, nonce: nonce.body.nonce }),
+	});
+	assert.equal(login.status, 200, JSON.stringify(login.body));
+});

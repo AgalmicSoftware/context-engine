@@ -549,7 +549,7 @@ for (const [label, resources, canonical, expected] of [
   test(`login signed Resources checks ${label} before consuming the nonce`, async () => {
     const base = [
       'allowed.example wants you to sign in with your Ethereum account:',
-      '0xabc',
+      '0x0000000000000000000000000000000000000abc',
       '',
       'Sign in to Context Engine.',
       '',

@@ -185,15 +185,21 @@ const login = async ({ env, wallet }) => {
 
 	const issuedAt = new Date(Date.now() - 60_000).toISOString();
 	const expirationTime = new Date(Date.now() + 3_600_000).toISOString();
+	// The exact message shape the current client signs (workerAuth.ts).
 	const message = `${new URL(ORIGIN).host} wants you to sign in with your Ethereum account:
 ${wallet.address}
+
+Sign in to Context Engine.
 
 URI: ${ORIGIN}
 Version: 1
 Chain ID: 1
 Nonce: ${noncePayload.nonce}
 Issued At: ${issuedAt}
-Expiration Time: ${expirationTime}`;
+Expiration Time: ${expirationTime}
+Resources:
+- https://worker.example
+- urn:context-engine:session:id:${SESSION_ID}`;
 	const signature = await wallet.signMessage(message);
 	const response = await fetchWorker(
 		makeRequest('/auth/login', {

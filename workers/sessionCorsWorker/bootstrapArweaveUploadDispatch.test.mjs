@@ -375,7 +375,9 @@ for (const [label, resources, accepted, mode] of [
     let verified = false;
     let uploaded = false;
     const message = ['app.example wants you to sign in with your Ethereum account:', '0x0000000000000000000000000000000000000001',
-      'URI: https://app.example', ...(resources === null ? [] : ['Resources:', ...resources.map((r) => `- ${r}`)])].join('\n');
+      '', 'Admin request: bootstrap arweave upload', '', 'URI: https://app.example', 'Version: 1', 'Chain ID: 1',
+      'Nonce: nonce-1', 'Issued At: 2026-10-01T00:00:00.000Z',
+      ...(resources === null ? [] : ['Resources:', ...resources.map((r) => `- ${r}`)])].join('\n');
     const result = await dispatchBootstrapArweaveUpload({
       request: new Request('https://worker.example/arweave/upload'), hasAuthorization: false,
       deps: {

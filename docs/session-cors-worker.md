@@ -1729,6 +1729,14 @@ login, and signed admin request bodies must carry that config's canonical
      nonce never cancels an earlier pending one; past the cap the oldest is
      dropped, and each nonce is consumed at most once.
 2. Build a SIWE message client-side and sign with `personal_sign`.
+   The Worker parses it as strict EIP-4361 so that wallets recognize every
+   accepted message as a sign-in request: the header, the address, a blank
+   line, an optional statement and blank line, then `URI`, `Version` (`1`),
+   `Chain ID`, `Nonce`, and `Issued At`, then optional `Expiration Time`,
+   `Not Before`, and `Request ID`, all in that order, and an optional final
+   `Resources:` list. Reordered, duplicated, unknown, padded, or trailing
+   lines, CRLF line breaks, and statements outside the EIP-4361 character set
+   are rejected with `400` before the nonce is consumed.
    Include exactly two `Resources:` URI-list entries with a `- ` prefix: the
    receiving Worker origin and `urn:context-engine:session:id:<encoded-id>` for
    Worker-canonical sessions, or `urn:context-engine:session:slug:<encoded-slug>`
@@ -1763,9 +1771,9 @@ login, and signed admin request bodies must carry that config's canonical
      cached HMAC key reuse, the exact token verification error strings,
      non-empty `jti` validation, and `exp` comparison in epoch seconds.
    - SIWE message parsing/validation now also routes through a shared helper:
-     it preserves trimmed `URI` / `Chain ID` / `Nonce` / `Issued At` / `Expiration Time` extraction,
-     required field checks, URI host vs domain matching, and invalid/expired expiration rejection
-     across login, signed admin requests, and bootstrap admin verification.
+     it applies the strict line order above, required field checks, URI host
+     vs domain matching, invalid/expired expiration and future `Not Before`
+     rejection across login and bootstrap admin verification.
 
 On success, the worker returns
 `{ token, exp, sessionSlug, sessionId? }`, where `exp` is now + 4h.

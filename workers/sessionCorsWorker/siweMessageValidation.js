@@ -3,7 +3,7 @@ import {
   ADMIN_ACTION_DOMAIN,
   ADMIN_ACTION_TYPES,
 } from './adminTypedData.mjs';
-import { trimIfString, toStr } from './stringCoercion.js';
+import { toStr } from './stringCoercion.js';
 
 export {
   ADMIN_ACTION_DOMAIN,
@@ -23,9 +23,6 @@ export const TRUSTED_ORIGINS = Object.freeze([
   'http://127.0.0.1:7391',
 ]);
 
-const getSiweFieldValue = (line, prefix) => (
-  line.startsWith(prefix) ? line.slice(prefix.length).trim() : null
-);
 
 const normalizeOrigin = (value) => {
   const raw = toStr(value).trim();
@@ -220,59 +217,106 @@ export const validateAdminActionAudience = ({
   };
 };
 
+const SIWE_HEADER_SUFFIX = ' wants you to sign in with your Ethereum account:';
+const SIWE_DOMAIN_RE = /^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
+const SIWE_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+// EIP-4361 statement characters: RFC 3986 reserved and unreserved, and space.
+const SIWE_STATEMENT_RE = /^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;= ]+$/;
+const SIWE_VALUE_RE = /^\S+$/;
+const SIWE_REQUIRED_FIELDS = Object.freeze([
+  ['URI: ', 'uri'],
+  ['Version: ', 'version'],
+  ['Chain ID: ', 'chainId'],
+  ['Nonce: ', 'nonce'],
+  ['Issued At: ', 'issuedAt'],
+]);
+const SIWE_OPTIONAL_FIELDS = Object.freeze([
+  ['Expiration Time: ', 'expirationTime'],
+  ['Not Before: ', 'notBefore'],
+  ['Request ID: ', 'requestId'],
+]);
+
+const malformedSiwe = (detail) => ({
+  domain: '',
+  address: '',
+  uri: '',
+  chainId: '',
+  nonce: '',
+  issuedAt: '',
+  expirationTime: '',
+  error: `Malformed SIWE message: ${detail}.`,
+});
+
+// Strict EIP-4361: every line in its fixed place, no duplicate or unknown
+// lines. Wallets then recognize anything accepted here as a sign-in request
+// and can warn about a mismatched domain.
 export const parseSiweMessage = (message) => {
   const text = toStr(message);
-  const lines = text.split('\n').map((line) => trimIfString(line));
-  const firstLine = lines[0] || '';
-  const domainMatch = firstLine.match(/^(.*) wants you to sign in with your Ethereum account:/);
-  const domain = domainMatch ? trimIfString(domainMatch[1]) || '' : '';
+  if (text.includes('\r')) return malformedSiwe('line breaks must be LF');
+  const lines = text.split('\n');
+  const header = lines[0] || '';
+  const domain = header.endsWith(SIWE_HEADER_SUFFIX) ? header.slice(0, -SIWE_HEADER_SUFFIX.length) : '';
+  if (!SIWE_DOMAIN_RE.test(domain)) return malformedSiwe('missing or invalid header');
   const address = lines[1] || '';
+  if (!SIWE_ADDRESS_RE.test(address)) return malformedSiwe('invalid address line');
+  if (lines[2] !== '') return malformedSiwe('expected a blank line after the address');
+  let index = 3;
+  let statement;
+  if (lines[index] !== '') {
+    statement = lines[index] || '';
+    if (!SIWE_STATEMENT_RE.test(statement)) return malformedSiwe('invalid statement');
+    index += 1;
+  }
+  if (lines[index] !== '') return malformedSiwe('expected a blank line before URI');
+  index += 1;
 
   const fields = {};
-  lines.forEach((line) => {
-    const uri = getSiweFieldValue(line, 'URI:');
-    if (uri != null) fields.uri = uri;
+  const readField = ([prefix, key]) => {
+    const line = lines[index];
+    if (typeof line !== 'string' || !line.startsWith(prefix)) return false;
+    const value = line.slice(prefix.length);
+    if (!SIWE_VALUE_RE.test(value)) return false;
+    fields[key] = value;
+    index += 1;
+    return true;
+  };
+  const missing = SIWE_REQUIRED_FIELDS.find((field) => !readField(field));
+  if (missing) return malformedSiwe(`expected ${missing[0].trim()} in order`);
+  SIWE_OPTIONAL_FIELDS.forEach(readField);
 
-    const version = getSiweFieldValue(line, 'Version:');
-    if (version != null) fields.version = version;
-
-    const chainId = getSiweFieldValue(line, 'Chain ID:');
-    if (chainId != null) fields.chainId = chainId;
-
-    const nonce = getSiweFieldValue(line, 'Nonce:');
-    if (nonce != null) fields.nonce = nonce;
-
-    const issuedAt = getSiweFieldValue(line, 'Issued At:');
-    if (issuedAt != null) fields.issuedAt = issuedAt;
-
-    const expirationTime = getSiweFieldValue(line, 'Expiration Time:');
-    if (expirationTime != null) fields.expirationTime = expirationTime;
-  });
-
-  const resourceIndex = lines.indexOf('Resources:');
-  const resourceLines = lines.slice(resourceIndex + 1).filter(Boolean);
-  const resources =
-    resourceIndex < 0
-      ? undefined
-      : resourceLines.some((line) => !line.startsWith('- '))
-        ? []
-        : resourceLines
-          .map((line) => line.slice(2).trim());
+  let resources;
+  if (lines[index] === 'Resources:') {
+    resources = [];
+    index += 1;
+    while (index < lines.length && lines[index].startsWith('- ')) {
+      const resource = lines[index].slice(2);
+      if (!SIWE_VALUE_RE.test(resource)) return malformedSiwe('invalid resource');
+      resources.push(resource);
+      index += 1;
+    }
+  }
+  if (index !== lines.length) return malformedSiwe('unexpected or repeated line');
+  if (fields.version !== '1') return malformedSiwe('unsupported version');
+  if (!/^\d+$/.test(fields.chainId)) return malformedSiwe('invalid chain ID');
 
   return {
     domain,
     address,
-    uri: fields.uri || '',
-    chainId: fields.chainId || '',
-    nonce: fields.nonce || '',
-    issuedAt: fields.issuedAt || '',
+    ...(statement === undefined ? {} : { statement }),
+    uri: fields.uri,
+    chainId: fields.chainId,
+    nonce: fields.nonce,
+    issuedAt: fields.issuedAt,
     expirationTime: fields.expirationTime || '',
+    ...(fields.notBefore ? { notBefore: fields.notBefore } : {}),
+    ...(fields.requestId ? { requestId: fields.requestId } : {}),
     ...(resources === undefined ? {} : { resources }),
   };
 };
 
 export const validateSiwe = (siwe, deps) => {
-  if (!siwe.domain) return { ok: false, error: 'Missing SIWE domain.' };
+  if (siwe?.error) return { ok: false, error: siwe.error };
+  if (!siwe?.domain) return { ok: false, error: 'Missing SIWE domain.' };
   if (!siwe.uri) return { ok: false, error: 'Missing SIWE uri.' };
   if (!siwe.chainId) return { ok: false, error: 'Missing SIWE chainId.' };
   if (!siwe.nonce) return { ok: false, error: 'Missing SIWE nonce.' };
@@ -292,6 +336,14 @@ export const validateSiwe = (siwe, deps) => {
 
     const now = typeof deps?.now === 'function' ? deps.now : Date.now;
     if (now() >= expMs) return { ok: false, error: 'SIWE message expired.' };
+  }
+
+  if (siwe.notBefore) {
+    const notBeforeMs = Date.parse(siwe.notBefore);
+    if (!Number.isFinite(notBeforeMs)) return { ok: false, error: 'Invalid SIWE not-before time.' };
+
+    const now = typeof deps?.now === 'function' ? deps.now : Date.now;
+    if (now() < notBeforeMs) return { ok: false, error: 'SIWE message is not valid yet.' };
   }
 
   if (deps?.requireIssuedAt) {
