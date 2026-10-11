@@ -1,6 +1,6 @@
 import processShim from 'process/browser';
 import { Buffer } from 'buffer/';
-import { clearBootReloadMarker, installStaleChunkPreloadRecovery, renderBootFailure } from './bootRecovery.js';
+import { clearBootReloadMarker, renderBootFailure } from './bootRecovery.js';
 import { initializeThemeRuntime } from './utilities/ui/themeRuntime';
 import { initializeColorVisionRuntime } from './utilities/ui/colorVisionRuntime';
 import 'assets/css/contextEngine.scss';
@@ -14,7 +14,8 @@ globalThis.Buffer = globalThis.Buffer || Buffer;
 globalThis.global = globalThis.global || globalThis;
 initializeThemeRuntime();
 initializeColorVisionRuntime();
-installStaleChunkPreloadRecovery();
+// No vite:preloadError reload here: it fires on the first failed attempt, before
+// retry helpers run. Error boundaries recover once an import has really failed.
 
 // Keep the app import dynamic so browser globals are available before app modules run.
 import('./index')

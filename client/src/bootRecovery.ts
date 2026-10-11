@@ -30,6 +30,7 @@ type BootWindow = {
   history?: BootHistory;
   localStorage?: BootStorage;
   location?: BootLocation;
+  navigator?: { onLine?: boolean };
   sessionStorage?: BootStorage;
   setTimeout?: (handler: TimerHandler, timeout?: number, ...args: unknown[]) => unknown;
 };
@@ -159,6 +160,9 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   }
 
   const win = options.window || globalThis.window;
+  // Offline failures are transient; a reload would only reach the browser's offline page.
+  if (win?.navigator?.onLine === false) return false;
+
   const storage = options.storage || win?.sessionStorage;
   const storageKey = options.storageKey || STALE_CHUNK_RELOAD_STORAGE_KEY;
   const reloadParam = options.reloadParam || STALE_CHUNK_RELOAD_PARAM;
@@ -186,24 +190,6 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
 // React.lazy caches a rejected chunk import, so only a fresh page load can pick up a newer deploy.
 export const reloadForStaleChunk = (win: BootWindow = globalThis.window): void =>
   reloadWithCacheBuster(win, STALE_CHUNK_RELOAD_PARAM);
-
-type PreloadErrorTarget = {
-  addEventListener?: (type: string, listener: (event: Event) => void) => void;
-  removeEventListener?: (type: string, listener: (event: Event) => void) => void;
-};
-
-// Vite reports a failed lazy chunk or CSS preload here before the import rejects. The
-// rejection still reaches its caller, so error boundaries keep their fallback.
-export const installStaleChunkPreloadRecovery = (
-  target: PreloadErrorTarget | undefined = globalThis.window,
-  options: BootRecoveryOptions = {},
-): (() => void) => {
-  const listener = (event: Event) => {
-    recoverFromStaleChunkLoadError((event as Event & { payload?: unknown }).payload, options);
-  };
-  target?.addEventListener?.('vite:preloadError', listener);
-  return () => target?.removeEventListener?.('vite:preloadError', listener);
-};
 
 const appendTextNode = (
   doc: Document,

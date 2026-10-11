@@ -2,13 +2,21 @@ import {
   clearBootReloadMarker,
   clearBootCaches,
   clearStaleChunkReloadMarker,
-  installStaleChunkPreloadRecovery,
   isStaleChunkLoadError,
   reloadForStaleChunk,
   reloadWithCacheBuster,
   recoverFromStaleChunkLoadError,
   renderBootFailure,
 } from './bootRecovery.js';
+
+const createMemoryStorage = () => {
+  const values = new Map();
+  return {
+    getItem: jest.fn((key) => (values.has(key) ? values.get(key) : null)),
+    setItem: jest.fn((key, value) => values.set(key, String(value))),
+    removeItem: jest.fn((key) => values.delete(key)),
+  };
+};
 
 const screenButton = (label) =>
   Array.from(document.querySelectorAll('button')).find((button) => button.textContent === label);
@@ -242,24 +250,24 @@ describe('bootRecovery', () => {
     ).toBe(true);
   });
 
-  it('recovers when Vite reports a failed lazy chunk preload without swallowing the rejection', () => {
+  it('leaves an offline chunk failure to the error boundary instead of reloading', () => {
     const reload = jest.fn();
-    const storage = { getItem: jest.fn(() => null), setItem: jest.fn() };
-    const fakeWindow = { location: { href: 'https://app.example.test/session/alpha' }, sessionStorage: storage };
-    const preloadError = (payload) => Object.assign(new Event('vite:preloadError', { cancelable: true }), { payload });
-    const uninstall = installStaleChunkPreloadRecovery(window, { window: fakeWindow, storage, reload });
+    const storage = createMemoryStorage();
+    const fakeWindow = {
+      location: { href: 'https://app.example.test/session/alpha' },
+      navigator: { onLine: false },
+      sessionStorage: storage,
+    };
 
-    const staleCss = preloadError(new Error('Unable to preload CSS for /assets/OnePageSession-00000000.css'));
-    window.dispatchEvent(staleCss);
-    window.dispatchEvent(preloadError(new Error('Kaboom')));
-
-    expect(reload).toHaveBeenCalledTimes(1);
-    expect(staleCss.defaultPrevented).toBe(false);
-    expect(storage.setItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b', 'true');
-
-    uninstall();
-    window.dispatchEvent(preloadError(new Error('Unable to preload CSS for /assets/Other-00000000.css')));
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(
+      recoverFromStaleChunkLoadError(new TypeError('Failed to fetch dynamically imported module'), {
+        window: fakeWindow,
+        storage,
+        reload,
+      }),
+    ).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled();
   });
 
   it('reloads a stale route through the chunk recovery marker', () => {
