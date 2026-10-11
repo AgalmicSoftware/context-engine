@@ -7,6 +7,7 @@ import {
   base64UrlEncode,
   signToken,
   timingSafeEqual,
+  timingSafeSecretEqual,
   verifyToken,
 } from './tokenSigning.js';
 
@@ -33,6 +34,28 @@ test('timingSafeEqual preserves same-length string comparison semantics', () => 
   assert.equal(timingSafeEqual('match', 'match'), true);
   assert.equal(timingSafeEqual('match', 'mismatch'), false);
   assert.equal(timingSafeEqual('short', 'longer'), false);
+});
+
+test('timingSafeSecretEqual compares fixed-length digests instead of raw secrets', async () => {
+  const digested = [];
+  const deps = {
+    crypto: {
+      subtle: {
+        digest: async (algorithm, bytes) => {
+          digested.push([algorithm, decoder.decode(bytes)]);
+          return webcrypto.subtle.digest(algorithm, bytes);
+        },
+      },
+    },
+  };
+
+  assert.equal(await timingSafeSecretEqual('top-secret', 'top-secret', deps), true);
+  assert.equal(await timingSafeSecretEqual('top-secreT', 'top-secret', deps), false);
+  // A wrong-length guess still runs the full digest comparison.
+  assert.equal(await timingSafeSecretEqual('t', 'top-secret', deps), false);
+  assert.equal(await timingSafeSecretEqual('', 'top-secret'), false);
+  assert.deepEqual(digested.slice(-2), [['SHA-256', 't'], ['SHA-256', 'top-secret']]);
+  assert.equal(digested.length, 6);
 });
 
 test('signToken preserves JSON.stringify payload format and verifyToken round-trips the payload', async () => {
