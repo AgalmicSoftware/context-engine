@@ -221,7 +221,7 @@ describe('error paths', () => {
   it('shows a plain message when the Worker refuses another sign-in nonce', async () => {
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(jsonResp(429, { error: 'Too many pending sign-ins for this wallet. Try again shortly.' }));
+      .mockResolvedValueOnce(jsonResp(429, { error: 'Too many nonce requests. Try again shortly.' }));
 
     const error = await getWorkerSessionToken({
       workerUrl: 'https://worker.example',

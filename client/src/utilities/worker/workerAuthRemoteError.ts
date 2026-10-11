@@ -61,7 +61,7 @@ export const createWorkerAuthRemoteError = ({
       normalizedStatus,
     );
   }
-  // The Worker caps pending sign-in nonces per wallet and nonce requests per caller.
+  // The Worker rate-limits nonce requests per caller, and per caller and wallet.
   if (normalizedStatus === 429) {
     return new WorkerAuthRemoteError('worker_auth_rate_limited', SIGN_IN_RATE_LIMITED_MESSAGE, normalizedStatus);
   }

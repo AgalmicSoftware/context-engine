@@ -777,8 +777,8 @@ export const getWorkerSessionToken = async ({
       } catch (err) {
         if (isAbortError(err)) throw err;
         if (isNonceMismatchError(getErrorMessage(err)) && !retriedNonceMismatch) {
-          // The Worker evicted, expired or refused this nonce (another tab may
-          // have filled its pending list). Retry once with a fresh nonce.
+          // The Worker refused this nonce: it expired, or it was issued for
+          // another wallet or request. Retry once with a fresh nonce.
           retriedNonceMismatch = true;
           continue;
         }
