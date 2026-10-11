@@ -1557,6 +1557,13 @@ export const recordInterviewProvenance = (
             ? { ...currentProvenance }
             : {};
         const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
+        const savedConsentFor = (questionId: string) => {
+          const consent = provenance[questionId] ?? prev.editBaseline?.interviewProvenance?.[questionId];
+          return consent && typeof consent === 'object' ? (consent as Record<string, unknown>) : null;
+        };
+        // Without an imported name, a ticked box shows the saved name and every submitted response gets one.
+        const shownSavedName =
+          drafts.map((draft) => String(savedConsentFor(draft.questionId)?.responderName || '')).find(Boolean) || '';
         drafts.forEach((draft) => {
           const reviewed =
             reviewedByQuestionId.get(draft.questionId) ||
@@ -1570,10 +1577,7 @@ export const recordInterviewProvenance = (
               ? originalDraft.revisions[0]
               : originalDraft;
           // An untouched control preserves consent, including withdrawals; this draft supplies its own source.
-          const savedConsent =
-            provenance[draft.questionId] ?? prev.editBaseline?.interviewProvenance?.[draft.questionId];
-          const saved =
-            savedConsent && typeof savedConsent === 'object' ? (savedConsent as Record<string, unknown>) : null;
+          const saved = savedConsentFor(draft.questionId);
           const flags = resolveConsentFlags(saved);
           const ai =
             consentOverrides?.includeAiProvenance ?? (consentOverrides && saved ? flags.includeAiProvenance : included);
@@ -1586,7 +1590,7 @@ export const recordInterviewProvenance = (
               : consentOverrides?.includeResponderName === false
                 ? ''
                 : normalizedResponderName ||
-                  (consentOverrides?.includeResponderName ? String(saved?.responderName || '') : '');
+                  (consentOverrides?.includeResponderName ? String(saved?.responderName || shownSavedName) : '');
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: ai,

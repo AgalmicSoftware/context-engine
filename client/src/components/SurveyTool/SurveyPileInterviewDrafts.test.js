@@ -56,7 +56,32 @@ const packet = (responses) => ({
   responderContext: {},
   responses,
 });
-const mockSession = () => {
+const field = (value) => ({
+  value,
+  encrypted: false,
+  encryptionAudience: 'self',
+  audienceMode: 'explicit',
+  hash: '',
+  encryptedPortion: '',
+});
+const savedNamedQ1 = {
+  questionID: 'q1',
+  type: 'binary',
+  prompt: 'Q1',
+  answer: field('Agree'),
+  additional: field(''),
+  importance: null,
+  conviction: null,
+  responderName: 'Participant A',
+  interviewProvenance: {
+    version: 1,
+    source: { platform: 'claude', modelId: 'saved-model', verification: 'self_reported' },
+    promptVersion: 'ce-interview-brief-v4',
+    questionSetHash: 'b'.repeat(64),
+    appliedAt: 1,
+  },
+};
+const mockSession = (saved = []) => {
   jest
     .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
     .mockImplementation((slug) => (slug === 'edge' ? SESSION_CONFIG : null));
@@ -66,14 +91,25 @@ const mockSession = () => {
         q1: { id: 'q1', type: 'binary', prompt: 'Q1' },
         q3: { id: 'q3', type: 'binary', prompt: 'Q3' },
       },
-      questionResponses: {},
+      questionResponses: Object.fromEntries(saved.map((row) => [row.questionID, { [A]: JSON.stringify(row) }])),
+      questionResponsesMeta: Object.fromEntries(
+        saved.map((row) => [row.questionID, { [A]: { ts: 1000, storageRefId: `ref-${row.questionID}` } }]),
+      ),
       pendingQuestionMetadata: {},
     },
   });
   jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (ns) => (ns === 'questionsCache' ? cache() : {}));
   jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((ns) => (ns === 'questionsCache' ? cache() : null));
   jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
-  jest.spyOn(workerHydration, 'loadWorkerResponses').mockResolvedValue([]);
+  jest.spyOn(workerHydration, 'loadWorkerResponses').mockResolvedValue(
+    saved.map((row) => ({
+      questionId: row.questionID,
+      responder: A,
+      timestamp: 1000,
+      storageRefId: `ref-${row.questionID}`,
+      response: row,
+    })),
+  );
   jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network access'));
   jest.spyOn(surveyQuestionReadsPort, 'getResponse').mockResolvedValue(null);
   jest.spyOn(surveyQuestionReadsPort, 'getSurveyResponse').mockResolvedValue(null);
@@ -217,4 +253,30 @@ it('treats an unsaved pile answer as existing, so its draft is not preselected',
   expect(screen.getByRole('button', { name: 'Replace with draft' })).toBeEnabled();
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
   expect(upload).not.toHaveBeenCalled();
+});
+
+it('names every submitted response once the saved name box is ticked', async () => {
+  const upload = mockSession([savedNamedQ1]);
+  await mountWithInterview(
+    packet([
+      { questionId: 'q1', answer: 'Disagree', confidence: 0.8 },
+      { questionId: 'q3', answer: 'Agree', confidence: 0.8 },
+    ]),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  fireEvent.click(screen.getByText('AI submission info'));
+  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
+  expect(name).toHaveAttribute('aria-checked', 'mixed');
+  fireEvent.click(name);
+  expect(name.closest('label')).toHaveTextContent(
+    'Include “Participant A” as the responder name with submitted responses',
+  );
+
+  await submitDrafts();
+
+  expect(upload).toHaveBeenCalledTimes(1);
+  expect(upload.mock.calls[0][2].map((row) => [row.questionID, row.responderName]).sort()).toEqual([
+    ['q1', 'Participant A'],
+    ['q3', 'Participant A'],
+  ]);
 });
