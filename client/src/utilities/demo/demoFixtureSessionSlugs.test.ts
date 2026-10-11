@@ -8,6 +8,7 @@ import {
 } from './demoFixtureSessionSlugs';
 import { resolveDemoPolisDataset } from './demoPolisDatasets';
 import { getDemoFixtureQuestionIdsByIndex } from '../session/demoSessionQuestionFixtures';
+import { getDemoSessionMap } from '../session/sessionDemoCompat';
 
 const LEGACY_DEMO_SLUGS = ['demo', 'demo-1', 'demo-3', 'demo-sh'];
 
@@ -27,26 +28,46 @@ describe('demoFixtureSessionSlugs', () => {
     expect(hasDemoAnalysisFixture('unknown-demo')).toBe(false);
   });
 
-  // The slug lists stand in for the fixture data, so they must name exactly
-  // the slugs the data covers.
-  it('lists exactly the slugs that have a Polis dataset', () => {
+  // The slug lists stand in for the fixture data, so they must name exactly the
+  // slugs the data covers: every listed slug has data, and every slug with data
+  // is listed. Check each demo session slug and the extra route aliases.
+  const knownSlugs = Array.from(
+    new Set([
+      ...DEMO_POLIS_DATASET_SLUGS,
+      ...DEMO_QUESTION_FIXTURE_SLUGS,
+      ...Object.entries(getDemoSessionMap() as Record<string, { slug?: string }>).flatMap(([key, config]) => [
+        key,
+        String(config?.slug || ''),
+      ]),
+      'demo',
+      'demo-3',
+      'edge',
+      'democracy-2026',
+    ]),
+  ).filter(Boolean);
+  const hasPolisDataset = (slug: string) => {
     const fallback = { source: 'none' };
-    DEMO_POLIS_DATASET_SLUGS.forEach((slug) => {
-      expect(resolveDemoPolisDataset(slug, fallback)).not.toBe(fallback);
+    return resolveDemoPolisDataset(slug, fallback) !== fallback;
+  };
+  const hasQuestionData = (slug: string) => getDemoFixtureQuestionIdsByIndex(slug).length > 0;
+
+  it('lists exactly the slugs that have a Polis dataset', () => {
+    knownSlugs.forEach((slug) => {
+      expect({ slug, hasData: hasPolisDataset(slug) }).toEqual({
+        slug,
+        hasData: DEMO_POLIS_DATASET_SLUGS.includes(slug),
+      });
     });
-    ['demo-interview', 'democracy-2026', 'edge'].forEach((slug) => {
-      expect(resolveDemoPolisDataset(slug, fallback)).toBe(fallback);
-    });
+    expect(resolveDemoPolisDataset('demo-2')).not.toBe(resolveDemoPolisDataset('demo'));
   });
 
   it('lists exactly the slugs that have question fixtures', () => {
-    DEMO_QUESTION_FIXTURE_SLUGS.forEach((slug) => {
-      expect(hasDemoQuestionFixtures(slug)).toBe(true);
-      expect(getDemoFixtureQuestionIdsByIndex(slug).length).toBeGreaterThan(0);
-    });
-    ['demo', 'demo-3', 'edge'].forEach((slug) => {
-      expect(hasDemoQuestionFixtures(slug)).toBe(false);
-      expect(getDemoFixtureQuestionIdsByIndex(slug)).toEqual([]);
+    knownSlugs.forEach((slug) => {
+      expect({ slug, listed: hasDemoQuestionFixtures(slug), hasData: hasQuestionData(slug) }).toEqual({
+        slug,
+        listed: DEMO_QUESTION_FIXTURE_SLUGS.includes(slug),
+        hasData: DEMO_QUESTION_FIXTURE_SLUGS.includes(slug),
+      });
     });
   });
 

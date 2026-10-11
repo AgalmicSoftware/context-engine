@@ -2,6 +2,7 @@ import { normalizeSessionSlug } from '../session/sessionNaming.js';
 
 // Which sessions read the checked-in demo fixtures. These checks are cheap;
 // the fixture data is large, so session routes load it only for these slugs.
+// The fixture modules build their slug maps from these lists.
 
 // Slugs with a Polis dataset (see demoPolisDatasets).
 export const DEMO_POLIS_DATASET_SLUGS: readonly string[] = Object.freeze([

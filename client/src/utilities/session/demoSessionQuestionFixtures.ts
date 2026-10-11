@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import { comments as demo2QuestionComments } from '../../variables/demo/demo_2_question_seed.json';
 import { comments as legacyDemoQuestionComments } from '../../variables/demo/demo_polis_data.json';
+import { DEMO_QUESTION_FIXTURE_SLUGS } from '../demo/demoFixtureSessionSlugs';
 import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoQuestionSemantics';
 import { normalizeSessionSlug } from './sessionNaming.js';
 
@@ -32,20 +33,22 @@ const LEGACY_DEMO_FIXTURE: DemoFixtureRegistryEntry = {
   sourceSessionSlug: 'demo',
 };
 
-const DEMO_FIXTURES_BY_SLUG: Readonly<Record<string, DemoFixtureRegistryEntry>> = Object.freeze({
-  'demo-1': LEGACY_DEMO_FIXTURE,
-  'demo-2': {
-    // Regression guard: AppShell only needs question rows; importing the full
-    // participant/analysis fixture here pushes the route shell over its budget.
-    comments: Array.isArray(demo2QuestionComments) ? demo2QuestionComments : [],
-    fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
-    onchainQuestionIds: [],
-    onchainQuestionIdsFile: '',
-    sourceSessionSlug: 'demo-2',
-  },
-  'demo-sh': LEGACY_DEMO_FIXTURE,
-  'demo-interview': LEGACY_DEMO_FIXTURE,
-});
+const DEMO_2_FIXTURE: DemoFixtureRegistryEntry = {
+  // Regression guard: AppShell only needs question rows; importing the full
+  // participant/analysis fixture here pushes the route shell over its budget.
+  comments: Array.isArray(demo2QuestionComments) ? demo2QuestionComments : [],
+  fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
+  onchainQuestionIds: [],
+  onchainQuestionIdsFile: '',
+  sourceSessionSlug: 'demo-2',
+};
+
+// demo-2 has its own question seed; the other listed slugs share the original questions.
+const DEMO_FIXTURES_BY_SLUG: Readonly<Record<string, DemoFixtureRegistryEntry>> = Object.freeze(
+  Object.fromEntries(
+    DEMO_QUESTION_FIXTURE_SLUGS.map((slug) => [slug, slug === 'demo-2' ? DEMO_2_FIXTURE : LEGACY_DEMO_FIXTURE]),
+  ),
+);
 
 const uniqueStrings = (values: unknown[]): string[] => {
   const out: string[] = [];
