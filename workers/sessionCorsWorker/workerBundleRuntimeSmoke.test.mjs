@@ -284,13 +284,15 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 	assert.equal(duplicatePolicy.status, 400, await duplicatePolicy.clone().text());
 	assert.equal(storageKv.dump().size, 0);
 	const marker = 'credential-free bundle runtime plaintext marker';
+	// Responses must be answer-shaped JSON, as the client uploads them.
+	const answer = { questionID: 'bundle-runtime-question', answer: marker };
 	const uploadResponse = await fetchWorker(
 		makeRequest('/storage/upload', {
 			method: 'POST',
 			token: participantToken,
 			body: {
-				data: marker,
-				contentType: 'text/plain',
+				data: answer,
+				contentType: 'application/json',
 				resource: 'responses',
 			},
 		}),
@@ -309,7 +311,7 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 		env,
 	);
 	assert.equal(participantRead.status, 200, await participantRead.clone().text());
-	assert.equal(await participantRead.text(), marker);
+	assert.deepEqual(await participantRead.json(), answer);
 
 	const anonymousRead = await fetchWorker(makeRequest(readPath), env);
 	assert.equal(anonymousRead.status, 403);
