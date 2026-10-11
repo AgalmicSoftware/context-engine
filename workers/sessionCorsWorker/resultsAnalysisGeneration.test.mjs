@@ -428,6 +428,42 @@ test('worker-canonical source keeps the first or admin version of each question 
   assert.deepEqual(source.snapshot.responses.map((entry) => entry.questionId).sort(), ['q1', 'q2']);
 });
 
+test('worker-canonical source keys questions on the id the upload route trusted', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const author = '0x00000000000000000000000000000000000000bb';
+  const attacker = '0x00000000000000000000000000000000000000cc';
+  const putQuestion = (id, metadata, payload) => putPayload({
+    kv, resource: 'questions', id, metadata, payload: { sessionSlug: 'session-a', sessionId, type: 'freeform', ...payload },
+  });
+  // Ownership saw "fresh" (id comes first); the payload also claims the victim id.
+  await putQuestion('s1', { uploader: attacker, resourceId: 'fresh' }, { id: 'fresh', questionId: 'victim', prompt: 'ATTACKER prompt' });
+  // Legacy rows have no trusted id and fall back to the same payload order.
+  await putQuestion('s2', {}, { id: 'legacy-id', questionId: 'other', prompt: 'Legacy prompt' });
+  // The trusted id is lower case; responses keep matching the payload's own spelling.
+  await putQuestion('s3', { uploader: author, resourceId: 'mixed' }, { id: 'MiXed', prompt: 'Mixed case' });
+  await putQuestion('s4', { uploader: author, resourceId: 'hidden-q' }, { id: 'Hidden-Q', prompt: 'Hidden by marker' });
+  await kv.put('ce-storage-hidden:session-a:questions:hidden-q', JSON.stringify({ version: 1, hidden: true }));
+  for (const [index, questionId] of ['victim', 'legacy-id', 'MiXed', 'Hidden-Q'].entries()) {
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `r${index}`,
+      metadata: { responder: `0x${String(index + 1).repeat(40)}` },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer: `answer for ${questionId}` },
+    });
+  }
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.questions.map((entry) => [entry.id, entry.prompt]).sort(), [
+    ['MiXed', 'Mixed case'],
+    ['fresh', 'ATTACKER prompt'],
+    ['legacy-id', 'Legacy prompt'],
+  ]);
+  assert.deepEqual(source.snapshot.responses.map((entry) => entry.questionId).sort(), ['MiXed', 'legacy-id']);
+});
+
 test('worker-canonical source accepts public response envelopes with empty encrypted fields while rejecting non-empty encrypted envelopes', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };

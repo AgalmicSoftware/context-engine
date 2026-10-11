@@ -579,8 +579,16 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
     if (!isObj(payload)) continue;
     if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
-    const normalized = normalizeQuestionRecord(payload);
-    if (!normalized || hiddenQuestionIds.has(normalized.questionId)) continue;
+    // Key on the id the upload route checked for ownership (stored lower case).
+    // Legacy rows without it read the payload id in the same order, id first,
+    // so a second id field in the payload cannot claim another question.
+    const payloadId = trim(payload.id || payload.questionId || payload.questionID);
+    const trustedId = lower(metadata.resourceId);
+    const normalized = normalizeQuestionRecord({
+      ...payload,
+      questionId: trustedId && lower(payloadId) !== trustedId ? trustedId : payloadId,
+    });
+    if (!normalized || hiddenQuestionIds.has(lower(normalized.questionId))) continue;
     candidates.push({
       resourceId: normalized.questionId,
       createdAtMs: Date.parse(trim(metadata.createdAt)) || 0,
