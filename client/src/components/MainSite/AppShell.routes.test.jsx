@@ -958,6 +958,39 @@ describe('AppShell route render smoke', () => {
     expect(subject.setReadinessStateIfChanged).not.toHaveBeenCalled();
   });
 
+  it("clears the previous account's unsaved answers for every session when the account changes", () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    const ACCOUNT_A = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_B = '0x00000000000000000000000000000000000000bb';
+    const drafts = {
+      a: `dg:surveyDraft:edge:11155420:${ACCOUNT_A}:questions`,
+      aOtherSession: `dg:surveyDraft:other:84532:${ACCOUNT_A}:questions:q:0x01`,
+      b: `dg:surveyDraft:edge:11155420:${ACCOUNT_B}:questions`,
+      anon: 'dg:surveyDraft:edge:11155420:anon:questions',
+    };
+    Object.values(drafts).forEach((key) => sessionStorage.setItem(key, '{}'));
+    const update = (prevAccount, nextAccount) => {
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount };
+      subject.componentDidUpdate(prevProps, subject.state);
+    };
+
+    try {
+      update(ACCOUNT_A, ACCOUNT_B);
+      expect(sessionStorage.getItem(drafts.a)).toBeNull();
+      expect(sessionStorage.getItem(drafts.aOtherSession)).toBeNull();
+      expect(sessionStorage.getItem(drafts.b)).toBe('{}');
+
+      // Logout clears the store account.
+      update(ACCOUNT_B, undefined);
+      expect(sessionStorage.getItem(drafts.b)).toBeNull();
+      expect(sessionStorage.getItem(drafts.anon)).toBe('{}');
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
   it('drops cached decrypts only when the signed-in account really changes', () => {
     const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
     subject.handleNetworkChange = jest.fn();

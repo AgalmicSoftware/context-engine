@@ -743,6 +743,25 @@ export const selectSurveyDraftKeysForAccount = (
   return storageKeys.filter((key) => key.startsWith(prefix) && key.slice(prefix.length).split(':')[1] === owner);
 };
 
+/**
+ * Unsaved answers belong to the signed-in account. When it signs out or switches,
+ * its drafts go for every session, not only the one on screen.
+ */
+export const clearSurveyDraftsForAccount = (account: unknown): void => {
+  const owner = String(account || '')
+    .trim()
+    .toLowerCase();
+  if (!owner || owner === 'anon' || typeof sessionStorage === 'undefined') return;
+  try {
+    // Key layout: dg:surveyDraft:<session>:<network>:<account>:<scope>.
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith('dg:surveyDraft:') && key.split(':')[4] === owner)
+      .forEach((key) => sessionStorage.removeItem(key));
+  } catch (_) {
+    // Storage can be unavailable; there is then nothing stored to clear.
+  }
+};
+
 export const buildSurveyDraftStorageVariantKeys = ({
   sessionSlug = '',
   networkIdStr = '',

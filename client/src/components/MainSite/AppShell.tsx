@@ -35,6 +35,7 @@ import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { clearSurveyDraftsForAccount } from '../SurveyTool/surveyToolDraftState.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
@@ -2759,6 +2760,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         .toLowerCase();
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
+      clearSurveyDraftsForAccount(prevProps.account);
     }
 
     this.redirectLegacyDemoPath();
