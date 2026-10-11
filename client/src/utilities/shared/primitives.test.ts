@@ -13,6 +13,40 @@ describe('shared primitives', () => {
       expect(toStr(false)).toBe('false');
       expect(toStr(123n)).toBe('123');
     });
+
+    it('keeps String() results for every other ordinary value', () => {
+      expect(toStr('')).toBe('');
+      expect(toStr(0)).toBe('0');
+      expect(toStr(-0)).toBe('0');
+      expect(toStr(1.5)).toBe('1.5');
+      expect(toStr(NaN)).toBe('NaN');
+      expect(toStr(Infinity)).toBe('Infinity');
+      expect(toStr(-Infinity)).toBe('-Infinity');
+      expect(toStr(true)).toBe('true');
+      expect(toStr(Symbol('x'))).toBe('Symbol(x)');
+      expect(toStr([1, 'a', null])).toBe('1,a,');
+      expect(toStr([])).toBe('');
+      expect(toStr({})).toBe('[object Object]');
+      expect(toStr({ toString: () => 'custom' })).toBe('custom');
+      expect(toStr(new Error('boom'))).toBe('Error: boom');
+      const date = new Date(0);
+      expect(toStr(date)).toBe(String(date));
+    });
+
+    it('returns an empty string for objects that cannot become text', () => {
+      // Uploaded JSON can carry these; String() throws on each.
+      expect(toStr(JSON.parse('{"toString":1}'))).toBe('');
+      expect(toStr(Object.create(null))).toBe('');
+      expect(
+        toStr({
+          toString: () => {
+            throw new Error('nope');
+          },
+        }),
+      ).toBe('');
+      expect(toStr({ [Symbol.toPrimitive]: () => ({}) })).toBe('');
+      expect(toStr([JSON.parse('{"toString":1}')])).toBe('');
+    });
   });
 
   describe('normalizeSlug', () => {

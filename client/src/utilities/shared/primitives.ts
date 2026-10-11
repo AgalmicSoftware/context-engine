@@ -1,4 +1,14 @@
-export const toStr = (val: unknown): string => (typeof val === 'string' ? val : val == null ? '' : String(val));
+export const toStr = (val: unknown): string => {
+  if (typeof val === 'string') return val;
+  if (val == null) return '';
+  // Uploaded JSON can hold objects whose conversion throws ({"toString":1});
+  // those read as empty text instead of breaking the caller.
+  try {
+    return String(val);
+  } catch {
+    return '';
+  }
+};
 export const normalizeSlug = (raw: unknown): string =>
   toStr(raw)
     .trim()
