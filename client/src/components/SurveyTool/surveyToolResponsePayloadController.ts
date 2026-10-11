@@ -205,6 +205,8 @@ export interface BuildResponsePayloadOptions {
   getImportanceFromSlice: (state: ResponseSlice, qid: string) => number | null;
   sanitizeQuestionPromptForResponsePayload: (q: ResponseQuestionSource, opts: { isLocked: boolean }) => string;
   recruitmentSource?: unknown;
+  // Edited questions to include even when blank: a cleared answer is an explicit upload.
+  includeQuestionIds?: Iterable<string> | null;
 }
 
 export const buildResponsePayload = (opts: BuildResponsePayloadOptions): ResponsePayload => {
@@ -251,12 +253,18 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
   const hasConviction = (qid: string) => opts.getConvictionFromSlice(surveyResponseState, qid) !== null;
 
   const shouldFilterByAnswered = opts.isStandalone || opts.singleQuestionMode || poolFromState.length === 0;
+  const includedQuestionIds = new Set(Array.from(opts.includeQuestionIds || [], (id) => normalizeQuestionIdKey(id)));
 
   const answeredQuestions = shouldFilterByAnswered
     ? candidateQuestions.filter((q) => {
         const a = surveyResponseState.answers?.[q.id]?.value;
         const add = surveyResponseState.additionalComments?.[q.id]?.value;
-        return hasMainAnswer(a) || hasAdditional(add) || hasConviction(q.id);
+        return (
+          hasMainAnswer(a) ||
+          hasAdditional(add) ||
+          hasConviction(q.id) ||
+          includedQuestionIds.has(normalizeQuestionIdKey(q.id))
+        );
       })
     : candidateQuestions;
 
@@ -267,6 +275,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const additionalAudience = opts.resolveFieldEncryptionAudience(additional, q.id, 'additional');
     const additionalHasContent = hasAdditional(additional.value);
     const additionalEncrypted = additionalHasContent && !!additional.encrypted;
+    // A blank answer has nothing encrypted; never resend an envelope it once had.
+    const answerEnvelope = answer.encrypted && hasMainAnswer(answer.value) ? answer.encryptedPortion || '' : '';
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
@@ -407,7 +417,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         encryptionGateId: answer.encrypted ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
         audienceMode: 'explicit',
         hash: answer.hash || '',
-        encryptedPortion: answer.encrypted ? answer.encryptedPortion || '' : '',
+        encryptedPortion: answerEnvelope,
       },
       additional: {
         value: additional.value !== undefined ? additional.value : '',

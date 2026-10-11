@@ -210,6 +210,7 @@ const fixture = async () => {
   const savedRows = (questionId) =>
     rows.responses.filter((row) => row.payload.questionID === questionId).map((row) => row.payload);
   return {
+    add,
     sync: () => controller.fetchQuestionResponsesChunkedForGroup(SLUG),
     mount,
     click,
@@ -290,4 +291,82 @@ it('uploads an interview answer for a question hidden by the active filter', asy
 
   expect(outcome).toEqual({ status: 'submitted' });
   expect(h.savedRows(BINARY_QID).map((row) => row.answer.value)).toEqual(['No']);
+});
+
+const savedFreeform = (answer, additional = { value: '', encrypted: false }) => ({
+  questionID: FREEFORM_QID,
+  type: 'freeform',
+  answer,
+  additional,
+  importance: null,
+  conviction: null,
+});
+
+it('uploads a cleared saved answer as an explicit blank', async () => {
+  const h = await fixture();
+  h.add('responses', savedFreeform({ value: 'Saved answer', encrypted: false }));
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  expect(engine().state.surveysResponseState[0].answers[FREEFORM_QID].value).toBe('Saved answer');
+  await act(async () => engine().handleAnswerPile(FREEFORM_QID, ''));
+  await settle();
+  expect(engine().getPendingEditStats().total).toBe(1);
+
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  await settle();
+
+  expect(h.submitResponses.mock.calls[0][2]).toEqual([
+    expect.objectContaining({ questionID: FREEFORM_QID, answer: expect.objectContaining({ value: '' }) }),
+  ]);
+  expect(h.savedRows(FREEFORM_QID).at(-1).answer.value).toBe('');
+  expect(engine().getPendingEditStats().total).toBe(0);
+});
+
+it('never re-sends the envelope of a cleared locked answer', async () => {
+  const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'old-secret' });
+  const h = await fixture();
+  h.add(
+    'responses',
+    savedFreeform(
+      { value: '*', encrypted: true, encryptedPortion: envelope, encryptionAudience: 'self', audienceMode: 'explicit' },
+      { value: 'Public note', encrypted: false, audienceMode: 'explicit' },
+    ),
+  );
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  await run(
+    () =>
+      new Promise((resolve) =>
+        engine().setState(
+          (prev) =>
+            buildSelfQuestionDecryptSuccessState(
+              prev,
+              {
+                surveyIndex: 0,
+                questionId: FREEFORM_QID,
+                clearMode: 'both',
+                didUpdate: true,
+                baselineSlice: prev.editBaseline,
+                decryptedStateSlice: { answers: { [FREEFORM_QID]: { value: 'Old secret' } }, additionalComments: {} },
+              },
+              (value) => JSON.parse(JSON.stringify(value)),
+            ),
+          resolve,
+        ),
+      ),
+  );
+  await act(async () => engine().handleAnswerPile(FREEFORM_QID, ''));
+  await settle();
+
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+
+  const [row] = h.submitResponses.mock.calls[0][2];
+  expect(row.answer).toMatchObject({ value: '', encryptedPortion: '' });
+  expect(row.additional).toMatchObject({ value: 'Public note' });
+  expect(JSON.stringify(h.submitResponses.mock.calls[0][2])).not.toContain('old-secret');
 });

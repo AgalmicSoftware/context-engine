@@ -2083,9 +2083,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     // Use correct survey index for payload + diff gating
     const idx: SurveyQuestionsLegacyValue = context.surveyIndex;
 
-    const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState);
-
-    // Build full JSON snapshot first (unchanged behavior) then filter by changed set
+    // Filter the full JSON snapshot by the changed set
     let changedSet: SurveyQuestionsLegacyValue;
     let changedMapForSubmit: SurveyQuestionsLegacyValue = {};
     try {
@@ -2103,6 +2101,9 @@ export const createSurveyQuestionsRuntimeMethods = (
       setState(buildSubmitPreparationErrorState());
       throw new Error('No new or changed responses to submit.');
     }
+
+    // Changed questions upload even when blank: clearing a saved answer is an edit.
+    const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet);
 
     let filtered: SurveyQuestionsLegacyValue;
     try {

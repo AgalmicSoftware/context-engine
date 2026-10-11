@@ -116,6 +116,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
     surveyIndex: SurveyQuestionsLegacyValue,
     responderAddress?: SurveyQuestionsLegacyValue,
     overrideState: SurveyQuestionsLegacyValue = null,
+    includeQuestionIds: Iterable<string> | null = null,
   ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     const surveyResponseState: SurveyQuestionsLegacyValue =
@@ -158,6 +159,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       getImportanceFromSlice,
       sanitizeQuestionPromptForResponsePayload: surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload,
       recruitmentSource: readSessionRecruitmentSource(resolveEffectiveSlug(propsRef.current)),
+      includeQuestionIds,
     });
   };
 

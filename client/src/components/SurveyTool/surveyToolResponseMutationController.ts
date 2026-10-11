@@ -33,6 +33,17 @@ type MutationSourceSlice = {
   additionalComments: Record<string, ResponseFieldState>;
 };
 
+const isBlankValue = (value: unknown): boolean =>
+  value === undefined || value === null || (Array.isArray(value) ? value.length === 0 : String(value).length === 0);
+
+// A cleared field keeps its lock choice but never the saved envelope, which would
+// otherwise be uploaded again with the old text.
+const withoutStaleEnvelope = (field: ResponseFieldState): ResponseFieldState => {
+  if (!isBlankValue(field.value) || !field.encryptedPortion) return field;
+  const { encryptedPortion: _staleEnvelope, ...cleared } = field;
+  return cleared;
+};
+
 export const resolveFieldEncryptionDefaults = (
   prevFieldState: ResponseFieldState,
   questionId: string,
@@ -135,7 +146,7 @@ export const buildAnswerUpdatePlan = (
       : String(finalAnswer ?? '');
   const newAnswerHash = shouldHash ? deps.computeHash(answerStr) : '';
 
-  const nextAnswerState: ResponseFieldState = {
+  const nextAnswerState: ResponseFieldState = withoutStaleEnvelope({
     ...prevAnswerState,
     value: finalAnswer,
     encrypted: nextEncrypted,
@@ -143,7 +154,7 @@ export const buildAnswerUpdatePlan = (
     encryptionGateId: resolvedGateId,
     audienceMode: 'explicit',
     hash: newAnswerHash,
-  };
+  });
 
   const prevAdditionalState =
     sourceSlice.additionalComments?.[questionId] || deps.buildEmptyResponseFieldState(questionId, 'additional');
@@ -215,7 +226,7 @@ export const buildAdditionalUpdatePlan = (
   }
 
   const newAdditionalHash = deps.computeHash(normalizedAdditional);
-  const nextAdditionalState: ResponseFieldState = {
+  const nextAdditionalState: ResponseFieldState = withoutStaleEnvelope({
     ...prevAdditionalState,
     value: normalizedAdditional,
     encrypted: nextEncrypted,
@@ -223,7 +234,7 @@ export const buildAdditionalUpdatePlan = (
     encryptionGateId: resolvedGateId,
     audienceMode: additionalAudienceMode,
     hash: newAdditionalHash,
-  };
+  });
 
   return {
     changed: true,
