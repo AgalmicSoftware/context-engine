@@ -1,4 +1,38 @@
+import assert from 'node:assert/strict';
 import { assertReadable } from './civic-theme-overlay-smoke.mjs';
+
+export async function inspectPublishSummary(page) {
+  const summary = page.locator('#session-wizard-section-publish dl');
+  await summary.waitFor({ state: 'visible' });
+  await assertReadable(summary);
+  const layout = await summary.evaluate((list) => {
+    const bounds = list.getBoundingClientRect();
+    const rows = [...list.children].map((row) => {
+      const label = row.querySelector('dt');
+      const value = row.querySelector('dd');
+      const rect = row.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        labelRight: label.getBoundingClientRect().right,
+        valueLeft: value.getBoundingClientRect().left,
+        overflow: value.scrollWidth > value.clientWidth + 1,
+      };
+    });
+    return { mobile: window.innerWidth <= 720, left: bounds.left, right: bounds.right, rows };
+  });
+  assert.ok(layout.rows.length >= 3, 'Deployment summary includes session, access, and Worker details');
+  for (const [index, row] of layout.rows.entries()) {
+    assert.ok(!row.overflow && row.left >= layout.left - 1 && row.right <= layout.right + 1, 'Summary values fit');
+    if (layout.mobile) {
+      assert.ok(row.valueLeft >= row.labelRight + 8, 'Mobile summary places each value beside its label');
+      assert.ok(Math.abs(row.left - layout.left) <= 1 && Math.abs(row.right - layout.right) <= 1, 'Rows fill the width');
+      if (index) assert.ok(row.top >= layout.rows[index - 1].bottom + 8, 'Mobile summary rows stack with spacing');
+    }
+  }
+}
 
 // Read-only setup review plus a disposable local group draft. Never generate
 // credentials, deploy a Worker, publish a session, or submit an on-chain action.
@@ -39,6 +73,7 @@ export async function inspectCivicWizard(page) {
     await page.getByRole('button', { name: 'Step 3: Session Worker', exact: true }).click();
     await assertReadable(body);
     await page.getByRole('button', { name: 'Step 4: Deploy Session', exact: true }).click();
+    await inspectPublishSummary(page);
     await assertReadable(body);
     const advanced = page.getByRole('button', { name: 'Advanced publish settings', exact: true });
     if (await advanced.isVisible()) {

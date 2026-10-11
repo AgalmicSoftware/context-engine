@@ -130,14 +130,14 @@ const SessionPublishSummary = ({
           {sessionModeProfilePublishControl}
           {isNormalDisplayMode ? (
             <div className={styles.publishHero}>
-              <div className={styles.publishSummaryGrid}>
+              <dl className={styles.publishSummaryGrid}>
                 {normalModePublishSummary.map((item) => (
                   <div key={item.label} className={styles.publishSummaryCard}>
-                    <span className={styles.publishSummaryLabel}>{item.label}</span>
-                    <span className={styles.publishSummaryValue}>{item.value}</span>
+                    <dt className={styles.publishSummaryLabel}>{item.label}</dt>
+                    <dd className={styles.publishSummaryValue}>{item.value}</dd>
                   </div>
                 ))}
-              </div>
+              </dl>
               <SessionPublishActionControls
                 displayState={publishActionDisplayState}
                 onPublish={onPublish}

@@ -138,6 +138,8 @@ describe('SessionPublishSummary', () => {
       />,
     );
 
+    expect(screen.getByRole('term')).toHaveTextContent('Session');
+    expect(screen.getByRole('definition')).toHaveTextContent('Ready');
     fireEvent.click(screen.getByRole('button', { name: /Deploy Session/i }));
     expect(onPublish).toHaveBeenCalledTimes(1);
 

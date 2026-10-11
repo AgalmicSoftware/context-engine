@@ -1307,21 +1307,6 @@ $muted-text: var(--ce-panel-text-muted);
     width: 100%;
   }
 
-  .publishSummaryGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .publishPrimaryButton {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .publishSettingsButton {
-    width: auto;
-    height: auto;
-    padding: 6px;
-  }
-
   .encryptionGateHeader {
     align-items: flex-start;
   }
@@ -1951,31 +1936,39 @@ $muted-text: var(--ce-panel-text-muted);
 
 .publishSummaryGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 12px;
+  margin: 0;
 }
 
 .publishSummaryCard {
   display: grid;
+  align-content: start;
   gap: 6px;
-  padding: 12px 14px;
+  min-width: 0;
+  padding: 16px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  border: 1px solid $card-border;
+  background: var(--ce-control-face);
 }
 
 .publishSummaryLabel {
-  font-size: 11px;
+  margin: 0;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: $muted-text;
 }
 
 .publishSummaryValue {
+  min-width: 0;
+  margin: 0;
   font-size: 0.98rem;
-  line-height: 1.35;
-  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  color: var(--ce-control-text);
 }
 
 .publishActionCluster {
@@ -2027,9 +2020,10 @@ $muted-text: var(--ce-panel-text-muted);
   }
 
   &:disabled {
-    background-color: color-mix(in srgb, var(--ce-status-info) 45%, transparent) !important;
-    color: color-mix(in srgb, var(--ce-text-inverse) 78%, transparent) !important;
-    border-color: color-mix(in srgb, var(--ce-status-info) 45%, transparent) !important;
+    background-color: var(--ce-control-disabled-bg) !important;
+    color: var(--ce-control-text) !important;
+    border-color: $card-border !important;
+    opacity: 1;
     box-shadow: none;
     transform: none;
   }
@@ -2077,9 +2071,35 @@ $muted-text: var(--ce-panel-text-muted);
   color: color-mix(in srgb, var(--ce-action-accent) 95%, transparent);
 }
 
-@media (min-width: 721px) and (max-width: 980px) {
+@media (max-width: 720px) {
   .publishSummaryGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .publishSummaryCard {
+    grid-template-columns: minmax(0, 100px) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .publishActionCluster {
+    gap: 10px;
+  }
+
+  .publishPrimaryButton {
+    width: 100%;
+    min-width: 0;
+    min-height: 60px;
+    padding: 14px 18px;
+    font-size: 1.1rem;
+    gap: 10px;
+  }
+
+  .publishSettingsButton {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
