@@ -12,11 +12,13 @@ const buildMethods = ({
   surveyHash = ethers.constants.HashZero,
   questionHash = ethers.constants.HashZero,
   readError = null as Error | null,
+  hangReads = false,
 } = {}) => {
   const reads = {
-    surveyHashes: jest.fn(async (_surveyId: string) => {
-      if (readError) throw readError;
-      return surveyHash;
+    surveyHashes: jest.fn((_surveyId: string): Promise<string> => {
+      // An RPC that never answers.
+      if (hangReads) return new Promise<string>(() => undefined);
+      return readError ? Promise.reject(readError) : Promise.resolve(surveyHash);
     }),
     questionHashes: jest.fn(async (_questionId: string) => questionHash),
   };
@@ -111,5 +113,28 @@ describe('survey write id pre-check', () => {
     const unreadable = buildMethods({ readError: new Error('rpc down') });
     await expect(unreadable.addSurvey()).rejects.toThrow('upload reached');
     expect(unreadable.contractsLog.warn).toHaveBeenCalled();
+  });
+
+  it('stops waiting for a hanging id read after 10 s and uploads as before', async () => {
+    jest.useFakeTimers();
+    try {
+      const hanging = buildMethods({ hangReads: true });
+      const outcome = hanging.addSurvey().then(
+        () => 'resolved',
+        (error: Error) => error.message,
+      );
+
+      await jest.advanceTimersByTimeAsync(9_999);
+      expect(hanging.reads.surveyHashes).toHaveBeenCalledWith(SURVEY_ID);
+      expect(hanging.uploadJsonPayloadForContractPointer).not.toHaveBeenCalled();
+      expect(hanging.contractsLog.warn).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(outcome).resolves.toBe('upload reached');
+      expect(hanging.contractsLog.warn).toHaveBeenCalledTimes(1);
+      expect(hanging.uploadJsonPayloadForContractPointer).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
