@@ -4432,6 +4432,37 @@ test('admins hide a question id without deleting it, and unhide restores it', as
 	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
 });
 
+test('hiding reads each legacy payload once and records its id for later scans', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const stored = [];
+	for (const id of ['0xq1', '0xq2', '0xq3']) stored.push((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Legacy?', id))).body.id);
+	// Uploads from before this release have no resourceId in their index row.
+	for (const storageId of stored) {
+		const key = `ce-storage:session-a:questions:${storageId}`;
+		const metadata = JSON.parse(kv.store.get(key));
+		delete metadata.resourceId;
+		delete metadata.uploader;
+		kv.store.set(key, JSON.stringify(metadata));
+	}
+	const payloadReads = [];
+	const get = kv.get.bind(kv);
+	kv.get = async (key) => {
+		if (key.startsWith('ce-storage-payload:')) payloadReads.push(key);
+		return get(key);
+	};
+	const hide = (id, hidden = true) => setCloudflareStorageResourceHidden({
+		...common, body: { resource: 'questions', id, hidden }, actor: OWNERSHIP_ADMIN,
+	});
+	assert.equal((await hide('0xq1')).body.matchedRows, 1);
+	assert.equal(payloadReads.length, 3);
+	assert.deepEqual(stored.map((storageId) => JSON.parse(kv.store.get(`ce-storage:session-a:questions:${storageId}`)).resourceId),
+		['0xq1', '0xq2', '0xq3']);
+	// Later hides and unhides of other ids read only the index.
+	assert.equal((await hide('0xq2')).body.matchedRows, 1);
+	assert.equal((await hide('0xq1', false)).body.matchedRows, 1);
+	assert.equal(payloadReads.length, 3);
+});
+
 test('hide requests validate the resource, id, and flag', async () => {
 	const { common } = createOwnershipHarness();
 	for (const [body, error] of [

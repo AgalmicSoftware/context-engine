@@ -1969,6 +1969,22 @@ const readStoredPayloadJson = async ({ env, index, slug, config, metadata, deps 
   }
 };
 
+// The questions or surveys id of an index row. Rows stored before resourceId
+// was recorded need one payload read; their id is then written back, so later
+// scans read only the index. Returns null when the payload cannot be read and
+// '' when it has no valid id.
+const readIndexRowResourceId = async ({ env, index, slug, config, resource, row, deps }) => {
+  const recorded = normalizeAddress(row.metadata?.resourceId);
+  if (recorded) return recorded;
+  const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
+  if (!payload) return null;
+  const resourceId = readStoragePayloadResourceId(resource, payload);
+  if (!isStorageResourceId(resourceId)) return '';
+  row.metadata = { ...row.metadata, resourceId };
+  await index.put(row.key, JSON.stringify(row.metadata));
+  return resourceId;
+};
+
 // Admin soft hide: every stored version stays readable by its storage id, but
 // lists, the interview catalog, and results analysis skip the question or
 // survey id, and later uploads of the id start hidden.
@@ -2002,14 +2018,10 @@ export const setCloudflareStorageResourceHidden = async ({ env, config, slug, bo
       unreadableRows += 1;
       continue;
     }
-    let rowResourceId = normalizeAddress(row.metadata.resourceId);
-    if (!rowResourceId) {
-      const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
-      if (!payload) {
-        unreadableRows += 1;
-        continue;
-      }
-      rowResourceId = readStoragePayloadResourceId(resource, payload);
+    const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+    if (rowResourceId === null) {
+      unreadableRows += 1;
+      continue;
     }
     if (rowResourceId !== resourceId) continue;
     matchedRows += 1;

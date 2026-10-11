@@ -1889,7 +1889,8 @@ token):
   progress is listed only as a marker too. Unhiding restores all versions.
 - The Worker marks every stored version of the id. Versions stored before this
   release have no `resourceId` in their index row, so the first hide reads
-  those payloads once to match them.
+  those payloads once and writes their id into every row it reads; later hides
+  and unhides read only the index.
 - Each change writes an audit entry (`storage_resource_hidden` or
   `storage_resource_unhidden`, with the admin address) to the storage audit
   KV before it takes effect.
