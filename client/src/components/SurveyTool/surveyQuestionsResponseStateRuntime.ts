@@ -173,6 +173,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
       buildEmptyResponseFieldState: buildEmptyResponseFieldState,
       setState: setState.bind(engine),
       clearDraft: clearDraft,
+      persistDraft: persistDraft,
       recalculateEditStats: recalculateEditStats,
       updateJsonPreview: updateJsonPreview,
       onFailure: (error: SurveyQuestionsLegacyValue) => {

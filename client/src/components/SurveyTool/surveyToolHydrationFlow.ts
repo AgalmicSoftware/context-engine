@@ -1,4 +1,4 @@
-import { buildSavedInterviewConsent, consentSignature } from './sessionInterviewConsent';
+import { buildSavedInterviewConsent, consentSignature, keepConsentWithdrawals } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import {
   shouldForceOverwriteDraftValues,
@@ -407,6 +407,7 @@ type ApplyResetFormStateEffectsArgs = {
 
 type ApplyRevertPendingEffectsArgs = {
   clearDraft?: (() => void) | null;
+  persistDraft?: (() => void) | null;
   recalculateEditStats?: (() => void) | null;
   updateJsonPreview?: (() => void) | null;
 };
@@ -588,6 +589,7 @@ type BuildMergedHydrationQuestionResponsesArgs = {
 
 type BuildRevertedResponseSliceArgs = {
   baselineSlice?: ResponseSlice | null;
+  currentSlice?: ResponseSlice | null;
   renderedQuestionIds?: Iterable<unknown> | unknown[];
   cloneFieldState?: ((value: unknown) => unknown) | null;
   buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
@@ -2013,11 +2015,16 @@ export const applyResetFormStateEffects = ({ callback = null }: ApplyResetFormSt
 
 export const applyRevertPendingEffects = ({
   clearDraft = null,
+  persistDraft = null,
   recalculateEditStats = null,
   updateJsonPreview = null,
 }: ApplyRevertPendingEffectsArgs = {}) => {
   if (typeof clearDraft === 'function') {
     clearDraft();
+  }
+  // Re-store what Clear changes keeps, so a kept consent withdrawal survives a reload.
+  if (typeof persistDraft === 'function') {
+    persistDraft();
   }
   if (typeof recalculateEditStats === 'function') {
     recalculateEditStats();
@@ -2740,6 +2747,7 @@ export const buildPrefilledSingleQuestionState = ({
 
 export const buildRevertedResponseSlice = ({
   baselineSlice = null,
+  currentSlice = null,
   renderedQuestionIds = [],
   cloneFieldState = null,
   buildEmptyResponseFieldState = null,
@@ -2753,6 +2761,12 @@ export const buildRevertedResponseSlice = ({
     conviction: { ...((baseline.conviction as Record<string, unknown>) || {}) },
     additionalComments: clone(baseline.additionalComments || {}) as Record<string, unknown>,
   };
+  // Clear changes discards edits but never a consent withdrawal: nothing becomes more disclosing.
+  const savedConsent = asHydrationRecord(baseline.interviewProvenance);
+  const keptWithdrawals = Object.entries(asHydrationRecord(currentSlice?.interviewProvenance))
+    .map(([questionId, pending]) => [questionId, keepConsentWithdrawals(savedConsent[questionId], pending)] as const)
+    .filter(([, withdrawal]) => withdrawal);
+  if (keptWithdrawals.length) nextSlice.interviewProvenance = Object.fromEntries(keptWithdrawals);
 
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
     const questionId = normalizeQuestionIdKey(rawQuestionId);

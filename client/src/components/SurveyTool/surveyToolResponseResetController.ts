@@ -142,6 +142,7 @@ export const executeSurveyPendingRevert = ({
   buildEmptyResponseFieldState = () => null,
   setState = () => {},
   clearDraft = () => {},
+  persistDraft = () => {},
   recalculateEditStats = () => {},
   updateJsonPreview = () => {},
   resolveBaselineSlice = resolveRevertPendingBaselineSlice,
@@ -159,6 +160,7 @@ export const executeSurveyPendingRevert = ({
   buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
   setState?: SetState;
   clearDraft?: () => void;
+  persistDraft?: () => void;
   recalculateEditStats?: () => void;
   updateJsonPreview?: () => void;
   resolveBaselineSlice?: (args?: ResetArgs) => unknown;
@@ -183,6 +185,7 @@ export const executeSurveyPendingRevert = ({
     const renderedQuestionIds = getRenderedQuestionIds();
     const nextSlice = buildRevertedSlice({
       baselineSlice,
+      currentSlice: Array.isArray(nextState.surveysResponseState) ? nextState.surveysResponseState[surveyIndex] : null,
       renderedQuestionIds,
       cloneFieldState,
       buildEmptyResponseFieldState,
@@ -198,6 +201,7 @@ export const executeSurveyPendingRevert = ({
       () =>
         applyRevertEffects({
           clearDraft,
+          persistDraft,
           recalculateEditStats,
           updateJsonPreview,
         }),

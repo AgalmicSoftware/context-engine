@@ -330,3 +330,34 @@ it('keeps a saved comment that loads during a rejected interview upload', async 
   expect(slice.additionalComments.q1.value).toBe('Note from another device');
   expect(pile.engine().getPendingEditStats().total).toBe(0);
 });
+
+it('keeps a withdrawal from a rejected interview upload through Clear changes', async () => {
+  const upload = mockSession([savedNamedQ1]);
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  fireEvent.click(screen.getByText('AI submission info'));
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
+  await submitDrafts();
+  await act(async () => pile.engine().closeSessionVoiceModeModal());
+  await settle(300);
+  await act(async () => pile.engine().handleAnswerPile('q3', 'Agree'));
+  await settle(300);
+  expect(pile.engine().getPendingEditStats().total).toBe(2);
+
+  await act(async () => pile.engine().handleRevertPendingChanges());
+  await settle(300);
+
+  const slice = pile.engine().state.surveysResponseState[0];
+  expect(slice.answers.q3?.value ?? '').toBe('');
+  expect(slice.interviewProvenance.q1).not.toHaveProperty('responderName');
+  expect(Array.from(pile.engine().getChangedQidsAndFields(0).changedQids)).toEqual(['q1']);
+  expect(draftText()).toContain('"includeAiProvenance":true');
+  await act(async () => {
+    await pile.engine().handlePileSubmitClick();
+  });
+  await settle();
+  const [row] = upload.mock.calls.at(-1)[2];
+  expect(row.answer.value).toBe('Agree');
+  expect(row).not.toHaveProperty('responderName');
+});
