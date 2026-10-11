@@ -453,6 +453,63 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ).rejects.toThrow(/publication revision mismatch/i);
   });
 
+  it('ignores fields the Worker manages or advertises on every read', async () => {
+    const revision = 'revision-worker-managed';
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: verifiedConfig(revision, {
+            authzEpoch: 3,
+            workerCanonicalPublicationRevision: revision,
+            responseFieldEncryption: { version: 1 },
+            corsWorkerUrl: `${WORKER_ORIGIN.toUpperCase()}/`,
+          }),
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: revision,
+        retryDelaysMs: [],
+      }),
+    ).resolves.toEqual(expect.objectContaining({ configRevision: revision }));
+  });
+
+  it('ignores a staged config revision until publication claims its own', async () => {
+    const stagedReadback = verifiedConfig('deploy-attempt-revision', {
+      responseFieldEncryption: { mode: 'none', version: 0 },
+    });
+    const fetchImpl = jest.fn(async (_url: unknown, init?: RequestInit) =>
+      init?.method === 'POST' ? jsonResponse(200, { ok: true }) : jsonResponse(200, { config: stagedReadback }),
+    );
+    const input = {
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      config: baseConfig(),
+      signAdminAction: async () => ({ signature: '0xsigned' }),
+      fetchImpl,
+      retryDelaysMs: [],
+    };
+
+    await expect(persistAndVerifySessionWizardWorkerConfig({ ...input, finalizePublication: false })).resolves.toEqual(
+      expect.objectContaining({ workerOrigin: WORKER_ORIGIN, configRevision: '' }),
+    );
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({ ...input, configRevision: 'publication-revision' }),
+    ).rejects.toThrow(/timed out waiting for worker config revision "publication-revision"/i);
+  });
+
   it('signs the exact non-secret Lit descriptor fields for a worker-canonical Lit session', async () => {
     const litCredentials = {
       litApiBase: 'https://api.chipotle.litprotocol.com',
