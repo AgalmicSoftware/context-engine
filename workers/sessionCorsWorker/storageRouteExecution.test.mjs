@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { exportCloudflareEncryptedPayloadEnvelopes, readStorageUploadRequestPayload, storageRoute } from './storageRouteExecution.js';
+import {
+	exportCloudflareEncryptedPayloadEnvelopes,
+	readStorageUploadRequestPayload,
+	setCloudflareStorageResourceHidden,
+	storageRoute,
+} from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
 import { writeStorageEnvelopeKeyReleaseAudit } from './storageEnvelopeEncryption.js';
@@ -4274,4 +4279,136 @@ test('own-response listing uses authenticated ownership, preserves public rows, 
   const key = [...kv.store.keys()].find((key) => key.startsWith('ce-storage:'));
   await kv.put(key, '{bad');
   assert.equal((await list('&mine=true', account)).status, 503);
+});
+
+const OWNERSHIP_ADMIN = '0x00000000000000000000000000000000000000aa';
+const OWNERSHIP_AUTHOR = '0x00000000000000000000000000000000000000bb';
+const OWNERSHIP_OTHER = '0x00000000000000000000000000000000000000cc';
+
+const createOwnershipHarness = () => {
+	const kv = createMockKv();
+	let clock = Date.parse('2026-10-10T00:00:00.000Z');
+	const common = {
+		env: { CE_STORAGE_INDEX_KV: kv },
+		slug: 'session-a',
+		config: {
+			adminAddress: OWNERSHIP_ADMIN,
+			storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+		},
+		baseHeaders: {},
+		deps: { json, randomBytes: createSequenceRandomBytes(), now: () => (clock += 1_000) },
+	};
+	const upload = async (uploaderAddress, data, resource = 'questions') => {
+		const response = await storageRoute({
+			...common,
+			uploaderAddress,
+			path: '/storage/upload',
+			method: 'POST',
+			request: new Request('https://worker.example/storage/upload', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ data, contentType: 'application/json', resource }),
+			}),
+		});
+		return { status: response.status, body: await readJson(response) };
+	};
+	const list = async (resource = 'questions') => readJson(await storageRoute({
+		...common,
+		uploaderAddress: '',
+		path: '/storage/list',
+		method: 'GET',
+		request: new Request(`https://worker.example/storage/list?resource=${resource}`),
+	}));
+	const read = async (id) => storageRoute({
+		...common,
+		uploaderAddress: '',
+		path: '/storage/read',
+		method: 'GET',
+		request: new Request(`https://worker.example/storage/read?id=${id}`),
+	});
+	return { common, kv, upload, list, read };
+};
+
+const ownedQuestion = (prompt, id = '0xQ1') => ({ id, type: 'binary', prompt, sessionSlug: 'session-a' });
+
+test('question and survey uploads record their authenticated uploader and id', async () => {
+	const { upload, list } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_AUTHOR, { surveyID: '0xS1', title: 'Survey' }, 'surveys')).status, 200);
+	const [question] = (await list()).items;
+	assert.equal(question.metadata.uploader, OWNERSHIP_AUTHOR);
+	assert.equal(question.metadata.resourceId, '0xq1');
+	const [survey] = (await list('surveys')).items;
+	assert.equal(survey.metadata.uploader, OWNERSHIP_AUTHOR);
+	assert.equal(survey.metadata.resourceId, '0xs1');
+});
+
+test('only the first author or a session admin can upload an existing question or survey id again', async () => {
+	const { upload, list } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+
+	const overwrite = await upload(OWNERSHIP_OTHER, ownedQuestion('ATTACKER rewrite', '0xq1'));
+	assert.equal(overwrite.status, 409);
+	assert.equal(overwrite.body.reason, 'storage_resource_id_owned');
+	assert.match(overwrite.body.error, /question id already belongs to another author/);
+
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Admin correction'))).status, 200);
+	assert.deepEqual((await list()).items.map((item) => item.metadata.uploader).sort(), [OWNERSHIP_AUTHOR, OWNERSHIP_AUTHOR, OWNERSHIP_ADMIN].sort());
+
+	assert.equal((await upload(OWNERSHIP_AUTHOR, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xS1', title: 'Hijacked' }, 'surveys')).status, 409);
+	// A new id is anyone's to create.
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xq2'))).status, 200);
+});
+
+test('admins hide a question id without deleting it, and unhide restores it', async () => {
+	const { common, kv, upload, list, read } = createOwnershipHarness();
+	const first = await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'));
+	await upload(OWNERSHIP_AUTHOR, ownedQuestion('Kept?', '0xq2'));
+	// An upload from before this release has no resourceId in its index row.
+	const legacyKey = `ce-storage:session-a:questions:${first.body.id}`;
+	const legacyMetadata = JSON.parse(kv.store.get(legacyKey));
+	delete legacyMetadata.resourceId;
+	delete legacyMetadata.uploader;
+	kv.store.set(legacyKey, JSON.stringify(legacyMetadata));
+
+	const hide = await setCloudflareStorageResourceHidden({
+		...common, body: { resource: 'questions', id: '0xQ9', hidden: true }, actor: OWNERSHIP_ADMIN,
+	});
+	assert.deepEqual(hide.body, {
+		ok: true, resource: 'questions', id: '0xq9', hidden: true, matchedRows: 1, unreadableRows: 0, hiddenIds: ['0xq9'],
+	});
+	const audit = [...kv.store.entries()].find(([key]) => key.startsWith('ce-storage-audit:session-a:questions:0xq9:'));
+	assert.equal(JSON.parse(audit[1]).event, 'storage_resource_hidden');
+	assert.equal(JSON.parse(audit[1]).principal, OWNERSHIP_ADMIN);
+
+	const listed = (await list()).items;
+	assert.deepEqual(listed.find((item) => item.hidden), { hidden: true, metadata: { resource: 'questions', resourceId: '0xq9', hidden: true } });
+	assert.deepEqual(listed.filter((item) => item.storageRef).map((item) => item.metadata.resourceId), ['0xq2']);
+	// Soft hide: the stored record is still readable by its storage id.
+	assert.equal((await read(first.body.id)).status, 200);
+	// A later upload of the hidden id by its author starts hidden too.
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
+	assert.equal((await list()).items.filter((item) => item.hidden).length, 2);
+
+	const unhide = await setCloudflareStorageResourceHidden({
+		...common, body: { resource: 'questions', id: '0xq9', hidden: false }, actor: OWNERSHIP_ADMIN,
+	});
+	assert.equal(unhide.body.matchedRows, 2);
+	assert.deepEqual(unhide.body.hiddenIds, []);
+	assert.equal((await list()).items.filter((item) => item.storageRef).length, 3);
+});
+
+test('hide requests validate the resource, id, and flag', async () => {
+	const { common } = createOwnershipHarness();
+	for (const [body, error] of [
+		[{ resource: 'responses', id: 'q1', hidden: true }, /Only questions and surveys/],
+		[{ resource: 'questions', id: 'bad id', hidden: true }, /Invalid questions id/],
+		[{ resource: 'surveys', id: 's1', hidden: 'yes' }, /hidden must be true or false/],
+	]) {
+		const result = await setCloudflareStorageResourceHidden({ ...common, body, actor: OWNERSHIP_ADMIN });
+		assert.equal(result.status, 400);
+		assert.match(result.error, error);
+	}
 });

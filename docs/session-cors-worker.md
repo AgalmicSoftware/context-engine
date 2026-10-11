@@ -641,6 +641,18 @@ Authenticated clients can use the worker as the session storage boundary:
     rewrite stored data or revoke plaintext already downloaded. Aggregate-only
     visibility does not authorize raw reads to compute a client-side summary;
     a combined summary needs an authorized server-generated aggregate.
+  - For `questions` and `surveys`, the Worker records the authenticated
+    uploader as `uploader` and the payload id as `resourceId` in the index
+    metadata, and keeps a first-writer record per session, resource, and id.
+    Uploading an id that already exists returns `409` with
+    `reason: "storage_resource_id_owned"` unless the uploader is that id's
+    first author or a current session admin. Because KV is eventually
+    consistent, every reader also picks one canonical version per id: a
+    session admin's newest upload, otherwise the earliest upload. The client
+    hydration, `/agent/interview-catalog`, and results analysis all apply this
+    rule, so a later upload by anyone else never replaces a question or survey
+    people already answered. Uploads stored before this release have no
+    uploader, so they never count as admin uploads.
   - JSON and multipart uploads share per-upload policy validation. Group IDs
     accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
     of precedence, using the first nonempty list. Multipart `groupIds` and
@@ -701,7 +713,7 @@ Authenticated clients can use the worker as the session storage boundary:
     `Content-Disposition: attachment`, so opening the URL downloads it instead
     of rendering it on the Worker origin. A malformed declared type is served
     as `application/octet-stream`.
-- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
     contract. Fresh clients paginate the `questions` and `surveys` indexes,
@@ -1845,6 +1857,23 @@ token):
 - `POST /admin/secret-presence`
 - `POST /admin/set-limits`
 - `POST /admin/lit-chipotle-status`
+- `POST /admin/storage/set-hidden`
+
+`/admin/storage/set-hidden` notes:
+
+- The signed body adds `{ "resource": "questions" | "surveys", "id": "<payload id>", "hidden": true | false }`.
+- It is a soft hide. Every stored version stays readable by its storage id,
+  but `/storage/list` returns only a hidden marker for it, and the interview
+  catalog and results analysis skip the id. Later uploads of a hidden id start
+  hidden. Unhiding restores all versions.
+- The Worker marks every stored version of the id. Versions stored before this
+  release have no `resourceId` in their index row, so the first hide reads
+  those payloads once to match them.
+- Each change writes an audit entry (`storage_resource_hidden` or
+  `storage_resource_unhidden`, with the admin address) to the storage audit
+  KV before it takes effect.
+- The response is `{ ok, resource, id, hidden, matchedRows, unreadableRows, hiddenIds }`,
+  where `hiddenIds` lists every hidden id for that resource.
 
 Never return secrets in responses.
 
@@ -2161,6 +2190,8 @@ Signed login/bootstrap requests:
     establish which version a deployed Worker serves.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
+    it reads up to 200 stored rows so it can keep the canonical version of a
+    re-uploaded id (see `POST /storage/upload`) and skips hidden ids;
     on-chain discovery requires configured block limits and is capped at a
     two-million-block range.
   - Applies the session's anonymous rate-limit bucket before reading questions.

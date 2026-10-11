@@ -17,7 +17,9 @@ import {
   getStorageIndexBinding,
   listCloudflareMetadataRows,
   readStoredCloudflarePayloadBytes,
+  resolveSessionAdminAddresses,
 } from './storageRouteExecution.js';
+import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import {
   isModelAllowed,
   normalizeAiRequestPayload,
@@ -540,16 +542,29 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
   }
   const questionRows = await listCloudflareMetadataRows({ index, slug, resource: 'questions' });
-  const questions = [];
+  const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: 'questions' });
+  const candidates = [];
   for (const row of questionRows) {
     const metadata = row?.metadata;
-    if (!isObj(metadata) || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
+    if (!isObj(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
     const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
     if (!isObj(payload)) continue;
     if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
     const normalized = normalizeQuestionRecord(payload);
-    if (normalized) questions.push(normalized);
+    if (!normalized || hiddenQuestionIds.has(normalized.questionId)) continue;
+    candidates.push({
+      resourceId: normalized.questionId,
+      createdAtMs: Date.parse(trim(metadata.createdAt)) || 0,
+      storageRefId: trim(metadata.id),
+      uploader: trim(metadata.uploader),
+      question: normalized,
+    });
   }
+  // A re-upload of an id by someone else never replaces the question people
+  // answered: keep the first upload unless a session admin uploaded a newer one.
+  const admins = resolveSessionAdminAddresses(config);
+  const questions = selectCanonicalStorageVersions(candidates, { isAdmin: (address) => admins.has(address) })
+    .map((candidate) => candidate.question);
 
   const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses' });
   const responseRows = [];

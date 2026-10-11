@@ -21,6 +21,7 @@ import {
   encryptPayloadWithStorageEnvelope,
   toUint8Array,
   writeStorageEnvelopeKeyReleaseAudit,
+  writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
 import {
   isWorkerGroupMember,
@@ -43,7 +44,19 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
-import { validateStorageUploadPayload } from './storageUploadValidation.js';
+import {
+  isStorageResourceId,
+  readStoragePayloadResourceId,
+  validateStorageUploadPayload,
+} from './storageUploadValidation.js';
+import {
+  isOwnedStorageResource,
+  isStorageResourceHidden,
+  listHiddenStorageResourceIds,
+  readStorageResourceOwner,
+  writeStorageResourceHidden,
+  writeStorageResourceOwner,
+} from './storageResourceOwnership.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -551,6 +564,8 @@ const resolveRoleAddressSet = ({ config = {}, role }) => {
   });
   return addresses;
 };
+
+export const resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet({ config, role: 'admin' });
 
 const listDelimitedAddresses = (value) => {
   if (typeof value === 'string') {
@@ -1334,7 +1349,7 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
   }, 200, baseHeaders);
 };
 
-const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps }) => {
+const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, resourceId = '', baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
   const canWriteR2 = !!r2 && typeof r2.put === 'function';
@@ -1374,6 +1389,29 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT && payload.payloadEncrypted !== true) {
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
   }
+  const resource = trim(payload.resource) || 'docsContext';
+  const uploader = normalizeAddress(uploaderAddress);
+  const owned = isOwnedStorageResource(resource);
+  let owner = null;
+  let hidden = false;
+  if (owned) {
+    if (!isStorageResourceId(resourceId)) {
+      return responseJson(deps, { error: `Invalid ${resource} payload: missing id.` }, 400, baseHeaders);
+    }
+    if (typeof index?.get !== 'function') {
+      return responseJson(deps, { error: 'Cloudflare storage index binding not configured.' }, 501, baseHeaders);
+    }
+    // Only the id's first author or a session admin may upload it again;
+    // anyone else would be rewriting a question or survey people answered.
+    owner = await readStorageResourceOwner({ index, slug, resource, resourceId });
+    if (owner && normalizeAddress(owner.uploader) !== uploader && !resolveSessionAdminAddresses(config).has(uploader)) {
+      return responseJson(deps, {
+        error: `This ${resource === 'questions' ? 'question' : 'survey'} id already belongs to another author. Only its first author or a session admin can upload it again.`,
+        reason: 'storage_resource_id_owned',
+      }, 409, baseHeaders);
+    }
+    hidden = await isStorageResourceHidden({ index, slug, resource, resourceId });
+  }
 
   let id = '';
   try {
@@ -1389,7 +1427,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
   const createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
   const objectKey = buildObjectKey({ slug, id });
-  const resource = trim(payload.resource) || 'docsContext';
   const storageLayer = canWriteR2 ? 'r2' : 'kv';
   let bytesToStore = payload.bytes || new Uint8Array();
   let envelope = null;
@@ -1438,6 +1475,8 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     ...(resource === 'responses' && trim(uploaderAddress)
       ? { responder: trim(uploaderAddress).toLowerCase() }
       : {}),
+    // Trusted authorship for questions and surveys, like responder above.
+    ...(owned ? { resourceId, ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
     payloadAccessMode: payloadAccess.mode,
     payloadAccessControl: {
       gate: payloadAccess.gate,
@@ -1492,6 +1531,9 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
 
   if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
+  }
+  if (owned && !owner && uploader) {
+    await writeStorageResourceOwner({ index, slug, resource, resourceId, uploader, storageRefId: id, createdAt });
   }
 
   const storageRef = normalizeStorageRef(metadata);
@@ -1811,6 +1853,14 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       if (mine) return itemAccess.response;
       continue;
     }
+    const owned = isOwnedStorageResource(storageRef.resource);
+    const resourceId = owned ? normalizeAddress(metadata?.resourceId) : '';
+    if (owned && metadata?.hidden === true) {
+      // An admin hid this id. List no reference to the stored record, only a
+      // marker so clients can drop a copy they cached before the hide.
+      if (resourceId) items.push({ hidden: true, metadata: { resource: storageRef.resource, resourceId, hidden: true } });
+      continue;
+    }
     const metadataAccess = normalizePayloadAccessControl(
       metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config),
     );
@@ -1826,6 +1876,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
         ...(storageRef.resource === 'responses' && trim(metadata?.responder)
           ? { responder: trim(metadata.responder).toLowerCase() }
           : {}),
+        ...(resourceId ? { resourceId } : {}),
+        ...(owned && trim(metadata?.uploader) ? { uploader: normalizeAddress(metadata.uploader) } : {}),
         payloadAccessControl: {
           gate: metadataAccess.gate,
           encryption: metadataAccess.encryption,
@@ -1883,6 +1935,79 @@ export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metad
   const envelope = await readKvPayloadEnvelope({ index, slug, id });
   if (envelope?.payloadBase64url) return base64urlToBytes(envelope.payloadBase64url);
   return null;
+};
+
+const readStoredPayloadJson = async ({ env, index, slug, config, metadata, deps }) => {
+  try {
+    let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
+    if (!bytes) return null;
+    if (isObj(metadata?.envelope)) {
+      bytes = await decryptPayloadWithStorageEnvelope({
+        env, config, slug, payloadId: trim(metadata.id), ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+      });
+    }
+    const payload = JSON.parse(decoder.decode(await toUint8Array(bytes)));
+    return isObj(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+// Admin soft hide: every stored version stays readable by its storage id, but
+// lists, the interview catalog, and results analysis skip the question or
+// survey id, and later uploads of the id start hidden.
+export const setCloudflareStorageResourceHidden = async ({ env, config, slug, body, actor = '', deps = {} } = {}) => {
+  const resource = trim(body?.resource);
+  const resourceId = normalizeAddress(body?.id);
+  if (!isOwnedStorageResource(resource)) {
+    return { ok: false, status: 400, error: 'Only questions and surveys can be hidden.' };
+  }
+  if (!isStorageResourceId(resourceId)) return { ok: false, status: 400, error: `Invalid ${resource} id.` };
+  if (typeof body?.hidden !== 'boolean') return { ok: false, status: 400, error: 'hidden must be true or false.' };
+  const index = getStorageIndexBinding(env);
+  if (!index || ['get', 'put', 'list', 'delete'].some((method) => typeof index[method] !== 'function')) {
+    return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
+  }
+  const { hidden } = body;
+  try {
+    await writeStorageVisibilityAudit({ env, slug, resource, resourceId, hidden, principal: actor, deps });
+  } catch (error) {
+    return { ok: false, status: 503, error: error?.message || 'Storage audit store is unavailable.' };
+  }
+  await writeStorageResourceHidden({
+    index, slug, resource, resourceId, hidden, actor, updatedAt: new Date(deps?.now?.() || Date.now()).toISOString(),
+  });
+  // Mark every stored version so lists can skip them from index metadata.
+  // Uploads from before this release lack resourceId; read those once here.
+  let matchedRows = 0;
+  let unreadableRows = 0;
+  for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
+    if (!row.metadata) {
+      unreadableRows += 1;
+      continue;
+    }
+    let rowResourceId = normalizeAddress(row.metadata.resourceId);
+    if (!rowResourceId) {
+      const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
+      if (!payload) {
+        unreadableRows += 1;
+        continue;
+      }
+      rowResourceId = readStoragePayloadResourceId(resource, payload);
+    }
+    if (rowResourceId !== resourceId) continue;
+    matchedRows += 1;
+    const next = { ...row.metadata, resourceId };
+    if (hidden) next.hidden = true;
+    else delete next.hidden;
+    await index.put(row.key, JSON.stringify(next));
+  }
+  const hiddenIds = [...await listHiddenStorageResourceIds({ index, slug, resource })].sort();
+  return {
+    ok: true,
+    status: 200,
+    body: { ok: true, resource, id: resourceId, hidden, matchedRows, unreadableRows, hiddenIds },
+  };
 };
 
 const resolveEnvelopeExportKeyProvider = ({ metadataAccess, metadata, config }) => {
@@ -2056,7 +2181,9 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
       return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
-    return handleCloudflareUpload({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps: routeDeps });
+    return handleCloudflareUpload({
+      env, config, slug, uploaderAddress, authScopes, payload, resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
+    });
   }
 
   const configuredBackend = resolveConfiguredStorageBackend({ config });

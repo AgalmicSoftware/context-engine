@@ -20,6 +20,7 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import {
   exportCloudflareEncryptedPayloadEnvelopes,
+  setCloudflareStorageResourceHidden,
 } from './storageRouteExecution.js';
 import {
   dispatchAdminWorkerGroupRequest,
@@ -224,6 +225,22 @@ export const dispatchAdminRequest = async ({
       );
     } catch (error) {
       return deps?.json?.({ error: error?.message || 'Results analysis generation failed.' }, 500, privateHeaders);
+    }
+  }
+
+  if (action === 'storage/set-hidden') {
+    try {
+      const result = await (deps?.setCloudflareStorageResourceHidden || setCloudflareStorageResourceHidden)({
+        env,
+        config: existingConfig,
+        slug: targetSlug,
+        body,
+        actor: authorityResult.address,
+        deps: { now: deps?.now },
+      });
+      return deps?.json?.(result?.ok ? result.body : { error: result?.error }, result?.status || 500, headers);
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Storage visibility update failed.' }, 500, headers);
     }
   }
 

@@ -375,3 +375,34 @@ export const writeStorageEnvelopeKeyReleaseAudit = async ({
   );
   return { ok: true, store: 'kv', entry };
 };
+
+// Admin hide/unhide of a question or survey id, in the same audit store.
+export const writeStorageVisibilityAudit = async ({
+  env = {},
+  slug,
+  resource,
+  resourceId,
+  hidden,
+  principal,
+  deps = {},
+} = {}) => {
+  const timestamp = nowIso(deps);
+  const entry = {
+    version: ENVELOPE_VERSION,
+    event: hidden ? 'storage_resource_hidden' : 'storage_resource_unhidden',
+    sessionSlug: safeSlugPart(slug),
+    resource: trim(resource),
+    resourceId: trim(resourceId),
+    principal: trim(principal).toLowerCase(),
+    timestamp,
+  };
+  const kv = resolveAuditKv(env);
+  if (!kv || typeof kv.put !== 'function') {
+    throw new Error('Storage audit store is not configured.');
+  }
+  await kv.put(
+    `ce-storage-audit:${entry.sessionSlug}:${entry.resource}:${entry.resourceId}:${timestamp}:${auditSuffix(deps)}`,
+    JSON.stringify(entry),
+  );
+  return { ok: true, store: 'kv', entry };
+};

@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import { Wallet } from 'ethers';
 import sessionWorker, { SessionWriteCoordinator } from './worker.js';
+import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
+import { loadWorkerCanonicalResultsAnalysisSource } from './resultsAnalysisGeneration.js';
+import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
 
 // End-to-end checks against the real Worker entry with in-memory KV and the
 // real session coordinator, shaped like a public evaluator session.
@@ -238,4 +241,88 @@ test('a participant cannot store a 15 MiB answer that every results viewer would
 	assert.equal(shapeless.status, 400);
 	const accepted = await uploadJson({ env, token, resource: 'responses', data: { questionID: 'q-official-1', answer: 'Agree' } });
 	assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+});
+
+const signedAdminRequest = async ({ env, wallet, action, body }) => {
+	const nonce = await readJson(await fetchWorker(makeRequest('/auth/nonce', {
+		method: 'POST',
+		body: { address: wallet.address, sessionSlug: SLUG, sessionId: SESSION_ID, adminAction: true },
+	}), env));
+	assert.equal(nonce.status, 200, JSON.stringify(nonce.body));
+	const unsigned = { address: wallet.address, sessionSlug: SLUG, sessionId: SESSION_ID, ...body };
+	const typedData = buildAdminActionTypedData({
+		action,
+		slug: SLUG,
+		bodyHash: buildAdminActionBodyHash(unsigned),
+		nonce: nonce.body.nonce,
+		audience: APP_ORIGIN,
+		expiration: Math.floor(Date.now() / 1000) + 300,
+	});
+	const signature = await wallet.signTypedData(typedData.domain, ADMIN_ACTION_TYPES, typedData.message);
+	return readJson(await fetchWorker(makeRequest(`/admin/${action}`, {
+		method: 'POST',
+		body: { ...unsigned, ...typedData.message, signature },
+	}), env));
+};
+
+const readCatalogPrompts = async (env) => {
+	const catalog = await readJson(await fetchWorker(new Request(`${WORKER_ORIGIN}/agent/interview-catalog`, {
+		headers: { Origin: APP_ORIGIN },
+	}), env));
+	assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+	return catalog.body.questions.map((question) => question.prompt);
+};
+
+test('participants cannot rewrite an official question, and admins can hide one', async () => {
+	const { admin, config, env } = createSessionEnv({ configOverrides: { sessionUrl: `${APP_ORIGIN}/session/${SLUG}` } });
+	const attacker = Wallet.createRandom();
+	const adminToken = await login({ env, wallet: admin });
+	const attackerToken = await login({ env, wallet: attacker });
+	const question = (prompt) => ({ id: 'q-official-1', prompt, type: 'binary', sessionId: SESSION_ID, sessionSlug: SLUG });
+
+	assert.equal((await uploadJson({ env, token: adminToken, resource: 'questions', data: question('Official: should the pilot continue?') })).status, 200);
+	const rewrite = await uploadJson({ env, token: attackerToken, resource: 'questions', data: question('ATTACKER: rewritten prompt') });
+	assert.equal(rewrite.status, 409);
+	assert.equal(rewrite.body.reason, 'storage_resource_id_owned');
+
+	// A rewrite stored before this release: later, with no recorded uploader.
+	const legacyId = 'legacy-attacker-rewrite-0001';
+	const legacyMetadata = {
+		id: legacyId,
+		backend: 'cloudflare',
+		resource: 'questions',
+		contentType: 'application/json',
+		encrypted: false,
+		createdAt: new Date(Date.now() + 60_000).toISOString(),
+		payloadAccessControl: payloadAccessControl,
+	};
+	await env.CE_STORAGE_INDEX_KV.put(buildIndexKey({ slug: SLUG, resource: 'questions', id: legacyId }), JSON.stringify(legacyMetadata));
+	await env.CE_STORAGE_INDEX_KV.put(buildPayloadKey({ slug: SLUG, id: legacyId }), JSON.stringify({
+		metadata: legacyMetadata,
+		payloadBase64url: Buffer.from(JSON.stringify(question('ATTACKER: legacy rewrite'))).toString('base64url'),
+	}));
+
+	const listed = (await listResource({ env, resource: 'questions' })).body.items;
+	assert.equal(listed.length, 2);
+	assert.equal(listed.find((item) => item.metadata.uploader)?.metadata.uploader, admin.address.toLowerCase());
+	assert.deepEqual(await readCatalogPrompts(env), ['Official: should the pilot continue?']);
+	const analysis = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: SLUG, config });
+	assert.deepEqual(analysis.snapshot.questions.map((entry) => entry.prompt), ['Official: should the pilot continue?']);
+
+	const forbidden = await signedAdminRequest({
+		env, wallet: attacker, action: 'storage/set-hidden', body: { resource: 'questions', id: 'q-official-1', hidden: true },
+	});
+	assert.equal(forbidden.status, 403);
+	const hidden = await signedAdminRequest({
+		env, wallet: admin, action: 'storage/set-hidden', body: { resource: 'questions', id: 'q-official-1', hidden: true },
+	});
+	assert.equal(hidden.status, 200, JSON.stringify(hidden.body));
+	assert.deepEqual(hidden.body.hiddenIds, ['q-official-1']);
+	assert.equal(hidden.body.matchedRows, 2);
+	assert.deepEqual((await listResource({ env, resource: 'questions' })).body.items.map((item) => item.metadata), [
+		{ resource: 'questions', resourceId: 'q-official-1', hidden: true },
+		{ resource: 'questions', resourceId: 'q-official-1', hidden: true },
+	]);
+	const afterHide = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: SLUG, config });
+	assert.deepEqual(afterHide.snapshot.questions, []);
 });

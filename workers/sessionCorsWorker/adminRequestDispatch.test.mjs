@@ -1509,6 +1509,60 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
   });
 });
 
+test('dispatchAdminRequest hides a question id for the signed session admin', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ resource: 'questions', id: '0xq1', hidden: true }) },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'storage/set-hidden',
+    deps: createAdminDeps({
+      now: () => 123,
+      setCloudflareStorageResourceHidden: async (value) => {
+        calls.push(value);
+        return { ok: true, status: 200, body: { ok: true, resource: 'questions', id: '0xq1', hidden: true, hiddenIds: ['0xq1'] } };
+      },
+    }),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].actor, '0xabc');
+  assert.deepEqual(calls[0].config, { adminAddress: '0xabc' });
+  assert.equal(calls[0].body.id, '0xq1');
+  assert.equal(calls[0].deps.now(), 123);
+  assert.deepEqual(result, {
+    body: { ok: true, resource: 'questions', id: '0xq1', hidden: true, hiddenIds: ['0xq1'] },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest refuses storage hides without admin authority', async () => {
+  let called = false;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ resource: 'questions', id: '0xq1', hidden: true }) },
+    env: {},
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'storage/set-hidden',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: false,
+        response: { body: { error: 'Admin authorization failed.' }, status: 403 },
+      }),
+      recordAbuseEvent: async () => {},
+      setCloudflareStorageResourceHidden: async () => {
+        called = true;
+        return { ok: true, status: 200, body: {} };
+      },
+    }),
+  });
+  assert.equal(called, false);
+  assert.deepEqual(result, { body: { error: 'Admin authorization failed.' }, status: 403 });
+});
+
 test('dispatchAdminRequest exports encrypted storage envelopes through the admin gate', async () => {
   const calls = [];
   const result = await dispatchAdminRequest({

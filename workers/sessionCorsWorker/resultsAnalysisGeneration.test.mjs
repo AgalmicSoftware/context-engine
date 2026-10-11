@@ -241,6 +241,43 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
   assert.equal(source.snapshot.responses[0].participantId, 'participant_001');
 });
 
+test('worker-canonical source keeps the first or admin version of each question and skips hidden ids', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const admin = '0x00000000000000000000000000000000000000aa';
+  const author = '0x00000000000000000000000000000000000000bb';
+  const attacker = '0x00000000000000000000000000000000000000cc';
+  const question = (questionId, prompt) => ({ sessionSlug: 'session-a', sessionId, questionId, prompt, type: 'text' });
+  const putQuestion = (id, createdAt, metadata, payload) => putPayload({
+    kv, resource: 'questions', id, metadata: { createdAt, ...metadata }, payload,
+  });
+  await putQuestion('zz-official', '2026-09-17T00:00:00.000Z', { uploader: author, resourceId: 'q1' }, question('q1', 'Official prompt'));
+  // Index keys sort by storage id, so the attacker row is read first.
+  await putQuestion('aa-attacker', '2026-09-17T00:05:00.000Z', { uploader: attacker, resourceId: 'q1' }, question('q1', 'ATTACKER prompt'));
+  await putQuestion('mm-legacy', '2026-09-16T00:00:00.000Z', {}, question('q2', 'Participant draft'));
+  await putQuestion('nn-admin', '2026-09-18T00:00:00.000Z', { uploader: admin, resourceId: 'q2' }, question('q2', 'Admin correction'));
+  await putQuestion('hh-hidden', '2026-09-17T00:00:00.000Z', { uploader: author, resourceId: 'q3', hidden: true }, question('q3', 'Hidden by flag'));
+  await putQuestion('ii-marked', '2026-09-17T00:00:00.000Z', {}, question('q4', 'Hidden by marker'));
+  await kv.put('ce-storage-hidden:session-a:questions:q4', JSON.stringify({ version: 1, hidden: true }));
+  for (const [index, questionId] of ['q1', 'q2', 'q3', 'q4'].entries()) {
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `r${index}`,
+      metadata: { responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-19T00:00:00.000Z' },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer: 'yes' },
+    });
+  }
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: { ...config, adminAddress: admin } });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.questions.map((entry) => [entry.id, entry.prompt]), [
+    ['q1', 'Official prompt'],
+    ['q2', 'Admin correction'],
+  ]);
+  assert.deepEqual(source.snapshot.responses.map((entry) => entry.questionId).sort(), ['q1', 'q2']);
+});
+
 test('worker-canonical source accepts public response envelopes with empty encrypted fields while rejecting non-empty encrypted envelopes', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };

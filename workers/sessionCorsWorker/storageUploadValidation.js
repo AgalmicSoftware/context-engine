@@ -23,6 +23,8 @@ export const MAX_RESPONSE_ITEM_BYTES = 64 * KIB;
 // this also admits short fixture ids while keeping index keys bounded.
 const RESOURCE_ID_RE = /^[a-z0-9][a-z0-9._:-]{0,127}$/;
 
+export const isStorageResourceId = (value) => typeof value === 'string' && RESOURCE_ID_RE.test(value);
+
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const isText = (value) => typeof value === 'string' && value.trim() !== '';
 const jsonBytes = (value) => encoder.encode(JSON.stringify(value)).byteLength;
@@ -93,7 +95,7 @@ export const validateStorageUploadPayload = ({ resource, bytes, payloadEncrypted
   }
 
   const resourceId = readStoragePayloadResourceId(resource, payload);
-  if (!RESOURCE_ID_RE.test(resourceId)) {
+  if (!isStorageResourceId(resourceId)) {
     return invalid(resource, 'expected a string id of up to 128 letters, digits, or ._:- characters');
   }
   if (resource === 'questions') {

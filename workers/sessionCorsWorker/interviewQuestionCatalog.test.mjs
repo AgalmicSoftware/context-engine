@@ -4,6 +4,7 @@ import {
   __test__interviewQuestionCatalog as helpers,
   loadPublicInterviewQuestions,
 } from './interviewQuestionCatalog.js';
+import { buildIndexKey, buildPayloadKey, storageRoute } from './storageRouteExecution.js';
 
 test('interview question normalization omits masked prompts and deduplicates IDs', () => {
   assert.deepEqual(
@@ -148,4 +149,57 @@ test('choice catalogs retain canonical and legacy single-select settings and def
   const questions = [{}, { singleSelect: false }, { singleSelect: true }, { oneSelectionOnly: true }, { singleChoice: true }]
     .map((settings, index) => ({ id: `q${index}`, prompt: 'Pick topics', type: 'multichoice', options: ['Parks', 'Transit'], ...settings }));
   assert.deepEqual(helpers.dedupeQuestions(questions).map((question) => question.singleSelect), [false, false, true, true, true]);
+});
+
+test('Cloudflare catalog keeps the first or admin version of each question and skips hidden ids', async () => {
+  const store = new Map();
+  const kv = {
+    async get(key) { return store.has(key) ? store.get(key) : null; },
+    async put(key, value) { store.set(key, value); },
+    async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
+      const names = [...store.keys()].filter((key) => key.startsWith(prefix)).sort();
+      const offset = Number(cursor) || 0;
+      const keys = names.slice(offset, offset + limit).map((name) => ({ name }));
+      const done = offset + keys.length >= names.length;
+      return { keys, list_complete: done, cursor: done ? '' : String(offset + keys.length) };
+    },
+  };
+  const admin = '0x00000000000000000000000000000000000000aa';
+  const author = '0x00000000000000000000000000000000000000bb';
+  const attacker = '0x00000000000000000000000000000000000000cc';
+  const config = {
+    adminAddress: admin,
+    storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+  };
+  const put = async (id, createdAt, metadata, payload) => {
+    const fullMetadata = { id, resource: 'questions', backend: 'cloudflare', contentType: 'application/json', createdAt, ...metadata };
+    await kv.put(buildIndexKey({ slug: 'session-a', resource: 'questions', id }), JSON.stringify(fullMetadata));
+    await kv.put(buildPayloadKey({ slug: 'session-a', id }), JSON.stringify({
+      metadata: fullMetadata,
+      payloadBase64url: Buffer.from(JSON.stringify(payload)).toString('base64url'),
+    }));
+  };
+  const question = (id, prompt) => ({ id, prompt, type: 'binary' });
+  // Storage ids sort the attacker re-upload ahead of the official question.
+  await put('aa-attacker-q1', '2026-10-02T00:00:00.000Z', { uploader: attacker, resourceId: 'q1' }, question('q1', 'ATTACKER prompt'));
+  await put('zz-official-q1', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q1' }, question('q1', 'Official prompt'));
+  await put('mm-draft-q2', '2026-10-01T00:00:00.000Z', {}, question('q2', 'Participant draft'));
+  await put('nn-admin-q2', '2026-10-03T00:00:00.000Z', { uploader: admin, resourceId: 'q2' }, question('q2', 'Admin correction'));
+  await put('hh-hidden-q3', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q3', hidden: true }, question('q3', 'Hidden'));
+  await put('ii-copy-q3', '2026-10-04T00:00:00.000Z', {}, question('q3', 'Unmarked copy of hidden'));
+  // Filler rows push the canonical q2 version past the first list page.
+  for (let index = 0; index < 120; index += 1) {
+    await put(`nm-filler-${String(index).padStart(3, '0')}`, '2026-10-05T00:00:00.000Z', {}, question(`filler-${index}`, `Filler ${index}?`));
+  }
+
+  const questions = await loadPublicInterviewQuestions({
+    env: { CE_STORAGE_INDEX_KV: kv },
+    config,
+    slug: 'session-a',
+    storageRoute,
+  });
+  const byId = new Map(questions.map((entry) => [entry.id, entry.prompt]));
+  assert.equal(byId.get('q1'), 'Official prompt');
+  assert.equal(byId.get('q2'), 'Admin correction');
+  assert.equal(byId.has('q3'), false);
 });

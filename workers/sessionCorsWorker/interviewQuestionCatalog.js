@@ -2,9 +2,15 @@ const QUESTIONS_ADDED_TOPIC0 = '0x3b584fb360a325f39352e75bd13458807d8e31735ef4da
 const GET_QUESTION_HASH_SELECTOR = '0x24b9f713';
 const ZERO_BYTES32 = `0x${'00'.repeat(32)}`;
 const MAX_QUESTIONS = 100;
+// Room for re-uploads of the same id: the canonical version may sit beyond
+// the first 100 stored rows.
+const MAX_CLOUDFLARE_QUESTION_ROWS = MAX_QUESTIONS * 2;
+const MAX_CLOUDFLARE_LIST_PAGES = 10;
 const MAX_SCAN_BLOCKS = 2_000_000;
 const RPC_CHUNK_SIZE = 100_000;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
+import { resolveSessionAdminAddresses } from './storageRouteExecution.js';
+import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 const trim = (value) => String(value == null ? '' : value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -26,38 +32,54 @@ const readJsonResponse = async (response) => {
 const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   if (typeof storageRoute !== 'function') return [];
   const origin = 'https://session-worker.invalid';
-  const listResponse = await storageRoute({
-    path: '/storage/list',
+  const callStorage = (path, query) => storageRoute({
+    path,
     method: 'GET',
-    request: new Request(`${origin}/storage/list?resource=questions&limit=${MAX_QUESTIONS}`),
+    request: new Request(`${origin}${path}?${query}`),
     env,
     config,
     slug,
     uploaderAddress: '',
     baseHeaders: {},
   });
-  const listing = await readJsonResponse(listResponse);
-  const items = Array.isArray(listing?.items) ? listing.items.slice(0, MAX_QUESTIONS) : [];
-  const questions = [];
-  for (const item of items) {
+  const items = [];
+  let cursor = '';
+  for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES && items.length < MAX_CLOUDFLARE_QUESTION_ROWS; page += 1) {
+    const query = new URLSearchParams({ resource: 'questions', limit: String(MAX_QUESTIONS), ...(cursor ? { cursor } : {}) });
+    const listing = await readJsonResponse(await callStorage('/storage/list', query.toString()));
+    items.push(...(Array.isArray(listing?.items) ? listing.items : []));
+    cursor = trim(listing?.cursor);
+    if (!cursor || listing?.listComplete === true) break;
+  }
+  // Hidden ids arrive as markers without a storage reference.
+  const hiddenIds = new Set(items
+    .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
+    .map((item) => lower(item?.metadata?.resourceId))
+    .filter(Boolean));
+  const candidates = [];
+  for (const item of items.slice(0, MAX_CLOUDFLARE_QUESTION_ROWS)) {
     const id = trim(item?.storageRef?.id || item?.metadata?.id || item?.id);
-    if (!id) continue;
+    if (!id || item?.hidden === true) continue;
     // Deliberately sequential and bounded. Each read reuses the storage route's
     // per-item access checks, so this endpoint cannot widen question visibility.
-    const readResponse = await storageRoute({
-      path: '/storage/read',
-      method: 'GET',
-      request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id)}`),
-      env,
-      config,
-      slug,
-      uploaderAddress: '',
-      baseHeaders: {},
+    const payload = await readJsonResponse(await callStorage('/storage/read', `id=${encodeURIComponent(id)}`));
+    const questionId = lower(payload?.id || payload?.questionId);
+    if (!isObj(payload) || !questionId || hiddenIds.has(questionId)) continue;
+    candidates.push({
+      resourceId: questionId,
+      createdAtMs: Date.parse(trim(item?.metadata?.createdAt)) || 0,
+      storageRefId: id,
+      uploader: trim(item?.metadata?.uploader),
+      payload,
     });
-    const payload = await readJsonResponse(readResponse);
-    if (payload) questions.push(payload);
   }
-  return dedupeQuestions(questions);
+  // Same rule as the client: the first upload of an id wins unless a session
+  // admin uploaded a newer one, so a re-upload cannot rewrite the catalog.
+  const admins = resolveSessionAdminAddresses(config);
+  return dedupeQuestions(
+    selectCanonicalStorageVersions(candidates, { isAdmin: (address) => admins.has(address) })
+      .map((candidate) => candidate.payload),
+  );
 };
 
 const pickContractAddress = (config = {}) => {
