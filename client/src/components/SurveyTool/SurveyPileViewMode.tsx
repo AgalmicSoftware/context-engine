@@ -2565,14 +2565,6 @@ const notifyPileSubmitRailVisibility = (engine: PileViewModeEngine) => {
   }
 };
 
-// A restored draft could not keep this field's unlock, because drafts never store a locked value's plaintext.
-const renderUnlockNotKeptNote = (field: any, label: 'answer' | 'comment') =>
-  field?.unlockLostFor && field.unlockLostFor === field.encryptedPortion ? (
-    <p className={styles.answerTooLongNotice} role="status">
-      {`Your unlock of this ${label} wasn't kept after the page reloaded. Decrypt it and unlock it again.`}
-    </p>
-  ) : null;
-
 const renderPileResponseInput = (
   engine: PileViewModeEngine,
   {
@@ -2591,21 +2583,16 @@ const renderPileResponseInput = (
 ) => {
   const updateAnswer = onAnswerChange || ((value: unknown) => engine.handleAnswerPile(question.id, value));
   if (maskedAnswer) {
-    return (
-      <>
-        {engine.renderQuestionFieldDecryptControl({
-          questionId: question.id,
-          fieldKey: 'answer',
-          allowDecrypt: allowDecryptAnswer,
-          decryptTooltip,
-          actionLabel: 'Decrypt Answer',
-          busy: isAnswerDecrypting,
-          showBusySpinnerWhenAutoDecryptEnabled: true,
-          wrapperStyle: { marginBottom: 8 },
-        })}
-        {renderUnlockNotKeptNote(answer, 'answer')}
-      </>
-    );
+    return engine.renderQuestionFieldDecryptControl({
+      questionId: question.id,
+      fieldKey: 'answer',
+      allowDecrypt: allowDecryptAnswer,
+      decryptTooltip,
+      actionLabel: 'Decrypt Answer',
+      busy: isAnswerDecrypting,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      wrapperStyle: { marginBottom: 8 },
+    });
   }
 
   switch (normalizePileQuestionInputType(question)) {
@@ -2813,20 +2800,15 @@ const renderPileCommentsSection = (
   return renderPileCommentsSectionView({
     showComments,
     maskedAdditional,
-    decryptAdditionalControl: (
-      <>
-        {engine.renderQuestionFieldDecryptControl({
-          questionId,
-          fieldKey: 'additional',
-          allowDecrypt: allowDecryptAdditional,
-          decryptTooltip,
-          actionLabel: 'Decrypt Comments',
-          busy: isAdditionalDecrypting,
-          showBusySpinnerWhenAutoDecryptEnabled: true,
-        })}
-        {renderUnlockNotKeptNote(additional, 'comment')}
-      </>
-    ),
+    decryptAdditionalControl: engine.renderQuestionFieldDecryptControl({
+      questionId,
+      fieldKey: 'additional',
+      allowDecrypt: allowDecryptAdditional,
+      decryptTooltip,
+      actionLabel: 'Decrypt Comments',
+      busy: isAdditionalDecrypting,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+    }),
     additionalEditorRow: engine.renderPileAdditionalEditorRow({
       questionId,
       additional,

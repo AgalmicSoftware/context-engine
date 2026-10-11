@@ -707,4 +707,30 @@ describe('View all editor after a reload', () => {
     expect(screen.getByDisplayValue('Draft comment')).toBeInTheDocument();
     await expectUpload(h, 'Newer saved answer', 'Draft comment');
   });
+
+  it('says when a reload could not keep an unlock', async () => {
+    const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
+    const h = await fixture();
+    h.add(
+      'responses',
+      savedFreeform({
+        value: '*',
+        encrypted: true,
+        encryptedPortion: envelope,
+        encryptionAudience: 'self',
+        audienceMode: 'explicit',
+        hash: '0xsalted',
+      }),
+    );
+    await act(async () => h.sync());
+    await h.mount();
+    await decryptSavedFreeform(h.engine, { answer: 'Old secret', comment: '' });
+    await act(async () => h.engine().toggleAnswerEncryption(0, FREEFORM_QID, false));
+    await settle();
+    h.unmount();
+
+    await h.mountEditor();
+    expect(screen.getByText(/Your unlock of this answer wasn't kept after the page reloaded/)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Old secret')).toBeNull();
+  });
 });

@@ -598,8 +598,23 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
       wrapperStyle,
     });
 
-    return (
+    const control = (
       <QuestionDecryptControl {...displayState} onClick={() => handleDecryptQuestionAnswer(questionId, fieldKey)} />
+    );
+    // A restored draft could not keep this field's unlock: drafts never store a locked value's plaintext.
+    const fields = fieldKey === 'additional' ? 'additionalComments' : 'answers';
+    const unlockLost = (stateRef.current.surveysResponseState || []).some((slice: SurveyQuestionsLegacyValue) => {
+      const field = slice?.[fields]?.[questionId];
+      return !!field?.unlockLostFor && field.unlockLostFor === field.encryptedPortion;
+    });
+    if (!unlockLost) return control;
+    return (
+      <>
+        {control}
+        <p className={styles.answerTooLongNotice} role="status">
+          {`Your unlock of this ${fieldKey === 'additional' ? 'comment' : 'answer'} wasn't kept after the page reloaded. Decrypt it and unlock it again.`}
+        </p>
+      </>
     );
   };
 
