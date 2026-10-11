@@ -275,7 +275,6 @@ describe('surveyToolHydrationController', () => {
         getPendingEditStats: () => ({ total: 0 }),
         getHydrationQuestionIds: () => ['q1'],
         applyDraftHydrationEntryToSlice: jest.fn(),
-        cloneBaseline: <T>(value: T): T => value,
         setState,
         updateJsonPreview,
         skipDraftHydrationRun: () => false,
