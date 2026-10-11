@@ -241,6 +241,32 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
   assert.equal(source.snapshot.responses[0].participantId, 'participant_001');
 });
 
+test('admin snapshots validate and label answers like the worker-canonical source', async () => {
+  const questions = [
+    { id: 'quadratic', prompt: 'Allocate', type: 'quadratic', options: ['A', 'B'], voiceCredits: 25 },
+    { id: 'binary', prompt: 'Agree?', type: 'binary' },
+    { id: 'rating', prompt: 'Rate', type: 'rating', scale: { min: 1, max: 10 } },
+    { id: 'multi', prompt: 'Pick', type: 'multichoice', options: ['Bus', 'Tram'], singleSelect: true },
+  ];
+  const rows = [
+    ['quadratic', [3, -4]], ['binary', 'yes'], ['rating', '7'], ['multi', ['bus']],
+    ['quadratic', [500, 500]], ['binary', 'invented'], ['rating', 99], ['multi', ['Bus', 'Tram']], ['multi', ['Car']],
+  ];
+  const source = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId, questions,
+      responses: rows.map(([questionId, answer], index) => ({ questionId, participantId: `p${index}`, answer })) } } },
+  });
+  assert.equal(source.ok, true);
+  assert.deepEqual(
+    source.snapshot.responses.map((row) => [row.questionId, row.answer]).sort(),
+    [['binary', 'Agree'], ['multi', 'Bus'], ['quadratic', 'A: +3; B: -4'], ['rating', '7']],
+  );
+  assert.equal(source.aiSnapshot.responses.find((row) => row.questionId === 'quadratic').answer, 'A: +3; B: -4');
+  assert.equal(source.counts.excludedCount, 5);
+});
+
 test('worker-canonical source breaks equal-time ties by storage id, not list order', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
@@ -610,7 +636,9 @@ test('AI input response cap samples round-robin across answered questions and pr
     Array.from({ length: 30 }, (_, index) => ({
       questionId: question.questionId,
       participantId: `participant-${String(index + 1).padStart(2, '0')}`,
-      answer: question.type === 'quadratic' ? [2, -1, 0] : question.type === 'rating' ? 7 : `answer ${index + 1} for ${question.questionId}`,
+      answer: question.type === 'quadratic' ? [2, -1, 0]
+        : question.type === 'rating' ? 7
+          : question.type === 'binary' ? 'Agree' : `answer ${index + 1} for ${question.questionId}`,
     })));
   const body = {
       source: {

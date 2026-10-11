@@ -451,7 +451,9 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     const answerValue = withoutFieldMask(hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response));
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
     const knownQuestion = questionMap.get(questionId) || {};
-    const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
+    // Both sources validate against the question: invalid answers are not
+    // evidence, and quadratic allocations reach the AI with option labels.
+    const validatedAnswer = formatValidAnalysisAnswer(answerValue, knownQuestion);
     if (validatedAnswer === null) {
       excludedCount += 1;
       continue;
