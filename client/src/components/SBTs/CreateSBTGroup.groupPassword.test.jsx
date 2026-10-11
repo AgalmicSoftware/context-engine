@@ -207,24 +207,38 @@ describe('CreateSBTGroup group password', () => {
       return instance;
     };
 
-    it('locks the password and Generate new, and shows the deployed password afterwards', async () => {
+    it.each([
+      ['while "Securing password…" shows', 'computeGroupPasswordHash'],
+      ['while the wallet prompt is open', 'createSBT'],
+    ])('locks the password and Generate new %s, and shows the deployed password afterwards', async (_moment, step) => {
       const instance = makeCreatingInstance();
+      const results = {
+        computeGroupPasswordHash: `0x${'66'.repeat(32)}`,
+        createSBT: { logs: [makeFactoryReceiptLog('SBTCreated', [PREDICTED])] },
+      };
       let lockedDuringCreate = null;
-      const hashSpy = jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockImplementation(async () => {
-        render(instance.render());
-        const input = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT);
-        const generate = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE);
-        lockedDuringCreate = input.disabled && generate.disabled;
-        fireEvent.click(generate);
-        instance.handleGenerateGroupPassword();
-        return `0x${'66'.repeat(32)}`;
-      });
+      for (const method of Object.keys(results)) {
+        jest.spyOn(contractScripts, method).mockImplementation(async () => {
+          if (method === step) {
+            render(instance.render());
+            const input = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT);
+            const generate = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE);
+            lockedDuringCreate = input.disabled && generate.disabled;
+            fireEvent.click(generate);
+            instance.handleGenerateGroupPassword();
+          }
+          return results[method];
+        });
+      }
 
-      // Not wrapped in act(): React would defer the render inside the hash step until act() ends.
+      // Not wrapped in act(): React would defer the render inside the create until act() ends.
       await instance.handleMintClick();
 
       expect(lockedDuringCreate).toBe(true);
-      expect(hashSpy).toHaveBeenCalledWith({ password: PASSPHRASE, sbtAddress: PREDICTED });
+      expect(contractScripts.computeGroupPasswordHash).toHaveBeenCalledWith({
+        password: PASSPHRASE,
+        sbtAddress: PREDICTED,
+      });
       expect(instance.state.sbtMinted).toBe(true);
       expect(instance.state.groupPassword).toBe(PASSPHRASE);
     });
