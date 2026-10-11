@@ -6,8 +6,9 @@ export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v202
 // every load reloads at most once per window instead of looping.
 export const STALE_CHUNK_RELOAD_AT_STORAGE_KEY = 'ce:staleChunkReloadAt:v20261011';
 export const STALE_CHUNK_RELOAD_WINDOW_MS = 60_000;
-// Failures that already caused an automatic reload in this tab. One that comes back,
-// for example a chunk a content blocker always blocks, shows the error panel instead.
+// Failures that already caused an automatic reload in this tab, for the build that was
+// running. One that comes back in that build, for example a chunk a content blocker
+// always blocks, shows the error panel instead; a new deploy starts a new list.
 const STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY = 'ce:staleChunkReloadedFailures:v20261011';
 const MAX_REMEMBERED_RELOAD_FAILURES = 20;
 
@@ -36,6 +37,7 @@ type BootHistory = {
 
 type BootWindow = {
   caches?: BootCacheApi;
+  document?: Pick<Document, 'querySelector'>;
   history?: BootHistory;
   localStorage?: BootStorage;
   location?: BootLocation;
@@ -182,10 +184,27 @@ export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window)
 const describeReloadFailure = (error: unknown): string =>
   (readErrorField(error, 'message') || String(error || '')).trim().slice(0, 500);
 
-const readReloadedFailures = (storage: BootStorage | undefined): string[] => {
+// The entry script's hashed URL changes when any chunk or stylesheet changes, so it
+// names the running build. WebKit's import error names no chunk, so the build is what
+// tells two deploys apart.
+const readRunningBuild = (win: BootWindow | undefined): string => {
   try {
-    const failures: unknown = JSON.parse(storage?.getItem?.(STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY) || '[]');
-    return Array.isArray(failures) ? failures.filter((failure): failure is string => typeof failure === 'string') : [];
+    return win?.document?.querySelector('script[type="module"][src]')?.getAttribute('src') || '';
+  } catch {
+    return '';
+  }
+};
+
+type ReloadedFailures = { build?: unknown; failures?: unknown };
+
+const readReloadedFailures = (storage: BootStorage | undefined, build: string): string[] => {
+  try {
+    const stored = JSON.parse(
+      storage?.getItem?.(STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY) || 'null',
+    ) as ReloadedFailures | null;
+    // A list from another build never blocks this one; the next write replaces it.
+    if (stored?.build !== build || !Array.isArray(stored.failures)) return [];
+    return stored.failures.filter((failure): failure is string => typeof failure === 'string');
   } catch {
     return [];
   }
@@ -218,9 +237,11 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   const now = Date.now();
 
   // Regression guard: at most one automatic reload per window, and never twice in a tab
-  // for the same failure; otherwise the error boundary stays up and reloads on request.
+  // for the same failure in the same build; otherwise the error boundary stays up and
+  // reloads on request.
+  const build = readRunningBuild(win);
   const failure = describeReloadFailure(error);
-  const reloadedFailures = readReloadedFailures(storage);
+  const reloadedFailures = readReloadedFailures(storage, build);
   if (
     hasReloadParam(win, reloadParam) ||
     wasRecentlyAutoReloaded(storage, storageKey, now) ||
@@ -234,7 +255,7 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
     storage?.setItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY, String(now));
     storage?.setItem?.(
       STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY,
-      JSON.stringify([...reloadedFailures, failure].slice(-MAX_REMEMBERED_RELOAD_FAILURES)),
+      JSON.stringify({ build, failures: [...reloadedFailures, failure].slice(-MAX_REMEMBERED_RELOAD_FAILURES) }),
     );
   } catch {
     // Best-effort loop guard; reloadWithCacheBuster also marks the URL.

@@ -330,6 +330,80 @@ describe('bootRecovery', () => {
     }
   });
 
+  describe('when a deploy changes the running build', () => {
+    // One tab whose session storage survives reloads; each reload lands on the live build.
+    const createTab = (entry) => {
+      const storage = createMemoryStorage();
+      const reload = jest.fn();
+      const fakeWindow = {
+        document,
+        history: {
+          replaceState: jest.fn((state, title, url) => {
+            fakeWindow.location.href = new URL(url, fakeWindow.location.href).href;
+          }),
+        },
+        location: { href: 'https://app.example.test/session/alpha' },
+        sessionStorage: storage,
+      };
+      const runBuild = (src) => {
+        document.head.innerHTML = `<script type="module" crossorigin src="${src}"></script>`;
+      };
+      runBuild(entry);
+      return {
+        reload,
+        fail: (message) => recoverFromStaleChunkLoadError(new TypeError(message), { window: fakeWindow, reload }),
+        reloadInto: (src) => {
+          runBuild(src);
+          fakeWindow.location.href = 'https://app.example.test/session/alpha?ceChunkReload=123';
+          clearStaleChunkReloadMarker(fakeWindow);
+        },
+      };
+    };
+    const HOUR_MS = 60 * 60 * 1000;
+    let now;
+
+    beforeEach(() => {
+      now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    });
+
+    afterEach(() => {
+      now.mockRestore();
+      document.head.innerHTML = '';
+    });
+
+    it('reloads once per deploy for a WebKit failure that names no chunk', () => {
+      const webkitFailure = 'Importing a module script failed.';
+      const tab = createTab('/assets/index-aaaa1111.js');
+
+      expect(tab.fail(webkitFailure)).toBe(true);
+      tab.reloadInto('/assets/index-bbbb2222.js');
+      // A day later another deploy lands while the tab stays open.
+      now.mockReturnValue(1_000_000 + 26 * HOUR_MS);
+      expect(tab.fail(webkitFailure)).toBe(true);
+      // No new deploy this time, so the same failure in the same build shows the panel.
+      tab.reloadInto('/assets/index-bbbb2222.js');
+      now.mockReturnValue(1_000_000 + 27 * HOUR_MS);
+      expect(tab.fail(webkitFailure)).toBe(false);
+      expect(tab.reload).toHaveBeenCalledTimes(2);
+    });
+
+    it('reloads again for a chunk that failed before a rollback and a fix-forward', () => {
+      const chunkFailure = (chunk) =>
+        `Failed to fetch dynamically imported module: https://app.example.test/assets/${chunk}.js`;
+      const tab = createTab('/assets/index-aaaa1111.js');
+
+      expect(tab.fail(chunkFailure('Route-aaaa1111'))).toBe(true);
+      tab.reloadInto('/assets/index-bbbb2222.js');
+      now.mockReturnValue(1_000_000 + HOUR_MS);
+      expect(tab.fail(chunkFailure('Other-bbbb2222'))).toBe(true);
+      // The rollback serves the first build again; a fix-forward then replaces its route chunk.
+      tab.reloadInto('/assets/index-aaaa1111.js');
+      now.mockReturnValue(1_000_000 + 2 * HOUR_MS);
+      expect(tab.fail(chunkFailure('Route-aaaa1111'))).toBe(true);
+      expect(tab.reload).toHaveBeenCalledTimes(3);
+    });
+  });
+
   it('keeps the URL marker as the loop guard when session storage is unavailable', () => {
     const replaceState = jest.fn();
     const fakeWindow = {
