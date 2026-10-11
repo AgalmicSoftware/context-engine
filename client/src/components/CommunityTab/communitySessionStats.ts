@@ -157,14 +157,17 @@ export const buildCommunitySessionCatalog = ({
   const verifiedRecordFor = (slugIn: unknown, config: SessionRecord) => {
     if (classifyCommunitySession(config) !== 'centralized') return null;
     const slug = parseSessionSlug(typeof config.slug === 'string' ? config.slug : slugIn);
+    if (!slug.ok) return null;
     const hintOrigin = workerOrigin(config.corsWorkerUrl);
     return (
-      records.find(
-        (record) =>
-          slug.ok &&
-          parseSessionSlug(record.slug).slug === slug.slug &&
-          (!hintOrigin || workerOrigin(record.workerOrigin) === hintOrigin),
-      ) || null
+      records.find((record) => {
+        const recordSlug = parseSessionSlug(record.slug);
+        return (
+          recordSlug.ok &&
+          recordSlug.slug === slug.slug &&
+          (!hintOrigin || workerOrigin(record.workerOrigin) === hintOrigin)
+        );
+      }) || null
     );
   };
 
