@@ -4,7 +4,7 @@
 
 ## Deployment Profiles
 
-![Context Engine deployment modes](client/src/assets/img/readme-architecture-deployment-modes.png)
+![Context Engine deployment modes](docs/assets/readme-architecture-deployment-modes.jpg)
 
 App hosting, public/private session access, and session infrastructure are
 separate choices. A publicly hosted web app can open either a private
