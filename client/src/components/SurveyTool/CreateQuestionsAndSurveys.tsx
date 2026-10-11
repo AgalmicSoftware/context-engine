@@ -74,6 +74,7 @@ import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionD
 import { chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
+import { loadWorkerCanonicalQuestionMatcher } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
 import {
   workerCanonicalCacheIdentityMatches,
   withWorkerCanonicalCacheIdentity,
@@ -2459,13 +2460,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         const questionIdsForContract = uniqueQuestions.map((q) => q.id);
         let submittedQuestions: unknown[] = [];
         if (isWorkerCanonicalAuthoring) {
-          const workerResult = await workerCanonicalAuthoringPort.publishQuestions({
-            account: this.props.account,
-            providerLike: this.props.provider,
-            questions: questionDataArray,
-            sessionConfig,
-            sessionSlug,
-          });
+          const workerResult = await workerCanonicalAuthoringPort.publishQuestions(
+            {
+              account: this.props.account,
+              providerLike: this.props.provider,
+              questions: questionDataArray,
+              sessionConfig,
+              sessionSlug,
+            },
+            { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
+          );
           submittedQuestions = workerResult.uploadedQuestions;
         } else {
           const surveyIdsForContract = uniqueQuestions.map((q) => q.associatedSurveyId || ethers.constants.HashZero);
@@ -2749,14 +2753,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         this.setState(buildCreateSurveySubmitProgressPatch({ progress: 60, submitStep: 2 }));
         let addSurveyResult: UnknownRecord;
         if (isWorkerCanonicalAuthoring) {
-          addSurveyResult = await workerCanonicalAuthoringPort.publishSurvey({
-            account: this.props.account,
-            providerLike: this.props.provider,
-            questions: questionDataArray,
-            sessionConfig,
-            sessionSlug,
-            survey: completeSurveyData,
-          });
+          addSurveyResult = await workerCanonicalAuthoringPort.publishSurvey(
+            {
+              account: this.props.account,
+              providerLike: this.props.provider,
+              questions: questionDataArray,
+              sessionConfig,
+              sessionSlug,
+              survey: completeSurveyData,
+            },
+            { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
+          );
         } else {
           addSurveyResult = await contractScriptsForSubmit.addSurveyWithQuestions(
             this.props.provider,

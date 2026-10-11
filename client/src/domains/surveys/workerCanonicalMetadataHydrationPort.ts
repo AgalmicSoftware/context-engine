@@ -550,6 +550,41 @@ export const loadWorkerCanonicalSurveys = (
   deps: WorkerCanonicalMetadataHydrationDeps = {},
 ): Promise<WorkerCanonicalMetadataEntry[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.SURVEYS, input, deps);
 
+// Loads the session's questions once and returns a check for whether readers
+// already see a given question under its id: the version that wins there has
+// the same content, so both it and the question hash to that id. Locked or
+// unknown questions never match.
+export const loadWorkerCanonicalQuestionMatcher = async (
+  input: WorkerCanonicalMetadataHydrationInput = {},
+  deps: WorkerCanonicalMetadataHydrationDeps = {},
+): Promise<(question: UnknownRecord) => boolean> => {
+  const target = resolveWorkerCanonicalStorageTarget({
+    sessionConfig: input.sessionConfig,
+    sessionSlug: input.sessionSlug,
+  });
+  const rows = await loadWorkerCanonicalQuestions(input, deps);
+  const cache = peekCacheSync<UnknownRecord>(
+    METADATA_CACHE_NAMESPACES[STORAGE_RESOURCE_KEYS.QUESTIONS],
+    readString(input.sessionSlug),
+    { clone: false },
+  );
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig: target.sessionConfig,
+    sessionSlug: target.sessionSlug,
+  });
+  const node = mergeWorkerCanonicalQuestionMetadata(cache, rows, identity)[WORKER_CANONICAL_CACHE_SCOPE_KEY];
+  const questions = isRecord(node) && isRecord(node.questions) ? node.questions : {};
+  return (question) => {
+    const id = readPayloadResourceId(question, STORAGE_RESOURCE_KEYS.QUESTIONS);
+    const stored = id ? questions[id] : null;
+    return (
+      isRecord(stored) &&
+      questionPayloadMatchesId(id, question) === true &&
+      questionPayloadMatchesId(id, stored) === true
+    );
+  };
+};
+
 export const workerCanonicalMetadataHydrationPort: WorkerCanonicalMetadataHydrationPort = {
   loadQuestions: loadWorkerCanonicalQuestions,
   loadSurveys: loadWorkerCanonicalSurveys,

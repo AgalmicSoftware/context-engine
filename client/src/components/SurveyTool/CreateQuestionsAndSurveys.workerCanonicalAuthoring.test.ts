@@ -9,6 +9,7 @@ import {
   writeCacheOptimisticMock,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
 import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
+import { loadWorkerCanonicalQuestionMatcher } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
 import { sha256Utf8 } from '../../utilities/crypto/sha256';
 import { buildCreateSurveyHashValue } from './createQuestionsAndSurveysSignatureHelpers';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -501,22 +502,26 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
 
     await instance.createSurvey();
 
-    expect(publishQuestions).toHaveBeenCalledWith({
-      account: '0x1111111111111111111111111111111111111111',
-      providerLike: 'passkey_eoa',
-      questions: [
-        expect.objectContaining({
-          id: '0xquestion',
-          prompt: 'Worker-native prompt',
-          sessionSlug: 'worker-session',
+    expect(publishQuestions).toHaveBeenCalledWith(
+      {
+        account: '0x1111111111111111111111111111111111111111',
+        providerLike: 'passkey_eoa',
+        questions: [
+          expect.objectContaining({
+            id: '0xquestion',
+            prompt: 'Worker-native prompt',
+            sessionSlug: 'worker-session',
+          }),
+        ],
+        sessionConfig: expect.objectContaining({
+          sessionId: SESSION_ID,
+          slug: 'worker-session',
         }),
-      ],
-      sessionConfig: expect.objectContaining({
-        sessionId: SESSION_ID,
-        slug: 'worker-session',
-      }),
-      sessionSlug: 'worker-session',
-    });
+        sessionSlug: 'worker-session',
+      },
+      // Another author's question under the same id counts only if its stored content matches.
+      { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
+    );
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.getWalletChainId).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).not.toHaveBeenCalled();
@@ -611,6 +616,7 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
           title: 'Worker survey',
         }),
       }),
+      { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
     );
     expect(instance.state.lastSubmittedSurveyId).toBe(authorScopedSurveyId);
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
@@ -687,6 +693,7 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
         }),
         sessionSlug: 'worker-session',
       }),
+      { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
     );
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).toHaveBeenCalledWith(

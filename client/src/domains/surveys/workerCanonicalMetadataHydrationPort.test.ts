@@ -1,4 +1,5 @@
 import {
+  loadWorkerCanonicalQuestionMatcher,
   loadWorkerCanonicalQuestions,
   loadWorkerCanonicalSurveys,
   mergeWorkerCanonicalQuestionMetadata,
@@ -742,6 +743,65 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         ['cf_former_admin', false],
         ['cf_config_admin', true],
       ]);
+    });
+
+    describe('published question matcher', () => {
+      const loadMatcher = (items: Array<Record<string, unknown>>, payloads: Record<string, Record<string, unknown>>) =>
+        loadWorkerCanonicalQuestionMatcher(
+          { sessionConfig, sessionSlug: 'worker-session' },
+          {
+            listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+            readSessionStorageBlob: jest.fn(
+              async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
+            ),
+          },
+        );
+
+      it('matches only when the question readers see has the same content', async () => {
+        const matches = await loadMatcher([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_official: question(),
+        });
+        expect(matches(question({ tags: ['local tag'] }))).toBe(true);
+        // A local edit that kept the old id, a locked copy, and an unknown id never match.
+        expect(matches(question({ prompt: 'Edited prompt' }))).toBe(false);
+        expect(matches(question({ prompt: '[encrypted]', promptEncrypted: { ciphertext: 'x' } }))).toBe(false);
+        const otherId = String(generateQuestionId('binary', 'Another question', [], false, 99)).toLowerCase();
+        expect(matches(question({ id: otherId, prompt: 'Another question' }))).toBe(false);
+      });
+
+      it('does not match an id another author filled with different content', async () => {
+        const squatted = await loadMatcher([listedItem('cf_squat', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_squat: question({ prompt: 'Spoofed text under a predicted id' }),
+        });
+        expect(squatted(question())).toBe(false);
+
+        const locked = await loadMatcher([listedItem('cf_locked', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_locked: question({ prompt: '[encrypted]', promptEncrypted: { ciphertext: 'x' } }),
+        });
+        expect(locked(question())).toBe(false);
+
+        const hidden = await loadMatcher(
+          [
+            { hidden: true, metadata: { resource: 'questions', resourceId: QUESTION_ID, hidden: true } },
+            listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+          ],
+          { cf_official: question() },
+        );
+        expect(hidden(question())).toBe(false);
+      });
+
+      it('uses the cached copy of a version it does not read again', async () => {
+        const cached = mergeWorkerCanonicalQuestionMetadata(
+          null,
+          (await loadFrom([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], { cf_official: question() }))
+            .rows,
+          identity,
+        );
+        (peekCacheSync as jest.Mock).mockReturnValue(cached);
+
+        const matches = await loadMatcher([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], {});
+        expect(matches(question())).toBe(true);
+      });
     });
   });
 

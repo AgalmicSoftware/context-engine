@@ -34,7 +34,14 @@ type WorkerCanonicalSurveyAuthoringInput = WorkerCanonicalAuthoringInput & {
 
 type UploadData = typeof uploadDataToSessionStorage;
 
+// Returns a check for whether readers already see a question under its id
+// with the same content (the metadata hydration port provides it).
+type LoadPublishedQuestionMatcher = (
+  input: WorkerCanonicalAuthoringInput,
+) => Promise<(question: UnknownRecord) => boolean>;
+
 type WorkerCanonicalAuthoringDeps = {
+  loadPublishedQuestionMatcher?: LoadPublishedQuestionMatcher;
   uploadData?: UploadData;
 };
 
@@ -171,6 +178,20 @@ const uploadQuestions = async ({
   if (!rows.length) throw new Error('worker_authoring_questions_missing');
   const uploadData = deps.uploadData || uploadDataToSessionStorage;
   const uploadedQuestions: UploadedWorkerQuestion[] = [];
+  // Read the session's questions at most once, on the first id another author owns.
+  let publishedQuestionMatcher: Promise<((question: UnknownRecord) => boolean) | null> | null = null;
+  const isAlreadyPublished = async (payload: UnknownRecord): Promise<boolean> => {
+    const loadMatcher = deps.loadPublishedQuestionMatcher;
+    if (!loadMatcher) return false;
+    publishedQuestionMatcher ??= loadMatcher({
+      account,
+      providerLike,
+      sessionConfig: target.sessionConfig,
+      sessionSlug: target.sessionSlug,
+    }).catch(() => null);
+    const matches = await publishedQuestionMatcher;
+    return !!matches && matches(payload);
+  };
   for (const value of rows) {
     const question = requireRecord(value, 'worker_authoring_question_invalid');
     const questionId = String(question.id || question.questionId || '').trim();
@@ -202,9 +223,10 @@ const uploadQuestions = async ({
       });
     } catch (error) {
       const reason = readUploadRejectionReason(error);
-      // Question ids hash their content, so another author's question with this
-      // id is this same question: it is already published, not a failure.
-      if (reason === STORAGE_ID_OWNED) {
+      // Another author owns this id. It counts as already published only when
+      // the stored question readers see has this same content; otherwise the
+      // Worker's refusal stands.
+      if (reason === STORAGE_ID_OWNED && (await isAlreadyPublished(payload))) {
         uploadedQuestions.push({ questionId, resource: STORAGE_RESOURCE_KEYS.QUESTIONS, alreadyPublished: true });
         continue;
       }
