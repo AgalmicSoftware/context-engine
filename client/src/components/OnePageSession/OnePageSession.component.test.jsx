@@ -16,6 +16,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import * as demoSessionFixtureLoader from '../SurveyTool/demoSessionFixtureLoader';
+import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary';
+import * as bootRecovery from '../../bootRecovery.js';
 import { captureSessionRecruitmentSource, readSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
 import { writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -917,6 +919,32 @@ describe('OnePageSession view gating', () => {
     } finally {
       loadSpy.mockRestore();
     }
+  });
+
+  it('shows the new-version panel when the demo fixtures fail to load', async () => {
+    // A tab left open across a release asks for a chunk the new deploy no longer has.
+    const staleChunk = new TypeError(
+      'Failed to fetch dynamically imported module: https://app.example/assets/demoSessionFixtures-old.js',
+    );
+    jest.spyOn(demoSessionFixtureLoader, 'getLoadedDemoSessionFixtures').mockReturnValue(null);
+    jest.spyOn(demoSessionFixtureLoader, 'loadDemoSessionFixtures').mockRejectedValue(staleChunk);
+    const recover = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <RouteErrorBoundary>
+        <OnePageSession
+          {...buildProps()}
+          slug="demo-2"
+          questionSessionSlug="demo-2"
+          sessionConfig={{ ...buildProps().sessionConfig, slug: 'demo-2' }}
+        />
+      </RouteErrorBoundary>,
+    );
+
+    expect(await screen.findByText('A new version of Context Engine is available')).toBeInTheDocument();
+    // The boundary's one-reload rule sees the failed chunk.
+    expect(recover).toHaveBeenCalledWith(staleChunk);
   });
 
   it('builds built-in demo live report responses only from the demo source bucket', async () => {

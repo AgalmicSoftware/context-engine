@@ -22,6 +22,7 @@ import {
   getLoadedDemoSessionFixtures,
   loadDemoSessionFixtures,
   resolveLoadedPolisDemoQuestionPool,
+  showDemoFixtureLoadError,
   shouldUseBuiltInPolisDemoQuestionPool,
 } from '../SurveyTool/demoSessionFixtureLoader';
 import { usesDemoSessionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
@@ -453,7 +454,11 @@ class OnePageSession extends Component<any, any> {
       () => {
         if (!this._demoFixturesDisposed) this.setState({ demoFixturesLoaded: true });
       },
-      (error: unknown) => demoLog.warn('OnePageSession: demo fixtures failed to load', error),
+      (error: unknown) => {
+        demoLog.warn('OnePageSession: demo fixtures failed to load', error);
+        // Without the fixtures the demo has no questions or results, so never wait silently.
+        if (!this._demoFixturesDisposed) showDemoFixtureLoadError((update) => this.setState(update), error);
+      },
     );
   }
 

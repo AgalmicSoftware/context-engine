@@ -169,6 +169,39 @@ describe('surveyQuestionsDataRuntime', () => {
     });
   });
 
+  it('hands a failed demo fixture load to the error boundary instead of rejecting', async () => {
+    // A tab left open across a release asks for a chunk the new deploy no longer has.
+    const staleChunk = new TypeError(
+      'Failed to fetch dynamically imported module: https://app.example/assets/demoSessionFixtures-old.js',
+    );
+    const setState = jest.fn();
+    const context = createContext({
+      inst: { _isMounted: true, _questionPoolHydrationRunId: 0 },
+      loadTemporaryDemoSessionQuestionFixtures: jest.fn(async () => {
+        throw staleChunk;
+      }),
+      normalizeSessionSlugValue: jest.fn((value) =>
+        String(value || '')
+          .trim()
+          .toLowerCase(),
+      ),
+      propsRef: { current: { provider: { id: 'provider' }, sessionConfig: {}, surveyId: '0xSURVEY' } },
+      readSurveysCache: jest.fn(() => ({})),
+      resolveQuestionReadCacheContext: jest.fn(() => ({ networkIdStr: '11155420', sessionSlug: 'demo-2' })),
+      resolveSlugForIds: jest.fn(() => 'demo-2'),
+      setState,
+    });
+    const runtime = createSurveyQuestionsDataRuntime(context);
+
+    await expect(runtime.fetchQuestionPool()).resolves.toBeUndefined();
+
+    // The update throws while rendering, which is when error boundaries catch.
+    expect(setState).toHaveBeenCalledTimes(1);
+    const [update] = setState.mock.calls[0];
+    expect(typeof update).toBe('function');
+    expect(() => update({})).toThrow(staleChunk);
+  });
+
   it('parses JSON answer values without throwing on plain text', () => {
     const runtime = createSurveyQuestionsDataRuntime(createContext());
 

@@ -28,6 +28,18 @@ export const loadDemoSessionFixtures = (): Promise<DemoSessionFixtures> => {
   return pendingFixtures;
 };
 
+/**
+ * Hands a failed fixture load to the route's error boundary, which shows a
+ * stale chunk as a new version (with its one automatic reload) and any other
+ * failure with Try again. Boundaries only catch errors thrown while rendering,
+ * and a state updater runs during render.
+ */
+export const showDemoFixtureLoadError = (setState: (update: () => never) => unknown, error: unknown): void => {
+  setState(() => {
+    throw error;
+  });
+};
+
 const readString = (value: unknown = ''): string => String(value || '').trim();
 
 const normalizePathname = (value: unknown = ''): string =>

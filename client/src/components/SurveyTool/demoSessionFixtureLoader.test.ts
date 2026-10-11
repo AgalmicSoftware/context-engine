@@ -1,10 +1,18 @@
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+
 import {
   getLoadedDemoSessionFixtures,
   loadDemoSessionFixtures,
   loadTemporaryDemoSessionQuestionFixtures,
   resolveLoadedPolisDemoQuestionPool,
   shouldUseBuiltInPolisDemoQuestionPool,
+  showDemoFixtureLoadError,
 } from './demoSessionFixtureLoader';
+import { surveyQuestionsReducer } from './surveyQuestionsState';
+import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary';
+import * as bootRecovery from '../../bootRecovery.js';
+import type { SurveyQuestionsState } from './surveyQuestionsTypes';
 
 describe('demoSessionFixtureLoader before the fixtures load', () => {
   it('serves no demo questions until the fixture chunk has loaded', () => {
@@ -20,6 +28,28 @@ describe('demoSessionFixtureLoader before the fixtures load', () => {
     await expect(loadTemporaryDemoSessionQuestionFixtures('edge')).resolves.toEqual([]);
     await expect(loadTemporaryDemoSessionQuestionFixtures('democracy-2026')).resolves.toEqual([]);
     expect(getLoadedDemoSessionFixtures()).toBeNull();
+  });
+});
+
+describe('showDemoFixtureLoadError', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('reaches the route boundary from a reducer-state component like SurveyQuestions', async () => {
+    const staleChunk = new TypeError(
+      'Failed to fetch dynamically imported module: https://app.example/assets/demoSessionFixtures-old.js',
+    );
+    const recover = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const Probe = () => {
+      const [, dispatch] = React.useReducer(surveyQuestionsReducer, {} as SurveyQuestionsState);
+      React.useEffect(() => showDemoFixtureLoadError(dispatch, staleChunk), []);
+      return React.createElement('p', null, 'Loading questions');
+    };
+
+    render(React.createElement(RouteErrorBoundary, null, React.createElement(Probe)));
+
+    expect(await screen.findByText('A new version of Context Engine is available')).toBeInTheDocument();
+    expect(recover).toHaveBeenCalledWith(staleChunk);
   });
 });
 
