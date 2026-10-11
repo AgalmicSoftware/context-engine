@@ -916,7 +916,8 @@ class SBTPage extends Component<any, any> {
 
     const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', currentSbtAddressString, slug);
     if (!isUrlAutoMintTargetCurrent()) return false;
-    if (onchainGph && onchainGph !== ethers.constants.HashZero) {
+    // A failed read (null) may still be a password group: that path reads the hash again and says if it can't.
+    if (onchainGph !== ethers.constants.HashZero) {
       const minted = await this.mintUnlimitedWithGroupPassword({
         accountLowerOverride: targetAccountLower,
         chainIdOverride: targetChainId,
@@ -2929,7 +2930,7 @@ class SBTPage extends Component<any, any> {
       ) {
         return false;
       }
-      if (!onchain || onchain === ethers.constants.HashZero) {
+      if (onchain === ethers.constants.HashZero) {
         this.setState(
           buildSbtPageErrorPatch({
             error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.`,
@@ -2938,7 +2939,8 @@ class SBTPage extends Component<any, any> {
         return false;
       }
 
-      // The slow password check and the signature share one derivation.
+      // The slow password check and the signature share one derivation. A failed read (null) stops
+      // signing with "Could not read this group's password check…", and the join can be tried again.
       sbtLog.log('[MANUAL-MINT] Checking password and signing authorization...');
       this.setState({ groupPasswordChecking: true });
       let sig = '';
@@ -2948,7 +2950,7 @@ class SBTPage extends Component<any, any> {
           sbtAddress: sbt,
           userAddress: String(mintAccount || ''),
           chainId: mintChainId,
-          groupPasswordHash: onchain,
+          groupPasswordHash: onchain ?? '',
         });
       } catch (error) {
         // A wrong password, or a check that cannot run here (no WebCrypto), gets its own message.

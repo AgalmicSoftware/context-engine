@@ -25,6 +25,9 @@ const UNPAIRED_HIGH_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/;
 
 export const GROUP_PASSWORD_INVALID_CHARACTER_MESSAGE =
   'The group password contains an invalid character. Retype it and try again.';
+// Hash reads return null when they fail, which is not the same as a group without a password (a zero hash).
+export const GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE =
+  "Could not read this group's password check from the chain. Check the network and try again.";
 
 const { deriveGroupPasswordWallet } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
@@ -96,10 +99,7 @@ const deriveGroupSigner = async ({ password, sbtAddress, groupPasswordHash }: Sb
     .trim()
     .toLowerCase();
   if (!BYTES32_HEX.test(expectedHash)) {
-    throw groupPasswordError(
-      "Could not read this group's password check from the chain. Check the network and try again.",
-      GROUP_PASSWORD_UNVERIFIABLE,
-    );
+    throw groupPasswordError(GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE, GROUP_PASSWORD_UNVERIFIABLE);
   }
   // A zero hash means the group has no group password: no password can match, so skip the slow KDF.
   if (expectedHash === ethers.constants.HashZero) {

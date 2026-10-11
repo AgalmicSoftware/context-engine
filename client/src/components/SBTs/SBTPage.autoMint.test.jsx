@@ -1059,6 +1059,41 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
+  it('reports an unreadable URL group hash as a read failure instead of asking for an invite code', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000105';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=shared-secret`,
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: false },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const send = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+
+      await expect(subject.handleUrlAutoMintIntent()).resolves.toBe(false);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(subject.state.error).toBe(
+        "Could not read this group's password check from the chain. Check the network and try again.",
+      );
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
   it('routes unlimited group-password auto-mint URLs to the signature-mint helper', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000104';
     const previousHref = window.location.href;

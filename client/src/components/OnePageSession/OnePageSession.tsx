@@ -2,6 +2,7 @@
 import React, { Component } from 'react';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
+import { GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE } from '../../utilities/crypto/sbtAuthorization';
 import { ethers } from 'ethers';
 
 import {
@@ -1723,7 +1724,9 @@ class OnePageSession extends Component<any, any> {
           path = 'invite';
         } else {
           const gph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
-          const hasGroupPassword = !!gph && gph !== ethers.constants.HashZero;
+          // null means the read failed: the group may still have a password, so never treat it as open.
+          const gphUnreadable = gph == null;
+          const hasGroupPassword = !gphUnreadable && gph !== ethers.constants.HashZero;
 
           let isPublic = false;
           if (sbtInfo && typeof sbtInfo.hasPasswordMint === 'boolean') {
@@ -1732,7 +1735,7 @@ class OnePageSession extends Component<any, any> {
             // Fallback: Use password presence as heuristic if metadata flag missing
             if (!t.gp) isPublic = true;
           }
-          if (hasGroupPassword) isPublic = false;
+          if (hasGroupPassword || (gphUnreadable && t.gp)) isPublic = false;
 
           if (isPublic) {
             path = 'public';
@@ -1769,6 +1772,8 @@ class OnePageSession extends Component<any, any> {
             } else if (hasGroupPassword) {
               // The tx phase checks the password with the same slow derivation that signs.
               path = 'unlimited';
+            } else if (gphUnreadable) {
+              throw new Error(GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE);
             } else {
               throw new Error('Invite code required for this group');
             }
@@ -1915,16 +1920,16 @@ class OnePageSession extends Component<any, any> {
       sbtAddress,
       resolveEffectiveSlug(this.props),
     );
-    if (!onchain || onchain === ethers.constants.HashZero) throw new Error('No group password set on-chain');
 
     // One slow derivation checks the password against the on-chain hash and signs the claim;
-    // a wrong password throws a group-password mismatch error before anything is sent.
+    // a wrong password throws a group-password mismatch error before anything is sent. A failed
+    // read (null) and a group without a password (zero hash) stop signing with their own messages.
     const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
       userAddress: normalizedExpectedAccount,
       chainId: mintChainId,
-      groupPasswordHash: onchain,
+      groupPasswordHash: onchain ?? '',
     });
     onPasswordAccepted();
     assertExpectedAccountCurrent();

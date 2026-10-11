@@ -1,6 +1,7 @@
 import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { useFastGroupPasswordKdf } from '../../utilities/crypto/groupPasswordKdf.testUtils';
 import { SBT_GROUP_PASSWORD_MISMATCH_MESSAGE } from './sbtClaimUrlSafety';
 
@@ -111,6 +112,38 @@ describe('SBTPage group-password mint', () => {
     expect(mint).not.toHaveBeenCalled();
     expect(subject.state.mintingStatus).toBe('failure');
     expect(subject.state.error).toMatch(/Group passwords need WebCrypto/);
+  });
+
+  it('reports an unreadable password check as a read failure that can be retried', async () => {
+    const { importKey } = useFastGroupPasswordKdf();
+    const password = 'orbit-maple-signal-tunnel-quartz';
+    const subject = createSubject();
+    const read = jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValueOnce(null);
+    const mint = jest.spyOn(contractScripts, 'mintWithGroupSignature').mockResolvedValue({ transactionHash: '0xmint' });
+
+    await expect(subject.mintUnlimitedWithGroupPassword({ passwordOverride: password })).resolves.toBe(false);
+
+    expect(subject.state).toMatchObject({
+      error: "Could not read this group's password check from the chain. Check the network and try again.",
+      mintingStatus: 'failure',
+    });
+    expect(importKey).not.toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
+
+    read.mockResolvedValueOnce(await cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: SBT_ADDRESS }));
+    await expect(subject.mintUnlimitedWithGroupPassword({ passwordOverride: password })).resolves.toBe(true);
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it('still says a group with a zero hash does not support group-password joins', async () => {
+    const subject = createSubject();
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(`0x${'00'.repeat(32)}`);
+    const sign = jest.spyOn(contractScripts, 'signGroupMintAuthorization');
+
+    await expect(subject.mintUnlimitedWithGroupPassword({ passwordOverride: 'any-password' })).resolves.toBe(false);
+
+    expect(sign).not.toHaveBeenCalled();
+    expect(subject.state.error).toMatch(/does not support group-password signature/);
   });
 
   it('keeps other signing failures on the generic claim message', async () => {

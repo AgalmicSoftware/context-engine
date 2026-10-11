@@ -973,6 +973,65 @@ describe('OnePageSession auto-mint queue', () => {
     });
   });
 
+  describe('when the group password hash cannot be used', () => {
+    const UNREADABLE = "Could not read this group's password check from the chain. Check the network and try again.";
+
+    const queueGroupPasswordJoin = (sbtAddress, account) => {
+      const subject = createSubject({ account, loginComplete: true, slug: 'edge' });
+      subject.state = { ...subject.state, autoMintTargets: [{ sbt: sbtAddress, gp: 'shared-secret' }] };
+      subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+      jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+      jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+      jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+        name: 'Password Badge',
+        tokenURI: 'ar://password-badge',
+        hasPasswordMint: false,
+        maxTokens: '0',
+      });
+      return subject;
+    };
+
+    it('skips with a read-failure message, not a public claim, when the hash cannot be read', async () => {
+      const sbtAddress = '0x00000000000000000000000000000000000000e9';
+      const subject = queueGroupPasswordJoin(sbtAddress, '0x00000000000000000000000000000000000000ea');
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const claimSpy = jest.spyOn(contractScripts, 'claim');
+      const sendSpy = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+
+      await subject.runAutoMintQueue();
+
+      expect(claimSpy).not.toHaveBeenCalled();
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toEqual({
+        status: 'info',
+        name: 'Skipped (read error)',
+        error: UNREADABLE,
+      });
+    });
+
+    it.each([
+      ['cannot be read', null, UNREADABLE],
+      ['is zero', `0x${'00'.repeat(32)}`, "This group has no group password, so it can't be joined with one."],
+    ])('fails the join clearly when the hash %s at join time', async (_case, hashAtJoin, message) => {
+      const sbtAddress = '0x00000000000000000000000000000000000000eb';
+      const subject = queueGroupPasswordJoin(sbtAddress, '0x00000000000000000000000000000000000000ec');
+      jest
+        .spyOn(contractScripts, 'getGroupPasswordHash')
+        .mockResolvedValue(hashAtJoin)
+        .mockResolvedValueOnce(`0x${'11'.repeat(32)}`);
+      const sendSpy = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+
+      await subject.runAutoMintQueue();
+
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toEqual({
+        status: 'failed',
+        name: 'Join Failed',
+        error: message,
+      });
+    });
+  });
+
   it('checks the group password and signs the claim in one derivation before sending', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000e5';
     const account = '0x00000000000000000000000000000000000000e6';
