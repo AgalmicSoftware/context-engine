@@ -1217,9 +1217,16 @@ test('dispatchAdminRequest rejects unsafe Lit Chipotle status API bases before s
   });
 });
 
+// A deploy grant deploys the release recorded on the sponsoring Worker.
+const SPONSOR_RELEASE_ENV = Object.freeze({
+  WORKER_BUNDLE_URL: 'https://releases.example.test/sessionCorsWorker.bundle.js',
+  WORKER_BUNDLE_MANIFEST_URL: 'https://releases.example.test/worker-release-manifest.json',
+});
+
 test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', async () => {
   const kvCalls = [];
   const env = {
+    ...SPONSOR_RELEASE_ENV,
     DEPLOY_HELPER_ENABLED: '1',
     GROUP_KV: {
       put: async (key, value, opts) => {
@@ -1311,6 +1318,7 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
       }),
     },
     env: {
+      ...SPONSOR_RELEASE_ENV,
       DEPLOY_HELPER_ENABLED: '1',
       GROUP_KV: {
         put: async () => {
@@ -1344,6 +1352,7 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
 test('dispatchAdminRequest allows sponsored deploy grants without a standalone helper when embedded deploy-helper is enabled at deploy time', async () => {
   const kvCalls = [];
   const env = {
+    ...SPONSOR_RELEASE_ENV,
     DEPLOY_HELPER_ENABLED: '1',
     GROUP_KV: {
       put: async (key, value, opts) => {
@@ -1434,6 +1443,7 @@ test('dispatchAdminRequest ignores unexpected helper/account fields and still st
       }),
     },
     env: {
+      ...SPONSOR_RELEASE_ENV,
       DEPLOY_HELPER_ENABLED: '1',
       GROUP_KV: {
         put: async (key, value, opts) => {
@@ -1454,6 +1464,83 @@ test('dispatchAdminRequest ignores unexpected helper/account fields and still st
   assert.equal(kvCalls[0][1].cloudflareApiToken, 'cf-sponsored-token');
   assert.equal(Object.prototype.hasOwnProperty.call(kvCalls[0][1], 'deployHelperUrl'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(kvCalls[0][1], 'cloudflareAccountId'), false);
+});
+
+test('dispatchAdminRequest refuses deploy grants until the Worker records its release', async () => {
+  for (const releaseEnv of [
+    {},
+    { WORKER_BUNDLE_URL: SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL },
+    { WORKER_BUNDLE_URL: '  ', WORKER_BUNDLE_MANIFEST_URL: SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL },
+  ]) {
+    const kvCalls = [];
+    const result = await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody({
+          grantRequest: {
+            bootstrapWorkerUrl: 'https://source-worker.example.test',
+            deploy: { cloudflareApiToken: 'cf-sponsored-token' },
+            faucet: { faucetPrivateKey: '0xfaucet' },
+          },
+        }),
+      },
+      env: {
+        ...releaseEnv,
+        DEPLOY_HELPER_ENABLED: '1',
+        GROUP_KV: {
+          put: async (key, value, opts) => {
+            kvCalls.push([key, JSON.parse(value), opts]);
+          },
+        },
+      },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      action: 'issue-sponsored-grants',
+      deps: createAdminDeps(),
+    });
+
+    assert.deepEqual(result, {
+      body: {
+        error: 'Deploy grants need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on this Worker, because a grant deploys the release recorded there. Set both, then issue the grant again.',
+        reason: 'sponsored_release_missing',
+      },
+      status: 409,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    });
+    // Nothing is issued, not even the faucet grant in the same request.
+    assert.equal(kvCalls.length, 0);
+  }
+});
+
+test('dispatchAdminRequest issues faucet-only grants without a recorded release', async () => {
+  const kvCalls = [];
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
+          faucet: { faucetPrivateKey: '0xfaucet' },
+        },
+      }),
+    },
+    env: {
+      DEPLOY_HELPER_ENABLED: '1',
+      GROUP_KV: {
+        put: async (key, value, opts) => {
+          kvCalls.push([key, JSON.parse(value), opts]);
+        },
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps(),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.deployGrantToken, '');
+  assert.equal(typeof result.body.faucetGrantToken, 'string');
+  assert.equal(kvCalls.length, 1);
+  assert.equal(kvCalls[0][1].type, 'faucet-tx');
 });
 
 test('dispatchAdminRequest merges limits and persists the result for set-limits', async () => {

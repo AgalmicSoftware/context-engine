@@ -503,6 +503,21 @@ export const dispatchAdminRequest = async ({
         headers,
       );
     }
+    // A deploy grant deploys only the release recorded on this Worker, and
+    // redeeming one without it fails, so refuse to issue the grant at all.
+    if (
+      cloudflareApiToken &&
+      (!toTrimmedString(env?.WORKER_BUNDLE_URL) || !toTrimmedString(env?.WORKER_BUNDLE_MANIFEST_URL))
+    ) {
+      return deps?.json?.(
+        {
+          error: 'Deploy grants need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on this Worker, because a grant deploys the release recorded there. Set both, then issue the grant again.',
+          reason: 'sponsored_release_missing',
+        },
+        409,
+        headers,
+      );
+    }
 
     let ttlSeconds = null;
     try {
