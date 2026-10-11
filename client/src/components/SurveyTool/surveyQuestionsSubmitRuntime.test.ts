@@ -522,4 +522,44 @@ describe('answer size budget', () => {
     await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
     expect(context.submitSurveyResponse).toHaveBeenCalled();
   });
+
+  it('counts the prompt copy and locking against the stored entry cap', async () => {
+    // Inside the plaintext budget, but the 40 KiB prompt each stored answer
+    // repeats plus both locked envelopes pass the Worker's 96 KiB entry cap.
+    const context = prepare('cloudflare', fill(24 * 1024), fill(23 * 1024));
+    context.stateRef.current.questionPool = [{ id: 'Q1', type: 'freeform', prompt: 'p'.repeat(40 * 1024) }];
+    const slice = context.stateRef.current.surveysResponseState[2];
+    slice.answers.q1 = { ...slice.answers.q1, encrypted: true, encryptionAudience: 'self_admin' };
+    slice.additionalComments.q1 = { ...slice.additionalComments.q1, encrypted: true, encryptionAudience: 'self_admin' };
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: expect.stringMatching(/^This answer is too long to save\. Shorten it by about [\d,]+ characters\.$/),
+    });
+    expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('refuses answers to a question whose prompt alone fills the stored entry', async () => {
+    const context = prepare('cloudflare', 'Yes', '');
+    context.stateRef.current.questionPool = [{ id: 'q1', type: 'freeform', prompt: 'p'.repeat(96 * 1024) }];
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message:
+        "Answers to this question can't be saved because its prompt is too long. Ask the session admin to shorten it.",
+    });
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('counts a locked question by its masked prompt copy', async () => {
+    const context = prepare('cloudflare', 'Yes', '');
+    context.stateRef.current.questionPool = [
+      { id: 'q1', type: 'freeform', prompt: 'p'.repeat(96 * 1024), encryption: { gates: [{ sbtAddress: '0xabc' }] } },
+    ];
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+  });
 });

@@ -1,5 +1,7 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 import { readAnswerTooLongMessage, sessionStoresAnswersInWorker } from '../../utilities/survey/answerSizeBudget';
+import { getQuestionEncryptionGates } from './surveyToolAudienceDerivationController';
+import { resolveEditableQuestionList } from './surveyToolResponsePayloadController';
 import { resolveRevertPendingAnswerValue } from './surveyToolHydrationFlow';
 import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 
@@ -307,16 +309,49 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     });
   };
 
+  // The same pool the submit check reads, for callers that pass only an id.
+  const findQuestionById = (questionId: SurveyQuestionsLegacyValue): SurveyQuestionsLegacyValue => {
+    const key = String(questionId || '')
+      .trim()
+      .toLowerCase();
+    const pool: SurveyQuestionsLegacyValue = stateRef.current.questionPool?.length
+      ? stateRef.current.questionPool
+      : resolveEditableQuestionList(stateRef.current);
+    return (
+      (Array.isArray(pool) ? pool : []).find(
+        (entry: SurveyQuestionsLegacyValue) =>
+          String(entry?.id || '')
+            .trim()
+            .toLowerCase() === key,
+      ) || null
+    );
+  };
+
   // The same budget the submit check enforces, shown while the answer is edited.
-  const getAnswerTooLongMessage = (answer: SurveyQuestionsLegacyValue, additional: SurveyQuestionsLegacyValue) => {
-    const message = readAnswerTooLongMessage(answer?.value, additional?.value);
+  const getAnswerTooLongMessage = ({
+    question,
+    questionId,
+    responseSlice,
+    answer,
+    additional,
+  }: SurveyQuestionsLegacyValue) => {
+    const sizedQuestion: SurveyQuestionsLegacyValue = question || findQuestionById(questionId);
+    const message = readAnswerTooLongMessage({
+      question: sizedQuestion,
+      promptLocked: getQuestionEncryptionGates(sizedQuestion).length > 0,
+      answer,
+      comment: additional,
+      ratingCount: [responseSlice?.importance?.[questionId], responseSlice?.conviction?.[questionId]].filter(
+        (value) => value != null,
+      ).length,
+    });
     if (!message) return '';
     const slug: SurveyQuestionsLegacyValue =
       (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') || resolveEffectiveSlug(propsRef.current);
     return sessionStoresAnswersInWorker(resolveEffectiveResponseGateConfig(slug, propsRef.current)) ? message : '';
   };
 
-  const getQuestionRenderDisplayState = ({ questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
+  const getQuestionRenderDisplayState = ({ question, questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
     const responseDisplayState: SurveyQuestionsLegacyValue = getQuestionResponseDisplayState({
       questionId,
       responseSlice,
@@ -332,7 +367,13 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
         responseDisplayState,
         fieldDisplayState,
       }),
-      answerTooLongMessage: getAnswerTooLongMessage(responseDisplayState.answer, responseDisplayState.additional),
+      answerTooLongMessage: getAnswerTooLongMessage({
+        question,
+        questionId,
+        responseSlice,
+        answer: responseDisplayState.answer,
+        additional: responseDisplayState.additional,
+      }),
     };
   };
 

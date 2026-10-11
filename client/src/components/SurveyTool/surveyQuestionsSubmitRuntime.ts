@@ -16,6 +16,7 @@ import type {
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
 import { remaskUnchangedEncryptedFields } from './surveyToolSubmitPrepController.js';
 import { shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState.js';
+import { getQuestionEncryptionGates } from './surveyToolAudienceDerivationController.js';
 import {
   captureInterviewPredictionComparisonSubmissions,
   resolveEditableQuestionList,
@@ -326,17 +327,25 @@ export const createSurveyQuestionsSubmitRuntime = (
         const error = validateQuadraticAllocation(value, question);
         if (error) throw new Error(error);
       }
-      // The Worker refuses an oversized answer; check its plaintext before locking or upload.
+      // The Worker refuses an oversized answer entry; check it before locking or upload.
       if (
         sessionStoresAnswersInWorker(
           resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
         )
       ) {
         for (const qid of changedQids as Set<string>) {
-          const tooLong = readAnswerTooLongMessage(
-            activeSlice.answers?.[qid]?.value,
-            activeSlice.additionalComments?.[qid]?.value,
-          );
+          const question: SurveyQuestionsLegacyValue =
+            submitQuestionPool.find(
+              (entry: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(entry?.id) === normalizeQuestionIdKey(qid),
+            ) || null;
+          const tooLong = readAnswerTooLongMessage({
+            question,
+            promptLocked: getQuestionEncryptionGates(question).length > 0,
+            answer: activeSlice.answers?.[qid],
+            comment: activeSlice.additionalComments?.[qid],
+            ratingCount: [activeSlice.importance?.[qid], activeSlice.conviction?.[qid]].filter((value) => value != null)
+              .length,
+          });
           if (tooLong) throw new Error(tooLong);
         }
       }

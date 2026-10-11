@@ -56,6 +56,7 @@ export const createSurveyQuestionsRenderRuntime = (
     const surveyIndex: SurveyQuestionsLegacyValue =
       propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
     const displayState: SurveyQuestionsLegacyValue = getQuestionRenderDisplayState({
+      question,
       questionId: question.id,
       responseSlice: currentSurveyResponseState,
     });
