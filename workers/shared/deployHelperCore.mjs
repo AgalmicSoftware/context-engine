@@ -1296,9 +1296,13 @@ const executeDeployHelperRequestCore = async ({
     : toStr(body?.bundleText);
   const hasBundleText = bundleText.trim() !== '';
   const bundleUrl = toStr(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
+  const bundleManifestUrl = toStr(body?.bundleManifestUrl).trim();
   const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex(bundleText) : '';
   const suppliedBundleSha256 = toStr(body?.bundleSha256).trim();
   let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+  // Set only when the bundle comes from bundleUrl and the release manifest
+  // pins its digest; the Worker then records that release (see metadata).
+  let releaseManifestBundleSha256 = '';
   let bundleSource = hasBundleText ? bundleText : '';
   const bundleSourceKind = hasBundleText ? 'bundleText' : 'bundleUrl';
   let bundleDiagnostics = null;
@@ -1314,9 +1318,9 @@ const executeDeployHelperRequestCore = async ({
   const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
   const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
 
-  if (!hasBundleText && toStr(body?.bundleManifestUrl).trim()) {
+  if (!hasBundleText && bundleManifestUrl) {
     const manifestDigest = await fetchExpectedWorkerBundleDigest({
-      manifestUrl: toStr(body.bundleManifestUrl).trim(),
+      manifestUrl: bundleManifestUrl,
       artifactFile: 'sessionCorsWorker.bundle.js',
       artifactKind: 'session-cors-worker',
       fetchImpl,
@@ -1328,6 +1332,7 @@ const executeDeployHelperRequestCore = async ({
       return buildFailure(409, { error: 'Worker release manifest digest conflicts with bundleSha256.' });
     }
     expectedBundleSha256 = manifestDigest.digest;
+    releaseManifestBundleSha256 = manifestDigest.digest;
   }
 
   if (expectedBundleSha256 && !bundleSource) {
@@ -1767,6 +1772,18 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
+  // An Agents HTTP session also gets an Agent Bridge Worker after this one.
+  // When a release manifest pins that bundle (resolveDeploymentBundleProvenance
+  // set agentBridgeBundleSha256 from it), the upload below records it once the
+  // bytes are checked.
+  const agentHttpRequested = body?.sessionModeProfile?.surfaces?.agentHttp === true;
+  const agentBridgeBundleUrl = toStr(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL).trim();
+  const agentBridgeBundleManifestUrl = toStr(body?.agentBridgeBundleManifestUrl).trim();
+  const agentBridgeManifestSha256 = agentBridgeBundleManifestUrl
+    ? normalizeWorkerBundleSha256(body?.agentBridgeBundleSha256)
+    : '';
+  let agentBridgeReleaseVerified = false;
+
   // An exactly owned uploaded Worker already contains the requested module.
   // Do not make recovery depend on the original bundle host still being
   // reachable; bundle acquisition belongs only to the upload path.
@@ -1782,6 +1799,25 @@ const executeDeployHelperRequestCore = async ({
         error: 'Deployment bundle content changed after this request started; upload was stopped.',
         deploymentRequestPending: true,
       });
+    }
+    // Check the bridge bytes before the KV namespace and Worker below are
+    // created, so a bad bridge release stops the deploy instead of leaving
+    // a session Worker without its bridge.
+    if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
+      let agentBridgeSource = '';
+      try {
+        agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
+      } catch (error) {
+        return buildFailure(502, {
+          error: `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+        }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
+      }
+      if (await sha256Hex(agentBridgeSource) !== agentBridgeManifestSha256) {
+        return buildFailure(409, {
+          error: 'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
+        });
+      }
+      agentBridgeReleaseVerified = true;
     }
   }
 
@@ -1905,6 +1941,16 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
+  // Record the release this deploy verified, so the Worker's embedded helper
+  // can sponsor grant deploys of that same release
+  // (sponsoredBootstrapRedeemDispatch.js). Only a bundle fetched from a URL
+  // and matched to its release manifest qualifies; uploaded bundleText or an
+  // unpinned URL records nothing. The URLs come from the request, else the
+  // helper's own defaults, exactly as for the deployed bundle. Only uploads of
+  // the Worker this request creates carry them, so an existing Worker keeps
+  // any values set by hand.
+  const sessionReleaseVerified = !hasBundleText && !!bundleUrl && !!releaseManifestBundleSha256 &&
+    bundleDiagnostics?.sha256 === releaseManifestBundleSha256;
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -1930,6 +1976,18 @@ const executeDeployHelperRequestCore = async ({
         class_name: SESSION_COORDINATOR_CLASS_NAME,
       },
       { name: 'DEPLOY_HELPER_ENABLED', type: 'plain_text', text: embeddedDeployHelperEnabled ? '1' : '0' },
+      ...(sessionReleaseVerified
+        ? [
+            { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: bundleUrl },
+            { name: 'WORKER_BUNDLE_MANIFEST_URL', type: 'plain_text', text: bundleManifestUrl },
+          ]
+        : []),
+      ...(agentBridgeReleaseVerified
+        ? [
+            { name: 'AGENT_BRIDGE_BUNDLE_URL', type: 'plain_text', text: agentBridgeBundleUrl },
+            { name: 'AGENT_BRIDGE_BUNDLE_MANIFEST_URL', type: 'plain_text', text: agentBridgeBundleManifestUrl },
+          ]
+        : []),
     ],
     migrations: {
       old_tag: '',
@@ -2509,7 +2567,7 @@ const executeDeployHelperRequestCore = async ({
     deploymentPayload.tokenSecretSet = true;
   }
 
-  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
+  if (agentHttpRequested) {
     const wrappedDeploy = await executeAgentSessionWrappedDeployment({
       body: {
         deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
