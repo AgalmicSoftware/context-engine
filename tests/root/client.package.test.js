@@ -89,6 +89,26 @@ test('client HTML shell seeds structured data with the public GitHub repository'
   assert.doesNotMatch(html, /"@type":\s*"WebPage"/);
 });
 
+test('client HTML shell loads its fonts in one swap request after the preconnect hints', () => {
+  const html = readText('client/index.html');
+  const stylesheets = (html.match(/<link\b[^>]*>/g) || []).filter(
+    (tag) => tag.includes('rel="stylesheet"') && tag.includes('fonts.googleapis.com'),
+  );
+
+  assert.equal(stylesheets.length, 1);
+  const fontsUrl = new URL(stylesheets[0].match(/href="([^"]+)"/)[1].replace(/&amp;/g, '&'));
+  assert.equal(fontsUrl.pathname, '/css2');
+  // Minimal uses Open Sans at 600-800, so load the variable weight range instead of synthesizing bold.
+  assert.deepEqual(fontsUrl.searchParams.getAll('family'), [
+    'Open Sans:ital,wght@0,300..800;1,300..800',
+    'Poppins:wght@400;600;700;800',
+  ]);
+  assert.equal(fontsUrl.searchParams.get('display'), 'swap');
+  const stylesheetIndex = html.indexOf(stylesheets[0]);
+  assert.ok(html.indexOf('<link rel="preconnect" href="https://fonts.googleapis.com">') < stylesheetIndex);
+  assert.ok(html.indexOf('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>') < stylesheetIndex);
+});
+
 test('client HTML shell description stays aligned with the README framing', () => {
   const html = readText('client/index.html');
 
