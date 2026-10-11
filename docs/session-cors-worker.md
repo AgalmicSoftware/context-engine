@@ -460,8 +460,8 @@ variables once:
   remains pending and the action is not repeated; inspect the first attempt and
   issue a new grant instead of retrying the same bearer.
 
-- The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
-  - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
+- The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding. Workers from the native Cloudflare template run with `DEPLOY_HELPER_ENABLED` set to `"0"`; the wizard records them with `embeddedDeployHelperEnabled: false` when it verifies them.
+  - If the hosted release-asset fetch fails, the normal-mode worker step keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override. Grant-backed sponsored deploys send no bundle, because the sponsoring Worker deploys its configured release; a manual bundle does not change them.
   - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
   - Scoped Chipotle identifiers and `litUsageApiKey` already flow through the worker-mediated Lit execution path.
@@ -2628,7 +2628,7 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 
 ## Release bundle
 
-- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection.
+- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection. Each release moves the pin to the newest published release (`node scripts/release-version.mjs pin-worker-release`), and release preparation refuses a pin that a newer published release has superseded; see [Worker release pin](release-runbook.md#worker-release-pin).
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
 - Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.
