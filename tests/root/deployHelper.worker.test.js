@@ -768,8 +768,9 @@ describe('deploy-helper worker', () => {
         String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config')
       ));
       expect(String(configRewrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:config$/);
+      // Staged as the bare origin the client writes, so the identity guard matches.
       expect(JSON.parse(configRewrite[1].body).corsWorkerUrl).toBe(
-        `https://${payload.workerName}.tenant-subdomain.workers.dev/` // intentional: real URL — tests worker URL construction
+        `https://${payload.workerName}.tenant-subdomain.workers.dev` // intentional: real URL — tests worker URL construction
       );
     } finally {
       consoleLogSpy.mockRestore();
@@ -1467,7 +1468,7 @@ describe('deploy-helper worker', () => {
       const configRewrite = JSON.parse(finalConfigWrite[1].body);
       expect(configRewrite.configRevision).toBe('revision-a');
       expect(configRewrite.corsWorkerUrl).toBe(
-        `https://${payload.workerName}.tenant-subdomain.workers.dev/`
+        `https://${payload.workerName}.tenant-subdomain.workers.dev`
       );
       const configReadbackIndex = fetchMock.calls.findIndex(([url, init = {}]) => (
         String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
@@ -1785,7 +1786,7 @@ describe('deploy-helper worker', () => {
       ));
       const configRewrite = JSON.parse(finalConfigWrite[1].body);
       expect(configRewrite.storageProfile.payloadAccessControl.mode).toBe('public_read');
-      expect(configRewrite.corsWorkerUrl).toBe(`https://${payload.workerName}.tenant-subdomain.workers.dev/`);
+      expect(configRewrite.corsWorkerUrl).toBe(`https://${payload.workerName}.tenant-subdomain.workers.dev`);
     } finally {
       consoleLogSpy.mockRestore();
     }

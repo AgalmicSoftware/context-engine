@@ -1437,7 +1437,9 @@ const executeDeployHelperRequestCore = async ({
       fallbackEligible: accountSubdomain.fallbackEligible,
     });
   }
-  const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
+  // Stage the bare origin, as the client writes it, so later signed config
+  // writes match the stored Worker identity.
+  const anticipatedWorkerOrigin = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev`;
   const allowOrigins = normalizeAllowList(
     allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
   );
@@ -1500,7 +1502,7 @@ const executeDeployHelperRequestCore = async ({
     allowOrigins,
     limits,
     scopes,
-    corsWorkerUrl: anticipatedWorkerUrl,
+    corsWorkerUrl: anticipatedWorkerOrigin,
     embeddedDeployHelperEnabled,
     ...(!workerCanonicalRequested
       ? {
@@ -2311,7 +2313,7 @@ const executeDeployHelperRequestCore = async ({
   if (workerUrl) {
     const configWithWorkerUrl = {
       ...config,
-      corsWorkerUrl: workerUrl,
+      corsWorkerUrl: normalizeOrigin(workerUrl),
     };
     const readbackMatches = (result) => {
       const readbackConfig = result?.data?.result || result?.data || {};
