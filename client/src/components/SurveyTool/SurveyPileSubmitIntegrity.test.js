@@ -747,3 +747,127 @@ describe('View all editor after a reload', () => {
     expect(screen.queryByDisplayValue('Old secret')).toBeNull();
   });
 });
+
+describe('an answer held back for size', () => {
+  const { captureSessionInterviewResponses, recordInterviewProvenance } = require('./SurveyPileViewMode');
+  const SOURCE = { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' };
+  const PACKET = { promptVersion: 'ce-interview-brief-v5', questionSetHash: 'a'.repeat(64) };
+  // Too long for the Worker to store: the size check holds it back by name.
+  const LONG = 'x'.repeat(100 * 1024);
+  const field = (value) => ({
+    value,
+    encrypted: false,
+    encryptionAudience: 'public',
+    audienceMode: 'explicit',
+    hash: '',
+    encryptedPortion: '',
+  });
+  // A saved answer that shares the responder's name and the AI's attribution.
+  const savedWithConsent = () => ({
+    questionID: FREEFORM_QID,
+    responder: OWNER,
+    type: 'freeform',
+    prompt: 'Freeform question',
+    answer: field('Saved answer'),
+    additional: field(''),
+    importance: null,
+    conviction: null,
+    responderName: 'Participant',
+    interviewProvenance: { version: 1, source: { ...SOURCE }, ...PACKET, appliedAt: 1 },
+  });
+  const consentOf = (engine) => {
+    const record = engine().state.surveysResponseState[0].interviewProvenance?.[FREEFORM_QID];
+    return record && { name: record.responderName || '', ai: !!record.includeAiProvenance };
+  };
+  const mountWithSavedConsent = async () => {
+    const h = await fixture();
+    h.add('responses', savedWithConsent());
+    await act(async () => h.sync());
+    await h.mount();
+    return h;
+  };
+  // The person shortens the held-back answer and submits it on its own.
+  const submitShortened = async (h) => {
+    await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Short answer'));
+    await settle();
+    const callsBefore = h.submitResponses.mock.calls.length;
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(callsBefore + 1));
+    await settle();
+    return h.submitResponses.mock.calls[callsBefore][2].find((row) => row.questionID === FREEFORM_QID);
+  };
+
+  it.each([
+    ['while another edit uploads', true],
+    ['when nothing else is submitted', false],
+  ])('keeps a withdrawn name and AI attribution %s', async (_label, otherEdit) => {
+    const h = await mountWithSavedConsent();
+    const engine = () => h.engine();
+    await run(() =>
+      recordInterviewProvenance(
+        engine(),
+        [{ questionId: FREEFORM_QID, answer: 'Saved answer' }],
+        SOURCE,
+        PACKET,
+        false,
+        false,
+        '',
+      ),
+    );
+    await settle();
+    expect(consentOf(engine)).toEqual({ name: '', ai: false });
+    await act(async () => engine().handleAnswerPile(FREEFORM_QID, LONG));
+    if (otherEdit) await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+    await settle();
+
+    await h.click();
+    await settle();
+
+    expect(h.submitResponses.mock.calls.map(([, ids]) => ids.length)).toEqual(otherEdit ? [1] : []);
+    expect(h.savedRows(BINARY_QID)).toHaveLength(otherEdit ? 1 : 0);
+    expect(engine().state.submissionError).toMatch(/^“Freeform question” wasn't submitted\. This answer is too long/);
+    // The unsaved withdrawal and the long answer both stay pending.
+    expect(consentOf(engine)).toEqual({ name: '', ai: false });
+    expect(engine().state.surveysResponseState[0].answers[FREEFORM_QID].value).toBe(LONG);
+    expect(draftHolds(FREEFORM_QID)).toBe(true);
+
+    const row = await submitShortened(h);
+    expect(row.answer.value).toBe('Short answer');
+    expect(row.responderName).toBeUndefined();
+    expect(row.interviewProvenance?.source).toBeUndefined();
+  });
+
+  it('keeps a withdrawal made in the interview window when the other edits upload', async () => {
+    const h = await mountWithSavedConsent();
+    const engine = () => h.engine();
+    await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+    await settle();
+    // As the interview window does: capture, apply the draft, record the consent, submit, then undo.
+    const restore = captureSessionInterviewResponses(engine(), [FREEFORM_QID]);
+    await run(() => applySessionInterviewAnswer(engine(), FREEFORM_QID, LONG));
+    await run(() =>
+      recordInterviewProvenance(
+        engine(),
+        [{ questionId: FREEFORM_QID, answer: LONG }],
+        SOURCE,
+        PACKET,
+        false,
+        false,
+        '',
+      ),
+    );
+    const outcome = await run(() => submitSessionInterviewResponses(engine(), [FREEFORM_QID]));
+    await settle();
+    await run(() => restore());
+    await settle();
+
+    expect(outcome.status).toBe('failed');
+    expect(h.savedRows(BINARY_QID)).toHaveLength(1);
+    expect(consentOf(engine)).toEqual({ name: '', ai: false });
+    expect(Array.from(engine().getChangedQidsAndFields(0).changedQids)).toEqual([FREEFORM_QID]);
+
+    const row = await submitShortened(h);
+    expect(row.responderName).toBeUndefined();
+    expect(row.interviewProvenance?.source).toBeUndefined();
+  });
+});

@@ -656,7 +656,15 @@ export const createSurveyQuestionsSubmitRuntime = (
             ]),
         ),
       };
-      delete finalSlice.interviewProvenance;
+      // Uploaded questions now hold their saved consent in the baseline. A question
+      // that was not uploaded keeps its unsaved consent edits, so a withdrawal stays.
+      const pendingProvenance = Object.fromEntries(
+        Object.entries(finalSlice.interviewProvenance || {}).filter(
+          ([qid]) => !uploadedQids.has(normalizeQuestionIdKey(qid)),
+        ),
+      );
+      if (Object.keys(pendingProvenance).length) finalSlice.interviewProvenance = pendingProvenance;
+      else delete finalSlice.interviewProvenance;
 
       // Check encryption status from the new baseline
       const hasEncrypted =
