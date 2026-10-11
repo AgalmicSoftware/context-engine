@@ -534,6 +534,31 @@ describe('surveyToolResponsePayloadController', () => {
     expect(result.responses![0].answer).toMatchObject({ value: '', encryptedPortion: '' });
   });
 
+  it('sends a cleared locked answer as cleared, as it does a cleared comment', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        isStandalone: true,
+        pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Cleared' }],
+        surveyResponseState: {
+          answers: { q1: { value: '', encrypted: true, encryptionAudience: 'self_admin' } },
+          additionalComments: { q1: { value: '', encrypted: true, encryptionAudience: 'self' } },
+          importance: {},
+          conviction: {},
+        },
+        includeQuestionIds: ['q1'],
+      }),
+    );
+
+    const [response] = result.responses!;
+    expect(response.answer).toMatchObject({
+      value: '',
+      encrypted: false,
+      encryptionGateId: null,
+      encryptedPortion: '',
+    });
+    expect(response.additional).toMatchObject({ value: '', encrypted: false, encryptedPortion: '' });
+  });
+
   it('importance falls back to conviction when null', () => {
     const result = buildResponsePayload(
       defaultOpts({

@@ -649,3 +649,33 @@ it('keeps ratings protected by a locked comment encrypted after its text is dele
   expect(row.importance == null && row.conviction == null).toBe(true);
   expect(guard(h.uploads.at(-1))).toBe('passed');
 }, 60000);
+
+it('reloads a cleared locked answer as cleared, not as a locked "*"', async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await lockAndAnswer(h, 2, 'self_admin', 'secret two', [6, 5]);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  await goTo(h, 2);
+  expect(await clickDecrypt()).toEqual([]);
+  await act(async () => h.engine().handleAnswerPile(qid(2), ''));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(2));
+  expect(row.answer).toMatchObject({ value: '', encrypted: false, encryptedPortion: '' });
+  expect(guard(h.uploads.at(-1))).toBe('passed');
+
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 19 });
+  await goTo(h, 2);
+  expect(h.engine().state.surveysResponseState[0].answers[qid(2)]).toMatchObject({ value: '', encrypted: false });
+  expect(screen.queryByRole('button', { name: 'Decrypt Answer' })).not.toBeInTheDocument();
+}, 60000);

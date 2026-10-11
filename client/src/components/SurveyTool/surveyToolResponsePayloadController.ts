@@ -271,8 +271,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const additionalAudience = opts.resolveFieldEncryptionAudience(additional, q.id, 'additional');
     const additionalHasContent = hasAdditional(additional.value);
     const additionalEncrypted = additionalHasContent && !!additional.encrypted;
-    // A blank answer has nothing encrypted; never resend an envelope it once had.
-    const answerEnvelope = answer.encrypted && hasMainAnswer(answer.value) ? answer.encryptedPortion || '' : '';
+    // A blank answer has nothing encrypted, so it is sent as cleared, never with an envelope it once had.
+    const answerEncrypted = !!answer.encrypted && hasMainAnswer(answer.value);
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
@@ -408,12 +408,12 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       importance: importanceForPayload !== null ? importanceForPayload : null,
       answer: {
         value: answer.value !== undefined ? answer.value : '',
-        encrypted: !!answer.encrypted,
+        encrypted: answerEncrypted,
         encryptionAudience: answerAudience,
-        encryptionGateId: answer.encrypted ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
+        encryptionGateId: answerEncrypted ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
         audienceMode: 'explicit',
         hash: answer.hash || '',
-        encryptedPortion: answerEnvelope,
+        encryptedPortion: answerEncrypted ? answer.encryptedPortion || '' : '',
       },
       additional: {
         value: additional.value !== undefined ? additional.value : '',
