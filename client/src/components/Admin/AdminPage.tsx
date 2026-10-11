@@ -50,6 +50,7 @@ import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
+import AdminStorageVisibilityPanel from './AdminStorageVisibilityPanel';
 import {
   getBackgroundResultsAnalysisUnsupportedReason,
   supportsBackgroundResultsAnalysis,
@@ -2889,6 +2890,14 @@ const AdminPageRuntime = ({
             postSignedRequest={postSignedAdminRequest}
             title={workerGroupsPanelTitle}
             description={workerGroupsPanelDescription}
+          />
+        ) : null}
+
+        {selectedConfig && isWorkerCanonicalSession ? (
+          <AdminStorageVisibilityPanel
+            canAdminWorker={canAdminWorker}
+            sessionSlug={normalizeSlug(selectedSlug)}
+            postSignedRequest={postSignedAdminRequest}
           />
         ) : null}
 
