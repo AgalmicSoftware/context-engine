@@ -23,6 +23,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
 import SBTSelector from '../SBTs/SBTSelector';
+import { toViewerBlob } from './documentLibraryViewerMime';
 
 const log = createLogger('DocumentLibraryPanelViews');
 
@@ -181,12 +182,15 @@ const DocRowImagePreview = ({
         });
 
         const blob = litStorage.decodeLitPayloadToBlob(payload);
-        if (!blob || !toStr(blob.type).trim().toLowerCase().startsWith('image/')) {
+        // Only inert raster images preview: "Open image in new tab" on an SVG blob
+        // would run its script as the app.
+        const preview = blob ? toViewerBlob(blob, blob.type) : null;
+        if (!preview || !preview.mime.startsWith('image/')) {
           throw new Error('Encrypted image preview unavailable.');
         }
         if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
 
-        objectUrl = URL.createObjectURL(blob);
+        objectUrl = URL.createObjectURL(preview.blob);
         if (cancelled) {
           if (objectUrl && typeof URL.revokeObjectURL === 'function') {
             URL.revokeObjectURL(objectUrl);

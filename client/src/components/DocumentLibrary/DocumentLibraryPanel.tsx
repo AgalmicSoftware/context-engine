@@ -49,6 +49,7 @@ import {
   type SessionConfig,
 } from './documentLibraryCapabilityRouting';
 import { resolveDocumentLibraryAutoOpenDoc } from './documentLibraryAutoOpen';
+import { isTextLikeMime, toViewerBlob } from './documentLibraryViewerMime';
 import { buildSbtListFilters, buildSessionListFilters } from './documentLibraryListFilters';
 
 const log = createLogger('DocumentLibraryPanel');
@@ -274,20 +275,6 @@ const buildDocRecordFromStorageItem = (item: Record<string, unknown>): DocRecord
       type: storageRef.contentType || toStr(metadata.contentType).trim() || null,
     },
   });
-};
-
-const isTextLikeMime = (mime: unknown): boolean => {
-  const m = toStr(mime).trim().toLowerCase();
-  if (!m) return false;
-  if (m.startsWith('text/')) return true;
-  return [
-    'application/json',
-    'application/xml',
-    'application/xhtml+xml',
-    'application/javascript',
-    'application/x-javascript',
-    'image/svg+xml',
-  ].includes(m);
 };
 
 const buildAsyncContextKeyPart = (value: unknown): string => {
@@ -869,10 +856,11 @@ export default function DocumentLibraryPanel({
               text: text || '',
             });
           }
-          const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
+          const viewerBlob = toViewerBlob(blob, mime);
+          const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(viewerBlob.blob) : '';
           return applyBlobViewerState({
             title: toStr(tagMap['CE-DocName']).trim() || 'Document',
-            mime,
+            mime: viewerBlob.mime,
             blobUrl,
           });
         }
@@ -913,10 +901,11 @@ export default function DocumentLibraryPanel({
           if (!blob) {
             throw new Error('Unable to decode encrypted document.');
           }
-          const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
+          const viewerBlob = toViewerBlob(blob, blob.type || mime);
+          const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(viewerBlob.blob) : '';
           return applyBlobViewerState({
             title: name,
-            mime: blob.type || mime || '',
+            mime: viewerBlob.mime,
             blobUrl,
           });
         }
@@ -951,10 +940,11 @@ export default function DocumentLibraryPanel({
             text: text || '',
           });
         }
-        const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
+        const viewerBlob = toViewerBlob(blob, mime);
+        const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(viewerBlob.blob) : '';
         return applyBlobViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Document',
-          mime,
+          mime: viewerBlob.mime,
           blobUrl,
         });
       } catch (err) {

@@ -120,6 +120,52 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     });
   });
 
+  it('shows no thumbnail for an encrypted SVG image, which could run as the app', async () => {
+    const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
+    litStorage.downloadEncryptedArweaveData.mockResolvedValue({
+      payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
+    });
+    litStorage.decodeLitPayloadToBlob.mockReturnValue(
+      new Blob(['<svg onload="alert(1)"/>'], { type: 'image/svg+xml;charset=utf-8' }),
+    );
+    mockListArweaveTransactionsByTags.mockResolvedValue([
+      {
+        cursor: 'cursor-v',
+        txId: 'V'.repeat(43),
+        owner: 'owner',
+        tags: [],
+        tagMap: {
+          'CE-DocStorage': 'lit-arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'encrypted-drawing.svg',
+          'CE-DocMime': 'image/svg+xml',
+        },
+        data: { size: 24, type: 'image/svg+xml' },
+        block: { height: 1, timestamp: 1710000005 },
+      },
+    ]);
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'9'.repeat(32)}`}
+        litHooks={{ getKey: jest.fn(async () => ({})) }}
+      />,
+    );
+
+    await screen.findByText('encrypted-drawing.svg');
+    await waitFor(() => expect(litStorage.decodeLitPayloadToBlob).toHaveBeenCalled());
+    expect(screen.queryByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW)).not.toBeInTheDocument();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
   it('lists and opens Cloudflare session docs through storage refs', async () => {
     mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
     mockListSessionStorageRefs.mockResolvedValueOnce([
