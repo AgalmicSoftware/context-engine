@@ -114,7 +114,6 @@ const mockAppDependencies = () => {
     },
   }));
   jest.doMock('../variables/appConfig.js', () => ({
-    SERVER: 'http://localhost',
     CE_ENABLE_WALLETCONNECT_FALLBACK: mockWalletConnectFallbackEnabled,
   }));
   jest.doMock('../utilities/ceAgent.js', () => ({ installCeAgent: mockInstallCeAgent }));
@@ -162,13 +161,6 @@ const mockAppDependencies = () => {
     createClient: mockCreateClient,
     createStorage: jest.fn(({ storage }: { storage: unknown }) => ({ storage })),
     WagmiConfig: ({ children }: { children: React.ReactNode }) => children,
-  }));
-  jest.doMock('@wagmi/core', () => ({
-    noopStorage: {
-      getItem: jest.fn(() => null),
-      setItem: jest.fn(),
-      removeItem: jest.fn(),
-    },
   }));
   jest.doMock('wagmi/connectors/metaMask', () => ({
     MetaMaskConnector: mockMetaMaskConnector,
