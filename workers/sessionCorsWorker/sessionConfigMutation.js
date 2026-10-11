@@ -62,6 +62,8 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'embeddedDeployHelperEnabled',
   'litCredentials',
   'resultsAnalysis',
+  'responseFieldEncryption',
+  'linkedWorkerGroups',
   WORKER_GROUPS_BOOTSTRAP_KEY,
 ]);
 

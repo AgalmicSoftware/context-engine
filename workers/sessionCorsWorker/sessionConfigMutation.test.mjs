@@ -306,6 +306,41 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
   assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
 });
 
+test('set-config sets optional field encryption and linked groups on Worker sessions', () => {
+  const linkedWorkerGroups = [{
+    sessionSlug: 'source-session',
+    sessionId: `0x${'11'.repeat(16)}`,
+    workerUrl: 'https://source.example.test/',
+    groupId: 'community',
+  }];
+  const apply = (existingConfig, incomingConfig) => applySessionConfigMutation({
+    existingConfig: cloneJson(existingConfig),
+    mutation: { kind: 'set-config', incomingConfig },
+    slug: 'session-a',
+  });
+  // A patch may carry only the new field; the merged record is checked.
+  const patched = apply(profileBearingConfig, { responseFieldEncryption: { mode: 'optional' }, linkedWorkerGroups });
+  assert.equal(patched.ok, true, JSON.stringify(patched));
+  assert.deepEqual(patched.config.responseFieldEncryption, { mode: 'optional' });
+  assert.deepEqual(patched.config.linkedWorkerGroups, linkedWorkerGroups);
+  const full = apply(profileBearingConfig, { ...cloneJson(profileBearingConfig), responseFieldEncryption: { mode: 'none' } });
+  assert.equal(full.ok, true, JSON.stringify(full));
+
+  for (const [incomingConfig, path] of [
+    [{ responseFieldEncryption: { mode: 'always' } }, 'responseFieldEncryption'],
+    [{ linkedWorkerGroups: [{ ...linkedWorkerGroups[0], workerUrl: 'http://source.example.test/' }] }, 'linkedWorkerGroups.workerUrl'],
+  ]) {
+    assert.deepEqual(apply(profileBearingConfig, incomingConfig), {
+      ok: false, status: 400, error: `Invalid session config mode at ${path}.`,
+    });
+  }
+  // Optional field encryption still needs a Worker-canonical Cloudflare session.
+  const registry = { ...baseConfig, sessionModeProfile: registryModeProfile, storageProfile: { backend: 'arweave' } };
+  assert.deepEqual(apply(registry, { responseFieldEncryption: { mode: 'optional' } }), {
+    ok: false, status: 400, error: 'Invalid session config mode at responseFieldEncryption.mode.',
+  });
+});
+
 test('set-config rejects malformed or unsupported interview mode config', () => {
   for (const incomingConfig of [
     { interviewModeEnabled: 'false' },

@@ -667,13 +667,17 @@ const validateProfileStoragePolicyCoherence = ({ profile, storageSide }) => {
 };
 
 // Optional field recipients do not change the public/private storage policy.
-const validateSupplementalSessionPolicies = (config) => {
+// A partial patch that omits the profile or storage record defers the
+// Worker-canonical check to the merged record, which is always validated.
+const validateSupplementalSessionPolicies = (config, { allowPartialProfileStorage = false } = {}) => {
   if (hasOwn(config, 'responseFieldEncryption')) {
     const policy = config.responseFieldEncryption;
     if (!isObj(policy) || Object.keys(policy).some(key => !['mode', 'version'].includes(key)) ||
         (hasOwn(policy, 'mode') && !['none', 'optional'].includes(policy.mode)) ||
         (hasOwn(policy, 'version') && ![0, 1].includes(policy.version))) return invalid('responseFieldEncryption');
-    if (policy.mode === 'optional' && (config.sessionModeProfile?.authority?.mode !== 'worker_canonical' ||
+    const partialPatch = allowPartialProfileStorage &&
+      (!hasOwn(config, 'sessionModeProfile') || !hasOwn(config, 'storageProfile'));
+    if (policy.mode === 'optional' && !partialPatch && (config.sessionModeProfile?.authority?.mode !== 'worker_canonical' ||
         config.sessionModeProfile?.storage?.backend !== 'cloudflare' ||
         config.storageProfile?.backend !== 'cloudflare')) return invalid('responseFieldEncryption.mode');
   }
@@ -702,7 +706,7 @@ export const validateWorkerConfigModeValues = (
   { allowPartialProfileStorage = false } = {},
 ) => {
   if (!isObj(config)) return invalid('config');
-  const supplemental = validateSupplementalSessionPolicies(config);
+  const supplemental = validateSupplementalSessionPolicies(config, { allowPartialProfileStorage });
   if (!supplemental.ok) return supplemental;
   if (hasOwn(config, 'sessionEndsAt') && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
     return invalid('sessionEndsAt');

@@ -1908,6 +1908,10 @@ Never return secrets in responses.
   with first-use worker-envelope key selection. Revision-free signed Admin
   patches remain supported; upload retry receipts and key-changing maintenance
   actions are not part of this config boundary.
+- Worker-canonical sessions accept `responseFieldEncryption` and
+  `linkedWorkerGroups` through signed `set-config`, as a patch on their own or
+  with the full config. The optional field-encryption mode is checked against
+  the merged record, so it still needs a Worker-canonical Cloudflare session.
 - A successful worker-canonical publish is terminal in `/new`, including after a
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.
