@@ -35,7 +35,10 @@ export const auditPanelContrast = (element, parentLevels = 0) => {
     );
     const placeholder = isTextField && !node.value ? node.getAttribute('placeholder') : '';
     const value = isTextField ? node.value : '';
-    if (!text && !placeholder && !value) continue;
+    // An icon-only control drawn in currentColor: audit its color under its label.
+    const iconLabel =
+      node === root && !node.textContent.trim() && node.querySelector('svg') ? node.getAttribute('aria-label') || '' : '';
+    if (!text && !placeholder && !value && !iconLabel) continue;
     const chain = [];
     for (let current = node; current; current = current.parentElement) chain.unshift(current);
     let backgrounds = [[255, 255, 255]];
@@ -74,7 +77,7 @@ export const auditPanelContrast = (element, parentLevels = 0) => {
       return (levels[0] + 0.05) / (levels[1] + 0.05);
     });
     results.push({
-      text: (text || placeholder || value).slice(0, 100),
+      text: (text || placeholder || value || iconLabel).slice(0, 100),
       ratio: Math.min(...ratios),
     });
   }

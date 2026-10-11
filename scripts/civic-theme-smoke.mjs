@@ -6,22 +6,6 @@ import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
 import { inspectCivicWizard } from './civic-theme-wizard-smoke.mjs';
 import { inspectCivicAuthoring } from './civic-theme-authoring-smoke.mjs';
 
-const contrast = (foreground, background) => {
-  const luminance = (color) => {
-    const channels = color
-      .match(/[\d.]+/g)
-      .slice(0, 3)
-      .map(Number)
-      .map((value) => {
-        const channel = value / 255;
-        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-      });
-    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-  };
-  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
-  return (values[0] + 0.05) / (values[1] + 0.05);
-};
-
 export const readControl = (element) => {
   const style = getComputedStyle(element);
   const rect = element.getBoundingClientRect();
@@ -326,7 +310,7 @@ export async function inspectCivicSession(page) {
   const clear = page.getByRole('button', { name: 'Clear pending changes', exact: true });
   await clear.waitFor({ state: 'visible' });
   const clearStyle = await clear.evaluate(readControl);
-  assert(contrast(clearStyle.color, 'rgb(255, 255, 255)') >= 4.5, 'Clear control is legible on white');
+  await assertReadable(clear);
   assert.equal(clearStyle.opacity, '1', 'Clear control is not faded');
   const submit = await page.getByRole('button', { name: 'Submit (1)', exact: true }).evaluate(readControl);
   const titleBox = await title.evaluate(readControl);
@@ -340,22 +324,17 @@ export async function inspectCivicSession(page) {
   await fullClear.waitFor({ state: 'visible' });
   const fullClearStyle = await fullClear.evaluate(readControl);
   assert.equal(fullClearStyle.opacity, '1', 'Full-view clear control is not faded');
-  assert(contrast(fullClearStyle.color, 'rgb(255, 255, 255)') >= 4.5, 'Full-view clear control is visible');
+  await assertReadable(fullClear);
   await fullClear.click();
   await assertReadable(page.locator('body'));
   const option = page.getByText('An elected legislature', { exact: true });
   await option.waitFor({ state: 'visible' });
-  const choiceStyle = () =>
-    option.evaluate((element) => {
-      const label = element.closest('label');
-      const style = getComputedStyle(label);
-      return { color: style.color, background: style.backgroundColor, checked: label.querySelector('input').checked };
-    });
+  const choiceLabel = option.locator('xpath=ancestor::label[1]');
   for (const selected of [false, true]) {
     if (selected) await option.click();
-    const style = await choiceStyle();
-    assert.equal(style.checked, selected);
-    assert(contrast(style.color, style.background) >= 4.5, 'Multi-choice labels remain readable in both states');
+    assert.equal(await choiceLabel.evaluate((label) => label.querySelector('input').checked), selected);
+    // Multi-choice labels remain readable in both states.
+    await assertReadable(choiceLabel);
   }
   await option.click();
   await page.getByRole('button', { name: 'Back to pile view', exact: true }).click();
@@ -367,7 +346,7 @@ export async function inspectCivicSession(page) {
   const description = page.getByText(/^Preview of a new public demo in which sixty-two historical figures/);
   const reportStyle = await description.evaluate(readControl);
   assert.equal(reportStyle.opacity, '1');
-  assert(contrast(reportStyle.color, 'rgb(255, 255, 255)') >= 4.5, 'Report description remains readable');
+  await assertReadable(description);
   return civicLogin;
 }
 
