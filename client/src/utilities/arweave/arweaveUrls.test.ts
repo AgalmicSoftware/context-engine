@@ -69,12 +69,17 @@ describe('arweaveUrls helpers', () => {
     expect(normalizeArweaveUrl('https://example.example.test/foo.png')).toBe('https://example.example.test/foo.png');
   });
 
-  it('allows only http, https, and ar:// values as link hrefs', () => {
+  it('allows only http, https, ar://, and same-site path values as link hrefs', () => {
     expect(toSafeLinkHref(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(toSafeLinkHref(`ar://${txId}`, { gateway: testArweaveGateway })).toBe(`${testArweaveGateway}/${txId}`);
     expect(toSafeLinkHref(' https://example.test/doc ')).toBe('https://example.test/doc');
     expect(toSafeLinkHref('http://example.test/doc?x=1')).toBe('http://example.test/doc?x=1');
-    // Unlike normalizeArweaveUrl, unsafe or relative values never pass through.
+    // Same-site paths, such as saved doc-library viewer links, resolve against this origin.
+    expect(toSafeLinkHref('/session/demo/docs?__ceDocTx=abc')).toBe(
+      `${window.location.origin}/session/demo/docs?__ceDocTx=abc`,
+    );
+    expect(toSafeLinkHref('/.//evil.example/phish')).toBe(`${window.location.origin}//evil.example/phish`);
+    // Unlike normalizeArweaveUrl, unsafe values never pass through.
     expect(normalizeArweaveUrl('javascript:alert(1)')).toBe('javascript:alert(1)');
     for (const unsafe of [
       'javascript:alert(1)',
@@ -83,7 +88,10 @@ describe('arweaveUrls helpers', () => {
       'vbscript:msgbox(1)',
       'ar://not-a-tx-id',
       'ftp://example.test/doc',
-      '/relative/doc',
+      '//evil.example/phish',
+      '/\\evil.example/phish',
+      '/\t/evil.example/phish',
+      'relative/doc',
       'example.test/doc',
       txId,
       '',

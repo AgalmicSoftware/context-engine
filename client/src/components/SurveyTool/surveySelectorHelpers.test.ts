@@ -49,6 +49,14 @@ describe('surveySelectorHelpers document URLs', () => {
     expect(getSurveyDocumentLinkTitle({ documentURLs: ['javascript:alert(1)'] })).toBe('');
   });
 
+  it('links same-site document paths, such as saved doc-library viewer links', () => {
+    expect(
+      getSurveyDocumentUrls({
+        documentURLs: ['/session/demo/docs?__ceDocTx=abc', '//evil.example/phish', '/\\evil.example/phish'],
+      }),
+    ).toEqual([`${window.location.origin}/session/demo/docs?__ceDocTx=abc`]);
+  });
+
   it('returns an empty list when no document URL array exists', () => {
     expect(getSurveyDocumentUrls({ documentURLs: 'https://example.com' })).toEqual([]);
     expect(getSurveyDocumentUrls(null)).toEqual([]);

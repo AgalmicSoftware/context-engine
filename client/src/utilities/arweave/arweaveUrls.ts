@@ -244,9 +244,10 @@ export const buildArweaveGatewayUrl = (
   options: { gateway?: unknown; contextLabel?: unknown } = {},
 ): string => normalizeArweaveUrl(value, options);
 
-// Render-time guard for stored or uploaded links: only http(s) URLs and
-// ar://<txId> (mapped to the gateway) may become an href. Anything else,
-// such as javascript:, returns '' so callers render plain text instead.
+// Render-time guard for stored or uploaded links: only http(s) URLs,
+// ar://<txId> (mapped to the gateway) and paths on this site (such as saved
+// doc-library viewer links) may become an href. Anything else, such as
+// javascript: or //other.host, returns '' so callers render plain text instead.
 export const toSafeLinkHref = (
   value: unknown,
   { gateway = '', contextLabel = 'ui_link' }: { gateway?: unknown; contextLabel?: unknown } = {},
@@ -255,6 +256,12 @@ export const toSafeLinkHref = (
   if (!raw) return '';
   if (raw.startsWith('ar://')) return parseArweaveTxId(raw) ? normalizeArweaveUrl(raw, { gateway, contextLabel }) : '';
   try {
+    if (raw.startsWith('/')) {
+      // Return the absolute URL: a resolved path such as //host would leave the site again.
+      const origin = typeof window === 'undefined' ? '' : window.location.origin;
+      const url = new URL(raw, origin);
+      return url.origin === origin ? url.href : '';
+    }
     const url = new URL(raw);
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : '';
   } catch {

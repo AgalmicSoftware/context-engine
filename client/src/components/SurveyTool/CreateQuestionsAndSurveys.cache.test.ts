@@ -371,6 +371,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     }
   });
 
+  it('rejects root-relative document paths that would leave this site', () => {
+    expect(
+      sanitizeDocumentUrls(['/\\evil.example/phish', '/\t/evil.example/phish', '//evil.example/phish', '/local/doc']),
+    ).toEqual(['/local/doc']);
+  });
+
   it('accepts http(s), root-relative, Arweave, and Lit document URLs while blocking unsafe hrefs', () => {
     const txId = 'a'.repeat(43);
     const arUrl = `ar://${txId}`;

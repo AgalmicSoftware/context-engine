@@ -22,11 +22,10 @@ export const buildCreateSurveyDocumentUrlsPatch = (documentURLs: unknown) => ({
 const normalizeDocumentUrl = (value: unknown) => {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
+  // Lit encrypted-doc references are kept as text; displays never link them.
   if (litStorage.isLitArweaveUrl(trimmed)) return trimmed;
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-    return trimmed;
-  }
-  // Store the author's text; the shared render-time check decides what is linkable.
+  // Store the author's text, but only when the shared display check would link it,
+  // so authoring and every survey display accept the same URLs.
   return toSafeLinkHref(trimmed) ? trimmed : '';
 };
 
