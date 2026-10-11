@@ -254,6 +254,31 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
   });
 });
 
+it('checks the expected survey and question bindings on envelope values', async () => {
+  Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  const provider = makeProvider(SIG_A);
+  const envelope = await cryptoUtils.encryptEnvelopeValue(4, {
+    providerKind: provider,
+    account: ACCOUNT,
+    chainId: CHAIN_ID,
+    surveyId: SURVEY_ID,
+    kind: 'rating',
+    qId: 'importance:q1',
+  });
+  const decrypt = (binding) =>
+    cryptoUtils.decryptEnvelopeValue(envelope, {
+      providerLike: provider,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      ...binding,
+    });
+
+  await expect(decrypt({ expectedQId: 'conviction:q1' })).rejects.toThrow(/bound to a different survey field/);
+  await expect(decrypt({ expectedQId: 'importance:q2' })).rejects.toThrow(/bound to a different survey field/);
+  await expect(decrypt({ expectedSurveyId: OTHER_SURVEY_ID })).rejects.toThrow(/bound to a different survey field/);
+  await expect(decrypt({ expectedQId: 'IMPORTANCE:Q1', expectedSurveyId: SURVEY_ID })).resolves.toBe(4);
+});
+
 it('round-trips signed quadratic allocations through self-encrypted response envelopes', async () => {
   Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
   const provider = makeProvider(SIG_A);

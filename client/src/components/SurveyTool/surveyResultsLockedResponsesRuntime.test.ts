@@ -70,4 +70,12 @@ describe('SurveyResults locked response decrypt', () => {
       );
     });
   });
+  it('binds rating decrypts to the rating and question they were encrypted for', async () => {
+    const decryptEnvelopeValue = jest.fn<ReturnType<DecryptPort>, Parameters<DecryptPort>>().mockResolvedValue('7');
+    await buildRuntime(decryptEnvelopeValue).handleDecryptLockedResponses();
+
+    const [[, answerOptions], [, importanceOptions]] = decryptEnvelopeValue.mock.calls;
+    expect(answerOptions).not.toHaveProperty('expectedQId');
+    expect(importanceOptions).toEqual(expect.objectContaining({ expectedQId: 'importance:q1' }));
+  });
 });

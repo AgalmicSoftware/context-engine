@@ -14,6 +14,10 @@ export type CryptoGateDecryptOptions = {
   // Worker, which needs the verified session context.
   sessionConfig?: Record<string, unknown>;
   sessionSlug?: string;
+  // Values the envelope's authenticated data must match.
+  expectedSurveyId?: unknown;
+  expectedQId?: unknown;
+  expectedFieldKey?: unknown;
 };
 
 export type CryptoGatePort = {

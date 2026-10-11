@@ -460,10 +460,11 @@ export const createSurveyResultsLockedResponsesRuntime = ({
         !hasOwn(override, 'importance')
       ) {
         try {
-          const importance = await ports.decryptEnvelopeValue(
-            response.importanceEncrypted,
-            getCryptoGateDecryptOptions(),
-          );
+          // Ratings are encrypted with qId `${fieldKey}:${questionId}`.
+          const importance = await ports.decryptEnvelopeValue(response.importanceEncrypted, {
+            ...getCryptoGateDecryptOptions(),
+            expectedQId: `importance:${row.questionId}`,
+          });
           override.importance = Number.isNaN(Number(importance)) ? importance : Number(importance);
           anyDecrypted = true;
         } catch (e) {
@@ -477,10 +478,10 @@ export const createSurveyResultsLockedResponsesRuntime = ({
         !hasOwn(override, 'conviction')
       ) {
         try {
-          const conviction = await ports.decryptEnvelopeValue(
-            response.convictionEncrypted,
-            getCryptoGateDecryptOptions(),
-          );
+          const conviction = await ports.decryptEnvelopeValue(response.convictionEncrypted, {
+            ...getCryptoGateDecryptOptions(),
+            expectedQId: `conviction:${row.questionId}`,
+          });
           override.conviction = Number.isNaN(Number(conviction)) ? conviction : Number(conviction);
           anyDecrypted = true;
         } catch (e) {

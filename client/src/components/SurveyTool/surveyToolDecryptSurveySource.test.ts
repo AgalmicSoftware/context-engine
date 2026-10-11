@@ -1,4 +1,12 @@
-import { buildSurveyDecryptAttemptSourceInputs, buildSurveyDecryptSourceState } from './surveyToolDecryptSurveySource';
+import { webcrypto } from 'crypto';
+import { ethers } from 'ethers';
+import { cryptoUtils } from '../../utilities/crypto/cryptography';
+import {
+  buildSurveyDecryptAttemptSourceInputs,
+  buildSurveyDecryptSourceState,
+  decryptQuestionRatingEnvelopeMap,
+  decryptQuestionRatingEnvelopes,
+} from './surveyToolDecryptSurveySource';
 
 describe('surveyToolDecryptSurveySource', () => {
   it('normalizes latest responses into a typed source slice and rating envelope map', () => {
@@ -69,5 +77,61 @@ describe('surveyToolDecryptSurveySource', () => {
       fallbackSourceSlice: fallbackSlice,
       previousStateSlice: fallbackSlice,
     });
+  });
+});
+
+describe('rating envelope decrypt binding', () => {
+  const wallet = new ethers.Wallet(`0x${'81'.repeat(32)}`);
+  const context = {
+    account: wallet.address,
+    chainId: 11155420,
+    providerLike: {
+      request: async ({ method, params }: { method: string; params: string[] }) => {
+        if (method === 'eth_chainId') return '0xaa37dc';
+        if (method === 'eth_accounts') return [wallet.address];
+        const { domain, types, message } = JSON.parse(params[1]);
+        delete types.EIP712Domain;
+        return wallet._signTypedData(domain, types, message);
+      },
+    },
+  };
+  const encryptRating = (value: number, fieldKey: string, questionId: string) =>
+    cryptoUtils.encryptEnvelopeValue(value, {
+      ...context,
+      provider: context.providerLike,
+      surveyId: ethers.constants.HashZero,
+      kind: 'rating',
+      qId: `${fieldKey}:${questionId}`,
+    });
+  const ports = {
+    decryptEnvelopeValue: (value: unknown, options: Record<string, unknown>) =>
+      cryptoUtils.decryptEnvelopeValue(value, options),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  });
+
+  it('rejects rating envelopes moved between ratings or questions', async () => {
+    const importance = await encryptRating(7, 'importance', 'q1');
+    const conviction = await encryptRating(3, 'conviction', 'q1');
+
+    await expect(
+      decryptQuestionRatingEnvelopeMap(
+        {
+          q1: { importanceEncrypted: importance, convictionEncrypted: importance },
+          q2: { importanceEncrypted: importance, convictionEncrypted: conviction },
+        },
+        context,
+        ports,
+      ),
+    ).resolves.toEqual({ decryptedImportanceFromEnv: { q1: 7 }, decryptedConvictionFromEnv: {} });
+    await expect(
+      decryptQuestionRatingEnvelopes(
+        { importanceEncrypted: conviction, convictionEncrypted: conviction },
+        { ...context, questionId: 'Q1' },
+        ports,
+      ),
+    ).resolves.toEqual({ decryptedImportance: null, decryptedConviction: 3 });
   });
 });

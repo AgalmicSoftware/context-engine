@@ -162,6 +162,10 @@ type CryptoDecryptOptions = UnknownRecord & {
   litOpts?: LitOptions;
   throwOnError?: boolean;
   preferLitRecipients?: boolean;
+  // Values the envelope's authenticated data must match (case-insensitive).
+  expectedSurveyId?: unknown;
+  expectedQId?: unknown;
+  expectedFieldKey?: unknown;
 };
 type GroupPasswordInput = {
   password?: unknown;
@@ -2032,7 +2036,16 @@ const decryptWithPassword = async (encryptedData: string | UnknownRecord, passwo
  */
 const decryptEnvelopeValue = async (envelopeJson: unknown, opts: CryptoDecryptOptions = {}) => {
   const jsonStr = typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
-  const { account, chainId, providerLike, litOpts, preferLitRecipients } = opts || {};
+  const {
+    account,
+    chainId,
+    providerLike,
+    litOpts,
+    preferLitRecipients,
+    expectedSurveyId,
+    expectedQId,
+    expectedFieldKey,
+  } = opts || {};
   const { value } = await decryptEnvelopeToValue({
     envelopeJson: jsonStr,
     account: toOptionalString(account),
@@ -2040,6 +2053,9 @@ const decryptEnvelopeValue = async (envelopeJson: unknown, opts: CryptoDecryptOp
     providerLike: providerLike as ProviderLike,
     litOpts,
     preferLitRecipients: !!preferLitRecipients,
+    expectedSurveyId,
+    expectedQId,
+    expectedFieldKey,
     workerContext: {
       sessionConfig: opts.sessionConfig,
       sessionSlug: opts.sessionSlug,
