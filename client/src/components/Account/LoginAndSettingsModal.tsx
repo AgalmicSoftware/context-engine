@@ -822,8 +822,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   handleLogout = async () => {
     this._passkeyWalletActionId += 1;
     this._purposefulPasskeyActionId = null;
-    if (this.props.provider === 'passkey_eoa') {
+    // Disconnect a saved passkey wallet on every logout, not only a passkey one,
+    // so the start-up restore cannot sign the visitor back in as that account.
+    try {
       await passkeyWallet.logoutPasskeyWallet();
+    } catch (error) {
+      if (this.props.provider === 'passkey_eoa') throw error;
+      accountLog.warn('Saved passkey wallet disconnect failed during logout:', error);
     }
 
     if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {

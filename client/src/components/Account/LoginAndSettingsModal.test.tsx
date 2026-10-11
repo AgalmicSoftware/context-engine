@@ -835,6 +835,33 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }
   });
 
+  it('disconnects a saved passkey wallet when a wagmi account logs out', async () => {
+    // Otherwise the start-up restore signs the visitor back in as that passkey account.
+    const wagmiDisconnect = jest.fn();
+    const subject = new LoginAndSettingsModalSubject(buildProps({ provider: 'wagmi', wagmiDisconnect }));
+
+    await subject.handleLogout();
+
+    expect(mockedPasskeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
+    expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('still logs a wagmi account out when the saved passkey wallet cannot be disconnected', async () => {
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockedPasskeyWallet.logoutPasskeyWallet.mockRejectedValueOnce(new Error('storage unavailable'));
+    const props = buildProps({ provider: 'wagmi', wagmiDisconnect: jest.fn() });
+    const subject = new LoginAndSettingsModalSubject(props);
+
+    try {
+      await expect(subject.handleLogout()).resolves.toBeUndefined();
+      expect(props.changeAccount).toHaveBeenCalledWith({});
+      expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleWarnSpy.mockRestore();
+      mockedPasskeyWallet.logoutPasskeyWallet.mockReset();
+    }
+  });
+
   it('does not set wagmi disconnect flag when logging out passkey wallet', async () => {
     const subject = new LoginAndSettingsModalSubject(
       buildProps({
