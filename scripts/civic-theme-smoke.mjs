@@ -1,7 +1,7 @@
 // Run against a local server with demo surfaces enabled. Answers stay in the
 // isolated browser context and are cleared; this smoke never submits responses.
 import assert from 'node:assert/strict';
-import { assertReadable, auditPanelContrast, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
+import { assertReadable, auditPanelContrast, clickQuestionAction, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
 import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
 import { inspectCivicWizard } from './civic-theme-wizard-smoke.mjs';
 import { inspectCivicAuthoring } from './civic-theme-authoring-smoke.mjs';
@@ -46,6 +46,34 @@ export async function inspectCivicAbout(page) {
     return element.getBoundingClientRect().top - container.getBoundingClientRect().top;
   });
   assert(topPadding >= 16, 'The About hero has space above it below the navbar');
+  await assertReadable(page.locator('body'));
+  for (const name of ['Related Work', 'Recognition', 'Roadmap', 'Functionality']) {
+    const section = page.getByRole('button', { name, exact: true });
+    if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click();
+    await assertReadable(page.locator('body'));
+  }
+}
+
+export async function inspectMinimalPost(page) {
+  await page.getByRole('heading', { name: 'Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)', exact: true }).waitFor({ state: 'visible' });
+  await assertReadable(page.locator('body'));
+  await page.getByRole('button', { name: 'List', exact: true }).click();
+  await assertReadable(page.locator('body'));
+  const point = page.getByRole('button', { name: 'P1: 3/10, 70% confidence', exact: true });
+  await point.click();
+  await assertReadable(page.getByRole('tooltip'));
+  await point.press('Escape');
+  await page.getByText('Evaluation protocol, scoring, and record schema', { exact: true }).click();
+  await assertReadable(page.locator('body'));
+}
+
+export async function inspectMinimalProfile(page) {
+  const switcher = page.getByRole('button', { name: 'Show Surveys', exact: true }).first();
+  await switcher.waitFor({ state: 'visible' });
+  await assertReadable(page.locator('body'));
+  await switcher.click();
+  await page.getByRole('button', { name: 'Show Questions', exact: true }).first().waitFor({ state: 'visible' });
+  await assertReadable(page.locator('body'));
 }
 
 export async function inspectCivicWelcome(page) {
@@ -295,7 +323,7 @@ export async function inspectCivicSession(page) {
   await clear.click();
   await clear.waitFor({ state: 'hidden' });
 
-  await page.getByRole('button', { name: 'View All Questions', exact: true }).click();
+  await clickQuestionAction(page, 'View All Questions');
   await page.getByRole('radio', { name: 'Agree', exact: true }).first().check();
   const fullClear = page.getByRole('button', { name: 'Clear pending changes', exact: true });
   await fullClear.waitFor({ state: 'visible' });
@@ -303,6 +331,7 @@ export async function inspectCivicSession(page) {
   assert.equal(fullClearStyle.opacity, '1', 'Full-view clear control is not faded');
   assert(contrast(fullClearStyle.color, 'rgb(255, 255, 255)') >= 4.5, 'Full-view clear control is visible');
   await fullClear.click();
+  await assertReadable(page.locator('body'));
   const option = page.getByText('An elected legislature', { exact: true });
   await option.waitFor({ state: 'visible' });
   const choiceStyle = () =>
@@ -349,10 +378,17 @@ export async function runSmoke() {
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
       await inspectCivicExplorer(page);
       await inspectCivicStats(page);
+      const profilePath = await page.locator('a[href^="/u/"]').first().getAttribute('href');
+      assert(profilePath, 'The demo leaderboard links to a public profile');
+      await page.goto(`${baseUrl}${profilePath}`, { waitUntil: 'domcontentloaded' });
+      await inspectMinimalProfile(page);
+      await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
       await inspectCivicWelcome(page);
       await inspectCivicExplorerContent(page);
       await page.goto(`${baseUrl}/about`, { waitUntil: 'domcontentloaded' });
       await inspectCivicAbout(page);
+      await page.goto(`${baseUrl}/posts/agent-village-wrapped-2026`, { waitUntil: 'domcontentloaded' });
+      await inspectMinimalPost(page);
       await page.goto(`${baseUrl}/session/new`, { waitUntil: 'domcontentloaded' });
       await inspectCivicWizard(page);
       await page.goto(`${baseUrl}/session/demo-2`, { waitUntil: 'domcontentloaded' });

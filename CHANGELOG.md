@@ -4,8 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-- Add the Civic light theme with readable controls, dialogs, response cards, and
-  reports, while preserving the existing themes and binary answer colors.
+- Make Minimal the default light theme with readable controls, dialogs, response
+  cards, reports, and article charts. Preserve saved theme selections and binary
+  answer colors.
 - Add a Sessions directory to community Stats with authority totals and filters
   for session type, creation date, recorded activity, and admin address. Show the
   chart and leaderboard's session scope above each section.

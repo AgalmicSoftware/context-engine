@@ -159,7 +159,7 @@ describe('PostViz presentation variants', () => {
             {
               kind: 'Freeform',
               title: 'What is my personal AI fire alarm?',
-              quotes: [{ label: 'P1', text: 'A privacy-line crossing.' }],
+              quotes: [{ label: 'P1', text: 'A privacy-line crossing.', color: '#9ee7ff' }],
             },
           ],
         }}
@@ -170,6 +170,9 @@ describe('PostViz presentation variants', () => {
     const freeform = screen.getByRole('group', { name: 'What is my personal AI fire alarm?' });
     expect(multichoice).toHaveClass('responseTypeMultiSelectPanel');
     expect(freeform).toHaveClass('responseTypeFreeformPanel');
+    const participant = within(freeform).getByText('P1');
+    expect(participant.style.color).toBe('');
+    expect(participant.querySelector('[aria-hidden="true"]')).toHaveStyle({ backgroundColor: '#9ee7ff' });
     expect(within(multichoice).getByText('event filtering')).toBeInTheDocument();
     expect(within(multichoice).getByLabelText('event filtering: 3')).toBeInTheDocument();
   });

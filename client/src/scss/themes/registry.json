@@ -1,5 +1,5 @@
 {
-  "defaultThemeId": "context-engine",
+  "defaultThemeId": "civic",
   "themes": [
     {
       "id": "context-engine",
@@ -15,7 +15,7 @@
     },
     {
       "id": "civic",
-      "label": "Civic",
+      "label": "Minimal",
       "colorScheme": "light",
       "layoutProfile": "minimal-app"
     }

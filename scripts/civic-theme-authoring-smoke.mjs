@@ -1,8 +1,8 @@
-import { assertReadable } from './civic-theme-overlay-smoke.mjs';
+import { assertReadable, clickQuestionAction } from './civic-theme-overlay-smoke.mjs';
 
 // Uses disposable local drafts only; never generates with AI or submits content.
 export async function inspectCivicAuthoring(page) {
-  await page.getByRole('button', { name: 'Create New Question', exact: true }).click();
+  await clickQuestionAction(page, 'Create New Question');
   const panel = page.locator('[class*="createSurveyContainer_"]');
   await panel.waitFor({ state: 'visible' });
   const manual = panel.getByRole('button', { name: 'Manual', exact: true });
@@ -37,5 +37,5 @@ export async function inspectCivicAuthoring(page) {
   }
   await page.getByRole('dialog').getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.getByRole('button', { name: 'Close Create Interface', exact: true }).click();
+  await clickQuestionAction(page, 'Close Create Interface');
 }

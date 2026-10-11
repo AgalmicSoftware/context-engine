@@ -6,7 +6,7 @@
 @use 'color-vision';
 
 @mixin emit-all-themes() {
-  @include contract.emit-theme(':root', 'context-engine', context-engine.$theme);
+  @include contract.emit-theme(':root', 'civic', civic.$theme);
   @include contract.emit-theme(":root[data-ce-theme='context-engine']", 'context-engine', context-engine.$theme);
   @include contract.emit-theme(":root[data-ce-theme='classic-95']", 'classic-95', classic-95.$theme);
   @include contract.emit-theme(":root[data-ce-theme='civic']", 'civic', civic.$theme);

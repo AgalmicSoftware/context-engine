@@ -2701,9 +2701,75 @@ h3.postHeading {
   }
 
   figcaption {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin-top: 4px;
-    color: $blue;
+    color: $text;
     font-size: 0.72rem;
+
+    i {
+      width: 8px;
+      height: 8px;
+      border: 1px solid var(--ce-input-border);
+      border-radius: 50%;
+    }
+  }
+}
+
+// These charts originally paired inverse text with translucent dark surfaces.
+// Keep complete foreground/background pairs when the page uses a light canvas.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .postDisclosure,
+  .postCode,
+  .precisionBeeswarmCard,
+  .precisionTable,
+  .responseTypePrecisionGrid,
+  .networkCanvas,
+  .binaryBeeswarmSvg,
+  .binaryBeeswarmTooltip {
+    background: var(--ce-surface-subtle);
+    color: var(--ce-panel-text);
+  }
+
+  .editorialStatsPanel h4,
+  .editorialStatsTotal,
+  .editorialLegendRow strong,
+  .editorialBarMeta strong,
+  .editorialRing > span,
+  .precisionQuestionLabel,
+  .precisionMedian,
+  .binaryBeeswarmTooltip strong,
+  .markdownBody code {
+    color: var(--ce-panel-text);
+  }
+
+  .editorialLegendRow > span:last-child,
+  .precisionTableHeader,
+  .precisionQuestionText,
+  .binaryBeeswarmTooltip p,
+  .binaryBeeswarmTooltip span {
+    color: var(--ce-panel-text-muted);
+  }
+
+  .vizToggleButtonActive,
+  .vizToggleButtonActive:hover {
+    background: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+  }
+
+  .binaryBeeswarmYTickLabel {
+    fill: var(--ce-panel-text-muted);
+  }
+
+  .markdownBody a {
+    &,
+    &:visited,
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-surface-subtle);
+      color: var(--ce-link);
+    }
   }
 }
 

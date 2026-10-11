@@ -22,7 +22,7 @@ describe('AppThemeSelector', () => {
       'Context Engine (default)',
       'Context Engine',
       'Classic 95',
-      'Civic',
+      'Minimal',
     ]);
 
     fireEvent.change(select, { target: { value: 'classic-95' } });
@@ -35,7 +35,7 @@ describe('AppThemeSelector', () => {
     expect(document.documentElement.dataset.ceThemeSource).toBe('deployment');
   });
 
-  test('selects and persists Civic with light native controls', () => {
+  test('selects and persists Minimal with light native controls', () => {
     render(<AppThemeSelector />);
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.SETTINGS_THEME), { target: { value: 'civic' } });
     expect(window.localStorage.getItem(CE_THEME_STORAGE_KEY)).toBe('civic');

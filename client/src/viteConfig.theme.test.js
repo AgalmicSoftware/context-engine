@@ -12,7 +12,7 @@ describe('Vite theme bootstrap contract', () => {
 
     expect(normalizeThemeIdForHtml(' classic-95 ', registry)).toBe('classic-95');
     expect(normalizeThemeIdForHtml(' civic ', registry)).toBe('civic');
-    expect(normalizeThemeIdForHtml('../remote.css', registry)).toBe('context-engine');
+    expect(normalizeThemeIdForHtml('../remote.css', registry)).toBe('civic');
   });
 
   test('keeps the bootstrap external and ahead of the app entry', () => {

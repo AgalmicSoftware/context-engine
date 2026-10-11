@@ -66,7 +66,8 @@ export const auditPanelContrast = (element, parentLevels = 0) => {
     if (opacity === 0) continue;
     const textStyle = placeholder ? getComputedStyle(node, '::placeholder') : style;
     const textFill = isTextField && textStyle.webkitTextFillColor;
-    const foreground = parse(textFill && textFill !== 'currentcolor' ? textFill : textStyle.color);
+    const svgFill = node.matches('text, tspan') && textStyle.fill;
+    const foreground = parse(textFill && textFill !== 'currentcolor' ? textFill : svgFill || textStyle.color);
     foreground.alpha *= opacity * (placeholder ? Number(textStyle.opacity) : 1);
     const ratios = backgrounds.map((background) => {
       const levels = [luminance(blend(foreground, background)), luminance(background)].sort((a, b) => b - a);
@@ -94,6 +95,12 @@ export const assertReadable = async (locator, parentLevels = 0) => {
   assert.equal(result.failures.length, 0, `Panel contrast: ${JSON.stringify(result.failures)}`);
 };
 
+export async function clickQuestionAction(page, name) {
+  const action = page.getByRole('button', { name, exact: true });
+  if (!(await action.isVisible())) await page.getByRole('button', { name: 'Question actions', exact: true }).click();
+  await action.click();
+}
+
 export async function inspectCivicOverlays(page) {
   const lock = page.getByRole('button', { name: 'Choose encryption audience', exact: true });
   await lock.click();
@@ -113,7 +120,7 @@ export async function inspectCivicOverlays(page) {
   await page.getByTestId('ce-survey-additional-lock').click();
   await page.getByTestId('ce-survey-additional-toggle').click();
 
-  await page.getByRole('button', { name: 'Filter Questions', exact: true }).click();
+  await clickQuestionAction(page, 'Filter Questions');
   const filterTag = page.getByRole('dialog').locator('[class*="tagBubble_"]').first();
   await filterTag.click();
   assert.equal(await filterTag.getAttribute('aria-pressed'), 'true');
@@ -128,14 +135,14 @@ export async function inspectCivicOverlays(page) {
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
 
-  await page.getByRole('button', { name: 'Open voice mode', exact: true }).click();
+  await clickQuestionAction(page, 'Open voice mode');
   await assertReadable(page.getByRole('dialog'));
   await page.getByRole('button', { name: /^Interview Talk/ }).click();
   await assertReadable(page.getByRole('dialog'));
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
 
-  await page.getByRole('button', { name: 'View All Questions', exact: true }).click();
+  await clickQuestionAction(page, 'View All Questions');
   const tags = page.getByRole('button', { name: 'Show question tags', exact: true }).first();
   await tags.click();
   await assertReadable(page.getByRole('menu'));

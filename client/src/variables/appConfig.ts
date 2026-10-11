@@ -30,8 +30,8 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
 // fresh installs / no-storage cases honor this env default.
 export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', false);
 // Bundled runtime theme selected when no explicit user preference is stored.
-// Unknown values fail closed to `context-engine` in the theme registry.
-export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'context-engine');
+// Unknown values fall back to Minimal (`civic`) in the theme registry.
+export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'civic');
 // Opt-in exposure gate. Keep false until the deployment's route and
 // accessibility matrix has passed for every bundled app theme.
 export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', true);

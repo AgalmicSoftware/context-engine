@@ -22,7 +22,7 @@ describe('pre-paint theme bootstrap', () => {
     expect(document.documentElement.dataset.ceThemeSource).toBe('user');
   });
 
-  test('restores Civic with light native controls before the app loads', () => {
+  test('restores Minimal with light native controls before the app loads', () => {
     window.localStorage.setItem('ce:theme', 'civic');
     window.eval(source);
     expect(document.documentElement.dataset.ceTheme).toBe('civic');
@@ -47,5 +47,28 @@ describe('pre-paint theme bootstrap', () => {
     window.localStorage.setItem('ce:color-vision', 'unknown');
     window.eval(source);
     expect(document.documentElement.dataset.ceColorVision).toBe('standard');
+  });
+
+  test.each(['', 'unknown'])('boots Minimal when no valid preference or deployment exists (%s)', (deployment) => {
+    document.documentElement.dataset.ceDeploymentTheme = deployment;
+    window.localStorage.setItem('ce:theme', 'removed-theme');
+    window.eval(source);
+    expect(document.documentElement.dataset.ceTheme).toBe('civic');
+    expect(document.documentElement.dataset.ceThemeSource).toBe('default');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+  });
+
+  test('boots Minimal even when browser storage is unavailable', () => {
+    delete document.documentElement.dataset.ceDeploymentTheme;
+    const getItem = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Storage unavailable');
+    });
+    try {
+      window.eval(source);
+      expect(document.documentElement.dataset.ceTheme).toBe('civic');
+      expect(document.documentElement.style.colorScheme).toBe('light');
+    } finally {
+      getItem.mockRestore();
+    }
   });
 });

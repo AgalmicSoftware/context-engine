@@ -25,7 +25,7 @@
     ? storedTheme
     : isAllowed(deploymentTheme)
       ? deploymentTheme
-      : 'context-engine';
+      : 'civic';
 
   root.dataset.ceTheme = themeId;
   root.dataset.ceColorVision = colorBlindMode ? 'color-blind' : 'standard';

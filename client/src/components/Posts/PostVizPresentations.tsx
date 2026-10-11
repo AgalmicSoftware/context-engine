@@ -562,7 +562,10 @@ export const ResponseTypeGridPresentation = ({
                   <figure key={`${quote.label || 'quote'}-${index}`}>
                     <blockquote>{quote.text}</blockquote>
                     {quote.label && (
-                      <figcaption style={quote.color ? { color: quote.color } : undefined}>{quote.label}</figcaption>
+                      <figcaption>
+                        {quote.color && <i aria-hidden="true" style={{ backgroundColor: quote.color }} />}
+                        {quote.label}
+                      </figcaption>
                     )}
                   </figure>
                 ))}

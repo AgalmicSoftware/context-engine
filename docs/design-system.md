@@ -28,7 +28,7 @@ Expanded content avoids an extra padded wrapper, and the embedded report uses
 smaller toolbar and content insets. Results controls retain 44px touch targets
 and use the available width; desktop and standalone report spacing is unchanged.
 
-Civic question previews and response cards use panel text on light surfaces for
+Minimal question previews and response cards use panel text on light surfaces for
 choice labels, freeform answers, rating values, comments, encrypted placeholders,
 and aggregate summaries. Response stance pills keep their semantic background
 and foreground colors.
@@ -38,7 +38,7 @@ order is:
 
 1. explicit accessibility/user preference (`ce:theme` in local storage);
 2. deployment default `REACT_APP_CE_DEFAULT_THEME`;
-3. built-in `context-engine`.
+3. built-in Minimal (`civic`).
 
 `client/public/theme-bootstrap.js` applies user/deployment state before the app
 bundle runs. `client/src/utilities/ui/themeRuntime.ts` validates and persists
@@ -65,7 +65,7 @@ charts use `chartColors.ts` token references instead of fixed JavaScript colors.
 
 Quadratic option scrolling uses `--ce-option-scroll-*` tokens for its yellow
 navigation cues, including hover and disabled states. These controls retain the
-same colors in Context Engine and Classic 95; Civic uses a quiet blue-gray treatment.
+same colors in Context Engine and Classic 95; Minimal uses a quiet blue-gray treatment.
 They remain independent of response stance colors.
 Their foreground/background pairs are contrast-tested at 4.5:1.
 
@@ -88,18 +88,24 @@ palette and control tokens. The document root is the named `ce-theme` style
 container, so components that genuinely change layout use
 `@container ce-theme style(--ce-layout-profile: …)` instead of naming an app
 theme ID. The `standard-app` profile keeps the existing application layout.
-The `minimal-app` profile adds the restrained session and control layout used by Civic.
+The `minimal-app` profile adds the restrained session and control layout used by Minimal.
 The `desktop-window` profile provides the compact window grammar used by the home
 window, Control Panel applets, Statistics split pane, question dialog, login
 control, and bottom taskbar. Keep ordinary color, spacing, and control changes
 on their narrower semantic tokens rather than adding structural queries.
 
-`civic` is a white, minimal theme for government and business sessions. Select
-**Civic** in Settings → App theme, or use `REACT_APP_CE_DEFAULT_THEME=civic`
+Minimal is the default white theme. Its stable configuration and storage ID remains
+`civic`, preserving existing saved selections. Select
+**Minimal** in Settings → App theme, or use `REACT_APP_CE_DEFAULT_THEME=civic`
 for a deployment default. It uses dark slate text, blue actions, subtle borders,
 modest corner radii, sans-serif typography with system fallbacks, and flat surfaces.
 Login and Submit share the brighter blue submit palette, including hover states.
-Civic Welcome slides use a white canvas, opaque artwork, dark copy, and blue navigation. White line-art illustrations are inverted only within this profile; color illustrations retain their original colors.
+Minimal Welcome slides use a white canvas, opaque artwork, dark copy, and blue navigation. White line-art illustrations are inverted only within this profile; color illustrations retain their original colors.
+Article chart labels, totals, tooltips, code blocks, and expanded methodology use
+explicit light-surface text pairs. Participant colors appear as swatches beside
+readable quote labels.
+Public profile section switchers use opaque muted text for their inactive labels
+and dividers, retaining readable contrast on the white canvas.
 
 The `minimal-app` layout profile centers session titles with the shared five-second fade and hover/focus reveal, presents session
 sections as a single column of compact rows, and removes decorative depth from
@@ -428,7 +434,7 @@ the 735×803 feedback viewport plus compact, wide, and ultra-wide/short desktop
 sizes so content, artwork, and the bottom controls cannot overlap or escape the
 frame.
 
-For Civic Explorer tab labels, session choice-state contrast, clear control, centered title with timed fade, report
+For Minimal Explorer tab labels, session choice-state contrast, clear control, centered title with timed fade, report
 readability, and login-size regression smoke, start a local server with demo surfaces
 enabled and run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:civic`.
 The smoke covers desktop and mobile Explorer cards and all five expanded tools,
