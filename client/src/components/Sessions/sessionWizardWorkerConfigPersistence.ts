@@ -205,8 +205,17 @@ const verifyExpectedPublicConfigValue = (expected: unknown, actual: unknown, pat
     }
     const expectedKeys = Object.keys(expected as UnknownRecord).sort();
     const actualKeys = Object.keys(actual as UnknownRecord).sort();
-    if (expectedKeys.length !== actualKeys.length || expectedKeys.some((key, index) => key !== actualKeys[index])) {
-      throw new Error(`Worker config verification failed: public config mismatch at "${path}".`);
+    // Field names only: values are never part of the message.
+    const missingKeys = expectedKeys.filter((key) => !actualKeys.includes(key));
+    const unexpectedKeys = actualKeys.filter((key) => !expectedKeys.includes(key));
+    if (missingKeys.length || unexpectedKeys.length) {
+      const detail = [
+        missingKeys.length ? `missing ${missingKeys.join(', ')}` : '',
+        unexpectedKeys.length ? `unexpected ${unexpectedKeys.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join('; ');
+      throw new Error(`Worker config verification failed: public config mismatch at "${path}" (${detail}).`);
     }
     Object.entries(expected as UnknownRecord).forEach(([key, entry]) => {
       verifyExpectedPublicConfigValue(entry, (actual as UnknownRecord)[key], `${path}.${key}`);

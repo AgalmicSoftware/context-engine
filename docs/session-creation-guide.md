@@ -1145,8 +1145,8 @@ public fields, including session appearance and the Worker URL's origin. It
 skips fields the Worker sets itself: the authorization epoch, the publication
 marker, the response field encryption it reports on every read, and, before
 publication, a revision the deploy helper staged. If verification fails, the
-wizard shows the Worker's reason, such as a rejected write or the field that
-did not match.
+wizard shows the reason: the Worker's error for a rejected write, or where the
+read-back config differs, naming the fields it lacks or adds.
 
 Retrying queued Group creation compares canonical HTTPS image and document URLs,
 so a host-only URL and the same URL with a trailing slash reuse the saved Group.

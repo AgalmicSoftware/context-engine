@@ -396,6 +396,29 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ).rejects.toThrow(/public config mismatch at "config\.limits"/i);
   });
 
+  it('names the fields a read-back object lacks or adds', async () => {
+    const readback = verifiedConfig('revision-field-names', { limits: { perWalletPerDay: 1 } });
+    delete (readback as Record<string, unknown>).appearance;
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(jsonResponse(200, { config: readback }));
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), limits: {} },
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: 'revision-field-names',
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow('Worker config verification failed: public config mismatch at "config" (missing appearance).');
+  });
+
   it('accepts the matching server publication marker while exactly verifying expected nested fields', async () => {
     const revision = 'revision-server-marker';
     const limits = { perWalletPerDay: 2 };
