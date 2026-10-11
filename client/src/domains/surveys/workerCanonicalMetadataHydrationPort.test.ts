@@ -3,7 +3,9 @@ import {
   loadWorkerCanonicalSurveys,
   mergeWorkerCanonicalQuestionMetadata,
   mergeWorkerCanonicalSurveyMetadata,
+  type WorkerCanonicalMetadataEntry,
 } from './workerCanonicalMetadataHydrationPort';
+import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { resolveWorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
 
 const SESSION_ID = `0x${'2'.repeat(32)}`;
@@ -413,6 +415,183 @@ describe('workerCanonicalMetadataHydrationPort', () => {
     ).rejects.toThrow('worker_metadata_storage_invalid_cursor');
     expect(listSessionStorageRefsPage).toHaveBeenCalledTimes(2);
     expect(readSessionStorageBlob).not.toHaveBeenCalled();
+  });
+
+  describe('question and survey ownership', () => {
+    const ADMIN = '0x00000000000000000000000000000000000000aa';
+    const AUTHOR = '0x00000000000000000000000000000000000000bb';
+    const ATTACKER = '0x00000000000000000000000000000000000000cc';
+    const PROMPT = 'Should the pilot continue?';
+    const QUESTION_ID = String(generateQuestionId('binary', PROMPT, [], false, 99)).toLowerCase();
+    const sessionConfig = { ...buildWorkerSessionConfig(), adminAddress: ADMIN };
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+    const question = (overrides: Record<string, unknown> = {}) => ({
+      id: QUESTION_ID,
+      type: 'binary',
+      prompt: PROMPT,
+      sessionId: SESSION_ID,
+      sessionSlug: 'worker-session',
+      ...overrides,
+    });
+    const listedItem = (
+      id: string,
+      createdAt: string,
+      uploader = '',
+      resource: 'questions' | 'surveys' = 'questions',
+    ) => ({
+      storageRef: { backend: 'cloudflare', id, resource },
+      metadata: { createdAt, resource, ...(uploader ? { uploader } : {}) },
+    });
+    const loadFrom = async (
+      items: Array<Record<string, unknown>>,
+      payloads: Record<string, Record<string, unknown>>,
+      resource: 'questions' | 'surveys' = 'questions',
+    ) => {
+      const readSessionStorageBlob = jest.fn(
+        async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
+      );
+      const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+      const rows = await load(
+        { sessionConfig, sessionSlug: 'worker-session' },
+        {
+          listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+          readSessionStorageBlob,
+        },
+      );
+      return { rows, readSessionStorageBlob };
+    };
+
+    it('keeps the first upload of a question id when someone uploads it again later', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_attacker', '2026-10-02T00:00:00.000Z', ATTACKER),
+          listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+        ],
+        {
+          cf_official: question(),
+          cf_attacker: question({ prompt: 'ATTACKER rewrite', options: ['No', 'Yes'] }),
+        },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
+      expect(cache.worker.questions[QUESTION_ID].options).toBeUndefined();
+      expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID]).toEqual({
+        admin: false,
+        createdAtMs: Date.parse('2026-10-01T00:00:00.000Z'),
+        storageRefId: 'cf_official',
+        verified: true,
+      });
+    });
+
+    it('lets a session admin upload replace the first version', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+          listedItem('cf_admin', '2026-10-03T00:00:00.000Z', ADMIN),
+          listedItem('cf_attacker', '2026-10-04T00:00:00.000Z', ATTACKER),
+        ],
+        {
+          cf_official: question(),
+          cf_admin: question({ tags: ['moderated'] }),
+          cf_attacker: question({ prompt: 'ATTACKER rewrite' }),
+        },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID].tags).toEqual(['moderated']);
+      expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID].storageRefId).toBe('cf_admin');
+    });
+
+    it('prefers the version whose content hashes to its id over an earlier rewrite', async () => {
+      const { rows } = await loadFrom(
+        [listedItem('cf_front_run', '2026-10-01T00:00:00.000Z'), listedItem('cf_author', '2026-10-02T00:00:00.000Z')],
+        { cf_front_run: question({ prompt: 'Spoofed text under a predicted id' }), cf_author: question() },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID].prompt).toBe(PROMPT);
+      // A lone legacy question whose id used another hash input still shows.
+      const legacy = await loadFrom([listedItem('cf_legacy_poll', '2026-10-01T00:00:00.000Z')], {
+        cf_legacy_poll: question({ id: '0xlegacypoll', type: 'multichoice', options: ['A', 'B'] }),
+      });
+      const legacyCache = mergeWorkerCanonicalQuestionMetadata(null, legacy.rows, identity) as any;
+      expect(legacyCache.worker.questions['0xlegacypoll'].prompt).toBe(PROMPT);
+    });
+
+    it('corrects a cache that kept a later rewrite under the old newest-wins rule', async () => {
+      const staleCache = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
+      staleCache.worker.questions[QUESTION_ID] = { ...question({ prompt: 'ATTACKER rewrite' }), voiceCredits: 1 };
+      staleCache.worker.workerQuestionMetadataRefs[QUESTION_ID] = {
+        createdAtMs: Date.parse('2026-10-02T00:00:00.000Z'),
+        storageRefId: 'cf_attacker',
+      };
+      const { rows, readSessionStorageBlob } = await loadFrom(
+        [listedItem('cf_attacker', '2026-10-02T00:00:00.000Z'), listedItem('cf_official', '2026-10-01T00:00:00.000Z')],
+        { cf_official: question(), cf_attacker: question({ prompt: 'ATTACKER rewrite' }) },
+      );
+      expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual([
+        'cf_attacker',
+        'cf_official',
+      ]);
+      const cache = mergeWorkerCanonicalQuestionMetadata(staleCache, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
+      expect(cache.worker.questions[QUESTION_ID].voiceCredits).toBeUndefined();
+    });
+
+    it('drops ids the Worker lists as hidden, including cached copies', async () => {
+      const cached = mergeWorkerCanonicalQuestionMetadata(
+        null,
+        (await loadFrom([listedItem('cf_spam', '2026-10-01T00:00:00.000Z')], { cf_spam: question() })).rows,
+        identity,
+      ) as any;
+      expect(cached.worker.questions[QUESTION_ID]).toBeDefined();
+      const { rows, readSessionStorageBlob } = await loadFrom(
+        [
+          { hidden: true, metadata: { resource: 'questions', resourceId: QUESTION_ID, hidden: true } },
+          listedItem('cf_unmarked_copy', '2026-10-05T00:00:00.000Z'),
+        ],
+        { cf_unmarked_copy: question() },
+      );
+      expect(rows).toEqual([{ hidden: true, id: QUESTION_ID }]);
+      expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
+      const cache = mergeWorkerCanonicalQuestionMetadata(cached, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID]).toBeUndefined();
+      expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID]).toBeUndefined();
+    });
+
+    it('skips survey rows whose title is not text', async () => {
+      const survey = (title: unknown) => ({
+        surveyID: '0xsurvey',
+        title,
+        sessionId: SESSION_ID,
+        sessionSlug: 'worker-session',
+      });
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_object_title', '2026-10-01T00:00:00.000Z', '', 'surveys'),
+          listedItem('cf_text_title', '2026-10-02T00:00:00.000Z', '', 'surveys'),
+        ],
+        { cf_object_title: survey({ text: 'crash' }), cf_text_title: survey('Readable survey') },
+        'surveys',
+      );
+      expect(
+        rows.map((row: WorkerCanonicalMetadataEntry) => ('storageRefId' in row ? row.storageRefId : row.id)),
+      ).toEqual(['cf_text_title']);
+      const cache = mergeWorkerCanonicalSurveyMetadata(null, rows, identity) as any;
+      expect(cache.worker.surveys['0xsurvey'].title).toBe('Readable survey');
+    });
+
+    it('marks rows from a listed session admin uploader', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_admin', '2026-10-01T00:00:00.000Z', ADMIN),
+          listedItem('cf_author', '2026-10-01T00:00:01.000Z', AUTHOR),
+        ],
+        { cf_admin: question({ id: '0xadminq' }), cf_author: question() },
+      );
+      expect(rows.map((row: any) => [row.storageRefId, row.uploaderIsAdmin === true])).toEqual([
+        ['cf_admin', true],
+        ['cf_author', false],
+      ]);
+    });
   });
 
   it('replaces same-slug question and survey caches when the exact Worker authority changes', () => {
