@@ -2082,13 +2082,15 @@ class CommunityTab extends Component<any, any> {
     );
   }
 
-  renderQuestionSwarm() {
-    const { points, scopeLabel } = this._getQuestionSwarmView();
+  renderQuestionSwarm(view = this._getQuestionSwarmView()) {
+    const { points, scopeLabel, isDemoFallback } = view;
     return (
       <section className={styles.beeswarmSection} data-testid="ce-community-beeswarm-section">
-        <p className={styles.scopeLabel} data-testid="ce-community-beeswarm-session">
-          {scopeLabel}
-        </p>
+        {isDemoFallback && (
+          <p className={styles.scopeLabel} data-testid="ce-community-beeswarm-session">
+            {scopeLabel}
+          </p>
+        )}
         <BeeswarmPlot
           points={points}
           className={styles.beeswarmPlot}
@@ -2107,6 +2109,7 @@ class CommunityTab extends Component<any, any> {
       return {
         points: this._buildDemoBeeswarmPoints(),
         scopeLabel: `Demo session: ${this._sessionDisplayName(slug)}`,
+        isDemoFallback: false,
       };
     }
     const points =
@@ -2117,9 +2120,10 @@ class CommunityTab extends Component<any, any> {
       return {
         points: this._buildDemoBeeswarmPoints(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG),
         scopeLabel: `Demo session: ${this._sessionDisplayName(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG)}`,
+        isDemoFallback: true,
       };
     }
-    return { points, scopeLabel: this._communityScopeLabel() };
+    return { points, scopeLabel: this._communityScopeLabel(), isDemoFallback: false };
   };
 
   _getQuestionSwarmPoints = () => this._getQuestionSwarmView().points;
@@ -2457,62 +2461,67 @@ class CommunityTab extends Component<any, any> {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
     const participantCount = this.getMemoizedLeaderboardData().length;
     const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
+    const swarmView = this._getQuestionSwarmView();
 
     return (
       <div className={styles.communityTab}>
-        <div className={styles.leaderboardSection}>
-          <div className={styles.leaderboardTopBar}>
-            <div className={styles.leaderboardHeading}>
-              <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
-              <p className={styles.scopeLabel} data-testid="ce-community-leaderboard-session">
-                {this._communityScopeLabel()}
-              </p>
+        <div className={styles.statsSection}>
+          <div className={styles.statsHeader}>
+            <div className={styles.headerActionsRight}>
+              {!initialLoadDone && (
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  spin
+                  className={styles.statsHeaderSpinner}
+                  data-testid="ce-community-stats-loading-spinner"
+                />
+              )}
             </div>
-            <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
           </div>
-          <div className={styles.content}>
-            <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
+          <div className={styles.statsGrid}>
+            {displayStats.map((stat: any) => (
+              <button
+                type="button"
+                key={stat.label}
+                className={styles.statItem}
+                onClick={() => this.handleStatClick(stat)}
+                data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
+                data-ce-count={String(stat.count)}
+              >
+                <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
+                <span className={styles.statCount}>
+                  {stat.label === 'Groups' && loadingSbtsCreated ? (
+                    <FontAwesomeIcon icon={faSpinner} spin />
+                  ) : (
+                    stat.count
+                  )}
+                </span>
+                <span className={styles.statLabel}>{stat.label === 'Groups' ? t('sbts') : stat.label}</span>
+              </button>
+            ))}
           </div>
         </div>
-        <div className={styles.rightSection}>
-          <div className={styles.statsSection}>
-            <div className={styles.statsHeader}>
-              <div className={styles.headerActionsRight}>
-                {!initialLoadDone && (
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    className={styles.statsHeaderSpinner}
-                    data-testid="ce-community-stats-loading-spinner"
-                  />
-                )}
+        <section
+          className={styles.sessionSection}
+          data-testid="ce-community-session-section"
+          aria-labelledby="ce-community-session-scope"
+        >
+          <p id="ce-community-session-scope" className={styles.scopeLabel} data-testid="ce-community-session-scope">
+            {swarmView.isDemoFallback ? this._communityScopeLabel() : swarmView.scopeLabel}
+          </p>
+          <div className={styles.sessionContent}>
+            <div className={styles.leaderboardSection} data-testid="ce-community-leaderboard-section">
+              <div className={styles.leaderboardTopBar}>
+                <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
+                <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
+              </div>
+              <div className={styles.content}>
+                <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
               </div>
             </div>
-            <div className={styles.statsGrid}>
-              {displayStats.map((stat: any) => (
-                <button
-                  type="button"
-                  key={stat.label}
-                  className={styles.statItem}
-                  onClick={() => this.handleStatClick(stat)}
-                  data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
-                  data-ce-count={String(stat.count)}
-                >
-                  <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
-                  <span className={styles.statCount}>
-                    {stat.label === 'Groups' && loadingSbtsCreated ? (
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                    ) : (
-                      stat.count
-                    )}
-                  </span>
-                  <span className={styles.statLabel}>{stat.label === 'Groups' ? t('sbts') : stat.label}</span>
-                </button>
-              ))}
-            </div>
+            {this.renderQuestionSwarm(swarmView)}
           </div>
-          {this.renderQuestionSwarm()}
-        </div>
+        </section>
 
         <Modal
           isOpen={showModal}

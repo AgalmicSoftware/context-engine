@@ -10,6 +10,7 @@
   --ce-beeswarm-point-color: var(--ce-data-viz-point);
   --ce-beeswarm-point-stroke: var(--ce-data-viz-point-stroke);
   display: flex;
+  flex-direction: column;
   background: var(--ce-color-surface);
   color: var(--ce-panel-text);
   border-radius: var(--ce-radius-5);
@@ -35,6 +36,7 @@
 
   .leaderboardSection {
     flex: 1;
+    min-width: 0;
     padding: 18px;
     border-right: 1px solid var(--ce-color-border-light);
     display: flex;
@@ -55,10 +57,6 @@
     margin: 0;
   }
 
-  .leaderboardHeading {
-    min-width: 0;
-  }
-
   .scopeLabel {
     margin: 0 0 10px;
     color: var(--ce-panel-text);
@@ -68,14 +66,26 @@
     overflow-wrap: anywhere;
   }
 
-  .leaderboardTopBar .scopeLabel {
-    margin: 0;
-  }
-
-  .rightSection {
+  .sessionSection {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    border: var(--ce-data-viz-border);
+    border-radius: var(--ce-radius-12);
+    background: var(--ce-data-viz-surface);
+  }
+
+  .sessionSection > .scopeLabel {
+    margin: 0;
+    padding: 16px 18px 0;
+  }
+
+  .sessionContent {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    min-width: 0;
   }
 
   .statsHeader {
@@ -105,9 +115,11 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
   }
 
   .statsSection {
+    flex: 0 0 auto;
     border-bottom: 1px solid var(--ce-color-border-light);
     background: transparent;
   }
@@ -397,9 +409,13 @@
     flex-direction: column;
     height: auto;
 
-    .rightSection {
-      order: 1;
+    .sessionContent {
+      flex-direction: column;
       width: 100%;
+    }
+
+    .sessionSection {
+      order: 2;
     }
 
     .leaderboardSection {
@@ -416,7 +432,7 @@
     }
 
     .beeswarmSection {
-      order: 2;
+      order: 1;
       height: auto;
     }
 
@@ -426,8 +442,8 @@
   }
 }
 
-/* Classic 95 presents Community as a dense Statistics utility: a participant
- * list on the left and the summary/plot workspace on the right. */
+/* Classic 95 keeps the participant list and plot in a split pane below the
+ * summary counts and their shared session heading. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .communityTab {
     height: 500px;
@@ -525,7 +541,7 @@
     border: 1px solid var(--ce-border-strong);
   }
 
-  .communityTab .rightSection {
+  .communityTab .sessionContent {
     flex: 1 1 auto;
     min-width: 0;
     background: var(--ce-surface-raised);

@@ -300,7 +300,7 @@ describe('CommunityTab helpers', () => {
     expect(toggle().props['aria-pressed']).toBe(false);
   });
 
-  it('labels the chart and leaderboard with the exact selected session', () => {
+  it('groups the chart and leaderboard under one selected-session label', () => {
     const instance = new CommunityTab({
       activeSessionSlug: 'cloud',
       sessionConfig: { slug: 'cloud', sessionName: 'Cloud forum' },
@@ -308,10 +308,27 @@ describe('CommunityTab helpers', () => {
     instance._getSelectedSessionSlugs = jest.fn(() => ['cloud']);
     instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
     instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
-    const labels = collectTreeNodes(instance.render(), (node) =>
-      ['ce-community-beeswarm-session', 'ce-community-leaderboard-session'].includes(node.props?.['data-testid']),
+    const [section] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-session-section',
     );
-    expect(labels.map(collectNodeText)).toEqual(['Session: Cloud forum (cloud)', 'Session: Cloud forum (cloud)']);
+    const labels = collectTreeNodes(section, (node) => node.props?.id === section.props['aria-labelledby']);
+    expect(labels.map(collectNodeText)).toEqual(['Session: Cloud forum (cloud)']);
+    for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
+      expect(collectTreeNodes(section, (node) => node.props?.['data-testid'] === id)).toHaveLength(1);
+    }
+    expect(
+      collectTreeNodes(section, (node) => node.props?.['data-testid'] === 'ce-community-beeswarm-session'),
+    ).toHaveLength(0);
+
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => true);
+    instance._iterScopeCaches = jest.fn(() => [{ slug: 'cloud' }]);
+    instance._buildDemoBeeswarmPoints = jest.fn(() => []);
+    const [demoLabel] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
+    );
+    expect(collectNodeText(demoLabel)).toBe('Demo session: Cloud forum (cloud)');
   });
 
   it('names selected sessions and uses an all-session label for combined scope', () => {
@@ -337,7 +354,13 @@ describe('CommunityTab helpers', () => {
     expect(instance._getQuestionSwarmView()).toEqual({
       points: [{ questionId: 'demo-question', total: 10 }],
       scopeLabel: 'Demo session: demo',
+      isDemoFallback: true,
     });
+    instance._communityScopeLabel = jest.fn(() => 'Session: cloud');
+    const labels = collectTreeNodes(instance.render(), (node) =>
+      ['ce-community-session-scope', 'ce-community-beeswarm-session'].includes(node.props?.['data-testid']),
+    );
+    expect(labels.map(collectNodeText)).toEqual(['Session: cloud', 'Demo session: demo']);
   });
 
   it('keeps /session/debate as its explicit slug', () => {

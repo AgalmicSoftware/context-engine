@@ -113,11 +113,18 @@ export async function inspectCivicStats(page) {
 }
 
 export async function inspectStatsSessionLabels(page) {
-  for (const id of ['ce-community-beeswarm-session', 'ce-community-leaderboard-session']) {
-    const label = page.getByTestId(id);
-    assert(await label.isVisible(), `${id} is visible at the top of its section`);
-    assert.match((await label.innerText()).trim(), /^(?:Demo session: .+|Sessions?: .+|All sessions)$/);
-    await assertReadable(label);
+  const section = page.getByTestId('ce-community-session-section');
+  const label = section.getByTestId('ce-community-session-scope');
+  await label.waitFor({ state: 'visible' });
+  assert(await label.isVisible(), 'One shared session label is visible above the chart and leaderboard');
+  assert.match((await label.innerText()).trim(), /^(?:Demo session: .+|Sessions?: .+|All sessions)$/);
+  await assertReadable(label);
+  const labelBottom = await label.evaluate((element) => element.getBoundingClientRect().bottom);
+  for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
+    const child = section.getByTestId(id);
+    assert.equal(await child.count(), 1, `${id} belongs to the shared session section`);
+    const top = await child.evaluate((element) => element.getBoundingClientRect().top);
+    assert(top >= labelBottom - 1, `${id} appears below the shared session label`);
   }
 }
 

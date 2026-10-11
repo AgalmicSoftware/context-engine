@@ -134,10 +134,11 @@ recorded session creation or updates, not when a local cache was refreshed.
 Sessions with unavailable metadata are excluded only by the relevant active
 filter. Clear filters restores the full directory.
 
-The Consensus Difference chart and leaderboard each show their session scope at
-the top of the section, using the session name and slug when available. Combined
-views list selected sessions or show "All sessions." When the chart displays
-bundled demo data, its label identifies the demo session that supplied the data.
+The Consensus Difference chart and address leaderboard share one session section
+with a name-and-slug caption above both. Combined views list selected sessions or
+show "All sessions." Demo sessions use one shared demo caption; when only the chart
+falls back to a different bundled demo, it retains a separate caption identifying
+that source while the shared caption continues to identify the selected session.
 
 `classic-95` follows the owner's personal-site visual grammar—teal canvas,
 gray raised/inset surfaces, navy title bars, square controls, and Tahoma-style
