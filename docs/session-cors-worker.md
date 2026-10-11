@@ -672,18 +672,26 @@ Admin test panel:
   Legacy configurations without a group policy retain their previous behavior.
   Older artifacts with truncated membership citations may need regeneration to
   show a group above the former 16-citation limit.
-- Generated-analysis input, canonical or admin snapshot, validates readable
-  answers against the full question before counting them: rating bounds, exact
-  choice options and selection limits, and signed quadratic allocations within
-  the question budget, which reach the model with option labels. Invalid
-  answers are excluded even when accompanied by a comment; genuinely
-  unanswered comment-only rows remain supported. This does not change opaque
-  storage admission or the historical admin-snapshot format.
-- Only each participant's latest row per question is analysed, ordered by
-  Worker time and then storage id, as the client orders them. A newer locked,
-  cleared, or invalid answer therefore withdraws an older public one, and
-  superseded rows are not counted as excluded or locked. Canonical questions
-  are keyed by the id the upload route checked for ownership.
+- Generated-analysis input validates readable answers to the current question
+  types (binary, rating, multiple choice, quadratic, freeform) against the full
+  question before counting them: rating bounds, exact choice options and
+  selection limits, and signed quadratic allocations within the question
+  budget, which reach the model with option labels. This applies to canonical
+  input and admin snapshots alike; admin snapshots keep answers to older types,
+  such as polls, as text. Invalid answers are excluded even when accompanied by
+  a comment; genuinely unanswered comment-only rows remain supported. This does
+  not change opaque storage admission or the historical admin-snapshot format.
+- Only each participant's latest readable row per question is analysed,
+  ordered by Worker time and then storage id, as the client orders them. A
+  newer answer that is locked field by field, cleared, or invalid therefore
+  withdraws an older public one, and superseded rows are not counted as
+  excluded or locked. Rows whose whole payload is encrypted, or that were
+  stored for a different audience than the session's current one, are set
+  aside before this step: they do not withdraw an older public answer, and
+  each counts as excluded (whole-payload encrypted rows also as locked) even
+  when a newer row replaced it. Current clients never write either kind into a
+  public session. Canonical questions are keyed by the id the upload route
+  checked for ownership.
 - Only encryption flags and envelopes lock an answer or comment. Public text
   such as "Locked", "Redacted", or "***" is analysed like any other answer; a
   `*` or `[encrypted]` mask without its encryption flag reads as no answer.
@@ -757,11 +765,16 @@ Authenticated clients can use the worker as the session storage boundary:
     rule, so a later upload by anyone else never replaces a question or survey
     people already answered. Uploads stored before this release have no
     uploader, so they never count as admin uploads, and their ids have no
-    first-writer record. The first non-admin upload of a question or survey
-    id without one makes the session coordinator scan that resource once:
-    each id stored only by such older uploads gets an admin-only owner, so
-    only a session admin can upload it again (`409`,
-    `reason: "storage_resource_id_owned"`). New ids stay open to anyone.
+    first-writer record. When a non-admin uploads a question or survey id
+    that has no owner record, the session coordinator checks whether that id
+    was stored before this release. It scans the resource's index in steps
+    of 200 rows, keeping its progress and the ids it finds, so the scan
+    finishes however large the session is; a step reads at most about 400 KV
+    keys and writes none. Each such id is admin-only: only a session admin can
+    upload it again (`409`, `reason: "storage_resource_id_owned"`). An upload
+    runs up to four steps; while a larger session is still being scanned, an
+    upload of a new id returns `503` ("Existing questions and surveys are
+    still being indexed; retry shortly."). New ids stay open to anyone.
   - JSON and multipart uploads share per-upload policy validation. Group IDs
     accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
     of precedence, using the first nonempty list. Multipart `groupIds` and
@@ -1826,8 +1839,8 @@ login, and signed admin request bodies must carry that config's canonical
      `{ nonce, sessionSlug, sessionId }`, and a missing or mismatched canonical
      session ID is rejected before nonce issue.
    - Nonce generation/consumption now also route through a shared helper:
-     it creates 16-byte random nonces as 32 hex characters (EIP-4361 nonces
-     are letters and digits only), and preserves lowercase nonce KV keys,
+     it creates signed nonces from 16 random bytes (see below), and preserves
+     lowercase nonce KV keys,
      `Nonce mismatch or expired.`, `Nonce already used.`, used-nonce TTL writes,
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
@@ -1841,12 +1854,15 @@ login, and signed admin request bodies must carry that config's canonical
      IPv4-mapped address as its IPv4 address; outside that runtime, forwarded
      IP headers are ignored and requests fall back to the bounded
      `anon:unknown` bucket.
-   - Each address may hold up to 16 unexpired nonces at once, each tagged with
-     a hash of the caller network that requested it. Issuing a new nonce never
-     cancels an earlier pending one. Past the cap a new nonce replaces the
-     requesting caller's own oldest one, else the oldest of the caller holding
-     the most; another caller's only pending nonce is never dropped, so the
-     request gets `429` instead. Each nonce is consumed at most once.
+   - Nonces are signed, not stored: `n1`, 32 random hex characters, the expiry
+     as 13 digits of epoch milliseconds, and a 128-bit HMAC of these for the
+     session and wallet, under a random key the session coordinator creates
+     on first use (no new secret or binding). Issuing a nonce stores nothing,
+     so no number of other callers can stop a wallet from getting one. A used
+     nonce is recorded until it expires, so each works once; a forged,
+     foreign, or expired nonce gets `Nonce mismatch or expired.`. A nonce
+     the previous release issued and stored is still accepted once. Nonces
+     contain only letters and digits, as EIP-4361 requires.
 2. Build a SIWE message client-side and sign with `personal_sign`.
    The Worker parses it as strict EIP-4361 so that wallets recognize every
    accepted message as a sign-in request: the header, the address, a blank
@@ -2001,8 +2017,9 @@ token):
   progress is listed only as a marker too. Unhiding restores all versions.
 - The Worker marks every stored version of the id. Versions stored before this
   release have no `resourceId` in their index row, so the first hide reads
-  those payloads once and writes their id into every row it reads; later hides
-  and unhides read only the index.
+  those payloads once and records each row's id in the single write it makes
+  to that row (KV takes one write per key per second); later hides and
+  unhides read only the index.
 - Each change writes an audit entry (`storage_resource_hidden` or
   `storage_resource_unhidden`, with the admin address) to the storage audit
   KV before it takes effect.
