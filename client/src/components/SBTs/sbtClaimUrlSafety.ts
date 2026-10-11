@@ -21,11 +21,16 @@ export const resolveSbtGroupPasswordFailureMessage = (error: unknown): string =>
   return '';
 };
 
-// The on-chain mint mode carried by SBT metadata, or null when it is missing or invalid.
+// The on-chain mint mode carried by SBT metadata, or null when it is missing or invalid. Only an integer or a plain
+// digit string counts: Number() turns values such as ' ', false, [] or '0x0' into 0, which would read as "open".
 export const readKnownSbtMintMode = (sbtInfo: unknown): number | null => {
   const mintMode = sbtInfo && typeof sbtInfo === 'object' ? (sbtInfo as { mintMode?: unknown }).mintMode : null;
-  if (mintMode === null || mintMode === undefined || mintMode === '') return null;
-  const mode = normalizeSbtMintMode(mintMode, -1);
+  const candidate =
+    (typeof mintMode === 'number' && Number.isInteger(mintMode)) ||
+    (typeof mintMode === 'string' && /^(?:0|[1-9]\d*)$/.test(mintMode))
+      ? Number(mintMode)
+      : -1;
+  const mode = normalizeSbtMintMode(candidate, -1);
   return mode < 0 ? null : mode;
 };
 
