@@ -893,6 +893,28 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         expect(same(multi(realOptions))).toBe(true);
       });
 
+      it('ignores surrounding spaces and voice credits written as text, but not case', async () => {
+        const QUAD_PROMPT = 'Spend credits';
+        const quadId = String(generateQuestionId('quadratic', QUAD_PROMPT, ['A', 'B'], false, 120)).toLowerCase();
+        const quadratic = (overrides: Record<string, unknown> = {}) =>
+          question({
+            id: quadId,
+            type: 'quadratic',
+            prompt: QUAD_PROMPT,
+            options: ['A', 'B'],
+            voiceCredits: 120,
+            ...overrides,
+          });
+        // The id hash trims the prompt and options, so these are the same question.
+        const stored = await loadMatcher([listedItem('cf_quad', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_quad: quadratic({ prompt: ` ${QUAD_PROMPT} `, options: ['A ', ' B'], voiceCredits: '120' }),
+        });
+        expect(stored(quadratic())).toBe(true);
+        // Case is kept: readers would see different text.
+        expect(stored(quadratic({ prompt: QUAD_PROMPT.toUpperCase() }))).toBe(false);
+        expect(stored(quadratic({ options: ['a', 'B'] }))).toBe(false);
+      });
+
       it('uses the cached copy of a version it does not read again', async () => {
         const cached = mergeWorkerCanonicalQuestionMetadata(
           null,

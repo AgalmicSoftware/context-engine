@@ -564,13 +564,19 @@ export const loadWorkerCanonicalSurveys = (
 // The authoring inputs a question id is hashed from, compared exactly: the
 // hash trims and lowercases the prompt, skips options for most types and joins
 // multichoice options with commas, so equal ids can hide different questions.
+// Surrounding spaces in the prompt or options are ignored, as the hash ignores
+// them, and voice credits may be stored as text ("120"); everything else,
+// including case, must match.
+const trimText = (value: unknown): unknown => (typeof value === 'string' ? value.trim() : value);
+const readVoiceCredits = (value: unknown): number =>
+  value == null ? 99 : typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
 const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
   JSON.stringify([
     payload.type,
-    payload.prompt,
-    Array.isArray(payload.options) ? payload.options : [],
+    trimText(payload.prompt),
+    Array.isArray(payload.options) ? payload.options.map(trimText) : [],
     !!(payload.singleSelect || payload.oneSelectionOnly),
-    payload.voiceCredits ?? 99,
+    readVoiceCredits(payload.voiceCredits),
   ]);
 
 // Loads the session's questions once and returns a check for whether readers
