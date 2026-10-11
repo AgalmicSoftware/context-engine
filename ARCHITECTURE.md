@@ -76,7 +76,7 @@ architecture.
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
-| **Lit Protocol** | Client-side encrypt/decrypt with EVM access-control conditions | Optional when Lit encryption is selected | External SDK |
+| **Lit Protocol (Chipotle)** | Wraps and releases content keys behind SBT gates; the browser encrypts content locally and the session Worker calls a registered Lit Action | Optional when Lit encryption is selected | Lit Chipotle API via the Session Worker |
 | **Organization adapters** | IAM, key release/KMS, storage, AI, networking, and observability | Planned Company-Operated profile; not shipped | Future adapter boundary |
 
 ## Data Flows
@@ -150,8 +150,10 @@ Hosted & Fast default:
   Worker roles/conditions gate future key release
 
 Lit opt-in:
-  Client encrypts with Lit access conditions
-  Lit nodes evaluate the selected EVM conditions before client-side decrypt
+  Client encrypts content locally with a fresh content key
+  Session Worker asks a registered Lit Action to wrap that key for the SBT gate
+  On read, the Lit Action checks the SBT gate and the Worker returns the key
+  The Worker sees the content key, so this is not end-to-end encryption
   Arweave or Cloudflare stores the resulting ciphertext according to the profile
 ```
 
@@ -356,7 +358,7 @@ Trustless & Slower (implemented opt-in)
 SessionRegistry / Surveys / SBTs   public identity, gates, hashes, membership
 Arweave                            metadata, payloads, tokenURI, documents
 Public EVM                         wallet transactions, gas, contract reads
-Lit (optional)                     selected EVM access conditions and decrypt
+Lit (optional)                     SBT-gated key release via the session Worker
 
 Company-Operated (planned)
 ──────────────────────────

@@ -91,12 +91,19 @@ Worker:
 - authenticates the requester with existing CE worker auth
 - holds or resolves the scoped Chipotle usage key
 - forwards only the minimum request payload to the configured Lit Action
+- sees the CEK in plaintext: the browser sends it to the Worker to be wrapped,
+  and the Worker relays the unwrapped CEK back after a passing decrypt
 
 Lit Action / PKP:
 
 - checks whether the requester satisfies the required SBT gate
-- unwraps or decrypts the protected CEK only after the gate check passes
-- returns either decrypted plaintext or a requester-specific release payload, depending on the final CE envelope design
+- unwraps the protected CEK only after the gate check passes
+- returns the plaintext CEK to the Worker, which relays it to the requester
+
+What this means for the `gate` audience: content wrapped for `lit-sbt-v1`
+recipients can be read by SBT holders who pass the gate and by whoever operates
+the session Worker (normally the session admin). Lit enforces who gets the key,
+but this is not end-to-end encryption between SBT holders.
 
 ## Proposed v3 envelope direction
 
