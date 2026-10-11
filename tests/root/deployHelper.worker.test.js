@@ -5233,6 +5233,35 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.cloudflare.mock.calls.every(([url]) => String(url).endsWith('/accounts?per_page=5'))).toBe(true);
     });
 
+    it('refuses a bundle-text retry whose pinned digest the text does not match', async () => {
+      const fetchMock = makeResumableDeploymentFetch();
+      global.fetch = fetchMock;
+      const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+      const body = {
+        deploymentRequestId: 'inline-pin-request-0001',
+        workerName: 'inline-pin-worker',
+        sessionSlug: 'inline-pin-session',
+        bundleText: 'export default { fetch() { return new Response("caller code"); } };',
+      };
+      // The upload lands, then the first runtime-secret write is ambiguous.
+      fetchMock.workerSecretPutResponses.push(cfFailure(500, 'Secret write response lost.'));
+      const first = await deploySessionWorker(body, env);
+      expect(first.status).toBe(502);
+      expect(first.payload.deploymentRequestPending).toBe(true);
+      const { kvNamespaceId, workerName } = first.payload.orphanResources;
+
+      const retry = await deploySessionWorker({ ...body, bundleSha256: 'a'.repeat(64) }, env);
+
+      expect(retry.status).toBe(409);
+      expect(retry.payload).toEqual(expect.objectContaining({
+        error: 'Worker bundle SHA-256 does not match the verified release manifest.',
+        deploymentRequestPending: true,
+        orphanResources: { kvNamespaceId, kvCleanupStatus: 'retained-upload-pending', workerName },
+      }));
+      expect(retry.payload.deploymentRequestTerminal).toBeUndefined();
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    });
+
     it('never records an Agent Bridge URL that the bridge deploy would refuse', async () => {
       const release = makeWorkerRelease('9');
       const fetchMock = makeReleaseFetch(release);

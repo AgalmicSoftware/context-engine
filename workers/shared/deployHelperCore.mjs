@@ -1657,11 +1657,11 @@ const executeDeployHelperRequestCore = async ({
       toStr(bundleIdentityBindings[0]?.type).trim() === 'plain_text'
       ? toStr(bundleIdentityBindings[0]?.text).trim().toLowerCase()
       : '';
-    // A replay that has not fetched its bundle yet still matches against the
-    // pinned digest, as strictly as after the fetch.
-    const expectedWorkerBundleSha256 = bundleDiagnostics?.sha256 ||
+    // A pinned digest always wins, so neither inline text nor a replay that
+    // has not fetched its bundle yet can resume bytes the pin does not allow.
+    const expectedWorkerBundleSha256 = expectedBundleSha256 ||
+      bundleDiagnostics?.sha256 ||
       expectedInlineBundleSha256 ||
-      expectedBundleSha256 ||
       toStr(idempotencyContext?.bundleSha256).trim().toLowerCase();
     const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) &&
       (ignoreBundleIdentity || !expectedWorkerBundleSha256 || observedBundleSha256 === expectedWorkerBundleSha256);
@@ -1743,6 +1743,20 @@ const executeDeployHelperRequestCore = async ({
       }
       kvId = toStr(existingMarkedNamespaces.matches[0]?.id).trim();
     }
+  }
+
+  // A replay skipped the early bundle check, but uploaded bundle text needs no
+  // network: compare it with the pinned digest now that any staged KV
+  // namespace is known, before a resume can skip the upload path.
+  if (
+    !checkBundleBeforeCloudflare &&
+    hasBundleText &&
+    expectedBundleSha256 &&
+    expectedInlineBundleSha256 !== expectedBundleSha256
+  ) {
+    return keepStagedResourcesPending(buildFailure(409, {
+      error: 'Worker bundle SHA-256 does not match the verified release manifest.',
+    }));
   }
 
   if (
