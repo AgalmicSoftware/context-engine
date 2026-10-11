@@ -976,20 +976,82 @@ describe('OnePageSession auto-mint queue', () => {
   describe('when the group password hash cannot be used', () => {
     const UNREADABLE = "Could not read this group's password check from the chain. Check the network and try again.";
 
-    const queueGroupPasswordJoin = (sbtAddress, account) => {
+    // Metadata without a mint mode can't tell an open group from an unlimited password group.
+    const PASSWORD_BADGE = {
+      name: 'Password Badge',
+      tokenURI: 'ar://password-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    };
+
+    const queueGroupPasswordJoin = (
+      sbtAddress,
+      account,
+      { target = { gp: 'shared-secret' }, info = PASSWORD_BADGE } = {},
+    ) => {
       const subject = createSubject({ account, loginComplete: true, slug: 'edge' });
-      subject.state = { ...subject.state, autoMintTargets: [{ sbt: sbtAddress, gp: 'shared-secret' }] };
+      subject.state = { ...subject.state, autoMintTargets: [{ sbt: sbtAddress, ...target }] };
       subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
       jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
       jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
-      jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
-        name: 'Password Badge',
-        tokenURI: 'ar://password-badge',
-        hasPasswordMint: false,
-        maxTokens: '0',
-      });
+      jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue(info);
       return subject;
     };
+
+    it.each([
+      ['the claim link has no code', PASSWORD_BADGE],
+      ['the metadata could not be read either', null],
+    ])('never claims openly when the hash cannot be read and %s', async (_case, info) => {
+      const sbtAddress = '0x00000000000000000000000000000000000000ed';
+      const subject = queueGroupPasswordJoin(sbtAddress, '0x00000000000000000000000000000000000000ee', {
+        target: {},
+        info,
+      });
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+
+      await subject.runAutoMintQueue();
+
+      expect(claimSpy).not.toHaveBeenCalled();
+      expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
+        name: 'Skipped (read error)',
+        error: UNREADABLE,
+      });
+    });
+
+    it('still claims openly when the metadata says the group is open', async () => {
+      const sbtAddress = '0x00000000000000000000000000000000000000ef';
+      const subject = queueGroupPasswordJoin(sbtAddress, '0x00000000000000000000000000000000000000f0', {
+        target: {},
+        info: { ...PASSWORD_BADGE, name: 'Open Badge', mintMode: 0 },
+      });
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+
+      await subject.runAutoMintQueue();
+
+      expect(claimSpy).toHaveBeenCalledTimes(1);
+      expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({ status: 'success' });
+    });
+
+    it('still uses an invite code when the hash cannot be read', async () => {
+      const sbtAddress = '0x00000000000000000000000000000000000000fa';
+      const subject = queueGroupPasswordJoin(sbtAddress, '0x00000000000000000000000000000000000000fb', {
+        target: { gp: 'invite-token' },
+        info: { ...PASSWORD_BADGE, name: 'Limited Badge', maxTokens: '5' },
+      });
+      subject.decodeInviteInput = jest
+        .fn()
+        .mockReturnValue({ chainId: '84532', sbtAddress, nonce: '3', signature: '0xsig' });
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const claimSpy = jest.spyOn(contractScripts, 'claim');
+      const inviteSpy = jest.spyOn(contractScripts, 'claimWithInvite').mockResolvedValue({ transactionHash: '0xinv' });
+
+      await subject.runAutoMintQueue();
+
+      expect(claimSpy).not.toHaveBeenCalled();
+      expect(inviteSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '3', '0xsig');
+    });
 
     it('skips with a read-failure message, not a public claim, when the hash cannot be read', async () => {
       const sbtAddress = '0x00000000000000000000000000000000000000e9';

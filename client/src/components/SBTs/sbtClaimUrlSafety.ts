@@ -2,6 +2,7 @@ import {
   isGroupPasswordMismatchError,
   isGroupPasswordUnverifiableError,
 } from '../../utilities/crypto/sbtAuthorization';
+import { normalizeSbtMintMode, SBT_MINT_MODE } from '../../utilities/sbt/sbtMintMode.js';
 
 const isCredentialQueryKey = (key: string): boolean => /^(gp|inv|password)\d*$/.test(key.toLowerCase());
 
@@ -19,6 +20,19 @@ export const resolveSbtGroupPasswordFailureMessage = (error: unknown): string =>
   if (isGroupPasswordUnverifiableError(error)) return error instanceof Error ? error.message : String(error);
   return '';
 };
+
+// The on-chain mint mode carried by SBT metadata, or null when it is missing or invalid.
+const readKnownSbtMintMode = (sbtInfo: unknown): number | null => {
+  const mintMode = sbtInfo && typeof sbtInfo === 'object' ? (sbtInfo as { mintMode?: unknown }).mintMode : null;
+  if (mintMode === null || mintMode === undefined || mintMode === '') return null;
+  const mode = normalizeSbtMintMode(mintMode, -1);
+  return mode < 0 ? null : mode;
+};
+
+// A failed group-password hash read (null) is not "no password", so it only allows an open claim when the
+// metadata says the group is open.
+export const isKnownOpenSbt = (sbtInfo: unknown): boolean =>
+  readKnownSbtMintMode(sbtInfo) === SBT_MINT_MODE.PUBLIC_CLAIM;
 
 export const resolveSbtPageMintFailure = ({
   error,

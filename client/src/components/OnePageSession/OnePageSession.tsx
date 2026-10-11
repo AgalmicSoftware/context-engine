@@ -12,7 +12,7 @@ import {
 } from '../../domains/sessions/sessionBalanceReaders.js';
 import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
-import { resolveSbtGroupPasswordFailureMessage } from '../SBTs/sbtClaimUrlSafety';
+import { isKnownOpenSbt, resolveSbtGroupPasswordFailureMessage } from '../SBTs/sbtClaimUrlSafety';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
@@ -1729,9 +1729,11 @@ class OnePageSession extends Component<any, any> {
           path = 'invite';
         } else {
           const gph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
-          // null means the read failed: the group may still have a password, so never treat it as open.
+          // null means the read failed: the group may still have a password, so it is only treated as open
+          // when the metadata says so.
           const gphUnreadable = gph == null;
           const hasGroupPassword = !gphUnreadable && gph !== ethers.constants.HashZero;
+          const mayHaveGroupPassword = gphUnreadable && !isKnownOpenSbt(sbtInfo);
 
           let isPublic = false;
           if (sbtInfo && typeof sbtInfo.hasPasswordMint === 'boolean') {
@@ -1740,13 +1742,17 @@ class OnePageSession extends Component<any, any> {
             // Fallback: Use password presence as heuristic if metadata flag missing
             if (!t.gp) isPublic = true;
           }
-          if (hasGroupPassword || (gphUnreadable && t.gp)) isPublic = false;
+          if (hasGroupPassword || mayHaveGroupPassword) isPublic = false;
 
           if (isPublic) {
             path = 'public';
           } else {
             // Password required paths
-            if (!t.gp) throw new Error('Password required for this group');
+            if (!t.gp) {
+              throw new Error(
+                mayHaveGroupPassword ? GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE : 'Password required for this group',
+              );
+            }
 
             let maxTokensLimit: any = null;
             try {
