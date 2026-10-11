@@ -2162,31 +2162,39 @@ export const createSurveyQuestionsRuntimeMethods = (
         : savedSource
           ? [savedSource]
           : [];
-      const savedIds = new Set(
-        // Optimistic answer rows may omit ratings; they must not shadow the saved envelopes.
-        savedResponses
-          .filter(
-            (response) =>
-              (typeof response.importanceEncrypted === 'string' && response.importanceEncrypted) ||
-              (typeof response.convictionEncrypted === 'string' && response.convictionEncrypted) ||
-              getImportanceFromResponse(response) !== null ||
-              getConvictionFromResponse(response) !== null,
-          )
-          .map((response) => normalizeQuestionIdKey(response.questionID || response.questionId)),
-      );
       const cacheScope = resolveQuestionReadCacheContext(context.props || propsRef.current, submissionGroupKey);
       const cachedResponses =
         readQuestionsCache(submissionGroupKey)?.[cacheScope.networkIdStr]?.questionResponses || {};
-      const cachedRatingSources = questionResponses.flatMap((response: SurveyQuestionsLegacyValue) => {
-        const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
-        if (savedIds.has(qid)) return [];
+      const readCachedResponse = (qid: string): SurveyQuestionsLegacyValue => {
         const raw = cachedResponses[qid]?.[String(context.account || '').toLowerCase()];
         try {
           const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          return saved && typeof saved === 'object' ? [{ ...saved, questionID: qid }] : [];
+          return saved && typeof saved === 'object' ? saved : null;
         } catch (_) {
-          return [];
+          return null;
         }
+      };
+      // Per rating field, the saved row wins; a field it lacks keeps the cached
+      // envelope, so a row with one plaintext rating cannot hide the other envelope.
+      const ratingSources = questionResponses.map((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
+        const rows = [
+          savedResponses.find((row) => normalizeQuestionIdKey(row?.questionID || row?.questionId) === qid),
+          readCachedResponse(qid),
+        ];
+        const source: SurveyQuestionsLegacyValue = { questionID: qid };
+        for (const [fieldKey, envelopeKey] of [
+          ['importance', 'importanceEncrypted'],
+          ['conviction', 'convictionEncrypted'],
+        ]) {
+          const row = rows.find(
+            (candidate) =>
+              candidate &&
+              ((typeof candidate[envelopeKey] === 'string' && candidate[envelopeKey]) || candidate[fieldKey] != null),
+          );
+          if (row) Object.assign(source, { [fieldKey]: row[fieldKey] ?? null, [envelopeKey]: row[envelopeKey] || '' });
+        }
+        return source;
       });
       await processRatingEnvelopesForSubmit(
         {
@@ -2200,7 +2208,7 @@ export const createSurveyQuestionsRuntimeMethods = (
                   additionalComments: {},
                 },
           // A standalone pile may hydrate fields without populating userAnswers.
-          userAnswersSource: { responses: [...savedResponses, ...cachedRatingSources] },
+          userAnswersSource: { responses: ratingSources },
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {

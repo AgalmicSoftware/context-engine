@@ -534,3 +534,57 @@ it.each(['first', 'after another submit', 'with an answer edit', 'with a comment
   },
   60000,
 );
+
+it('keeps an untouched encrypted rating when one locked question is submitted twice in a sitting', async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await lockAndAnswer(h, 1, 'self', 'secret one', [7, 4]);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  await goTo(h, 1);
+
+  await act(async () => h.engine().handleConviction(0, qid(1), 6));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  await act(async () => h.engine().handleAdditionalPile(qid(1), 'later comment'));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+
+  const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(1));
+  expect(row.additional.value).toBe('later comment');
+  expect(registry.get(row.importanceEncrypted)).toBe(7);
+  expect(registry.get(row.convictionEncrypted)).toBe(6);
+  expect(row.importance == null && row.conviction == null).toBe(true);
+  expect(guard(h.uploads.at(-1))).toBe('passed');
+}, 60000);
+
+it('takes a missing rating envelope from the cache even when the saved row has the other rating', async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await lockAndAnswer(h, 1, 'self', 'secret one', [7, 4]);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const prior = h.uploads[0].questionResponses.find((response) => response.questionID === qid(1));
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  await goTo(h, 1);
+  // A saved row that knows only one rating must not stand in for the other.
+  await act(async () => {
+    h.engine().setState({ userAnswers: { responses: [{ questionID: qid(1), importance: 7 }] } });
+  });
+
+  await act(async () => h.engine().handleAdditionalPile(qid(1), 'later comment'));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+
+  const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(1));
+  expect(row.convictionEncrypted).toBe(prior.convictionEncrypted);
+  expect(registry.get(row.convictionEncrypted)).toBe(4);
+}, 60000);

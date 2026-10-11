@@ -478,7 +478,29 @@ export const createSurveyQuestionsSubmitRuntime = (
 
       // Regression guard: the encrypted merge above is a class setState, so
       // build optimistic JSON from the known final slice instead of stateRef.current.
-      const optimisticUserAnswers: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex, undefined, finalSlice);
+      // The slice holds plaintext ratings; uploaded rows hold what storage now has
+      // (envelopes, null plaintext), which a later submit must keep for untouched ratings.
+      const uploadedRows = new Map<string, SurveyQuestionsLegacyValue>(
+        (Array.isArray(receipt?.__ceQuestionResponses) ? receipt.__ceQuestionResponses : []).map(
+          (row: SurveyQuestionsLegacyValue) => [normalizeQuestionIdKey(row?.questionID || row?.questionId), row],
+        ),
+      );
+      const withUploadedRatings = (row: SurveyQuestionsLegacyValue) => {
+        const uploaded = uploadedRows.get(normalizeQuestionIdKey(row?.questionID));
+        return uploaded
+          ? {
+              ...row,
+              importance: uploaded.importance ?? null,
+              conviction: uploaded.conviction ?? null,
+              importanceEncrypted: uploaded.importanceEncrypted || '',
+              convictionEncrypted: uploaded.convictionEncrypted || '',
+            }
+          : row;
+      };
+      const builtUserAnswers: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex, undefined, finalSlice);
+      const optimisticUserAnswers: SurveyQuestionsLegacyValue = Array.isArray(builtUserAnswers?.responses)
+        ? { ...builtUserAnswers, responses: builtUserAnswers.responses.map(withUploadedRatings) }
+        : withUploadedRatings(builtUserAnswers);
       nextBaseline.interviewProvenance = {
         ...stateRef.current.editBaseline?.interviewProvenance,
         ...Object.fromEntries(
