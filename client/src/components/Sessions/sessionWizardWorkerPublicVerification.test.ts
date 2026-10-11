@@ -202,13 +202,11 @@ describe('verifySessionWizardWorkerPublicDeployment', () => {
   });
 
   it("reports the Worker's reason when it rejects the signed config write", async () => {
-    const fetchImpl = jest
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ error: 'Registry-canonical session identity cannot be changed.' }), {
-          status: 409,
-        }),
-      );
+    const fetchImpl = jest.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Registry-canonical session identity cannot be changed.' }), {
+        status: 409,
+      }),
+    );
 
     await expect(
       verifySessionWizardWorkerPublicDeployment({
