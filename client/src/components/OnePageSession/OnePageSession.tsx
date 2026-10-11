@@ -11,7 +11,7 @@ import {
 } from '../../domains/sessions/sessionBalanceReaders.js';
 import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
-import { SBT_GROUP_PASSWORD_MISMATCH_MESSAGE } from '../SBTs/sbtClaimUrlSafety';
+import { resolveSbtGroupPasswordFailureMessage } from '../SBTs/sbtClaimUrlSafety';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
@@ -1843,11 +1843,13 @@ class OnePageSession extends Component<any, any> {
         }
       } catch (e: any) {
         const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
+        // A wrong password, or a check that cannot run here (no WebCrypto), gets its own message.
+        const groupPasswordFailure = resolveSbtGroupPasswordFailureMessage(e);
 
         if (msg.includes('wallet changed during auto-join')) {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
-        } else if (cryptoUtils.isGroupPasswordMismatchError(e)) {
-          updateStatus(sbtKey, { status: 'failed', name: 'Join Failed', error: SBT_GROUP_PASSWORD_MISMATCH_MESSAGE });
+        } else if (groupPasswordFailure) {
+          updateStatus(sbtKey, { status: 'failed', name: 'Join Failed', error: groupPasswordFailure });
         } else if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
           // Graceful handling of "already owned" revert
           this.consumeAutoMintAttempt(sbtAddr, userAddr);

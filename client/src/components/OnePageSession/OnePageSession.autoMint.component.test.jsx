@@ -935,6 +935,44 @@ describe('OnePageSession auto-mint queue', () => {
     });
   });
 
+  it('shows the WebCrypto message when this origin cannot check group passwords', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000e7';
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000e8',
+      loginComplete: true,
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress, gp: 'shared-secret' }],
+    };
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Http Badge',
+      tokenURI: 'ar://http-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(`0x${'11'.repeat(32)}`);
+    const sendSpy = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+    const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+    Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });
+    try {
+      await subject.runAutoMintQueue();
+    } finally {
+      Object.defineProperty(globalThis.crypto, 'subtle', original);
+    }
+
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toEqual({
+      status: 'failed',
+      name: 'Join Failed',
+      error: expect.stringMatching(/^Group passwords need WebCrypto/),
+    });
+  });
+
   it('checks the group password and signs the claim in one derivation before sending', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000e5';
     const account = '0x00000000000000000000000000000000000000e6';

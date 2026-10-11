@@ -35,7 +35,7 @@ export type { SbtPageSessionDisplayConfig } from './sbtPageSessionDisplayHelpers
 export {
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
-  SBT_GROUP_PASSWORD_MISMATCH_MESSAGE,
+  resolveSbtGroupPasswordFailureMessage,
   resolveSbtPageMintFailure,
 } from './sbtClaimUrlSafety';
 export { applySbtPageHistorySummaryFallback, normalizeSbtPageHistorySummary } from './sbtPageHistorySummaryHelpers';

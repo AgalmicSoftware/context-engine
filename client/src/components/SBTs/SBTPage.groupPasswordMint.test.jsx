@@ -78,7 +78,10 @@ describe('SBTPage group-password mint', () => {
       mintingStatus: 'failure',
       groupPasswordChecking: false,
     });
-    expect(SBT_GROUP_PASSWORD_MISMATCH_MESSAGE).toContain('created before Context Engine 0.6.8');
+    // A plain typo must not read as "this group needs recreating".
+    expect(SBT_GROUP_PASSWORD_MISMATCH_MESSAGE).toMatch(
+      /^Incorrect group password\. If this group was created before Context Engine 0\.6\.8, /,
+    );
     expect(toast).not.toHaveBeenCalled();
   });
 
@@ -91,6 +94,23 @@ describe('SBTPage group-password mint', () => {
     await expect(subject.mintUnlimitedWithGroupPassword({ passwordOverride: 'wrong-password' })).resolves.toBe(false);
 
     expect(toast).toHaveBeenCalledWith(SBT_GROUP_PASSWORD_MISMATCH_MESSAGE);
+  });
+
+  it('shows the WebCrypto message when this origin cannot check group passwords', async () => {
+    const subject = createSubject();
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(`0x${'22'.repeat(32)}`);
+    const mint = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+    const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+    Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });
+    try {
+      await expect(subject.mintUnlimitedWithGroupPassword({ passwordOverride: 'any-password' })).resolves.toBe(false);
+    } finally {
+      Object.defineProperty(globalThis.crypto, 'subtle', original);
+    }
+
+    expect(mint).not.toHaveBeenCalled();
+    expect(subject.state.mintingStatus).toBe('failure');
+    expect(subject.state.error).toMatch(/Group passwords need WebCrypto/);
   });
 
   it('keeps other signing failures on the generic claim message', async () => {

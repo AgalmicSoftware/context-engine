@@ -178,7 +178,7 @@ import {
   shouldRunSbtPagePropPasswordAutoMint,
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
-  SBT_GROUP_PASSWORD_MISMATCH_MESSAGE,
+  resolveSbtGroupPasswordFailureMessage,
 } from './sbtPageHelpers';
 import type {
   ReconcileSbtPageHolderRefreshStateArgs,
@@ -2951,7 +2951,9 @@ class SBTPage extends Component<any, any> {
           groupPasswordHash: onchain,
         });
       } catch (error) {
-        if (!cryptoUtils.isGroupPasswordMismatchError(error)) throw error;
+        // A wrong password, or a check that cannot run here (no WebCrypto), gets its own message.
+        const groupPasswordFailure = resolveSbtGroupPasswordFailureMessage(error);
+        if (!groupPasswordFailure) throw error;
         sbtLog.error('[MANUAL-MINT] Credential check failed.');
         if (
           !this.isMintTargetContextCurrent({
@@ -2963,9 +2965,9 @@ class SBTPage extends Component<any, any> {
         ) {
           return false;
         }
-        this.setState(buildSbtPageMintFailurePatch({ error: SBT_GROUP_PASSWORD_MISMATCH_MESSAGE }));
+        this.setState(buildSbtPageMintFailurePatch({ error: groupPasswordFailure }));
         // The mini card shows only "failed", so surface the reason as a toast there.
-        if (this.props.miniaturized) notify.error(SBT_GROUP_PASSWORD_MISMATCH_MESSAGE);
+        if (this.props.miniaturized) notify.error(groupPasswordFailure);
         return false;
       } finally {
         if (this._isMounted) this.setState({ groupPasswordChecking: false });

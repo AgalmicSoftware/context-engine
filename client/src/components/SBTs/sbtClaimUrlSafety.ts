@@ -1,3 +1,8 @@
+import {
+  isGroupPasswordMismatchError,
+  isGroupPasswordUnverifiableError,
+} from '../../utilities/crypto/sbtAuthorization';
+
 const isCredentialQueryKey = (key: string): boolean => /^(gp|inv|password)\d*$/.test(key.toLowerCase());
 
 export const SBT_CLAIM_FAILURE_MESSAGE = 'Claim failed. Verify the credential and network, then retry.';
@@ -5,7 +10,15 @@ export const SBT_ADMIN_INVITE_FAILURE_MESSAGE =
   'Adding invite credentials failed. Verify the network and admin account, then retry.';
 // Pre-0.6.8 groups keep an older on-chain password check that this version cannot derive or replace.
 export const SBT_GROUP_PASSWORD_MISMATCH_MESSAGE =
-  "Incorrect group password. Groups created before Context Engine 0.6.8 use an older password format that this version can't check; the group admin needs to create a new group.";
+  "Incorrect group password. If this group was created before Context Engine 0.6.8, its password uses an older format this version can't check; the group admin needs to create a new group.";
+
+// Group-password failures people can act on: a wrong (or pre-0.6.8) password, or a check that cannot run
+// here, such as an http:// origin without WebCrypto. Other failures return '' and keep their generic copy.
+export const resolveSbtGroupPasswordFailureMessage = (error: unknown): string => {
+  if (isGroupPasswordMismatchError(error)) return SBT_GROUP_PASSWORD_MISMATCH_MESSAGE;
+  if (isGroupPasswordUnverifiableError(error)) return error instanceof Error ? error.message : String(error);
+  return '';
+};
 
 export const resolveSbtPageMintFailure = ({
   error,
