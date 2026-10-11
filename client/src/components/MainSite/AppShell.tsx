@@ -633,7 +633,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     sessionInfoOverrides: {},
     sessionNameOverrides: {},
     sessionHeaderOverrides: {},
-    groupCredentials: {},
     sessionPathResolutionNonce: 0,
     isCacheManagerReady: false,
   };
@@ -1495,12 +1494,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   refreshSessionMetaFields: SessionMetaRefreshController['refreshSessionMetaFields'] = (...args) =>
     this._sessionMetaRefreshController.refreshSessionMetaFields(...args);
 
-  refreshGroupCredentials = async () => {
-    // Legacy metadata-backed Lit credentials are intentionally disabled so
-    // payer/delegation material cannot flow through public session metadata.
-    return;
-  };
-
   // Smart group resolver for deep-linked surveys
   getSurveyRouteSessionSlugHint = () => {
     try {
@@ -2312,7 +2305,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     this.syncLitHooks();
     this.refreshSessionInfo();
     this.refreshSessionMetaFields();
-    this.refreshGroupCredentials();
     const activeProjection = resolveSessionCapabilityProjection(bootstrapSessionConfig);
     const hasExplicitSessionTarget =
       !!this.getSessionTokenFromPath(bootstrapPath) ||
@@ -2771,7 +2763,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this.syncLitHooks();
       this.refreshSessionInfo();
       this.refreshSessionMetaFields();
-      this.refreshGroupCredentials();
       this._questionCacheController?.pruneMaskedQuestionDecryptBackoff?.(Number.MAX_SAFE_INTEGER);
     }
     const authOrProviderChanged =
@@ -3256,8 +3247,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   ensureSessionRouteSbtDiscovery: SessionSbtCacheController['ensureSessionRouteSbtDiscovery'] = (...args) =>
     this._sbtCacheController.ensureSessionRouteSbtDiscovery(...args);
-
-  sendMessageToServer = () => {};
 
   ensureLightSbtDiscovery: SessionSbtCacheController['ensureLightSbtDiscovery'] = (...args) =>
     this._sbtCacheController.ensureLightSbtDiscovery(...args);

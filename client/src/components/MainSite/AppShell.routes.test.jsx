@@ -658,7 +658,6 @@ const stubMainSiteMountSideEffects = (subject) => {
   subject.syncLitHooks = jest.fn();
   subject.refreshSessionInfo = jest.fn();
   subject.refreshSessionMetaFields = jest.fn();
-  subject.refreshGroupCredentials = jest.fn();
   subject.hasPersistedManagedCacheData = jest.fn(async () => false);
   subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
   subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -1424,7 +1423,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -1679,7 +1677,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -1729,7 +1726,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
     subject.getSessionNetwork = jest.fn(() => null);
@@ -2645,7 +2641,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -2697,7 +2692,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -4448,7 +4442,6 @@ describe('AppShell live pathname updates', () => {
         'syncLitHooks',
         'refreshSessionInfo',
         'refreshSessionMetaFields',
-        'refreshGroupCredentials',
         'handleDeepLinkScan',
         'preloadAboutDemoSessionData',
         'checkAllCachesReady',
