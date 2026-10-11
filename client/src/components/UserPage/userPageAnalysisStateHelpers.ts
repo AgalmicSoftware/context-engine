@@ -390,16 +390,35 @@ export const buildUserPageAnalysisErrorStatePatch = ({
   analysisCachedAt: null,
 });
 
+// Analysis sends text to the session's AI provider and caches the result, so it
+// reads only fields that were public when submitted. A field the viewer
+// decrypted in this browser stays marked encrypted and is skipped.
+// encryptionAudience is no signal: writers stamp it on public fields too.
+export const readUserPageAnalysisPublicValue = (field: unknown): unknown => {
+  const record = toAnalysisRecord(field);
+  if (record.encrypted || record.decryptedLocally || record.encryptedPortion) return undefined;
+  return record.value === '*' || record.value === '' ? undefined : record.value;
+};
+
 export const extractUserPageAnalysisAdditionalComment = (value: unknown): string | null => {
   const record = toAnalysisRecord(value);
   if (!Object.keys(record).length) return null;
-  const candidates = [record.additionalComment, record.additionalComments, record.comment, record.comments];
+  // Writers store comments in `additional`; older payloads used the other keys.
+  const candidates = [
+    record.additional,
+    record.additionalComment,
+    record.additionalComments,
+    record.comment,
+    record.comments,
+  ];
   for (const candidate of candidates) {
     if (candidate == null) continue;
     const candidateRecord = toAnalysisRecord(candidate);
-    const val = typeof candidate === 'string' ? candidate : (candidateRecord.value ?? candidateRecord.text ?? null);
-    const encrypted = typeof candidate === 'object' && candidateRecord.encrypted === true;
-    if (val && val !== '*' && !encrypted && String(val).trim() !== '*') return String(val);
+    const val =
+      typeof candidate === 'string'
+        ? candidate
+        : readUserPageAnalysisPublicValue({ ...candidateRecord, value: candidateRecord.value ?? candidateRecord.text });
+    if (val && String(val).trim() && String(val).trim() !== '*') return String(val);
   }
   return null;
 };

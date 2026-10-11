@@ -231,3 +231,38 @@ describe('userPageAnalysisStateHelpers', () => {
     expect(extractUserPageAnalysisImportance({ importance: 3, conviction: 8 })).toBe(3);
   });
 });
+
+it('reads public comments where the response writer stores them, with the same exclusions as answers', () => {
+  // Shaped like the `additional` field surveyToolResponsePayloadController writes.
+  const writerComment = (value: unknown, overrides: Record<string, unknown> = {}) => ({
+    value,
+    encrypted: false,
+    encryptionAudience: 'self',
+    encryptionGateId: null,
+    audienceMode: 'explicit',
+    hash: '',
+    encryptedPortion: '',
+    ...overrides,
+  });
+
+  expect(extractUserPageAnalysisAdditionalComment({ additional: writerComment('public note') })).toBe('public note');
+  expect(
+    extractUserPageAnalysisAdditionalComment({
+      additional: writerComment('*', { encrypted: true, encryptedPortion: '{"v":1}' }),
+    }),
+  ).toBeNull();
+  expect(
+    extractUserPageAnalysisAdditionalComment({
+      additional: writerComment('decrypted note', { encrypted: true, decryptedLocally: true }),
+    }),
+  ).toBeNull();
+  expect(
+    extractUserPageAnalysisAdditionalComment({ additional: writerComment('note', { encryptedPortion: '{"v":1}' }) }),
+  ).toBeNull();
+  expect(
+    extractUserPageAnalysisAdditionalComment({ additional: writerComment(''), additionalComment: 'legacy note' }),
+  ).toBe('legacy note');
+  expect(
+    extractUserPageAnalysisAdditionalComment({ additionalComment: { value: 'legacy note', decryptedLocally: true } }),
+  ).toBeNull();
+});

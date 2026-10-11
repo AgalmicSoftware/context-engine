@@ -255,6 +255,54 @@ describe('UserPage analysis cache and routing', () => {
     expect(JSON.stringify(entry)).not.toContain('private plaintext');
   });
 
+  it('sends public comments but never a comment this browser decrypted', async () => {
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
+    const writerField = (value, overrides = {}) => ({
+      value,
+      encrypted: false,
+      encryptionAudience: 'self',
+      encryptionGateId: null,
+      audienceMode: 'explicit',
+      hash: '',
+      encryptedPortion: '',
+      ...overrides,
+    });
+    const lockedComment = {
+      questionID: 'q2',
+      answer: writerField('A second public answer'),
+      additional: writerField('*', { encrypted: true, hash: `0x${'cd'.repeat(32)}`, encryptedPortion: '{"v":1}' }),
+    };
+    instance.state = {
+      ...instance.state,
+      questionResponseInfo: [
+        ...instance.state.questionResponseInfo,
+        { id: 'q2', type: 'freeform', prompt: 'Question with a locked comment' },
+      ],
+      detailedQuestionResponses: {
+        q1: { ...instance.state.detailedQuestionResponses.q1, additional: writerField('Public context') },
+        q2: lockedComment,
+      },
+    };
+    cryptoUtils.decryptSingleField.mockResolvedValue({
+      answers: {},
+      additionalComments: { q2: { value: 'only-me remark' } },
+      importance: {},
+    });
+
+    await expect(instance.handleDecryptQuestionAnswer('q2', 'additional', lockedComment)).resolves.toBe(true);
+    expect(instance.state.detailedQuestionResponses.q2.additional.value).toBe('only-me remark');
+    await instance.analyzeUser();
+
+    const [userData] = analyzeUserOpinions.mock.calls[0];
+    expect(userData.questions).toEqual([
+      expect.objectContaining({ id: 'q1', additionalComment: 'Public context' }),
+      expect.objectContaining({ id: 'q2', answer: 'A second public answer', additionalComment: undefined }),
+    ]);
+    expect(JSON.stringify(userData)).not.toContain('only-me remark');
+    const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+    expect(JSON.stringify(entry)).not.toContain('only-me remark');
+  });
+
   it('writes analysisCache after a cache miss calls AI', async () => {
     const now = 1710000000000;
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);

@@ -3,6 +3,7 @@ import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } f
 import {
   extractUserPageAnalysisAdditionalComment,
   extractUserPageAnalysisImportance,
+  readUserPageAnalysisPublicValue,
 } from './userPageAnalysisStateHelpers';
 
 type UserPageSbtDisplayNameReader = (sbtInfo: unknown) => unknown;
@@ -87,16 +88,6 @@ export const isUserPageSbtAggregateEntry = (value: unknown): boolean => {
 
 const quadraticMetadata = (question: UserPageUnknownRecord): UserPageUnknownRecord =>
   question.type === 'quadratic' ? { options: question.options, voiceCredits: getVoiceCredits(question) } : {};
-
-// Analysis sends answers to the session's AI provider and caches the result,
-// so it reads only answers that were public when submitted. An answer the
-// viewer decrypted in this browser stays marked encrypted and is skipped.
-// encryptionAudience is no signal: writers stamp it on public answers too.
-const readUserPageAnalysisPublicValue = (field: unknown): unknown => {
-  const record = toAnalysisRecord(field);
-  if (record.encrypted || record.decryptedLocally || record.encryptedPortion) return undefined;
-  return record.value === '*' || record.value === '' ? undefined : record.value;
-};
 
 export const buildUserPageAnalysisCreatedQuestions = (questionCreationInfo: unknown = []): UserPageUnknownRecord[] =>
   (Array.isArray(questionCreationInfo) ? (questionCreationInfo as UserPageAnalysisQuestionRecord[]) : []).map((q) => ({

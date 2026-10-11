@@ -283,7 +283,10 @@ it('sends public answers to profile analysis but never answers this browser decr
 
   const responses: Record<string, unknown> = {
     q1: decrypted,
-    q2: { answer: writerAnswer('public under a Me + admin default', 'self_admin') },
+    q2: {
+      answer: writerAnswer('public under a Me + admin default', 'self_admin'),
+      additional: writerAnswer('a public comment', 'self_admin'),
+    },
     q3: { answer: writerLockedAnswer('gate') },
     q4: { answer: writerAnswer('public under an Only me default', 'self') },
     q5: { answer: writerAnswer('public in a gated session', 'gate') },
@@ -305,6 +308,12 @@ it('sends public answers to profile analysis but never answers this browser decr
     'public from the companion',
   ];
   expect(questions.map((question) => question.answer)).toEqual(publicAnswers);
-  expect(surveys[0]).toMatchObject({ answeredCount: 4 });
+  expect(questions.map((question) => question.additionalComment)).toEqual([
+    'a public comment',
+    undefined,
+    undefined,
+    undefined,
+  ]);
+  expect(surveys[0]).toMatchObject({ answeredCount: 4, additionalCommentsSample: ['a public comment'] });
   expect(JSON.stringify({ questions, surveys })).not.toMatch(/only-me/);
 });
