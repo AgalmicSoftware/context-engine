@@ -3034,6 +3034,8 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     interviewPrefillPacket,
     interviewPrefillError,
   } = engine.state;
+  // The voice modal and its large chunk load on first open, then stay mounted so closing animates.
+  const voiceModeModalMounted = (engine._voiceModeModalMounted ||= !!showVoiceModeModal);
   const fallbackQuestionPool: EarlyVisiblePileQuestion[] =
     Array.isArray(engine.state.questionPool) && engine.state.questionPool.length > 0
       ? (engine.state.questionPool as EarlyVisiblePileQuestion[])
@@ -3248,7 +3250,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         )}
       </div>
 
-      {isInterviewFeatureEnabled(engine.props?.sessionConfig) ? (
+      {isInterviewFeatureEnabled(engine.props?.sessionConfig) && voiceModeModalMounted ? (
         <React.Suspense fallback={null}>
           {(() => {
             const submitContextToken = engine.buildSessionInterviewSubmitContextToken(engine.props);

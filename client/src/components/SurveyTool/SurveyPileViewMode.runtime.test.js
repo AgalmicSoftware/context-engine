@@ -583,6 +583,24 @@ describe('SurveyPileViewMode runtime surface', () => {
     }
   });
 
+  it('mounts the voice-mode modal on first open and keeps it mounted after closing', async () => {
+    mockVoiceModeProps = undefined;
+    renderPile({}, { route: '/session/demo' });
+    const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    // A closed modal is never rendered, so its code is not loaded on a plain visit.
+    expect(mockVoiceModeProps).toBeUndefined();
+
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+    await act(async () => mockVoiceModeProps.onClose());
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    expect(mockVoiceModeProps.isOpen).toBe(false);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE));
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+  });
+
   it('opens interview and group conversation directly from their mode query values', async () => {
     const first = renderPile({}, { route: '/session/demo?foo=1&mode=interview' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
