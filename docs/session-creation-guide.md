@@ -430,7 +430,7 @@ Enter the core session metadata:
   `Amber`; the compact preview updates immediately. This controls only
   documented session accents/chrome and does not change the app theme.
 - slug
-  Use lowercase letters, numbers, `_`, or `-`. The reserved aliases `general`, `debate`, and `rxc` are not allowed for new sessions.
+  Start with a lowercase letter or number, then use only lowercase letters, numbers, `_`, or `-`, up to 128 characters. Participant links open only slugs in this form. The reserved alias `general` is not allowed for new sessions.
 - session ID
 - network/contract defaults for chain-backed profiles
 - `blockLimits.start` for chain-scanned profiles

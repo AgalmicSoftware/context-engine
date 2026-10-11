@@ -7,6 +7,7 @@ import {
   isMissingSessionSlug,
   isReservedSessionSlug,
 } from './sessionWizardSlugValidation';
+import { buildSessionWorkerBootstrapUrl } from '../../utilities/session/sessionWorkerDiscovery';
 
 describe('SessionWizard reserved slug validation', () => {
   it('marks "general" as reserved regardless of case or surrounding whitespace', () => {
@@ -34,6 +35,21 @@ describe('SessionWizard reserved slug validation', () => {
     expect(hasInvalidSessionSlugFormat('good_slug-1')).toBe(false);
   });
 
+  it('accepts exactly the slugs a participant link can open', () => {
+    const accepted = ['a', '0-team', 'good_slug-1', 'a'.repeat(128)];
+    const rejected = ['-team', '_x', 'a'.repeat(129)];
+    [...accepted, ...rejected].forEach((slug) => {
+      let opensForParticipants = true;
+      try {
+        buildSessionWorkerBootstrapUrl('https://worker.example.test', slug);
+      } catch {
+        opensForParticipants = false;
+      }
+      expect(hasInvalidSessionSlugFormat(slug)).toBe(!opensForParticipants);
+      expect(opensForParticipants).toBe(accepted.includes(slug));
+    });
+  });
+
   it('marks empty and blank slugs as missing (not reserved)', () => {
     expect(isMissingSessionSlug('')).toBe(true);
     expect(isMissingSessionSlug('   ')).toBe(true);
@@ -53,7 +69,9 @@ describe('SessionWizard reserved slug validation', () => {
 
   it('uses the exact slug validation error copy', () => {
     expect(REQUIRED_SESSION_SLUG_ERROR).toBe('A session slug is required.');
-    expect(INVALID_SESSION_SLUG_FORMAT_ERROR).toBe('Session slugs must use lowercase letters, numbers, "_" or "-".');
+    expect(INVALID_SESSION_SLUG_FORMAT_ERROR).toBe(
+      'Session slugs must start with a lowercase letter or number and use at most 128 lowercase letters, numbers, "_" or "-".',
+    );
     expect(RESERVED_SESSION_SLUG_ERROR).toBe(
       'This slug is reserved for the default session or legacy compatibility aliases ("general"). Please choose a different slug.',
     );

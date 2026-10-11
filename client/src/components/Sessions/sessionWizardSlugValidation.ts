@@ -10,9 +10,13 @@ const RESERVED_SESSION_SLUG_LIST = Array.from(RESERVED_SESSION_SLUGS)
 
 export const RESERVED_SESSION_SLUG_ERROR = `This slug is reserved for the default session or legacy compatibility aliases (${RESERVED_SESSION_SLUG_LIST}). Please choose a different slug.`;
 
-export const INVALID_SESSION_SLUG_FORMAT_ERROR = 'Session slugs must use lowercase letters, numbers, "_" or "-".';
+export const INVALID_SESSION_SLUG_FORMAT_ERROR =
+  'Session slugs must start with a lowercase letter or number and use at most 128 lowercase letters, numbers, "_" or "-".';
 
-const VALID_SESSION_SLUG_REGEX = /^[a-z0-9_-]+$/;
+// The participant link opens only slugs the Worker bootstrap accepts
+// (validateExactSlug in sessionWorkerDiscovery.ts). Anything looser would
+// publish a session nobody can open.
+const VALID_SESSION_SLUG_REGEX = /^[a-z0-9][a-z0-9_-]{0,127}$/;
 
 export const isMissingSessionSlug = (slug: unknown): boolean => toStr(slug).trim() === '';
 
