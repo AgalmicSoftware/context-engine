@@ -16,6 +16,15 @@ test('immutable cache rules name each emitted hashed file and nothing else', () 
   assert.equal(buildImmutableAssetHeaderRules(['assets/a-11111111.js'], { base: 'https://cdn.example.test/' }), '');
 });
 
+test('file names outside a safe character set get no rule, so they just revalidate', () => {
+  const unusual = ['a b-11111111.js', 'a%20b-11111111.js', '[redacted-email]', 'a~1-11111111.js', 'café-11111111.js'];
+  assert.equal(
+    buildImmutableAssetHeaderRules(['assets/Ok_1.2-abcd1234.js', ...unusual.map((name) => `assets/${name}`)]),
+    `/assets/Ok_1.2-abcd1234.js\n  ${IMMUTABLE}\n`,
+  );
+  assert.equal(buildImmutableAssetHeaderRules(['assets/a-11111111.js'], { base: '/c e/' }), '');
+});
+
 test('the build appends per-file rules after public/_headers is copied, with no /assets wildcard', () => {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-asset-headers-'));
   try {

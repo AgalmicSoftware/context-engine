@@ -445,16 +445,21 @@ const publicAssetsCompatibilityPlugin = () => ({
 });
 
 const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+// Netlify does not document how _headers paths with spaces, %, @ or non-ASCII match.
+const SAFE_HEADER_RULE_PATH = /^[A-Za-z0-9._/-]+$/;
 
 // One exact-path rule per emitted file. A wildcard /assets/* rule would also mark the
-// 404 for a missing file immutable, pinning it in browsers across a rollback.
+// 404 for a missing file immutable, pinning it in browsers across a rollback. A file
+// with an unusual name gets no rule and just revalidates.
 export const buildImmutableAssetHeaderRules = (fileNames, { base = '/', assetsDir = 'assets' } = {}) => {
   if (!String(base).startsWith('/')) return '';
   const prefix = `${String(base).replace(/\/+$/, '')}/`;
   return [...fileNames]
     .filter((fileName) => fileName.startsWith(`${assetsDir}/`))
+    .map((fileName) => `${prefix}${fileName}`)
+    .filter((rulePath) => SAFE_HEADER_RULE_PATH.test(rulePath))
     .sort()
-    .map((fileName) => `${prefix}${fileName}\n  Cache-Control: ${IMMUTABLE_CACHE_CONTROL}\n`)
+    .map((rulePath) => `${rulePath}\n  Cache-Control: ${IMMUTABLE_CACHE_CONTROL}\n`)
     .join('');
 };
 
