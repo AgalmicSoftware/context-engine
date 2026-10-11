@@ -59,7 +59,7 @@ protocol, pinned-authority, and durable-config checks.
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
-2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. Helper and healthcheck URLs are legacy/self-host overrides.
+2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. The deploy-helper URL is a legacy/self-host override.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
@@ -305,7 +305,6 @@ writes (about 240), so set up caching there separately.
   defaults from `publicDeploymentConfig.ts` and `appConfig.ts`.
 - Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
 - The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
-- Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
 - Only `REACT_APP_*` keys are exposed to the browser in the Vite client
   compatibility env.
 - `publicDeploymentConfig.ts` is the single owner of deployment endpoint

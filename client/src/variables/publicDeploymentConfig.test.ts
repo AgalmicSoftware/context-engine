@@ -67,7 +67,7 @@ describe('publicDeploymentConfig', () => {
     });
   });
 
-  it('ships the verified project worker, healthcheck, and deploy-helper defaults', () => {
+  it('ships the verified project worker and deploy-helper defaults', () => {
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
 
