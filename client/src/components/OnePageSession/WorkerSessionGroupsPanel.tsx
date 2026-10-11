@@ -183,8 +183,14 @@ const WorkerSessionGroupsPanel = ({
 
   useEffect(() => {
     // Config objects can refresh during the same wallet prompt; only a new
-    // session, Worker, or account invalidates the user's explicit Join.
-    setPendingJoin(undefined);
+    // session, Worker, or account invalidates the user's explicit Join. A Join
+    // clicked while signed out survives the sign-in it starts on this target.
+    const signedOutTargetKey = targetKey.slice(0, targetKey.lastIndexOf('\n') + 1);
+    setPendingJoin((pending) =>
+      pending?.targetKey === signedOutTargetKey && targetKey !== signedOutTargetKey
+        ? { ...pending, targetKey }
+        : undefined,
+    );
   }, [targetKey]);
 
   useEffect(() => {
