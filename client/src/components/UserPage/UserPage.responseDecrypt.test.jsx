@@ -126,7 +126,8 @@ describe('UserPage response decrypt helpers', () => {
     expect(didDecrypt).toBe(true);
     expect(cryptoUtils.decryptSingleField).toHaveBeenCalled();
     expect(instance.state.detailedQuestionResponses.q1.answer.value).toBe('clear text answer');
-    expect(instance.state.detailedQuestionResponses.q1.answer.encrypted).toBe(false);
+    expect(instance.state.detailedQuestionResponses.q1.answer.encrypted).toBe(true);
+    expect(instance.state.detailedQuestionResponses.q1.answer.decryptedLocally).toBe(true);
     expect(instance.state.detailedQuestionResponses.q1.answer.encryptedPortion).toBeUndefined();
     expect(instance.state.detailedSurveyResponses.s1[0].responseData.answer.value).toBe('clear text answer');
   });

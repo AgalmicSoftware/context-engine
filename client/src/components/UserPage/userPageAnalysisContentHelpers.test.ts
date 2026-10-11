@@ -8,6 +8,7 @@ import {
   isUserPageSbtAggregateEntry,
   readUserPageDirectNetworkCacheBucket,
 } from './userPageAnalysisContentHelpers';
+import { buildUserPageDecryptedResponsePatch } from './userPageGateHelpers';
 
 describe('userPageAnalysisContentHelpers', () => {
   it('detects aggregate SBT entries', () => {
@@ -245,4 +246,42 @@ it('keeps quadratic option order and budgets in profile analysis and excludes ma
     options: question.options,
     voiceCredits: 25,
   });
+});
+
+it('keeps locked answers out of profile analysis after this browser decrypts them', () => {
+  const lockedField = (audience: string) => ({
+    value: '*',
+    encrypted: true,
+    encryptionAudience: audience,
+    encryptedPortion: '{"v":1}',
+  });
+  const decrypted = buildUserPageDecryptedResponsePatch({
+    responseObj: { answer: lockedField('self'), additional: lockedField('self') },
+    questionId: 'q1',
+    fieldToDecrypt: 'both',
+    decryptedResult: {
+      answers: { q1: { value: 'only-me answer' } },
+      additionalComments: { q1: { value: 'only-me note' } },
+    },
+  });
+  expect(decrypted?.answer).toMatchObject({ value: 'only-me answer', encrypted: true, decryptedLocally: true });
+
+  const responses = {
+    q1: decrypted,
+    q2: { answer: { value: 'admin answer', encryptionAudience: 'self_admin' } },
+    q3: { answer: { value: 'gated answer', encrypted: true } },
+    q4: { answer: { value: 'public answer' } },
+  };
+  const questionResponseInfo = ['q1', 'q2', 'q3', 'q4'].map((id) => ({ id, type: 'freeform', prompt: id }));
+  const questions = buildUserPageAnalysisQuestions({ detailedQuestionResponses: responses, questionResponseInfo });
+  const surveys = buildUserPageAnalysisSurveys({
+    surveyResponseInfo: [{ id: 's1', title: 'Survey' }],
+    detailedSurveyResponses: {
+      s1: questionResponseInfo.map((questionData) => ({ questionData, responseData: responses[questionData.id] })),
+    },
+  });
+
+  expect(questions.map((question) => question.answer)).toEqual(['public answer']);
+  expect(surveys[0]).toMatchObject({ answeredCount: 1, sample: [{ answer: 'public answer' }] });
+  expect(JSON.stringify({ questions, surveys })).not.toMatch(/only-me|admin answer|gated answer/);
 });

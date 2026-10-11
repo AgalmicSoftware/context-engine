@@ -5,6 +5,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -201,6 +202,40 @@ describe('UserPage analysis cache and routing', () => {
         sessionConfig: expect.objectContaining({ slug: 'open-slug' }),
       }),
     );
+  });
+
+  it('never sends or caches an Only me answer that this browser decrypted', async () => {
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
+    const lockedResponse = {
+      questionID: 'q2',
+      answer: { value: '*', encrypted: true, encryptionAudience: 'self', encryptedPortion: '{"v":1}' },
+      additional: { value: '', encrypted: false },
+    };
+    instance.state = {
+      ...instance.state,
+      questionResponseInfo: [
+        ...instance.state.questionResponseInfo,
+        { id: 'q2', type: 'freeform', prompt: 'Private question' },
+      ],
+      detailedQuestionResponses: { ...instance.state.detailedQuestionResponses, q2: lockedResponse },
+    };
+    cryptoUtils.decryptSingleField.mockResolvedValue({
+      answers: { q2: { value: 'private plaintext' } },
+      additionalComments: {},
+      importance: {},
+    });
+
+    await expect(instance.handleDecryptQuestionAnswer('q2', 'answer', lockedResponse)).resolves.toBe(true);
+    expect(instance.state.detailedQuestionResponses.q2.answer.value).toBe('private plaintext');
+    await instance.analyzeUser();
+
+    expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+    const [userData] = analyzeUserOpinions.mock.calls[0];
+    expect(userData.questions.map((question) => question.id)).toEqual(['q1']);
+    expect(JSON.stringify(userData)).not.toContain('private plaintext');
+    const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+    expect(entry).toBeTruthy();
+    expect(JSON.stringify(entry)).not.toContain('private plaintext');
   });
 
   it('writes analysisCache after a cache miss calls AI', async () => {
