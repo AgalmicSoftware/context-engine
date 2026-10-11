@@ -376,10 +376,10 @@ export class SessionWriteCoordinator {
       let record = await this.state.storage.get(key);
       if (!Array.isArray(record?.ids)) {
         try {
-          const ids = await this.backfillLegacyStorageOwners({
+          const { ids } = await this.backfillLegacyStorageOwners({
             env: this.env, config: payload?.config, slug: payload?.slug, resource,
           });
-          record = { version: 1, ids: [...ids], completedAtMs: Number(this.now()) || Date.now() };
+          record = { version: 1, ids, completedAtMs: Number(this.now()) || Date.now() };
         } catch {
           return jsonResponse({ ok: false, error: 'Recording the owners of existing questions and surveys failed; retry.' }, 503);
         }

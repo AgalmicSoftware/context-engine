@@ -2015,9 +2015,6 @@ export const backfillLegacyStorageOwners = async ({ env, config, slug, resource,
     if (resourceId) (normalizeAddress(row.metadata.uploader) ? recorded : legacy).add(resourceId);
   }
   const ids = [...legacy].filter((resourceId) => !recorded.has(resourceId)).sort();
-  // Nothing stored yet means nothing to backfill: every later row records its
-  // uploader. Tell the caller, so a failed first upload leaves no marker.
-  ids.scannedRows = rows.length;
   const createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
   for (const resourceId of ids) {
     if (await readStorageResourceOwner({ index, slug, resource, resourceId })) continue;
@@ -2025,7 +2022,7 @@ export const backfillLegacyStorageOwners = async ({ env, config, slug, resource,
       index, slug, resource, resourceId, uploader: LEGACY_STORAGE_OWNER, storageRefId: '', createdAt,
     });
   }
-  return ids;
+  return { ids, scannedRows: rows.length };
 };
 
 // Whether an id without an owner record was stored before first-writer
@@ -2043,8 +2040,10 @@ const resolveLegacyStorageOwner = async ({ env, config, slug, resource, resource
     const markerKey = legacyStorageOwnersMarkerKey({ slug, resource });
     // Another upload may have just recorded the owners; read them again.
     if (await index.get(markerKey)) return { ok: true, owner: await readStorageResourceOwner({ index, slug, resource, resourceId }) };
-    const ids = await backfillLegacyStorageOwners({ env, config, slug, resource, deps });
-    if (ids.scannedRows) await index.put(markerKey, JSON.stringify({ version: 1, count: ids.length }));
+    const { ids, scannedRows } = await backfillLegacyStorageOwners({ env, config, slug, resource, deps });
+    // Nothing stored yet means nothing to backfill, since every later row
+    // records its uploader; skip the marker so a failed first upload leaves none.
+    if (scannedRows) await index.put(markerKey, JSON.stringify({ version: 1, count: ids.length }));
     return { ok: true, owner: ids.includes(resourceId) ? LEGACY_OWNER : null };
   } catch {
     return { ok: false, status: 503, error: 'Recording the owners of existing questions and surveys failed; retry.' };
