@@ -324,6 +324,18 @@ describe('surveySelectorHelpers submitted survey list building', () => {
     expect(first.id).toBe('Survey-A');
   });
 
+  it('skips surveys whose title is not a string', () => {
+    const named = { id: 'named', title: 'Named survey', questionIDs: ['q1'] };
+
+    expect(
+      buildSurveySelectorSubmittedSurveyList({
+        objectTitle: { id: 'object-title', title: { pwned: true }, questionIDs: ['q2'] },
+        numberTitle: { id: 'number-title', title: 7, questionIDs: ['q3'] },
+        named,
+      }),
+    ).toEqual([named]);
+  });
+
   it('returns an empty list for non-object survey bags', () => {
     expect(buildSurveySelectorSubmittedSurveyList(null)).toEqual([]);
     expect(buildSurveySelectorSubmittedSurveyList('bad')).toEqual([]);

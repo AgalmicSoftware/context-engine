@@ -127,7 +127,8 @@ export const buildSurveySelectorSubmittedSurveyList = (surveyBag: unknown = {}):
 
   Object.keys(bag).forEach((sid) => {
     const survey = bag[sid];
-    if (!survey || !survey.title || !Array.isArray(survey.questionIDs)) return;
+    // Uploaded metadata is untrusted; a non-string title would crash the selector render.
+    if (!survey || typeof survey.title !== 'string' || !survey.title || !Array.isArray(survey.questionIDs)) return;
 
     const qids = survey.questionIDs.map((questionId) => String(questionId || '').toLowerCase());
     if (qids.length === 0) return;
