@@ -1,4 +1,10 @@
-import { isInertViewerMime, isTextLikeMime, readBaseMimeType, toViewerBlob } from './viewerMime';
+import {
+  isInertRasterImageMime,
+  isInertViewerMime,
+  isTextLikeMime,
+  readBaseMimeType,
+  toViewerBlob,
+} from './viewerMime';
 
 describe('viewerMime', () => {
   it('reads the base type without parameters, case or padding', () => {
@@ -38,6 +44,22 @@ describe('viewerMime', () => {
       '',
     ]) {
       expect(isInertViewerMime(mime)).toBe(false);
+    }
+  });
+
+  it('accepts only raster images where an image is shown', () => {
+    for (const mime of ['image/png', 'image/jpeg;x=1', 'image/webp', 'IMAGE/GIF']) {
+      expect(isInertRasterImageMime(mime)).toBe(true);
+    }
+    for (const mime of [
+      'image/svg+xml',
+      'image/svg+xml;charset=utf-8',
+      'application/pdf',
+      'video/mp4',
+      'text/html',
+      '',
+    ]) {
+      expect(isInertRasterImageMime(mime)).toBe(false);
     }
   });
 

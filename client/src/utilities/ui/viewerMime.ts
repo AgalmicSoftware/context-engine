@@ -17,15 +17,18 @@ export const isTextLikeMime = (mime: unknown): boolean => {
   return base.startsWith('text/') || TEXT_LIKE_MIME_TYPES.has(base);
 };
 
+// Raster images run nothing, unlike SVG, which can carry script.
+export const isInertRasterImageMime = (mime: unknown): boolean => {
+  const base = readBaseMimeType(mime);
+  return base.startsWith('image/') && !base.includes('svg') && !base.includes('xml');
+};
+
 // A blob: URL has the app's own origin, so opening one in a tab runs any script
 // an SVG, HTML or XML document carries as the app. Only these types run nothing.
 export const isInertViewerMime = (mime: unknown): boolean => {
   const base = readBaseMimeType(mime);
   return (
-    base === 'application/pdf' ||
-    base.startsWith('audio/') ||
-    base.startsWith('video/') ||
-    (base.startsWith('image/') && !base.includes('svg') && !base.includes('xml'))
+    base === 'application/pdf' || base.startsWith('audio/') || base.startsWith('video/') || isInertRasterImageMime(base)
   );
 };
 

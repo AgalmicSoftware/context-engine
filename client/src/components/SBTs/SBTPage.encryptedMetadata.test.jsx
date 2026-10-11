@@ -214,6 +214,87 @@ describe('SBTPage encrypted metadata rendering', () => {
     objectUrlMock.restore();
   });
 
+  it('shows no decrypted SVG image, which could run as the app from its blob URL', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000ad';
+    const account = '0x00000000000000000000000000000000000000bd';
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      84532: {
+        sbtList: {
+          [sbtAddress]: {
+            sbtAddress,
+            sbtInfo: {
+              name: 'Badge',
+              image: '',
+              description: '',
+              tags: [],
+              documentURLs: [],
+              encryptedFields: { image: { storage: 'lit-arweave', txId: 'img-tx' } },
+              encryption: { enabled: true, status: 'lit-v1', targets: { image: true } },
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '0',
+              admin: '0x00000000000000000000000000000000000000a2',
+              chainID: 84532,
+            },
+            mintedAddresses: [account],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1234,
+          },
+        },
+        lastBlock: 1234,
+      },
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(litStorage, 'downloadEncryptedArweaveData').mockResolvedValue({
+      payload: { encoding: 'base64', data: 'PHN2Zy8+', mime: 'image/svg+xml;charset=utf-8', name: 'badge.svg' },
+      txId: 'img-tx',
+      url: 'lit-ar://img-tx',
+    });
+    const decodeBlobSpy = jest
+      .spyOn(litStorage, 'decodeLitPayloadToBlob')
+      .mockReturnValue(new Blob(['<svg onload="alert(1)"/>'], { type: 'image/svg+xml;charset=utf-8' }));
+    const objectUrlMock = mockObjectUrlApis('blob:locked-svg');
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject({ SBTAddress: sbtAddress, sessionSlug: 'edge', account });
+    subject.state = { ...subject.state, network: { id: 84532, name: 'Base Sepolia' } };
+
+    await subject.loadSBTInfo(false);
+
+    expect(decodeBlobSpy).toHaveBeenCalledTimes(1);
+    expect(objectUrlMock.createObjectURL).not.toHaveBeenCalled();
+    expect(subject.state.sbtInfo.image).toBe('');
+    expect(subject.state.sbtInfo.imageDecrypted).not.toBe(true);
+    objectUrlMock.restore();
+  });
+
+  it('offers a decrypted document that could run as a page only as a plain download', async () => {
+    jest.spyOn(litStorage, 'downloadEncryptedArweaveData').mockResolvedValue({
+      payload: { encoding: 'base64', data: 'PGh0bWwvPg==', mime: 'text/html;charset=utf-8', name: 'notes.html' },
+    });
+    jest.spyOn(litStorage, 'decodeLitPayloadToText').mockReturnValue('');
+    jest
+      .spyOn(litStorage, 'decodeLitPayloadToBlob')
+      .mockReturnValue(new Blob(['<html onload="alert(1)"/>'], { type: 'text/html;charset=utf-8' }));
+    const objectUrlMock = mockObjectUrlApis('blob:decrypted-doc');
+    window.__litHooks = { getKey: jest.fn() };
+
+    const subject = createSubject();
+    subject._isMounted = true;
+    subject.setState = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(typeof patch === 'function' ? patch(subject.state) : patch) };
+    });
+
+    await subject.openEncryptedDoc(`lit://arweave/${'D'.repeat(43)}`);
+
+    expect(objectUrlMock.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(objectUrlMock.createObjectURL.mock.calls[0][0].type).toBe('application/octet-stream');
+    expect(subject.state.docModalBlobUrl).toBe('blob:decrypted-doc');
+    objectUrlMock.restore();
+  });
+
   it('does not rehydrate metadata when a locked image is intentionally blank', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000ac';
     const sbtLower = sbtAddress.toLowerCase();

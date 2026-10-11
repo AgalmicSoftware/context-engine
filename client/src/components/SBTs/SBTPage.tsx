@@ -28,6 +28,7 @@ import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { isInertRasterImageMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -1727,7 +1728,9 @@ class SBTPage extends Component<any, any> {
       if (!text) {
         const blob = litStorage.decodeLitPayloadToBlob(payload);
         if (blob && typeof URL !== 'undefined') {
-          blobUrl = URL.createObjectURL(blob);
+          // A blob: URL runs as the app if opened in a tab, so a type that could act
+          // as a page (SVG, HTML, XML) is offered only as a plain download.
+          blobUrl = URL.createObjectURL(toViewerBlob(blob, blob.type).blob);
         }
       }
 
@@ -2405,8 +2408,11 @@ class SBTPage extends Component<any, any> {
                 });
                 if (!isCurrentLoad()) return;
                 const blob = litStorage.decodeLitPayloadToBlob(payload);
-                if (blob && typeof URL !== 'undefined') {
-                  const blobUrl = URL.createObjectURL(blob);
+                // Only raster images display: "Open image in new tab" on an SVG
+                // blob would run its script as the app.
+                const image = blob ? toViewerBlob(blob, blob.type) : null;
+                if (image && isInertRasterImageMime(image.mime) && typeof URL !== 'undefined') {
+                  const blobUrl = URL.createObjectURL(image.blob);
                   this.releaseDecryptedImageBlobUrl();
                   this._decryptedImageBlobUrl = blobUrl;
                   sbtInfo.image = blobUrl;
