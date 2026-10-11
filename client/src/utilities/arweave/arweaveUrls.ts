@@ -265,6 +265,8 @@ export const toSafeLinkHref = (
       return url.origin === origin ? url.href : '';
     }
     const url = new URL(raw);
+    // A user name or password hides the real host (https://[redacted-email]/).
+    if (url.username || url.password) return '';
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : '';
   } catch {
     return '';
