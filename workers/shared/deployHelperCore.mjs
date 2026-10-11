@@ -1262,6 +1262,18 @@ export const validateDeployHelperPublicConfigInputs = (body = {}) => {
     : '';
 };
 
+// The URL rule readBundle applies in agentSessionWrappedDeployment.mjs, so a
+// bridge URL this helper checks and records is one the bridge deploy accepts.
+const normalizeAgentBridgeBundleUrl = (value) => {
+  try {
+    const parsed = new URL(toStr(value).trim());
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+};
+
 const executeDeployHelperRequestCore = async ({
   body,
   env,
@@ -1777,7 +1789,7 @@ const executeDeployHelperRequestCore = async ({
   // set agentBridgeBundleSha256 from it), the upload below records it once the
   // bytes are checked.
   const agentHttpRequested = body?.sessionModeProfile?.surfaces?.agentHttp === true;
-  const agentBridgeBundleUrl = toStr(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL).trim();
+  const agentBridgeBundleUrl = normalizeAgentBridgeBundleUrl(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
   const agentBridgeBundleManifestUrl = toStr(body?.agentBridgeBundleManifestUrl).trim();
   const agentBridgeManifestSha256 = agentBridgeBundleManifestUrl
     ? normalizeWorkerBundleSha256(body?.agentBridgeBundleSha256)
@@ -1800,22 +1812,30 @@ const executeDeployHelperRequestCore = async ({
         deploymentRequestPending: true,
       });
     }
-    // Check the bridge bytes before the KV namespace and Worker below are
-    // created, so a bad bridge release stops the deploy instead of leaving
-    // a session Worker without its bridge.
+    // Check the bridge bytes before this upload, so a bad bridge release stops
+    // the deploy instead of leaving a session Worker without its bridge. A
+    // first attempt has created nothing yet; a replay that already staged this
+    // request's KV namespace stays resumable and reports what it kept.
     if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
+      const bridgeCheckFailure = (status, error, options) => (kvId
+        ? buildDeploymentFailure(status, {
+            error,
+            deploymentRequestPending: true,
+            orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: 'retained-upload-pending', workerName },
+          }, options)
+        : buildFailure(status, { error }, options));
       let agentBridgeSource = '';
       try {
         agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
       } catch (error) {
-        return buildFailure(502, {
-          error: `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
-        }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
+        return bridgeCheckFailure(
+          502,
+          `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+          { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) },
+        );
       }
       if (await sha256Hex(agentBridgeSource) !== agentBridgeManifestSha256) {
-        return buildFailure(409, {
-          error: 'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
-        });
+        return bridgeCheckFailure(409, 'Agent Bridge bundle SHA-256 does not match the verified release manifest.');
       }
       agentBridgeReleaseVerified = true;
     }
