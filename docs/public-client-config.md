@@ -254,7 +254,8 @@ Netlify's default `Cache-Control: public, max-age=0, must-revalidate`, which
 also covers `index.html` and other unhashed files; the `/*` rule sets no cache
 header because overlapping rules could combine values. For manual drag-and-drop
 deploys, upload the built `client/build/` directory so its generated `_headers`
-goes with it. Keep unhashed public files out of `client/public/assets/`. After a
+goes with it. Keep unhashed files out of an `assets/` folder in
+`client/public/`, so `/assets/` holds only hashed build output. After a
 deploy, `curl -sI https://<site>/assets/missing.js` should return 404 without
 `immutable` in `cache-control`.
 

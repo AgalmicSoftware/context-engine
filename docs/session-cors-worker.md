@@ -2685,7 +2685,7 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 
 ## Release bundle
 
-- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection. Each release moves the pin to the newest published release (`node scripts/release-version.mjs pin-worker-release`), and release preparation refuses a pin that a newer published release has superseded; see [Worker release pin](release-runbook.md#worker-release-pin).
+- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection. Each release moves the pin to the newest published release (`npm run release:worker-pin`), and release preparation refuses a pin that a newer published release has superseded.
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
 - Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.
