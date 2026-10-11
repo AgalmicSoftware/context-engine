@@ -52,6 +52,32 @@ export const buildPasskeyWalletNetwork = (targetNetwork: unknown): unknown => {
   return { ...targetNetwork, id: chainId, chainId, name };
 };
 
+export type PasskeyAccountPayload = {
+  account: unknown;
+  provider: 'passkey_eoa';
+  network: unknown;
+  userImageURL: undefined;
+};
+
+export type PassivePasskeyRestoreDeps = {
+  changeAccount: (payload: PasskeyAccountPayload) => void;
+  getNetwork: () => unknown;
+  isCurrent: () => boolean;
+  restoreSession: (options: { requireSigner: false }) => Promise<unknown>;
+  updateLoginInfo: LoginPasskeyActionsDeps['updateLoginInfo'];
+};
+
+// Shows a saved passkey account without a prompt; signing still unlocks the
+// wallet first. isCurrent lets callers drop a restore that a login superseded.
+export const restorePasskeyLoginPassively = async (deps: PassivePasskeyRestoreDeps): Promise<unknown> => {
+  const network = deps.getNetwork();
+  const address = await deps.restoreSession({ requireSigner: false });
+  if (!address || !deps.isCurrent()) return null;
+  deps.changeAccount({ account: address, provider: 'passkey_eoa', network, userImageURL: undefined });
+  deps.updateLoginInfo({ loginInProgress: false, loginComplete: true, provider: 'passkey_eoa' });
+  return address;
+};
+
 export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginPasskeyActions => {
   const syncPasskeyWalletChain = (targetNetwork: unknown = null): unknown => {
     const tn = targetNetwork || deps.getTargetNetwork();

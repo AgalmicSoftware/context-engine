@@ -24,6 +24,7 @@ passkey verification, or hard onchain session-key permissions.
 - `client/src/wallet/passkeyWallet.ts`: client API and EIP-1193 provider facade.
 - `client/src/wallet/session/`: soft-session policy, worker, and worker client.
 - `client/src/components/Account/LoginAndSettingsModal.tsx`: create, sign-in, restore, logout, and account sync.
+- `client/src/components/Navbar/AccountSection.tsx`: silent account restore at app start, before the login modal opens.
 - `client/src/utilities/web3/providerAdapter.ts`: provider-like compatibility for app code that expects an EIP-1193 provider.
 - `client/src/utilities/crypto/cryptography.ts`: passkey EOA provider resolution for Lit/self-sign flows.
 
@@ -359,6 +360,10 @@ are non-identifying and must never be used for production funds.
 Locking or disconnecting a passkey soft session rejects pending Worker signing
 requests with a locked-wallet error and terminates the signer. A lock during
 lazy Worker startup also cancels that startup.
+
+After a reload, the navbar restores a saved, connected account from the
+IndexedDB wallet metadata without a passkey prompt; signing still unlocks the
+wallet first.
 
 Disconnect also saves a local disconnected flag with the wallet record. Reloading
 does not restore the account automatically until the user signs in again. Locking

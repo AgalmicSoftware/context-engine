@@ -19,6 +19,10 @@ jest.mock('../Account/LoginAndSettingsModal', () => ({
   default: (props: unknown) => mockLoginAndSettingsModal(props),
 }));
 jest.mock('components/Account/LoginButton', () => () => <button type="button">Connect Wallet</button>);
+jest.mock('../../wallet/passkeyWallet.js', () => ({
+  getPasskeyWalletChain: () => null,
+  restorePasskeyWalletSession: async () => null,
+}));
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
   generateBlockieDataUrl: () => '',
 }));
