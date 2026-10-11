@@ -3766,7 +3766,8 @@ var init_deployHelperCore = __esm({
         expectedBundleSha256 = manifestDigest.digest;
         releaseManifestBundleSha256 = manifestDigest.digest;
       }
-      if (expectedBundleSha256 && !bundleSource) {
+      const checkBundleBeforeCloudflare = idempotencyContext?.isReplay !== true;
+      if (checkBundleBeforeCloudflare && expectedBundleSha256 && !bundleSource) {
         try {
           bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
         } catch (error) {
@@ -3776,7 +3777,7 @@ var init_deployHelperCore = __esm({
         }
         bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
       }
-      if (expectedBundleSha256 && (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256) {
+      if (checkBundleBeforeCloudflare && expectedBundleSha256 && (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256) {
         return buildFailure(409, {
           error: "Worker bundle SHA-256 does not match the verified release manifest."
         });
@@ -4010,8 +4011,8 @@ var init_deployHelperCore = __esm({
         const adminMatches = adminAddress ? hasExactPlainText("BOOTSTRAP_ADMIN_ADDRESS", adminAddress, { caseInsensitive: true }) : named("BOOTSTRAP_ADMIN_ADDRESS").length === 0;
         const bundleIdentityBindings = named(BUNDLE_SHA256_BINDING_NAME);
         const observedBundleSha256 = bundleIdentityBindings.length === 1 && toStr10(bundleIdentityBindings[0]?.type).trim() === "plain_text" ? toStr10(bundleIdentityBindings[0]?.text).trim().toLowerCase() : "";
-        const expectedBundleSha2562 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr10(idempotencyContext?.bundleSha256).trim().toLowerCase();
-        const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedBundleSha2562 || observedBundleSha256 === expectedBundleSha2562);
+        const expectedWorkerBundleSha256 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || expectedBundleSha256 || toStr10(idempotencyContext?.bundleSha256).trim().toLowerCase();
+        const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedWorkerBundleSha256 || observedBundleSha256 === expectedWorkerBundleSha256);
         const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr10(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
         return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
       };
@@ -4027,6 +4028,11 @@ var init_deployHelperCore = __esm({
       let replaceRejectedWorker = idempotencyContext?.definitiveUploadRejected === true;
       let createdKvThisInvocation = false;
       let uploadedWorkerThisInvocation = false;
+      const keepStagedResourcesPending = (failure2) => kvId ? buildDeploymentFailure(failure2.status, {
+        ...failure2.body,
+        deploymentRequestPending: true,
+        orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: "retained-upload-pending", workerName }
+      }, { fallbackEligible: failure2.fallbackEligible }) : failure2;
       if (requestMarker) {
         const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
         if (!existingMarkedNamespaces.ok) {
@@ -4086,7 +4092,7 @@ var init_deployHelperCore = __esm({
       if (resumeWorkerSettings) {
         if (idempotencyContext?.definitiveUploadRejected === true) {
           const preparedBundle = await prepareBundleDiagnostics();
-          if (!preparedBundle.ok) return preparedBundle.result;
+          if (!preparedBundle.ok) return keepStagedResourcesPending(preparedBundle.result);
           if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId, { ignoreBundleIdentity: true })) {
             return buildFailure(409, {
               error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
@@ -4116,7 +4122,7 @@ var init_deployHelperCore = __esm({
       let agentBridgeReleaseVerified = false;
       if (!resumeUploadedWorker) {
         const preparedBundle = await prepareBundleDiagnostics();
-        if (!preparedBundle.ok) return preparedBundle.result;
+        if (!preparedBundle.ok) return keepStagedResourcesPending(preparedBundle.result);
         if (idempotencyContext?.bundleSha256 && toStr10(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 && idempotencyContext?.definitiveUploadRejected !== true) {
           return buildFailure(409, {
             error: "Deployment bundle content changed after this request started; upload was stopped.",
@@ -4124,23 +4130,18 @@ var init_deployHelperCore = __esm({
           });
         }
         if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
-          const bridgeCheckFailure = (status, error, options) => kvId ? buildDeploymentFailure(status, {
-            error,
-            deploymentRequestPending: true,
-            orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: "retained-upload-pending", workerName }
-          }, options) : buildFailure(status, { error }, options);
           let agentBridgeSource = "";
           try {
             agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
           } catch (error) {
-            return bridgeCheckFailure(
-              502,
-              `Failed to fetch Agent Bridge bundle: ${toStr10(error?.message || error).trim() || "Unknown error."}`,
-              { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) }
-            );
+            return keepStagedResourcesPending(buildFailure(502, {
+              error: `Failed to fetch Agent Bridge bundle: ${toStr10(error?.message || error).trim() || "Unknown error."}`
+            }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) }));
           }
           if (await sha256Hex2(agentBridgeSource) !== agentBridgeManifestSha256) {
-            return bridgeCheckFailure(409, "Agent Bridge bundle SHA-256 does not match the verified release manifest.");
+            return keepStagedResourcesPending(buildFailure(409, {
+              error: "Agent Bridge bundle SHA-256 does not match the verified release manifest."
+            }));
           }
           agentBridgeReleaseVerified = true;
         }
