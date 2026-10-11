@@ -2336,6 +2336,30 @@ test('SessionWriteCoordinator keeps empty public encrypted envelopes unlocked an
 	assert.equal(lockedJob.committedResponses[0].payload.answer.encryptedPortion, 'ciphertext');
 });
 
+test('SessionWriteCoordinator does not lock a response for a cleared field that kept its lock flag', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	// Clients up to 0.6.7 uploaded a cleared locked answer like this.
+	const cleared = { value: '', encrypted: true, encryptionAudience: 'self_admin', hash: '', encryptedPortion: '' };
+	const result = await coordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-cleared',
+		committedResponses: [{
+			metadata: { id: 'cleared', responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+			payload: {
+				sessionSlug: 'session-a',
+				questionId: 'q1',
+				answer: cleared,
+				additional: { value: 'public note', encrypted: false, hash: '', encryptedPortion: '' },
+			},
+		}],
+	});
+	assert.equal(result.ok, true);
+	const job = store.get('results-analysis-auto-job-v1');
+	assert.equal(job.committedResponses[0].payload.locked, undefined);
+	assert.deepEqual(job.committedResponses[0].payload.answer, cleared);
+});
+
 
 test('SessionWriteCoordinator keeps below-threshold automatic jobs for bounded delayed rechecks', async () => {
 	let now = 1_000;

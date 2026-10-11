@@ -5,7 +5,7 @@ import {
   stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
-import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
+import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
 import { scanLegacyStorageOwnerIds } from './storageRouteExecution.js';
 import {
   applySessionConfigMutation,
@@ -500,23 +500,6 @@ export class SessionWriteCoordinator {
     });
   }
 
-  resultsAnalysisPayloadLooksLocked(value, depth = 0) {
-    if (depth > 5) return false;
-    if (!isObjectRecord(value)) return false;
-    if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-    const encryptedKeys = new Set(['ciphertext', 'cipherText', 'encryptedContent', 'encryptedKey', 'encryptedPortion', 'keyCipher', 'payloadCiphertext', 'wrappedKey']);
-    if (Object.entries(value).some(([key, entry]) => encryptedKeys.has(key) && this.resultsAnalysisEncryptedEnvelopeValueHasContent(entry))) return true;
-    return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
-  }
-
-  resultsAnalysisEncryptedEnvelopeValueHasContent(value) {
-    if (value == null || value === false) return false;
-    if (typeof value === 'string') return value.trim() !== '';
-    if (Array.isArray(value)) return value.length > 0;
-    if (isObjectRecord(value)) return Object.keys(value).length > 0;
-    return true;
-  }
-
   sanitizeResultsAnalysisAutoJob(payload = {}) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
     const requestId = toTrimmedString(payload.requestId);
@@ -524,7 +507,8 @@ export class SessionWriteCoordinator {
       ? payload.committedResponses.slice(0, 1).map((entry) => {
           const metadata = isObjectRecord(entry?.metadata) ? entry.metadata : {};
           const payloadRecord = isObjectRecord(entry?.payload) ? entry.payload : {};
-          const payloadLooksLocked = this.resultsAnalysisPayloadLooksLocked(payloadRecord);
+          // Checked before sanitizing, which may drop a deeply nested envelope.
+          const payloadLooksLocked = valueLooksEncrypted(payloadRecord);
           const sanitizedPayload = this.sanitizeResultsAnalysisResponsePayload(payloadRecord);
           if (payloadLooksLocked) sanitizedPayload.locked = true;
           return {

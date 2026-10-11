@@ -124,10 +124,24 @@ const encryptedEnvelopeValueHasContent = (value) => {
   return true;
 };
 
-const valueLooksEncrypted = (value, depth = 0) => {
+const isBlankFieldValue = (value) => value == null ||
+  (typeof value === 'string' && !trim(value)) ||
+  (Array.isArray(value) && value.length === 0) ||
+  (isObj(value) && Object.keys(value).length === 0);
+
+// Clients up to 0.6.7 uploaded a cleared locked answer or comment as
+// { value: '', encrypted: true, encryptedPortion: '' }. A locked field always
+// keeps its envelope beside a '*' mask, so a blank one without any is cleared.
+const isClearedFieldWithLockFlag = (value) => hasOwn(value, 'value') &&
+  isBlankFieldValue(value.value) &&
+  !['envelope', ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
+
+// Also decides which committed responses the session coordinator marks locked.
+export const valueLooksEncrypted = (value, depth = 0) => {
   if (depth > 5) return false;
   if (!isObj(value)) return false;
-  if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
+  if (value.locked === true || value.payloadEncrypted === true) return true;
+  if (value.encrypted === true && !isClearedFieldWithLockFlag(value)) return true;
   if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
   return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
 };
