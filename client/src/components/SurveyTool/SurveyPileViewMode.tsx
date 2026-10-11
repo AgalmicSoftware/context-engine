@@ -1221,6 +1221,8 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     if (engine._jsonPreviewTimer) clearTimeout(engine._jsonPreviewTimer);
     engine._jsonPreviewTimer = null;
     engine._draftDirtyQids?.clear();
+    engine._userAnswersSliceCache = { source: null, value: null };
+    engine.invalidateDiffCaches();
     engine._lastLoadAndSortResultSignature = '';
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;

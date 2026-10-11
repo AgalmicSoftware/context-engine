@@ -198,3 +198,31 @@ it.each([
   },
   40000,
 );
+
+it('drops the previous account saved answers when another account takes over the pile', async () => {
+  mockCaches();
+  jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
+  const pile = mountPile();
+  await waitFor(() => expect(pile.getEngine()?.state?.pileQuestions?.length).toBe(1), { timeout: 8000 });
+  await settle();
+  // After a submit in this sitting, the pile holds the owner's saved rows as userAnswers.
+  await run(
+    () =>
+      new Promise((resolve) =>
+        pile.getEngine().setState({ userAnswers: { responses: [savedResponse()] }, userHasResponse: true }, resolve),
+      ),
+  );
+
+  await act(async () => {
+    pile.view.rerenderSurveyQuestions({ account: OTHER });
+  });
+  await settle();
+
+  const engine = pile.getEngine();
+  expect(engine.state.userAnswers).toBeNull();
+  expect(engine.state.userHasResponse).toBe(false);
+  expect(engine.getPendingEditStats().total).toBe(0);
+  await act(async () => engine.handleRevertPendingChanges());
+  await settle();
+  expect(pile.getEngine().state.surveysResponseState[0].answers.q1?.value ?? '').toBe('');
+});

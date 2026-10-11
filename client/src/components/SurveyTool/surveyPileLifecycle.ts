@@ -78,6 +78,7 @@ export const buildPileQuestionProgressSignals = ({
   };
 };
 
+// A new wallet, network or session owns none of the previous saved answers or edits.
 export const buildPileContextResetState = ({
   submittedSinceLastEdit = false,
 }: {
@@ -90,6 +91,11 @@ export const buildPileContextResetState = ({
   submittedSinceLastEdit: updateSubmittedSinceLastEdit(submittedSinceLastEdit, 'reset'),
   editBaseline: null,
   surveysResponseState: [{ ...EMPTY_PILE_RESPONSE_SLICE }],
+  userAnswers: null,
+  userHasResponse: false,
+  isDirty: false,
+  modifiedCount: 0,
+  hasEncryptedChanges: false,
 });
 
 export const buildPileAutoDecryptUpdatePlan = ({
