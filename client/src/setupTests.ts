@@ -224,6 +224,3 @@ jest.mock('d3', () => {
     pack,
   };
 });
-
-jest.mock('node:os', () => require('os'), { virtual: true });
-jest.mock('node:events', () => require('events'), { virtual: true });

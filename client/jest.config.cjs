@@ -49,8 +49,6 @@ module.exports = {
     '^.+\\.sol\\?raw$': '<rootDir>/scripts/jest/fileMock.js',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^(utilities/.+)\\.js$': '$1',
-    '^node:os$': '<rootDir>/src/shims/node-os.ts',
-    '^node:events$': '<rootDir>/src/shims/node-events.ts',
     '^viem$': '<rootDir>/node_modules/viem/_cjs/index.js',
     '^viem\\/(.*)$': '<rootDir>/node_modules/viem/_cjs/$1',
     '^ox$': `${oxCjsBase}/index.js`,
