@@ -323,9 +323,11 @@ deploy to the release recorded on that Worker, never code chosen by the person
 who redeems the grant. The pinning is in the Worker's code, not in its
 settings: a sponsoring Worker running code older than 0.6.8 still deploys
 whatever bundle the redeemer sends, whether or not the variables below are
-set. Update such a Worker to 0.6.8 or later code first, for example by
-uploading a 0.6.8 or later release's `sessionCorsWorker.bundle.js` as its code
-while keeping its bindings and secrets (see [Self-deploy](#self-deploy)).
+set. Before issuing deploy grants from such a Worker, update it to 0.6.8 or
+later code: replace only its code with a 0.6.8 or later release's
+`sessionCorsWorker.bundle.js` and keep its bindings, variables and secrets.
+The deploy helper cannot do this, because it only creates new Workers
+(in-place redeploy is disabled; see [Self-deploy](#self-deploy)).
 
 The Worker keeps its release in four plain-text variables, where `<release>`
 is
@@ -351,7 +353,8 @@ Worker it deploys:
 - It sets the Agent Bridge pair only when the new session enables Agents HTTP
   and the bridge bundle matched its manifest. The helper checks that bundle
   before it uploads the session Worker: a first attempt stops before creating
-  anything, and a retry that already staged resources stays pending.
+  the session's KV namespace or Worker, and a retry that already staged
+  resources stays pending.
 - The recorded URLs are the ones that deploy used. A release named in the
   deploy request takes precedence over the helper's own `WORKER_BUNDLE_URL`
   and `WORKER_BUNDLE_MANIFEST_URL` defaults. A sponsored deploy always uses
