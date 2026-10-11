@@ -142,10 +142,12 @@ export const dispatchAuthNonceRequest = async ({
     nonce,
     deps?.NONCE_TTL_SECONDS,
   );
-  // The coordinator signs the random part for this session and wallet; only
-  // that signed nonce can be used to sign in.
-  const signedNonce = typeof issueResult?.nonce === 'string' ? issueResult.nonce : '';
-  if (!issueResult?.ok || !signedNonce) {
+  // The coordinator signs the random part for this session and wallet. A
+  // previous-release coordinator, still running briefly during a deploy or
+  // rollback, stores the random part itself and returns no signed nonce;
+  // this release accepts such a stored nonce once, so hand that part out.
+  const issuedNonce = typeof issueResult?.nonce === 'string' && issueResult.nonce ? issueResult.nonce : nonce;
+  if (!issueResult?.ok) {
     return deps?.json?.(
       { error: issueResult?.error || 'Authorization state coordination is unavailable.' },
       Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,
@@ -155,7 +157,7 @@ export const dispatchAuthNonceRequest = async ({
 
   const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : '';
   return deps?.json?.({
-    nonce: signedNonce,
+    nonce: issuedNonce,
     ...(responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {}),
     ...(bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}),
   }, 200, headers);
