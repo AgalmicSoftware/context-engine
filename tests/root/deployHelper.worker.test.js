@@ -5144,6 +5144,95 @@ describe('deploy-helper worker', () => {
       });
     });
 
+    it.each([
+      ['is unavailable', null, 502, 'Failed to fetch bundle: Artifact fetch failed (404).'],
+      [
+        'does not match its manifest',
+        'export default { fetch() { return new Response("tampered session"); } };',
+        409,
+        'Worker bundle SHA-256 does not match the verified release manifest.',
+      ],
+    ])('keeps a replay with staged resources pending when its Worker bundle %s, then finishes', async (
+      _label,
+      sessionBytes,
+      status,
+      error,
+    ) => {
+      const release = makeWorkerRelease('0');
+      const fetchMock = makeReleaseFetch(release);
+      global.fetch = fetchMock;
+      const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+      const body = {
+        deploymentRequestId: 'session-replay-request-0001',
+        workerName: 'session-replay-worker',
+        sessionSlug: 'session-replay-session',
+        bundleUrl: release.workerBundleUrl,
+        bundleManifestUrl: release.manifestUrl,
+      };
+      // The first attempt stages its KV namespace, then loses the upload response.
+      fetchMock.cloudflare.scriptUploadResponses.push(cfFailure(500, 'Upload response lost.'));
+      const first = await deploySessionWorker(body, env);
+      expect(first.status).toBe(502);
+      expect(first.payload.deploymentRequestPending).toBe(true);
+      const staged = first.payload.orphanResources;
+      expect(staged).toEqual(expect.objectContaining({ kvCleanupStatus: 'retained-upload-pending' }));
+
+      const sessionBundle = release.sessionBundle;
+      release.sessionBundle = sessionBytes;
+      const retry = await deploySessionWorker(body, env);
+
+      expect(retry.status).toBe(status);
+      expect(retry.payload).toEqual(expect.objectContaining({
+        error,
+        deploymentRequestPending: true,
+        deploymentId: first.payload.deploymentId,
+        orphanResources: {
+          kvNamespaceId: staged.kvNamespaceId,
+          kvCleanupStatus: 'retained-upload-pending',
+          workerName: staged.workerName,
+        },
+      }));
+      expect(retry.payload.deploymentRequestTerminal).toBeUndefined();
+
+      release.sessionBundle = sessionBundle;
+      const recovered = await deploySessionWorker(body, env);
+
+      expect(recovered.status).toBe(200);
+      expect(recovered.payload.kvNamespaceId).toBe(staged.kvNamespaceId);
+      expect(fetchMock.cloudflare.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.uploadedModules.get(staged.workerName)).toBe(sessionBundle);
+      expect(recordedRelease(workerVars(fetchMock, staged.workerName))).toEqual({
+        WORKER_BUNDLE_URL: release.workerBundleUrl,
+        WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
+      });
+    });
+
+    it('keeps the plain failure when a first attempt cannot fetch its Worker bundle', async () => {
+      const release = makeWorkerRelease('f');
+      const fetchMock = makeReleaseFetch(release);
+      global.fetch = fetchMock;
+      release.sessionBundle = null;
+
+      const first = await deploySessionWorker({
+        deploymentRequestId: 'session-first-request-0001',
+        workerName: 'session-first-worker',
+        sessionSlug: 'session-first-session',
+        bundleUrl: release.workerBundleUrl,
+        bundleManifestUrl: release.manifestUrl,
+      }, makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() }));
+
+      expect(first).toEqual({
+        status: 502,
+        payload: {
+          error: 'Failed to fetch bundle: Artifact fetch failed (404).',
+          deploymentRequestTerminal: true,
+        },
+      });
+      // Nothing was staged: only the token's account lookups reached Cloudflare.
+      expect(fetchMock.cloudflare.mock.calls.length).toBeGreaterThan(0);
+      expect(fetchMock.cloudflare.mock.calls.every(([url]) => String(url).endsWith('/accounts?per_page=5'))).toBe(true);
+    });
+
     it('never records an Agent Bridge URL that the bridge deploy would refuse', async () => {
       const release = makeWorkerRelease('9');
       const fetchMock = makeReleaseFetch(release);

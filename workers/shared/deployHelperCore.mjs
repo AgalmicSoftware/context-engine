@@ -1347,7 +1347,12 @@ const executeDeployHelperRequestCore = async ({
     releaseManifestBundleSha256 = manifestDigest.digest;
   }
 
-  if (expectedBundleSha256 && !bundleSource) {
+  // An earlier attempt may have staged resources, and the journal does not
+  // record their KV namespace. A replay therefore checks its bundle in the
+  // upload path (prepareBundleDiagnostics), once reconciliation has found what
+  // was staged, so a bad bundle keeps those resources pending.
+  const checkBundleBeforeCloudflare = idempotencyContext?.isReplay !== true;
+  if (checkBundleBeforeCloudflare && expectedBundleSha256 && !bundleSource) {
     try {
       bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
     } catch (error) {
@@ -1358,6 +1363,7 @@ const executeDeployHelperRequestCore = async ({
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
   }
   if (
+    checkBundleBeforeCloudflare &&
     expectedBundleSha256 &&
     (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256
   ) {
@@ -1651,11 +1657,14 @@ const executeDeployHelperRequestCore = async ({
       toStr(bundleIdentityBindings[0]?.type).trim() === 'plain_text'
       ? toStr(bundleIdentityBindings[0]?.text).trim().toLowerCase()
       : '';
-    const expectedBundleSha256 = bundleDiagnostics?.sha256 ||
+    // A replay that has not fetched its bundle yet still matches against the
+    // pinned digest, as strictly as after the fetch.
+    const expectedWorkerBundleSha256 = bundleDiagnostics?.sha256 ||
       expectedInlineBundleSha256 ||
+      expectedBundleSha256 ||
       toStr(idempotencyContext?.bundleSha256).trim().toLowerCase();
     const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) &&
-      (ignoreBundleIdentity || !expectedBundleSha256 || observedBundleSha256 === expectedBundleSha256);
+      (ignoreBundleIdentity || !expectedWorkerBundleSha256 || observedBundleSha256 === expectedWorkerBundleSha256);
     const requestDigestMatches = requestMarker
       ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr(idempotencyContext?.requestDigest).trim())
       : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
@@ -1689,6 +1698,16 @@ const executeDeployHelperRequestCore = async ({
   let replaceRejectedWorker = idempotencyContext?.definitiveUploadRejected === true;
   let createdKvThisInvocation = false;
   let uploadedWorkerThisInvocation = false;
+  // Once an earlier attempt has staged this request's KV namespace, a bundle
+  // that fails its check keeps the request pending and reports what it kept,
+  // instead of ending it terminally with those resources orphaned.
+  const keepStagedResourcesPending = (failure) => (kvId
+    ? buildDeploymentFailure(failure.status, {
+        ...failure.body,
+        deploymentRequestPending: true,
+        orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: 'retained-upload-pending', workerName },
+      }, { fallbackEligible: failure.fallbackEligible })
+    : failure);
   if (requestMarker) {
     const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
     if (!existingMarkedNamespaces.ok) {
@@ -1760,7 +1779,7 @@ const executeDeployHelperRequestCore = async ({
   if (resumeWorkerSettings) {
     if (idempotencyContext?.definitiveUploadRejected === true) {
       const preparedBundle = await prepareBundleDiagnostics();
-      if (!preparedBundle.ok) return preparedBundle.result;
+      if (!preparedBundle.ok) return keepStagedResourcesPending(preparedBundle.result);
       if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId, { ignoreBundleIdentity: true })) {
         return buildFailure(409, {
           error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
@@ -1801,7 +1820,7 @@ const executeDeployHelperRequestCore = async ({
   // reachable; bundle acquisition belongs only to the upload path.
   if (!resumeUploadedWorker) {
     const preparedBundle = await prepareBundleDiagnostics();
-    if (!preparedBundle.ok) return preparedBundle.result;
+    if (!preparedBundle.ok) return keepStagedResourcesPending(preparedBundle.result);
     if (
       idempotencyContext?.bundleSha256 &&
       toStr(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 &&
@@ -1813,29 +1832,20 @@ const executeDeployHelperRequestCore = async ({
       });
     }
     // Check the bridge bytes before this upload, so a bad bridge release stops
-    // the deploy instead of leaving a session Worker without its bridge. A
-    // first attempt has created nothing yet; a replay that already staged this
-    // request's KV namespace stays resumable and reports what it kept.
+    // the deploy instead of leaving a session Worker without its bridge.
     if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
-      const bridgeCheckFailure = (status, error, options) => (kvId
-        ? buildDeploymentFailure(status, {
-            error,
-            deploymentRequestPending: true,
-            orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: 'retained-upload-pending', workerName },
-          }, options)
-        : buildFailure(status, { error }, options));
       let agentBridgeSource = '';
       try {
         agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
       } catch (error) {
-        return bridgeCheckFailure(
-          502,
-          `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
-          { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) },
-        );
+        return keepStagedResourcesPending(buildFailure(502, {
+          error: `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+        }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) }));
       }
       if (await sha256Hex(agentBridgeSource) !== agentBridgeManifestSha256) {
-        return bridgeCheckFailure(409, 'Agent Bridge bundle SHA-256 does not match the verified release manifest.');
+        return keepStagedResourcesPending(buildFailure(409, {
+          error: 'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
+        }));
       }
       agentBridgeReleaseVerified = true;
     }
