@@ -1,4 +1,9 @@
-import type { WorkerCanonicalMetadataHydrationPort } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
+import {
+  mergeWorkerCanonicalQuestionMetadata,
+  mergeWorkerCanonicalSurveyMetadata,
+  workerCanonicalMetadataHydrationPort,
+  type WorkerCanonicalMetadataHydrationPort,
+} from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import {
   resolveWorkerCanonicalCacheIdentity,
@@ -64,15 +69,13 @@ const loadWorkerCanonicalQuestionMetadata = async (
   { host, sessionConfig, sessionSlug }: WorkerMetadataHydrationOptions,
   identity: WorkerCanonicalCacheIdentity,
 ): Promise<WorkerMetadataMergeResult> => {
-  const module = await import('../../domains/surveys/workerCanonicalMetadataHydrationPort');
   const loader =
-    host.workerCanonicalMetadataHydrationPort?.loadQuestions ||
-    module.workerCanonicalMetadataHydrationPort.loadQuestions;
+    host.workerCanonicalMetadataHydrationPort?.loadQuestions || workerCanonicalMetadataHydrationPort.loadQuestions;
   const rows = await loader({ ...resolveHydrationContext(host), sessionConfig, sessionSlug });
   return {
     count: rows.length,
     identity,
-    merge: (current) => module.mergeWorkerCanonicalQuestionMetadata(current, rows, identity),
+    merge: (current) => mergeWorkerCanonicalQuestionMetadata(current, rows, identity),
   };
 };
 
@@ -80,14 +83,13 @@ const loadWorkerCanonicalSurveyMetadata = async (
   { host, sessionConfig, sessionSlug }: WorkerMetadataHydrationOptions,
   identity: WorkerCanonicalCacheIdentity,
 ): Promise<WorkerMetadataMergeResult> => {
-  const module = await import('../../domains/surveys/workerCanonicalMetadataHydrationPort');
   const loader =
-    host.workerCanonicalMetadataHydrationPort?.loadSurveys || module.workerCanonicalMetadataHydrationPort.loadSurveys;
+    host.workerCanonicalMetadataHydrationPort?.loadSurveys || workerCanonicalMetadataHydrationPort.loadSurveys;
   const rows = await loader({ ...resolveHydrationContext(host), sessionConfig, sessionSlug });
   return {
     count: rows.length,
     identity,
-    merge: (current) => module.mergeWorkerCanonicalSurveyMetadata(current, rows, identity),
+    merge: (current) => mergeWorkerCanonicalSurveyMetadata(current, rows, identity),
   };
 };
 
@@ -101,30 +103,20 @@ const workerMetadataTargetIsCurrent = (
     sessionSlug: options.sessionSlug,
   });
 
-const prepareWorkerCanonicalQuestionCache = async (
+const prepareWorkerCanonicalQuestionCache = (
   options: WorkerMetadataHydrationOptions,
-): Promise<WorkerMetadataCachePreparation> => {
+): WorkerMetadataCachePreparation => {
   const identity = resolveWorkerCanonicalCacheIdentity(options);
-  const module = await import('../../domains/surveys/workerCanonicalMetadataHydrationPort');
-  return {
-    identity,
-    merge: (current) => module.mergeWorkerCanonicalQuestionMetadata(current, [], identity),
-  };
+  return { identity, merge: (current) => mergeWorkerCanonicalQuestionMetadata(current, [], identity) };
 };
 
-const prepareWorkerCanonicalSurveyCache = async (
-  options: WorkerMetadataHydrationOptions,
-): Promise<WorkerMetadataCachePreparation> => {
+const prepareWorkerCanonicalSurveyCache = (options: WorkerMetadataHydrationOptions): WorkerMetadataCachePreparation => {
   const identity = resolveWorkerCanonicalCacheIdentity(options);
-  const module = await import('../../domains/surveys/workerCanonicalMetadataHydrationPort');
-  return {
-    identity,
-    merge: (current) => module.mergeWorkerCanonicalSurveyMetadata(current, [], identity),
-  };
+  return { identity, merge: (current) => mergeWorkerCanonicalSurveyMetadata(current, [], identity) };
 };
 
 const hydrateWorkerCanonicalCache = async (
-  prepare: (options: WorkerMetadataHydrationOptions) => Promise<WorkerMetadataCachePreparation>,
+  prepare: (options: WorkerMetadataHydrationOptions) => WorkerMetadataCachePreparation,
   load: (
     options: WorkerMetadataHydrationOptions,
     identity: WorkerCanonicalCacheIdentity,
@@ -132,7 +124,7 @@ const hydrateWorkerCanonicalCache = async (
   options: WorkerCacheHydrationOptions,
 ): Promise<void> => {
   try {
-    const prepared = await prepare(options);
+    const prepared = prepare(options);
     if (!workerMetadataTargetIsCurrent(options, prepared.identity)) return;
     const initialized = await options.persist((current) =>
       workerMetadataTargetIsCurrent(options, prepared.identity) ? prepared.merge(current) : current,

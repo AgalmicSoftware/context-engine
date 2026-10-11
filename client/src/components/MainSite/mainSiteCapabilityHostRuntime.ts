@@ -6,6 +6,7 @@ import { isBrowserOriginAllowedBySessionWorkerConfig } from '../../utilities/ses
 import { getChainById } from '../../variables/chains.js';
 import type { SessionConfigLike } from '../shellTypes';
 import type { AppShell } from './AppShell';
+import { initializeMainSiteWorkerCanonicalCaches } from './mainSiteWorkerCanonicalCacheRuntime.js';
 import { mergeMainSiteSessionDisplayConfig } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 
@@ -94,7 +95,6 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
   }
 
   try {
-    const { initializeMainSiteWorkerCanonicalCaches } = await import('./mainSiteWorkerCanonicalCacheRuntime.js');
     await initializeMainSiteWorkerCanonicalCaches({
       host,
       sessionConfig,

@@ -42,6 +42,20 @@ const createHost = (loadResponses: () => Promise<void>) => {
 };
 
 describe('initializeMainSiteWorkerCanonicalCachesForGroup', () => {
+  it('starts the first Worker read without waiting for another code chunk', async () => {
+    const host = createHost(async () => {});
+
+    const initialization = initializeMainSiteWorkerCanonicalCachesForGroup(
+      host as unknown as AppShell,
+      'worker-init',
+      {},
+      jest.fn(),
+    );
+
+    expect(host.initializeQuestionCacheForGroup).toHaveBeenCalledWith('worker-init');
+    await expect(initialization).resolves.toBe(true);
+  });
+
   it('leaves saved answers unready with error flags when the Worker response load fails', async () => {
     const host = createHost(async () => {
       throw new Error('Response listing failed');
