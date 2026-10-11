@@ -267,6 +267,26 @@ test('admin snapshots validate and label answers like the worker-canonical sourc
   assert.equal(source.counts.excludedCount, 5);
 });
 
+test('admin snapshots keep the legacy answer shapes of other question types', async () => {
+  const source = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'poll', prompt: 'Which?', type: 'poll' }, { id: 'untyped', prompt: 'Notes?' }],
+      responses: [
+        { questionId: 'poll', participantId: 'p1', answer: ['Alpha', 'Beta'] },
+        { questionId: 'untyped', participantId: 'p2', answer: ['one', 'two'] },
+        { questionId: 'untyped', participantId: 'p3', answer: 7 },
+      ] } } },
+  });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.responses.map((row) => [row.questionId, row.answer]).sort(), [
+    ['poll', 'Alpha; Beta'],
+    ['untyped', '7'],
+    ['untyped', 'one; two'],
+  ]);
+});
+
 test('worker-canonical source breaks equal-time ties by storage id, not list order', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };

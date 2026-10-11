@@ -156,6 +156,7 @@ const rowLooksLocked = (row) => {
   return valueLooksEncrypted(hasOwn(row, 'answer') ? row.answer : hasOwn(row, 'value') ? row.value : row.response);
 };
 
+const VALIDATED_QUESTION_TYPES = new Set(['binary', 'rating', 'multichoice', 'quadratic', 'freeform']);
 const normalizeQuestionId = (value) => trim(value).slice(0, 128);
 const normalizeQuestionPrompt = (value) => trim(value).replace(/\s+/g, ' ').slice(0, 1200);
 const normalizeQuestionType = (value) => trim(value).slice(0, 64) || 'text';
@@ -451,9 +452,13 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     const answerValue = withoutFieldMask(hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response));
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
     const knownQuestion = questionMap.get(questionId) || {};
-    // Both sources validate against the question: invalid answers are not
-    // evidence, and quadratic allocations reach the AI with option labels.
-    const validatedAnswer = formatValidAnalysisAnswer(answerValue, knownQuestion);
+    // Answers to the current question types are validated against the question
+    // in both sources: invalid answers are not evidence, and quadratic
+    // allocations reach the AI with option labels. Admin snapshots keep the
+    // legacy shapes of other types (such as "poll") as text, as before.
+    const validatedAnswer = requireKnownQuestion || VALIDATED_QUESTION_TYPES.has(knownQuestion.type)
+      ? formatValidAnalysisAnswer(answerValue, knownQuestion)
+      : valueFromAnswerLike(answerValue);
     if (validatedAnswer === null) {
       excludedCount += 1;
       continue;
