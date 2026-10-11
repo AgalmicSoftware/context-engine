@@ -183,9 +183,13 @@ release configured on it (its `WORKER_BUNDLE_URL` and
 `WORKER_BUNDLE_MANIFEST_URL`). The wizard still sends this build's configured
 release with a grant, never an uploaded file or a manual bundle URL, so
 sponsoring Workers running older code, which deploy the release a request
-names, keep working. If the sponsoring Worker has no release to deploy, the
-wizard says so: the grant was not used and works once the sponsor sets both
-values.
+names, keep working. If a 0.6.8 or later sponsoring Worker lacks either
+value, the wizard says the grant was not used and works once the sponsor
+sets both. An older sponsoring Worker with no release to deploy deploys
+nothing but keeps the grant reserved for that exact request: retry the same
+draft from the same site once the sponsor sets `WORKER_BUNDLE_URL` on that
+Worker. If the sponsor updates its Worker code instead, ask for a new grant;
+the updated code sees a different request and returns `409`.
 
 ### Temporary standard sponsored links fixture
 

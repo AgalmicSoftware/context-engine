@@ -452,8 +452,11 @@ variables once:
     This pinning is the sponsoring Worker's own code from 0.6.8; a sponsoring
     Worker running older code still deploys the redeemer's bundle, so update
     it first. The first-party wizard sends its configured release for such
-    Workers and never an uploaded file or manual bundle URL; when an older
-    Worker has no bundle to deploy, the wizard says the grant was not used.
+    Workers and never an uploaded file or manual bundle URL. An older Worker
+    with no bundle to deploy deploys nothing but keeps the grant reserved for
+    that exact request, so the wizard says to retry the same draft once the
+    sponsor sets `WORKER_BUNDLE_URL`, or to ask for a new grant if the sponsor
+    updates its Worker code, which then returns `409` for that grant.
     See [Sponsored deploy release](#sponsored-deploy-release) for
     how the vars are recorded and how to set missing ones.
   - In that deploy-ready state, Publish deploys the worker first. A

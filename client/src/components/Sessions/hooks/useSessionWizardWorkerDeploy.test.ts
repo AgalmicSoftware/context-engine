@@ -489,7 +489,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(options.updateDeploymentState).not.toHaveBeenCalledWith({ forceManualBundleFile: true });
   });
 
-  it('explains that a sponsor running older code left the grant unused when it has no bundle', async () => {
+  it('tells the redeemer how to retry when a sponsor running older code has no bundle', async () => {
     const { options } = prepareSponsoredAgentsHttpRedeem({
       status: 400,
       body: { error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).' },
@@ -498,8 +498,9 @@ describe('useSessionWizardWorkerDeploy', () => {
     await expect(redeemSponsoredDeploy(options)).resolves.toEqual({
       ok: false,
       error:
-        'The sponsoring Worker has no Worker release to deploy. Your deploy grant was not used. It will work ' +
-        'once the sponsor sets WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on their Worker.',
+        'The sponsoring Worker has no Worker release to deploy, so nothing was deployed. The grant now only works ' +
+        'for this exact request: retry this same draft here once the sponsor sets WORKER_BUNDLE_URL on that ' +
+        'Worker. If the sponsor updates its Worker code instead, ask for a new deploy grant.',
     });
   });
 

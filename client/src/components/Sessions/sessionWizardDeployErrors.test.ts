@@ -201,7 +201,7 @@ describe('sessionWizardDeployErrors', () => {
     );
   });
 
-  it('explains that a deploy grant was not used when the sponsor has no Worker release set', () => {
+  it('explains how to recover a deploy grant when the sponsor has no Worker release set', () => {
     expect(
       describeSessionWizardSponsoredDeployFailure({
         status: 400,
@@ -217,7 +217,9 @@ describe('sessionWizardDeployErrors', () => {
         error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).',
       }),
     ).toBe(
-      'The sponsoring Worker has no Worker release to deploy. Your deploy grant was not used. It will work once the sponsor sets WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on their Worker.',
+      'The sponsoring Worker has no Worker release to deploy, so nothing was deployed. The grant now only works for ' +
+        'this exact request: retry this same draft here once the sponsor sets WORKER_BUNDLE_URL on that Worker. ' +
+        'If the sponsor updates its Worker code instead, ask for a new deploy grant.',
     );
     expect(describeSessionWizardSponsoredDeployFailure({ status: 400, error: 'Missing deployPayload.' })).toBe(
       'Missing deployPayload.',
