@@ -41,7 +41,9 @@ type WorkerCanonicalAuthoringDeps = {
 type UploadedWorkerQuestion = {
   questionId: string;
   resource: typeof STORAGE_RESOURCE_KEYS.QUESTIONS;
-  storageRef: StorageRef;
+  // Absent when another author already published this exact question.
+  storageRef?: StorageRef;
+  alreadyPublished?: true;
 };
 
 export type WorkerCanonicalQuestionsAuthoringResult = WorkerCanonicalAuthoringTarget & {
@@ -59,6 +61,20 @@ type WorkerCanonicalStorageTargetOptions = {
 
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+
+// Session Workers let only an id's first author or a session admin upload it
+// again, and refuse ids a session admin hid.
+const STORAGE_ID_OWNED = 'storage_resource_id_owned';
+const STORAGE_ID_HIDDEN = 'storage_resource_id_hidden';
+
+const readUploadRejectionReason = (error: unknown): string =>
+  isRecord(error) && typeof error.reason === 'string' ? error.reason : '';
+
+const describeQuestionPrompt = (question: UnknownRecord): string => {
+  const prompt = typeof question.prompt === 'string' ? question.prompt.trim() : '';
+  if (!prompt || prompt === '[encrypted]') return '';
+  return `: "${prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt}"`;
+};
 
 const requireRecord = (value: unknown, error: string): UnknownRecord => {
   if (!isRecord(value)) throw new Error(error);
@@ -165,23 +181,40 @@ const uploadQuestions = async ({
       sessionId: target.sessionId,
       sessionSlug: target.sessionSlug,
     };
-    const uploaded = await uploadData(payload, 'json', {
-      sessionSlug: target.sessionSlug,
-      sessionConfig: target.sessionConfig,
-      context: {
-        account,
-        providerLike,
-      },
-      workerUrl: target.workerUrl,
-      tags: buildStorageTags({
-        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-        resourceId: questionId,
-        sessionId: target.sessionId,
+    let uploaded: unknown;
+    try {
+      uploaded = await uploadData(payload, 'json', {
         sessionSlug: target.sessionSlug,
-      }),
-      contentType: 'application/json',
-      resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-    });
+        sessionConfig: target.sessionConfig,
+        context: {
+          account,
+          providerLike,
+        },
+        workerUrl: target.workerUrl,
+        tags: buildStorageTags({
+          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+          resourceId: questionId,
+          sessionId: target.sessionId,
+          sessionSlug: target.sessionSlug,
+        }),
+        contentType: 'application/json',
+        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+      });
+    } catch (error) {
+      const reason = readUploadRejectionReason(error);
+      // Question ids hash their content, so another author's question with this
+      // id is this same question: it is already published, not a failure.
+      if (reason === STORAGE_ID_OWNED) {
+        uploadedQuestions.push({ questionId, resource: STORAGE_RESOURCE_KEYS.QUESTIONS, alreadyPublished: true });
+        continue;
+      }
+      if (reason === STORAGE_ID_HIDDEN) {
+        throw new Error(
+          `This question was hidden by the session admin and can't be published again${describeQuestionPrompt(question)}.`,
+        );
+      }
+      throw error;
+    }
     uploadedQuestions.push({
       questionId,
       resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
@@ -251,7 +284,12 @@ export const publishWorkerCanonicalSurvey = async (
       contentType: 'application/json',
       resource: STORAGE_RESOURCE_KEYS.SURVEYS,
     },
-  );
+  ).catch((error: unknown) => {
+    if (readUploadRejectionReason(error) === STORAGE_ID_HIDDEN) {
+      throw new Error("This survey was hidden by the session admin and can't be published again.");
+    }
+    throw error;
+  });
   return {
     ...target,
     uploadedQuestions,

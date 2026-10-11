@@ -88,8 +88,11 @@ const resolveStorageWorkerUrl = async ({
 const parseStorageUploadResponse = async (response: Response): Promise<UnknownRecord> => {
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) {
-    throw new Error(
-      (body?.error as string) || (body?.message as string) || `Storage upload failed (${response.status}).`,
+    // Keep the HTTP status and the Worker's machine-readable reason (for example
+    // storage_resource_id_owned) so callers can react without parsing the text.
+    throw Object.assign(
+      new Error((body?.error as string) || (body?.message as string) || `Storage upload failed (${response.status}).`),
+      { status: response.status, reason: typeof body?.reason === 'string' ? body.reason : '' },
     );
   }
   const storageRef = normalizeStorageRef(body?.storageRef || body, {
