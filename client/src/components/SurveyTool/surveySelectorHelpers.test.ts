@@ -57,6 +57,12 @@ describe('surveySelectorHelpers document URLs', () => {
     ).toEqual([`${window.location.origin}/session/demo/docs?__ceDocTx=abc`]);
   });
 
+  it('skips document URLs that are not text, even ones whose conversion throws', () => {
+    expect(getSurveyDocumentUrls({ documentURLs: [JSON.parse('{"toString":1}'), 'https://example.com/ok'] })).toEqual([
+      'https://example.com/ok',
+    ]);
+  });
+
   it('returns an empty list when no document URL array exists', () => {
     expect(getSurveyDocumentUrls({ documentURLs: 'https://example.com' })).toEqual([]);
     expect(getSurveyDocumentUrls(null)).toEqual([]);

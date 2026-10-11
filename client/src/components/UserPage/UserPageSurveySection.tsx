@@ -76,10 +76,12 @@ type UserPageSurveySectionProps = {
   surveysCreatedSectionToggleState: UserPageSectionToggleState;
 };
 
-// Survey metadata comes from any uploader, so unsafe document URLs stay plain text.
-const renderSurveyDocumentLinks = (documentURLs: string[]): React.ReactNode[] =>
-  documentURLs.map((url: string, urlIndex: number) => {
-    const text = String(url ?? '');
+// Survey metadata comes from any uploader, so unsafe document URLs stay plain
+// text, and values that are not text at all are skipped.
+const renderSurveyDocumentLinks = (documentURLs: unknown[]): React.ReactNode[] =>
+  documentURLs.map((url: unknown, urlIndex: number) => {
+    if (typeof url !== 'string') return null;
+    const text = url;
     const label = text.length > 60 ? text.slice(0, 57) + '...' : text;
     const href = toSafeLinkHref(text, { contextLabel: 'survey_document' });
     return href ? (

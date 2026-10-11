@@ -252,7 +252,9 @@ export const toSafeLinkHref = (
   value: unknown,
   { gateway = '', contextLabel = 'ui_link' }: { gateway?: unknown; contextLabel?: unknown } = {},
 ): string => {
-  const raw = toStr(value).trim();
+  // Uploaded JSON can hold objects whose text conversion throws, so only strings can be links.
+  if (typeof value !== 'string') return '';
+  const raw = value.trim();
   if (!raw) return '';
   if (raw.startsWith('ar://')) return parseArweaveTxId(raw) ? normalizeArweaveUrl(raw, { gateway, contextLabel }) : '';
   try {
@@ -274,7 +276,7 @@ export const toSafeLinkHref = (
 export const toSafeArweaveLinkHref = (
   value: unknown,
   options: { gateway?: unknown; contextLabel?: unknown } = {},
-): string => toSafeLinkHref(normalizeArweaveUrl(value, options));
+): string => (typeof value === 'string' ? toSafeLinkHref(normalizeArweaveUrl(value, options)) : '');
 
 export const buildArweaveGatewayUrlCandidates = (
   value: unknown,

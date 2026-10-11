@@ -252,6 +252,41 @@ describe('UserPageSurveySection', () => {
     );
   });
 
+  it('skips document URLs that are not text instead of crashing', () => {
+    const hostileUrl = JSON.parse('{"toString":1}');
+    render(
+      <UserPageSurveySection
+        {...createProps({
+          surveyCreationEntries: [
+            {
+              documentURLs: [hostileUrl, 'https://docs.example.test/created'],
+              id: 'survey-created',
+              questionIDs: [],
+              questionPreviews: [],
+              questionsCount: 1,
+              slug: 'alpha',
+              tags: [],
+              title: 'Created survey',
+            },
+          ],
+          surveyResponseEntries: [
+            {
+              documentURLs: [hostileUrl, 'https://docs.example.test/response'],
+              id: 'survey-response',
+              questionsCount: 1,
+              slug: 'beta',
+              tags: [],
+              title: 'Response survey',
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/created' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/response' })).toBeInTheDocument();
+  });
+
   it('keeps gated cached survey responses visible and defers decrypt to the parent handler', () => {
     const onDecryptQuestion = jest.fn();
 

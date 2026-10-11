@@ -97,6 +97,8 @@ describe('arweaveUrls helpers', () => {
       '',
       null,
       { href: 'https://example.test' },
+      // Uploaded JSON can carry an object whose text conversion throws.
+      JSON.parse('{"toString":1}'),
     ]) {
       expect(toSafeLinkHref(unsafe)).toBe('');
     }
@@ -108,7 +110,14 @@ describe('arweaveUrls helpers', () => {
     expect(toSafeArweaveLinkHref(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(toSafeArweaveLinkHref(`${canonicalArweaveGateway}/tx/${txId}/data`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(toSafeArweaveLinkHref(txId, { gateway: testArweaveGateway })).toBe(`${testArweaveGateway}/${txId}`);
-    for (const unsafe of ['javascript:alert(document.domain)', '//evil.example/phish', 'data:text/html,x', '', null]) {
+    for (const unsafe of [
+      'javascript:alert(document.domain)',
+      '//evil.example/phish',
+      'data:text/html,x',
+      '',
+      null,
+      JSON.parse('{"toString":1}'),
+    ]) {
       expect(toSafeArweaveLinkHref(unsafe)).toBe('');
     }
   });
