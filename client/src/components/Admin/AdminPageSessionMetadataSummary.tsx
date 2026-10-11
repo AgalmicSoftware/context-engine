@@ -1,4 +1,5 @@
 import React from 'react';
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import styles from './AdminPage.module.scss';
 import { buildAdminChainRegistryDisplay, shortAddress } from './adminPageSessionDisplayHelpers';
@@ -16,6 +17,17 @@ type AdminPageSessionMetadataSummaryProps = {
   metadataUriValue: string;
   metadataUriUrl: string;
   metadataLoadStateLabel: string;
+};
+
+// The registry metadata URI is set by whoever registered the session, so unsafe values stay text.
+const renderMetadataUri = (metadataUriValue: string, metadataUriUrl: string): React.ReactNode => {
+  const href = toSafeLinkHref(metadataUriUrl, { contextLabel: 'admin_metadata_uri' });
+  if (!href) return metadataUriValue || '—';
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+      {metadataUriValue}
+    </a>
+  );
 };
 
 const AdminPageSessionMetadataSummary = ({
@@ -111,15 +123,7 @@ const AdminPageSessionMetadataSummary = ({
       <>
         <div className={styles.metadataItem}>
           <span>Metadata URI</span>
-          <span>
-            {metadataUriUrl ? (
-              <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                {metadataUriValue}
-              </a>
-            ) : (
-              '—'
-            )}
-          </span>
+          <span>{renderMetadataUri(metadataUriValue, metadataUriUrl)}</span>
         </div>
         <div className={styles.metadataItem}>
           <span>Metadata source</span>

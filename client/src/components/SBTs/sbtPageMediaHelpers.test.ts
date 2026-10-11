@@ -54,6 +54,17 @@ describe('sbtPageMediaHelpers', () => {
     );
   });
 
+  it('never links an unsafe token URI set by the SBT creator', () => {
+    expect(normalizeSbtPageCanonicalMetadataHref('javascript:alert(document.domain)')).toBe('');
+    expect(normalizeSbtPageCanonicalMetadataHref('//evil.example/metadata.json')).toBe('');
+    expect(resolveSbtPageTokenMetadataLinkDisplayState({ tokenUriRaw: 'javascript:alert(1)' })).toEqual({
+      href: '',
+      shouldRenderLink: false,
+    });
+    const embedded = encodeURIComponent(JSON.stringify({ tokenURI: 'javascript:alert(1)' }));
+    expect(resolveSbtPageTokenMetadataHref(`data:application/json,${embedded}`)).toBe('');
+  });
+
   it('resolves embedded token metadata links by SBT-specific field precedence', () => {
     const sbtTxId = 'GfaX7MhJndTePSYdECj8VJmFQ5m2KDtDMU8fHgUTw24';
     const sessionTxId = 'ue3Ek_Mh1ypNvvCaGlfrntt_8HxJ9CDiwDlG06uoTpY';

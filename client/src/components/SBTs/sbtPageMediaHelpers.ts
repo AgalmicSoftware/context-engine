@@ -1,4 +1,4 @@
-import { buildArweaveGatewayUrlCandidates, normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { buildArweaveGatewayUrlCandidates, toSafeArweaveLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { decodeSbtPageJsonDataUri } from './sbtPagePasswordExportHelpers';
 
 export type SbtPageInfoImageLike = Record<string, unknown> & {
@@ -127,8 +127,9 @@ export const getNextDisplayImageFallbackState = (
 export const normalizeSbtPageCanonicalMetadataHref = (candidateRaw: unknown): string => {
   const candidate = String(candidateRaw || '').trim();
   if (!candidate) return '';
-  const normalized = normalizeArweaveUrl(candidate, { contextLabel: 'sbt_page_token_uri' });
-  if (!normalized || /^data:/i.test(normalized)) return '';
+  // The SBT creator sets the token URI, so only a safe link may come back.
+  const normalized = toSafeArweaveLinkHref(candidate, { contextLabel: 'sbt_page_token_uri' });
+  if (!normalized) return '';
   if (isSbtPageImageLikeUri(normalized)) return '';
   return normalized;
 };

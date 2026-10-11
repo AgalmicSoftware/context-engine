@@ -5,6 +5,7 @@ import {
   isArweaveTxId,
   normalizeArweaveUrl,
   parseArweaveTxId,
+  toSafeArweaveLinkHref,
   toSafeLinkHref,
 } from './arweaveUrls';
 
@@ -90,6 +91,17 @@ describe('arweaveUrls helpers', () => {
       { href: 'https://example.test' },
     ]) {
       expect(toSafeLinkHref(unsafe)).toBe('');
+    }
+  });
+
+  it('links stored Arweave references only through safe gateway hrefs', () => {
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = false;
+    expect(toSafeArweaveLinkHref(txId)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeArweaveLinkHref(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeArweaveLinkHref(`${canonicalArweaveGateway}/tx/${txId}/data`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeArweaveLinkHref(txId, { gateway: testArweaveGateway })).toBe(`${testArweaveGateway}/${txId}`);
+    for (const unsafe of ['javascript:alert(document.domain)', '//evil.example/phish', 'data:text/html,x', '', null]) {
+      expect(toSafeArweaveLinkHref(unsafe)).toBe('');
     }
   });
 

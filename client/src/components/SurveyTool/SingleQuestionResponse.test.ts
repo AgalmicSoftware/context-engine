@@ -222,6 +222,37 @@ describe('SingleQuestionResponse card actions', () => {
     expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')?.props?.href).toContain(preferredTxId);
   });
 
+  it('never turns unsafe Arweave ids from uploaded questions or responses into links', () => {
+    const unsafe = 'javascript:alert(document.domain)';
+    const trees = [
+      createSubject({
+        mode: 'mini',
+        questionOnly: true,
+        question: { id: 'q-unsafe', prompt: 'Prompt', type: 'freeform', arweaveTxId: unsafe },
+        response: null,
+      }).render(),
+      createSubject({
+        mode: 'fullscreen',
+        question: { id: 'q-unsafe', prompt: 'Prompt', type: 'freeform' },
+        response: {
+          arweaveTxId: unsafe,
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      }).render(),
+      createSubject({
+        aggregatorResponseMode: true,
+        question: { id: 'q-unsafe', type: 'binary', storageRef: { backend: 'arweave', id: '//evil.example/x' } },
+        allResponses: [],
+      }).render(),
+    ];
+
+    trees.forEach((tree) => {
+      expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')).toBeNull();
+      expect(findElement(tree, (node) => node?.props?.title === 'View question page')).not.toBeNull();
+    });
+  });
+
   it('does not render an Arweave link for Cloudflare-only question storage refs', () => {
     const subject = createSubject({
       mode: 'mini',
