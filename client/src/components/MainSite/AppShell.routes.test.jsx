@@ -4451,6 +4451,7 @@ describe('AppShell live pathname updates', () => {
       this.getInitializableSessionNetwork = jest.fn(() => null);
       this.getSessionChainId = jest.fn(() => null);
       this.resolveSessionSlugFromPathToken = jest.fn((token) => token);
+      this.hasMaskedQuestionPayloadInCache = jest.fn(() => false);
     });
     jest.spyOn(AppShell.prototype, 'componentWillUnmount').mockImplementation(function () {
       this._mounted = false;
@@ -4463,11 +4464,11 @@ describe('AppShell live pathname updates', () => {
     localStorage.clear();
   });
 
-  const mountShell = () => {
+  const mountShell = (propOverrides = {}) => {
     const shell = React.createRef();
     const store = React.createRef();
     const dispatch = jest.fn();
-    const props = buildProps({ demoSurfaceMode: false });
+    const props = buildProps({ demoSurfaceMode: false, ...propOverrides });
     class SessionStore extends React.Component {
       state = { primarySessionSlug: '', primarySessionExplicit: true };
       changeActiveSessionSlug = (slug) => {
@@ -4510,6 +4511,20 @@ describe('AppShell live pathname updates', () => {
     h.commit('/session/route-alpha', 4);
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('checks masked questions once when a redirect runs ahead of the router path prop', () => {
+    const h = mountShell({ account: '0x00000000000000000000000000000000000000aa', loginComplete: true });
+    window.history.replaceState({}, '', '/session/route-alpha');
+    h.commit('/entry');
+    const maskedChecks = h.shell.current.hasMaskedQuestionPayloadInCache;
+    expect(maskedChecks).toHaveBeenCalledWith('route-alpha');
+
+    maskedChecks.mockClear();
+    h.commit('/entry', 2);
+    h.commit('/session/route-alpha', 3);
+    expect(maskedChecks).not.toHaveBeenCalled();
     h.unmount();
   });
 

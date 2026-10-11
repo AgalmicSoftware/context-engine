@@ -2785,8 +2785,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
 
     if (this.props.loginComplete && this.props.account) {
+      // Compare live paths like the session transition below: the router path prop
+      // can lag a redirect, which would rescan masked questions on every update.
       const prevPath = this.getEffectiveRoutePath(
-        prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
+        this._lastDidUpdatePathRaw ?? (prevProps.path || this.getCurrentPathname()),
       );
       const path = this.getEffectiveRoutePath(this.getCurrentPathname());
       const activeSlug = this.getActiveSessionSlug();
