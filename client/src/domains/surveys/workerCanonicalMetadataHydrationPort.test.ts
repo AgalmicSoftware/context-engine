@@ -8,6 +8,7 @@ import {
 import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { resolveWorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { mergeWorkerQuestionResponses } from '../../utilities/survey/workerResponseHydration';
 
 jest.mock('../../utilities/cache/cacheScripts', () => ({ peekCacheSync: jest.fn(() => null) }));
 
@@ -579,6 +580,38 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       const cache = mergeWorkerCanonicalQuestionMetadata(staleCache, rows, identity) as any;
       expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
       expect(cache.worker.questions[QUESTION_ID].voiceCredits).toBeUndefined();
+    });
+
+    it('replaces a placeholder built from a response payload with the real question', async () => {
+      const responseCache = mergeWorkerQuestionResponses(
+        null,
+        [
+          {
+            questionId: QUESTION_ID,
+            responder: AUTHOR,
+            response: { questionID: QUESTION_ID, prompt: 'Payload headline', type: 'freeform', answer: { value: 'x' } },
+            storageRefId: 'response-ref',
+            timestamp: 10,
+          },
+        ],
+        'worker-session',
+        identity,
+      ) as any;
+      expect(responseCache.worker.questions[QUESTION_ID].source).toBe('worker-response-payload');
+
+      const { rows } = await loadFrom([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+        cf_official: question(),
+      });
+      const cache = mergeWorkerCanonicalQuestionMetadata(responseCache, rows, identity) as any;
+      const merged = cache.worker.questions[QUESTION_ID];
+      expect(merged).toEqual({ ...(rows[0] as any).payload, id: QUESTION_ID });
+      expect(merged).toEqual(expect.objectContaining({ prompt: PROMPT, type: 'binary' }));
+      expect(merged.question).toBeUndefined();
+      expect(merged.text).toBeUndefined();
+      expect(merged.source).not.toBe('worker-response-payload');
+      expect(cache.worker.questionResponses[QUESTION_ID][AUTHOR]).toEqual(
+        expect.objectContaining({ prompt: 'Payload headline' }),
+      );
     });
 
     it('drops ids the Worker lists as hidden, including cached copies', async () => {
