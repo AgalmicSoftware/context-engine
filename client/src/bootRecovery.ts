@@ -319,6 +319,8 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   }
 
   const staleChunk = isStaleChunkLoadError(error);
+  // Offline, an automatic reload would only reach the browser's offline page.
+  const offline = staleChunk && isBrowserOffline(win);
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
   const reload =
     options.reload ||
@@ -329,7 +331,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
   const requestedAutoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   const automaticReloadPaused = hasReloadParam(win, reloadParam);
-  const autoReloadDelayMs = !staleChunk || automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
+  const autoReloadDelayMs = !staleChunk || offline || automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
   let refreshStarted = false;
   const refresh = async (button: HTMLButtonElement | null) => {
     if (refreshStarted) return;
@@ -384,23 +386,29 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     doc,
     panel,
     'h1',
-    staleChunk ? 'A new version of Context Engine is available' : 'Context Engine could not start',
+    offline
+      ? 'You appear to be offline'
+      : staleChunk
+        ? 'A new version of Context Engine is available'
+        : 'Context Engine could not start',
     'margin:0 0 14px;color:var(--ce-panel-text,CanvasText);font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
     panel,
     'p',
-    staleChunk
-      ? 'Reloading clears cached app data and loads the latest version.'
-      : 'Reload to try again. Your drafts and settings will be preserved.',
+    offline
+      ? 'Reconnect, then reload Context Engine.'
+      : staleChunk
+        ? 'Reloading clears cached app data and loads the latest version.'
+        : 'Reload to try again. Your drafts and settings will be preserved.',
     'margin:0 0 20px;color:var(--ce-panel-text-muted,CanvasText);font-size:17px;line-height:1.45',
   );
   const countdownNode = appendTextNode(
     doc,
     panel,
     'p',
-    automaticReloadPaused
+    automaticReloadPaused && !offline
       ? 'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.'
       : '',
     'margin:0 0 20px;color:var(--ce-panel-text,CanvasText);font-size:15px;font-weight:700;line-height:1.35',

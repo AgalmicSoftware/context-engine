@@ -188,6 +188,50 @@ describe('bootRecovery', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  it('tells an offline reader to reconnect at startup instead of counting down to a reload', async () => {
+    jest.useFakeTimers();
+    const reload = jest.fn();
+    const clearCaches = jest.fn().mockResolvedValue(undefined);
+    const fakeWindow = {
+      location: { href: 'https://contextengine.xyz/' },
+      navigator: { onLine: false },
+      setTimeout,
+    };
+
+    renderBootFailure(new TypeError('Failed to fetch dynamically imported module'), {
+      window: fakeWindow,
+      clearCaches,
+      reload,
+    });
+
+    expect(document.querySelector('h1')).toHaveTextContent('You appear to be offline');
+    expect(document.body).toHaveTextContent('Reconnect, then reload Context Engine.');
+    expect(document.body).not.toHaveTextContent('A new version');
+    expect(document.body).not.toHaveTextContent('Reloading and clearing cached app data');
+    jest.advanceTimersByTime(10_000);
+    await Promise.resolve();
+    expect(reload).not.toHaveBeenCalled();
+
+    screenButton('Reload').click();
+    await Promise.resolve();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask an offline reader to fix the startup issue after a previous attempt', () => {
+    const fakeWindow = {
+      location: { href: 'https://contextengine.xyz/?ceBootReload=123' },
+      navigator: { onLine: false },
+    };
+
+    renderBootFailure(new TypeError('Failed to fetch dynamically imported module'), {
+      window: fakeWindow,
+      reload: jest.fn(),
+    });
+
+    expect(document.querySelector('h1')).toHaveTextContent('You appear to be offline');
+    expect(document.body).not.toHaveTextContent('Automatic reload paused');
+  });
+
   it('returns false when there is no root node to recover into', () => {
     document.body.innerHTML = '';
 
