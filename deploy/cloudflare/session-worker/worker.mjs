@@ -2513,11 +2513,12 @@ var init_workerConfigModeValidation = __esm({
       }
       return validateCanonicalStorageAccessConditions({ profile, storageSide });
     };
-    validateSupplementalSessionPolicies = (config) => {
+    validateSupplementalSessionPolicies = (config, { allowPartialProfileStorage = false } = {}) => {
       if (hasOwn(config, "responseFieldEncryption")) {
         const policy = config.responseFieldEncryption;
         if (!isObj3(policy) || Object.keys(policy).some((key) => !["mode", "version"].includes(key)) || hasOwn(policy, "mode") && !["none", "optional"].includes(policy.mode) || hasOwn(policy, "version") && ![0, 1].includes(policy.version)) return invalid("responseFieldEncryption");
-        if (policy.mode === "optional" && (config.sessionModeProfile?.authority?.mode !== "worker_canonical" || config.sessionModeProfile?.storage?.backend !== "cloudflare" || config.storageProfile?.backend !== "cloudflare")) return invalid("responseFieldEncryption.mode");
+        const partialPatch = allowPartialProfileStorage && (!hasOwn(config, "sessionModeProfile") || !hasOwn(config, "storageProfile"));
+        if (policy.mode === "optional" && !partialPatch && (config.sessionModeProfile?.authority?.mode !== "worker_canonical" || config.sessionModeProfile?.storage?.backend !== "cloudflare" || config.storageProfile?.backend !== "cloudflare")) return invalid("responseFieldEncryption.mode");
       }
       if (hasOwn(config, "linkedWorkerGroups")) {
         if (!Array.isArray(config.linkedWorkerGroups) || config.linkedWorkerGroups.length > 20) return invalid("linkedWorkerGroups");
@@ -2539,7 +2540,7 @@ var init_workerConfigModeValidation = __esm({
     };
     validateWorkerConfigModeValues = (config, { allowPartialProfileStorage = false } = {}) => {
       if (!isObj3(config)) return invalid("config");
-      const supplemental = validateSupplementalSessionPolicies(config);
+      const supplemental = validateSupplementalSessionPolicies(config, { allowPartialProfileStorage });
       if (!supplemental.ok) return supplemental;
       if (hasOwn(config, "sessionEndsAt") && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
         return invalid("sessionEndsAt");
@@ -3836,7 +3837,7 @@ var init_deployHelperCore = __esm({
           fallbackEligible: accountSubdomain.fallbackEligible
         });
       }
-      const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
+      const anticipatedWorkerOrigin = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev`;
       const allowOrigins = normalizeAllowList(
         allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
       );
@@ -3897,7 +3898,7 @@ var init_deployHelperCore = __esm({
         allowOrigins,
         limits,
         scopes,
-        corsWorkerUrl: anticipatedWorkerUrl,
+        corsWorkerUrl: anticipatedWorkerOrigin,
         embeddedDeployHelperEnabled,
         ...!workerCanonicalRequested ? {
           registryAddress,
@@ -4548,7 +4549,7 @@ var init_deployHelperCore = __esm({
       if (workerUrl) {
         const configWithWorkerUrl = {
           ...config,
-          corsWorkerUrl: workerUrl
+          corsWorkerUrl: normalizeOrigin(workerUrl)
         };
         const readbackMatches = (result) => {
           const readbackConfig = result?.data?.result || result?.data || {};
@@ -5488,10 +5489,7 @@ var init_sessionConfigNormalization = __esm({
         ...existing,
         ...incoming
       };
-      merged.limits = {
-        ...isObj6(existing.limits) ? existing.limits : {},
-        ...isObj6(incoming.limits) ? cloneValue(incoming.limits) : {}
-      };
+      merged.limits = isObj6(incoming.limits) ? cloneValue(incoming.limits) : { ...isObj6(existing.limits) ? existing.limits : {} };
       merged.scopes = {
         ...isObj6(existing.scopes) ? existing.scopes : {},
         ...isObj6(incoming.scopes) ? cloneValue(incoming.scopes) : {}
@@ -5554,7 +5552,7 @@ var init_authorizationScopeFreshness = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEYS, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEYS, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_interviewSettings();
@@ -5610,6 +5608,8 @@ var init_sessionConfigMutation = __esm({
       "embeddedDeployHelperEnabled",
       "litCredentials",
       "resultsAnalysis",
+      "responseFieldEncryption",
+      "linkedWorkerGroups",
       WORKER_GROUPS_BOOTSTRAP_KEY
     ]);
     toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
@@ -5711,6 +5711,15 @@ var init_sessionConfigMutation = __esm({
       if (typeof value !== "string" || value !== value.trim()) return "";
       return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : "";
     };
+    normalizeWorkerUrlIdentity = (value) => {
+      const raw = toTrimmedString6(value);
+      try {
+        const url = new URL(raw);
+        return url.pathname === "/" && !url.search && !url.hash ? url.origin : url.href;
+      } catch {
+        return raw;
+      }
+    };
     changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
       if (getWorkerAuthorityMode(existingConfig) !== "worker_canonical") return false;
       if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") return true;
@@ -5718,9 +5727,9 @@ var init_sessionConfigMutation = __esm({
       const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
       if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
       if (existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value) return true;
-      return ["slug", "corsWorkerUrl"].some((key) => {
-        const existingValue = toTrimmedString6(existingConfig?.[key]);
-        return !!existingValue && toTrimmedString6(mergedConfig?.[key]) !== existingValue;
+      return [["slug", toTrimmedString6], ["corsWorkerUrl", normalizeWorkerUrlIdentity]].some(([key, normalize]) => {
+        const existingValue = normalize(existingConfig?.[key]);
+        return !!existingValue && normalize(mergedConfig?.[key]) !== existingValue;
       });
     };
     changesInitializedRegistryCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
@@ -36965,7 +36974,7 @@ var init_uploadSizeLimits = __esm({
 });
 
 // workers/sessionCorsWorker/storageUploadValidation.js
-var KIB, decoder2, encoder2, STORAGE_RESOURCE_MAX_BYTES, MAX_RESPONSE_ITEM_BYTES, RESOURCE_ID_RE, isStorageResourceId, isObj12, isText, jsonBytes, invalid2, readStoragePayloadResourceId, validateResponseItem, validateStorageUploadPayload;
+var KIB, decoder2, encoder2, STORAGE_RESOURCE_MAX_BYTES, MAX_RESPONSE_ITEM_BYTES, MAX_RESPONSE_PLAINTEXT_BYTES, RESOURCE_ID_RE, isStorageResourceId, isObj12, isText, jsonBytes, invalid2, readStoragePayloadResourceId, validateResponseItem, validateStorageUploadPayload;
 var init_storageUploadValidation = __esm({
   "workers/sessionCorsWorker/storageUploadValidation.js"() {
     init_uploadSizeLimits();
@@ -36979,7 +36988,8 @@ var init_storageUploadValidation = __esm({
       // than one answer; each bundled answer still has the per-answer cap.
       responses: 2 * 1024 * KIB
     });
-    MAX_RESPONSE_ITEM_BYTES = 64 * KIB;
+    MAX_RESPONSE_ITEM_BYTES = 96 * KIB;
+    MAX_RESPONSE_PLAINTEXT_BYTES = 48 * KIB;
     RESOURCE_ID_RE = /^[a-z0-9][a-z0-9._:-]{0,127}$/;
     isStorageResourceId = (value) => typeof value === "string" && RESOURCE_ID_RE.test(value);
     isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -37060,7 +37070,7 @@ var init_storageUploadValidation = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim6, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds, compareVersionAge, isPreferredStorageVersion, selectCanonicalStorageVersions;
+var OWNED_STORAGE_RESOURCES, trim6, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, legacyStorageOwnersMarkerKey, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds, compareVersionAge, isPreferredStorageVersion, selectCanonicalStorageVersions;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
@@ -37081,6 +37091,8 @@ var init_storageResourceOwnership = __esm({
         return null;
       }
     };
+    LEGACY_STORAGE_OWNER = "legacy-admin-only";
+    legacyStorageOwnersMarkerKey = ({ slug, resource }) => recordKey("owner-backfill", { slug, resource });
     readStorageResourceOwner = ({ index, slug, resource, resourceId }) => readJsonRecord(index, recordKey("owner", { slug, resource, resourceId }));
     writeStorageResourceOwner = ({ index, slug, resource, resourceId, uploader, storageRefId, createdAt }) => index.put(recordKey("owner", { slug, resource, resourceId }), JSON.stringify({
       version: 1,
@@ -37245,7 +37257,7 @@ var init_responseFieldKeyRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder3, decoder3, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim7, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder3, decoder3, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim7, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, backfillLegacyStorageOwners, LEGACY_OWNER, resolveLegacyStorageOwner, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -37258,6 +37270,7 @@ var init_storageRouteExecution = __esm({
     init_sessionConfigMutation();
     init_storageUploadValidation();
     init_storageResourceOwnership();
+    init_sessionWriteCoordinator();
     init_sessionSlugResolution();
     init_responseFieldKeyRoute();
     init_stringCoercion();
@@ -38488,10 +38501,17 @@ var init_storageRouteExecution = __esm({
         if (typeof index?.get !== "function") {
           return responseJson(deps, { error: "Cloudflare storage index binding not configured." }, 501, baseHeaders);
         }
+        const uploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
         owner = await readStorageResourceOwner({ index, slug, resource, resourceId });
-        if (owner && normalizeAddress(owner.uploader) !== uploader && !resolveSessionAdminAddresses(config).has(uploader)) {
+        if (!owner && !uploaderIsAdmin) {
+          const legacy = await resolveLegacyStorageOwner({ env, config, slug, resource, resourceId, deps });
+          if (!legacy.ok) return responseJson(deps, { error: legacy.error }, legacy.status || 503, baseHeaders);
+          owner = legacy.owner;
+        }
+        if (owner && normalizeAddress(owner.uploader) !== uploader && !uploaderIsAdmin) {
+          const noun = resource === "questions" ? "question" : "survey";
           return responseJson(deps, {
-            error: `This ${resource === "questions" ? "question" : "survey"} id already belongs to another author. Only its first author or a session admin can upload it again.`,
+            error: owner.uploader === LEGACY_STORAGE_OWNER ? `This ${noun} id was stored before authors were recorded, so only a session admin can upload it again.` : `This ${noun} id already belongs to another author. Only its first author or a session admin can upload it again.`,
             reason: "storage_resource_id_owned"
           }, 409, baseHeaders);
         }
@@ -38887,6 +38907,7 @@ var init_storageRouteExecution = __esm({
         return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
       }
       const items = [];
+      const admins = isOwnedStorageResource(resource) ? resolveSessionAdminAddresses(config) : null;
       for (const { name, raw } of rows) {
         if (!name) continue;
         let metadata;
@@ -38941,6 +38962,7 @@ var init_storageRouteExecution = __esm({
             ...storageRef.resource === "responses" && trim7(metadata?.responder) ? { responder: trim7(metadata.responder).toLowerCase() } : {},
             ...resourceId ? { resourceId } : {},
             ...owned && trim7(metadata?.uploader) ? { uploader: normalizeAddress(metadata.uploader) } : {},
+            ...owned ? { uploaderIsAdmin: !!admins?.has(normalizeAddress(metadata?.uploader)) } : {},
             payloadAccessControl: {
               gate: metadataAccess.gate,
               encryption: metadataAccess.encryption
@@ -39014,6 +39036,61 @@ var init_storageRouteExecution = __esm({
         return null;
       }
     };
+    readIndexRowResourceId = async ({ env, index, slug, config, resource, row, deps }) => {
+      const recorded = normalizeAddress(row.metadata?.resourceId);
+      if (recorded) return recorded;
+      const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
+      if (!payload) return null;
+      const resourceId = readStoragePayloadResourceId(resource, payload);
+      if (!isStorageResourceId(resourceId)) return "";
+      row.metadata = { ...row.metadata, resourceId };
+      await index.put(row.key, JSON.stringify(row.metadata));
+      return resourceId;
+    };
+    backfillLegacyStorageOwners = async ({ env, config, slug, resource, deps } = {}) => {
+      const index = getStorageIndexBinding(env);
+      if (!index || ["get", "put", "list"].some((method) => typeof index[method] !== "function")) {
+        throw new Error("Cloudflare storage index binding not configured.");
+      }
+      const recorded = /* @__PURE__ */ new Set();
+      const legacy = /* @__PURE__ */ new Set();
+      const rows = await listCloudflareMetadataRows({ index, slug, resource });
+      for (const row of rows) {
+        if (!row.metadata) continue;
+        const resourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+        if (resourceId) (normalizeAddress(row.metadata.uploader) ? recorded : legacy).add(resourceId);
+      }
+      const ids = [...legacy].filter((resourceId) => !recorded.has(resourceId)).sort();
+      const createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
+      for (const resourceId of ids) {
+        if (await readStorageResourceOwner({ index, slug, resource, resourceId })) continue;
+        await writeStorageResourceOwner({
+          index,
+          slug,
+          resource,
+          resourceId,
+          uploader: LEGACY_STORAGE_OWNER,
+          storageRefId: "",
+          createdAt
+        });
+      }
+      return { ids, scannedRows: rows.length };
+    };
+    LEGACY_OWNER = Object.freeze({ uploader: LEGACY_STORAGE_OWNER });
+    resolveLegacyStorageOwner = async ({ env, config, slug, resource, resourceId, deps }) => {
+      const coordinated = await checkCoordinatedLegacyStorageOwner({ env, config, slug, resource, resourceId });
+      if (coordinated) return coordinated.ok ? { ok: true, owner: coordinated.adminOnly ? LEGACY_OWNER : null } : coordinated;
+      try {
+        const index = getStorageIndexBinding(env);
+        const markerKey = legacyStorageOwnersMarkerKey({ slug, resource });
+        if (await index.get(markerKey)) return { ok: true, owner: await readStorageResourceOwner({ index, slug, resource, resourceId }) };
+        const { ids, scannedRows } = await backfillLegacyStorageOwners({ env, config, slug, resource, deps });
+        if (scannedRows) await index.put(markerKey, JSON.stringify({ version: 1, count: ids.length }));
+        return { ok: true, owner: ids.includes(resourceId) ? LEGACY_OWNER : null };
+      } catch {
+        return { ok: false, status: 503, error: "Recording the owners of existing questions and surveys failed; retry." };
+      }
+    };
     setCloudflareStorageResourceHidden = async ({ env, config, slug, body, actor = "", deps = {} } = {}) => {
       const resource = trim7(body?.resource);
       const resourceId = normalizeAddress(body?.id);
@@ -39048,14 +39125,10 @@ var init_storageRouteExecution = __esm({
           unreadableRows += 1;
           continue;
         }
-        let rowResourceId = normalizeAddress(row.metadata.resourceId);
-        if (!rowResourceId) {
-          const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
-          if (!payload) {
-            unreadableRows += 1;
-            continue;
-          }
-          rowResourceId = readStoragePayloadResourceId(resource, payload);
+        const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+        if (rowResourceId === null) {
+          unreadableRows += 1;
+          continue;
         }
         if (rowResourceId !== resourceId) continue;
         matchedRows += 1;
@@ -39855,7 +39928,7 @@ var init_quadraticAllocation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisAnswerValidation.js
-var unwrap, scalarText, binaryAliases, formatValidAnalysisAnswer;
+var unwrap, scalarText, binaryAliases, formatValidAnalysisAnswer, RATING_MIN, RATING_MAX, LEGACY_RATING_MAX, readStoredRating;
 var init_resultsAnalysisAnswerValidation = __esm({
   "workers/sessionCorsWorker/resultsAnalysisAnswerValidation.js"() {
     init_quadraticAllocation();
@@ -39898,11 +39971,25 @@ var init_resultsAnalysisAnswerValidation = __esm({
           return scalarText(value) || null;
       }
     };
+    RATING_MIN = 0;
+    RATING_MAX = 10;
+    LEGACY_RATING_MAX = 100;
+    readStoredRating = (value) => {
+      const record = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+      if (record?.encrypted === true) return null;
+      const raw = record ? record.value : value;
+      if (typeof raw !== "number" && typeof raw !== "string") return null;
+      if (typeof raw === "string" && !raw.trim()) return null;
+      const rating = Number(raw);
+      if (!Number.isFinite(rating)) return null;
+      const scaled = rating > RATING_MAX && rating <= LEGACY_RATING_MAX ? rating / 10 : rating;
+      return Math.min(RATING_MAX, Math.max(RATING_MIN, scaled));
+    };
   }
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder4, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim8, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder4, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim8, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_stringCoercion();
@@ -40009,14 +40096,15 @@ var init_resultsAnalysisGeneration = __esm({
       if (isObj15(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
       return "";
     };
+    FIELD_MASKS = /* @__PURE__ */ new Set(["*", "[encrypted]"]);
+    withoutFieldMask = (value) => {
+      const raw = isObj15(value) && hasOwn6(value, "value") ? value.value : value;
+      return typeof raw === "string" && FIELD_MASKS.has(raw.trim()) ? "" : value;
+    };
     rowLooksLocked = (row) => {
       if (!isObj15(row)) return true;
       if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
-      const answer = hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response;
-      if (valueLooksEncrypted(answer)) return true;
-      const value = isObj15(answer) && hasOwn6(answer, "value") ? answer.value : answer;
-      const text = trim8(value);
-      return text === "*" || /^\*+$/.test(text) || /^\[?(encrypted|locked|redacted)\]?$/i.test(text);
+      return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
     normalizeQuestionId = (value) => trim8(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim8(value).replace(/\s+/g, " ").slice(0, 1200);
@@ -40204,6 +40292,7 @@ var init_resultsAnalysisGeneration = __esm({
       }
       return out;
     };
+    isNewerResponseRow = (candidate, current) => candidate.rowTime > current.rowTime || candidate.rowTime === current.rowTime && candidate.storageRefId > current.storageRefId;
     normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
       const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
       const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
@@ -40212,8 +40301,7 @@ var init_resultsAnalysisGeneration = __esm({
         const normalized = normalizeQuestionRecord(question);
         if (normalized) questionMap.set(normalized.questionId, normalized);
       });
-      const responseByQuestionParticipant = /* @__PURE__ */ new Map();
-      const participantDigests = /* @__PURE__ */ new Set();
+      const latestByQuestionParticipant = /* @__PURE__ */ new Map();
       let excludedCount = 0;
       let lockedCount = 0;
       for (const row of Array.isArray(rows) ? rows : []) {
@@ -40225,15 +40313,36 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        if (rowLooksLocked(row)) {
-          excludedCount += 1;
-          lockedCount += 1;
-          if (strictLocked) return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
-          continue;
+        if (strictLocked && rowLooksLocked(row)) {
+          return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
         }
         const questionId = normalizeQuestionId(row.questionId || row.questionID || row.id);
         if (!questionId || requireKnownQuestion && !questionMap.has(questionId)) {
           excludedCount += 1;
+          continue;
+        }
+        const participantSource = trim8(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || "");
+        if (!participantSource) {
+          excludedCount += 1;
+          continue;
+        }
+        const candidate = {
+          row,
+          questionId,
+          participantKey: await participantDigest(participantSource),
+          rowTime: Date.parse(row.submittedAt || row.createdAt || row.timestamp || "") || 0,
+          storageRefId: trim8(row.__storageRefId)
+        };
+        const dedupeKey = `${questionId}:${candidate.participantKey}`;
+        const existing = latestByQuestionParticipant.get(dedupeKey);
+        if (!existing || isNewerResponseRow(candidate, existing)) latestByQuestionParticipant.set(dedupeKey, candidate);
+      }
+      const includedRows = [];
+      const participantDigests = /* @__PURE__ */ new Set();
+      for (const { row, questionId, participantKey } of latestByQuestionParticipant.values()) {
+        if (rowLooksLocked(row)) {
+          excludedCount += 1;
+          lockedCount += 1;
           continue;
         }
         if (!questionMap.has(questionId)) {
@@ -40244,50 +40353,39 @@ var init_resultsAnalysisGeneration = __esm({
           });
           if (inferred) questionMap.set(questionId, inferred);
         }
-        const participantSource = trim8(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || "");
-        if (!participantSource) {
-          excludedCount += 1;
-          continue;
-        }
-        const digest = await participantDigest(participantSource);
-        const answerValue = hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response;
+        const answerValue = withoutFieldMask(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
         const additionalValue = hasOwn6(row, "additional") ? row.additional : hasOwn6(row, "additionalComments") ? row.additionalComments : hasOwn6(row, "comments") ? row.comments : row.comment;
         const knownQuestion = questionMap.get(questionId) || {};
-        const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
+        const validatedAnswer = formatValidAnalysisAnswer(answerValue, knownQuestion);
         if (validatedAnswer === null) {
           excludedCount += 1;
           continue;
         }
         const answer = validatedAnswer.slice(0, 4e3);
-        const additionalLocked = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue));
-        const additionalComments = additionalLocked ? "" : valueFromAnswerLike(additionalValue).slice(0, 2e3);
+        const additionalLocked = valueLooksEncrypted(additionalValue);
+        const additionalComments = additionalLocked ? "" : valueFromAnswerLike(withoutFieldMask(additionalValue)).slice(0, 2e3);
         if (!answer && !additionalComments) {
           excludedCount += 1;
           if (additionalLocked) lockedCount += 1;
           continue;
         }
-        participantDigests.add(digest);
-        const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || "") || 0;
-        const dedupeKey = `${questionId}:${digest}`;
-        const candidate = {
+        participantDigests.add(participantKey);
+        includedRows.push({
           questionId,
-          participantKey: digest,
+          participantKey,
           answer,
           additionalComments,
-          importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : safeNumber(row.importance),
-          conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : safeNumber(row.conviction),
+          importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : readStoredRating(row.importance),
+          conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : readStoredRating(row.conviction),
           submittedAt: normalizeSubmittedAt(row.submittedAt || row.createdAt || row.timestamp),
           questionPrompt: knownQuestion.prompt || "",
-          questionType: knownQuestion.type || "text",
-          rowTime
-        };
-        const existing = responseByQuestionParticipant.get(dedupeKey);
-        if (!existing || candidate.rowTime >= existing.rowTime) responseByQuestionParticipant.set(dedupeKey, candidate);
+          questionType: knownQuestion.type || "text"
+        });
       }
       const sortedParticipantDigests = [...participantDigests].sort();
       const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, "0")}`]));
       const participants = sortedParticipantDigests.map((digest) => ({ syntheticId: participantLabels.get(digest) }));
-      const responseRows = [...responseByQuestionParticipant.values()].sort((a, b2) => a.questionId.localeCompare(b2.questionId) || (participantLabels.get(a.participantKey) || "").localeCompare(participantLabels.get(b2.participantKey) || ""));
+      const responseRows = includedRows.sort((a, b2) => a.questionId.localeCompare(b2.questionId) || (participantLabels.get(a.participantKey) || "").localeCompare(participantLabels.get(b2.participantKey) || ""));
       const sanitizedResponses = responseRows.map((row, index) => ({
         responseId: `r${index + 1}`,
         questionId: row.questionId,
@@ -40379,8 +40477,13 @@ var init_resultsAnalysisGeneration = __esm({
         const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
         if (!isObj15(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
-        const normalized2 = normalizeQuestionRecord(payload);
-        if (!normalized2 || hiddenQuestionIds.has(normalized2.questionId)) continue;
+        const payloadId = trim8(payload.id || payload.questionId || payload.questionID);
+        const trustedId = lower4(metadata.resourceId);
+        const normalized2 = normalizeQuestionRecord({
+          ...payload,
+          questionId: trustedId && lower4(payloadId) !== trustedId ? trustedId : payloadId
+        });
+        if (!normalized2 || hiddenQuestionIds.has(lower4(normalized2.questionId))) continue;
         candidates.push({
           resourceId: normalized2.questionId,
           createdAtMs: Date.parse(trim8(metadata.createdAt)) || 0,
@@ -40414,6 +40517,7 @@ var init_resultsAnalysisGeneration = __esm({
         responseRows.push({
           ...payload,
           __trustedParticipantId: metadata.responder,
+          __storageRefId: metadata.id,
           responder: metadata.responder,
           createdAt: metadata.createdAt,
           submittedAt: metadata.createdAt,
@@ -40449,6 +40553,7 @@ var init_resultsAnalysisGeneration = __esm({
         responseRows.push({
           ...payload,
           __trustedParticipantId: metadata.responder,
+          __storageRefId: metadata.id,
           responder: metadata.responder,
           createdAt: metadata.createdAt,
           submittedAt: metadata.createdAt,
@@ -40931,6 +41036,7 @@ __export(sessionWriteCoordinator_exports, {
   SessionWriteCoordinator: () => SessionWriteCoordinator,
   WorkerGroupWriteCoordinator: () => WorkerGroupWriteCoordinator,
   checkCoordinatedAuthRateLimit: () => checkCoordinatedAuthRateLimit,
+  checkCoordinatedLegacyStorageOwner: () => checkCoordinatedLegacyStorageOwner,
   consumeCoordinatedAuthNonce: () => consumeCoordinatedAuthNonce,
   enqueueCoordinatedResultsAnalysisAutoJob: () => enqueueCoordinatedResultsAnalysisAutoJob,
   executeCoordinatedSessionConfigMutation: () => executeCoordinatedSessionConfigMutation,
@@ -40943,12 +41049,13 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, MAX_ACTIVE_AUTH_NONCES, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_OWNERS_KEY_PREFIX, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, MAX_ACTIVE_AUTH_NONCES, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, admitActiveAuthNonce, putActiveAuthNonces, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_deployHelperCore();
     init_sponsoredBootstrapGrantStore();
     init_resultsAnalysisGeneration();
+    init_storageRouteExecution();
     init_sessionConfigMutation();
     init_sessionConfigNormalization();
     init_sessionConfigSecretsStore();
@@ -40956,6 +41063,7 @@ var init_sessionWriteCoordinator = __esm({
     init_workerSessionConfig();
     init_workerGroups();
     SPONSORED_DEPLOY_RECORD_KEY = "sponsored-deploy";
+    STORAGE_LEGACY_OWNERS_KEY_PREFIX = "storage-legacy-owners:";
     DIRECT_DEPLOY_RECORD_KEY = "direct-deploy";
     SPONSORED_FAUCET_RECORD_KEY = "sponsored-faucet";
     SESSION_CONFIG_AUTHORITY_KEY = "session-config-authority";
@@ -41003,7 +41111,29 @@ var init_sessionWriteCoordinator = __esm({
     };
     readActiveAuthNonces = (record, nowMs) => {
       const entries = Array.isArray(record?.entries) ? record.entries : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
-      return entries.map((entry) => ({ nonce: toTrimmedString9(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) })).filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
+      return entries.map((entry) => ({
+        nonce: toTrimmedString9(entry?.nonce),
+        expiresAtMs: Number(entry?.expiresAtMs || 0),
+        caller: toTrimmedString9(entry?.caller)
+      })).filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
+    };
+    admitActiveAuthNonce = (active, entry) => {
+      if (active.length < MAX_ACTIVE_AUTH_NONCES) return [...active, entry];
+      const counts = /* @__PURE__ */ new Map();
+      active.forEach((item) => counts.set(item.caller, (counts.get(item.caller) || 0) + 1));
+      let evicted = counts.has(entry.caller) ? entry.caller : null;
+      if (evicted === null) {
+        let most = 1;
+        counts.forEach((count, caller) => {
+          if (count > most) {
+            most = count;
+            evicted = caller;
+          }
+        });
+      }
+      if (evicted === null) return null;
+      const oldest = active.findIndex((item) => item.caller === evicted);
+      return [...active.slice(0, oldest), ...active.slice(oldest + 1), entry];
     };
     putActiveAuthNonces = async (transaction, entries) => {
       if (!entries.length) {
@@ -41170,6 +41300,8 @@ var init_sessionWriteCoordinator = __esm({
         this.sessionConfigTail = Promise.resolve();
         this.workerGroupTail = Promise.resolve();
         this.resultsAnalysisTail = Promise.resolve();
+        this.storageOwnerTail = Promise.resolve();
+        this.backfillLegacyStorageOwners = deps.backfillLegacyStorageOwners || backfillLegacyStorageOwners;
       }
       serializeSessionConfigOperation(operation) {
         const run = this.sessionConfigTail.then(operation);
@@ -41180,6 +41312,42 @@ var init_sessionWriteCoordinator = __esm({
         const run = this.workerGroupTail.then(operation);
         this.workerGroupTail = run.catch(() => void 0);
         return run;
+      }
+      serializeStorageOwnerOperation(operation) {
+        const run = this.storageOwnerTail.then(operation);
+        this.storageOwnerTail = run.catch(() => void 0);
+        return run;
+      }
+      // Answers whether a question or survey id was stored before first-writer
+      // records existed. The scan runs once per resource; racing first uploads
+      // wait for it and then read the same stored answer.
+      async executeStorageLegacyOwner(payload) {
+        const resource = toTrimmedString9(payload?.resource);
+        const resourceId = toTrimmedString9(payload?.resourceId).toLowerCase();
+        if (!["questions", "surveys"].includes(resource) || !resourceId) {
+          return jsonResponse2({ ok: false, error: "Invalid legacy owner request." }, 400);
+        }
+        return this.serializeStorageOwnerOperation(async () => {
+          const key = `${STORAGE_LEGACY_OWNERS_KEY_PREFIX}${resource}`;
+          let record = await this.state.storage.get(key);
+          if (!Array.isArray(record?.ids)) {
+            try {
+              const { ids } = await this.backfillLegacyStorageOwners({
+                env: this.env,
+                config: payload?.config,
+                slug: payload?.slug,
+                resource
+              });
+              record = { version: 1, ids, completedAtMs: Number(this.now()) || Date.now() };
+            } catch {
+              return jsonResponse2({ ok: false, error: "Recording the owners of existing questions and surveys failed; retry." }, 503);
+            }
+            await this.state.storage.transaction(async (transaction) => {
+              await transaction.put(key, record);
+            });
+          }
+          return jsonResponse2({ ok: true, adminOnly: record.ids.includes(resourceId) }, 200);
+        });
       }
       serializeResultsAnalysisOperation(operation) {
         const run = this.resultsAnalysisTail.then(operation);
@@ -42532,6 +42700,7 @@ var init_sessionWriteCoordinator = __esm({
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         const address2 = toTrimmedString9(payload?.address).toLowerCase();
         const nonce = toTrimmedString9(payload?.nonce);
+        const caller = toTrimmedString9(payload?.caller).slice(0, 128);
         const expiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.expiresAtMs,
           nowMs,
@@ -42545,14 +42714,17 @@ var init_sessionWriteCoordinator = __esm({
         if (!slug || !address2 || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce issuance request." }, 400);
         }
-        await this.state.storage.transaction(async (transaction) => {
+        const admitted = await this.state.storage.transaction(async (transaction) => {
           const used = await transaction.get(AUTH_NONCE_USED_KEY);
           const entries = Array.isArray(used?.entries) ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs) : [];
           await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
           const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs).filter((entry) => entry.nonce !== nonce);
-          await putActiveAuthNonces(transaction, [...active, { nonce, expiresAtMs }].slice(-MAX_ACTIVE_AUTH_NONCES));
+          const next = admitActiveAuthNonce(active, { nonce, expiresAtMs, caller });
+          if (!next) return false;
+          await putActiveAuthNonces(transaction, next);
+          return true;
         });
-        return jsonResponse2({ ok: true });
+        return admitted ? jsonResponse2({ ok: true }) : jsonResponse2({ ok: false, error: "Too many pending sign-ins for this wallet. Try again shortly." }, 429);
       }
       async executeAuthNonceConsume(payload) {
         const nowMs = Number(this.now()) || Date.now();
@@ -42885,6 +43057,9 @@ var init_sessionWriteCoordinator = __esm({
         if (url.pathname === "/results-analysis/status") {
           return this.executeResultsAnalysisStatus();
         }
+        if (url.pathname === "/storage/legacy-owner") {
+          return this.executeStorageLegacyOwner(payload);
+        }
         if (url.pathname === "/results-analysis/reserve") {
           return this.executeResultsAnalysisReserve(payload);
         }
@@ -43090,9 +43265,11 @@ var init_sessionWriteCoordinator = __esm({
       nonce,
       ttlSeconds,
       usedNonceTtlSeconds = 600,
-      now = Date.now
+      now = Date.now,
+      caller = ""
     } = {}) => {
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
+      const callerKey = toTrimmedString9(caller) ? (await sha256Hex2(`auth-nonce-caller:${toTrimmedString9(caller).toLowerCase()}`)).slice(0, 32) : "";
       return callAuthStateCoordinator({
         env,
         identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
@@ -43101,6 +43278,7 @@ var init_sessionWriteCoordinator = __esm({
           slug,
           address: address2,
           nonce,
+          ...callerKey ? { caller: callerKey } : {},
           expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1e3,
           usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1e3
         }
@@ -43259,6 +43437,23 @@ var init_sessionWriteCoordinator = __esm({
         return response3.ok ? result?.receipt : null;
       } catch {
         return null;
+      }
+    };
+    checkCoordinatedLegacyStorageOwner = async ({ env, config, slug, resource, resourceId } = {}) => {
+      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+      const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+      if (!stub) return null;
+      const unavailable2 = { ok: false, status: 503, error: "Recording the owners of existing questions and surveys failed; retry." };
+      try {
+        const response3 = await stub.fetch("https://session-coordinator.internal/storage/legacy-owner", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, config, resource, resourceId })
+        });
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok && result?.ok === true ? { ok: true, adminOnly: result.adminOnly === true } : unavailable2;
+      } catch {
+        return unavailable2;
       }
     };
     readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
@@ -72281,6 +72476,7 @@ var SIWE_DOMAIN_RE = /^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
 var SIWE_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 var SIWE_STATEMENT_RE = /^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;= ]+$/;
 var SIWE_VALUE_RE = /^\S+$/;
+var SIWE_NONCE_RE = /^[A-Za-z0-9]{8,}$/;
 var SIWE_REQUIRED_FIELDS = Object.freeze([
   ["URI: ", "uri"],
   ["Version: ", "version"],
@@ -72349,6 +72545,7 @@ var parseSiweMessage = (message) => {
   if (index !== lines.length) return malformedSiwe("unexpected or repeated line");
   if (fields.version !== "1") return malformedSiwe("unsupported version");
   if (!/^\d+$/.test(fields.chainId)) return malformedSiwe("invalid chain ID");
+  if (!SIWE_NONCE_RE.test(fields.nonce)) return malformedSiwe("invalid nonce");
   return {
     domain,
     address: address2,
@@ -79362,11 +79559,27 @@ var dispatchResultsAnalysisArtifactRequest = async ({
 
 // workers/sessionCorsWorker/authNonceRequestDispatch.js
 init_sessionConfigMutation();
+var ipv6Prefix64 = (ip) => {
+  const halves = ip.split("::");
+  if (halves.length > 2) return "";
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return "";
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...tail];
+  if (!groups.every((group) => /^[0-9a-f]{1,4}$/.test(group))) return "";
+  return `${groups.slice(0, 4).map((group) => parseInt(group, 16).toString(16)).join(":")}::/64`;
+};
+var normalizeCallerIp = (ip) => {
+  const mappedIpv4 = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mappedIpv4) return mappedIpv4[1];
+  return ip.includes(":") ? ipv6Prefix64(ip) || ip : ip;
+};
 var resolveAuthNonceSharedNetworkIdentity = ({ request, deps } = {}) => {
   const isCloudflareRuntime = !!(request?.cf && typeof request.cf === "object");
   if (isCloudflareRuntime) {
     const cfIp = String(deps?.toStr?.(request?.headers?.get("CF-Connecting-IP")) ?? "").trim().toLowerCase();
-    if (cfIp) return `anon:${cfIp}`;
+    if (cfIp) return `anon:${normalizeCallerIp(cfIp)}`;
   }
   return "anon:unknown";
 };
@@ -79464,7 +79677,8 @@ var dispatchAuthNonceRequest = async ({
     targetSlug,
     address2.toLowerCase(),
     nonce,
-    deps?.NONCE_TTL_SECONDS
+    deps?.NONCE_TTL_SECONDS,
+    rateLimitIdentity
   );
   if (!issueResult?.ok) {
     return deps?.json?.(
@@ -79801,10 +80015,7 @@ var fillRandomValues2 = (bytes2, deps) => {
 var buildNonce = (deps) => {
   const bytes2 = new Uint8Array(16);
   fillRandomValues2(bytes2, deps);
-  const encode2 = typeof deps?.base64UrlEncode === "function" ? deps.base64UrlEncode : () => {
-    throw new Error("base64UrlEncode unavailable");
-  };
-  return encode2(bytes2);
+  return Array.from(bytes2, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
   const coordinate = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
@@ -79815,7 +80026,8 @@ var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
     nonce,
     ttlSeconds,
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
-    now: deps?.now
+    now: deps?.now,
+    caller: deps?.caller
   });
   if (!result?.ok) {
     return {
@@ -80084,6 +80296,25 @@ var buildDeployExecutionFailure = (error) => ({
     error: toTrimmedString19(error?.message || error) || "Failed to run embedded sponsored deploy."
   }
 });
+var resolveSponsoredReleaseBundles = (env, deployPayload) => {
+  const bundleUrl = toTrimmedString19(env?.WORKER_BUNDLE_URL);
+  const bundleManifestUrl = toTrimmedString19(env?.WORKER_BUNDLE_MANIFEST_URL);
+  if (!bundleUrl || !bundleManifestUrl) {
+    return { ok: false, error: "Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker." };
+  }
+  if (deployPayload?.sessionModeProfile?.surfaces?.agentHttp !== true) {
+    return { ok: true, fields: { bundleUrl, bundleManifestUrl } };
+  }
+  const agentBridgeBundleUrl = toTrimmedString19(env?.AGENT_BRIDGE_BUNDLE_URL);
+  const agentBridgeBundleManifestUrl = toTrimmedString19(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+  if (!agentBridgeBundleUrl || !agentBridgeBundleManifestUrl) {
+    return {
+      ok: false,
+      error: "Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker."
+    };
+  }
+  return { ok: true, fields: { bundleUrl, bundleManifestUrl, agentBridgeBundleUrl, agentBridgeBundleManifestUrl } };
+};
 var buildSponsoredRequestDigest = async (action, payload, requestOrigin = "") => sha256Hex2(
   stableCanonicalSerialize({ action, payload, requestOrigin: normalizeOrigin(requestOrigin) })
 );
@@ -80192,16 +80423,29 @@ var dispatchSponsoredBootstrapRedeem = async ({
         "Embedded sponsored deploy is disabled on this worker."
       );
     }
+    const releaseBundles = resolveSponsoredReleaseBundles(env, deployPayload);
+    if (!releaseBundles.ok) {
+      return buildGrantErrorResponse(deps, headers, 400, releaseBundles.error);
+    }
     const {
       accountId: _discardedAccountId,
       deploymentRequestId: _discardedDeploymentRequestId,
       configRevision: _discardedConfigRevision,
+      deploymentKind: _discardedDeploymentKind,
+      bundleText: _discardedBundleText,
+      bundleUrl: _discardedBundleUrl,
+      bundleSha256: _discardedBundleSha256,
+      bundleManifestUrl: _discardedBundleManifestUrl,
+      agentBridgeBundleUrl: _discardedAgentBridgeBundleUrl,
+      agentBridgeBundleManifestUrl: _discardedAgentBridgeBundleManifestUrl,
+      agentBridgeBundleSha256: _discardedAgentBridgeBundleSha256,
       ...accountIndependentDeployPayload
     } = deployPayload;
     const deploymentRequestId = await buildSponsoredDeploymentRequestId(grantToken);
     const configRevision = await buildSponsoredConfigRevision(grantToken);
     const effectiveDeployPayload = {
       ...accountIndependentDeployPayload,
+      ...releaseBundles.fields,
       deploymentRequestId,
       configRevision
     };
@@ -80949,17 +81193,16 @@ var createWorkerRouteShellWithWorkerDeps = ({
             checkNonceRateLimit: deps?.checkNonceRateLimit,
             ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
             now: deps?.now,
-            buildNonce: () => deps?.buildNonce?.({
-              base64UrlEncode: deps?.base64UrlEncode
-            }),
-            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (deps?.issueNonce || issueNonce)(
+            buildNonce: () => deps?.buildNonce?.(),
+            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl, caller) => (deps?.issueNonce || issueNonce)(
               currentEnv,
               slugArg,
               addressArg,
               nonceArg,
               ttl,
               {
-                now: deps?.now
+                now: deps?.now,
+                caller
               }
             ),
             MISSING_SLUG_ERROR: constants?.missingSlugError,
