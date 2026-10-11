@@ -567,7 +567,7 @@ const SessionWizard = ({
   const {
     workerMode,
     setWorkerMode,
-    workerSecretsEnabled,
+    workerSecretsEnabled: savedWorkerSecretsEnabled,
     setWorkerSecretsEnabled,
     persistWorkerSecrets,
     deployHelperUrl,
@@ -611,6 +611,15 @@ const SessionWizard = ({
     defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
     buildProvisionedSponsoredContextState,
   });
+  // "Require users to pay for usage" is a custom setting for decentralized
+  // sessions. Its saved choice applies only where its toggle shows; elsewhere
+  // (normal mode, other profiles) Worker secrets stay on, so the AI-key inputs
+  // never lock without a control. The saved choice returns with the toggle.
+  const userPaidUsageAvailable =
+    resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile).authorityMode ===
+    'evm_registry_canonical';
+  const userPaidUsageToggleShown = wizardMode === 'advanced' && userPaidUsageAvailable;
+  const workerSecretsEnabled = savedWorkerSecretsEnabled || !userPaidUsageToggleShown;
 
   useEffect(() => {
     const limits = draft?.limits;
@@ -639,7 +648,8 @@ const SessionWizard = ({
   const provisionedSponsoredContextRef = useRef<ProvisionedSponsoredContextState>(
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );
-  const workerSecretsEnabledRef = useRef(workerSecretsEnabled);
+  // Holds the saved choice: sponsored-bundle restore puts it back as it was.
+  const workerSecretsEnabledRef = useRef(savedWorkerSecretsEnabled);
   const persistWorkerSecretsRef = useRef(persistWorkerSecrets);
   const workerSecretsRef = useRef<WorkerSecretsLike>(
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets),
@@ -929,7 +939,7 @@ const SessionWizard = ({
       manualGasPriceGwei,
       manualMaxFeePerGasGwei,
       manualMaxPriorityFeePerGasGwei,
-      workerSecretsEnabled,
+      workerSecretsEnabled: savedWorkerSecretsEnabled,
       effectivePersistWorkerSecrets,
       workerSecrets,
       workerAllowOrigins,
@@ -959,7 +969,7 @@ const SessionWizard = ({
     manualGasPriceGwei,
     manualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
-    workerSecretsEnabled,
+    savedWorkerSecretsEnabled,
     effectivePersistWorkerSecrets,
     workerSecrets,
     workerAllowOrigins,
@@ -1401,7 +1411,7 @@ const SessionWizard = ({
     deployWorkerUrlRef,
     provisionedSponsoredContext,
     provisionedSponsoredContextRef,
-    workerSecretsEnabled,
+    workerSecretsEnabled: savedWorkerSecretsEnabled,
     workerSecretsEnabledRef,
     persistWorkerSecrets,
     persistWorkerSecretsRef,
@@ -2027,7 +2037,7 @@ const SessionWizard = ({
         const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
           deployForm: deployFormRef.current,
-          workerSecretsEnabled: workerSecretsEnabledRef.current,
+          workerSecretsEnabled: workerSecretsEnabledRef.current || !userPaidUsageToggleShown,
           currentWorkerSecrets,
           getMissingWorkerSecretsForDeploy,
         });
@@ -2537,14 +2547,6 @@ const SessionWizard = ({
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
   const isNormalMode = wizardMode !== 'advanced';
-  const showUserPaidUsage = sessionModeRequirements.authorityMode === 'evm_registry_canonical';
-  const profileHidesUserPaidUsage = sessionModeRequirements.selected && !showUserPaidUsage;
-  // "Require users to pay for usage" turns Worker secrets off, and only its
-  // toggle turns them back on. A selected profile without that toggle would
-  // otherwise keep a value set under another profile and lock the AI keys.
-  useEffect(() => {
-    if (profileHidesUserPaidUsage && !workerSecretsEnabled) setWorkerSecretsEnabled(true);
-  }, [profileHidesUserPaidUsage, setWorkerSecretsEnabled, workerSecretsEnabled]);
   const hasConfiguredDeployHelperUrl = !!workerAuthPublishAdapter.normalizeWorkerUrl(
     toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim(),
   );
@@ -3026,7 +3028,7 @@ const SessionWizard = ({
       workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
       setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
       workerMode={workerMode}
-      showUserPaidUsage={showUserPaidUsage}
+      showUserPaidUsage={userPaidUsageAvailable}
       workerSecretsEnabled={workerSecretsEnabled}
       workerUrlAutoFilled={workerUrlAutoFilled}
       workerUrlSource={workerUrlSource}

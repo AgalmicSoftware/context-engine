@@ -388,7 +388,10 @@ custom settings in the draft. Profile settings follow the existing stages:
   requires Telegram; disabling Telegram also disables its Mini App.
 - **Require users to pay for usage** appears only in the custom Worker settings
   for decentralized (Ethereum registry + Arweave) sessions. Centralized Cloudflare
-  sessions, including those using Lit, do not show this option.
+  sessions, including those using Lit, do not show this option. The choice
+  applies only where the option shows: in normal mode and for other profiles,
+  Worker secrets stay on, and the saved choice applies again when you return to
+  the custom settings of a decentralized session.
 - Deploy owns the export policy. Selected-channel export remains visible as
   unavailable until the export runtime consumes that filter.
 
