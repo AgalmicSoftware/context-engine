@@ -14,10 +14,10 @@ import {
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
   buildDraftBaselineEntry,
+  clearSurveyDraftsForAccount,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   withoutStaleDraftFields,
-  selectSurveyDraftKeysForAccount,
   withoutUnrestorableUnlocks,
   removeQuestionFromPersistedDraftPayload,
   buildSurveyDraftCompatScope,
@@ -208,21 +208,21 @@ describe('surveyToolDraftState', () => {
     });
   });
 
-  it("selects one account's draft keys for a session across networks and scopes", () => {
-    const keys = [
+  it("clears one account's drafts for every session, network and scope", () => {
+    const kept = ['dg:surveyDraft:edge:84532:anon:questions', 'dg:surveyDraft:edge:84532:0xdef:questions', 'unrelated'];
+    [
+      ...kept,
       'dg:surveyDraft:edge:84532:0xabc:questions',
       'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
-      'dg:surveyDraft:edge:84532:anon:questions',
-      'dg:surveyDraft:edge:84532:0xdef:questions',
       'dg:surveyDraft:other:84532:0xabc:questions',
-      'unrelated',
-    ];
+    ].forEach((key) => sessionStorage.setItem(key, '{}'));
 
-    expect(selectSurveyDraftKeysForAccount(keys, 'edge', '0xABC')).toEqual([
-      'dg:surveyDraft:edge:84532:0xabc:questions',
-      'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
-    ]);
-    expect(selectSurveyDraftKeysForAccount(keys, 'edge', '')).toEqual([]);
+    clearSurveyDraftsForAccount('');
+    clearSurveyDraftsForAccount('anon');
+    expect(Object.keys(sessionStorage)).toHaveLength(6);
+    clearSurveyDraftsForAccount('0xABC');
+    expect(Object.keys(sessionStorage).sort()).toEqual([...kept].sort());
+    sessionStorage.clear();
   });
 
   it('drops only the draft fields whose saved value changed since the draft was written', () => {
