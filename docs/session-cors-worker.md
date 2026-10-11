@@ -774,7 +774,16 @@ Authenticated clients can use the worker as the session storage boundary:
     upload it again (`409`, `reason: "storage_resource_id_owned"`). An upload
     runs up to four steps; while a larger session is still being scanned, an
     upload of a new id returns `503` ("Existing questions and surveys are
-    still being indexed; retry shortly."). New ids stay open to anyone.
+    still being indexed; retry shortly."). If reading a stored payload fails,
+    the step fails with `503` ("Recording the owners of existing questions
+    and surveys failed; retry.") and the next upload repeats it from the same
+    place, so a passing storage error never leaves an id open. Rows whose
+    payload is gone, or that the Worker cannot read by design
+    (client-encrypted, undecryptable, or not JSON), are skipped and counted
+    in the coordinator's scan record. KV lists can lag recent writes by up to
+    about a minute, so a row the previous release stored just before the
+    scan read that part of the index may be missed. New ids stay open to
+    anyone.
   - JSON and multipart uploads share per-upload policy validation. Group IDs
     accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
     of precedence, using the first nonempty list. Multipart `groupIds` and
@@ -1859,9 +1868,12 @@ login, and signed admin request bodies must carry that config's canonical
      session and wallet, under a random key the session coordinator creates
      on first use (no new secret or binding). Issuing a nonce stores nothing,
      so no number of other callers can stop a wallet from getting one. A used
-     nonce is recorded until it expires, so each works once; a forged,
+     nonce is recorded until it expires or for ten minutes after use,
+     whichever is later, so each works once; a forged,
      foreign, or expired nonce gets `Nonce mismatch or expired.`. A nonce
-     the previous release issued and stored is still accepted once. Nonces
+     the previous release issued and stored is still accepted once, and while
+     a previous-release coordinator is still running during a deploy or
+     rollback, `/auth/nonce` hands out the random nonce it stored. Nonces
      contain only letters and digits, as EIP-4361 requires.
 2. Build a SIWE message client-side and sign with `personal_sign`.
    The Worker parses it as strict EIP-4361 so that wallets recognize every
@@ -2019,7 +2031,13 @@ token):
   release have no `resourceId` in their index row, so the first hide reads
   those payloads once and records each row's id in the single write it makes
   to that row (KV takes one write per key per second); later hides and
-  unhides read only the index.
+  unhides read only the index. In a session with several hundred such
+  versions, the first hide can stop partway at the Worker's per-request
+  limit; repeat it, and each attempt gets further.
+- Changing the same id again within about a second returns `429` ("This id
+  changed less than a second ago. Try again in a moment."), because KV takes
+  one write per key per second. The audit entry is already written;
+  repeating the request completes the change.
 - Each change writes an audit entry (`storage_resource_hidden` or
   `storage_resource_unhidden`, with the admin address) to the storage audit
   KV before it takes effect.
