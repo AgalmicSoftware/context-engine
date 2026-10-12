@@ -4011,7 +4011,7 @@ var init_deployHelperCore = __esm({
         const adminMatches = adminAddress ? hasExactPlainText("BOOTSTRAP_ADMIN_ADDRESS", adminAddress, { caseInsensitive: true }) : named("BOOTSTRAP_ADMIN_ADDRESS").length === 0;
         const bundleIdentityBindings = named(BUNDLE_SHA256_BINDING_NAME);
         const observedBundleSha256 = bundleIdentityBindings.length === 1 && toStr10(bundleIdentityBindings[0]?.type).trim() === "plain_text" ? toStr10(bundleIdentityBindings[0]?.text).trim().toLowerCase() : "";
-        const expectedWorkerBundleSha256 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || expectedBundleSha256 || toStr10(idempotencyContext?.bundleSha256).trim().toLowerCase();
+        const expectedWorkerBundleSha256 = expectedBundleSha256 || bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr10(idempotencyContext?.bundleSha256).trim().toLowerCase();
         const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedWorkerBundleSha256 || observedBundleSha256 === expectedWorkerBundleSha256);
         const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr10(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
         return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
@@ -4067,6 +4067,11 @@ var init_deployHelperCore = __esm({
           }
           kvId = toStr10(existingMarkedNamespaces.matches[0]?.id).trim();
         }
+      }
+      if (!checkBundleBeforeCloudflare && hasBundleText && expectedBundleSha256 && expectedInlineBundleSha256 !== expectedBundleSha256) {
+        return keepStagedResourcesPending(buildFailure(409, {
+          error: "Worker bundle SHA-256 does not match the verified release manifest."
+        }));
       }
       if (!resumeWorkerSettings && workerNameConfirmedAbsent && idempotencyContext?.isReplay === true && idempotencyContext?.uploadStarted === true && kvId) {
         for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -11774,7 +11779,7 @@ var require_utils2 = __commonJS({
     if (!exports.isLE)
       throw new Error("Non little-endian hardware is not supported");
     var hexes2 = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-    function bytesToHex3(bytes2) {
+    function bytesToHex4(bytes2) {
       if (!u8a3(bytes2))
         throw new Error("Uint8Array expected");
       let hex = "";
@@ -11783,8 +11788,8 @@ var require_utils2 = __commonJS({
       }
       return hex;
     }
-    exports.bytesToHex = bytesToHex3;
-    function hexToBytes2(hex) {
+    exports.bytesToHex = bytesToHex4;
+    function hexToBytes3(hex) {
       if (typeof hex !== "string")
         throw new Error("hex string expected, got " + typeof hex);
       const len = hex.length;
@@ -11801,7 +11806,7 @@ var require_utils2 = __commonJS({
       }
       return array;
     }
-    exports.hexToBytes = hexToBytes2;
+    exports.hexToBytes = hexToBytes3;
     var nextTick2 = async () => {
     };
     exports.nextTick = nextTick2;
@@ -13534,7 +13539,7 @@ var require_utils3 = __commonJS({
     var _2n6 = BigInt(2);
     var u8a3 = (a) => a instanceof Uint8Array;
     var hexes2 = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-    function bytesToHex3(bytes2) {
+    function bytesToHex4(bytes2) {
       if (!u8a3(bytes2))
         throw new Error("Uint8Array expected");
       let hex = "";
@@ -13543,7 +13548,7 @@ var require_utils3 = __commonJS({
       }
       return hex;
     }
-    exports.bytesToHex = bytesToHex3;
+    exports.bytesToHex = bytesToHex4;
     function numberToHexUnpadded2(num) {
       const hex = num.toString(16);
       return hex.length & 1 ? `0${hex}` : hex;
@@ -13555,7 +13560,7 @@ var require_utils3 = __commonJS({
       return BigInt(hex === "" ? "0" : `0x${hex}`);
     }
     exports.hexToNumber = hexToNumber2;
-    function hexToBytes2(hex) {
+    function hexToBytes3(hex) {
       if (typeof hex !== "string")
         throw new Error("hex string expected, got " + typeof hex);
       const len = hex.length;
@@ -13572,19 +13577,19 @@ var require_utils3 = __commonJS({
       }
       return array;
     }
-    exports.hexToBytes = hexToBytes2;
+    exports.hexToBytes = hexToBytes3;
     function bytesToNumberBE2(bytes2) {
-      return hexToNumber2(bytesToHex3(bytes2));
+      return hexToNumber2(bytesToHex4(bytes2));
     }
     exports.bytesToNumberBE = bytesToNumberBE2;
     function bytesToNumberLE2(bytes2) {
       if (!u8a3(bytes2))
         throw new Error("Uint8Array expected");
-      return hexToNumber2(bytesToHex3(Uint8Array.from(bytes2).reverse()));
+      return hexToNumber2(bytesToHex4(Uint8Array.from(bytes2).reverse()));
     }
     exports.bytesToNumberLE = bytesToNumberLE2;
     function numberToBytesBE2(n2, len) {
-      return hexToBytes2(n2.toString(16).padStart(len * 2, "0"));
+      return hexToBytes3(n2.toString(16).padStart(len * 2, "0"));
     }
     exports.numberToBytesBE = numberToBytesBE2;
     function numberToBytesLE2(n2, len) {
@@ -13592,14 +13597,14 @@ var require_utils3 = __commonJS({
     }
     exports.numberToBytesLE = numberToBytesLE2;
     function numberToVarBytesBE2(n2) {
-      return hexToBytes2(numberToHexUnpadded2(n2));
+      return hexToBytes3(numberToHexUnpadded2(n2));
     }
     exports.numberToVarBytesBE = numberToVarBytesBE2;
     function ensureBytes2(title, hex, expectedLength) {
       let res;
       if (typeof hex === "string") {
         try {
-          res = hexToBytes2(hex);
+          res = hexToBytes3(hex);
         } catch (e) {
           throw new Error(`${title} must be valid hex string, got "${hex}". Cause: ${e}`);
         }
@@ -37118,7 +37123,7 @@ var init_storageUploadValidation = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim6, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, legacyStorageOwnersMarkerKey, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds, compareVersionAge, isPreferredStorageVersion, selectCanonicalStorageVersions;
+var OWNED_STORAGE_RESOURCES, trim6, lower3, isObj13, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, listHiddenStorageResourceIds, compareVersionAge, isPreferredStorageVersion, selectCanonicalStorageVersions;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
@@ -37140,7 +37145,6 @@ var init_storageResourceOwnership = __esm({
       }
     };
     LEGACY_STORAGE_OWNER = "legacy-admin-only";
-    legacyStorageOwnersMarkerKey = ({ slug, resource }) => recordKey("owner-backfill", { slug, resource });
     readStorageResourceOwner = ({ index, slug, resource, resourceId }) => readJsonRecord(index, recordKey("owner", { slug, resource, resourceId }));
     writeStorageResourceOwner = ({ index, slug, resource, resourceId, uploader, storageRefId, createdAt }) => index.put(recordKey("owner", { slug, resource, resourceId }), JSON.stringify({
       version: 1,
@@ -37305,7 +37309,7 @@ var init_responseFieldKeyRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder3, decoder3, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim7, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, backfillLegacyStorageOwners, LEGACY_OWNER, resolveLegacyStorageOwner, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
+var encoder3, decoder3, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim7, isObj14, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_storageRefNormalization();
@@ -37391,10 +37395,17 @@ var init_storageRouteExecution = __esm({
       const source = Array.isArray(raw) ? raw : [raw];
       return Array.from(new Set(source.map(safeGroupId).filter(Boolean)));
     };
-    readKvPayloadEnvelope = async ({ index, slug, id: id2 }) => {
+    readKvPayloadEnvelope = async ({ index, slug, id: id2, strict = false }) => {
       if (!index || typeof index.get !== "function") return null;
+      let raw;
       try {
-        const envelope = JSON.parse(await index.get(buildPayloadKey({ slug, id: id2 })) || "null");
+        raw = await index.get(buildPayloadKey({ slug, id: id2 }));
+      } catch (error) {
+        if (strict) throw error;
+        return null;
+      }
+      try {
+        const envelope = JSON.parse(raw || "null");
         return envelope && isObj14(envelope?.metadata) ? envelope : null;
       } catch {
         return null;
@@ -39051,7 +39062,7 @@ var init_storageRouteExecution = __esm({
       } while (cursor);
       return rows;
     };
-    readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
+    readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false }) => {
       const id2 = trim7(metadata?.id);
       if (!id2) return null;
       const r2 = getStorageR2Binding(env);
@@ -39059,9 +39070,14 @@ var init_storageRouteExecution = __esm({
         const object2 = await r2.get(buildObjectKey({ slug, id: id2 }));
         if (object2) return toUint8Array(object2);
       }
-      const envelope = await readKvPayloadEnvelope({ index, slug, id: id2 });
-      if (envelope?.payloadBase64url) return base64urlToBytes2(envelope.payloadBase64url);
-      return null;
+      const envelope = await readKvPayloadEnvelope({ index, slug, id: id2, strict });
+      if (!envelope?.payloadBase64url) return null;
+      if (!strict) return base64urlToBytes2(envelope.payloadBase64url);
+      try {
+        return base64urlToBytes2(envelope.payloadBase64url);
+      } catch {
+        return null;
+      }
     };
     readStoredPayloadJson = async ({ env, index, slug, config, metadata, deps }) => {
       try {
@@ -39090,50 +39106,85 @@ var init_storageRouteExecution = __esm({
       const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
       if (!payload) return null;
       const resourceId = readStoragePayloadResourceId(resource, payload);
-      if (!isStorageResourceId(resourceId)) return "";
-      row.metadata = { ...row.metadata, resourceId };
-      await index.put(row.key, JSON.stringify(row.metadata));
-      return resourceId;
+      return isStorageResourceId(resourceId) ? resourceId : "";
     };
-    backfillLegacyStorageOwners = async ({ env, config, slug, resource, deps } = {}) => {
+    readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
+      const recorded = normalizeAddress(metadata.resourceId);
+      if (recorded) return recorded;
+      if (metadata.encrypted === true && !isObj14(metadata.envelope)) return "";
+      let bytes2 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
+      if (!bytes2) return "";
+      try {
+        if (isObj14(metadata.envelope)) {
+          bytes2 = await decryptPayloadWithStorageEnvelope({
+            env,
+            config,
+            slug,
+            payloadId: trim7(metadata.id),
+            ciphertextBytes: bytes2,
+            envelope: metadata.envelope,
+            deps
+          });
+        }
+        const payload = JSON.parse(decoder3.decode(await toUint8Array(bytes2)));
+        const resourceId = isObj14(payload) ? readStoragePayloadResourceId(resource, payload) : "";
+        return isStorageResourceId(resourceId) ? resourceId : "";
+      } catch {
+        return "";
+      }
+    };
+    scanLegacyStorageOwnerIds = async ({
+      env,
+      config,
+      slug,
+      resource,
+      cursor = "",
+      lastKey = "",
+      maxRows = Infinity,
+      deps
+    } = {}) => {
       const index = getStorageIndexBinding(env);
-      if (!index || ["get", "put", "list"].some((method) => typeof index[method] !== "function")) {
+      if (!index || typeof index.list !== "function" || typeof index.get !== "function") {
         throw new Error("Cloudflare storage index binding not configured.");
       }
-      const recorded = /* @__PURE__ */ new Set();
-      const legacy = /* @__PURE__ */ new Set();
-      const rows = await listCloudflareMetadataRows({ index, slug, resource });
-      for (const row of rows) {
-        if (!row.metadata) continue;
-        const resourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
-        if (resourceId) (normalizeAddress(row.metadata.uploader) ? recorded : legacy).add(resourceId);
+      const prefix = buildIndexPrefix({ slug, resource });
+      const ids = /* @__PURE__ */ new Set();
+      let rows = 0;
+      let skippedRows = 0;
+      let pageCursor = trim7(cursor);
+      let after = trim7(lastKey);
+      for (; ; ) {
+        const listed = await index.list({ prefix, ...pageCursor ? { cursor: pageCursor } : {} });
+        const nextCursor = listed?.list_complete === false ? trim7(listed?.cursor) : "";
+        if (listed?.list_complete === false && !nextCursor) throw new Error("Cloudflare storage list cursor is unavailable.");
+        const names2 = (Array.isArray(listed?.keys) ? listed.keys : []).map((entry) => trim7(entry?.name || entry)).filter((name) => name && (!after || name > after)).sort();
+        for (const name of names2) {
+          if (rows >= maxRows) return { ids: [...ids], skippedRows, cursor: pageCursor, lastKey: after, done: false };
+          rows += 1;
+          after = name;
+          const raw = await index.get(name);
+          let metadata = null;
+          try {
+            metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
+          } catch {
+            continue;
+          }
+          if (!isObj14(metadata) || !trim7(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+          const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
+          if (resourceId) ids.add(resourceId);
+          else skippedRows += 1;
+        }
+        if (!nextCursor) return { ids: [...ids], skippedRows, cursor: "", lastKey: "", done: true };
+        pageCursor = nextCursor;
+        after = "";
       }
-      const ids = [...legacy].filter((resourceId) => !recorded.has(resourceId)).sort();
-      const createdAt = new Date(deps?.now?.() || Date.now()).toISOString();
-      for (const resourceId of ids) {
-        if (await readStorageResourceOwner({ index, slug, resource, resourceId })) continue;
-        await writeStorageResourceOwner({
-          index,
-          slug,
-          resource,
-          resourceId,
-          uploader: LEGACY_STORAGE_OWNER,
-          storageRefId: "",
-          createdAt
-        });
-      }
-      return { ids, scannedRows: rows.length };
     };
     LEGACY_OWNER = Object.freeze({ uploader: LEGACY_STORAGE_OWNER });
     resolveLegacyStorageOwner = async ({ env, config, slug, resource, resourceId, deps }) => {
       const coordinated = await checkCoordinatedLegacyStorageOwner({ env, config, slug, resource, resourceId });
       if (coordinated) return coordinated.ok ? { ok: true, owner: coordinated.adminOnly ? LEGACY_OWNER : null } : coordinated;
       try {
-        const index = getStorageIndexBinding(env);
-        const markerKey = legacyStorageOwnersMarkerKey({ slug, resource });
-        if (await index.get(markerKey)) return { ok: true, owner: await readStorageResourceOwner({ index, slug, resource, resourceId }) };
-        const { ids, scannedRows } = await backfillLegacyStorageOwners({ env, config, slug, resource, deps });
-        if (scannedRows) await index.put(markerKey, JSON.stringify({ version: 1, count: ids.length }));
+        const { ids } = await scanLegacyStorageOwnerIds({ env, config, slug, resource, deps });
         return { ok: true, owner: ids.includes(resourceId) ? LEGACY_OWNER : null };
       } catch {
         return { ok: false, status: 503, error: "Recording the owners of existing questions and surveys failed; retry." };
@@ -39157,33 +39208,44 @@ var init_storageRouteExecution = __esm({
       } catch (error) {
         return { ok: false, status: 503, error: error?.message || "Storage audit store is unavailable." };
       }
-      await writeStorageResourceHidden({
-        index,
-        slug,
-        resource,
-        resourceId,
-        hidden,
-        actor,
-        updatedAt: new Date(deps?.now?.() || Date.now()).toISOString()
-      });
       let matchedRows = 0;
       let unreadableRows = 0;
-      for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
-        if (!row.metadata) {
-          unreadableRows += 1;
-          continue;
+      try {
+        await writeStorageResourceHidden({
+          index,
+          slug,
+          resource,
+          resourceId,
+          hidden,
+          actor,
+          updatedAt: new Date(deps?.now?.() || Date.now()).toISOString()
+        });
+        for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
+          if (!row.metadata) {
+            unreadableRows += 1;
+            continue;
+          }
+          const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+          if (rowResourceId === null) {
+            unreadableRows += 1;
+            continue;
+          }
+          const matched = rowResourceId === resourceId;
+          const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
+          if (!matched && !recordsId) continue;
+          const next = { ...row.metadata, resourceId: rowResourceId };
+          if (matched) {
+            matchedRows += 1;
+            if (hidden) next.hidden = true;
+            else delete next.hidden;
+          }
+          await index.put(row.key, JSON.stringify(next));
         }
-        const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
-        if (rowResourceId === null) {
-          unreadableRows += 1;
-          continue;
+      } catch (error) {
+        if (/\b429\b|too many requests/i.test(toStr6(error?.message))) {
+          return { ok: false, status: 429, error: "This id changed less than a second ago. Try again in a moment." };
         }
-        if (rowResourceId !== resourceId) continue;
-        matchedRows += 1;
-        const next = { ...row.metadata, resourceId };
-        if (hidden) next.hidden = true;
-        else delete next.hidden;
-        await index.put(row.key, JSON.stringify(next));
+        throw error;
       }
       const hiddenIds = [...await listHiddenStorageResourceIds({ index, slug, resource })].sort();
       return {
@@ -40037,7 +40099,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder4, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim8, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder4, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, isObj15, hasOwn6, trim8, lower4, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId, normalizeQuestionPrompt, normalizeQuestionType, RATING_SCALE_METADATA_KEYS, safeNumber, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, normalizeRatingLabel, normalizeRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, sectionShapes, buildPrompt, normalizeProviderResponse, resolveAiTaskEntry, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_stringCoercion();
@@ -40130,10 +40192,13 @@ var init_resultsAnalysisGeneration = __esm({
       if (isObj15(value)) return Object.keys(value).length > 0;
       return true;
     };
+    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim8(value) || Array.isArray(value) && value.length === 0 || isObj15(value) && Object.keys(value).length === 0;
+    isClearedFieldWithLockFlag = (value) => hasOwn6(value, "value") && isBlankFieldValue(value.value) && !["envelope", ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
       if (!isObj15(value)) return false;
-      if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
+      if (value.locked === true || value.payloadEncrypted === true) return true;
+      if (value.encrypted === true && !isClearedFieldWithLockFlag(value)) return true;
       if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
       return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
     };
@@ -40154,6 +40219,7 @@ var init_resultsAnalysisGeneration = __esm({
       if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
       return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
+    VALIDATED_QUESTION_TYPES = /* @__PURE__ */ new Set(["binary", "rating", "multichoice", "quadratic", "freeform"]);
     normalizeQuestionId = (value) => trim8(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim8(value).replace(/\s+/g, " ").slice(0, 1200);
     normalizeQuestionType = (value) => trim8(value).slice(0, 64) || "text";
@@ -40404,7 +40470,7 @@ var init_resultsAnalysisGeneration = __esm({
         const answerValue = withoutFieldMask(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
         const additionalValue = hasOwn6(row, "additional") ? row.additional : hasOwn6(row, "additionalComments") ? row.additionalComments : hasOwn6(row, "comments") ? row.comments : row.comment;
         const knownQuestion = questionMap.get(questionId) || {};
-        const validatedAnswer = formatValidAnalysisAnswer(answerValue, knownQuestion);
+        const validatedAnswer = requireKnownQuestion || VALIDATED_QUESTION_TYPES.has(knownQuestion.type) ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
         if (validatedAnswer === null) {
           excludedCount += 1;
           continue;
@@ -41097,7 +41163,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_OWNERS_KEY_PREFIX, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, MAX_ACTIVE_AUTH_NONCES, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, admitActiveAuthNonce, putActiveAuthNonces, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString9, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_deployHelperCore();
@@ -41111,7 +41177,12 @@ var init_sessionWriteCoordinator = __esm({
     init_workerSessionConfig();
     init_workerGroups();
     SPONSORED_DEPLOY_RECORD_KEY = "sponsored-deploy";
-    STORAGE_LEGACY_OWNERS_KEY_PREFIX = "storage-legacy-owners:";
+    STORAGE_LEGACY_SCAN_KEY_PREFIX = "storage-legacy-scan:";
+    STORAGE_LEGACY_OWNER_KEY_PREFIX = "storage-legacy-owner:";
+    LEGACY_SCAN_ROWS_PER_STEP = 200;
+    LEGACY_SCAN_STEPS_PER_UPLOAD = 4;
+    LEGACY_SCAN_PENDING_ERROR = "Existing questions and surveys are still being indexed; retry shortly.";
+    LEGACY_SCAN_FAILED_ERROR = "Recording the owners of existing questions and surveys failed; retry.";
     DIRECT_DEPLOY_RECORD_KEY = "direct-deploy";
     SPONSORED_FAUCET_RECORD_KEY = "sponsored-faucet";
     SESSION_CONFIG_AUTHORITY_KEY = "session-config-authority";
@@ -41133,7 +41204,7 @@ var init_sessionWriteCoordinator = __esm({
     RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
     RUNNING_LEASE_MS = 65e3;
     MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1e3;
-    MAX_ACTIVE_AUTH_NONCES = 16;
+    AUTH_NONCE_MAC_KEY = "auth-nonce-mac-key";
     MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1e3;
     WRAPPED_SESSION_KEY_FIELDS = [
       "alg",
@@ -41159,29 +41230,7 @@ var init_sessionWriteCoordinator = __esm({
     };
     readActiveAuthNonces = (record, nowMs) => {
       const entries = Array.isArray(record?.entries) ? record.entries : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
-      return entries.map((entry) => ({
-        nonce: toTrimmedString9(entry?.nonce),
-        expiresAtMs: Number(entry?.expiresAtMs || 0),
-        caller: toTrimmedString9(entry?.caller)
-      })).filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
-    };
-    admitActiveAuthNonce = (active, entry) => {
-      if (active.length < MAX_ACTIVE_AUTH_NONCES) return [...active, entry];
-      const counts = /* @__PURE__ */ new Map();
-      active.forEach((item) => counts.set(item.caller, (counts.get(item.caller) || 0) + 1));
-      let evicted = counts.has(entry.caller) ? entry.caller : null;
-      if (evicted === null) {
-        let most = 1;
-        counts.forEach((count, caller) => {
-          if (count > most) {
-            most = count;
-            evicted = caller;
-          }
-        });
-      }
-      if (evicted === null) return null;
-      const oldest = active.findIndex((item) => item.caller === evicted);
-      return [...active.slice(0, oldest), ...active.slice(oldest + 1), entry];
+      return entries.map((entry) => ({ nonce: toTrimmedString9(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) })).filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
     };
     putActiveAuthNonces = async (transaction, entries) => {
       if (!entries.length) {
@@ -41195,6 +41244,24 @@ var init_sessionWriteCoordinator = __esm({
         expiresAtMs: newest.expiresAtMs,
         entries
       });
+    };
+    SIGNED_AUTH_NONCE_RE = /^n1([0-9a-f]{32})(\d{13})([0-9a-f]{32})$/;
+    bytesToHex3 = (bytes2) => Array.from(bytes2, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    hexToBytes2 = (hex) => Uint8Array.from(hex.match(/../g) || [], (pair) => parseInt(pair, 16));
+    equalText = (left, right) => {
+      if (left.length !== right.length) return false;
+      let difference = 0;
+      for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+      return difference === 0;
+    };
+    signAuthNonce = async ({ cryptoImpl, keyHex, slug, address: address2, random, expiry }) => {
+      const key = await cryptoImpl.subtle.importKey("raw", hexToBytes2(keyHex), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const message = new TextEncoder().encode(`ce-auth-nonce-v1
+${slug}
+${address2}
+${random}
+${expiry}`);
+      return bytesToHex3(new Uint8Array(await cryptoImpl.subtle.sign("HMAC", key, message))).slice(0, 32);
     };
     isBase64url = (value, length) => typeof value === "string" && value.length === length && /^[A-Za-z0-9_-]+$/.test(value);
     normalizeWrappedSessionKeyRecord = (value, slug) => {
@@ -41349,7 +41416,8 @@ var init_sessionWriteCoordinator = __esm({
         this.workerGroupTail = Promise.resolve();
         this.resultsAnalysisTail = Promise.resolve();
         this.storageOwnerTail = Promise.resolve();
-        this.backfillLegacyStorageOwners = deps.backfillLegacyStorageOwners || backfillLegacyStorageOwners;
+        this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
+        this.legacyScanRowsPerStep = deps.legacyScanRowsPerStep || LEGACY_SCAN_ROWS_PER_STEP;
       }
       serializeSessionConfigOperation(operation) {
         const run = this.sessionConfigTail.then(operation);
@@ -41367,8 +41435,9 @@ var init_sessionWriteCoordinator = __esm({
         return run;
       }
       // Answers whether a question or survey id was stored before first-writer
-      // records existed. The scan runs once per resource; racing first uploads
-      // wait for it and then read the same stored answer.
+      // records existed. The scan runs in bounded steps and keeps its progress and
+      // the ids found, so it finishes however large the session is; racing
+      // uploads wait their turn and read the same answers.
       async executeStorageLegacyOwner(payload) {
         const resource = toTrimmedString9(payload?.resource);
         const resourceId = toTrimmedString9(payload?.resourceId).toLowerCase();
@@ -41376,25 +41445,39 @@ var init_sessionWriteCoordinator = __esm({
           return jsonResponse2({ ok: false, error: "Invalid legacy owner request." }, 400);
         }
         return this.serializeStorageOwnerOperation(async () => {
-          const key = `${STORAGE_LEGACY_OWNERS_KEY_PREFIX}${resource}`;
-          let record = await this.state.storage.get(key);
-          if (!Array.isArray(record?.ids)) {
-            try {
-              const { ids } = await this.backfillLegacyStorageOwners({
-                env: this.env,
-                config: payload?.config,
-                slug: payload?.slug,
-                resource
-              });
-              record = { version: 1, ids, completedAtMs: Number(this.now()) || Date.now() };
-            } catch {
-              return jsonResponse2({ ok: false, error: "Recording the owners of existing questions and surveys failed; retry." }, 503);
-            }
-            await this.state.storage.transaction(async (transaction) => {
-              await transaction.put(key, record);
+          const ownerKey = (id2) => `${STORAGE_LEGACY_OWNER_KEY_PREFIX}${resource}:${id2}`;
+          if (await this.state.storage.get(ownerKey(resourceId))) return jsonResponse2({ ok: true, adminOnly: true }, 200);
+          const scanKey = `${STORAGE_LEGACY_SCAN_KEY_PREFIX}${resource}`;
+          const scan = await this.state.storage.get(scanKey);
+          if (scan?.done === true) return jsonResponse2({ ok: true, adminOnly: false }, 200);
+          let step;
+          try {
+            step = await this.scanLegacyStorageOwnerIds({
+              env: this.env,
+              config: payload?.config,
+              slug: payload?.slug,
+              resource,
+              cursor: toTrimmedString9(scan?.cursor),
+              lastKey: toTrimmedString9(scan?.lastKey),
+              maxRows: this.legacyScanRowsPerStep
             });
+          } catch {
+            return jsonResponse2({ ok: false, error: LEGACY_SCAN_FAILED_ERROR }, 503);
           }
-          return jsonResponse2({ ok: true, adminOnly: record.ids.includes(resourceId) }, 200);
+          await this.state.storage.transaction(async (transaction) => {
+            for (const id2 of step.ids) await transaction.put(ownerKey(id2), true);
+            await transaction.put(scanKey, {
+              version: 1,
+              cursor: step.cursor,
+              lastKey: step.lastKey,
+              done: step.done === true,
+              skippedRows: (Number(scan?.skippedRows) || 0) + (Number(step.skippedRows) || 0),
+              updatedAtMs: Number(this.now()) || Date.now()
+            });
+          });
+          if (step.ids.includes(resourceId)) return jsonResponse2({ ok: true, adminOnly: true }, 200);
+          if (step.done === true) return jsonResponse2({ ok: true, adminOnly: false }, 200);
+          return jsonResponse2({ ok: false, pending: true, error: LEGACY_SCAN_PENDING_ERROR }, 503);
         });
       }
       serializeResultsAnalysisOperation(operation) {
@@ -41478,28 +41561,13 @@ var init_sessionWriteCoordinator = __esm({
           updatedAtMs: Number(this.now()) || Date.now()
         });
       }
-      resultsAnalysisPayloadLooksLocked(value, depth = 0) {
-        if (depth > 5) return false;
-        if (!isObjectRecord(value)) return false;
-        if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-        const encryptedKeys = /* @__PURE__ */ new Set(["ciphertext", "cipherText", "encryptedContent", "encryptedKey", "encryptedPortion", "keyCipher", "payloadCiphertext", "wrappedKey"]);
-        if (Object.entries(value).some(([key, entry]) => encryptedKeys.has(key) && this.resultsAnalysisEncryptedEnvelopeValueHasContent(entry))) return true;
-        return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
-      }
-      resultsAnalysisEncryptedEnvelopeValueHasContent(value) {
-        if (value == null || value === false) return false;
-        if (typeof value === "string") return value.trim() !== "";
-        if (Array.isArray(value)) return value.length > 0;
-        if (isObjectRecord(value)) return Object.keys(value).length > 0;
-        return true;
-      }
       sanitizeResultsAnalysisAutoJob(payload = {}) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
         const requestId = toTrimmedString9(payload.requestId);
         const committedResponses = Array.isArray(payload.committedResponses) ? payload.committedResponses.slice(0, 1).map((entry) => {
           const metadata = isObjectRecord(entry?.metadata) ? entry.metadata : {};
           const payloadRecord = isObjectRecord(entry?.payload) ? entry.payload : {};
-          const payloadLooksLocked = this.resultsAnalysisPayloadLooksLocked(payloadRecord);
+          const payloadLooksLocked = valueLooksEncrypted(payloadRecord);
           const sanitizedPayload = this.sanitizeResultsAnalysisResponsePayload(payloadRecord);
           if (payloadLooksLocked) sanitizedPayload.locked = true;
           return {
@@ -42743,36 +42811,35 @@ var init_sessionWriteCoordinator = __esm({
           return jsonResponse2({ ok: true, skipPersistence: reserved.skipPersistence === true });
         });
       }
+      async readAuthNonceKey({ create = false } = {}) {
+        const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
+        if (/^[0-9a-f]{64}$/.test(toTrimmedString9(existing?.key)) || !create) return toTrimmedString9(existing?.key);
+        const candidate = { version: 1, key: bytesToHex3(this.crypto.getRandomValues(new Uint8Array(32))) };
+        const record = await this.state.storage.transaction(async (transaction) => {
+          const current = await transaction.get(AUTH_NONCE_MAC_KEY);
+          if (/^[0-9a-f]{64}$/.test(toTrimmedString9(current?.key))) return current;
+          await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
+          return candidate;
+        });
+        return record.key;
+      }
       async executeAuthNonceIssue(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         const address2 = toTrimmedString9(payload?.address).toLowerCase();
-        const nonce = toTrimmedString9(payload?.nonce);
-        const caller = toTrimmedString9(payload?.caller).slice(0, 128);
+        const random = toTrimmedString9(payload?.nonce);
         const expiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.expiresAtMs,
           nowMs,
           MAX_AUTH_NONCE_LIFETIME_MS
         );
-        const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
-          payload?.usedExpiresAtMs,
-          nowMs,
-          MAX_AUTH_NONCE_LIFETIME_MS
-        );
-        if (!slug || !address2 || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
+        if (!slug || !address2 || !/^[0-9a-f]{32}$/.test(random) || !expiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce issuance request." }, 400);
         }
-        const admitted = await this.state.storage.transaction(async (transaction) => {
-          const used = await transaction.get(AUTH_NONCE_USED_KEY);
-          const entries = Array.isArray(used?.entries) ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs) : [];
-          await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-          const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs).filter((entry) => entry.nonce !== nonce);
-          const next = admitActiveAuthNonce(active, { nonce, expiresAtMs, caller });
-          if (!next) return false;
-          await putActiveAuthNonces(transaction, next);
-          return true;
-        });
-        return admitted ? jsonResponse2({ ok: true }) : jsonResponse2({ ok: false, error: "Too many pending sign-ins for this wallet. Try again shortly." }, 429);
+        const keyHex = await this.readAuthNonceKey({ create: true });
+        const expiry = String(expiresAtMs).padStart(13, "0");
+        const mac = await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address: address2, random, expiry });
+        return jsonResponse2({ ok: true, nonce: `n1${random}${expiry}${mac}` });
       }
       async executeAuthNonceConsume(payload) {
         const nowMs = Number(this.now()) || Date.now();
@@ -42787,12 +42854,27 @@ var init_sessionWriteCoordinator = __esm({
         if (!slug || !address2 || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce consumption request." }, 400);
         }
+        const signed2 = nonce.match(SIGNED_AUTH_NONCE_RE);
+        let signedExpiresAtMs = 0;
+        if (signed2) {
+          const keyHex = await this.readAuthNonceKey();
+          const expiresAtMs = Number(signed2[2]);
+          const mac = keyHex ? await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address: address2, random: signed2[1], expiry: signed2[2] }) : "";
+          if (mac && equalText(mac, signed2[3]) && expiresAtMs > nowMs && expiresAtMs <= nowMs + MAX_AUTH_NONCE_LIFETIME_MS) {
+            signedExpiresAtMs = expiresAtMs;
+          }
+        }
         const result = await this.state.storage.transaction(async (transaction) => {
           const used = await transaction.get(AUTH_NONCE_USED_KEY);
           const entries = Array.isArray(used?.entries) ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs) : [];
           if (entries.some((entry) => toTrimmedString9(entry?.nonce) === nonce)) {
             await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
             return { ok: false, error: "Nonce already used." };
+          }
+          if (signed2) {
+            if (signedExpiresAtMs) entries.push({ nonce, expiresAtMs: Math.max(signedExpiresAtMs, usedExpiresAtMs) });
+            await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+            return signedExpiresAtMs ? { ok: true } : { ok: false, error: "Nonce mismatch or expired." };
           }
           const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs);
           const remaining = active.filter((entry) => entry.nonce !== nonce);
@@ -43313,11 +43395,9 @@ var init_sessionWriteCoordinator = __esm({
       nonce,
       ttlSeconds,
       usedNonceTtlSeconds = 600,
-      now = Date.now,
-      caller = ""
+      now = Date.now
     } = {}) => {
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
-      const callerKey = toTrimmedString9(caller) ? (await sha256Hex2(`auth-nonce-caller:${toTrimmedString9(caller).toLowerCase()}`)).slice(0, 32) : "";
       return callAuthStateCoordinator({
         env,
         identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address2).toLowerCase()}`,
@@ -43326,7 +43406,6 @@ var init_sessionWriteCoordinator = __esm({
           slug,
           address: address2,
           nonce,
-          ...callerKey ? { caller: callerKey } : {},
           expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1e3,
           usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1e3
         }
@@ -43491,15 +43570,19 @@ var init_sessionWriteCoordinator = __esm({
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return null;
-      const unavailable2 = { ok: false, status: 503, error: "Recording the owners of existing questions and surveys failed; retry." };
+      const unavailable2 = { ok: false, status: 503, error: LEGACY_SCAN_FAILED_ERROR };
       try {
-        const response3 = await stub.fetch("https://session-coordinator.internal/storage/legacy-owner", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug, config, resource, resourceId })
-        });
-        const result = await response3.json().catch(() => ({}));
-        return response3.ok && result?.ok === true ? { ok: true, adminOnly: result.adminOnly === true } : unavailable2;
+        for (let step = 0; step < LEGACY_SCAN_STEPS_PER_UPLOAD; step += 1) {
+          const response3 = await stub.fetch("https://session-coordinator.internal/storage/legacy-owner", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug, config, resource, resourceId })
+          });
+          const result = await response3.json().catch(() => ({}));
+          if (response3.ok && result?.ok === true) return { ok: true, adminOnly: result.adminOnly === true };
+          if (result?.pending !== true) return unavailable2;
+        }
+        return { ok: false, status: 503, error: LEGACY_SCAN_PENDING_ERROR };
       } catch {
         return unavailable2;
       }
@@ -79322,6 +79405,16 @@ var dispatchAdminRequest = async ({
         headers
       );
     }
+    if (cloudflareApiToken && (!toTrimmedString16(env?.WORKER_BUNDLE_URL) || !toTrimmedString16(env?.WORKER_BUNDLE_MANIFEST_URL))) {
+      return deps?.json?.(
+        {
+          error: "Deploy grants need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on this Worker, because a grant deploys the release recorded there. Set both, then issue the grant again.",
+          reason: "sponsored_release_missing"
+        },
+        409,
+        headers
+      );
+    }
     let ttlSeconds = null;
     try {
       ttlSeconds = computeSponsoredGrantExpirationTtl(expiresAt, deps?.now?.() ?? Date.now());
@@ -79725,19 +79818,19 @@ var dispatchAuthNonceRequest = async ({
     targetSlug,
     address2.toLowerCase(),
     nonce,
-    deps?.NONCE_TTL_SECONDS,
-    rateLimitIdentity
+    deps?.NONCE_TTL_SECONDS
   );
+  const issuedNonce = typeof issueResult?.nonce === "string" && issueResult.nonce ? issueResult.nonce : nonce;
   if (!issueResult?.ok) {
     return deps?.json?.(
       { error: issueResult?.error || "Authorization state coordination is unavailable." },
-      Number(issueResult?.status || 0) || 503,
+      Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,
       headers
     );
   }
   const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : "";
   return deps?.json?.({
-    nonce,
+    nonce: issuedNonce,
     ...responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {},
     ...bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}
   }, 200, headers);
@@ -80074,17 +80167,17 @@ var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
     nonce,
     ttlSeconds,
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
-    now: deps?.now,
-    caller: deps?.caller
+    now: deps?.now
   });
-  if (!result?.ok) {
+  const signed2 = typeof result?.nonce === "string" ? result.nonce.trim() : "";
+  if (!result?.ok || !signed2) {
     return {
       ok: false,
-      status: Number(result?.status || 0) || 503,
+      status: Number(result?.status || 0) >= 400 ? Number(result.status) : 503,
       error: result?.error || "Authorization state coordination is unavailable."
     };
   }
-  return { ok: true };
+  return { ok: true, nonce: signed2 };
 };
 var consumeNonce = async (env, slug, address2, nonce, deps = {}) => {
   const usedNonceTtlSeconds = Number.isFinite(deps?.usedNonceTtlSeconds) ? deps.usedNonceTtlSeconds : DEFAULT_USED_NONCE_TTL_SECONDS;
@@ -81242,15 +81335,14 @@ var createWorkerRouteShellWithWorkerDeps = ({
             ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
             now: deps?.now,
             buildNonce: () => deps?.buildNonce?.(),
-            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl, caller) => (deps?.issueNonce || issueNonce)(
+            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (deps?.issueNonce || issueNonce)(
               currentEnv,
               slugArg,
               addressArg,
               nonceArg,
               ttl,
               {
-                now: deps?.now,
-                caller
+                now: deps?.now
               }
             ),
             MISSING_SLUG_ERROR: constants?.missingSlugError,
