@@ -15,6 +15,7 @@ import {
   faFilter,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CommunityTab.module.scss';
+import { renderCommunitySessionFilters } from './renderCommunitySessionFilters';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -2224,74 +2225,13 @@ class CommunityTab extends Component<any, any> {
     this.setState((state: any) => ({ sessionFilters: { ...state.sessionFilters, [key]: value } }));
   };
 
-  renderSessionFilters = () => {
-    const filters: CommunitySessionFilters = this.state.sessionFilters;
-    // Stay mounted while collapsed so the toggle's aria-controls always resolves.
-    return (
-      <div id="ce-community-session-filters" className={styles.sessionFilters} hidden={!this.state.showSessionFilters}>
-        <label>
-          Session type
-          <select value={filters.kind} onChange={(event) => this._setSessionFilter('kind', event.target.value)}>
-            <option value="">All types</option>
-            <option value="centralized">Centralized</option>
-            <option value="decentralized">Decentralized</option>
-          </select>
-        </label>
-        <label>
-          Admin address
-          <input
-            type="search"
-            value={filters.adminAddress}
-            placeholder="Address or part of an address"
-            onChange={(event) => this._setSessionFilter('adminAddress', event.target.value)}
-          />
-        </label>
-        {(
-          [
-            ['Date created', 'createdFrom', 'createdTo'],
-            ['Last activity', 'activityFrom', 'activityTo'],
-          ] as const
-        ).map(([legend, from, to]) => (
-          <fieldset key={from}>
-            <legend>{legend}</legend>
-            <div className={styles.sessionDateRange}>
-              <label>
-                From
-                <input
-                  type="date"
-                  aria-label={`${legend} from`}
-                  value={filters[from]}
-                  max={filters[to] || undefined}
-                  onChange={(event) => this._setSessionFilter(from, event.target.value)}
-                />
-              </label>
-              <label>
-                Through
-                <input
-                  type="date"
-                  aria-label={`${legend} through`}
-                  value={filters[to]}
-                  min={filters[from] || undefined}
-                  onChange={(event) => this._setSessionFilter(to, event.target.value)}
-                />
-              </label>
-            </div>
-          </fieldset>
-        ))}
-        <p className={styles.sessionFilterHint}>
-          Activity uses recorded session updates. Sessions without recorded dates, such as centralized sessions, stay
-          listed and are marked “date unavailable”.
-        </p>
-        <button
-          type="button"
-          className={styles.sessionClearFilters}
-          onClick={() => this.setState({ sessionFilters: createCommunitySessionFilters() })}
-        >
-          Clear filters
-        </button>
-      </div>
-    );
-  };
+  renderSessionFilters = () =>
+    renderCommunitySessionFilters({
+      filters: this.state.sessionFilters,
+      isExpanded: this.state.showSessionFilters,
+      onFilterChange: this._setSessionFilter,
+      onClear: () => this.setState({ sessionFilters: createCommunitySessionFilters() }),
+    });
 
   renderSessionsModalContent = () => {
     const allSessions: CommunitySessionEntry[] = this.state.sessions;
