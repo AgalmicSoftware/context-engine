@@ -81,16 +81,15 @@ const savedNamedQ1 = {
     appliedAt: 1,
   },
 };
+const DEFAULT_QUESTION_IDS = ['q1', 'q3'];
+let questionIds = DEFAULT_QUESTION_IDS;
 const mockSession = (saved = []) => {
   jest
     .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
     .mockImplementation((slug) => (slug === 'edge' ? SESSION_CONFIG : null));
   const cache = () => ({
     11155420: {
-      questions: {
-        q1: { id: 'q1', type: 'binary', prompt: 'Q1' },
-        q3: { id: 'q3', type: 'binary', prompt: 'Q3' },
-      },
+      questions: Object.fromEntries(questionIds.map((id) => [id, { id, type: 'binary', prompt: id.toUpperCase() }])),
       questionResponses: Object.fromEntries(saved.map((row) => [row.questionID, { [A]: JSON.stringify(row) }])),
       questionResponsesMeta: Object.fromEntries(
         saved.map((row) => [row.questionID, { [A]: { ts: 1000, storageRefId: `ref-${row.questionID}` } }]),
@@ -122,12 +121,14 @@ const mockSession = (saved = []) => {
 };
 const settle = (ms = 600) => act(async () => new Promise((resolve) => setTimeout(resolve, ms)));
 afterEach(() => {
+  questionIds = DEFAULT_QUESTION_IDS;
   jest.restoreAllMocks();
   sessionStorage.clear();
   localStorage.clear();
 });
 
 // `edit` runs on the pile before the interview opens; drafts arrive after the own-answer read.
+// Without a prefill the pile mounts without opening the interview.
 const mountWithInterview = async (prefill, edit = null) => {
   let engine = null;
   const strategy = createPileViewRuntimeStrategy();
@@ -157,9 +158,10 @@ const mountWithInterview = async (prefill, edit = null) => {
     activeSessionSlug: 'edge',
     toggleLoginModal: jest.fn(),
   });
-  await waitFor(() => expect(engine?.state?.pileQuestions?.length).toBe(2), { timeout: 8000 });
+  await waitFor(() => expect(engine?.state?.pileQuestions?.length).toBe(questionIds.length), { timeout: 8000 });
   await settle();
   if (edit) await run(() => edit(engine));
+  if (!prefill) return { engine: () => engine, view };
   await act(async () => engine.setState({ showVoiceModeModal: true, sessionVoiceMode: 'interview' }));
   await settle();
   await act(async () => engine.setState({ interviewPrefillPacket: prefill }));
@@ -361,3 +363,40 @@ it('keeps a withdrawal from a rejected interview upload through Clear changes', 
   expect(row.answer.value).toBe('Agree');
   expect(row).not.toHaveProperty('responderName');
 });
+
+it('stores every kept withdrawal on Clear changes, not only the cards near the current one', async () => {
+  questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+  const upload = mockSession(questionIds.map((id) => ({ ...savedNamedQ1, questionID: id, prompt: id.toUpperCase() })));
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  const pile = await mountWithInterview(
+    packet(questionIds.map((questionId) => ({ questionId, answer: 'Disagree', confidence: 0.8 }))),
+  );
+  screen.queryAllByRole('button', { name: 'Replace with draft' }).forEach((button) => fireEvent.click(button));
+  fireEvent.click(screen.getByText('AI submission info'));
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
+  await submitDrafts();
+  await act(async () => pile.engine().closeSessionVoiceModeModal());
+  await settle(300);
+
+  await act(async () => pile.engine().handleRevertPendingChanges());
+  await settle(300);
+  expect(pile.engine().getPendingEditStats().total).toBe(questionIds.length);
+
+  // The pile shows only a few cards around the current one, but every withdrawal is stored,
+  // and a reload keeps them all; each comes back as its card comes into view.
+  const storedWithdrawals = () =>
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith('dg:surveyDraft:'))
+      .flatMap((key) =>
+        Object.entries(JSON.parse(sessionStorage.getItem(key)).answers || {})
+          .filter(([, entry]) => entry?.interviewProvenance && !('responderName' in entry.interviewProvenance))
+          .map(([id]) => id),
+      )
+      .sort();
+  expect(storedWithdrawals()).toEqual(questionIds);
+  pile.view.unmount();
+  const reloaded = await mountWithInterview(null);
+  await act(async () => reloaded.engine().handleAnswerPile('q1', 'Agree'));
+  await settle(300);
+  expect(storedWithdrawals()).toEqual(questionIds);
+}, 40000);
