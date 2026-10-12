@@ -161,8 +161,8 @@ The Summary and Statistics section keeps the live visible row shape: counts,
 Active Filters, and Blockchain/Timestamp. Benchmark id, run mode, persona, and
 parse/provider issue count remain machine-readable on the `statsSection`
 container and in Raw Results rather than appearing as benchmark-only visible
-summary rows. `Votes` and `Votes/Voter Avg` are computed from one averaged
-response distribution per model/question cell. Raw attempts, Unsure output,
+summary rows. `Responses` and `Responses/Participant Avg` are computed from one
+averaged response distribution per model/question cell. Raw attempts, Unsure output,
 and invalid responses remain visible in `runSummary`, coverage metrics, and Raw
 Results without giving a model extra participant weight.
 Benchmark-specific JSON exports live in Raw Results so the settings row remains
