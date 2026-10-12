@@ -36,21 +36,24 @@ Answering and saved answers:
 - Wait for saved answers to load before any upload, in the pile, View all and
   single-question editors, including after a failed or capped listing, a failed
   start-up load, or a change in another tab.
-- In View all, load each question's saved answers before restoring its unsaved
-  changes, including questions that appear after a Submit, a failed Submit, a
-  decrypt, or a filter change. Submit no longer replaces saved answers with
-  blanks, and filtering a question out and back in keeps its draft.
+- Load each question's saved answers before restoring its unsaved changes, in
+  the pile, View all, and single-question editors, including questions that
+  appear after a Submit (even when the refresh after it fails), a failed Submit,
+  a decrypt, a filter change, or a sign-in after Clear changes. Submit no longer
+  replaces saved answers with blanks, filtering a question out and back in keeps
+  its draft, and an edit typed just before its question is filtered out is kept.
 - Keep drafts to unsaved changes only. When restoring them, drop only the fields
   whose saved value changed since, and keep drafts written before saved answers
   loaded. Never store decrypted ratings in a draft while the saved ratings stay
   encrypted.
 - Clear the previous account's answers, comments, ratings, and unsaved drafts for
   every session on sign-out or account switch.
-- Make clearing a saved answer take effect, upload a cleared locked answer as
-  cleared, keep encrypted ratings intact across repeated submits, keep a pending
+- Make clearing a saved answer or comment take effect and stay cleared when
+  saved answers reload, upload a cleared locked answer as cleared, keep encrypted ratings intact across repeated submits, keep a pending
   rating through Decrypt & Edit, and never publish a "*" placeholder.
-- Keep ratings encrypted when a locked comment's text is deleted while its lock
-  stays on.
+- Keep saved encrypted ratings encrypted unless you turn a lock off, including
+  when a locked comment's text is deleted or another question is submitted. A
+  Submit leaves the saved answers of questions it didn't upload unchanged.
 - After a reload, keep an answer or comment that was unlocked but not submitted
   locked as saved, with a note to decrypt and unlock it again.
 - Hold back and name a question that can't be uploaded, such as an answer that
@@ -63,7 +66,8 @@ Answering and saved answers:
   answers can use the full stored size.
 - Never revert a consent withdrawal: withdrawn names, AI attribution, and
   research sharing stay withdrawn through undo, Clear changes, reloads, and
-  failed or partial submits.
+  failed or partial submits. After a reload, every stored withdrawal is pending
+  and uploads with the next Submit.
 - Send interview edits to the imported context (removed facts and names) to the
   AI, include unsaved pile edits in the interview review, and stop uploading
   interview drafts removed after a failed submit or discard.
