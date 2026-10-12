@@ -2923,14 +2923,23 @@ export const buildLocalCacheRehydrationState = ({
       baselineAdditional: nextBaseline.additionalComments?.[questionId],
     });
 
+    // A load fills only fields the user left as loaded: a saved comment they deleted stays
+    // deleted and pending, while the saved value still becomes its baseline below.
+    const edited = (key: 'answers' | 'additionalComments' | 'importance' | 'conviction') => {
+      const current = asHydrationRecord(nextSlice[key]);
+      const saved = asHydrationRecord(nextBaseline[key]);
+      const read = (map: Record<string, unknown>) =>
+        key === 'answers' || key === 'additionalComments' ? asHydrationRecord(map[questionId]).value : map[questionId];
+      return JSON.stringify(read(current) ?? '') !== JSON.stringify(read(saved) ?? '');
+    };
     if (
       applyLocalCacheHydrationEntryToSlice({
         targetSlice: nextSlice,
         questionId,
-        cachedAnswer: effectiveAnswerState,
-        cachedAdditional: effectiveAdditionalState,
-        cachedImportance,
-        cachedConviction,
+        cachedAnswer: edited('answers') ? null : effectiveAnswerState,
+        cachedAdditional: edited('additionalComments') ? null : effectiveAdditionalState,
+        cachedImportance: edited('importance') ? undefined : cachedImportance,
+        cachedConviction: edited('conviction') ? undefined : cachedConviction,
         allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
         allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
         debugLabel,

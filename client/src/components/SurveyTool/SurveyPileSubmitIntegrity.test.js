@@ -859,6 +859,63 @@ describe('View all editor after a reload', () => {
     await expectUpload(h, 'Newer saved answer', 'Draft comment');
   });
 
+  // A saved answer and a saved comment, then the responder deletes the comment in View all.
+  const clearSavedComment = async () => {
+    const h = await fixture();
+    h.add(
+      'responses',
+      savedFreeform(SAVED_ANSWER, { value: 'Saved comment', encrypted: false, audienceMode: 'explicit' }),
+    );
+    await act(async () => h.sync());
+    await h.mountEditor({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] });
+    await act(async () => h.editor().handleAdditional(0, FREEFORM_QID, ''));
+    await settle();
+    expect(freeformForm(h)).toEqual(['Saved public answer', '']);
+    return h;
+  };
+  const expectCommentStillCleared = async (h) => {
+    expect(freeformForm(h)).toEqual(['Saved public answer', '']);
+    expect(h.editor().getPendingEditStats().total).toBe(1);
+    await h.click();
+    await settle();
+    expect(uploadedFreeform(h)).toEqual([['Saved public answer', '']]);
+  };
+
+  it('keeps a cleared saved comment cleared when the list is passed again', async () => {
+    const h = await clearSavedComment();
+    await act(async () => h.rerender({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] }));
+    await settle();
+    await expectCommentStillCleared(h);
+  });
+
+  it('keeps a cleared saved comment cleared when saved answers refresh', async () => {
+    const h = await clearSavedComment();
+    await act(async () => h.rerender({ questionResponsesNonce: 7, questionsCacheNonce: 7 }));
+    await settle();
+    await expectCommentStillCleared(h);
+  });
+
+  it('keeps a cleared saved comment cleared when another question leaves the list', async () => {
+    const h = await clearSavedComment();
+    await act(async () => h.rerender({ questionPool: [FREEFORM_QUESTION] }));
+    await settle();
+    await expectCommentStillCleared(h);
+  });
+
+  it('keeps the stored clear through the next edit and a reopen', async () => {
+    const h = await clearSavedComment();
+    await act(async () => h.rerender({ questionPool: [FREEFORM_QUESTION] }));
+    await settle();
+    await act(async () => h.rerender({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] }));
+    await settle();
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'Yes'));
+    await settle();
+    await settle();
+    h.unmount();
+    await h.mountEditor({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] });
+    expect(freeformForm(h)).toEqual(['Saved public answer', '']);
+  });
+
   it('says when a reload could not keep an unlock', async () => {
     const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
     const h = await fixture();
