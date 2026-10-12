@@ -2074,7 +2074,7 @@ const renderParticipantGraph = (report) => {
     const { agree, unsure, disagree, invalid } = answerTotals(summary);
     return `<g class="graph-statement" data-ce-searchable hidden>
       <circle cx="${escapeHtml(graphX(x).toFixed(2))}" cy="${escapeHtml(graphY(y).toFixed(2))}" r="3" fill="#000" />
-      <title>${escapeHtml(`${question.id}: ${question.prompt || ''} Agree: ${agree}, Disagree: ${disagree}, Unsure: ${unsure}, Invalid: ${invalid}`)}</title>
+      <title>${escapeHtml(`${question.id}: ${question.prompt || ''} Agree: ${agree}, Unsure: ${unsure}, Disagree: ${disagree}, Invalid: ${invalid}`)}</title>
     </g>`;
   }).join('');
   const strongestEdges = [...edges]
@@ -3327,9 +3327,10 @@ const renderQuestionExplorer = (report) => {
     const modelAnswers = modelAnswersForQuestion(report, question.id, participantVisuals);
     const { agree, unsure, disagree, invalid } = answerTotals(summary);
     const label = `#${index + 1}`;
-    const total = Number.isFinite(summary.total)
-      ? summary.total
-      : agree + unsure + disagree + invalid;
+    // Like the live row, count only answering participants. Models without a
+    // valid averaged answer keep the benchmark's Invalid label, as in the
+    // Debate Map legend, instead of the live No response.
+    const responses = agree + unsure + disagree;
     const anchors = [...(question.sourceAnchors || []), ...(question.agentVillageAnchors || [])]
       .map((anchor) => anchor.idOrUrl || anchor.corpus || anchor.sourceType || '')
       .filter(Boolean)
@@ -3349,9 +3350,10 @@ const renderQuestionExplorer = (report) => {
       <div class="questionVoteRow">
         <span class="questionVoteSummary">
           <strong>Agree:</strong> ${escapeHtml(agree)} /
-          <strong>Disagree:</strong> ${escapeHtml(disagree)} /
           <strong>Unsure:</strong> ${escapeHtml(unsure)} /
-          (Total: ${escapeHtml(total)})
+          <strong>Disagree:</strong> ${escapeHtml(disagree)} /
+          <strong>Responses:</strong> ${escapeHtml(responses)}${invalid > 0 ? ` /
+          <strong>Invalid:</strong> ${escapeHtml(invalid)}` : ''}
         </span>
         ${renderAtlasQuestionDistribution(summary, modelAnswers, {
           className: 'questionModelDistribution',
@@ -3363,7 +3365,7 @@ const renderQuestionExplorer = (report) => {
   return renderCollapsibleSection({
     id: 'all-questions',
     title: 'All Questions',
-    subtitle: 'Question prompts with aggregate agree, disagree, and unsure counts',
+    subtitle: 'Question prompts with aggregate agree, unsure, and disagree counts',
     bodyClassName: 'graphSection aidb-question-section',
     body: `<div class="questionModelLegend" aria-label="Model marker legend">${modelLegend}</div><div class="questionList">${items}</div>`,
   });
@@ -6086,8 +6088,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
         beeswarmTooltip.innerHTML = [
           '<div style="font-weight: bold; margin-bottom: 4px;">' + escapeText(point.dataset.questionId) + ': ' + escapeText(point.dataset.questionPrompt) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Agree:</strong> ' + escapeText(point.dataset.questionAgree) + ', ' +
-            '<strong>Disagree:</strong> ' + escapeText(point.dataset.questionDisagree) + ', ' +
-            '<strong>Unsure:</strong> ' + escapeText(point.dataset.questionUnsure) + '</div>',
+            '<strong>Unsure:</strong> ' + escapeText(point.dataset.questionUnsure) + ', ' +
+            '<strong>Disagree:</strong> ' + escapeText(point.dataset.questionDisagree) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Mean:</strong> ' + escapeText(point.dataset.questionMean) + ', ' +
             '<strong>' + escapeText(differenceLabel) + ':</strong> ' + escapeText(point.dataset.questionDifference) + '</div>',
           point.dataset.questionHasVotes === 'false'

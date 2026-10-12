@@ -260,11 +260,17 @@ winning/attempted repeat counts behind the consistency axis while
 toggling the live `beeswarmCircleHover` class for the orange statement-dot
 state instead of adding standalone-only SVG hover effects.
 The All Questions list mirrors the live `PolisReport` question rows by using
-visible `#n` labels beside the prompt and stacked vote rows with box plots.
-The displayed row total counts model participants, not repeated provider calls.
-The `PolisBoxPlot` mini bar normalizes the model-level
-agree/unsure/disagree distributions. Attempt and validity totals remain in the
-report integrity data.
+visible `#n` labels beside the prompt and stacked vote rows with a vote bar.
+Each vote row lists Agree, Unsure, and Disagree in the live order, then
+`Responses`: model participants with a valid averaged answer, not repeated
+provider calls. Where the live row adds `No response`, the benchmark row adds
+`Invalid` when it is nonzero: model participants without a valid averaged
+answer, including models with no run for that question in a partial run set.
+It is the question summary's `invalid` count, which the vote bar and the Debate
+Map legend also label Invalid. The vote bar is the Debate Map question
+distribution: model-level Agree, Unsure, Disagree, and Invalid segments with
+numbered markers for the models that ran. Attempt and validity totals remain in
+the report integrity data.
 Benchmark question ids and topics are not rendered as a visible second row in
 Report mode; they stay available through stable `#question-<id>` anchors,
 `data-question-*` attributes, Raw Results, and CE export payloads for deep links

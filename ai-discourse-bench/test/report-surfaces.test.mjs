@@ -9,6 +9,11 @@ import { limitQuestionBank, mergeModelRosters, mergeRunsFiles } from '../src/rep
 import { buildContextEnginePolisExport } from '../src/ce-export.mjs';
 
 const readJson = async (url) => JSON.parse(await fs.readFile(url, 'utf8'));
+// The visible All Questions vote rows only, not the runtime script's string templates.
+const questionVoteSummaries = (html) => Array.from(
+  html.matchAll(/<span class="questionVoteSummary">[\s\S]*?<\/span>/g),
+  (match) => match[0],
+).join('\n');
 
 test('report preserves raw atlas and risk-matrix material', async () => {
   const questionBank = await readJson(new URL('../data/question-bank.sample.json', import.meta.url));
@@ -649,7 +654,11 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.equal(report.polisReport.byQuestion[question.id].invalid, 0);
   assert.equal(report.polisReport.byQuestion[question.id].runSummary.total, 2);
   assert.equal(report.polisReport.byQuestion[question.id].runSummary.invalid, 1);
-  assert.match(html, /<strong>Agree:<\/strong> 1 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Unsure:<\/strong> 0 \/\s*\(Total: 1\)/);
+  // One invalid raw run does not make the model's averaged answer Invalid.
+  const voteSummaries = questionVoteSummaries(html);
+  assert.match(voteSummaries, /<strong>Agree:<\/strong> 1 \/\s*<strong>Unsure:<\/strong> 0 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Responses:<\/strong> 1\s*<\/span>/);
+  assert.doesNotMatch(voteSummaries, /<strong>Invalid:<\/strong>/);
+  assert.doesNotMatch(html, /\(Total: /);
   assert.match(html, /class="questionModelLegend" aria-label="Model marker legend"/);
   assert.match(html, /<button\s+type="button"\s+class="questionModelLegendItem"\s+data-ce-question-model-card="model-a"\s+style="--atlas-model-color:#1f77b4"\s+title="Model A"\s+aria-label="Toggle Model A answer highlighting"\s+aria-pressed="false"[\s\S]*?>1<\/span>[\s\S]*?<span>Model A<\/span>/);
   assert.match(html, /id="question-[^"]+"[\s\S]*?class="atlasIssueQuestionDistribution questionModelDistribution"[\s\S]*?data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-answer="Agree"/);
@@ -858,7 +867,10 @@ test('Summary stats count averaged model/question responses without multiplying 
   assert.doesNotMatch(html, /class="statValue">[^<]*Binary/);
   assert.match(html, /<span class="statLabel">Responses<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1<\/span>/);
   assert.match(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.00<\/span>/);
-  assert.match(html, /\(Total: 2\)/);
+  // Model B ran but never answered validly: the benchmark's Invalid, not the live No response.
+  const voteSummaries = questionVoteSummaries(html);
+  assert.match(voteSummaries, /<strong>Agree:<\/strong> 1 \/\s*<strong>Unsure:<\/strong> 0 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Responses:<\/strong> 1 \/\s*<strong>Invalid:<\/strong> 1\s*<\/span>/);
+  assert.doesNotMatch(voteSummaries, /<strong>No response:<\/strong>/);
   assert.doesNotMatch(html, /<span class="statLabel">Responses<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">3<\/span>/);
   assert.doesNotMatch(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.50<\/span>/);
 });
@@ -2481,4 +2493,62 @@ test('Results subtitle follows expanded state in the standalone report', async (
   assert.equal(subtitle.hidden, true);
   assert.equal(attributes['aria-expanded'], 'true');
   assert.equal(classes.has('sectionExpanded'), true);
+});
+
+test('Report hover counts follow the live Agree, Unsure, Disagree order', async () => {
+  const questionBank = limitQuestionBank(await readJson(new URL('../data/question-bank.sample.json', import.meta.url)), 1);
+  const [question] = questionBank.questions;
+  const modelRoster = {
+    schemaVersion: 1,
+    models: ['a', 'b', 'c'].map((id) => ({ id: `model-${id}`, label: `Model ${id}`, model: `provider/model-${id}`, provider: 'mock', traits: {} })),
+  };
+  const runsFile = { schemaVersion: 1, benchmarkId: questionBank.benchmarkId, mode: 'self', runs: [
+    { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: 'model-b', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Disagree' },
+    { modelId: 'model-c', questionId: question.id, polarity: 'canonical', normalizedAnswer: null },
+  ] };
+  const html = renderHtmlReport(buildResultsReport({ questionBank, modelRoster, runsFile }));
+  assert.match(html, /<title>[^<]*Agree: 1, Unsure: 0, Disagree: 1, Invalid: 1<\/title>/);
+
+  const pointMarkup = html.match(/<a[^>]*data-ce-beeswarm-point[^>]*>/)?.[0];
+  assert.ok(pointMarkup);
+  const dataset = Object.fromEntries(Array.from(
+    pointMarkup.matchAll(/data-(question-[a-z-]+)="([^"]*)"/g),
+    ([, name, value]) => [name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()), value],
+  ));
+  const source = ['escapeText', 'percent', 'renderBeeswarmTooltip'].map((name) => {
+    const helper = html.match(new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n      \\}`))?.[0];
+    assert.ok(helper, `expected the report runtime to define ${name}`);
+    return helper;
+  }).join('\n');
+  const context = { beeswarmTooltip: { hidden: true, innerHTML: '' }, point: { dataset } };
+  vm.createContext(context);
+  vm.runInContext(`${source}\nrenderBeeswarmTooltip(point);`, context);
+  assert.equal(context.beeswarmTooltip.hidden, false);
+  assert.match(context.beeswarmTooltip.innerHTML, /<strong>Agree:<\/strong> 1, <strong>Unsure:<\/strong> 0, <strong>Disagree:<\/strong> 1<\/div>/);
+});
+
+test('All Questions Invalid is the question aggregate, including models not run on it', async () => {
+  const questionBank = limitQuestionBank(await readJson(new URL('../data/question-bank.sample.json', import.meta.url)), 1);
+  const [question] = questionBank.questions;
+  const modelRoster = {
+    schemaVersion: 1,
+    models: ['a', 'b', 'c'].map((id) => ({ id: `model-${id}`, label: `Model ${id}`, model: `provider/model-${id}`, provider: 'mock', traits: {} })),
+  };
+  // Model B ran without a valid answer; model C has no run for this question.
+  const runsFile = { schemaVersion: 1, benchmarkId: questionBank.benchmarkId, mode: 'self', runs: [
+    { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: 'model-b', questionId: question.id, polarity: 'canonical', normalizedAnswer: null },
+  ] };
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile });
+  const html = renderHtmlReport(report);
+  assert.equal(report.polisReport.byQuestion[question.id].invalid, 2);
+
+  // The row, the bar segment and the Debate Map legend share one Invalid count.
+  assert.match(questionVoteSummaries(html), /<strong>Responses:<\/strong> 1 \/\s*<strong>Invalid:<\/strong> 2\s*<\/span>/);
+  const row = html.match(new RegExp(`id="question-${question.id}"[\\s\\S]*?data-ce-atlas-question-distribution[^>]*>`))?.[0];
+  assert.ok(row);
+  assert.match(row, /aria-label="Model vote distribution: Agree 1, Unsure 0, Disagree 0, Invalid 2\. Model answers: Model a: Agree, Model b: Invalid"/);
+  // Only a model that ran gets an Invalid marker.
+  assert.doesNotMatch(row, /Model c:/);
 });
