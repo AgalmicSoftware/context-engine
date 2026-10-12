@@ -354,20 +354,23 @@ it('keeps omitted saved fields after the pile resets to another window during in
   expect(row.importance).toBe(7);
 });
 
-it.each(['', 'My edited comment'])('keeps an explicit comment edit %j when an imported question needs hydration', async (comment) => {
-  const upload = mockSession([{ ...savedNamedQ1, additional: field('Saved comment') }]);
-  const pile = await mountWithInterview(
-    packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]),
-    typeInPile({ comment }),
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
-  pile.engine()._savedAnswersLoadedQids.clear();
+it.each(['', 'My edited comment'])(
+  'keeps an explicit comment edit %j when an imported question needs hydration',
+  async (comment) => {
+    const upload = mockSession([{ ...savedNamedQ1, additional: field('Saved comment') }]);
+    const pile = await mountWithInterview(
+      packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]),
+      typeInPile({ comment }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+    pile.engine()._savedAnswersLoadedQids.clear();
 
-  await submitDrafts();
+    await submitDrafts();
 
-  expect(upload).toHaveBeenCalledTimes(1);
-  expect(upload.mock.calls[0][2][0].additional.value).toBe(comment);
-});
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(upload.mock.calls[0][2][0].additional.value).toBe(comment);
+  },
+);
 
 it('keeps a withdrawal from a rejected interview upload through Clear changes', async () => {
   const upload = mockSession([savedNamedQ1]);
