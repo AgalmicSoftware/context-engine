@@ -1,4 +1,4 @@
-import { removeKeys, safeJsonRead } from '../cache/storageJson.js';
+import { safeJsonRead } from '../cache/storageJson.js';
 
 // Nothing writes the unscoped legacy key: it is read, migrated to the scoped
 // key, and cleared. Drop it one public release after scoped create-SBT draft
@@ -60,11 +60,6 @@ const getSessionStorage = (storageIn?: StorageLike | null): StorageLike | null =
     void e;
   }
   return null;
-};
-
-const removeCacheKey = (storage: StorageLike | null, key: string) => {
-  if (!storage || !key) return;
-  removeKeys(storage, key);
 };
 
 export const normalizeCreateSbtFormCacheSessionSlug = (value: unknown = ''): string => {

@@ -359,13 +359,6 @@ const updateMirrorFromStorageKey = (storageKey: string, value: CacheValue): void
   setMirrorValue(parsed.namespace, parsed.slug, value);
 };
 
-const removeMirrorFromStorageKey = (storageKey: string): void => {
-  const parsed = parseStorageKey(storageKey);
-  if (!parsed) return;
-  if (!isManagedNamespace(parsed.namespace)) return;
-  removeMirrorValue(parsed.namespace, parsed.slug);
-};
-
 const attachStorageListenerOnce = (): void => {
   if (storageListenerAttached) return;
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;

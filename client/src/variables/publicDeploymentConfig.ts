@@ -13,7 +13,6 @@ import {
   normalizeCloudflareNativeDeployCommit,
 } from '../utilities/worker/cloudflareNativeDeploy.js';
 
-const EMPTY_PUBLIC_DEPLOYMENT_ENDPOINT = '';
 const DEFAULT_PROJECT_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/';
 const DEFAULT_DEMO_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev';
 
