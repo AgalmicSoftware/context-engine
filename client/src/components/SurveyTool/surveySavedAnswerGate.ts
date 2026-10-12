@@ -79,30 +79,15 @@ export const buildSessionInterviewActiveSubmitContextToken = (
 const readActiveSubmitContextToken = (engine: SurveyQuestionsRuntimeEngine) =>
   buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
 
-export const loadSessionInterviewOwnAnswers = async (
+const mergeSavedAnswersIntoForm = async (
   engine: SurveyQuestionsRuntimeEngine,
   questionIds: string[],
-  signal: AbortSignal,
-): Promise<InterviewSavedSlice | null> => {
+  saved: InterviewSavedSlice,
+  isCurrent: () => boolean,
+  userAnswers?: SurveyQuestionsRuntimeEngine['state']['userAnswers'],
+) => {
   const props = engine.props;
-  const token = readActiveSubmitContextToken(engine);
-  const isCurrent = () => !signal.aborted && token === readActiveSubmitContextToken(engine);
-  // The pile edits slice 0; a survey editor edits its own survey's slice.
   const sliceIndex = props.isStandalone || props.singleQuestionMode ? 0 : Number(props.surveyIndex || 0);
-  const responses = await loadSessionInterviewSavedAnswers({
-    questionIds,
-    account: String(props.account || '')
-      .trim()
-      .toLowerCase(),
-    provider: props.provider,
-    sessionSlug: resolveEffectiveSlug(props),
-    sessionConfig: props.sessionConfig || {},
-    signal,
-  });
-  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
-  if (responses === null) return null;
-  const userAnswers = { responses };
-  const saved = engine.buildSliceFromUserAnswers(userAnswers);
   await new Promise<void>((resolve) =>
     engine.setState((previous: SurveyQuestionsRuntimeEngine['state']) => {
       if (!isCurrent()) return null;
@@ -124,10 +109,52 @@ export const loadSessionInterviewOwnAnswers = async (
       );
       const surveysResponseState = [...(previous.surveysResponseState || [])];
       surveysResponseState[sliceIndex] = merged.slice;
-      return { userAnswers, editBaseline: merged.baseline, surveysResponseState };
+      return { ...(userAnswers ? { userAnswers } : {}), editBaseline: merged.baseline, surveysResponseState };
     }, resolve),
   );
   if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  questionIds.forEach((id) => engine._savedAnswersLoadedQids?.add(normalizeQuestionIdKey(id)));
+};
+
+/** Imported questions can sit outside the pile's hydrated card window. */
+export const ensureSessionInterviewCachedAnswers = async (
+  engine: SurveyQuestionsRuntimeEngine,
+  questionIds: string[],
+) => {
+  if (!engine.props.isResponsesCacheReady || !engine.buildSliceFromLocalCache) return;
+  const unloaded = questionIds.filter((id) => !engine._savedAnswersLoadedQids?.has(normalizeQuestionIdKey(id)));
+  if (!unloaded.length) return;
+  const token = readActiveSubmitContextToken(engine);
+  const saved = engine.buildSliceFromLocalCache(unloaded);
+  if (!saved) return;
+  // Load before the draft marks an answer as edited. The merge keeps deliberate
+  // pending field edits (including clears), while restoring omitted saved fields.
+  await mergeSavedAnswersIntoForm(engine, unloaded, saved, () => token === readActiveSubmitContextToken(engine));
+};
+
+export const loadSessionInterviewOwnAnswers = async (
+  engine: SurveyQuestionsRuntimeEngine,
+  questionIds: string[],
+  signal: AbortSignal,
+): Promise<InterviewSavedSlice | null> => {
+  const props = engine.props;
+  const token = readActiveSubmitContextToken(engine);
+  const isCurrent = () => !signal.aborted && token === readActiveSubmitContextToken(engine);
+  const responses = await loadSessionInterviewSavedAnswers({
+    questionIds,
+    account: String(props.account || '')
+      .trim()
+      .toLowerCase(),
+    provider: props.provider,
+    sessionSlug: resolveEffectiveSlug(props),
+    sessionConfig: props.sessionConfig || {},
+    signal,
+  });
+  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
+  if (responses === null) return null;
+  const userAnswers = { responses };
+  const saved = engine.buildSliceFromUserAnswers(userAnswers);
+  await mergeSavedAnswersIntoForm(engine, questionIds, saved, isCurrent, userAnswers);
   return saved || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
 };
 

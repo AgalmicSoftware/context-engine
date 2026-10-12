@@ -11,6 +11,7 @@ import {
   submitTelegramResponseOnChain,
 } from './onChainResponses.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
+import { parseSiweMessage, validateSiweResources } from '../sessionCorsWorker/siweMessageValidation.js';
 
 const bytes32QuestionId = `0x${'12'.repeat(32)}`;
 const surveysAddress = '0x1111111111111111111111111111111111111111';
@@ -146,11 +147,18 @@ test('worker-canonical agent auth sends and verifies the exact session identity'
       calls.push({ url: String(url), init });
       if (String(url).endsWith('/auth/nonce')) {
         return new Response(JSON.stringify({
-          nonce: 'nonce-exact',
+          nonce: 'nonceexact123',
           sessionSlug: 'alpha',
           sessionId,
         }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
+      const siwe = parseSiweMessage(JSON.parse(init.body).message);
+      assert.deepEqual(validateSiweResources({
+        siwe,
+        request: new Request(String(url)),
+        config: { sessionId, sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+        targetSlug: 'alpha',
+      }), { ok: true });
       return new Response(JSON.stringify({
         token: 'worker-token',
         exp: 2_000_000_000,
@@ -167,6 +175,49 @@ test('worker-canonical agent auth sends and verifies the exact session identity'
   assert.equal(calls.every(({ url }) => String(url).startsWith('https://session.example/')), true);
   assert.equal(JSON.parse(calls[0].init.body).sessionId, sessionId);
   assert.equal(JSON.parse(calls[1].init.body).sessionId, sessionId);
+});
+
+for (const [configuredSlug, targetSlug] of [['alpha', 'alpha'], ['debate', 'rxc'], ['general', '']]) {
+  test(`managed account SIWE resources match the Worker for session ${configuredSlug}`, async () => {
+    const { principal, account } = await makeAccount();
+    let loginCount = 0;
+    const result = await authenticateSessionWorker({
+      env: { DEMO_SIGNER_ROOT_SECRET: 'root-a', AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a' },
+      session: { sessionSlug: configuredSlug, sessionWorkerUrl: 'https://session.example' },
+      principal,
+      account,
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith('/auth/nonce')) return Response.json({ nonce: 'nonce123456' });
+        const siwe = parseSiweMessage(JSON.parse(init.body).message);
+        const result = validateSiweResources({ siwe, request: new Request(url), config: {}, targetSlug });
+        assert.deepEqual(result, { ok: true });
+        loginCount += 1;
+        return Response.json({ token: 'worker-token' });
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(loginCount, 1);
+  });
+}
+
+test('a named-session mismatch fails closed before signing for an unknown fallback session', async () => {
+  const { principal, account } = await makeAccount();
+  const calls = [];
+  await assert.rejects(authenticateSessionWorker({
+    env: { DEMO_SIGNER_ROOT_SECRET: 'root-a', AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a' },
+    session: { sessionSlug: 'alpha', sessionWorkerUrl: 'https://session.example' },
+    principal,
+    account,
+    fetchImpl: async (url, init) => {
+      calls.push({ url, body: JSON.parse(init.body) });
+      if (JSON.parse(init.body).sessionSlug) {
+        return Response.json({ error: 'sessionSlug does not match worker session.' }, { status: 400 });
+      }
+      return Response.json({ nonce: 'nonce123456', token: 'wrong-session-token' });
+    },
+  }), /session_worker_identity_mismatch/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.sessionSlug, 'alpha');
 });
 
 test('worker-canonical agent auth does not inherit caller-selected or generic Worker URLs', async () => {

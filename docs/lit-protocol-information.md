@@ -29,7 +29,7 @@ Primary docs:
 - Current worker/runtime split:
   - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
   - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`, and the Worker-generated `litAuthorizationPrivateKey`
-  - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }`
+  - per-session Worker-private config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }`; the public `/session-config` response strips this entire descriptor
 - Runtime security contract:
   - `op: "encrypt"` wraps a CEK for the configured audience but does not require the author to hold the target SBT
   - `op: "check"` and `op: "decrypt"` still require the requester to satisfy the SBT gate
@@ -41,6 +41,7 @@ Primary docs:
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
   - the real security boundary is still API-key scope + group membership + Lit Action code; hiding IDs alone is not a sufficient protection model
   - the Action verifies a 60-second Worker signature over the requester, policy, approved HTTPS RPC, operation, and reply key before any gate or key operation; decrypt replies are encrypted to the original Worker request. Account management credentials remain trusted because they can alter permissions. See [authorization and cutover](lit-worker-authorization.md).
+  - all permission paths available to untrusted execution keys must restrict the relevant PKP to its Worker-authorized Action: no wildcard Action/PKP grants or another unsigned Action attached to that PKP. CE creates its narrow group but does not audit or repair account-wide permissions; broad account management authority remains trusted
 - Current Chipotle endpoints/source-of-truth:
   - prod API: `https://api.chipotle.litprotocol.com`
   - prod dashboard: `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
@@ -56,10 +57,16 @@ Primary docs:
     - `lit-chipotle-status`
     - `lit-chipotle-provision`
     - `lit-chipotle-bootstrap-session`
-- Re-provisioning note: unsigned or incomplete authorities fail closed. Use a
-  signed admin bootstrap/provision request with `freshAuthority: true` to create
-  a new PKP, group, scoped key, and specialized Action. Retire old permissions
-  separately; old ciphertext is not automatically migrated. See
+- Re-provisioning note: unsigned or incomplete authorities fail closed.
+  Preserve required plaintext with the old working runtime **before updating
+  the Worker**; the updated Worker cannot decrypt legacy unsigned ciphertext.
+  In `/admin`, open **Worker secrets → Lit**, save the account key, refresh
+  status, acknowledge the warning, and select **Create fresh Lit authority**.
+  This sends the existing signed provision request with `freshAuthority: true`
+  to create a new PKP, group, scoped key, and specialized Action. Refresh status
+  and verify new content before retiring old permissions separately. Replacing
+  any authority cuts off its old ciphertext in this application; no automatic
+  content migration is provided. See
   [the upgrade runbook](lit-worker-authorization.md#upgrade-and-cutover).
 - Current default CE architecture direction:
   - create one new Lit account per session
@@ -106,6 +113,12 @@ Lit background with the concepts Context Engine uses, and the repo wiring.
   - the worker uses the default Chipotle API base unless worker config/env overrides it, then derives and persists `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, and `litUsageApiKey`
   - scoped-runtime identifiers remain supported as worker-side/admin/sponsored-bundle config, but they are no longer hand-entered in the `/new` Lit card
 - `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
+- `/admin` Lit status preserves `needsFreshAuthority` even when no execution
+  API key is configured, so operators can distinguish authority replacement
+  from an ordinary ready runtime. The fresh-authority control requires signed
+  status from an updated Worker, saved secret changes, and explicit
+  acknowledgement on every attempt. A missing account key produces guidance
+  to save one; failures do not automatically retry provisioning.
 - When passkey EOA soft-session mode is enabled and the current page has an
   unlocked in-memory signer, typed-data signatures are auto-signed, so worker
   auth can run without extra passkey prompts. Passive wallet restores only
@@ -207,6 +220,13 @@ on Arweave or in Cloudflare storage, as the session profile decides. Each
 - Demo session secrets live in `client/src/variables/demo/demo_sessions.json` under the `test` session.
 
 - Each session authority uses its own PKP and group containing only its Worker-authorized Action. Never add an older unsigned Action to that PKP/group. The SBT gate remains in the signed policy and Action logic.
+- Reused Action CIDs are checked against the canonical source specialized for
+  the pinned Worker signer, session, and PKP before bootstrap accepts a
+  completed setup or changes permissions. Changing that source changes the
+  CID and requires another fresh-authority cutover, with preservation before
+  deployment. Ordinary Worker updates that leave Action source unchanged do
+  not themselves require replacement. Fresh authority preserves the Worker
+  signing key; this release provides no signer-rotation procedure.
 - Session Wizard can now automate both Chipotle setup modes from canonical CE action source:
   - existing-account mode: `lit-chipotle-provision` uses the same fresh-authority bootstrap path, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`; legacy authority replacement requires `freshAuthority: true`
   - bootstrap mode: use `lit-chipotle-bootstrap-session` with a stored/session/deployment `litAccountApiKey` to derive the missing default group, PKP, usage key, and CE action before persisting the returned `litCredentials`; if no account key is available, the worker can still create a brand-new session account

@@ -18,6 +18,15 @@ const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
 const REPO_ROOT = path.join(__dirname, '..');
+const PUBLIC_URL_SECURITY_FIXTURE_PATHS = [
+  'client/src/utilities/arweave/arweaveUrls.test.ts',
+  'client/src/utilities/worker/workerGroupRoutes.test.ts',
+  'client/src/domains/worker/workerGroupAutoJoinIntent.test.ts',
+  'workers/sessionCorsWorker/workerGroups.test.mjs',
+  'workers/sessionCorsWorker/outboundUrlSafetyBinding.test.mjs',
+  'workers/shared/deployHelperTrust.test.mjs',
+  'scripts/vite-asset-headers.test.mjs',
+];
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -92,6 +101,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
     for (const relativePath of [
+      ...PUBLIC_URL_SECURITY_FIXTURE_PATHS,
       '.github/ISSUE_TEMPLATE/config.yml',
       'client/src/components/Sessions/sessionWizardUrlSupport.test.ts',
       'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts',
@@ -254,6 +264,16 @@ test('prepare-public-release strips private surfaces without publishing an inven
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /files stripped, output at /);
+
+    // Credential-bearing URLs and unusual asset names must exercise the same
+    // policy after export; an email placeholder changes those security cases.
+    for (const relativePath of PUBLIC_URL_SECURITY_FIXTURE_PATHS) {
+      assert.equal(
+        fs.readFileSync(path.join(outputDir, relativePath), 'utf8'),
+        fs.readFileSync(path.join(REPO_ROOT, relativePath), 'utf8'),
+        `${relativePath} must retain its original test inputs and assertions`,
+      );
+    }
 
     assert.equal(
       fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'),

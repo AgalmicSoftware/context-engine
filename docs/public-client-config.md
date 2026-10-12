@@ -74,6 +74,10 @@ server.
 Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.ts`,
 and `client/src/variables/appConfig.ts`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
+The entry point installs browser globals in `client/src/browserGlobals.ts`
+before its theme and application configuration imports run. This makes the
+first configuration read honor build overrides, including the release commit
+and a self-hosted deploy-helper URL.
 
 For a custom-domain self-host, the values to check first are:
 
@@ -155,7 +159,8 @@ pairs everything with the exact public commit it was built from: the native
 Cloudflare Deploy Button replays that commit, and the Session and Agent Bridge
 bundles and their manifest come from its immutable `worker-bundles-<sha>`
 release, never from GitHub's moving `latest` release. CI publishes that release
-about 20 minutes after the push to `main`. Until then, deploy-helper and
+after the required checks and `Publish Worker Bundles` complete; there is no
+fixed publication delay. Until then, deploy-helper and
 wrapped deploys fail closed; the native button works at once. After `Publish
 Worker Bundles` finishes, check the release with
 `CE_RELEASE_COMMIT=<sha> npm run verify:release-assets` from the repository

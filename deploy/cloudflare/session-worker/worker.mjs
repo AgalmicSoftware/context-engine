@@ -79876,8 +79876,25 @@ var readLitChipotleStatus = async ({
   runtime = {},
   fetchImpl = globalThis.fetch
 } = {}) => {
-  ensureChipotleApiKey(runtime);
   const warnings = [];
+  const status = {
+    ok: true,
+    apiBase: runtime.litApiBase,
+    apiKeySource: runtime.apiKeySource,
+    litGroupId: runtime.litGroupId,
+    litPkpId: runtime.litPkpId,
+    litActionCid: runtime.litActionCid,
+    balance: null,
+    clientConfig: null,
+    warnings,
+    groupSummary: { walletCount: null, actionCount: null, hasConfiguredPkp: null, hasConfiguredAction: null },
+    needsFreshAuthority: runtime.authorizationReady !== true,
+    ready: false
+  };
+  if (!toTrimmedString15(runtime.litUsageApiKey)) {
+    warnings.push(createStatusWarning("api-key", "Lit API key not configured. Save an account API key to provision Lit."));
+    return status;
+  }
   const balance = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey,
@@ -79921,12 +79938,7 @@ var readLitChipotleStatus = async ({
     return null;
   });
   return {
-    ok: true,
-    apiBase: runtime.litApiBase,
-    apiKeySource: runtime.apiKeySource,
-    litGroupId: runtime.litGroupId,
-    litPkpId: runtime.litPkpId,
-    litActionCid: runtime.litActionCid,
+    ...status,
     balance,
     clientConfig,
     warnings,
@@ -79936,7 +79948,6 @@ var readLitChipotleStatus = async ({
       hasConfiguredPkp: groupHasConfiguredPkp,
       hasConfiguredAction: groupHasConfiguredAction
     },
-    needsFreshAuthority: !runtime.authorizationReady,
     ready: runtime.authorizationReady === true && !!toTrimmedString15(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
   };
 };
@@ -80362,6 +80373,17 @@ var bootstrapLitChipotleSessionCore = async ({
     requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
     { allowLocalApiBase }
   );
+  if (existingActionCid) {
+    if (!existingPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+    const expectedCid = await deriveLitActionCid({
+      runtime: { litApiBase, allowLocalApiBase },
+      actionCode: buildActionCode(existingPkpId),
+      fetchImpl
+    });
+    if (expectedCid !== existingActionCid) {
+      throw new Error("Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.");
+    }
+  }
   if (existingAccountApiKey && existingUsageApiKey && existingGroupId && existingPkpId && existingActionCid) {
     return {
       ok: true,
@@ -81624,8 +81646,8 @@ var dispatchAuthNonceRequest = async ({
     nonce,
     deps?.NONCE_TTL_SECONDS
   );
-  const issuedNonce = typeof issueResult?.nonce === "string" && issueResult.nonce ? issueResult.nonce : nonce;
-  if (!issueResult?.ok) {
+  const issuedNonce = typeof issueResult?.nonce === "string" ? issueResult.nonce.trim() : "";
+  if (!issueResult?.ok || !issuedNonce) {
     return deps?.json?.(
       { error: issueResult?.error || "Authorization state coordination is unavailable." },
       Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,

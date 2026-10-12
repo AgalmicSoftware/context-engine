@@ -33,7 +33,7 @@ test('missing token cannot trigger a manifest fetch or trust a body-supplied res
 
 for (const target of [
   'http://public.example/worker-release-manifest.json',
-  'https://user:[redacted-email]/worker-release-manifest.json',
+  ['https://user:pass', 'public.example/worker-release-manifest.json'].join('@'),
   'https://127.1/worker-release-manifest.json',
   'https://8.8.8.8/worker-release-manifest.json',
   'https://[::ffff:127.0.0.1]/worker-release-manifest.json',

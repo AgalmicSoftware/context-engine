@@ -2,10 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [0.6.8] - 2026-10-12
 
 ### Client — available when the site deploys
 
+- Apply build-time deployment settings before theme and app configuration load,
+  so hosted Worker release commits and self-hosted helper URLs take effect on
+  the first browser load. Keep the pinned defaults when no override is set.
 - Keep standalone benchmark Results headings, help controls, mobile spacing,
   and vote counts aligned with session reports: vote rows read Agree, Unsure,
   Disagree, and Responses, with Invalid shown when any run gave no usable
@@ -31,6 +34,8 @@ All notable changes to this project will be documented in this file.
 
 Answering and saved answers:
 
+- Preserve a saved comment when an interview import leaves that field blank;
+  explicitly cleared comments remain cleared.
 - Keep edits to questions hidden by a filter when you submit, instead of marking
   them saved and discarding them.
 - Wait for saved answers to load before any upload, in the pile, View all and
@@ -143,6 +148,8 @@ Authoring, sessions, and links:
   release recorded.
 - Builds without a Netlify commit deploy the 0.6.7 Worker release by default
   (previously 0.6.4).
+- Show when a Lit authority needs replacement and let admins acknowledge the
+  content-access limits before creating a fresh authority.
 
 SBT groups:
 
@@ -189,8 +196,10 @@ Docs:
   encrypt decrypt replies to that request. A leaked scoped usage key cannot
   impersonate an SBT holder or substitute an RPC. Existing unsigned authorities
   fail closed and need a fresh PKP/group/key cutover; old permissions and
-  historical ciphertext require separate handling. See [the runbook](docs/lit-worker-authorization.md).
-
+  historical ciphertext require separate handling. See the
+  [Lit cutover guide](docs/lit-worker-authorization.md).
+- Verify a reused Lit Action CID matches the Worker's signer, session, and PKP
+  before granting permissions or returning the existing authority.
 - Let only a question's or survey's first uploader or a session admin replace
   it, and add admin hide and unhide for questions and surveys. Ids stored before
   this release become admin-only; very large sessions finish indexing them over
@@ -220,8 +229,11 @@ Docs:
 ### Agent Bridge — requires an Agent Bridge Worker update
 
 - Sign the Worker and session in sign-in messages. Update the Agent Bridge
-  together with session Workers: 0.6.8 session Workers refuse the older Agent
-  Bridge's sign-ins, so Telegram responses and managed-faucet logins would fail.
+  **before** session Workers: the new bridge works with both Worker versions,
+  while 0.6.8 session Workers refuse the older bridge's sign-ins. This order
+  keeps Telegram, Mini App, agent, and managed-faucet sign-ins available.
+- Preserve established session aliases in those bindings and reject a named
+  session mismatch without retrying against an unspecified session.
 
 ### Upgrade notes
 
@@ -230,10 +242,25 @@ Docs:
   issued keep working. Admins who want password joins need a new group.
 - Sponsoring Workers must run 0.6.8 or later code, with WORKER_BUNDLE_URL and
   WORKER_BUNDLE_MANIFEST_URL set, before their grants deploy a pinned release.
+- Update each session Worker before editing questions or surveys with the new
+  client. Rows written by 0.6.7 and earlier have no trusted uploader metadata,
+  so readers use the earliest version, subject to the client's plaintext
+  question hash-integrity check. Reapply any edits made during the
+  upgrade window after the Worker update; updating alone does not recover them.
+- Export required readable Lit content **before** updating that session's
+  Worker. The new Worker rejects unsigned authorities, and creating a fresh
+  authority does not migrate or restore access to historical ciphertext.
 - During an in-place session Worker update or rollback, sign-in and new-id
-  uploads can fail briefly while the update propagates; retrying works.
-- Older clients skip hidden questions and surveys, and get 409 when rewriting an
-  id someone else owns.
+  uploads can fail briefly while the update propagates. Nonce issuance fails
+  closed with a retryable 503 when the coordinator cannot issue a signed nonce;
+  it does not fall back to issuing a legacy stored nonce. Previously issued
+  stored nonces remain consumable once.
+- Fresh listings omit hidden question and survey ids. Older cached clients may
+  retain entries until updated or reloaded. Unauthorized rewrites of an owned
+  id return 409.
+- Hiding removes a question or survey from discovery, new-answer views,
+  interviews, and analysis. It does not delete historical responses or remove
+  them from Raw Results and CSV exports; already-open cached views may need a reload.
 
 ## [0.6.7] - 2026-10-09
 

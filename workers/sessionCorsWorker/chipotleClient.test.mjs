@@ -54,6 +54,12 @@ const jsonResponse = (body, { ok = true, status = 200 } = {}) => ({
   text: async () => JSON.stringify(body),
 });
 
+const validateExistingActionOnly = ({ pkpId = TEST_PKP_ID, sessionSlug = '', cid = TEST_ACTION_CID } = {}) => async (url, options) => {
+  assert.ok(url.endsWith('/get_lit_action_ipfs_id'), 'An already provisioned authority must not mutate remote resources');
+  assert.equal(JSON.parse(options.body), buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug, pkpId }));
+  return jsonResponse(cid);
+};
+
 const mockBalance = (value = 0) => ({
   isZero: () => BigInt(value || 0) === 0n,
   toString: () => String(value || 0),
@@ -1382,7 +1388,7 @@ test('manual provisioning keeps only hardened authority and rejects legacy reuse
   const config = { litCredentials: { ...AUTH_CONFIG, litGroupId: '7', litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } };
   const secrets = { ...AUTH_SECRETS, litAccountApiKey: 'account-key', litUsageApiKey: 'usage-key' };
   const runtime = { litApiBase: 'https://api.chipotle.litprotocol.com', litManagementApiKey: 'account-key' };
-  const result = await provisionLitChipotleAction({ runtime, config, secrets, fetchImpl: () => assert.fail('Already provisioned') });
+  const result = await provisionLitChipotleAction({ runtime, config, secrets, fetchImpl: validateExistingActionOnly() });
   assert.equal(result.alreadyBootstrapped, true);
   assert.equal(result.litCredentials.litAuthorizationSigner, TEST_WALLET.address);
   await assert.rejects(provisionLitChipotleAction({ runtime, config: { litCredentials: { litPkpId: TEST_PKP_ID } }, secrets }), /reprovision Lit/);
@@ -1412,7 +1418,7 @@ test('Worker-account bootstrap explicitly clears the session account in fresh an
   assert.equal(result.secretOutputs.litUsageApiKey, 'fresh-usage');
   const retry = await bootstrapLitChipotleSession({
     env, config: { litCredentials: result.litCredentials }, secrets: { ...secrets, ...result.secretOutputs },
-    sessionSlug: 'session-a', fetchImpl: () => assert.fail('Complete bootstrap must be idempotent'),
+    sessionSlug: 'session-a', fetchImpl: validateExistingActionOnly({ pkpId: 'fresh-pkp', sessionSlug: 'session-a', cid: 'fresh-action' }),
   });
   assert.equal(retry.alreadyBootstrapped, true);
   assert.equal(retry.secretOutputs.litAccountApiKey, '');
@@ -1604,7 +1610,7 @@ test('fresh-authority bootstrap isolates the new PKP from every old Action permi
   }
   const retry = await bootstrapLitChipotleSession({
     config: { litCredentials: result.litCredentials }, secrets: { ...persisted, ...result.secretOutputs }, sessionSlug: 'session-a',
-    fetchImpl: () => assert.fail('complete bootstrap must be idempotent'),
+    fetchImpl: validateExistingActionOnly({ pkpId: 'fresh-pkp', sessionSlug: 'session-a', cid: 'fresh-action' }),
   });
   assert.equal(retry.alreadyBootstrapped, true);
   assert.equal(retry.litAuthorizationSigner, TEST_WALLET.address);
@@ -1624,6 +1630,50 @@ test('invalid private signer state is redacted and legacy status never claims re
   const status = await readLitChipotleStatus({ runtime, fetchImpl: async () => jsonResponse([]) });
   assert.equal(status.ready, false);
   assert.equal(status.needsFreshAuthority, true);
+});
+
+test('legacy status remains actionable without execution or account keys and makes no provider calls', async () => {
+  const runtime = resolveLitChipotleRuntime({
+    config: { litCredentials: { litGroupId: '7', litPkpId: 'old-pkp', litActionCid: 'old-action' } },
+  });
+  const status = await readLitChipotleStatus({
+    runtime,
+    fetchImpl: () => assert.fail('Missing credentials must be reported locally'),
+  });
+  assert.equal(status.ok, true);
+  assert.equal(status.ready, false);
+  assert.equal(status.needsFreshAuthority, true);
+  assert.equal(status.apiKeySource, 'missing');
+  assert.equal(status.groupSummary.hasConfiguredAction, null);
+  assert.match(status.warnings[0].message, /API key.*not configured/i);
+});
+
+for (const complete of [false, true]) {
+  test(`provisioning rejects a mismatched stored Action before mutation (${complete ? 'complete' : 'partial'} authority)`, async () => {
+    const calls = [];
+    await assert.rejects(provisionLitChipotleAction({
+      runtime: { litApiBase: 'https://api.chipotle.litprotocol.com', litManagementApiKey: 'account-key' },
+      config: { litCredentials: { ...AUTH_CONFIG, litPkpId: TEST_PKP_ID, litActionCid: 'old-unsigned-action', ...(complete ? { litGroupId: '7' } : {}) } },
+      secrets: { ...AUTH_SECRETS, litAccountApiKey: 'account-key', ...(complete ? { litUsageApiKey: 'usage-key' } : {}) },
+      sessionSlug: 'session-a',
+      fetchImpl: async (url, options) => {
+        calls.push(new URL(url).pathname);
+        assert.ok(url.endsWith('/get_lit_action_ipfs_id'), 'No account, metadata, group, key, or permission mutation');
+        assert.equal(JSON.parse(options.body), buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug: 'session-a', pkpId: TEST_PKP_ID }));
+        return jsonResponse(TEST_ACTION_CID);
+      },
+    }), /does not match the configured Lit Action CID/);
+    assert.deepEqual(calls, ['/core/v1/get_lit_action_ipfs_id']);
+  });
+}
+
+test('fresh-authority provisioning without an account key explains the missing management credential', async () => {
+  await assert.rejects(provisionLitChipotleAction({
+    config: { litCredentials: { litPkpId: 'old-pkp' } },
+    secrets: { litUsageApiKey: 'usage-key' },
+    request: { freshAuthority: true },
+    fetchImpl: () => assert.fail('Provisioning needs a management credential before contacting Lit'),
+  }), /Lit account API key not configured/);
 });
 
 test('provider errors cannot reflect signed tickets back to the participant', async () => {

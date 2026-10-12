@@ -481,9 +481,26 @@ export const readLitChipotleStatus = async ({
   runtime = {},
   fetchImpl = globalThis.fetch,
 } = {}) => {
-  ensureChipotleApiKey(runtime);
-
   const warnings = [];
+  const status = {
+    ok: true,
+    apiBase: runtime.litApiBase,
+    apiKeySource: runtime.apiKeySource,
+    litGroupId: runtime.litGroupId,
+    litPkpId: runtime.litPkpId,
+    litActionCid: runtime.litActionCid,
+    balance: null,
+    clientConfig: null,
+    warnings,
+    groupSummary: { walletCount: null, actionCount: null, hasConfiguredPkp: null, hasConfiguredAction: null },
+    needsFreshAuthority: runtime.authorizationReady !== true,
+    ready: false,
+  };
+  // Legacy setup must remain diagnosable even after its execution key is removed.
+  if (!toTrimmedString(runtime.litUsageApiKey)) {
+    warnings.push(createStatusWarning('api-key', 'Lit API key not configured. Save an account API key to provision Lit.'));
+    return status;
+  }
 
   const balance = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
@@ -533,12 +550,7 @@ export const readLitChipotleStatus = async ({
   });
 
   return {
-    ok: true,
-    apiBase: runtime.litApiBase,
-    apiKeySource: runtime.apiKeySource,
-    litGroupId: runtime.litGroupId,
-    litPkpId: runtime.litPkpId,
-    litActionCid: runtime.litActionCid,
+    ...status,
     balance,
     clientConfig,
     warnings,
@@ -548,7 +560,6 @@ export const readLitChipotleStatus = async ({
       hasConfiguredPkp: groupHasConfiguredPkp,
       hasConfiguredAction: groupHasConfiguredAction,
     },
-    needsFreshAuthority: !runtime.authorizationReady,
     ready: (
       runtime.authorizationReady === true &&
       !!toTrimmedString(runtime.litUsageApiKey) &&
@@ -1029,6 +1040,20 @@ const bootstrapLitChipotleSessionCore = async ({
     DEFAULT_LIT_API_BASE,
     { allowLocalApiBase }
   );
+
+  if (existingActionCid) {
+    if (!existingPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+    // Validate before the completed-setup return or any permission mutation:
+    // attaching a stale unsigned Action would bypass Worker authorization.
+    const expectedCid = await deriveLitActionCid({
+      runtime: { litApiBase, allowLocalApiBase },
+      actionCode: buildActionCode(existingPkpId),
+      fetchImpl,
+    });
+    if (expectedCid !== existingActionCid) {
+      throw new Error('Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.');
+    }
+  }
 
   if (
     existingAccountApiKey &&

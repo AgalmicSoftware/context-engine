@@ -468,10 +468,8 @@ const WorkerDeploySection = ({
       )}
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
-          Sponsored deploy bundle is ready. Guided setup will use the GitHub-hosted worker bundle automatically. If a
-          retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload
-          override after a fetch failure. While customizing, you can switch between Upload file and Use URL for manual
-          testing.
+          Sponsored deploy bundle is ready. The sponsor selects the Worker release for this deployment. Manual bundle
+          URLs and uploads do not change that release. Contact the sponsor if you need a different version.
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (

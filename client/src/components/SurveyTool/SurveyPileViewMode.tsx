@@ -8,6 +8,7 @@ import {
   buildSessionInterviewActiveSubmitContextToken,
   buildSessionInterviewSubmitContextToken,
   collectSubmitQuestionIds,
+  ensureSessionInterviewCachedAnswers,
   loadSessionInterviewOwnAnswers,
   readOwnAnswersBeforeUpload,
 } from './surveySavedAnswerGate';
@@ -2120,8 +2121,13 @@ const readPlainRecord = (value: unknown): Record<string, unknown> =>
 
 // Interview drafts set answers; they never toggle them. Re-applying the value a
 // binary question already holds would clear it through the pile's toggle.
-export const applySessionInterviewAnswer = (engine: PileViewModeEngine, questionId: string, answer: unknown) =>
-  new Promise<void>((resolve) => {
+export const applySessionInterviewAnswer = async (engine: PileViewModeEngine, questionId: string, answer: unknown) => {
+  const readContext = () =>
+    buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const context = readContext();
+  await ensureSessionInterviewCachedAnswers(engine, [questionId]);
+  if (readContext() !== context) throw new Error('The signed-in account or session changed.');
+  return new Promise<void>((resolve) => {
     const current = readPlainRecord(
       engine.state.surveysResponseState?.[0]?.answers?.[normalizeQuestionIdKey(questionId)],
     ).value;
@@ -2131,6 +2137,7 @@ export const applySessionInterviewAnswer = (engine: PileViewModeEngine, question
     }
     engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
   });
+};
 
 // Each draft field with the pending-edit flags that mark it as an unsaved change.
 const INTERVIEW_DRAFT_FIELDS: Record<string, string[]> = {

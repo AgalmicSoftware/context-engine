@@ -26,7 +26,7 @@ it('persists only a validated invitation and expires it after one day', () => {
 
 it.each([
   { groupId: '' },
-  { workerOrigin: 'https://[redacted-email]' },
+  { workerOrigin: ['https://secret', 'worker.example'].join('@') },
   { version: 2 },
   { sessionId: 'bad' },
   { createdAt: Date.now() + 100000 },

@@ -431,12 +431,11 @@ variables once:
 - When the wizard opens with `sponsored`, it asks for the separately delivered key, downloads the envelope, validates `type` / `version` / `encryptedData`, decrypts client-side, rejects expired bundles, forces worker-secret mode back on, disables local secret persistence for that navigation, and auto-applies the supported sponsored fields.
 - Decrypted bundles, decryption keys, and bootstrap funding grants are memory-only. Startup and bundle reads purge legacy sponsored-bundle ciphertext/sessionStorage entries and the former IndexedDB key database. Reloading the page therefore requires the key again.
 - While a sponsored bundle is active in normal mode, the dedicated Worker step is hidden and the flow jumps straight from Privacy to Deploy Session.
-- Advanced mode still keeps the bundle-source controls visible for sponsored flows, so admins can switch between the default bundle URL and a manual Upload file override while testing.
+- Advanced mode may show bundle-source controls for manual deployments. Grant-backed sponsored deployments ignore those controls and use the release pinned on the sponsoring Worker; ask the sponsor to update that release when different code is needed.
 - Sponsored links only switch Publish into the streamlined "auto-deploy on Publish" worker path when the applied bundle is actually deploy-ready:
   - supported sponsored bundle is active,
   - worker secrets mode is still enabled,
   - a worker name has been generated from the current session name,
-  - worker bundle URL resolves,
   - and grant-backed deploy fields are present (`deployGrantToken` plus `bootstrapWorkerUrl` / source worker URL),
   - and `getMissingWorkerSecretsForDeploy(...)` is empty for the current session config.
 - Sponsored deploy grants now keep only the Cloudflare API token plus the source worker bootstrap context on the sponsoring worker; the encrypted bundle itself carries only the resulting `deployGrantToken` and bootstrap worker URL. Grants do not snapshot account ID or a standalone helper URL.
@@ -766,11 +765,11 @@ Authenticated clients can use the worker as the session storage boundary:
     Uploading an id that already exists returns `409` with
     `reason: "storage_resource_id_owned"` unless the uploader is that id's
     first author or a current session admin. Because KV is eventually
-    consistent, every reader also picks one canonical version per id: a
-    session admin's newest upload, otherwise the earliest upload. The client
-    hydration, `/agent/interview-catalog`, and results analysis all apply this
-    rule, so a later upload by anyone else never replaces a question or survey
-    people already answered. Uploads stored before this release have no
+    consistent, readers pick one canonical version per id using a session
+    admin's newest upload, otherwise the earliest upload. Client hydration also
+    prefers a plaintext non-admin question whose generated hash matches its id
+    over a mismatching plaintext version. The Worker interview catalog and
+    results analysis use the admin/age rule. Uploads stored before this release have no
     uploader, so they never count as admin uploads, and their ids have no
     first-writer record. When a non-admin uploads a question or survey id
     that has no owner record, the session coordinator checks whether that id
@@ -1850,13 +1849,13 @@ login, and signed admin request bodies must carry that config's canonical
    compatibility may omit `sessionId`.
    - Nonce request dispatch now also routes through a shared helper:
      it preserves nonce JSON parse failures, address validation, body/env slug resolution,
-     missing-slug selection, existing-session CORS passthrough, lowercase nonce KV storage,
+     missing-slug selection, existing-session CORS passthrough,
      and the response contract. Worker-canonical responses are
      `{ nonce, sessionSlug, sessionId }`, and a missing or mismatched canonical
      session ID is rejected before nonce issue.
    - Nonce generation/consumption now also route through a shared helper:
      it creates signed nonces from 16 random bytes (see below), and preserves
-     lowercase nonce KV keys,
+     lowercase keys for consuming legacy stored nonces,
      `Nonce mismatch or expired.`, `Nonce already used.`, used-nonce TTL writes,
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
@@ -1878,10 +1877,10 @@ login, and signed admin request bodies must carry that config's canonical
      nonce is recorded until it expires or for ten minutes after use,
      whichever is later, so each works once; a forged,
      foreign, or expired nonce gets `Nonce mismatch or expired.`. A nonce
-     the previous release issued and stored is still accepted once, and while
-     a previous-release coordinator is still running during a deploy or
-     rollback, `/auth/nonce` hands out the random nonce it stored. Nonces
-     contain only letters and digits, as EIP-4361 requires.
+     the previous release issued and stored is still accepted once. If the
+     coordinator cannot issue a signed nonce during an update or rollback,
+     `/auth/nonce` fails closed with a retryable 503; it does not issue a legacy
+     stored nonce. Nonces contain only letters and digits, as EIP-4361 requires.
 2. Build a SIWE message client-side and sign with `personal_sign`.
    The Worker parses it as strict EIP-4361 so that wallets recognize every
    accepted message as a sign-in request: the header, the address, a blank
@@ -2027,6 +2026,9 @@ token):
 `/admin/storage/set-hidden` notes:
 
 - The signed body adds `{ "resource": "questions" | "surveys", "id": "<payload id>", "hidden": true | false }`.
+- This uses the signed-admin boundary: the configured `adminAddress` or
+  configured admin Hat after chain verification. Role-map upload privileges
+  alone do not authorize this endpoint.
 - It is a soft hide. Every stored version stays readable by its storage id,
   but `/storage/list` returns only a hidden marker for it, and the interview
   catalog and results analysis skip the id. Only a session admin can upload a
@@ -2034,6 +2036,9 @@ token):
   `reason: "storage_resource_id_hidden"`), and that upload starts hidden.
   Lists also check the hide records, so a version stored while a hide was in
   progress is listed only as a marker too. Unhiding restores all versions.
+- Historical responses remain in Raw Results and CSV exports; hiding is not
+  deletion or redaction. An already-open cached view may need a reload before
+  it reflects the hide.
 - The Worker marks every stored version of the id. Versions stored before this
   release have no `resourceId` in their index row, so the first hide reads
   those payloads once and records each row's id in the single write it makes

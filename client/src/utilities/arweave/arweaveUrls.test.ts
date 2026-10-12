@@ -92,8 +92,8 @@ describe('arweaveUrls helpers', () => {
       '/\\evil.example/phish',
       '/\t/evil.example/phish',
       // A user name or password in the link hides its real host.
-      'https://[redacted-email]/',
-      'https://user:[redacted-email]/doc',
+      ['https://site.example', 'evil.example/'].join('@'),
+      ['https://user:pass', 'example.test/doc'].join('@'),
       'relative/doc',
       'example.test/doc',
       txId,

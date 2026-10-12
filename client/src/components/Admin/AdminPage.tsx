@@ -47,6 +47,7 @@ import AdminPageMetadataEditor from './AdminPageMetadataEditor';
 import AdminPageSessionMetadataSummary from './AdminPageSessionMetadataSummary';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
 import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
+import AdminLitAuthorityControls from './AdminLitAuthorityControls';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
@@ -1280,13 +1281,15 @@ const AdminPageRuntime = ({
         setLitResource(
           buildAdminLitStatusResource({
             ready: data?.ready === true,
+            needsFreshAuthority: data?.needsFreshAuthority === true,
+            supportsFreshAuthority: typeof data?.needsFreshAuthority === 'boolean',
             warnings,
             groupSummary,
             balanceDisplay,
-            configuredLitApiBase,
-            configuredLitGroupId,
-            configuredLitPkpId,
-            configuredLitActionCid,
+            configuredLitApiBase: data?.apiBase || configuredLitApiBase,
+            configuredLitGroupId: data?.litGroupId || configuredLitGroupId,
+            configuredLitPkpId: data?.litPkpId || configuredLitPkpId,
+            configuredLitActionCid: data?.litActionCid || configuredLitActionCid,
             formatPreviewValue,
           }),
         );
@@ -2923,6 +2926,34 @@ const AdminPageRuntime = ({
           faucetResource={faucetResource}
           litResource={litResource}
           litResourceLabel={litResourceLabel}
+          litAuthorityControls={
+            <AdminLitAuthorityControls
+              key={JSON.stringify([
+                normalizeSlug(selectedSlug),
+                normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl),
+                account,
+                signedWorkerSessionId,
+                sessionCapabilities.authorityMode,
+                Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1,
+              ])}
+              canAdminWorker={canAdminWorker && !!selectedConfig}
+              hasUnsavedChanges={workerSecretsDirty}
+              workerSupportsFreshAuthority={litResource.supportsFreshAuthority}
+              sessionSlug={normalizeSlug(selectedSlug)}
+              workerUrl={normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl)}
+              postSignedRequest={postSignedAdminRequest}
+              onProvisioned={() => {
+                // Do not let an old key retained in the form override the newly provisioned Worker key.
+                setSecrets((previous) => ({
+                  ...previous,
+                  litAccountApiKey:
+                    previous.litAccountApiKey === secrets.litAccountApiKey ? '' : previous.litAccountApiKey,
+                  litUsageApiKey: previous.litUsageApiKey === secrets.litUsageApiKey ? '' : previous.litUsageApiKey,
+                }));
+                return refreshLitResource({ includeSignedStatus: false });
+              }}
+            />
+          }
           refreshArweaveResource={refreshArweaveResource}
           refreshFaucetResource={refreshFaucetResource}
           refreshLitResource={refreshLitResource}

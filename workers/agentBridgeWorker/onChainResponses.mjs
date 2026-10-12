@@ -15,6 +15,7 @@ import {
   deriveDemoPrivateKeyMaterial,
 } from './managedAccounts.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { normalizeWorkerSessionSlug } from '../sessionCorsWorker/sessionSlugResolution.js';
 
 const HASH_ZERO = `0x${'0'.repeat(64)}`;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
@@ -467,7 +468,6 @@ export async function authenticateSessionWorker({
   if (workerCanonical && (!sessionSlugCandidates[0] || !sessionId)) {
     return { ok: false, reason: 'session_worker_identity_missing' };
   }
-  if (!workerCanonical && sessionSlugCandidates[0]) sessionSlugCandidates.push('');
   const originCandidates = resolveLoginOriginCandidates(env, session);
   let lastAuthError = null;
   for (const origin of originCandidates) {
@@ -500,7 +500,7 @@ export async function authenticateSessionWorker({
         // Session Workers require the signed Worker/session binding.
         const sessionResource = workerCanonical
           ? `urn:context-engine:session:id:${encodeURIComponent(sessionId)}`
-          : `urn:context-engine:session:slug:${encodeURIComponent(lower(authSessionSlug) === 'general' ? '' : lower(authSessionSlug))}`;
+          : `urn:context-engine:session:slug:${encodeURIComponent(normalizeWorkerSessionSlug(authSessionSlug))}`;
         const message = `${originUrl.host} wants you to sign in with your Ethereum account:\n`
           + `${wallet.address}\n\nSign in to Context Engine.\n\n`
           + `URI: ${origin}\nVersion: 1\nChain ID: ${normalizeChainId(env, session)}`
@@ -546,8 +546,11 @@ export async function authenticateSessionWorker({
       } catch (error) {
         lastAuthError = error;
         const message = safeString(error?.message || error);
-        const shouldRetryWithoutSlug = authSessionSlug && /sessionSlug does not match worker session/i.test(message);
-        if (shouldRetryWithoutSlug) continue;
+        // A nonce-only legacy response cannot identify another session. Never
+        // turn a named-session mismatch into a signature for an unknown target.
+        if (/sessionSlug does not match worker session/i.test(message)) {
+          throw new Error('worker_auth_failed: session_worker_identity_mismatch');
+        }
         if (isOriginAuthError(error)) break;
         throw error;
       }

@@ -142,12 +142,10 @@ export const dispatchAuthNonceRequest = async ({
     nonce,
     deps?.NONCE_TTL_SECONDS,
   );
-  // The coordinator signs the random part for this session and wallet. A
-  // previous-release coordinator, still running briefly during a deploy or
-  // rollback, stores the random part itself and returns no signed nonce;
-  // this release accepts such a stored nonce once, so hand that part out.
-  const issuedNonce = typeof issueResult?.nonce === 'string' && issueResult.nonce ? issueResult.nonce : nonce;
-  if (!issueResult?.ok) {
+  // Issuance needs the coordinator's signed nonce. Compatibility consumption
+  // of old stored nonces does not make an unsigned issue result usable.
+  const issuedNonce = typeof issueResult?.nonce === 'string' ? issueResult.nonce.trim() : '';
+  if (!issueResult?.ok || !issuedNonce) {
     return deps?.json?.(
       { error: issueResult?.error || 'Authorization state coordination is unavailable.' },
       Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,

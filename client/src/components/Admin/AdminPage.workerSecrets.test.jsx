@@ -5,6 +5,14 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const FRESH_LIT_AUTHORITY = {
+  ok: true,
+  litAuthorizationVersion: 'worker-signed-v1',
+  litAuthorizationSigner: ADMIN_ADDRESS,
+  litGroupId: '7',
+  litPkpId: 'pkp-fixture',
+  litActionCid: 'cid-fixture',
+};
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
 const buildRegistryLitProfile = () => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
@@ -829,6 +837,7 @@ describe('AdminPage worker secrets controls', () => {
               json: async () => ({
                 ok: true,
                 ready: true,
+                needsFreshAuthority: false,
                 apiBase: 'https://api.chipotle.litprotocol.com',
                 balance: { balance_display: '$5.00 credit' },
                 warnings: [],
@@ -933,5 +942,191 @@ describe('AdminPage worker secrets controls', () => {
       expect(payload.litUsageApiKey).toBe('lit-inline-test-key');
       expect(payload.sessionSlug).toBe('edge');
     });
+  });
+
+  it('shows legacy authority status and requires acknowledgement before signing fresh-authority provisioning', async () => {
+    let provisioned = false;
+    global.fetch = jest.fn((url) =>
+      Promise.resolve({
+        ok: true,
+        json: async () => {
+          if (String(url).endsWith('/admin/lit-chipotle-provision')) {
+            provisioned = true;
+            return FRESH_LIT_AUTHORITY;
+          }
+          return { ok: true, ready: provisioned, needsFreshAuthority: !provisioned, warnings: [], groupSummary: {} };
+        },
+      }),
+    );
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    const panel = await openWorkerSecretsPanel();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Lit' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+    expect(await screen.findByText('Fresh authority required')).toBeInTheDocument();
+    expect(screen.getByText(/before updating the Worker/i)).toBeInTheDocument();
+    const create = screen.getByRole('button', { name: 'Create fresh Lit authority' });
+    expect(create).toBeDisabled();
+    expect(mockBuildSignedAdminActionAuth.mock.calls.some(([args]) => args.action === 'lit-chipotle-provision')).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i }));
+    await clickAndSettle(create);
+    expect(await screen.findByText(/Fresh Lit authority created/)).toBeInTheDocument();
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+    await waitFor(() => expect(screen.getByText('Ready')).toBeInTheDocument());
+    const requests = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'));
+    expect(requests).toHaveLength(1);
+    expect(JSON.parse(requests[0][1].body)).toMatchObject({ sessionSlug: 'edge', freshAuthority: true });
+    expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'lit-chipotle-provision',
+        slug: 'edge',
+        body: { sessionSlug: 'edge', freshAuthority: true },
+      }),
+    );
+    expect(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i })).not.toBeChecked();
+  });
+
+  it('reports a missing Lit account key without automatically repeating a fresh-authority request', async () => {
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/admin/lit-chipotle-provision')
+          ? { ok: false, status: 502, json: async () => ({ error: 'Lit account API key not configured.' }) }
+          : { ok: true, json: async () => ({ ok: true, needsFreshAuthority: true }) },
+      ),
+    );
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    const panel = await openWorkerSecretsPanel();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Lit' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+    const create = screen.getByRole('button', { name: 'Create fresh Lit authority' });
+    fireEvent.click(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i }));
+    await clickAndSettle(create);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Save a Lit account API key/);
+    expect(
+      global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/lit-chipotle-provision')),
+    ).toHaveLength(1);
+    expect(create).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i })).not.toBeChecked();
+  });
+
+  it('does not offer a fresh-authority reset to an old Worker that reports ready without authorization status', async () => {
+    global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, ready: true }) }));
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    const panel = await openWorkerSecretsPanel();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Lit' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+    expect(await screen.findByText('Worker update required')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create fresh Lit authority' })).toBeDisabled();
+    expect(mockBuildSignedAdminActionAuth.mock.calls.some(([args]) => args.action === 'lit-chipotle-provision')).toBe(
+      false,
+    );
+  });
+
+  it.each(['session', 'worker', 'account'])(
+    'clears the fresh-authority acknowledgement when the %s changes',
+    async (identity) => {
+      sessionEntries.push(['other', buildSessionConfig({ slug: 'other', sessionName: 'Other Session' })]);
+      global.fetch = jest.fn(() =>
+        Promise.resolve({ ok: true, json: async () => ({ ok: true, needsFreshAuthority: true }) }),
+      );
+      const { rerender } = await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+      const panel = await openWorkerSecretsPanel();
+      fireEvent.click(within(panel).getByRole('button', { name: 'Lit' }));
+      await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i }));
+      expect(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i })).toBeChecked();
+      if (identity === 'session') {
+        fireEvent.change(screen.getByTestId('ce-admin-session-select'), { target: { value: 'other' } });
+      } else if (identity === 'worker') {
+        fireEvent.click(screen.getByRole('button', { name: 'Edit worker URL' }));
+        fireEvent.change(screen.getByDisplayValue('https://worker.example.test'), {
+          target: { value: 'https://other-worker.example.test' },
+        });
+      } else {
+        rerender(
+          <AdminPage
+            account="0x00000000000000000000000000000000000000bb"
+            network={{ id: 84532 }}
+            loginComplete={true}
+          />,
+        );
+      }
+      await waitFor(() =>
+        expect(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i })).not.toBeChecked(),
+      );
+      expect(mockBuildSignedAdminActionAuth.mock.calls.some(([args]) => args.action === 'lit-chipotle-provision')).toBe(
+        false,
+      );
+    },
+  );
+
+  it('ignores old provisioning completion after the canonical session id changes at the same slug and Worker', async () => {
+    const profile = buildWorkerProfile();
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = { mode: 'lit' };
+    profile.storage.payloadAccessControl.encryption = 'lit';
+    const makeConfig = (sessionId) =>
+      buildSessionConfig({ sessionId, adminAddress: ADMIN_ADDRESS, sessionModeProfile: profile });
+    sessionEntries = [['edge', makeConfig('0x11111111111111111111111111111111')]];
+    let finish;
+    global.fetch = jest.fn((url) =>
+      String(url).endsWith('/admin/lit-chipotle-provision')
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve({ ok: true, json: async () => ({ ok: true, needsFreshAuthority: true }) }),
+    );
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    const panel = await openWorkerSecretsPanel();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Lit' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Create fresh Lit authority' }));
+    expect(finish).toBeDefined();
+    sessionEntries = [['edge', makeConfig('0x22222222222222222222222222222222')]];
+    await act(async () => {
+      window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
+    });
+    await act(async () => {
+      finish({ ok: true, json: async () => FRESH_LIT_AUTHORITY });
+    });
+    expect(screen.queryByText(/Fresh Lit authority created/)).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i })).not.toBeChecked();
+  });
+
+  it('preserves Lit keys edited while a fresh-authority request is pending', async () => {
+    let finish;
+    global.fetch = jest.fn((url) =>
+      String(url).endsWith('/admin/lit-chipotle-provision')
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve({ ok: true, json: async () => ({ ok: true, needsFreshAuthority: true }) }),
+    );
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    const panel = await openWorkerSecretsPanel();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Lit' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Lit status' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I preserved.*old ciphertext/i }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Create fresh Lit authority' }));
+    fireEvent.change(getSecretInputByLabel('Lit account API key'), {
+      target: { value: 'replacement-account-fixture' },
+    });
+    fireEvent.change(getSecretInputByLabel('Lit usage API key'), { target: { value: 'replacement-usage-fixture' } });
+    await act(async () => {
+      finish({ ok: true, json: async () => FRESH_LIT_AUTHORITY });
+    });
+    expect(getSecretInputByLabel('Lit account API key')).toHaveValue('replacement-account-fixture');
+    expect(getSecretInputByLabel('Lit usage API key')).toHaveValue('replacement-usage-fixture');
+    expect(screen.getByRole('button', { name: 'Save worker secrets' })).toBeInTheDocument();
   });
 });

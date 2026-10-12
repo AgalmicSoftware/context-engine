@@ -6,6 +6,7 @@ export type AdminResourceDisplayState = {
   meta: string;
   loading: boolean;
   manualRefreshAvailable?: boolean;
+  supportsFreshAuthority?: boolean;
 };
 
 type ShortAddressFormatter = (address: unknown) => string;
@@ -254,6 +255,8 @@ export const buildAdminLitLoadingResource = ({
 
 export const buildAdminLitStatusResource = ({
   ready,
+  needsFreshAuthority,
+  supportsFreshAuthority,
   warnings,
   groupSummary,
   balanceDisplay,
@@ -264,6 +267,8 @@ export const buildAdminLitStatusResource = ({
   formatPreviewValue,
 }: {
   ready?: unknown;
+  needsFreshAuthority?: unknown;
+  supportsFreshAuthority?: unknown;
   warnings?: unknown;
   groupSummary?: unknown;
   balanceDisplay?: unknown;
@@ -286,15 +291,23 @@ export const buildAdminLitStatusResource = ({
   return {
     address: '',
     display:
-      ready === true
-        ? 'Ready'
-        : hasHardConfigMiss
-          ? 'Needs config'
-          : normalizedWarnings.length
-            ? 'Needs review'
-            : 'Configured',
+      supportsFreshAuthority === false
+        ? 'Worker update required'
+        : needsFreshAuthority === true
+          ? 'Fresh authority required'
+          : ready === true
+            ? 'Ready'
+            : hasHardConfigMiss
+              ? 'Needs config'
+              : normalizedWarnings.length
+                ? 'Needs review'
+                : 'Configured',
     meta:
       [
+        supportsFreshAuthority === false ? 'Preserve required legacy content before updating the session Worker.' : '',
+        needsFreshAuthority === true
+          ? 'The Worker requires a fresh Lit authority; old ciphertext is not migrated.'
+          : '',
         apiBase ? formatPreviewValue(apiBase.replace(/^https?:\/\//, ''), 28) : '',
         normalizedBalanceDisplay ? `balance ${normalizedBalanceDisplay}` : '',
         groupId ? `group ${formatPreviewValue(groupId, 20)}` : '',
@@ -324,6 +337,7 @@ export const buildAdminLitStatusResource = ({
         .join(' • ') || 'Lit Chipotle status loaded.',
     loading: false,
     manualRefreshAvailable: true,
+    ...(typeof supportsFreshAuthority === 'boolean' ? { supportsFreshAuthority } : {}),
   };
 };
 

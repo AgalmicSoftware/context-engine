@@ -333,6 +333,42 @@ it('keeps a saved comment that loads during a rejected interview upload', async 
   expect(pile.engine().getPendingEditStats().total).toBe(0);
 });
 
+it('keeps omitted saved fields after the pile resets to another window during interview review', async () => {
+  questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+  const upload = mockSession([{ ...savedNamedQ1, additional: field('Keep this saved comment'), importance: 7 }]);
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]));
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+
+  // Rebuilding a different card window leaves the reviewed question outside the form.
+  await act(async () => pile.engine().setState({ activePileIndex: 7 }));
+  await run(() => new Promise((resolve) => pile.engine().initializeResponseState(resolve)));
+  expect(pile.engine().state.surveysResponseState[0].additionalComments.q1?.value ?? '').toBe('');
+  expect(pile.engine().props.isResponsesCacheReady).toBe(true);
+
+  await submitDrafts();
+
+  expect(upload).toHaveBeenCalledTimes(1);
+  const [row] = upload.mock.calls[0][2];
+  expect(row.answer.value).toBe('Disagree');
+  expect(row.additional.value).toBe('Keep this saved comment');
+  expect(row.importance).toBe(7);
+});
+
+it.each(['', 'My edited comment'])('keeps an explicit comment edit %j when an imported question needs hydration', async (comment) => {
+  const upload = mockSession([{ ...savedNamedQ1, additional: field('Saved comment') }]);
+  const pile = await mountWithInterview(
+    packet([{ questionId: 'q1', answer: 'Disagree', confidence: 0.8 }]),
+    typeInPile({ comment }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+  pile.engine()._savedAnswersLoadedQids.clear();
+
+  await submitDrafts();
+
+  expect(upload).toHaveBeenCalledTimes(1);
+  expect(upload.mock.calls[0][2][0].additional.value).toBe(comment);
+});
+
 it('keeps a withdrawal from a rejected interview upload through Clear changes', async () => {
   const upload = mockSession([savedNamedQ1]);
   upload.mockRejectedValueOnce(new Error('User rejected the request.'));

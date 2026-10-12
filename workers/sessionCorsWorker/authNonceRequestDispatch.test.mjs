@@ -594,7 +594,7 @@ test('dispatchAuthNonceRequest keeps issuing a wallet nonces while strangers hol
   assert.equal((await consumeNonce(env, 'session-a', admin, first.body.nonce, { now })).error, 'Nonce mismatch or expired.');
 });
 
-test('dispatchAuthNonceRequest hands out the stored random part when an older coordinator stores it unsigned', async () => {
+test('dispatchAuthNonceRequest refuses successful issue results without a signed nonce', async () => {
   const result = await dispatchAuthNonceRequest({
     request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
     env: {},
@@ -602,8 +602,27 @@ test('dispatchAuthNonceRequest hands out the stored random part when an older co
     slug: '',
     deps: createNonceDeps({ issueNonce: async () => ({ ok: true }) }),
   });
-  assert.equal(result.status, 200);
-  assert.equal(result.body.nonce, 'nonce-1');
+  assert.equal(result.status, 503);
+  assert.equal(result.body.nonce, undefined);
+  assert.equal(result.body.error, 'Authorization state coordination is unavailable.');
+});
+
+test('dispatchAuthNonceRequest preserves production fail-closed behavior for old or unavailable coordinators', async () => {
+  for (const coordinatedResult of [{ ok: true }, { ok: true, nonce: '' }, { ok: false, status: 503 }]) {
+    const result = await dispatchAuthNonceRequest({
+      request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+      env: {},
+      baseHeaders: {},
+      slug: '',
+      deps: createNonceDeps({
+        issueNonce: (...args) => issueNonce(...args, {
+          issueCoordinatedAuthNonce: async () => coordinatedResult,
+        }),
+      }),
+    });
+    assert.equal(result.status, 503);
+    assert.equal(result.body.nonce, undefined);
+  }
 });
 
 test('dispatchAuthNonceRequest keeps a coordinator error status', async () => {

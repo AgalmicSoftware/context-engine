@@ -1,17 +1,9 @@
-import processShim from 'process/browser';
-import { Buffer } from 'buffer/';
+import './browserGlobals';
 import { clearBootReloadMarker, renderBootFailure } from './bootRecovery.js';
 import { initializeThemeRuntime } from './utilities/ui/themeRuntime';
 import { initializeColorVisionRuntime } from './utilities/ui/colorVisionRuntime';
 import 'assets/css/contextEngine.scss';
 
-globalThis.process = globalThis.process || processShim;
-globalThis.process.env = {
-  ...(processShim.env || {}),
-  ...(globalThis.process.env || {}),
-};
-globalThis.Buffer = globalThis.Buffer || Buffer;
-globalThis.global = globalThis.global || globalThis;
 initializeThemeRuntime();
 initializeColorVisionRuntime();
 // No vite:preloadError reload here: it fires on the first failed attempt, before

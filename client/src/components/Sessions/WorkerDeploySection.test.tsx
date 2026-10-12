@@ -457,7 +457,9 @@ describe('WorkerDeploySection', () => {
       shouldUseSponsoredAutoDeployFlow: true,
     });
 
-    expect(screen.getByText(/Sponsored deploy bundle is ready\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Sponsored deploy bundle is ready\./i)).toHaveTextContent(
+      'The sponsor selects the Worker release for this deployment. Manual bundle URLs and uploads do not change that release.',
+    );
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).not.toBeInTheDocument();
   });
 
