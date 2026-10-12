@@ -648,22 +648,30 @@ export const createSurveyQuestionsSubmitRuntime = (
             }
           : row;
       };
-      // A changed question this submit did not upload keeps the saved answer it
-      // had, so views of saved answers never show its unsaved text.
+      // Saved rows mirror storage: an uploaded question gets its new row, and every other
+      // question keeps the row it had exactly. A row rebuilt from the form would carry
+      // decrypted ratings without their envelopes, and a later Submit would publish them.
+      const rowQid = (row: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(row?.questionID || row?.questionId);
       const priorAnswers: SurveyQuestionsLegacyValue = stateRef.current.userAnswers;
-      const priorRows = new Map<string, SurveyQuestionsLegacyValue>(
-        (Array.isArray(priorAnswers?.responses) ? priorAnswers.responses : []).map(
-          (row: SurveyQuestionsLegacyValue) => [normalizeQuestionIdKey(row?.questionID || row?.questionId), row],
-        ),
-      );
-      const notUploaded = new Set(Array.from(changedQids as Set<string>).filter((qid) => !uploadedQids.has(qid)));
-      const asSaved = (row: SurveyQuestionsLegacyValue) => {
-        const qid = normalizeQuestionIdKey(row?.questionID);
-        return notUploaded.has(qid) ? priorRows.get(qid) || null : withUploadedRatings(row);
-      };
+      const priorResponses: SurveyQuestionsLegacyValue[] = Array.isArray(priorAnswers?.responses)
+        ? priorAnswers.responses
+        : [];
+      const priorRows = new Map<string, SurveyQuestionsLegacyValue>(priorResponses.map((row) => [rowQid(row), row]));
       const builtUserAnswers: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex, undefined, finalSlice);
+      const builtRows: SurveyQuestionsLegacyValue[] = Array.isArray(builtUserAnswers?.responses)
+        ? builtUserAnswers.responses
+        : [];
+      const builtQids = new Set(builtRows.map(rowQid));
       const optimisticUserAnswers: SurveyQuestionsLegacyValue = Array.isArray(builtUserAnswers?.responses)
-        ? { ...builtUserAnswers, responses: builtUserAnswers.responses.map(asSaved).filter(Boolean) }
+        ? {
+            ...builtUserAnswers,
+            responses: [
+              ...builtRows
+                .map((row) => (uploadedQids.has(rowQid(row)) ? withUploadedRatings(row) : priorRows.get(rowQid(row))))
+                .filter(Boolean),
+              ...priorResponses.filter((row) => !builtQids.has(rowQid(row))),
+            ],
+          }
         : withUploadedRatings(builtUserAnswers);
       nextBaseline.interviewProvenance = {
         ...stateRef.current.editBaseline?.interviewProvenance,

@@ -277,6 +277,20 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
   });
 
   describe('shouldEncryptRatingForQid', () => {
+    it('keeps ratings saved encrypted encrypted unless a lock on the question was turned off', () => {
+      const saved = { importance: null, importanceEncrypted: 'saved-envelope' };
+      const openFields = makeSlice({
+        answers: { q1: { value: 'Public answer', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+      });
+      // A cleared comment has no lock, but nothing was unlocked: the ratings stay encrypted.
+      expect(shouldEncryptRatingForQid('Q1', saved, openFields, buildMockDeps(), { answer: true })).toBe(true);
+      // Turning the comment lock off in this edit is an explicit unlock, so known ratings may go public.
+      expect(shouldEncryptRatingForQid('Q1', saved, openFields, buildMockDeps(), { encryptedAdditional: true })).toBe(
+        false,
+      );
+    });
+
     it('returns true when question is locked', () => {
       const result = shouldEncryptRatingForQid(
         'Q1',

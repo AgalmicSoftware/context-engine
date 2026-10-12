@@ -171,6 +171,8 @@ it('R2-D2: unlocking a decrypted answer publishes its ratings with it', async ()
       interviewProvenance: provenance(),
     },
     { responses: [savedRatingEnvelopes] },
+    // Making the answer public is a lock change, which is what lets saved encrypted ratings go public.
+    { answer: true, encryptedAnswer: true, importance: true, conviction: true },
   );
   expect(response).toMatchObject({ importance: 9, conviction: 2, importanceEncrypted: '', convictionEncrypted: '' });
   expect(response.interviewProvenance).toMatchObject({ finalSubmitted: { importance: 9, conviction: 2 } });

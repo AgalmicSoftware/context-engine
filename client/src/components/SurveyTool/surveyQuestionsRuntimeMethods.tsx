@@ -2166,8 +2166,9 @@ export const createSurveyQuestionsRuntimeMethods = (
 
     // Rating encryption (importance/conviction):
     // - Preserve existing rating envelopes on non-rating edits (prevents wiping encrypted ratings).
-    // - When the answer or a non-blank comment is locked, ratings are stored in envelopes with the
-    //   plaintext removed; otherwise known ratings go public and undecrypted ones keep their envelope.
+    // - When the answer or a non-blank comment is locked, or the ratings are saved encrypted and no
+    //   lock was turned off, ratings are stored in envelopes with the plaintext removed; otherwise
+    //   known ratings go public and undecrypted ones keep their envelope.
     try {
       const savedSource = stateRef.current.userAnswers;
       const savedResponses: SurveyQuestionsLegacyValue[] = Array.isArray(savedSource?.responses)
@@ -2187,8 +2188,8 @@ export const createSurveyQuestionsRuntimeMethods = (
           return null;
         }
       };
-      // Per rating field, the saved row wins; a field it lacks keeps the cached
-      // envelope, so a row with one plaintext rating cannot hide the other envelope.
+      // Per rating field, an envelope from either the saved row or the cache wins over a plaintext
+      // value: a row that lost its envelope must never publish a rating storage holds encrypted.
       const ratingSources = questionResponses.map((response: SurveyQuestionsLegacyValue) => {
         const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
         const rows = [
@@ -2200,11 +2201,9 @@ export const createSurveyQuestionsRuntimeMethods = (
           ['importance', 'importanceEncrypted'],
           ['conviction', 'convictionEncrypted'],
         ]) {
-          const row = rows.find(
-            (candidate) =>
-              candidate &&
-              ((typeof candidate[envelopeKey] === 'string' && candidate[envelopeKey]) || candidate[fieldKey] != null),
-          );
+          const row =
+            rows.find((candidate) => typeof candidate?.[envelopeKey] === 'string' && candidate[envelopeKey]) ||
+            rows.find((candidate) => candidate?.[fieldKey] != null);
           if (row) Object.assign(source, { [fieldKey]: row[fieldKey] ?? null, [envelopeKey]: row[envelopeKey] || '' });
         }
         return source;

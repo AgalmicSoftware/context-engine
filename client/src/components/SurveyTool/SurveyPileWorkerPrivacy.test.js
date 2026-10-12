@@ -596,7 +596,9 @@ const draftsText = () =>
     .map((key) => sessionStorage.getItem(key))
     .join('\n');
 
-it('keeps ratings protected by a locked comment encrypted after its text is deleted, also in drafts', async () => {
+// q2 has a public answer, a comment locked to "Only me" and ratings 6/5 that the lock encrypted.
+// After a reload the comment is decrypted (revealing the ratings), its text deleted and submitted.
+const submitAfterDeletingLockedComment = async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
   const store = createWorkerStore();
   seedWorkerCatalog(store);
@@ -649,18 +651,41 @@ it('keeps ratings protected by a locked comment encrypted after its text is dele
   expect(h.engine().state.surveysResponseState[0].additionalComments[qid(2)].encrypted).toBe(true);
 
   expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  return { h, prior };
+};
+const expectRatingsStillEncrypted = (h, prior) => {
   const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(2));
-  expect(row.additional.value).toBe('');
   expect(row.importanceEncrypted).toBe(prior.importanceEncrypted);
   expect(row.convictionEncrypted).toBe(prior.convictionEncrypted);
   expect(row.importance == null && row.conviction == null).toBe(true);
   expect(guard(h.uploads.at(-1))).toBe('passed');
+  return row;
+};
+
+it('keeps ratings protected by a locked comment encrypted after its text is deleted, also in drafts', async () => {
+  const { h, prior } = await submitAfterDeletingLockedComment();
+  expect(expectRatingsStillEncrypted(h, prior).additional.value).toBe('');
 
   // A later edit stores a draft; the ratings are still encrypted, so their plaintext stays out of it.
   await act(async () => h.engine().handleAnswerPile(qid(2), 'public answer v2'));
   await settle(600);
   expect(draftsText()).toContain('public answer v2');
   expect(draftsText()).not.toMatch(/"(importance|conviction)":\d/);
+}, 60000);
+
+it('keeps those ratings encrypted after a Submit of another question', async () => {
+  const { h, prior } = await submitAfterDeletingLockedComment();
+  await goTo(h, 3);
+  await act(async () => h.engine().handleAnswerPile(qid(3), 'other answer'));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+
+  await goTo(h, 2);
+  await act(async () => h.engine().handleAnswerPile(qid(2), 'public answer v2'));
+  await settle(600);
+  expect(draftsText()).toContain('public answer v2');
+  expect(draftsText()).not.toMatch(/"(importance|conviction)":\d/);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  expect(expectRatingsStillEncrypted(h, prior).answer.value).toBe('public answer v2');
 }, 60000);
 
 it('reloads a cleared locked answer as cleared, not as a locked "*", and keeps its ratings out of drafts', async () => {
@@ -695,4 +720,56 @@ it('reloads a cleared locked answer as cleared, not as a locked "*", and keeps i
   await goTo(h, 2);
   expect(h.engine().state.surveysResponseState[0].answers[qid(2)]).toMatchObject({ value: '', encrypted: false });
   expect(screen.queryByRole('button', { name: 'Decrypt Answer' })).not.toBeInTheDocument();
+}, 60000);
+
+it("keeps a cleared locked answer's encrypted ratings out of drafts after a Submit of another question", async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await lockAndAnswer(h, 2, 'self_admin', 'secret two', [6, 5]);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  await goTo(h, 2);
+  expect(await clickDecrypt()).toEqual([]);
+  await act(async () => h.engine().handleAnswerPile(qid(2), ''));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const prior = h.uploads.at(-1).questionResponses.find((row) => row.questionID === qid(2));
+  expect(prior.importanceEncrypted).toBeTruthy();
+
+  await goTo(h, 3);
+  await act(async () => h.engine().handleAnswerPile(qid(3), 'other answer'));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  await goTo(h, 2);
+  await act(async () => h.engine().handleAdditionalPile(qid(2), 'a public note'));
+  await settle(600);
+  expect(draftsText()).toContain('a public note');
+  expect(draftsText()).not.toMatch(/"(importance|conviction)":\d/);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  expectRatingsStillEncrypted(h, prior);
+}, 60000);
+
+it('publishes decrypted ratings once the user turns the answer lock off', async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  let h = await mountPile(store);
+  await lockAndAnswer(h, 2, 'self_admin', 'secret two', [6, 5]);
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  h.view.unmount();
+  jest.restoreAllMocks();
+  sessionStorage.clear();
+  await reloadFromWorker(store, true);
+  h = await mountPile(store, { nonce: 9 });
+  await goTo(h, 2);
+  expect(await clickDecrypt()).toEqual([]);
+  await act(async () => h.engine().toggleAnswerEncryption(0, qid(2), false));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(2));
+  expect(row).toMatchObject({ importance: 6, conviction: 5, importanceEncrypted: '', convictionEncrypted: '' });
+  expect(row.answer).toMatchObject({ value: 'secret two', encrypted: false });
 }, 60000);

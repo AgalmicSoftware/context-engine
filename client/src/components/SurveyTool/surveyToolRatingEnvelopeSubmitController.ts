@@ -210,6 +210,7 @@ export function shouldEncryptRatingForQid(
   respObj: RatingResponseObject,
   sliceForSubmit: RatingEnvelopeContext['sliceForSubmit'],
   deps: RatingEnvelopeDeps,
+  changedFields: Record<string, unknown> = {},
 ): boolean {
   const qLower = String(qid || '')
     .trim()
@@ -217,9 +218,14 @@ export function shouldEncryptRatingForQid(
   const answerState = sliceForSubmit?.answers?.[qLower];
   const additionalState = sliceForSubmit?.additionalComments?.[qLower];
   if (deps.isQuestionLockedForResponse(qLower) || answerState?.encrypted || respObj?.answer?.encrypted) return true;
-  if (!additionalState?.encrypted && !respObj?.additional?.encrypted) return false;
-  // Ratings stored encrypted stay encrypted while a comment lock is on, even once its text is deleted.
+  // Ratings saved encrypted stay encrypted unless the user turned a lock on this question off in
+  // this edit, whatever the answer and comment now hold (a cleared field, for example, has no lock).
   const storedEncrypted = RATING_FIELD_SPECS.some(({ envelopeKey }) => !!respObj?.[envelopeKey]);
+  const lockTurnedOff =
+    (!!changedFields.encryptedAnswer && !answerState?.encrypted) ||
+    (!!changedFields.encryptedAdditional && !additionalState?.encrypted);
+  if (storedEncrypted && !lockTurnedOff) return true;
+  if (!additionalState?.encrypted && !respObj?.additional?.encrypted) return false;
   return storedEncrypted || hasCommentText(additionalState) || hasCommentText(respObj?.additional);
 }
 
@@ -264,7 +270,7 @@ export async function processRatingEnvelopesForSubmit(
     });
 
     // Ratings follow the answer and comment locks; with every lock off, known ratings go public.
-    if (!shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps)) {
+    if (!shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps, changedFields)) {
       RATING_FIELD_SPECS.forEach(({ fieldKey, envelopeKey }) => {
         if (!respObj[envelopeKey]) return;
         const known =
