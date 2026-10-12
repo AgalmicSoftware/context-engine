@@ -830,6 +830,34 @@ describe('View all editor after a reload', () => {
     expect(stored).toEqual([expect.objectContaining({ value: 'Typed then left', additional: 'Draft comment' })]);
   });
 
+  it.each([
+    ['in the same update', false],
+    ['while its save is still pending', true],
+  ])('keeps a comment typed just before its question leaves the list (%s)', async (_when, laterTick) => {
+    const h = await fixture();
+    h.add('responses', savedFreeform(SAVED_ANSWER));
+    await act(async () => h.sync());
+    await h.mountEditor({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] });
+    const type = () => h.editor().handleAdditional(0, FREEFORM_QID, 'Typed before the filter');
+    const filter = () => h.rerender({ questionPool: [BINARY_QUESTION] });
+    if (laterTick) {
+      await act(async () => type());
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+      await act(async () => filter());
+    } else {
+      await act(async () => {
+        type();
+        filter();
+      });
+    }
+    await settle();
+    expect(draftedComments()).toEqual(['Typed before the filter']);
+    await act(async () => h.rerender({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] }));
+    await settle();
+    expect(freeformForm(h)).toEqual(['Saved public answer', 'Typed before the filter']);
+    await expectUpload(h, 'Saved public answer', 'Typed before the filter');
+  });
+
   it('restores the draft from a newer load when the first load is superseded', async () => {
     const h = await draftCommentInPile();
     h.renderEditor();

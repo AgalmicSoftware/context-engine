@@ -1155,6 +1155,12 @@ export const createSurveyQuestionsRuntimeMethods = (
     // Standalone mode (QuestionsDashboard)
     else {
       if (prevProps.questionPool !== propsRef.current.questionPool) {
+        // Save pending edits first: the merge drops the answers of questions that left the list.
+        if (inst._persistTimer || inst._draftDirtyQids?.size) {
+          if (inst._persistTimer) clearTimeout(inst._persistTimer);
+          inst._persistTimer = null;
+          persistDraft();
+        }
         setState(
           (prevStateInner: SurveyQuestionsLegacyValue) =>
             buildQuestionPoolResponseMergeState(prevStateInner, {
