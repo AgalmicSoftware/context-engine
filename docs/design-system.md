@@ -425,12 +425,15 @@ npm run build
 ```
 
 The runtime Playwright smoke covers the home Welcome/Login and Community Stats
-surfaces, `/about`, `/session/new`, `/session/demo`, a simulated-user profile,
+surfaces, `/about`, `/session/new`, `/session/demo-sh`, a simulated-user profile,
 session Groups, `/docs`, `/demos`, and a not-found route at desktop and mobile
 widths. It boots `classic-95`, switches to `context-engine`
 without reload, and verifies palette, typography, geometry, modal chrome,
 Session Wizard preview scope, Community Stats/tooltip contrast and data spread,
 the shared compact non-blocking beeswarm hover card, and horizontal overflow.
+The Settings default-label check follows the deployment theme embedded in the
+page, including Minimal. Session demos require working local demo data and RPC
+access; a cache initialization failure prevents those route checks from running.
 Welcome geometry and theme-specific artwork/action styling are also checked at
 the 735×803 feedback viewport plus compact, wide, and ultra-wide/short desktop
 sizes so content, artwork, and the bottom controls cannot overlap or escape the

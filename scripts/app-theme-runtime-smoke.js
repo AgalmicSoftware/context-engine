@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const { normalizeBaseUrl } = require('./vite-navigation-smoke');
+const themeRegistry = require('../client/src/scss/themes/registry.json');
 
 const ROUTE_CASES = Object.freeze([
   {
@@ -117,6 +118,7 @@ const readThemeState = () => {
   const probeStyle = window.getComputedStyle(probe);
   const state = {
     themeId: root.dataset.ceTheme || '',
+    deploymentThemeId: root.dataset.ceDeploymentTheme || '',
     themeSource: root.dataset.ceThemeSource || '',
     layoutProfile: style.getPropertyValue('--ce-layout-profile').trim(),
     canvas: style.getPropertyValue('--ce-canvas').trim().toLowerCase(),
@@ -2925,13 +2927,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
     assert.match(
       sessionSetupContrastState.entryCardText,
-      /EVM RPC URL/,
-      'Session Setup should identify the RPC URL as an EVM requirement',
+      /Ethereum RPC URL/,
+      'Session Setup should identify the RPC URL as an Ethereum requirement',
     );
     assert.match(
       sessionSetupContrastState.entryCardText,
-      /EVM Gas \(TX Fees\)/,
-      'Session Setup should explain that EVM gas pays transaction fees',
+      /Ethereum Gas \(TX Fees\)/,
+      'Session Setup should explain that Ethereum gas pays transaction fees',
     );
     assert.doesNotMatch(
       sessionSetupContrastState.entryCardText,
@@ -3100,7 +3102,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(preloginThemeSettingsState.accessibleName, 'App theme', 'Theme selector should retain its accessible name');
     assert.equal(
       preloginThemeSettingsState.defaultOptionText,
-      'Context Engine (default)',
+      `${themeRegistry.themes.find(({ id }) => id === classic.deploymentThemeId)?.label} (default)`,
       'Theme selector should identify the configured deployment theme',
     );
     assert.equal(
