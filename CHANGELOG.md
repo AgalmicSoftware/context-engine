@@ -6,8 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- Keep standalone benchmark Results headings, help controls, and mobile spacing
-  aligned with session reports.
+- Keep standalone benchmark Results headings, help controls, mobile spacing,
+  and vote counts aligned with session reports: vote rows read Agree, Unsure,
+  Disagree, and Responses, with Invalid shown when any run gave no usable
+  answer.
 - Make Minimal the default light theme with readable controls, dialogs, response
   cards, reports, group pages, and article charts. Preserve saved theme
   selections and binary answer colors.
