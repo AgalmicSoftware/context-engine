@@ -1,3 +1,4 @@
+import * as workerHydration from '../../utilities/survey/workerResponseHydration';
 import { createSurveyQuestionsResponseStateRuntime } from './surveyQuestionsResponseStateRuntime';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 
@@ -35,9 +36,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   getHydrationQuestionIds: jest.fn(() => ['q1']),
   initializeSurveyResponseState: jest.fn(),
   inst: {
-    _draftPersistDeferred: false,
-    _draftRestorePending: false,
-    _draftRestoredQids: new Set<string>(),
+    _viewAllSync: null as { loaded: Set<string>; restored: Set<string> } | null,
     _applyCachedResponseEntryToSlice: jest.fn(),
     _applyLocalCacheHydrationEntryToSlice: jest.fn(),
     _applyResponseHydrationListToSlice: jest.fn(),
@@ -55,7 +54,6 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   ),
   normalizeSessionSlugValue: jest.fn((value) => String(value || '').toLowerCase()),
   persistDraft: jest.fn(),
-  persistDraftSafely: jest.fn(),
   propsRef: {
     current: {
       isStandalone: false,
@@ -64,7 +62,6 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   },
   readQuestionsCache: jest.fn(),
   recalculateEditStats: jest.fn(),
-  rehydrateDraftForRenderedIds: jest.fn(),
   resolveResponseHydrationContext: jest.fn(() => ({ sessionSlug: 'edge' })),
   resolveSurveyBaselineSourceSlice: jest.fn(() => ({
     baselineSlice: { answers: {} },
@@ -134,86 +131,81 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     });
   });
 
-  it('restores a waiting draft over saved answers once a load finishes, never from a superseded load', async () => {
-    const callbacks: Array<() => void> = [];
+  // View all: the cache holds a saved answer for q1, the draft a comment typed in the pile.
+  const viewAllContext = (state: Record<string, unknown> = {}) => {
     const context = createContext({
-      executeSurveyLocalCacheRehydrate: jest.fn(async ({ callback }) => {
-        callbacks.push(callback);
+      buildDraftAwareCacheHydrationState: jest.fn(({ cachedAnswer, cachedAdditional }) => ({
+        effectiveAnswerState: cachedAnswer,
+        effectiveAdditionalState: cachedAdditional,
+      })),
+      loadDraft: jest.fn(() => ({ answers: { q1: { additional: 'Draft comment' } }, baseline: {} })),
+      propsRef: { current: { isStandalone: true, isResponsesCacheReady: true, sessionConfig: null } },
+    });
+    context.inst._viewAllSync = { loaded: new Set<string>(), restored: new Set<string>() };
+    // Minimal appliers: saved answers fill empty fields; the draft writes its comment.
+    context.inst._applyLocalCacheHydrationEntryToSlice = jest.fn(({ targetSlice, questionId, cachedAnswer }) => {
+      if (!cachedAnswer || targetSlice.answers[questionId]?.value) return false;
+      targetSlice.answers[questionId] = { ...targetSlice.answers[questionId], ...cachedAnswer };
+      return true;
+    });
+    Object.assign(context.inst, {
+      _applyDraftHydrationEntryToSlice: jest.fn(({ targetSlice, questionId, draftEntry }) => {
+        targetSlice.additionalComments[questionId] = { value: draftEntry.additional };
+        return true;
       }),
     });
-    const runtime = createSurveyQuestionsResponseStateRuntime(context);
-
-    await runtime.rehydrateSavedAnswersThenDraft();
-    expect(context.inst._draftRestorePending).toBe(true);
-    // The load is not an edit either, so its own update cannot cancel other hydration.
-    context.executeSurveyLocalCacheRehydrate.mock.calls[0][0].setState({});
-    expect(context.setResponseHydrationState).toHaveBeenCalledTimes(1);
-    expect(context.setState).not.toHaveBeenCalled();
-    // A readiness change starts a newer load before the first one finishes.
-    await runtime.rehydrateLocalCacheAnswersForRenderedIds();
-    callbacks[0]();
-    expect(context.rehydrateDraftForRenderedIds).not.toHaveBeenCalled();
-    expect(context.inst._draftRestorePending).toBe(true);
-
-    context.inst._draftPersistDeferred = true;
-    callbacks[1]();
-    expect(context.rehydrateDraftForRenderedIds).toHaveBeenCalledWith({
-      forceOverwrite: true,
-      responseHydrationOwned: true,
-      questionIds: ['q1'],
+    Object.assign(context.stateRef.current, {
+      editBaseline: { answers: {}, additionalComments: {} },
+      surveysResponseState: [{ answers: { q1: { value: '' } }, additionalComments: { q1: { value: '' } } }],
+      ...state,
     });
-    expect(context.inst._draftRestorePending).toBe(false);
-    // An edit skipped while the draft waited is saved now.
-    expect(context.persistDraftSafely).toHaveBeenCalledTimes(1);
-    expect(context.inst._draftPersistDeferred).toBe(false);
+    return context;
+  };
+  const applySync = (context: ReturnType<typeof viewAllContext>) => {
+    const [update] = context.setResponseHydrationState.mock.calls.at(-1) as [(prev: unknown) => any];
+    return update(context.stateRef.current);
+  };
 
-    // A later question-list change restores only questions that joined it.
-    context.getHydrationQuestionIds.mockReturnValue(['q1', 'Q2']);
-    await runtime.rehydrateSavedAnswersThenDraft();
-    callbacks[2]();
-    expect(context.rehydrateDraftForRenderedIds).toHaveBeenLastCalledWith(
-      expect.objectContaining({ questionIds: ['q2'] }),
-    );
-    // A reset form needs every draft again.
-    await runtime.rehydrateSavedAnswersThenDraft({ restoreAll: true });
-    callbacks[3]();
-    expect(context.rehydrateDraftForRenderedIds).toHaveBeenLastCalledWith(
-      expect.objectContaining({ questionIds: ['q1', 'q2'] }),
-    );
+  it('loads a question new to View all and restores its draft over it, even after a Submit', () => {
+    const context = viewAllContext({ submissionComplete: true });
+
+    createSurveyQuestionsResponseStateRuntime(context).syncViewAllQuestions();
+
+    const next = applySync(context);
+    expect(next.surveysResponseState[0].answers.q1.value).toBe('cached');
+    expect(next.surveysResponseState[0].additionalComments.q1.value).toBe('Draft comment');
+    expect(next.editBaseline.answers.q1.value).toBe('cached');
+    expect([...context.inst._viewAllSync!.loaded]).toEqual(['q1']);
+    expect([...context.inst._viewAllSync!.restored]).toEqual(['q1']);
   });
 
-  it('forgets restored drafts for questions that leave the list', async () => {
-    const context = createContext();
-    (context.stateRef.current as Record<string, unknown>).questionPool = [{ id: 'Q1' }];
-    context.inst._draftRestoredQids = new Set(['q1', 'q9']);
+  it('leaves loaded questions alone while a Submit result holds the form, and forgets questions that left', () => {
+    const context = viewAllContext({ submissionComplete: true });
+    context.inst._viewAllSync = { loaded: new Set(['q1', 'q9']), restored: new Set(['q1', 'q9']) };
 
-    await createSurveyQuestionsResponseStateRuntime(context).rehydrateSavedAnswersThenDraft();
+    createSurveyQuestionsResponseStateRuntime(context).syncViewAllQuestions();
 
-    expect([...context.inst._draftRestoredQids]).toEqual(['q1']);
+    expect(context.setResponseHydrationState).not.toHaveBeenCalled();
+    expect([...context.inst._viewAllSync!.loaded]).toEqual(['q1']);
+    expect([...context.inst._viewAllSync!.restored]).toEqual(['q1']);
   });
 
-  it('retries questions whose draft a submission error held back', async () => {
-    const callbacks: Array<() => void> = [];
-    const context = createContext({
-      executeSurveyLocalCacheRehydrate: jest.fn(async ({ callback }) => {
-        callbacks.push(callback);
-      }),
-    });
-    const state = context.stateRef.current as Record<string, unknown>;
-    state.submissionError = 'Upload failed';
+  it('counts saved answers as loaded only once the Worker listing has loaded', () => {
+    jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
+    const context = viewAllContext();
+    const props = context.propsRef.current as Record<string, unknown>;
+    props.isResponsesCacheReady = false;
     const runtime = createSurveyQuestionsResponseStateRuntime(context);
 
-    await runtime.rehydrateSavedAnswersThenDraft();
-    callbacks[0]();
-    expect(context.inst._draftRestorePending).toBe(false);
-    expect(context.inst._draftRestoredQids.has('q1')).toBe(false);
+    runtime.syncViewAllQuestions();
+    expect([...context.inst._viewAllSync!.loaded]).toEqual([]);
+    expect([...context.inst._viewAllSync!.restored]).toEqual(['q1']);
 
-    state.submissionError = '';
-    await runtime.rehydrateSavedAnswersThenDraft();
-    callbacks[1]();
-    expect(context.rehydrateDraftForRenderedIds).toHaveBeenLastCalledWith(
-      expect.objectContaining({ questionIds: ['q1'] }),
-    );
-    expect(context.inst._draftRestoredQids.has('q1')).toBe(true);
+    // Once the listing is complete, a held form still gets the saved answers it never loaded.
+    props.isResponsesCacheReady = true;
+    (context.stateRef.current as Record<string, unknown>).suppressPrefill = true;
+    runtime.syncViewAllQuestions();
+    expect(applySync(context).surveysResponseState[0].answers.q1.value).toBe('cached');
+    expect([...context.inst._viewAllSync!.loaded]).toEqual(['q1']);
   });
 });

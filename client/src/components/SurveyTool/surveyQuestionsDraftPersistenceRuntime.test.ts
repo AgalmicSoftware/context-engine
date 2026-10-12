@@ -39,8 +39,6 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   })),
   getHydrationQuestionIds: jest.fn(() => []),
   inst: {
-    _draftPersistDeferred: false,
-    _draftRestorePending: false,
     _applyDraftTrackingState: jest.fn(),
     _draftDirtyQids: new Set<string>(),
     _draftParseCache: null,
@@ -107,20 +105,6 @@ describe('surveyQuestionsDraftPersistenceRuntime', () => {
   beforeEach(() => {
     sessionStorage.clear();
     jest.clearAllMocks();
-  });
-
-  it('does not save over a draft that is still waiting to be restored', () => {
-    sessionStorage.setItem('draft:edge:11155420:0xabc:questions:q:q1', '{"answers":{"q1":{"value":"draft"}}}');
-    const context = createContext();
-    context.inst._draftRestorePending = true;
-
-    createSurveyQuestionsDraftPersistenceRuntime(context).persistDraft();
-
-    expect(context.buildPersistedDraftMapsForAllowedIds).not.toHaveBeenCalled();
-    expect(sessionStorage.getItem('draft:edge:11155420:0xabc:questions:q:q1')).toBe(
-      '{"answers":{"q1":{"value":"draft"}}}',
-    );
-    expect(context.inst._draftPersistDeferred).toBe(true);
   });
 
   it('builds draft keys from the active draft storage context', () => {

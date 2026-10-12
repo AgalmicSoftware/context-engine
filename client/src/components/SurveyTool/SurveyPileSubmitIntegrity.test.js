@@ -137,7 +137,7 @@ const fixture = async () => {
     onSuccess: () => {},
   });
   const state = { isResponsesCacheReady: false, questionResponsesNonce: 1 };
-  let view, engine;
+  let view, engine, editorEngine;
   const host = {
     setState: (updater, cb) => {
       const patch = typeof updater === 'function' ? updater(state) : updater;
@@ -210,10 +210,22 @@ const fixture = async () => {
   };
   // The "View all" editor: the same session rendered as the full question list.
   const renderEditor = (props = {}) => {
-    view = renderSurveyQuestions({ ...sessionProps(), questionPool: [FREEFORM_QUESTION], ...props });
+    view = renderSurveyQuestions({
+      ...sessionProps(),
+      questionPool: [FREEFORM_QUESTION],
+      // Render as usual and keep the engine, for edits the tests make directly.
+      runtimeStrategy: {
+        render: (current) => {
+          editorEngine = current;
+          return current.renderDefaultSurveyQuestionsRoute();
+        },
+      },
+      ...props,
+    });
   };
   const click = async () => {
-    await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)));
+    // After a Submit the editor also shows a "Submitted" button; the first is the form's own.
+    await act(async () => fireEvent.click(screen.getAllByTestId(E2E_TESTIDS.SURVEY_SUBMIT)[0]));
   };
   const savedRows = (questionId) =>
     rows.responses.filter((row) => row.payload.questionID === questionId).map((row) => row.payload);
@@ -235,6 +247,7 @@ const fixture = async () => {
     submitResponses,
     savedRows,
     engine: () => engine,
+    editor: () => editorEngine,
   };
 };
 
@@ -690,6 +703,99 @@ describe('View all editor after a reload', () => {
     await act(async () => h.rerender({ questionPool: [FREEFORM_QUESTION] }));
     await settle();
     await expectSavedAnswerAndDraft(h);
+  });
+
+  const BINARY_QUESTION = { id: BINARY_QID, type: 'binary', prompt: 'Binary question' };
+  const freeformForm = (h) => {
+    const slice = h.editor().state.surveysResponseState[0];
+    return [slice.answers[FREEFORM_QID]?.value, slice.additionalComments[FREEFORM_QID]?.value];
+  };
+  const draftedComments = () =>
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith(`dg:surveyDraft:${SLUG}:`))
+      .map((key) => JSON.parse(sessionStorage.getItem(key)).answers?.[FREEFORM_QID]?.additional);
+  // View all opens filtered to the binary question, which is answered and submitted first.
+  const submitBinaryThenShowFreeform = async (h, { failUpload = false } = {}) => {
+    await h.mountEditor({ questionPool: [BINARY_QUESTION] });
+    if (failUpload) h.submitResponses.mockRejectedValueOnce(new Error('Network down'));
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'Yes'));
+    await settle();
+    await h.click();
+    await settle();
+    await settle();
+    expect(h.editor().state[failUpload ? 'submissionError' : 'submissionComplete']).toBeTruthy();
+    await act(async () => h.rerender({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] }));
+    await settle();
+  };
+  const uploadedFreeform = (h) =>
+    h.submitResponses.mock.calls
+      .at(-1)[2]
+      .filter((row) => row.questionID === FREEFORM_QID)
+      .map((row) => [row.answer.value, row.additional.value]);
+
+  it('loads a question that joins after a successful Submit before restoring its draft', async () => {
+    const h = await draftCommentInPile();
+    await submitBinaryThenShowFreeform(h);
+    expect(freeformForm(h)).toEqual(['Saved public answer', 'Draft comment']);
+    await h.click();
+    await settle();
+    expect(uploadedFreeform(h)).toEqual([['Saved public answer', 'Draft comment']]);
+  });
+
+  it('loads a question that joins after a successful Submit when it has no draft', async () => {
+    const h = await fixture();
+    h.add('responses', savedFreeform(SAVED_ANSWER));
+    await act(async () => h.sync());
+    await submitBinaryThenShowFreeform(h);
+    expect(freeformForm(h)).toEqual(['Saved public answer', '']);
+    await act(async () => h.editor().handleAdditional(0, FREEFORM_QID, 'New comment'));
+    await settle();
+    await h.click();
+    await settle();
+    expect(uploadedFreeform(h)).toEqual([['Saved public answer', 'New comment']]);
+  });
+
+  it('loads and restores a question that joins after a failed Submit, and keeps its draft', async () => {
+    const h = await draftCommentInPile();
+    await submitBinaryThenShowFreeform(h, { failUpload: true });
+    expect(freeformForm(h)).toEqual(['Saved public answer', 'Draft comment']);
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'No'));
+    await settle();
+    await settle();
+    expect(draftedComments()).toEqual(['Draft comment']);
+  });
+
+  it('keeps a returning question draft through a filter round trip while other edits land', async () => {
+    const h = await draftCommentInPile();
+    await h.mountEditor({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] });
+    await act(async () => h.rerender({ questionPool: [BINARY_QUESTION] }));
+    await settle();
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'Yes'));
+    await settle();
+    await act(async () => h.rerender({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] }));
+    await settle();
+    expect(freeformForm(h)).toEqual(['Saved public answer', 'Draft comment']);
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'No'));
+    await settle();
+    await settle();
+    expect(draftedComments()).toEqual(['Draft comment']);
+    h.unmount();
+    await h.mountEditor({ questionPool: [BINARY_QUESTION, FREEFORM_QUESTION] });
+    expect(freeformForm(h)).toEqual(['Saved public answer', 'Draft comment']);
+  });
+
+  it('keeps an edit typed just before View all closes', async () => {
+    const h = await draftCommentInPile();
+    h.renderEditor();
+    act(() => {
+      h.editor().handleAnswer(0, FREEFORM_QID, 'Typed then left');
+    });
+    h.unmount();
+    await settle();
+    const stored = Object.keys(sessionStorage)
+      .filter((key) => key.startsWith(`dg:surveyDraft:${SLUG}:`))
+      .map((key) => JSON.parse(sessionStorage.getItem(key)).answers?.[FREEFORM_QID]);
+    expect(stored).toEqual([expect.objectContaining({ value: 'Typed then left', additional: 'Draft comment' })]);
   });
 
   it('restores the draft from a newer load when the first load is superseded', async () => {

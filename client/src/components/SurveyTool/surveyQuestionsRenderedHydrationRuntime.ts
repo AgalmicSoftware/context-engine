@@ -233,9 +233,7 @@ export const createSurveyQuestionsRenderedHydrationRuntime = (
       state: stateRef.current,
       loadDraft: () => loadDraft(),
       getPendingEditStats: () => getPendingEditStats?.() || null,
-      // A caller may restore only some of the rendered questions.
-      getHydrationQuestionIds: () =>
-        Array.isArray(options.questionIds) ? options.questionIds : getHydrationQuestionIds(),
+      getHydrationQuestionIds: () => getHydrationQuestionIds(),
       applyDraftHydrationEntryToSlice: inst._applyDraftHydrationEntryToSlice,
       setState: setStateForHydration,
       updateJsonPreview: updateJsonPreview,

@@ -184,10 +184,8 @@ export type SurveyQuestionsInstanceFields = {
   _questionPoolHydrationRunId: number;
   _localCacheRehydrateRunId: number;
   _responseHydrationStateUpdateDepth: number;
-  // View all editor: the draft waits for saved answers to load, then is restored over them once per question.
-  _draftRestorePending: boolean;
-  _draftPersistDeferred: boolean;
-  _draftRestoredQids: Set<string>;
+  // View all only: questions whose saved answers were loaded, and whose draft was restored, in this view.
+  _viewAllSync: { loaded: Set<string>; restored: Set<string> } | null;
   _surveyDecryptAttemptSeq: number;
   _activeSurveyDecryptAttemptSeq: number;
   _submitAttemptSeq: number;
@@ -270,9 +268,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _questionPoolHydrationRunId: 0,
   _localCacheRehydrateRunId: 0,
   _responseHydrationStateUpdateDepth: 0,
-  _draftRestorePending: false,
-  _draftPersistDeferred: false,
-  _draftRestoredQids: new Set(),
+  _viewAllSync: null,
   _surveyDecryptAttemptSeq: 0,
   _activeSurveyDecryptAttemptSeq: 0,
   _submitAttemptSeq: 0,

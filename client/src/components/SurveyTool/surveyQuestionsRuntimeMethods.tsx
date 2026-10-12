@@ -462,7 +462,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     ...context,
     getPendingEditStats: () => getPendingEditStats?.() || null,
     loadDraft: () => loadDraft(),
-    rehydrateLocalCacheAnswersForRenderedIds: () => rehydrateLocalCacheAnswersForRenderedIds(),
+    // View all reloads saved answers through its own sync, which nothing can race.
+    rehydrateLocalCacheAnswersForRenderedIds: () =>
+      inst._viewAllSync ? syncViewAllQuestions() : rehydrateLocalCacheAnswersForRenderedIds(),
   });
 
   const {
@@ -473,9 +475,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     handleRevertPendingChanges,
     prefillSurveyResponses,
     rehydrateLocalCacheAnswersForRenderedIds,
-    rehydrateSavedAnswersThenDraft,
     resetFormStateForAccountChange,
     resolveDiffBaselineSlice,
+    syncViewAllQuestions,
     valuesEqual,
   } = createSurveyQuestionsResponseStateRuntime({
     ...context,
@@ -488,9 +490,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     initializeSurveyResponseState: () => initializeSurveyResponseState(),
     loadDraft: () => loadDraft(),
     persistDraft: () => persistDraft(),
-    persistDraftSafely: () => persistDraftSafely(),
     recalculateEditStats: () => recalculateEditStats(),
-    rehydrateDraftForRenderedIds,
   });
 
   const {
@@ -783,7 +783,8 @@ export const createSurveyQuestionsRuntimeMethods = (
         );
       })();
     } else {
-      // Standalone mode (question pool passed as prop)
+      // Standalone mode (question pool passed as prop): the View all editor.
+      inst._viewAllSync = { loaded: new Set(), restored: new Set() };
       const initialSlice: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
       setState(
         buildInitialStandaloneResponseState({
@@ -793,7 +794,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           ),
           jsonPreview: prepareJsonAndHash(0),
         }),
-        () => rehydrateSavedAnswersThenDraft(),
+        () => syncViewAllQuestions(),
       );
     }
   };
@@ -833,9 +834,6 @@ export const createSurveyQuestionsRuntimeMethods = (
           buildQuestionIdScopeSignature(propsRef.current.questionPool);
       if (propsHydrationContextChanged || !inst._responseHydrationStateUpdateDepth) {
         invalidateResponseHydrationRuns();
-        // A draft still waiting for saved answers needs a load that was not cancelled.
-        if (inst._draftRestorePending)
-          void rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
       }
       invalidateDiffCaches();
     }
@@ -1165,14 +1163,13 @@ export const createSurveyQuestionsRuntimeMethods = (
               questionPool: propsRef.current.questionPool || [],
               surveyIndex: 0,
             }),
-          () => {
-            updateJsonPreview();
-            void rehydrateSavedAnswersThenDraft();
-          },
+          () => updateJsonPreview(),
         );
       }
 
+      // Sync once the new list is in place, or when saved answers changed.
       if (
+        prevState.questionPool !== stateRef.current.questionPool ||
         (prevProps.isQuestionCacheReady !== propsRef.current.isQuestionCacheReady &&
           propsRef.current.isQuestionCacheReady) ||
         (prevProps.isResponsesCacheReady !== propsRef.current.isResponsesCacheReady &&
@@ -1182,7 +1179,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         (propsRef.current.isResponsesCacheReady &&
           prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce)
       ) {
-        rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
+        syncViewAllQuestions();
       }
 
       const standaloneAuthBecameReady =
@@ -1198,7 +1195,7 @@ export const createSurveyQuestionsRuntimeMethods = (
             buildStandaloneAuthResetState(
               updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             ),
-            () => rehydrateSavedAnswersThenDraft({ restoreAll: true }),
+            () => syncViewAllQuestions({ restoreAll: true }),
           );
         }, propsRef.current.account === prevProps.account);
       }
