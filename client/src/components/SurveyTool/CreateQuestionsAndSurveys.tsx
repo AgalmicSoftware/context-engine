@@ -3444,7 +3444,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   target="cs-survey-gate-tip"
                   className={styles.tooltipBubble}
                 >
-                  {`Only holders of selected ${t('sbtsLower')} can access locked content.`}
+                  {`Holders of the selected ${t('sbtsLower')} can unlock locked content; the session worker operator can read it too.`}
                 </CETooltip>
               </div>
             ) : null}
