@@ -619,24 +619,40 @@ export const executeSurveyLocalCacheRehydrate = async ({
       buildDraftAnswersByQuestionId,
       onError,
     });
-    const rehydrationUpdatePlan = buildRehydrationUpdatePlan({
-      prevSurveysResponseState: nextState.surveysResponseState,
+    const planArgs = {
       surveyIndex,
       renderedQuestionIds,
-      baseSlice: rehydrateRun.baseSlice || {},
-      prevBaseline: nextState.editBaseline,
       cacheSlice,
       draftAnswersByQuestionId,
       cloneBaseline,
       buildDraftAwareCacheHydrationState,
       applyLocalCacheHydrationEntryToSlice,
       debugLabel: '[Survey][rehydrateLocal]',
+    };
+    const rehydrationUpdatePlan = buildRehydrationUpdatePlan({
+      ...planArgs,
+      prevSurveysResponseState: nextState.surveysResponseState,
+      baseSlice: rehydrateRun.baseSlice || {},
+      prevBaseline: nextState.editBaseline,
     });
 
     applyRehydrateUpdatePlan({
       changed: rehydrationUpdatePlan.changed,
       baselineChanged: rehydrationUpdatePlan.baselineChanged,
-      updates: rehydrationUpdatePlan.updates,
+      // Rebuilt from the latest form when applied: an update that landed after this run read
+      // the form (a decrypt result, say) is kept, and only this run's questions are filled.
+      updates: (latest: SurveyToolLikeState | null) => {
+        const current = latest || nextState;
+        const slices = Array.isArray(current.surveysResponseState) ? current.surveysResponseState : [];
+        return (
+          buildRehydrationUpdatePlan({
+            ...planArgs,
+            prevSurveysResponseState: current.surveysResponseState,
+            baseSlice: slices[Math.max(0, Number(surveyIndex) || 0)] || {},
+            prevBaseline: current.editBaseline,
+          }).updates || {}
+        );
+      },
       applyStateUpdates: buildSetStateApplyHandler(setState),
       updateJsonPreview,
       recalculateEditStats,
