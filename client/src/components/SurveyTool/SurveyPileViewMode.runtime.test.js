@@ -1061,6 +1061,29 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(engine.handlePileSubmitClick).toHaveBeenCalledTimes(3);
   });
 
+  it('checks questions the last upload left out against the saved baseline', async () => {
+    const engine = {
+      props: { loginComplete: true },
+      state: {
+        // After a Submit, userAnswers holds only the rows that upload sent.
+        userAnswers: { responses: [{ questionId: 'q1' }] },
+        editBaseline: { answers: { q1: { value: 'Agree' }, q2: { value: 'Disagree' } } },
+        surveysResponseState: [{ answers: { q1: { value: 'Agree' }, q2: { value: 'Disagree' } } }],
+        isSubmitting: false,
+      },
+      valuesEqual: (a, b) => a === b,
+      getSubmitCount: jest.fn(() => 0),
+      buildSliceFromUserAnswers: jest.fn(() => ({ answers: { q1: { value: 'Agree' } } })),
+      handlePileSubmitClick: jest
+        .fn()
+        .mockResolvedValue({ status: 'failed', message: 'No new or changed responses to submit.' }),
+    };
+    expect(await submitSessionInterviewResponses(engine, ['q1', 'q2'])).toEqual({ status: 'already-saved' });
+    // A question with no saved row and no saved baseline is still not saved.
+    expect(await submitSessionInterviewResponses(engine, ['q2', 'q3'])).toMatchObject({ status: 'failed' });
+    expect(engine.handlePileSubmitClick).toHaveBeenCalledTimes(1);
+  });
+
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {
     jest.useFakeTimers();
     const encryptAndUpload = jest.fn();

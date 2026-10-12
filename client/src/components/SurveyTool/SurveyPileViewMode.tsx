@@ -2357,9 +2357,11 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   // A zero edit count alone cannot prove that drafts were saved. Check the
   // persisted responses for every selected question before accepting a no-op.
   if (engine.props.loginComplete && !engine.state.isSubmitting && engine.getSubmitCount() === 0 && questionIds.length) {
-    const saved = engine.state.userAnswers
-      ? engine.buildSliceFromUserAnswers(engine.state.userAnswers)
-      : engine.state.editBaseline;
+    // Saved rows cover only what the last upload or saved-answer read touched;
+    // any other question is checked against the saved answers loaded into the form.
+    const savedRows = engine.state.userAnswers ? engine.buildSliceFromUserAnswers(engine.state.userAnswers) : null;
+    const savedFor = (id: string) =>
+      savedRows && Object.hasOwn(savedRows.answers || {}, id) ? savedRows : engine.state.editBaseline;
     const current = engine.state.surveysResponseState?.[0];
     const fieldValue = (entry: unknown) => {
       return entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
@@ -2371,13 +2373,15 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
     );
     if (
       !questionIds.some((id) => consentChanges.has(normalizeQuestionIdKey(id))) &&
-      questionIds.every(
-        (id) =>
+      questionIds.every((id) => {
+        const saved = savedFor(id);
+        return (
           Object.hasOwn(saved?.answers || {}, id) &&
           (['answers', 'additionalComments', 'importance', 'conviction'] as const).every((field) =>
             engine.valuesEqual(fieldValue(saved?.[field]?.[id]), fieldValue(current?.[field]?.[id])),
-          ),
-      )
+          )
+        );
+      })
     ) {
       return { status: 'already-saved' as const };
     }
