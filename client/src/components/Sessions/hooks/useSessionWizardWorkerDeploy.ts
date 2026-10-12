@@ -602,11 +602,21 @@ const useSessionWizardWorkerDeploy = ({
                   }),
                 postBootstrap: postSessionWizardLitBootstrap,
                 ensureSessionConfig: ensureWorkerSessionConfig,
-                applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
+                applyBootstrappedConfig: async ({
+                  apiBase,
+                  litActionCid,
+                  litGroupId,
+                  litPkpId,
+                  litAuthorizationVersion,
+                  litAuthorizationSigner,
+                  result,
+                }) => {
                   const recoveredLitCredentials = resolveCompleteSessionWizardLitRuntime({
                     ...(workerConfigPayload?.litCredentials || {}),
                     litApiBase: apiBase || result?.apiBase || result?.litCredentials?.litApiBase,
                     litActionCid,
+                    litAuthorizationVersion,
+                    litAuthorizationSigner,
                     litGroupId,
                     litPkpId,
                   });
@@ -663,7 +673,12 @@ const useSessionWizardWorkerDeploy = ({
               return provisionData;
             },
             ensureSessionConfig: ensureWorkerSessionConfig,
-            applyProvisionedConfig: async ({ litActionCid, litGroupId }) => {
+            applyProvisionedConfig: async ({
+              litActionCid,
+              litGroupId,
+              litAuthorizationVersion,
+              litAuthorizationSigner,
+            }) => {
               const nextActionCid = toStr(litActionCid).trim();
               if (!nextActionCid) return;
               const nextGroupId = toStr(litGroupId).trim();
@@ -675,15 +690,21 @@ const useSessionWizardWorkerDeploy = ({
                     : {}),
                   ...(nextGroupId ? { litGroupId: nextGroupId } : {}),
                   litActionCid: nextActionCid,
+                  litAuthorizationVersion,
+                  litAuthorizationSigner,
                 },
               };
               currentWorkerSecrets = {
                 ...currentWorkerSecrets,
                 litActionCid: nextActionCid,
+                litAuthorizationVersion,
+                litAuthorizationSigner,
               };
               applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
                 ...prev,
                 litActionCid: nextActionCid,
+                litAuthorizationVersion,
+                litAuthorizationSigner,
               }));
               await ensureWorkerSessionConfig({
                 workerUrl: resolvedDeployWorkerUrl,

@@ -1797,6 +1797,8 @@ describe('useSessionWizardWorkerDeploy', () => {
       litGroupId: 'stale-group',
       litPkpId: 'stale-pkp',
       litActionCid: 'stale-cid',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
     });
     options.resolveWorkerRpcUrl.mockReturnValue('');
     options.resolveWorkerRpcUrlMap.mockReturnValue({});
@@ -1851,6 +1853,8 @@ describe('useSessionWizardWorkerDeploy', () => {
       litGroupId: 'group_123',
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
       litUsageApiKey: 'lit-secret',
     });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
@@ -1876,6 +1880,8 @@ describe('useSessionWizardWorkerDeploy', () => {
       litGroupId: 'group_123',
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
     });
     expect(deployResult).toEqual(
       expect.objectContaining({
@@ -1974,6 +1980,8 @@ describe('useSessionWizardWorkerDeploy', () => {
             litGroupId: 'group-1',
             litPkpId: 'pkp-1',
             litActionCid: 'bafy-action',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
           }),
         } as Response;
       }
@@ -2045,6 +2053,8 @@ describe('useSessionWizardWorkerDeploy', () => {
             litGroupId: 'group-1',
             litPkpId: 'pkp-1',
             litActionCid: 'bafy-action',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
           }),
         } as Response;
       }
@@ -2101,6 +2111,8 @@ describe('useSessionWizardWorkerDeploy', () => {
         litGroupId: 'group-1',
         litPkpId: 'pkp-1',
         litActionCid: 'bafy-action',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litRuntimeRecovered: 'bootstrap',
       }),
     );
@@ -2134,6 +2146,8 @@ describe('useSessionWizardWorkerDeploy', () => {
             litGroupId: 'group-1',
             litPkpId: 'pkp-1',
             litActionCid: 'bafy-action',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
           },
         }),
       ]),

@@ -180,6 +180,34 @@ const createAdminDeps = (overrides = {}) => {
       return { ok: true, status: 200, body: { ok: true } };
     };
   }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'ensureSessionLitAuthorizationSigner')) {
+    deps.ensureSessionLitAuthorizationSigner = async ({ proposedPrivateKey }) => proposedPrivateKey;
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'updateSessionSecretsAfterLitRepair')) {
+    deps.updateSessionSecretsAfterLitRepair = async ({ env, slug, incomingSecrets }) => {
+      await deps.putSessionSecrets(env, slug, { ...await deps.getSessionSecrets(env, slug), ...incomingSecrets });
+      return { ok: true, status: 200, body: { ok: true } };
+    };
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'finalizeSessionLitAuthorization')) {
+    deps.finalizeSessionLitAuthorization = async ({ env, slug, baseConfig, litCredentials, secretOutputs }) => {
+      const existingSecrets = await deps.getSessionSecrets(env, slug) || {};
+      if (secretOutputs) await deps.putSessionSecrets(env, slug, { ...existingSecrets, ...secretOutputs });
+      return deps.executeCoordinatedSessionConfigMutation({ env, slug, existingConfig: baseConfig,
+        mutation: { kind: 'merge-lit-credentials', litCredentials } });
+    };
+  }
+  if (overrides.provisionLitChipotleAction) {
+    deps.provisionLitChipotleAction = async (options) => {
+      const result = await overrides.provisionLitChipotleAction(options);
+      return result.litCredentials ? result : { ...result, litCredentials: {
+        ...(result.apiBase ? { litApiBase: result.apiBase } : {}),
+        ...(result.litActionCid ? { litActionCid: result.litActionCid } : {}),
+        ...(result.litGroupId ? { litGroupId: result.litGroupId } : {}),
+        ...(result.litPkpId ? { litPkpId: result.litPkpId } : {}),
+      } };
+    };
+  }
   return deps;
 };
 
@@ -939,6 +967,29 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('set-secrets sends only the normalized patch and propagates pending repair failures', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ secrets: {
+      openaiKey: '  fixture-provider-key  ', litAccountApiKey: null,
+      litAuthorizationPrivateKey: 'must-not-be-admin-settable', unexpected: 'ignored',
+    } }) },
+    env: {}, baseHeaders: {}, slug: '', action: 'set-secrets',
+    deps: createAdminDeps({
+      getSessionSecrets: () => assert.fail('Dispatcher must not pre-read a stale whole-secrets snapshot'),
+      putSessionSecrets: () => assert.fail('Dispatcher must use coordinated persistence'),
+      normalizeSecretValue: (value) => value == null ? '' : String(value).trim(),
+      updateSessionSecretsAfterLitRepair: async (options) => {
+        calls.push(options);
+        return { ok: false, status: 503, body: { error: 'Lit setup projection is pending; retry before using the new authority.' } };
+      },
+    }),
+  });
+  assert.deepEqual(calls, [{ env: {}, slug: 'session-a', incomingSecrets: { openaiKey: 'fixture-provider-key', litAccountApiKey: '' } }]);
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /projection is pending/);
 });
 
 test('dispatchAdminRequest returns allowed-key secret presence without exposing values', async () => {
@@ -1930,8 +1981,6 @@ test('dispatchAdminRequest bootstraps a per-session Lit account and writes both 
   });
 
   assert.deepEqual(calls, [
-    ['normalizeSecretValue', 'account-key'],
-    ['normalizeSecretValue', 'usage-key'],
     ['putSessionSecrets', { GROUP_KV: {} }, 'session-a', {
       openaiKey: 'sk-existing',
       litAccountApiKey: 'account-key',
@@ -2317,4 +2366,62 @@ test('opening refresh requires admin authority and respects the session switch',
   assert.equal(refreshed.status, 200);
   assert.equal(refreshed.body.openingPrompt, 'What is your AI expertise?');
   assert.equal(generationCalls, 1);
+});
+
+test('Lit bootstrap reserves the coordinator signer before upstream calls and keeps failures private', async () => {
+  const env = { GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
+  const existingConfig = { slug: 'session-a', adminAddress: '0xabc', litCredentials: {} };
+  await putSessionConfig(env, 'session-a', existingConfig);
+  await putSessionSecrets(env, 'session-a', { litAccountApiKey: 'account-key' });
+  let winner;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let reserved = false;
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody() }, env, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig, headers: {}, targetSlug: 'session-a' }),
+        getSessionSecrets, putSessionSecrets, putSessionConfig, mergeWorkerConfigRecords,
+        ensureSessionLitAuthorizationSigner: async ({ proposedPrivateKey, slug }) => {
+          assert.equal(slug, 'session-a');
+          winner ||= proposedPrivateKey;
+          reserved = true;
+          return winner;
+        },
+        fetchImpl: async () => {
+          assert.equal(reserved, true);
+          assert.equal((await getSessionSecrets(env, 'session-a')).litAuthorizationPrivateKey, undefined);
+          throw new Error('Simulated provider outage');
+        },
+      }),
+    });
+    assert.equal(result.status, 502);
+    assert.equal(JSON.stringify(result).includes(winner), false);
+    assert.deepEqual((await getSessionConfig(env, 'session-a')).litCredentials, {});
+  }
+});
+
+test('manual Lit provisioning strips generated secret outputs and persists only public authorization metadata in config', async () => {
+  const env = { GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
+  const existingConfig = { slug: 'session-a', adminAddress: '0xabc', litCredentials: {} };
+  await putSessionConfig(env, 'session-a', existingConfig);
+  const privateKey = `0x${'12'.repeat(32)}`;
+  const credentials = { litApiBase: 'https://api.chipotle.litprotocol.com', litGroupId: '8', litPkpId: 'fresh-pkp', litActionCid: 'fresh-action',
+    litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: '0x00000000000000000000000000000000000000aa' };
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env, baseHeaders: {}, slug: '', action: 'lit-chipotle-provision',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets, putSessionSecrets, putSessionConfig, mergeWorkerConfigRecords,
+      provisionLitChipotleAction: async ({ persistAuthorizationSecret, sessionSlug }) => {
+        assert.equal(sessionSlug, 'session-a');
+        await persistAuthorizationSecret(privateKey);
+        return { ok: true, litCredentials: credentials, secretOutputs: { litAuthorizationPrivateKey: privateKey, litUsageApiKey: 'fresh-key' } };
+      },
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, { ok: true });
+  assert.deepEqual((await getSessionConfig(env, 'session-a')).litCredentials, credentials);
+  assert.equal((await getSessionSecrets(env, 'session-a')).litAuthorizationPrivateKey, privateKey);
+  assert.equal((await getSessionSecrets(env, 'session-a')).litUsageApiKey, 'fresh-key');
 });

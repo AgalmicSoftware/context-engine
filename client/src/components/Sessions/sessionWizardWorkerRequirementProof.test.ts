@@ -394,6 +394,8 @@ describe('sessionWizardWorkerRequirementProof', () => {
       litGroupId: 'group-1',
       litPkpId: 'pkp-1',
       litActionCid: 'bafy-action-1',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
     };
     const bootstrapProof = buildSessionWizardWorkerRequirementProof({
       workerUrl,
@@ -442,6 +444,8 @@ describe('sessionWizardWorkerRequirementProof', () => {
         litGroupId: 'group-edited',
         litPkpId: 'pkp-1',
         litActionCid: 'bafy-action-1',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
       },
     ],
   ])('invalidates a verified Lit runtime when its tuple is %s', (_label, currentLitRuntime) => {
@@ -458,6 +462,8 @@ describe('sessionWizardWorkerRequirementProof', () => {
       litGroupId: 'group-1',
       litPkpId: 'pkp-1',
       litActionCid: 'bafy-action-1',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
     };
     const proof = buildSessionWizardWorkerRequirementProof({
       workerUrl,

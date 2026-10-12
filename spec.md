@@ -72,7 +72,7 @@ Primary storage and authority split:
 - Worker token: A short-lived session token minted after login; it encodes
   scopes granted by the selected session authority.
 - Metadata URI: An Arweave JSON payload containing session content/config (non-authoritative for gates).
-- Lit encryption: The browser encrypts content locally; a registered Lit Action, called through the session Worker, wraps the content key and releases it after an SBT ownership check. The Worker operator and anyone holding the session's Lit API key can also obtain the key, so it is not end-to-end encryption.
+- Lit encryption: The browser encrypts content locally; a registered Lit Action, called through the session Worker, wraps the content key and releases it after an SBT ownership check. The Worker operator and Lit account administrators remain trusted. New authorities require per-session Worker-signed authorization and encrypt replies to the original Worker request; a scoped usage API key alone cannot impersonate a holder. This is not end-to-end encryption.
 
 ## User Roles
 
@@ -500,8 +500,8 @@ Worker API (selected endpoints):
 - `POST /admin/set-secrets`: Signed admin action to store session secrets in KV.
 - `POST /admin/set-limits`: Signed admin action to update rate limits in KV.
 - `POST /admin/lit-chipotle-status`: Signed admin action to check worker-mediated Chipotle readiness without returning stored API keys.
-- `POST /admin/lit-chipotle-provision`: Signed admin action to register the default CE action in an existing Lit account.
-- `POST /admin/lit-chipotle-bootstrap-session`: Signed admin action to create or derive the session Chipotle group, PKP, usage key, and CE action metadata.
+- `POST /admin/lit-chipotle-provision`: Signed admin action using the canonical Worker-authorized bootstrap path; legacy replacement requires `freshAuthority: true`.
+- `POST /admin/lit-chipotle-bootstrap-session`: Signed admin action to create the session Chipotle group, PKP, execution-only usage key, and specialized CE Action. Public config includes `litAuthorizationVersion`/`litAuthorizationSigner`; the private signing key stays in encrypted session secrets. Explicit fresh-authority cutover and old-permission retirement are documented in [Lit authorization](docs/lit-worker-authorization.md).
 - `POST /admin/issue-sponsored-grants`: Signed admin action to issue sponsored access grants.
 - `GET /admin/abuse-summary`: Bearer-admin abuse/rate-limit summary for a bounded
   number of coordinator windows.

@@ -1,3 +1,4 @@
+import { isWorkerAuthorizedLitConfig } from '../../../../shared/litChipotleAction.mjs';
 import { SPONSORED_BUNDLE_SUPPORTED_FIELDS } from '../../utilities/arweave/sponsoredBundles.js';
 import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -6,7 +7,14 @@ import { DEFAULT_GATE_KEYS } from './sessionWizardGateUtils';
 import { normalizeSessionWizardSlug } from './sessionWizardUrlSupport';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
-export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
+export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze([
+  'litApiBase',
+  'litGroupId',
+  'litPkpId',
+  'litActionCid',
+  'litAuthorizationVersion',
+  'litAuthorizationSigner',
+]);
 
 export const LIT_RUNTIME_RECOVERY_MARKER_FIELD = 'litRuntimeRecovered';
 
@@ -27,6 +35,8 @@ export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
   litGroupId: '',
   litPkpId: '',
   litActionCid: '',
+  litAuthorizationVersion: '',
+  litAuthorizationSigner: '',
   litRuntimeRecovered: '',
   litAccountApiKey: '',
   litUsageApiKey: '',
@@ -88,7 +98,9 @@ export const buildWorkerLitCredentialsConfig = (
 export const resolveSessionWizardLitCredentialPathReadiness = (workerSecrets: WorkerSecretsLike | AnyRecord = {}) => {
   const litAccountApiKey = toStr((workerSecrets as AnyRecord)?.litAccountApiKey).trim();
   const litUsageApiKey = toStr((workerSecrets as AnyRecord)?.litUsageApiKey).trim();
-  const hasRuntimeConfig = CHIPOTLE_LIT_CONFIG_FIELDS.every((key) => toStr((workerSecrets as AnyRecord)?.[key]).trim());
+  const hasRuntimeConfig =
+    isWorkerAuthorizedLitConfig(workerSecrets) &&
+    CHIPOTLE_LIT_CONFIG_FIELDS.every((key) => toStr((workerSecrets as AnyRecord)?.[key]).trim());
   const hasUsageCredential = !!litUsageApiKey;
   const canBootstrap = !!litAccountApiKey;
   return {

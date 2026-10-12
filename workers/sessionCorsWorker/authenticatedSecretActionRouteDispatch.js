@@ -262,6 +262,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       secrets: secretContext.secrets,
       request: body,
       requesterAddress: address,
+      sessionSlug: slug,
       fetchImpl: deps?.fetchImpl,
     });
     return {

@@ -86,7 +86,7 @@ describe('SessionModeProfileSections', () => {
     expect(litInfo).toHaveAccessibleName('About Lit encryption');
     expect(litInfo).toHaveTextContent(/encrypts data before upload/i);
     expect(litInfo).toHaveTextContent(/on-chain access conditions/i);
-    expect(litInfo).toHaveTextContent(/worker operator and anyone holding the session's Lit API key can decrypt/i);
+    expect(litInfo).toHaveTextContent(/worker operator and Lit account administrators remain trusted/i);
     expect(litInfo).toHaveTextContent(/not end-to-end encryption/i);
 
     const cloudflareInfo = screen.getByTestId(E2E_TESTIDS.WIZARD_ENCRYPTION_CLOUDFLARE_INFO);

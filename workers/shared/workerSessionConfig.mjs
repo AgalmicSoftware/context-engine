@@ -64,6 +64,8 @@ export const WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS = Object.freeze([
   'litGroupId',
   'litPkpId',
   'litActionCid',
+  'litAuthorizationVersion',
+  'litAuthorizationSigner',
 ]);
 const WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET = new Set(WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS);
 const TOP_LEVEL_PROVIDER_KEY_NAMES = new Set([

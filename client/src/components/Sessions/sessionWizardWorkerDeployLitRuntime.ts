@@ -1,3 +1,4 @@
+import { isWorkerAuthorizedLitConfig } from '../../../../shared/litChipotleAction.mjs';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
 import { CHIPOTLE_LIT_CONFIG_FIELDS, LIT_RUNTIME_RECOVERY_MARKER_FIELD } from './sessionWizardWorkerSecretSupport';
@@ -53,7 +54,10 @@ export const resolveCompleteSessionWizardLitRuntime = (value: unknown): Record<s
     result[field] = toStr(source[field]).trim();
     return result;
   }, {});
-  return CHIPOTLE_LIT_CONFIG_FIELDS.every((field) => !!litCredentials[field]) ? litCredentials : null;
+  return isWorkerAuthorizedLitConfig(litCredentials) &&
+    CHIPOTLE_LIT_CONFIG_FIELDS.every((field) => !!litCredentials[field])
+    ? litCredentials
+    : null;
 };
 
 export const mergeRecoveredSessionWizardLitRuntime = (

@@ -4,8 +4,9 @@ Context Engine installs no Lit SDK packages. When a session selects Lit
 encryption, the browser encrypts content locally with a fresh content key, and
 the session Worker calls Lit's Chipotle REST API to wrap and release that key
 behind an SBT gate. Lit-gated content is not end-to-end encrypted: the Worker
-sees the content key in plaintext, and anyone holding the session's Lit account
-or usage API key can request content keys directly. See
+sees the content key in plaintext, and Lit account administrators remain trusted.
+New authorities require Worker-signed authorization, so a scoped usage API key
+alone cannot impersonate an SBT holder. See
 [`lit-v3-design.md`](lit-v3-design.md) for the trust boundary.
 
 This file records the current wiring plus platform background from the move
@@ -27,8 +28,8 @@ Primary docs:
   - the worker can still fall back to a deployment-level server env key for sponsored/shared-account setups
 - Current worker/runtime split:
   - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
-  - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`
-  - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }`
+  - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`, and the Worker-generated `litAuthorizationPrivateKey`
+  - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }`
 - Runtime security contract:
   - `op: "encrypt"` wraps a CEK for the configured audience but does not require the author to hold the target SBT
   - `op: "check"` and `op: "decrypt"` still require the requester to satisfy the SBT gate
@@ -39,7 +40,7 @@ Primary docs:
   - `litUsageApiKey` is a secret
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
   - the real security boundary is still API-key scope + group membership + Lit Action code; hiding IDs alone is not a sufficient protection model
-  - the Lit Action trusts the `requesterAddress` and `rpcUrl` it receives and checks no signature, so anyone holding the session's Lit account or usage API key (for example a sponsor who supplied it in a sponsored bundle) can call the Lit API directly with any SBT holder's address and receive gate content keys
+  - the Action verifies a 60-second Worker signature over the requester, policy, approved HTTPS RPC, operation, and reply key before any gate or key operation; decrypt replies are encrypted to the original Worker request. Account management credentials remain trusted because they can alter permissions. See [authorization and cutover](lit-worker-authorization.md).
 - Current Chipotle endpoints/source-of-truth:
   - prod API: `https://api.chipotle.litprotocol.com`
   - prod dashboard: `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
@@ -55,11 +56,11 @@ Primary docs:
     - `lit-chipotle-status`
     - `lit-chipotle-provision`
     - `lit-chipotle-bootstrap-session`
-- Re-provisioning note: any edit to the default CE Lit Action source changes the
-  derived `litActionCid`. Chipotle-enabled sessions must re-run
-  `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` before live
-  v2 wrapped-key encrypt/decrypt is expected to work. CE intentionally does not
-  fall back to older insecure action CIDs.
+- Re-provisioning note: unsigned or incomplete authorities fail closed. Use a
+  signed admin bootstrap/provision request with `freshAuthority: true` to create
+  a new PKP, group, scoped key, and specialized Action. Retire old permissions
+  separately; old ciphertext is not automatically migrated. See
+  [the upgrade runbook](lit-worker-authorization.md#upgrade-and-cutover).
 - Current default CE architecture direction:
   - create one new Lit account per session
   - create one default group inside that account
@@ -205,7 +206,7 @@ on Arweave or in Cloudflare storage, as the session profile decides. Each
 - `/new` Session Wizard no longer shows a Lit quick-test panel or scoped runtime fields; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
 - Demo session secrets live in `client/src/variables/demo/demo_sessions.json` under the `test` session.
 
-- CE should default to one reusable group per environment or trust boundary, not one group per session. The SBT gate itself belongs in Lit Action code and request params. Session-specific groups remain an optional isolation choice, not the default migration target.
+- Each session authority uses its own PKP and group containing only its Worker-authorized Action. Never add an older unsigned Action to that PKP/group. The SBT gate remains in the signed policy and Action logic.
 - Session Wizard can now automate both Chipotle setup modes from canonical CE action source:
-  - existing-account mode: use `lit-chipotle-provision` to register the default CE action into a configured group/PKP, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`
+  - existing-account mode: `lit-chipotle-provision` uses the same fresh-authority bootstrap path, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`; legacy authority replacement requires `freshAuthority: true`
   - bootstrap mode: use `lit-chipotle-bootstrap-session` with a stored/session/deployment `litAccountApiKey` to derive the missing default group, PKP, usage key, and CE action before persisting the returned `litCredentials`; if no account key is available, the worker can still create a brand-new session account

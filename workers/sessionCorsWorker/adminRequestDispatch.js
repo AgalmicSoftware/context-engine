@@ -1,3 +1,9 @@
+import {
+  ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
+  ensureSessionLitAuthorizationSigner,
+  finalizeSessionLitAuthorization,
+  updateSessionSecretsAfterLitRepair,
+} from './sessionLitAuthorizationCoordinator.js';
 import { resolveInterviewStarter } from './interviewStarter.js';
 import {
   resolveAdminRequestAuthority,
@@ -35,18 +41,6 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
-
-const ALLOWED_SECRET_KEYS = [
-  'openaiKey',
-  'anthropicKey',
-  'openrouterKey',
-  'customRpcUrl',
-  'customRpcKey',
-  'arweaveJwk',
-  'faucetPrivateKey',
-  'litAccountApiKey',
-  'litUsageApiKey',
-];
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -104,12 +98,11 @@ const buildSetConfigIncomingConfig = ({
   return nextIncoming;
 };
 
-const mergeAdminSecrets = ({
-  existingSecrets,
+const normalizeAdminSecretsPatch = ({
   incomingSecrets,
   deps,
 } = {}) => {
-  const nextSecrets = { ...((existingSecrets && typeof existingSecrets === 'object') ? existingSecrets : {}) };
+  const nextSecrets = {};
   const normalizedIncoming = incomingSecrets && typeof incomingSecrets === 'object' ? incomingSecrets : {};
   ALLOWED_SECRET_KEYS.forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(normalizedIncoming, key)) return;
@@ -288,13 +281,20 @@ export const dispatchAdminRequest = async ({
     const incoming = body?.secrets && typeof body.secrets === 'object' ? body.secrets : null;
     if (!incoming) return deps?.json?.({ error: 'Missing secrets.' }, 400, headers);
 
-    const nextSecrets = mergeAdminSecrets({
-      existingSecrets: (await deps?.getSessionSecrets?.(env, targetSlug)) || {},
+    const incomingSecrets = normalizeAdminSecretsPatch({
       incomingSecrets: incoming,
       deps,
     });
-    await deps?.putSessionSecrets?.(env, targetSlug, nextSecrets);
-    return deps?.json?.({ ok: true }, 200, headers);
+    // Repair any earlier Lit projection before accepting a later secret edit.
+    // Otherwise replaying that journal could overwrite an acknowledged update.
+    const updated = await (deps?.updateSessionSecretsAfterLitRepair || updateSessionSecretsAfterLitRepair)({
+      env, slug: targetSlug, incomingSecrets,
+    });
+    return deps?.json?.(
+      updated?.body || { error: 'Session secret update could not be finalized; retry.' },
+      updated?.status || 503,
+      headers,
+    );
   }
 
   if (action === 'secret-presence') {
@@ -325,100 +325,49 @@ export const dispatchAdminRequest = async ({
     }
   }
 
-  if (action === 'lit-chipotle-provision') {
+  if (action === 'lit-chipotle-provision' || action === 'lit-chipotle-bootstrap-session') {
     try {
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
-      const runtime = (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({
-        env,
-        config: existingConfig,
-        secrets: existingSecrets,
-        body,
-      });
-      const result = await (deps?.provisionLitChipotleAction || provisionLitChipotleAction)({
-        runtime,
-        request: body,
-        fetchImpl: deps?.fetchImpl,
-      });
-      const litCredentials = (
-        result?.litActionCid ||
-        result?.litGroupId ||
-        result?.litPkpId
-      ) ? {
-        ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
-          ? existingConfig.litCredentials
-          : {}),
-        ...(result?.apiBase ? { litApiBase: result.apiBase } : {}),
-        ...(result?.litActionCid ? { litActionCid: result.litActionCid } : {}),
-        ...(result?.litGroupId ? { litGroupId: result.litGroupId } : {}),
-        ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
-      } : null;
-      if (litCredentials) {
-        const mutationResult = await executeDirectSessionConfigMutation({
-          env,
-          slug: targetSlug,
-          existingConfig,
-          mutation: { kind: 'merge-lit-credentials', litCredentials },
-          deps,
-        });
-        if (!mutationResult?.ok) {
-          return deps?.json?.(
-            mutationResult?.body || { error: 'Session config mutation failed.' },
-            mutationResult?.status || 503,
-            headers,
-          );
-        }
-      }
-      return deps?.json?.(result, 200, headers);
-    } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Failed to provision Lit Chipotle action.' }, 502, headers);
-    }
-  }
-
-  if (action === 'lit-chipotle-bootstrap-session') {
-    try {
-      const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
-      const result = await (deps?.bootstrapLitChipotleSession || bootstrapLitChipotleSession)({
+      const options = {
         env,
         config: existingConfig,
         secrets: existingSecrets,
         request: body,
         sessionSlug: targetSlug,
+        persistAuthorizationSecret: async (proposedPrivateKey) => {
+          const privateKey = await (deps?.ensureSessionLitAuthorizationSigner || ensureSessionLitAuthorizationSigner)({
+            env, slug: targetSlug, proposedPrivateKey, baseConfig: existingConfig,
+          });
+          existingSecrets.litAuthorizationPrivateKey = privateKey;
+          return privateKey;
+        },
         fetchImpl: deps?.fetchImpl,
-      });
-      const nextSecrets = mergeAdminSecrets({
-        existingSecrets,
-        incomingSecrets: result?.secretOutputs,
-        deps,
-      });
-      if (Object.keys(nextSecrets).length) {
-        await deps?.putSessionSecrets?.(env, targetSlug, nextSecrets);
-      }
-      const litCredentials = (
-        result?.litCredentials &&
-        typeof result.litCredentials === 'object'
-      ) ? result.litCredentials : null;
-      if (litCredentials) {
-        const mutationResult = await executeDirectSessionConfigMutation({
-          env,
-          slug: targetSlug,
-          existingConfig,
-          mutation: { kind: 'merge-lit-credentials', litCredentials },
-          deps,
+      };
+      let result;
+      if (action === 'lit-chipotle-provision') {
+        const runtime = (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({
+          env, config: existingConfig, secrets: existingSecrets, body,
         });
-        if (!mutationResult?.ok) {
-          return deps?.json?.(
-            mutationResult?.body || { error: 'Session config mutation failed.' },
-            mutationResult?.status || 503,
-            headers,
-          );
-        }
+        result = await (deps?.provisionLitChipotleAction || provisionLitChipotleAction)({ ...options, runtime });
+      } else {
+        result = await (deps?.bootstrapLitChipotleSession || bootstrapLitChipotleSession)(options);
+      }
+      // Commit the secret and public descriptor as one coordinator authority update.
+      // Separate KV writes can mix credentials from concurrent bootstrap completions.
+      const finalized = await (deps?.finalizeSessionLitAuthorization || finalizeSessionLitAuthorization)({
+        env, slug: targetSlug, baseConfig: existingConfig,
+        litCredentials: result?.litCredentials,
+        secretOutputs: result?.secretOutputs,
+      });
+      if (!finalized?.ok) {
+        return deps?.json?.(finalized?.body || { error: 'Lit provisioning could not be finalized; retry.' }, finalized?.status || 503, headers);
       }
       const responseBody = { ...result };
       delete responseBody.secretOutputs;
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Failed to bootstrap a Lit session account.' }, 502, headers);
+      return deps?.json?.({ error: error?.message || 'Failed to provision Lit authorization.' }, 502, headers);
     }
   }
 

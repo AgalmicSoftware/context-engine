@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { ethers } from 'ethers';
 
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
@@ -278,9 +279,14 @@ const adminConfigWriters = [
   },
 ];
 
-const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => (
-  bindConfigProjection(env, persist),
-  dispatchAdminRequest({
+const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => {
+  bindConfigProjection(env, persist);
+  const secretsKv = new Map();
+  env.GROUP_KV ||= {
+    get: async (key) => secretsKv.get(key) || null,
+    put: async (key, value) => { secretsKv.set(key, value); },
+  };
+  return dispatchAdminRequest({
     request: { json: async () => writer.body },
     env,
     baseHeaders: {},
@@ -297,14 +303,23 @@ const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => 
       }),
       getSessionSecrets: async () => ({}),
       putSessionSecrets: async () => undefined,
-      bootstrapLitChipotleSession: async () => ({
-        ok: true,
-        litCredentials: { litActionCid: 'bafy-atomic-lit-action' },
-        secretOutputs: {},
-      }),
+      bootstrapLitChipotleSession: async ({ persistAuthorizationSecret }) => {
+        const privateKey = await persistAuthorizationSecret(`0x${'11'.repeat(32)}`);
+        return {
+          ok: true,
+          litCredentials: {
+            litActionCid: 'bafy-atomic-lit-action',
+            litPkpId: 'atomic-test-pkp',
+            litGroupId: 'atomic-test-group',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: new ethers.Wallet(privateKey).address,
+          },
+          secretOutputs: { litAuthorizationPrivateKey: privateKey, litUsageApiKey: 'atomic-test-usage' },
+        };
+      },
     },
-  })
-);
+  });
+};
 
 const decryptOutcome = async ({ env, config, payloadId, encrypted }) => {
   try {

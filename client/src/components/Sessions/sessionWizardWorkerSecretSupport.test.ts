@@ -48,7 +48,14 @@ describe('sessionWizardWorkerSecretSupport', () => {
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
     });
-    expect(CHIPOTLE_LIT_CONFIG_FIELDS).toEqual(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
+    expect(CHIPOTLE_LIT_CONFIG_FIELDS).toEqual([
+      'litApiBase',
+      'litGroupId',
+      'litPkpId',
+      'litActionCid',
+      'litAuthorizationVersion',
+      'litAuthorizationSigner',
+    ]);
   });
 
   it('distinguishes Lit bootstrap authority from an already-complete runtime path', () => {
@@ -64,6 +71,8 @@ describe('sessionWizardWorkerSecretSupport', () => {
         litGroupId: 'group-1',
         litPkpId: 'pkp-1',
         litActionCid: 'action-1',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litUsageApiKey: 'usage-key',
       }),
     ).toEqual({
@@ -100,6 +109,8 @@ describe('sessionWizardWorkerSecretSupport', () => {
           litGroupId: 'group-1',
           litPkpId: 'pkp-1',
           litActionCid: 'action-1',
+          litAuthorizationVersion: 'worker-signed-v1',
+          litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         },
         litRuntimeConfigSynced: true,
       },
@@ -117,6 +128,8 @@ describe('sessionWizardWorkerSecretSupport', () => {
           litGroupId: 'group-1',
           litPkpId: 'pkp-1',
           litActionCid: 'action-1',
+          litAuthorizationVersion: 'worker-signed-v1',
+          litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         },
         litBootstrapSynced: true,
       },
@@ -134,6 +147,8 @@ describe('sessionWizardWorkerSecretSupport', () => {
           litGroupId: 'group-1',
           litPkpId: 'pkp-1',
           litActionCid: 'action-1',
+          litAuthorizationVersion: 'worker-signed-v1',
+          litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         },
       },
       false,
@@ -353,4 +368,26 @@ describe('sessionWizardWorkerSecretSupport', () => {
       workerName: 'launch-week-worker',
     });
   });
+});
+
+test('legacy public IDs and scoped usage credentials do not imply Worker authorization readiness', () => {
+  const legacy = {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litGroupId: '7',
+    litPkpId: 'old-pkp',
+    litActionCid: 'old-action',
+    litUsageApiKey: 'usage-key',
+  };
+  expect(resolveSessionWizardLitCredentialPathReadiness(legacy).hasRuntimeConfig).toBe(false);
+  expect(
+    resolveSessionWizardLitCredentialPathReadiness({
+      ...legacy,
+      litAuthorizationVersion: 'legacy',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
+    }).hasRuntimeConfig,
+  ).toBe(false);
+  const privateMaterial = 'must-not-reach-browser-state';
+  expect(normalizeWorkerSecrets({ ...legacy, litAuthorizationPrivateKey: privateMaterial })).not.toHaveProperty(
+    'litAuthorizationPrivateKey',
+  );
 });

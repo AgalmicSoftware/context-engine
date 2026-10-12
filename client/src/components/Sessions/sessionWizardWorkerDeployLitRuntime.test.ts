@@ -12,10 +12,12 @@ const litCredentials = {
   litGroupId: 'group-1',
   litPkpId: 'pkp-1',
   litActionCid: 'bafy-action-1',
+  litAuthorizationVersion: 'worker-signed-v1',
+  litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
 };
 
 describe('sessionWizardWorkerDeployLitRuntime', () => {
-  it('requires and normalizes the exact four-field public Lit tuple', () => {
+  it('requires and normalizes the public Lit tuple including Worker authorization', () => {
     expect(resolveCompleteSessionWizardLitRuntime({ ...litCredentials, litGroupId: ' group-1 ' })).toEqual(
       litCredentials,
     );

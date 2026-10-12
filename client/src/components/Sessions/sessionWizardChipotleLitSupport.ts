@@ -1,3 +1,4 @@
+import { isWorkerAuthorizedLitConfig } from '../../../../shared/litChipotleAction.mjs';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { DEFAULT_CHIPOTLE_ACTION, DEFAULT_CHIPOTLE_ACTION_NAME } from '../../utilities/crypto/litChipotleCatalog.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
@@ -6,12 +7,16 @@ type AsyncShellResult = AnyRecord | null | undefined;
 type AsyncShellCallback<TResult = AsyncShellResult | void> = (input: AnyRecord) => Promise<TResult>;
 
 export type LitProvisionSyncResult = WorkerSecretSyncResult & {
+  litAuthorizationVersion?: string;
+  litAuthorizationSigner?: string;
   litActionCid?: string;
   litGroupId?: string;
 };
 
 export type LitBootstrapSyncResult = WorkerSecretSyncResult & {
   apiBase?: string;
+  litAuthorizationVersion?: string;
+  litAuthorizationSigner?: string;
   litActionCid?: string;
   litGroupId?: string;
   litPkpId?: string;
@@ -174,9 +179,12 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
       });
       const litActionCid = toTrimmedString(result?.litActionCid);
       const litGroupId = toTrimmedString(result?.litGroupId);
-      if (!litActionCid) {
+      const litAuthorizationVersion = toTrimmedString(result?.litAuthorizationVersion);
+      const litAuthorizationSigner = toTrimmedString(result?.litAuthorizationSigner);
+      if (!litActionCid || !isWorkerAuthorizedLitConfig({ litAuthorizationVersion, litAuthorizationSigner })) {
         return {
-          warning: 'Lit provisioning did not return a Lit Action CID.',
+          warning:
+            'Lit provisioning did not return Worker authorization details. Upgrade the session Worker and reprovision Lit.',
           note: '',
           synced: false,
         };
@@ -184,6 +192,8 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
       if (typeof applyProvisionedConfig === 'function') {
         await applyProvisionedConfig({
           litActionCid,
+          litAuthorizationVersion,
+          litAuthorizationSigner,
           litGroupId,
           workerUrl: resolvedWorkerUrl,
           slug,
@@ -195,6 +205,8 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
         note: 'Lit action auto-provisioned.',
         synced: true,
         litActionCid,
+        litAuthorizationVersion,
+        litAuthorizationSigner,
         litGroupId,
       };
     } catch (err) {
@@ -298,9 +310,16 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
       });
       const litActionCid = toTrimmedString(result?.litActionCid);
       const litGroupId = toTrimmedString(result?.litGroupId);
+      const litAuthorizationVersion = toTrimmedString(result?.litAuthorizationVersion);
+      const litAuthorizationSigner = toTrimmedString(result?.litAuthorizationSigner);
       const litPkpId = toTrimmedString(result?.litPkpId);
       const apiBase = toTrimmedString(result?.apiBase || result?.litCredentials?.litApiBase);
-      if (!litActionCid || !litGroupId || !litPkpId) {
+      if (
+        !litActionCid ||
+        !litGroupId ||
+        !litPkpId ||
+        !isWorkerAuthorizedLitConfig({ litAuthorizationVersion, litAuthorizationSigner })
+      ) {
         return {
           warning: 'Lit bootstrap did not return the full Lit session credentials.',
           note: '',
@@ -311,6 +330,8 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
         await applyBootstrappedConfig({
           apiBase,
           litActionCid,
+          litAuthorizationVersion,
+          litAuthorizationSigner,
           litGroupId,
           litPkpId,
           workerUrl: resolvedWorkerUrl,
@@ -325,6 +346,8 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
         synced: true,
         apiBase,
         litActionCid,
+        litAuthorizationVersion,
+        litAuthorizationSigner,
         litGroupId,
         litPkpId,
       };

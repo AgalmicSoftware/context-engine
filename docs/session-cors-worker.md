@@ -2119,7 +2119,7 @@ Never return secrets in responses.
 - Lit sponsorship now adds:
   - `litUsageApiKey` as a supported worker-secret field for scoped Chipotle execution
   - `litAccountApiKey` as a server-only session secret for per-session-account provisioning and later action management
-  - `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }` as worker config
+  - `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }` as worker config
     metadata; these are not cryptographic secrets, but they stay worker-side by
     default because they still reveal operational topology
   - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
@@ -2157,10 +2157,22 @@ litActionCid, litPkpId }` into the encrypted plaintext via a policy
     `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
     fresh group / PKP / usage key for each redeemed session, then keep using
     only the scoped runtime during day-to-day execution
-  - after default action-source changes, operators must re-run
-    `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` so session
-    `litCredentials.litActionCid` points at the newly derived action CID; there
-    is no compatibility fallback to the old action source
+  - Worker-generated `litAuthorizationPrivateKey` is reserved in an encrypted
+    session coordinator record, then projected with matching Lit credentials
+    into encrypted session secrets. It is not admin-settable, sponsor-exported, or returned by
+    either provisioning endpoint. Public signer/version descriptors travel with
+    the runtime config.
+  - Every Action call requires short-lived Worker authorization binding the
+    authenticated requester, operation, policy, approved HTTPS RPC, and reply
+    key. Decrypt replies are encrypted to that Worker request; signed tickets
+    and response internals are not reflected to participants.
+  - unsigned authorities fail closed. Admin status reports `ready: false` and
+    `needsFreshAuthority: true` when the private/public authorization state is
+    missing or invalid. An explicit signed `freshAuthority: true` bootstrap or
+    provision request allocates a fresh PKP, group, and execution-only usage key.
+    Retire old permissions separately; do not attach old Actions to the new PKP.
+    See [Lit authorization and cutover](lit-worker-authorization.md) for the
+    protocol, historical-data limits, and operator steps.
 
 ## Gating on login (on-chain)
 

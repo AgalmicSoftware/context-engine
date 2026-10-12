@@ -14,6 +14,12 @@ import {
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import { putSessionConfig } from './sessionConfigSecretsStore.js';
 import {
+  executeLitAuthorizationSignerEnsure,
+  executeLitAuthorizationFinalize,
+  executeSessionSecretsAfterLitRepair,
+  repairPendingLitAuthorizationSetup,
+} from './sessionLitAuthorizationCoordinator.js';
+import {
   normalizeWorkerSessionSlug,
   resolveCoordinatorSessionSlugStorageKey,
 } from './sessionSlugResolution.js';
@@ -1745,6 +1751,7 @@ export class SessionWriteCoordinator {
   }
 
   async repairPendingSessionConfigProjection() {
+    await repairPendingLitAuthorizationSetup(this);
     const authority = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
     if (authority?.projectionPending !== true) return;
     await this.projectSessionConfigAuthority(authority);
@@ -2336,6 +2343,18 @@ export class SessionWriteCoordinator {
     }
 
     const payload = await request.json().catch(() => null);
+    if (url.pathname.startsWith('/session-config/lit-authorization/') && url.hostname !== 'session-coordinator.internal') {
+      return jsonResponse({ error: 'Not found.' }, 404);
+    }
+    if (url.pathname === '/session-config/lit-authorization/ensure') {
+      return this.serializeSessionConfigOperation(() => executeLitAuthorizationSignerEnsure(this, payload));
+    }
+    if (url.pathname === '/session-config/lit-authorization/finalize') {
+      return this.serializeSessionConfigOperation(() => executeLitAuthorizationFinalize(this, payload));
+    }
+    if (url.pathname === '/session-config/lit-authorization/update-secrets') {
+      return this.serializeSessionConfigOperation(() => executeSessionSecretsAfterLitRepair(this, payload));
+    }
     if (url.pathname === '/session-config/storage-envelope-key/get-or-create') {
       return this.executeStorageEnvelopeKeyGetOrCreate(payload);
     }

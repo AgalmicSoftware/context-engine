@@ -179,11 +179,17 @@ App shell and performance:
 
 Docs:
 
-- Say plainly who can read Lit-encrypted ("gate") data: SBT holders who pass the
-  check, the session Worker's operator, and anyone holding the session's Lit API
-  key. Lit encryption is SBT-gated key release, not end-to-end encryption.
+- Describe the trusted operators for Lit-encrypted data: the session Worker and
+  Lit account administrators. New authorities require Worker authorization;
+  scoped usage keys alone do not grant key release. Lit is not end-to-end encryption.
 
 ### Worker — requires a session Worker update
+
+- Authenticate Lit Action requests with a per-session Worker signature and
+  encrypt decrypt replies to that request. A leaked scoped usage key cannot
+  impersonate an SBT holder or substitute an RPC. Existing unsigned authorities
+  fail closed and need a fresh PKP/group/key cutover; old permissions and
+  historical ciphertext require separate handling. See [the runbook](docs/lit-worker-authorization.md).
 
 - Let only a question's or survey's first uploader or a session admin replace
   it, and add admin hide and unhide for questions and surveys. Ids stored before
