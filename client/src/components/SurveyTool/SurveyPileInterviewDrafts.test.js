@@ -400,3 +400,74 @@ it('stores every kept withdrawal on Clear changes, not only the cards near the c
   await settle(300);
   expect(storedWithdrawals()).toEqual(questionIds);
 }, 40000);
+
+it('makes every stored withdrawal pending after a reload, and uploads them all', async () => {
+  questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+  const upload = mockSession(questionIds.map((id) => ({ ...savedNamedQ1, questionID: id, prompt: id.toUpperCase() })));
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  const pile = await mountWithInterview(
+    packet(questionIds.map((questionId) => ({ questionId, answer: 'Disagree', confidence: 0.8 }))),
+  );
+  screen.queryAllByRole('button', { name: 'Replace with draft' }).forEach((button) => fireEvent.click(button));
+  fireEvent.click(screen.getByText('AI submission info'));
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
+  await submitDrafts();
+  await act(async () => pile.engine().closeSessionVoiceModeModal());
+  await settle(300);
+  await act(async () => pile.engine().handleRevertPendingChanges());
+  await settle(300);
+  pile.view.unmount();
+
+  // The reloaded pile shows a few cards around the first one, but all eight withdrawals are pending.
+  const reloaded = await mountWithInterview(null);
+  expect(reloaded.engine().getPendingEditStats().total).toBe(questionIds.length);
+  await act(async () => {
+    await reloaded.engine().handlePileSubmitClick();
+  });
+  await settle();
+  const rows = upload.mock.calls.at(-1)[2];
+  expect(rows.map((row) => row.questionID).sort()).toEqual(questionIds);
+  rows.forEach((row) => {
+    expect(row.answer.value).toBe('Agree');
+    expect(row).not.toHaveProperty('responderName');
+  });
+}, 60000);
+
+it('loads a card that scrolls into view after a Submit, before a rating-only change uploads it', async () => {
+  questionIds = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+  const saved = (id) => ({
+    ...savedNamedQ1,
+    questionID: id,
+    prompt: id.toUpperCase(),
+    additional: field(id === 'q5' ? 'Saved comment q5' : ''),
+  });
+  const upload = mockSession(questionIds.map(saved));
+  const pile = await mountWithInterview(null);
+  await act(async () => pile.engine().handleAnswerPile('q1', 'Disagree'));
+  await settle(300);
+  await act(async () => {
+    await pile.engine().handlePileSubmitClick();
+  });
+  await settle();
+  expect(pile.engine().state.submissionComplete).toBe(true);
+  for (let step = 0; step < 4; step += 1) {
+    await act(async () => pile.engine().handleNext());
+    await settle(250);
+  }
+  const slice = pile.engine().state.surveysResponseState[0];
+  expect(slice.answers.q5).toMatchObject({ value: 'Agree' });
+  expect(slice.additionalComments.q5).toMatchObject({ value: 'Saved comment q5' });
+  await act(async () => pile.engine().handleImportance(0, 'q5', 7));
+  await settle(400);
+  await act(async () => {
+    await pile.engine().handlePileSubmitClick();
+  });
+  await settle();
+  const [row] = upload.mock.calls.at(-1)[2];
+  expect(row).toMatchObject({
+    questionID: 'q5',
+    answer: { value: 'Agree' },
+    additional: { value: 'Saved comment q5' },
+  });
+  expect(row.importance).toBe(7);
+}, 60000);

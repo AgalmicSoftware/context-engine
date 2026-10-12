@@ -916,6 +916,35 @@ describe('View all editor after a reload', () => {
     expect(freeformForm(h)).toEqual(['Saved public answer', '']);
   });
 
+  it('loads saved answers after a signed-out Clear changes once the responder signs in', async () => {
+    const h = await fixture();
+    h.add(
+      'responses',
+      savedFreeform(SAVED_ANSWER, { value: 'Saved comment', encrypted: false, audienceMode: 'explicit' }),
+    );
+    await act(async () => h.sync());
+    await h.mountEditor({
+      questionPool: [BINARY_QUESTION, FREEFORM_QUESTION],
+      account: '',
+      loginComplete: false,
+      provider: null,
+    });
+    await act(async () => h.editor().handleAdditional(0, FREEFORM_QID, 'Anon note'));
+    await settle();
+    await act(async () => h.editor().handleRevertPendingChanges());
+    await settle();
+    expect(h.editor().state.startFresh).toBe(true);
+
+    await act(async () => h.rerender({ account: OWNER, loginComplete: true, provider: { request: jest.fn() } }));
+    await settle();
+    await settle();
+    expect(h.editor().state.startFresh).toBe(false);
+    expect(freeformForm(h)).toEqual(['Saved public answer', 'Saved comment']);
+    await act(async () => h.editor().handleAdditional(0, FREEFORM_QID, 'Signed-in note'));
+    await settle();
+    await expectUpload(h, 'Saved public answer', 'Signed-in note');
+  });
+
   it('says when a reload could not keep an unlock', async () => {
     const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
     const h = await fixture();

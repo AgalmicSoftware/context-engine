@@ -189,6 +189,8 @@ type PrepareLocalCacheRehydrateRunArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   lastHydrationSig?: unknown;
   buildHydrationSignature?: ((surveyIndex: number, renderedIds: unknown[]) => string) | null;
+  // The run loads only questions this view has not loaded, so a held form does not stop it.
+  loadsUnloadedOnly?: boolean;
 };
 
 type ResolveRevertPendingBaselineSliceArgs = {
@@ -1293,6 +1295,8 @@ export const buildResetFormStatePatch = ({
   return {
     surveysResponseState,
     isEditing: false,
+    // A new identity starts with saved answers loaded, not with a signed-out "start fresh".
+    startFresh: false,
     submissionError: '',
     submissionComplete: false,
     submittedSinceLastEdit: !!nextSubmittedSinceLastEdit,
@@ -1307,15 +1311,23 @@ export const buildResetFormStatePatch = ({
   };
 };
 
+/**
+ * A finished or failed Submit, or a decrypt, holds the form: saved answers it already loaded are
+ * not refreshed over it. A question it has not loaded yet still gets its saved answers.
+ */
+export const isSavedAnswerRefreshHeld = (state: UnknownRecord | null | undefined): boolean =>
+  !!(state?.suppressPrefill || state?.submissionError || state?.submissionComplete);
+
 export const prepareLocalCacheRehydrateRun = ({
   state = null,
   surveyIndex = 0,
   renderedIds = [],
   lastHydrationSig = '',
   buildHydrationSignature = null,
+  loadsUnloadedOnly = false,
 }: PrepareLocalCacheRehydrateRunArgs = {}) => {
   const currentState = state && typeof state === 'object' ? state : {};
-  if (currentState.suppressPrefill || currentState.submissionError || currentState.submissionComplete) {
+  if (!loadsUnloadedOnly && isSavedAnswerRefreshHeld(currentState)) {
     return {
       shouldSkip: true,
       shouldBumpNoop: false,

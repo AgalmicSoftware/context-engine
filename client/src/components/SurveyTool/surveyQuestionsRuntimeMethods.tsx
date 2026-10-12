@@ -784,7 +784,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       })();
     } else {
       // Standalone mode (question pool passed as prop): the View all editor.
-      inst._viewAllSync = { loaded: new Set(), restored: new Set() };
+      inst._viewAllSync = { restored: new Set() };
       const initialSlice: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
       setState(
         buildInitialStandaloneResponseState({

@@ -184,8 +184,10 @@ export type SurveyQuestionsInstanceFields = {
   _questionPoolHydrationRunId: number;
   _localCacheRehydrateRunId: number;
   _responseHydrationStateUpdateDepth: number;
-  // View all only: questions whose saved answers were loaded, and whose draft was restored, in this view.
-  _viewAllSync: { loaded: Set<string>; restored: Set<string> } | null;
+  // Questions whose saved answers this view loaded into its form; any other question always loads.
+  _savedAnswersLoadedQids: Set<string>;
+  // View all only: questions whose draft was restored in this view.
+  _viewAllSync: { restored: Set<string> } | null;
   _surveyDecryptAttemptSeq: number;
   _activeSurveyDecryptAttemptSeq: number;
   _submitAttemptSeq: number;
@@ -268,6 +270,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _questionPoolHydrationRunId: 0,
   _localCacheRehydrateRunId: 0,
   _responseHydrationStateUpdateDepth: 0,
+  _savedAnswersLoadedQids: new Set(),
   _viewAllSync: null,
   _surveyDecryptAttemptSeq: 0,
   _activeSurveyDecryptAttemptSeq: 0,

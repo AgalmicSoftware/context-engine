@@ -268,6 +268,7 @@ describe('surveyToolHydrationFlow', () => {
         },
       ],
       isEditing: false,
+      startFresh: false,
       submissionError: '',
       submissionComplete: false,
       submittedSinceLastEdit: false,

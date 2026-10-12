@@ -2071,6 +2071,8 @@ const initializeResponseState = (engine: PileViewModeEngine, cb: any) => {
     buildEmptyResponseFieldState: engine.buildEmptyResponseFieldState,
     setLastInitializeResponseSig: (nextInitializeResponseSig: string) => {
       engine._lastInitializeResponseSig = nextInitializeResponseSig;
+      // The form is rebuilt empty for the new window, so every card loads its saved answers again.
+      engine._savedAnswersLoadedQids?.clear();
     },
     cloneValue: engine.deepClone,
     setState: engine.setState.bind(engine),

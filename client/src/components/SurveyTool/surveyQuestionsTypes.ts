@@ -285,6 +285,7 @@ export type SurveyAccountViewResetStatePatch = {
 
 export type SurveyStandaloneAuthResetStatePatch = {
   isEditing: boolean;
+  startFresh: boolean;
   submissionError: string;
   submissionComplete: boolean;
   submittedSinceLastEdit: unknown;
@@ -1579,6 +1580,7 @@ export const buildStandaloneAuthResetState = (
   submittedSinceLastEdit: unknown,
 ): SurveyStandaloneAuthResetStatePatch => ({
   isEditing: false,
+  startFresh: false,
   submissionError: '',
   submissionComplete: false,
   submittedSinceLastEdit,

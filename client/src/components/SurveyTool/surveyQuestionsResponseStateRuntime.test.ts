@@ -36,7 +36,8 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   getHydrationQuestionIds: jest.fn(() => ['q1']),
   initializeSurveyResponseState: jest.fn(),
   inst: {
-    _viewAllSync: null as { loaded: Set<string>; restored: Set<string> } | null,
+    _savedAnswersLoadedQids: new Set<string>(),
+    _viewAllSync: null as { restored: Set<string> } | null,
     _applyCachedResponseEntryToSlice: jest.fn(),
     _applyLocalCacheHydrationEntryToSlice: jest.fn(),
     _applyResponseHydrationListToSlice: jest.fn(),
@@ -141,7 +142,7 @@ describe('surveyQuestionsResponseStateRuntime', () => {
       loadDraft: jest.fn(() => ({ answers: { q1: { additional: 'Draft comment' } }, baseline: {} })),
       propsRef: { current: { isStandalone: true, isResponsesCacheReady: true, sessionConfig: null } },
     });
-    context.inst._viewAllSync = { loaded: new Set<string>(), restored: new Set<string>() };
+    context.inst._viewAllSync = { restored: new Set<string>() };
     // Minimal appliers: saved answers fill empty fields; the draft writes its comment.
     context.inst._applyLocalCacheHydrationEntryToSlice = jest.fn(({ targetSlice, questionId, cachedAnswer }) => {
       if (!cachedAnswer || targetSlice.answers[questionId]?.value) return false;
@@ -175,18 +176,19 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     expect(next.surveysResponseState[0].answers.q1.value).toBe('cached');
     expect(next.surveysResponseState[0].additionalComments.q1.value).toBe('Draft comment');
     expect(next.editBaseline.answers.q1.value).toBe('cached');
-    expect([...context.inst._viewAllSync!.loaded]).toEqual(['q1']);
+    expect([...context.inst._savedAnswersLoadedQids]).toEqual(['q1']);
     expect([...context.inst._viewAllSync!.restored]).toEqual(['q1']);
   });
 
   it('leaves loaded questions alone while a Submit result holds the form, and forgets questions that left', () => {
     const context = viewAllContext({ submissionComplete: true });
-    context.inst._viewAllSync = { loaded: new Set(['q1', 'q9']), restored: new Set(['q1', 'q9']) };
+    context.inst._savedAnswersLoadedQids = new Set(['q1', 'q9']);
+    context.inst._viewAllSync = { restored: new Set(['q1', 'q9']) };
 
     createSurveyQuestionsResponseStateRuntime(context).syncViewAllQuestions();
 
     expect(context.setResponseHydrationState).not.toHaveBeenCalled();
-    expect([...context.inst._viewAllSync!.loaded]).toEqual(['q1']);
+    expect([...context.inst._savedAnswersLoadedQids]).toEqual(['q1']);
     expect([...context.inst._viewAllSync!.restored]).toEqual(['q1']);
   });
 
@@ -198,7 +200,7 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     const runtime = createSurveyQuestionsResponseStateRuntime(context);
 
     runtime.syncViewAllQuestions();
-    expect([...context.inst._viewAllSync!.loaded]).toEqual([]);
+    expect([...context.inst._savedAnswersLoadedQids]).toEqual([]);
     expect([...context.inst._viewAllSync!.restored]).toEqual(['q1']);
 
     // Once the listing is complete, a held form still gets the saved answers it never loaded.
@@ -206,6 +208,42 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     (context.stateRef.current as Record<string, unknown>).suppressPrefill = true;
     runtime.syncViewAllQuestions();
     expect(applySync(context).surveysResponseState[0].answers.q1.value).toBe('cached');
-    expect([...context.inst._viewAllSync!.loaded]).toEqual(['q1']);
+    expect([...context.inst._savedAnswersLoadedQids]).toEqual(['q1']);
+  });
+
+  it('loads saved answers but restores no draft while the form starts fresh', () => {
+    const context = viewAllContext({ startFresh: true });
+
+    createSurveyQuestionsResponseStateRuntime(context).syncViewAllQuestions();
+
+    const next = applySync(context);
+    expect(next.surveysResponseState[0].answers.q1.value).toBe('cached');
+    expect(next.surveysResponseState[0].additionalComments.q1.value).toBe('');
+    expect([...context.inst._viewAllSync!.restored]).toEqual([]);
+  });
+
+  it('loads only questions this view has not loaded while a Submit result holds the form', async () => {
+    let seenAtRun: Record<string, unknown> = {};
+    const context = createContext({
+      executeSurveyLocalCacheRehydrate: jest.fn(async (run) => {
+        seenAtRun = {
+          ids: run.getHydrationQuestionIds(),
+          q1Loaded: run.isQuestionLoaded('Q1'),
+          q2Loaded: run.isQuestionLoaded('q2'),
+        };
+        return { reason: 'applied', renderedQuestionIds: ['q2'] };
+      }),
+      getHydrationQuestionIds: jest.fn(() => ['q1']),
+      loadDraft: jest.fn(() => ({ answers: { q2: { value: 'Draft' }, q9: { value: 'Not in view' } } })),
+      propsRef: { current: { isStandalone: true, isResponsesCacheReady: true, sessionConfig: null } },
+    });
+    Object.assign(context.stateRef.current, { pileQuestions: [{ id: 'q1' }, { id: 'q2' }], submissionComplete: true });
+    context.inst._savedAnswersLoadedQids = new Set(['q1']);
+
+    await createSurveyQuestionsResponseStateRuntime(context).rehydrateLocalCacheAnswersForRenderedIds();
+
+    // A stored draft for a question of this view, outside the rendered window, loads with it.
+    expect(seenAtRun).toEqual({ ids: ['q1', 'q2'], q1Loaded: true, q2Loaded: false });
+    expect([...context.inst._savedAnswersLoadedQids]).toEqual(['q1', 'q2']);
   });
 });

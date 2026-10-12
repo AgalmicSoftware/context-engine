@@ -8,6 +8,7 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyUpdatePlan,
   buildLocalCacheRehydrationUpdatePlan,
+  isSavedAnswerRefreshHeld,
   loadDraftAnswersByQuestionIdSafely,
   loadLocalCacheHydrationSlice,
   prepareLocalCacheRehydrateRun,
@@ -513,6 +514,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
   applyRehydrateMissEffects = applyLocalCacheRehydrateMissEffects,
   applyRehydrateUpdatePlan = applyLocalCacheRehydrateUpdatePlan,
   isStaleRun = () => false,
+  isQuestionLoaded = () => true,
 }: {
   props?: SurveyToolLikeProps | null;
   state?: SurveyToolLikeState | null;
@@ -549,18 +551,25 @@ export const executeSurveyLocalCacheRehydrate = async ({
   applyRehydrateMissEffects?: (args?: Record<string, unknown>) => void;
   applyRehydrateUpdatePlan?: (args?: Record<string, unknown>) => boolean;
   isStaleRun?: () => boolean;
+  // Questions whose saved answers this view already loaded; others always load, held form or not.
+  isQuestionLoaded?: (questionId: unknown) => boolean;
 } = {}) => {
   try {
     const nextProps = props || {};
     const nextState = state || {};
     const surveyIndex = nextProps.isStandalone || nextProps.singleQuestionMode ? 0 : nextProps.surveyIndex;
-    const renderedQuestionIds = getHydrationQuestionIds();
+    const held = isSavedAnswerRefreshHeld(nextState);
+    const listedQuestionIds = getHydrationQuestionIds();
+    const renderedQuestionIds = held
+      ? listedQuestionIds.filter((questionId) => !isQuestionLoaded(questionId))
+      : listedQuestionIds;
     const rehydrateRun = prepareRehydrateRun({
       state: nextState,
       surveyIndex,
       renderedIds: renderedQuestionIds,
       lastHydrationSig,
       buildHydrationSignature,
+      loadsUnloadedOnly: held && renderedQuestionIds.length > 0,
     });
 
     if (rehydrateRun.shouldSkip) {

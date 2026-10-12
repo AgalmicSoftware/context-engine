@@ -1274,6 +1274,7 @@ describe('surveyQuestionsTypes', () => {
     });
     expect(buildStandaloneAuthResetState(false)).toEqual({
       isEditing: false,
+      startFresh: false,
       submissionError: '',
       submissionComplete: false,
       submittedSinceLastEdit: false,

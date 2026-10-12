@@ -286,7 +286,7 @@ const mockCommon = (store) => {
   return { uploads };
 };
 
-const mountPile = async (store, { nonce = 1 } = {}) => {
+const mountPile = async (store, { nonce = 1, failRefresh = false } = {}) => {
   const mocks = mockCommon(store);
   let engine = null;
   const strategy = createPileViewRuntimeStrategy();
@@ -298,6 +298,7 @@ const mountPile = async (store, { nonce = 1 } = {}) => {
   let view = null;
   const bump = { questionResponsesNonce: nonce, questionsCacheNonce: nonce };
   const refreshQuestionResponses = jest.fn(async () => {
+    if (failRefresh) throw new Error('Network down during refresh');
     await syncWorkerResponses(store);
     bump.questionResponsesNonce += 1;
     bump.questionsCacheNonce += 1;
@@ -772,4 +773,42 @@ it('publishes decrypted ratings once the user turns the answer lock off', async 
   const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(2));
   expect(row).toMatchObject({ importance: 6, conviction: 5, importanceEncrypted: '', convictionEncrypted: '' });
   expect(row.answer).toMatchObject({ value: 'secret two', encrypted: false });
+}, 60000);
+
+it('loads a card that scrolls into view after a Submit whose refresh failed', async () => {
+  const store = createWorkerStore();
+  seedWorkerCatalog(store);
+  await syncWorkerMetadata(store);
+  const savedRow = (n, answer, comment) => ({
+    questionID: qid(n),
+    type: 'freeform',
+    prompt: `RA question ${n}`,
+    answer: { value: answer, encrypted: false, encryptionAudience: 'self', audienceMode: 'explicit', hash: '' },
+    additional: { value: comment, encrypted: false, encryptionAudience: 'self', audienceMode: 'explicit', hash: '' },
+    importance: 3,
+    conviction: 3,
+    sessionId: SESSION_ID,
+    sessionSlug: SLUG,
+  });
+  store.add('responses', savedRow(1, 'Saved q1', ''), OWNER);
+  store.add('responses', savedRow(4, 'Saved q4', 'Saved q4 comment'), OWNER);
+  await syncWorkerResponses(store);
+  const h = await mountPile(store, { nonce: 3, failRefresh: true });
+  await act(async () => h.engine().handleAnswerPile(qid(1), 'Saved q1 edited'));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  expect(h.engine().state.submissionComplete).toBe(true);
+
+  // q4 was outside the cards shown before the Submit; it still gets its saved answers.
+  await goTo(h, 4);
+  const slice = h.engine().state.surveysResponseState[0];
+  expect(slice.answers[qid(4)]).toMatchObject({ value: 'Saved q4' });
+  expect(slice.additionalComments[qid(4)]).toMatchObject({ value: 'Saved q4 comment' });
+  await act(async () => h.engine().handleImportance(0, qid(4), 9));
+  expect((await submit(h)).outcome).toEqual({ status: 'submitted' });
+  const row = h.uploads.at(-1).questionResponses.find((response) => response.questionID === qid(4));
+  expect(row).toMatchObject({
+    answer: { value: 'Saved q4' },
+    additional: { value: 'Saved q4 comment' },
+    importance: 9,
+  });
 }, 60000);
