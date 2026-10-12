@@ -419,7 +419,8 @@ describe('saved Worker audience changes', () => {
       await act(async () => h.engine().applyAnswerEncryptionAudience(0, qid(2), 'self'));
       const countBefore = h.uploads.length;
       const blocked = await submit(h);
-      expect(blocked.submissionError).toMatch(/Decrypt and re-encrypt/);
+      // Still locked, the new audience can't be applied, so the question is held back by name.
+      expect(blocked.submissionError).toMatch(/^“RA question 2” wasn't submitted\. It is still locked.*Decrypt it/);
       expect(h.uploads).toHaveLength(countBefore);
       expect(await clickDecrypt()).toEqual([]);
       expect(h.engine().getSubmitCount()).toBe(1);
