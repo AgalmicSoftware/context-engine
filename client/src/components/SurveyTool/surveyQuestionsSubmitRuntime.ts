@@ -18,7 +18,7 @@ import type {
   SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
-import { remaskUnchangedEncryptedFields } from './surveyToolSubmitPrepController.js';
+import { isLockedAudienceChange, remaskUnchangedEncryptedFields } from './surveyToolSubmitPrepController.js';
 import { shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState.js';
 import { getQuestionEncryptionGates } from './surveyToolAudienceDerivationController.js';
 import { readQuestionsCacheRef } from './surveyToolCacheState.js';
@@ -449,6 +449,14 @@ export const createSurveyQuestionsSubmitRuntime = (
       // The Worker refuses an answer too large to store. Before locking or upload,
       // hold back and name each one; the other changes still submit.
       const oversize = readOversizeAnswers(submitContext, activeSlice, changedQids, submitQuestionPool);
+      // A still-locked field with a new audience can't be re-encrypted until it is decrypted again.
+      Array.from(changedQids as Set<string>).forEach((qid) => {
+        if ([activeSlice.answers?.[qid], activeSlice.additionalComments?.[qid]].some(isLockedAudienceChange))
+          oversize.set(
+            qid,
+            "It is still locked, so its new audience can't be applied yet. Decrypt it, then submit again.",
+          );
+      });
       heldBackNotice = Array.from(oversize, ([qid, message]) =>
         submitContext.singleQuestionMode
           ? message

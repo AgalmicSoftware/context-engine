@@ -1,4 +1,5 @@
 import {
+  isLockedAudienceChange,
   buildFieldEncryptionWorkGroups,
   remaskUnchangedEncryptedFields,
   verifyEncryptionIntegrity,
@@ -476,4 +477,24 @@ describe('remaskUnchangedEncryptedFields', () => {
       expect(result.answers.q1).toEqual(current);
     },
   );
+});
+
+describe('isLockedAudienceChange', () => {
+  const selfEnvelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'c' });
+  const masked = (encryptionAudience: string, encryptedPortion = selfEnvelope) => ({
+    value: '*',
+    encrypted: true,
+    encryptionAudience,
+    encryptedPortion,
+  });
+
+  it('flags a still-locked field whose envelope does not grant its new audience', () => {
+    expect(isLockedAudienceChange(masked('self_admin'))).toBe(true);
+    expect(isLockedAudienceChange(masked('self'))).toBe(false);
+  });
+
+  it('leaves decrypted values and unreadable envelopes to the later checks', () => {
+    expect(isLockedAudienceChange({ ...masked('self_admin'), value: 'Decrypted text' })).toBe(false);
+    expect(isLockedAudienceChange(masked('self_admin', 'not-json'))).toBe(false);
+  });
 });

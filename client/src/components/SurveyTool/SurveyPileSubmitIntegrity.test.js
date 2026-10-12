@@ -632,6 +632,38 @@ it.each([
   expect(engine().state.submissionError || '').toBe('');
 });
 
+it('holds back a question whose new audience needs its decrypted text, and names it', async () => {
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
+  const h = await fixture();
+  h.add(
+    'responses',
+    savedFreeform({
+      value: '*',
+      encrypted: true,
+      encryptedPortion: envelope,
+      encryptionAudience: 'self',
+      audienceMode: 'explicit',
+      hash: '0xsalted',
+    }),
+  );
+  await act(async () => h.sync());
+  await h.mount();
+  await decryptSavedFreeform(h.engine, { answer: 'Old secret', comment: '' });
+  await act(async () => h.engine().applyAnswerEncryptionAudience(0, FREEFORM_QID, 'self_admin'));
+  await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Yes'));
+  await settle();
+  // A reload restores the new audience, but never the decrypted text it needs.
+  h.unmount();
+  await h.mount();
+  await settle();
+
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  expect(h.submitResponses.mock.calls[0][2].map((row) => row.questionID)).toEqual([BINARY_QID]);
+  expect(h.engine().state.submissionError).toMatch(/^“Freeform question” wasn't submitted\. .*Decrypt it/);
+  expect(h.engine().getPendingEditStats().total).toBe(1);
+});
+
 describe('View all editor after a reload', () => {
   const SAVED_ANSWER = { value: 'Saved public answer', encrypted: false, audienceMode: 'explicit' };
   // A comment typed in the pile is kept as a draft, then the page reloads.

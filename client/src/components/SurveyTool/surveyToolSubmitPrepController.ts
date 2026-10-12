@@ -161,6 +161,24 @@ export const remaskUnchangedEncryptedFields = <T extends SubmitPrepSlice>(
   return next;
 };
 
+/**
+ * A still-locked field given a new audience: re-encrypting it for that audience needs its
+ * decrypted text. Only a readable envelope says who can open it; anything else is left to
+ * the final integrity check.
+ */
+export const isLockedAudienceChange = (field: SubmitResponseFieldState | null | undefined): boolean => {
+  if (!field?.encrypted || field.value !== '*' || !field.encryptedPortion) return false;
+  try {
+    const envelope = JSON.parse(String(field.encryptedPortion));
+    return (
+      Array.isArray(envelope?.recipients) &&
+      responseEnvelopeMatchesAudience(envelope, field.encryptionAudience) === false
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const verifyEncryptionIntegrity = (
   slice: SubmitPrepSlice | null | undefined,
   onlyTheseQids: Set<string> | null = null,
