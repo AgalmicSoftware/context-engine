@@ -105,7 +105,7 @@
 }
 
 .sessionLoadingSkeletonSection {
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  background: color-mix(in srgb, var(--ce-loading-text) 6%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 0.95rem;
 }
@@ -120,13 +120,12 @@
 }
 
 .sessionLoadingSkeletonSectionTitle {
-  color: var(--ce-color-white);
+  color: var(--ce-loading-text);
   font-weight: 700;
 }
 
 .sessionLoadingSkeletonSubtitle {
-  opacity: 0.5;
-  color: var(--ce-color-white);
+  color: var(--ce-loading-text);
 }
 
 .sessionLoadingSkeletonCaret {
@@ -134,7 +133,7 @@
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-top: 6px solid var(--ce-color-white);
+  border-top: 6px solid var(--ce-loading-text);
   flex-shrink: 0;
 }
 
@@ -147,7 +146,7 @@
 .sessionLoadingSkeletonBar {
   height: 12px;
   border-radius: var(--ce-radius-4);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  background: color-mix(in srgb, var(--ce-loading-text) 8%, transparent);
 }
 
 .sessionLoadingSkeletonTitleBar {
@@ -155,7 +154,7 @@
 }
 
 .sessionLoadingSkeletonStatus {
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
+  color: var(--ce-loading-text);
 }
 
 .sessionLoadingSkeletonStatusTitle {
@@ -181,7 +180,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--ce-text-inverse) 15%, transparent) 50%,
+    color-mix(in srgb, var(--ce-loading-text) 15%, transparent) 50%,
     transparent 100%
   );
   transform: translateX(-100%);

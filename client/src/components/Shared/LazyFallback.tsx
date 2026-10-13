@@ -29,7 +29,7 @@ export default function LazyFallback({ label = 'Loading...', subtext = '', minHe
           padding: '16px 18px',
           borderRadius: 'var(--ce-radius-8)',
           background: 'transparent',
-          color: 'var(--ce-panel-text)',
+          color: 'var(--ce-loading-text)',
           textAlign: 'center',
           maxWidth: '560px',
         }}

@@ -562,4 +562,41 @@
   #navbarContainerLoggedIn {
     align-items: center;
   }
+
+  @media (max-width: 768px) {
+    #navbarContainer,
+    #navbarContainerLoggedIn {
+      min-height: 64px;
+      margin: 8px 0 4px;
+    }
+
+    #navbarLogoCol,
+    #navbarLogoColLoggedIn {
+      width: auto;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+
+    #mainLogo,
+    #mainLogoLoggedIn {
+      display: block;
+      width: 88px;
+      max-width: 88px;
+      min-height: 0;
+      height: 88px;
+      // Compensate for the SVG's intrinsic padding without expanding the header row.
+      margin: -12px 0;
+      object-fit: contain;
+    }
+  }
+
+  @media (min-width: 466px) and (max-width: 768px) {
+    #mainLogo,
+    #mainLogoLoggedIn {
+      width: 112px;
+      max-width: 112px;
+      height: 112px;
+      margin: -16px 0;
+    }
+  }
 }

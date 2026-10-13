@@ -14,6 +14,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import LazyFallback from '../Shared/LazyFallback';
+import { formatPolisReportSessionInfo } from '../PolisReport/polisReportSessionInfo';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
@@ -432,6 +433,8 @@ export default function OnePageSessionStandardShell({
         ? 'Refresh AI Views'
         : 'Generate AI Views';
   const sessionInfoTooltipId = `session-info-${React.useId().replace(/:/g, '')}`;
+  const sessionInfoTooltip =
+    typeof sessionInfo === 'string' ? formatPolisReportSessionInfo(sessionInfo, displaySessionSlug) : sessionInfo;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
   const showContextSection = isDemoSlug || !!sessionContext || showContextAtlas;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
@@ -494,7 +497,7 @@ export default function OnePageSessionStandardShell({
             <FontAwesomeIcon icon={faQuestionCircle} />
           </button>
           <CETooltip target={sessionInfoTooltipId} placement="bottom" trigger="hover focus" autohide={false}>
-            {sessionInfo || 'Share input; your responses help generate a collective intelligence map.'}
+            {sessionInfoTooltip || 'Share input; your responses help generate a collective intelligence map.'}
           </CETooltip>
         </div>
 

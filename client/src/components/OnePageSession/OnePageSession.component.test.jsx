@@ -737,6 +737,33 @@ describe('OnePageSession view gating', () => {
     expect(button.closest(`.${styles.titleContainer}`)).not.toContainElement(tooltip);
   });
 
+  it.each([
+    { sessionSlug: 'rxc-ra-test', boldInstructions: false },
+    { sessionSlug: 'rxc-ra-test', boldInstructions: true },
+    { sessionSlug: 'another-session', boldInstructions: false },
+  ])('matches the Results description in the session tooltip (%j)', async ({ sessionSlug, boldInstructions }) => {
+    const description =
+      'Short questions testing the Reverse Alignment argument that institutions must be redesigned to absorb AI, with a focus on democracy.';
+    const retiredInstructions =
+      'Answer any you like, skip the rest, or take the short voice interview. Critique is welcome; answering implies no endorsement of the coalition or RadicalxChange.';
+    const sessionInfo = `${description} ${boldInstructions ? `**${retiredInstructions}**` : retiredInstructions}`;
+    const props = buildProps();
+    render(
+      <OnePageSession
+        {...props}
+        slug={sessionSlug}
+        sessionInfo={sessionInfo}
+        sessionConfig={{ ...props.sessionConfig, slug: sessionSlug, sessionInfo }}
+      />,
+    );
+
+    const button = await screen.findByRole('button', { name: 'Session info' });
+    act(() => button.focus());
+    const tooltip = await screen.findByRole('tooltip');
+
+    expect(tooltip.textContent.trim()).toBe(sessionSlug === 'rxc-ra-test' ? description : sessionInfo);
+  });
+
   it('keeps the mobile title tooltip inside the viewport', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
 

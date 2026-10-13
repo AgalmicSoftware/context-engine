@@ -6,7 +6,7 @@ describe('WorkerGroupMembershipPanel loading styles', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.workerGroupsLoadingState\s*\{[\s\S]*?margin:\s*0 0 24px;[\s\S]*?color:\s*var\(--ce-control-text\);[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*1\.25rem;[\s\S]*?font-weight:\s*700;[\s\S]*?line-height:\s*1\.4;/,
+      /\.workerGroupsLoadingState\s*\{[\s\S]*?margin:\s*0 0 24px;[\s\S]*?color:\s*var\(--ce-loading-text\);[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*1\.25rem;[\s\S]*?font-weight:\s*700;[\s\S]*?line-height:\s*1\.4;/,
     );
   });
 

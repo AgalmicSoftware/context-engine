@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.9] - 2026-10-13
+
+### Client — available when the site deploys
+
+- Give Minimal session titles and their info controls readable dark-gray text,
+  and show loading labels in black on Minimal and Classic 95 light surfaces.
+- Use the shared title spacing, timed fade, and hover/focus reveal in Minimal.
+  Compact its mobile header with a smaller logo while preserving account controls.
+- Match the RxC session tooltip to the shorter Results description, including
+  when cached session metadata still contains the retired trailing instructions.
+
 ## [0.6.8] - 2026-10-12
 
 ### Client — available when the site deploys
