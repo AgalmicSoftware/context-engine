@@ -306,7 +306,7 @@
 
 @container (max-width: 700px) {
   .option {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 36px auto;
     column-gap: 0.5rem;
   }
   .optionDescription {
@@ -319,12 +319,13 @@
     font-size: 1rem;
   }
   .cost {
-    color: var(--ce-panel-text-muted);
-    text-align: left;
-    font-size: 0.75rem;
+    display: none;
   }
   .squares {
-    display: none;
+    grid-column: 2;
+  }
+  .stepper {
+    grid-column: 3;
   }
 }
 
