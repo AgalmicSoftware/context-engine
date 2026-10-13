@@ -292,7 +292,7 @@
   overflow-wrap: anywhere;
 }
 
-@container (max-width: 360px) {
+@container (max-width: 700px) {
   .option {
     grid-template-columns: auto 36px minmax(0, 1fr);
     column-gap: 0.35rem;
