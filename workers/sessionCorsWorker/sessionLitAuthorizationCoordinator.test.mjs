@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import { SessionWriteCoordinator, executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoordinator.js';
 import { getSessionConfig, getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
-import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
+import { decryptSessionSecretsEnvelope, isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import worker from './worker.js';
 
 const KEY_A = `0x${'11'.repeat(32)}`;
@@ -79,18 +79,34 @@ const createFixture = () => {
   };
 };
 
+const assertDurableSignerWinner = async (fixture, keys) => {
+  const winner = keys[0];
+  // Hashing and request parsing happen before serialization, so either caller can arrive first.
+  assert.ok([KEY_A, KEY_B].includes(winner));
+  assert.deepEqual(keys, [winner, winner]);
+  const persisted = fixture.store.get(SIGNER_RECORD);
+  assert.equal(persisted.version, 1);
+  assert.equal(persisted.slug, 'fixture');
+  assert.ok(isEncryptedSessionSecretsEnvelope(persisted.envelope));
+  const secrets = await decryptSessionSecretsEnvelope(persisted.envelope, { env: fixture.env, slug: 'fixture' });
+  assert.equal(secrets.litAuthorizationPrivateKey, winner);
+  for (const key of [KEY_A, KEY_B]) assert.ok(!JSON.stringify([...fixture.store]).includes(key));
+  return winner;
+};
+
 test('concurrent signer creation chooses one encrypted durable winner without a stale KV write', async () => {
   const fixture = createFixture();
   await putSessionSecrets(fixture.env, 'fixture', { litAccountApiKey: 'synthetic-account' });
   const before = fixture.kv.get('session:fixture:secrets');
   const keys = await Promise.all([fixture.ensure(KEY_A), fixture.ensure(KEY_B)]);
-  assert.deepEqual(keys, [KEY_A, KEY_A]);
+  const winner = await assertDurableSignerWinner(fixture, keys);
   assert.equal(fixture.kv.get('session:fixture:secrets'), before);
-  const persisted = fixture.store.get(SIGNER_RECORD);
-  assert.ok(isEncryptedSessionSecretsEnvelope(persisted.envelope));
-  assert.ok(!JSON.stringify([...fixture.store]).includes(KEY_A));
+  const persisted = structuredClone(fixture.store.get(SIGNER_RECORD));
+  const loser = winner === KEY_A ? KEY_B : KEY_A;
   fixture.restart();
-  assert.equal(await fixture.ensure(KEY_B), KEY_A, 'remote provisioning failure/restart does not rotate the winner');
+  assert.equal(await fixture.ensure(loser), winner, 'remote provisioning failure/restart does not rotate the winner');
+  assert.deepEqual(fixture.store.get(SIGNER_RECORD), persisted);
+  assert.equal(fixture.kv.get('session:fixture:secrets'), before);
 });
 
 test('durable transaction chooses one winner even across independent coordinator instances', async () => {
@@ -100,7 +116,9 @@ test('durable transaction chooses one winner even across independent coordinator
   });
   const responses = await Promise.all([KEY_A, KEY_B].map((key) =>
     new SessionWriteCoordinator(fixture.state, fixture.env).fetch(request(key))));
-  assert.deepEqual(await Promise.all(responses.map((response) => response.json().then((body) => body.privateKey))), [KEY_A, KEY_A]);
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  await assertDurableSignerWinner(fixture, await Promise.all(responses.map((response) => response.json().then((body) => body.privateKey))));
+  assert.equal(fixture.kv.has('session:fixture:secrets'), false);
 });
 
 test('existing active signer seeds authority and conflicting or malformed state fails closed', async () => {
@@ -175,13 +193,24 @@ test('concurrent successful finalizations leave matching Lit config and secrets 
   assert.deepEqual(results.map((result) => result.status), [200, 200]);
   const config = await getSessionConfig(fixture.env, 'fixture');
   const secrets = await getSessionSecrets(fixture.env, 'fixture');
-  assert.equal(config.litCredentials.litPkpId, 'pkp-second');
-  assert.equal(secrets.litUsageApiKey, 'usage-second');
+  const winner = ['first', 'second'].find((label) => config.litCredentials.litPkpId === `pkp-${label}`);
+  assert.ok(winner, 'the committed credentials must belong to one completed attempt');
+  assert.deepEqual(config.litCredentials, {
+    litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: SIGNER_A,
+    litPkpId: `pkp-${winner}`, litGroupId: `group-${winner}`, litActionCid: `cid-${winner}`,
+  });
+  assert.equal(secrets.litUsageApiKey, `usage-${winner}`);
   assert.equal(config.litCredentials.litAuthorizationSigner, new ethers.Wallet(secrets.litAuthorizationPrivateKey).address);
   assert.equal(secrets.openaiKey, 'synthetic-unrelated-secret');
+  assert.deepEqual(fixture.store.get(CONFIG_RECORD).config.litCredentials, config.litCredentials);
+  const persisted = fixture.store.get(SIGNER_RECORD);
+  assert.ok(isEncryptedSessionSecretsEnvelope(persisted.envelope));
+  const durableSecrets = await decryptSessionSecretsEnvelope(persisted.envelope, { env: fixture.env, slug: 'fixture' });
+  assert.equal(durableSecrets.litAuthorizationPrivateKey, secrets.litAuthorizationPrivateKey);
+  assert.equal(durableSecrets.litUsageApiKey, secrets.litUsageApiKey);
   assert.equal(fixture.store.has(SETUP_RECORD), false);
   assert.ok(!JSON.stringify([...fixture.store]).includes(KEY_A));
-  assert.ok(!JSON.stringify([...fixture.store]).includes('usage-second'));
+  for (const label of ['first', 'second']) assert.ok(!JSON.stringify([...fixture.store]).includes(`usage-${label}`));
   assert.ok(!JSON.stringify(results).includes(KEY_A));
 });
 
