@@ -215,7 +215,12 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   }
 
   return (
-    <div role="status" aria-live="polite" data-testid="ce-worker-canonical-bootstrap-status">
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="ce-worker-canonical-bootstrap-status"
+      style={{ color: 'var(--ce-loading-text)' }}
+    >
       {viewState.kind === 'loading' ? (
         <ElapsedLoadingLabel key={`${sessionSlug}:${retryNonce}`} label={viewState.message} />
       ) : (

@@ -562,4 +562,29 @@
   #navbarContainerLoggedIn {
     align-items: center;
   }
+
+  @media (max-width: 768px) {
+    #navbarContainer,
+    #navbarContainerLoggedIn {
+      min-height: 64px;
+      margin: 8px 0 4px;
+    }
+
+    #navbarLogoCol,
+    #navbarLogoColLoggedIn {
+      width: auto;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+
+    #mainLogo,
+    #mainLogoLoggedIn {
+      display: block;
+      width: 56px;
+      max-width: 56px;
+      min-height: 0;
+      height: 56px;
+      object-fit: contain;
+    }
+  }
 }

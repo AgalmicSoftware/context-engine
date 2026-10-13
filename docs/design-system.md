@@ -109,7 +109,12 @@ readable quote labels.
 Public profile section switchers use opaque muted text for their inactive labels
 and dividers, retaining readable contrast on the white canvas.
 
-The `minimal-app` layout profile centers session titles with the shared five-second fade and hover/focus reveal, presents session
+The `minimal-app` layout profile centers session titles and their info controls in opaque dark-gray text,
+using the same title margins, collapse height, and submit-rail offsets as Context
+Engine, with the shared five-second fade and hover/focus reveal. Loading labels
+use `--ce-loading-text`: black on the Minimal and Classic 95 light surfaces and
+near-white in Context Engine. On mobile, Minimal uses a compact navigation header
+with a 56px logo while preserving the account controls. The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
 question cards and account controls. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.

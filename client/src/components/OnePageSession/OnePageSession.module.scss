@@ -228,7 +228,7 @@
 
 .workerGroupsLoadingState {
   margin: 0 0 24px;
-  color: var(--ce-control-text);
+  color: var(--ce-loading-text);
   font-family: var(--ce-font-body);
   font-size: 1.25rem;
   font-weight: 700;
@@ -2386,15 +2386,18 @@
   .titleContainer:focus-within,
   .titleContainer:active {
     align-self: center;
-    margin: 16px 0 24px;
-    transform: none;
   }
 
   .brandingSectionTitle {
     font-weight: 600;
+    color: var(--ce-panel-text-muted);
     opacity: 1;
     letter-spacing: normal;
     line-height: 1.3;
+  }
+
+  .sessionInfoButton {
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionsGrid,
@@ -2489,19 +2492,7 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  @media (min-width: 769px) {
-    // Reserve room for the submit rail while the title is visible or revealed.
-    .titleContainerWithPileSubmitRail,
-    .titleContainerWithPileSubmitRail:hover,
-    .titleContainerWithPileSubmitRail:focus-within,
-    .titleContainerWithPileSubmitRail:active {
-      margin-bottom: 96px;
-    }
-  }
-}
-
-@container ce-theme style(--ce-layout-profile: minimal-app) {
-  .telegramListEmpty {
+  .telegramListEmpty:not(.workerGroupsLoadingState) {
     color: var(--ce-panel-text-muted);
   }
 }
