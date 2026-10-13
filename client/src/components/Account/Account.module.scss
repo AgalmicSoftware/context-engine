@@ -2279,6 +2279,7 @@ h1 {
 }
 
 .settingsThemeQuickLabel {
+  margin: 0;
   color: var(--ce-settings-control-text);
   font-family: var(--ce-font-button);
   font-weight: 700;
@@ -2293,8 +2294,9 @@ h1 {
   min-width: 0;
 
   > div {
-    flex: 1 1 240px;
+    flex: 1 1 160px;
     min-width: 0;
+    max-width: 220px;
   }
 
   > label {
