@@ -37,8 +37,8 @@
     display: flex;
     justify-content: center;
     justify-content: center;
-    transform: scale(0.9);
-    min-height: 70px !important;
+    transform: scale(var(--ce-navbar-control-scale, 0.9));
+    min-height: var(--ce-navbar-control-size, 70px) !important;
   }
 
   .loginPromptText {
@@ -254,9 +254,9 @@
     display: flex;
     justify-content: center;
     justify-content: center;
-    transform: scale(0.9);
+    transform: scale(var(--ce-navbar-control-scale, 0.9));
     padding: 5% 2% 5% 2%;
-    min-height: 70px !important;
+    min-height: var(--ce-navbar-control-size, 70px) !important;
   }
 
   .loginIcons {
@@ -488,7 +488,7 @@
     display: flex;
     justify-content: center;
     padding: 5% 2% 5% 2%;
-    min-height: 80px !important;
+    min-height: var(--ce-navbar-control-size, 80px) !important;
   }
 
   .loginIcons {
@@ -719,7 +719,7 @@
     display: flex;
     justify-content: center;
     padding: 4% 0% 4% 0%;
-    min-height: 100px !important;
+    min-height: var(--ce-navbar-control-size, 100px) !important;
   }
 
   .loginIcons {
@@ -956,7 +956,7 @@
 
   .navConnectButton {
     min-width: 250px !important;
-    min-height: 100px;
+    min-height: var(--ce-navbar-control-size, 100px);
     display: flex;
     justify-content: center;
     justify-content: center;
@@ -1195,7 +1195,8 @@ h1 {
 
 .navConnectButton {
   min-width: 200px;
-  min-height: 100px;
+  min-height: var(--ce-navbar-control-size, 100px);
+  height: var(--ce-navbar-control-size, auto);
   display: flex;
   flex-direction: column;
   justify-items: center;

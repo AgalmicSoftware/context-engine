@@ -385,7 +385,7 @@
 @media (min-width: 0px) and (max-width: 319px) {
   #AccountSectionLoggedIn {
     width: 100%;
-    transform: scale(0.85);
+    transform: scale(var(--ce-navbar-control-scale, 0.85));
     display: flex;
     flex-direction: row-reverse;
     flex-wrap: wrap-reverse;
@@ -414,7 +414,7 @@
 
 @media (min-width: 320px) and (max-width: 465px) {
   #AccountSectionLoggedIn {
-    transform: scale(0.8);
+    transform: scale(var(--ce-navbar-control-scale, 0.8));
     display: flex;
     flex-direction: column-reverse;
     align-items: flex-end;
@@ -437,7 +437,7 @@
 
 @media (min-width: 466px) and (max-width: 768px) {
   #AccountSectionLoggedIn {
-    transform: scale(0.9);
+    transform: scale(var(--ce-navbar-control-scale, 0.9));
     display: flex;
     flex-direction: column-reverse;
     align-items: flex-end;
@@ -576,27 +576,71 @@
       padding: 0;
       flex: 0 0 auto;
     }
+  }
+}
 
-    #mainLogo,
-    #mainLogoLoggedIn {
-      display: block;
-      width: 88px;
-      max-width: 88px;
-      min-height: 0;
-      height: 88px;
-      // Compensate for the SVG's intrinsic padding without expanding the header row.
-      margin: -12px 0;
-      object-fit: contain;
-    }
+// Share the account control's unscaled box and responsive scale with the logo.
+#navbarContainer,
+#navbarContainerLoggedIn {
+  --ce-navbar-control-size: 100px;
+  --ce-navbar-control-scale: 1;
+  align-items: center;
+}
+
+#navbarContainerLoggedIn {
+  --ce-navbar-control-size: 49px;
+}
+
+#navbarLogoCol,
+#navbarLogoColLoggedIn {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  #navbarContainer {
+    --ce-navbar-control-size: 80px;
   }
 
-  @media (min-width: 466px) and (max-width: 768px) {
-    #mainLogo,
-    #mainLogoLoggedIn {
-      width: 112px;
-      max-width: 112px;
-      height: 112px;
-      margin: -16px 0;
-    }
+  #navbarContainerLoggedIn {
+    --ce-navbar-control-scale: 0.9;
   }
+}
+
+@media (max-width: 465px) {
+  #navbarContainer {
+    --ce-navbar-control-size: 70px;
+    --ce-navbar-control-scale: 0.9;
+  }
+
+  #navbarContainerLoggedIn {
+    --ce-navbar-control-scale: 0.8;
+  }
+}
+
+@media (max-width: 319px) {
+  #navbarContainerLoggedIn {
+    --ce-navbar-control-scale: 0.85;
+  }
+}
+
+#mainLogo,
+#mainLogoLoggedIn {
+  display: block;
+  width: var(--ce-navbar-control-size);
+  max-width: var(--ce-navbar-control-size);
+  min-height: 0;
+  height: var(--ce-navbar-control-size);
+  margin: 0;
+  object-fit: contain;
+  transform: scale(var(--ce-navbar-control-scale));
+}
+
+.logoHomeLink {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.addressButton {
+  height: var(--ce-navbar-control-size, auto);
 }

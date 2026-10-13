@@ -62,7 +62,7 @@ describe('LoginButton', () => {
     );
 
     expect(accountStylesheet).toMatch(
-      /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)[\s\S]*?\.navConnectButton\s*{[\s\S]*?min-height:\s*80px !important;/,
+      /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)[\s\S]*?\.navConnectButton\s*{[\s\S]*?min-height:\s*var\(--ce-navbar-control-size,\s*80px\) !important;/,
     );
     expect(classicLoginStyles).not.toContain('min-width: 150px !important;');
     expect(classicLoginStyles).not.toContain('min-height: 46px !important;');
