@@ -1060,6 +1060,10 @@
   flex-wrap: wrap;
   max-width: 100%;
   min-width: 0;
+
+  @media only screen and (max-width: 600px) {
+    position: relative;
+  }
 }
 
 .sectionHeader {
@@ -1078,16 +1082,22 @@
   min-width: 0;
   line-height: 1.1;
 
-  .tooltip .tooltiptext {
+  .tooltip {
     @media only screen and (max-width: 600px) {
-      left: auto;
-      right: -10px;
-      transform: none;
-      text-align: left;
-      &::after {
-        left: auto;
-        right: 15px;
-        margin-left: 0;
+      position: static;
+
+      .tooltiptext {
+        left: 0;
+        right: 0;
+        margin-inline: auto;
+        transform: none;
+        text-align: left;
+        width: min(250px, calc(100% - 16px));
+        max-width: calc(100% - 16px);
+
+        &::after {
+          display: none;
+        }
       }
     }
   }
