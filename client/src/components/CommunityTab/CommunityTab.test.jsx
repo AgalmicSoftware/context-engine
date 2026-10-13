@@ -1,4 +1,5 @@
 import CommunityTab from './CommunityTab';
+import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
 import * as polisReportModule from '../PolisReport/PolisReport';
 import {
   initCacheManager,
@@ -356,7 +357,14 @@ describe('CommunityTab helpers', () => {
       (node) => node.props?.['data-testid'] === 'ce-community-session-section',
     );
     const labels = collectTreeNodes(section, (node) => node.props?.id === section.props['aria-labelledby']);
-    expect(labels.map(collectNodeText)).toEqual(['Session: Cloud forum (cloud)']);
+    expect(labels.map((node) => node.props['aria-label'])).toEqual(['Session: Cloud forum (cloud)']);
+    const [summary] = collectTreeNodes(labels, (node) => node.type === LoginSettingsSessionSummary);
+    const summaryContent = LoginSettingsSessionSummary(summary.props);
+    expect(collectNodeText(summaryContent)).toBe('SESSIONCloud forum');
+    expect(collectTreeNodes(summaryContent, (node) => node.type === 'a')[0].props).toMatchObject({
+      href: '/session/cloud',
+      'aria-label': 'Open session Cloud forum',
+    });
     for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
       expect(collectTreeNodes(section, (node) => node.props?.['data-testid'] === id)).toHaveLength(1);
     }
@@ -371,7 +379,12 @@ describe('CommunityTab helpers', () => {
       instance.render(),
       (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
     );
-    expect(collectNodeText(demoLabel)).toBe('Demo session: Cloud forum (cloud)');
+    expect(demoLabel.props['aria-label']).toBe('Demo session: Cloud forum (cloud)');
+    expect(collectNodeText(demoLabel)).toBe('Demo');
+    expect(collectTreeNodes(demoLabel, (node) => node.type === LoginSettingsSessionSummary)[0].props).toMatchObject({
+      activeSession: { label: 'Cloud forum', slug: 'cloud' },
+      sessionHref: '/session/cloud',
+    });
   });
 
   it('names selected sessions and uses an all-session label for combined scope', () => {
@@ -382,9 +395,37 @@ describe('CommunityTab helpers', () => {
       sessionConfig: { slug: 'unrelated', sessionName: 'Wrong name' },
     });
     instance._getSelectedSessionSlugs = jest.fn(() => ['alpha', 'beta']);
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
+    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
     expect(instance._communityScopeLabel()).toBe('Sessions: alpha, beta');
+    const [selectedScope] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
+    );
+    expect(collectNodeText(selectedScope)).toBe('Sessions: alpha, beta');
+    expect(collectTreeNodes(selectedScope, (node) => node.type === LoginSettingsSessionSummary)).toHaveLength(0);
     instance._isUniverseEnabled = jest.fn(() => true);
     expect(instance._communityScopeLabel()).toBe('All sessions');
+    const [allScope] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
+    );
+    expect(collectNodeText(allScope)).toBe('All sessions');
+    expect(collectTreeNodes(allScope, (node) => node.type === LoginSettingsSessionSummary)).toHaveLength(0);
+  });
+
+  it('links the General session summary to the unqualified session route', () => {
+    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
+    const instance = new CommunityTab({ activeSessionSlug: '' });
+    instance._getSelectedSessionSlugs = jest.fn(() => ['']);
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
+    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
+    const [summary] = collectTreeNodes(instance.render(), (node) => node.type === LoginSettingsSessionSummary);
+    expect(summary.props).toMatchObject({
+      activeSession: { label: 'General', slug: '' },
+      sessionHref: '/session',
+    });
   });
 
   it('reuses the scope label until its session inputs change', () => {
@@ -421,7 +462,13 @@ describe('CommunityTab helpers', () => {
     const labels = collectTreeNodes(instance.render(), (node) =>
       ['ce-community-session-scope', 'ce-community-beeswarm-session'].includes(node.props?.['data-testid']),
     );
-    expect(labels.map(collectNodeText)).toEqual(['Session: cloud', 'Demo session: demo']);
+    expect(labels.map((node) => node.props['aria-label'] || collectNodeText(node))).toEqual([
+      'Session: cloud',
+      'Demo session: demo',
+    ]);
+    expect(collectTreeNodes(labels[0], (node) => node.type === LoginSettingsSessionSummary)[0].props.sessionHref).toBe(
+      '/session/cloud',
+    );
   });
 
   it('keeps /session/debate as its explicit slug', () => {

@@ -32,6 +32,8 @@ import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import CETooltip from '../Shared/CETooltip';
+import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
+import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
@@ -327,7 +329,7 @@ class CommunityTab extends Component<any, any> {
     return slug || 'General';
   };
 
-  _sessionDisplayName = (slugIn: unknown): string => {
+  _sessionName = (slugIn: unknown): string => {
     const slug = normalizeSessionSlug(slugIn || '');
     const propConfig = this.props.sessionConfig;
     const exactPropConfig =
@@ -335,6 +337,12 @@ class CommunityTab extends Component<any, any> {
     const config =
       exactPropConfig || getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
     const name = String(config?.sessionName || '').trim();
+    return name || slug || 'General';
+  };
+
+  _sessionDisplayName = (slugIn: unknown): string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const name = this._sessionName(slug);
     const slugLabel = slug || 'General';
     return name && name.toLowerCase() !== slugLabel.toLowerCase() ? `${name} (${slugLabel})` : slugLabel;
   };
@@ -2430,6 +2438,10 @@ class CommunityTab extends Component<any, any> {
     const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
     const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
     const swarmView = this._getQuestionSwarmView();
+    const scopeLabel = swarmView.isDemoFallback ? this._communityScopeLabel() : swarmView.scopeLabel;
+    const selectedSlugs = this._getSelectedSessionSlugs();
+    const summarySlug =
+      !this._isUniverseEnabled() && selectedSlugs.length <= 1 ? (selectedSlugs[0] ?? this._currentSlug()) : null;
 
     return (
       <div className={styles.communityTab}>
@@ -2452,6 +2464,7 @@ class CommunityTab extends Component<any, any> {
                 type="button"
                 key={stat.label}
                 className={styles.statItem}
+                data-ce-control-appearance="frameless"
                 onClick={() => this.handleStatClick(stat)}
                 data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
                 data-ce-count={String(stat.count)}
@@ -2474,9 +2487,24 @@ class CommunityTab extends Component<any, any> {
           data-testid="ce-community-session-section"
           aria-labelledby="ce-community-session-scope"
         >
-          <p id="ce-community-session-scope" className={styles.scopeLabel} data-testid="ce-community-session-scope">
-            {swarmView.isDemoFallback ? this._communityScopeLabel() : swarmView.scopeLabel}
-          </p>
+          <div
+            id="ce-community-session-scope"
+            className={`${styles.scopeLabel} ${styles.sessionScope}`}
+            data-testid="ce-community-session-scope"
+            aria-label={scopeLabel}
+          >
+            {summarySlug !== null ? (
+              <>
+                {scopeLabel.startsWith('Demo session: ') && <span>Demo</span>}
+                <LoginSettingsSessionSummary
+                  activeSession={{ slug: summarySlug, label: this._sessionName(summarySlug) }}
+                  sessionHref={buildSettingsSessionHref(summarySlug)}
+                />
+              </>
+            ) : (
+              scopeLabel
+            )}
+          </div>
           <div className={styles.sessionContent}>
             <div className={styles.leaderboardSection} data-testid="ce-community-leaderboard-section">
               <div className={styles.leaderboardTopBar}>
