@@ -580,11 +580,23 @@
     #mainLogo,
     #mainLogoLoggedIn {
       display: block;
-      width: 56px;
-      max-width: 56px;
+      width: 88px;
+      max-width: 88px;
       min-height: 0;
-      height: 56px;
+      height: 88px;
+      // Compensate for the SVG's intrinsic padding without expanding the header row.
+      margin: -12px 0;
       object-fit: contain;
+    }
+  }
+
+  @media (min-width: 466px) and (max-width: 768px) {
+    #mainLogo,
+    #mainLogoLoggedIn {
+      width: 112px;
+      max-width: 112px;
+      height: 112px;
+      margin: -16px 0;
     }
   }
 }

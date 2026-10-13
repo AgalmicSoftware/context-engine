@@ -114,7 +114,8 @@ using the same title margins, collapse height, and submit-rail offsets as Contex
 Engine, with the shared five-second fade and hover/focus reveal. Loading labels
 use `--ce-loading-text`: black on the Minimal and Classic 95 light surfaces and
 near-white in Context Engine. On mobile, Minimal uses a compact navigation header
-with a 56px logo while preserving the account controls. The profile presents session
+with the visible logo artwork matched to the Login button's height while preserving
+the account controls. The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
 question cards and account controls. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
