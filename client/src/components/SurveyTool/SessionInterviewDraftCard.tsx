@@ -340,7 +340,7 @@ export default function SessionInterviewDraftCard({
               convictionValue={edited.conviction ?? 0}
               importanceValue={edited.importance ?? 0}
               activeSliderValue={edited[sliderMode] ?? 0}
-              hasConvictionImportanceValue={edited.conviction !== undefined || edited.importance !== undefined}
+              hasConvictionImportanceValue={Number(edited.conviction) > 0 || Number(edited.importance) > 0}
               onSelectMode={(mode) => {
                 setSliderMode(mode);
                 setSliderOpen(true);
