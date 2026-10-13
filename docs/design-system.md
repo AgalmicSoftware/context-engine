@@ -118,6 +118,7 @@ with a 56px logo while preserving the account controls. The profile presents ses
 sections as a single column of compact rows, and removes decorative depth from
 question cards and account controls. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
+Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text
 and dark inactive icons on the light header. Expanded Explorer controls, group
 names, Context corpus cards, Risk Matrix details, and Debate Map labels use

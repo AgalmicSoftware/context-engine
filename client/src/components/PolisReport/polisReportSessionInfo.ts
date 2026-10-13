@@ -6,6 +6,6 @@ export const formatPolisReportSessionInfo = (sessionInfo: unknown, sessionSlug: 
   if (sessionSlug !== 'rxc-ra-test' || typeof sessionInfo !== 'string') return text;
 
   // Older Worker metadata and cached descriptions still contain this retired copy.
-  // Apply the display correction only to this session's report description.
+  // Share this session's display correction between Results and the title tooltip.
   return text.replaceAll(`**${retiredRxcInstructions}**`, '').replaceAll(retiredRxcInstructions, '').trim();
 };
