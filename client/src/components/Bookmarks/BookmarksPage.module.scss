@@ -11,7 +11,7 @@ $muted-text: var(--ce-panel-text-muted);
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  color: var(--ce-color-panel-text);
+  color: var(--ce-panel-text);
   font-family: var(--ce-font-mono);
 }
 
@@ -31,7 +31,7 @@ $muted-text: var(--ce-panel-text-muted);
 .title {
   margin: 0;
   font-size: 1.8rem;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   letter-spacing: -0.3px;
 }
 
@@ -46,9 +46,9 @@ $muted-text: var(--ce-panel-text-muted);
   width: 46px;
   height: 46px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-status-success-soft);
+  border: 0;
+  background: transparent;
+  color: var(--ce-panel-text);
   font-size: 1.1rem;
   cursor: pointer;
   display: inline-flex;
@@ -56,23 +56,24 @@ $muted-text: var(--ce-panel-text-muted);
   justify-content: center;
   transition:
     transform 0.08s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    background 0.2s ease;
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-overlay-base) 25%, transparent);
+    color 0.2s ease;
+  box-shadow: none;
 }
 
-.refreshButton:hover {
+.refreshButton:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--ce-action-accent) 60%, transparent);
-  background: $clickable-color;
-  color: var(--ce-document-text);
-  box-shadow: 0 14px 24px color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
+  color: var(--ce-status-info-text);
 }
 
-.refreshButton:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 45%, transparent);
+.refreshButton:focus-visible,
+.summaryHeader:focus-visible {
+  outline: 2px solid var(--ce-focus-ring);
   outline-offset: 2px;
+}
+
+.refreshButton:disabled {
+  color: var(--ce-control-disabled-text);
+  cursor: default;
 }
 
 .summaryRow {
@@ -121,13 +122,13 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .summaryCount {
-  color: var(--ce-color-panel-text);
+  color: var(--ce-panel-text);
   font-size: 1.35rem;
   font-weight: 700;
 }
 
 .summaryCaret {
-  color: color-mix(in srgb, var(--ce-control-text) 70%, transparent);
+  color: $muted-text;
 }
 
 .summaryBody {
@@ -142,7 +143,7 @@ $muted-text: var(--ce-panel-text-muted);
 
 .emptyBanner {
   border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
+  background: var(--ce-surface-alt);
   border-radius: var(--ce-radius-10);
   padding: 12px 16px;
   color: $muted-text;
@@ -163,7 +164,7 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .listItem {
-  background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
+  background: var(--ce-surface-alt);
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
   padding: 10px 12px;
@@ -176,7 +177,7 @@ $muted-text: var(--ce-panel-text-muted);
 
   &:hover {
     border-color: color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
-    background: color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
+    background: var(--ce-surface-raised);
   }
 }
 
@@ -195,7 +196,7 @@ $muted-text: var(--ce-panel-text-muted);
 
 .itemLink:hover,
 .itemLink:focus {
-  color: $clickable-color;
+  color: var(--ce-status-info-text);
   text-decoration: underline;
 }
 
@@ -216,7 +217,7 @@ $muted-text: var(--ce-panel-text-muted);
 .itemMeta {
   font-family: var(--ce-font-mono, 'SFMono-Regular', Menlo, monospace);
   font-size: 0.85rem;
-  color: color-mix(in srgb, var(--ce-control-text) 60%, transparent);
+  color: $muted-text;
   word-break: break-all;
 }
 
@@ -233,7 +234,7 @@ $muted-text: var(--ce-panel-text-muted);
   border-radius: var(--ce-radius-pill);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-  color: var(--ce-document-surface);
+  color: var(--ce-panel-text);
 }
 
 .chiptag {
@@ -248,12 +249,12 @@ $muted-text: var(--ce-panel-text-muted);
 
 .chiptype {
   border-color: color-mix(in srgb, var(--ce-data-series-7) 45%, transparent);
-  color: var(--ce-status-success-soft);
+  color: var(--ce-status-success-text);
 }
 
 .chipsbt {
   border-color: color-mix(in srgb, var(--ce-data-series-3) 45%, transparent);
-  color: var(--ce-data-series-3);
+  color: var(--ce-status-info-text);
 }
 
 .chiptop {
@@ -288,13 +289,13 @@ $muted-text: var(--ce-panel-text-muted);
 .filterCopyButton:hover {
   border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
   background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  color: var(--ce-document-text);
+  color: var(--ce-panel-text);
 }
 
 .filterCopyButtonActive {
   border-color: color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
-  color: var(--ce-document-text);
+  background: $clickable-color;
+  color: var(--ce-action-accent-text);
 }
 
 @media (max-width: 640px) {

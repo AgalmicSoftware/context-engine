@@ -642,6 +642,7 @@ const BookmarksPage = () => {
         <button
           type="button"
           className={styles.refreshButton}
+          data-ce-control-appearance="frameless"
           onClick={handleRefresh}
           aria-label="Refresh bookmarks"
           title="Refresh bookmarks"
@@ -659,6 +660,7 @@ const BookmarksPage = () => {
               <button
                 type="button"
                 className={styles.summaryHeader}
+                data-ce-control-appearance="frameless"
                 onClick={() => toggleSection(section.key)}
                 aria-expanded={isOpen}
               >
