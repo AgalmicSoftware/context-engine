@@ -1308,6 +1308,10 @@ $input-border: var(--ce-input-border);
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
+  .sbtItem {
+    outline: 1px solid color-mix(in srgb, var(--ce-color-black) 50%, transparent);
+  }
+
   .sbtItem .miniSbtName {
     color: var(--ce-document-text);
   }
