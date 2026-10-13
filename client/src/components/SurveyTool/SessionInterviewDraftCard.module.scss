@@ -170,7 +170,7 @@
 .agentCommentMarker {
   width: 26px;
   height: 26px;
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -325,32 +325,49 @@
     color: var(--ce-panel-text-muted);
   }
 
+  .draftCard :global(button[class*='iconButton']) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 1.25rem;
+
+    svg {
+      width: 1em;
+      height: 1em;
+    }
+  }
+
   .draftCard :global([class*='iconButton']),
   .draftCard :global([class*='convictionToggleButton']),
   .injectedEditorShell button {
     color: var(--ce-control-text) !important;
-    opacity: 1 !important;
+    opacity: 0.5 !important;
 
     svg {
       color: currentColor !important;
       filter: none;
     }
 
-    &:hover:not(:disabled),
-    &:focus-visible,
-    &[aria-pressed='true'],
-    &[class*='iconButtonActive'],
-    &[class*='convictionToggleButtonActive'] {
-      color: var(--ce-link) !important;
+    &[class*='iconButtonActive']:not(:has(svg[data-icon='unlock'])):not(:disabled),
+    &[class*='convictionToggleButtonActive']:not(:disabled),
+    &:has(svg[data-icon='lock']):not(:disabled) {
+      opacity: 1 !important;
     }
 
     &[class*='pileLockButtonMenuOpen'] {
-      color: var(--ce-link) !important;
       background: var(--ce-surface-subtle) !important;
     }
 
     &:disabled {
       color: var(--ce-control-disabled-text) !important;
+      opacity: 0.5 !important;
     }
+  }
+
+  .injectedEditorShell button[aria-pressed='true']:not(:disabled) {
+    opacity: 1 !important;
   }
 }

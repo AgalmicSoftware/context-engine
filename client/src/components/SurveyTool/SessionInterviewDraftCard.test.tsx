@@ -9,6 +9,29 @@ import type { InterviewDraftResponse } from './sessionInterview';
 const readDraftCardScss = () => fs.readFileSync(path.join(__dirname, 'SessionInterviewDraftCard.module.scss'), 'utf8');
 
 describe('SessionInterviewDraftCard sliders', () => {
+  it.each([
+    [undefined, undefined, false],
+    [0, 0, false],
+    [0, 4, true],
+    [5, 0, true],
+  ])('shows intensity activity only for nonzero values (%s, %s)', (conviction, importance, active) => {
+    const draft = { questionId: 'q-intensity', answer: 'Agree', conviction, importance };
+    render(
+      <SessionInterviewDraftCard
+        draft={draft}
+        edited={draft}
+        selected
+        existing={false}
+        disabled={false}
+        onSelect={jest.fn()}
+        onEdit={jest.fn()}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: 'Conviction / importance' });
+    if (active) expect(toggle).toHaveClass('iconButtonActive');
+    else expect(toggle).not.toHaveClass('iconButtonActive');
+  });
+
   it('exposes both modes and preserves their independent values when editing', () => {
     const draft = { questionId: 'q1', answer: 'Agree', conviction: 4, importance: 6 };
     const onEdit = jest.fn();
