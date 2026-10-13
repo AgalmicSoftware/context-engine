@@ -2412,7 +2412,6 @@
 
   .sectionsGrid,
   .sectionsGridTwoUp {
-    grid-template-columns: 1fr;
     gap: 12px;
     margin-top: 28px;
   }
@@ -2463,6 +2462,24 @@
     line-height: 1.5;
     align-self: center;
     opacity: 1;
+  }
+
+  @media (min-width: 768px) {
+    .sectionsGrid .sectionContainer:not(.sectionExpanded) {
+      .sectionHeaderText {
+        flex-direction: column;
+        align-items: flex-start;
+        flex-wrap: nowrap;
+        gap: 4px;
+        text-align: left;
+      }
+
+      .sectionHeaderSubtitle {
+        font-size: 0.63em;
+        line-height: 1.12;
+        align-self: flex-start;
+      }
+    }
   }
 
   .pileBackButton span {
