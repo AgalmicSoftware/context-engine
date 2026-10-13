@@ -286,17 +286,68 @@
   outline-offset: 2px;
 }
 
+.draftCard :global(button[class*='iconButton']) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 1.25rem;
+  opacity: 0.35 !important;
+
+  svg {
+    width: 1em;
+    height: 1em;
+  }
+
+  &[class*='iconButtonActive']:not(:has(svg[data-icon='unlock'])):not(:disabled),
+  &:has(svg[data-icon='lock']):not(:disabled) {
+    opacity: 1 !important;
+  }
+
+  &:has(svg[data-icon='unlock']):not(:disabled) {
+    color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent) !important;
+
+    svg {
+      color: currentColor !important;
+      filter: none;
+    }
+  }
+}
+
+.controlsRow > :global([class*='importanceSlider']) {
+  margin-bottom: 0;
+  opacity: 0.5;
+}
+
 @media (max-width: 700px) {
   .draftCard {
     padding: 12px 44px 12px 12px;
   }
 
   .controlsRow {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .controlsRow > :global([class*='importanceSlider']) {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+
+    &:has(input[type='range']) {
+      flex-basis: 100%;
+      width: 100%;
+    }
+  }
+
+  .controlsRow :global([class*='convictionToggleStack']) {
+    min-width: 0;
   }
 
   .footerIconCluster {
+    margin-left: auto;
     justify-content: flex-end;
   }
 }
@@ -325,23 +376,36 @@
     color: var(--ce-panel-text-muted);
   }
 
-  .draftCard :global(button[class*='iconButton']) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    font-size: 1.25rem;
+  .controlsRow > :global([class*='importanceSlider']) {
+    opacity: 1;
+  }
 
-    svg {
-      width: 1em;
-      height: 1em;
+  .draftCard :global(button[class*='iconButton']),
+  .draftCard :global(button[class*='convictionToggleButton']) {
+    color: var(--ce-control-text) !important;
+    opacity: 0.45 !important;
+
+    &[class*='iconButtonActive']:not(:has(svg[data-icon='unlock'])):not(:disabled),
+    &[class*='convictionToggleButtonActive']:not(:disabled),
+    &:has(svg[data-icon='lock']):not(:disabled) {
+      opacity: 1 !important;
+    }
+
+    &:has(svg[data-icon='unlock']):not(:disabled) {
+      color: var(--ce-control-text) !important;
+      opacity: 0.35 !important;
+    }
+
+    &[class*='pileLockButtonMenuOpen'] {
+      background: var(--ce-surface-subtle) !important;
+    }
+
+    &:disabled {
+      color: var(--ce-control-disabled-text) !important;
+      opacity: 0.25 !important;
     }
   }
 
-  .draftCard :global([class*='iconButton']),
-  .draftCard :global([class*='convictionToggleButton']),
   .injectedEditorShell button {
     color: var(--ce-control-text) !important;
     opacity: 0.5 !important;
@@ -351,19 +415,8 @@
       filter: none;
     }
 
-    &[class*='iconButtonActive']:not(:has(svg[data-icon='unlock'])):not(:disabled),
-    &[class*='convictionToggleButtonActive']:not(:disabled),
-    &:has(svg[data-icon='lock']):not(:disabled) {
-      opacity: 1 !important;
-    }
-
-    &[class*='pileLockButtonMenuOpen'] {
-      background: var(--ce-surface-subtle) !important;
-    }
-
     &:disabled {
       color: var(--ce-control-disabled-text) !important;
-      opacity: 0.5 !important;
     }
   }
 
