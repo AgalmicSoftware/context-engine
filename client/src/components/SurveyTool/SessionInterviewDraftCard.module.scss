@@ -300,3 +300,57 @@
     justify-content: flex-end;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .readableTextButton,
+  .autosizeTextArea,
+  .injectedEditorShell textarea {
+    background: var(--ce-input-bg) !important;
+    border: 1px solid var(--ce-border-strong) !important;
+    color: var(--ce-panel-text) !important;
+    caret-color: var(--ce-panel-text);
+
+    &::placeholder {
+      color: var(--ce-panel-text-muted) !important;
+      opacity: 1;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring) !important;
+      outline-offset: 2px;
+    }
+  }
+
+  .emptyReadableText {
+    color: var(--ce-panel-text-muted);
+  }
+
+  .draftCard :global([class*='iconButton']),
+  .draftCard :global([class*='convictionToggleButton']),
+  .injectedEditorShell button {
+    color: var(--ce-control-text) !important;
+    opacity: 1 !important;
+
+    svg {
+      color: currentColor !important;
+      filter: none;
+    }
+
+    &:hover:not(:disabled),
+    &:focus-visible,
+    &[aria-pressed='true'],
+    &[class*='iconButtonActive'],
+    &[class*='convictionToggleButtonActive'] {
+      color: var(--ce-link) !important;
+    }
+
+    &[class*='pileLockButtonMenuOpen'] {
+      color: var(--ce-link) !important;
+      background: var(--ce-surface-subtle) !important;
+    }
+
+    &:disabled {
+      color: var(--ce-control-disabled-text) !important;
+    }
+  }
+}
