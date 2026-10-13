@@ -94,12 +94,6 @@ const ensureMutableCountMap = (value: unknown): SbtCountMap => {
   return value as SbtCountMap;
 };
 
-export const isSbtActivityCacheEntry = (value: unknown): value is SbtActivityCacheEntry =>
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value) &&
-  (value as { schemaVersion?: unknown }).schemaVersion === SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION;
-
 export const hydrateSbtActivityCacheEntry = (value: unknown): SbtActivityCacheEntry | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const legacyEntry = value as LegacySbtActivityCacheEntry;

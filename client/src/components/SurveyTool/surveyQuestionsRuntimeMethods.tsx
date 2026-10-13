@@ -1,4 +1,4 @@
-import { loadPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
+import { createLazyPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
 import type {
   SurveyQuestionsLegacyRecord,
   SurveyQuestionsLegacyValue,
@@ -26,6 +26,8 @@ import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRunti
 import { createSurveyQuestionsRuntimeStateRuntime } from './surveyQuestionsRuntimeStateRuntime.js';
 import { readQuestionsCache } from './surveyToolCacheState.js';
 import { resolveQuestionReadCacheContext } from './surveyToolScope.js';
+import { resolveEditableQuestionList } from './surveyToolResponsePayloadController.js';
+import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads';
 
 export type SurveyQuestionsRuntimeMethods = SurveyQuestionsLegacyRecord;
 
@@ -439,6 +441,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     persistDraftSafely,
   } = createSurveyQuestionsDraftPersistenceRuntime({
     ...context,
+    getChangedQidsAndFields: (surveyIndex: SurveyQuestionsLegacyValue) => getChangedQidsAndFields(surveyIndex),
     getHydrationQuestionIds: () => getHydrationQuestionIds(),
     normalizeFieldAudienceMode,
     resolveFieldEncryptionAudience,
@@ -457,10 +460,11 @@ export const createSurveyQuestionsRuntimeMethods = (
     resolveSubmissionGroupContext,
   } = createSurveyQuestionsRenderedHydrationRuntime({
     ...context,
-    deepClone: (value: SurveyQuestionsLegacyValue) => deepClone(value),
     getPendingEditStats: () => getPendingEditStats?.() || null,
     loadDraft: () => loadDraft(),
-    rehydrateLocalCacheAnswersForRenderedIds: () => rehydrateLocalCacheAnswersForRenderedIds(),
+    // View all reloads saved answers through its own sync, which nothing can race.
+    rehydrateLocalCacheAnswersForRenderedIds: () =>
+      inst._viewAllSync ? syncViewAllQuestions() : rehydrateLocalCacheAnswersForRenderedIds(),
   });
 
   const {
@@ -473,6 +477,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     rehydrateLocalCacheAnswersForRenderedIds,
     resetFormStateForAccountChange,
     resolveDiffBaselineSlice,
+    syncViewAllQuestions,
     valuesEqual,
   } = createSurveyQuestionsResponseStateRuntime({
     ...context,
@@ -588,6 +593,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     renderPromptWithManualDecrypt,
     renderQuestionTagDropdown,
     renderQuestionTagDropdownRow,
+    resolveEffectiveResponseGateConfig,
     toggleAdditionalCommentsEncryption,
     toggleAnswerEncryption,
   });
@@ -693,21 +699,10 @@ export const createSurveyQuestionsRuntimeMethods = (
       setState(buildAutoDecryptDisabledState());
     }
 
-    // Lazy-load only the two Poseidon arities used by commitment serialization.
+    // Poseidon commitments load poseidon-lite when the first one is computed.
     inst._isMounted = true;
     inst._hasMounted = true;
-    const loadHasher: SurveyQuestionsLegacyValue = async () => {
-      try {
-        const poseidonHasher = await loadPoseidonHasher();
-        if (inst._isMounted) {
-          setState(buildHasherState(poseidonHasher));
-          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite arities 2/3)');
-        }
-      } catch (e: any) {
-        surveyLog.warn('⚠️ Poseidon commitments unavailable; Keccak commitments remain enabled.', e);
-      }
-    };
-    loadHasher();
+    setState(buildHasherState(createLazyPoseidonHasher()));
 
     loadBookmarks();
     hydrateGateSbtLabels();
@@ -788,7 +783,8 @@ export const createSurveyQuestionsRuntimeMethods = (
         );
       })();
     } else {
-      // Standalone mode (question pool passed as prop)
+      // Standalone mode (question pool passed as prop): the View all editor.
+      inst._viewAllSync = { restored: new Set() };
       const initialSlice: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
       setState(
         buildInitialStandaloneResponseState({
@@ -798,11 +794,7 @@ export const createSurveyQuestionsRuntimeMethods = (
           ),
           jsonPreview: prepareJsonAndHash(0),
         }),
-        () => {
-          rehydrateDraftForRenderedIds();
-          // Quick local-cache rehydrate for non-encrypted prior answers (standalone list)
-          rehydrateLocalCacheAnswersForRenderedIds();
-        },
+        () => syncViewAllQuestions(),
       );
     }
   };
@@ -1163,6 +1155,12 @@ export const createSurveyQuestionsRuntimeMethods = (
     // Standalone mode (QuestionsDashboard)
     else {
       if (prevProps.questionPool !== propsRef.current.questionPool) {
+        // Save pending edits first: the merge drops the answers of questions that left the list.
+        if (inst._persistTimer || inst._draftDirtyQids?.size) {
+          if (inst._persistTimer) clearTimeout(inst._persistTimer);
+          inst._persistTimer = null;
+          persistDraft();
+        }
         setState(
           (prevStateInner: SurveyQuestionsLegacyValue) =>
             buildQuestionPoolResponseMergeState(prevStateInner, {
@@ -1171,15 +1169,13 @@ export const createSurveyQuestionsRuntimeMethods = (
               questionPool: propsRef.current.questionPool || [],
               surveyIndex: 0,
             }),
-          () => {
-            updateJsonPreview();
-            rehydrateDraftForRenderedIds();
-            rehydrateLocalCacheAnswersForRenderedIds();
-          },
+          () => updateJsonPreview(),
         );
       }
 
+      // Sync once the new list is in place, or when saved answers changed.
       if (
+        prevState.questionPool !== stateRef.current.questionPool ||
         (prevProps.isQuestionCacheReady !== propsRef.current.isQuestionCacheReady &&
           propsRef.current.isQuestionCacheReady) ||
         (prevProps.isResponsesCacheReady !== propsRef.current.isResponsesCacheReady &&
@@ -1189,7 +1185,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         (propsRef.current.isResponsesCacheReady &&
           prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce)
       ) {
-        rehydrateLocalCacheAnswersForRenderedIds();
+        syncViewAllQuestions();
       }
 
       const standaloneAuthBecameReady =
@@ -1200,15 +1196,13 @@ export const createSurveyQuestionsRuntimeMethods = (
       if (propsRef.current.account !== prevProps.account || standaloneAuthBecameReady) {
         // Clear live form state before reacting to new account
         resetFormStateForAccountChange(() => {
+          // Rerun cache/prior-response hydration once the reset form is in place.
           setState(
             buildStandaloneAuthResetState(
               updateSubmittedSinceLastEdit(stateRef.current.submittedSinceLastEdit, 'reset'),
             ),
+            () => syncViewAllQuestions({ restoreAll: true }),
           );
-          // Standalone mode typically relies on local cache or props,
-          // but we should also rerun cache/prior-response hydration when auth becomes ready.
-          rehydrateDraftForRenderedIds();
-          rehydrateLocalCacheAnswersForRenderedIds();
         }, propsRef.current.account === prevProps.account);
       }
     }
@@ -1663,9 +1657,9 @@ export const createSurveyQuestionsRuntimeMethods = (
           ...(latest ? { userAnswers: deepClone(latest) } : {}),
         }),
         () => {
+          // Decrypting is not an edit: drafts hold only changes, never saved plaintext.
           const jsonPreview: SurveyQuestionsLegacyValue = prepareJsonAndHash(surveyIndex);
           setState(buildJsonPreviewState(jsonPreview));
-          persistDraftSafely && persistDraftSafely(0);
         },
       );
     } catch (error: any) {
@@ -1918,8 +1912,8 @@ export const createSurveyQuestionsRuntimeMethods = (
           ratingEnvelopes: latestRatingEnvs,
         },
         onSuccessStateApplied: () => {
+          // Decrypting is not an edit: drafts hold only changes, never saved plaintext.
           updateJsonPreview && updateJsonPreview();
-          persistDraftSafely && persistDraftSafely(0);
         },
       });
       if (completionStatus.shouldReturn) return completionStatus.result;
@@ -1965,6 +1959,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     isQuestionLockedForResponse,
     maybeBlockSubmitUntilQuestionPoolComplete,
     prepareJsonAndHash,
+    resolveDiffBaselineSlice,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
     resolveEffectiveResponseGateConfig,
@@ -2082,9 +2077,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     // Use correct survey index for payload + diff gating
     const idx: SurveyQuestionsLegacyValue = context.surveyIndex;
 
-    const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState);
-
-    // Build full JSON snapshot first (unchanged behavior) then filter by changed set
+    // Filter the full JSON snapshot by the changed set
     let changedSet: SurveyQuestionsLegacyValue;
     let changedMapForSubmit: SurveyQuestionsLegacyValue = {};
     try {
@@ -2103,6 +2096,53 @@ export const createSurveyQuestionsRuntimeMethods = (
       throw new Error('No new or changed responses to submit.');
     }
 
+    // Changed questions upload even when blank: clearing a saved answer is an edit.
+    const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet);
+
+    // A changed question that cannot be uploaded as it is stays unsaved and is named; it never
+    // holds back the other edits, and only rows that reach storage are marked saved.
+    inst._heldBackSubmitQids = [];
+    inst._heldBackSubmitMessage = '';
+    const payloadQids = new Set(
+      (context.singleQuestionMode ? [data] : Array.isArray(data?.responses) ? data.responses : []).map(
+        (response: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(response?.questionID),
+      ),
+    );
+    const submitSlice: SurveyQuestionsLegacyValue = overrideState || stateRef.current.surveysResponseState?.[idx] || {};
+    const heldBack = new Map<string, 'unlisted' | 'locked'>();
+    Array.from(changedSet as Set<string>).forEach((qid) => {
+      if (
+        !payloadQids.has(normalizeQuestionIdKey(qid)) &&
+        (hasMeaningfulFieldValue(submitSlice.answers?.[qid]) ||
+          hasMeaningfulFieldValue(submitSlice.additionalComments?.[qid]) ||
+          submitSlice.importance?.[qid] != null ||
+          submitSlice.conviction?.[qid] != null)
+      )
+        heldBack.set(normalizeQuestionIdKey(qid), 'unlisted');
+    });
+    const describeHeldBack = () => {
+      const questions = [
+        ...resolveEditableQuestionList(stateRef.current),
+        ...(Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : []),
+        ...(Array.isArray(propsRef.current.questionPool) ? propsRef.current.questionPool : []),
+      ];
+      return Array.from(heldBack, ([qid, reason]) => {
+        const prompt = String(
+          questions.find((question: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(question?.id) === qid)
+            ?.prompt || '',
+        ).trim();
+        const name = prompt && !isMaskedPromptText(prompt) ? `“${prompt}”` : `Question ${qid.slice(0, 10)}…`;
+        return reason === 'locked'
+          ? `${name} still holds a locked value that can't be sent as it is, so it wasn't submitted. Decrypt it, set its lock again and submit.`
+          : `${name} isn't in this page's question list, so its change wasn't submitted. If it came from an interview, remove that draft; otherwise reload the page and submit again.`;
+      }).join(' ');
+    };
+    const failPreparation = (message: string): never => {
+      inst._submitGuard = false;
+      setState(buildSubmitPreparationErrorState(message));
+      throw new Error(message);
+    };
+
     let filtered: SurveyQuestionsLegacyValue;
     try {
       filtered = filterChangedResponsesForSubmit({
@@ -2114,12 +2154,11 @@ export const createSurveyQuestionsRuntimeMethods = (
         HashZero: ethers.constants.HashZero,
       });
     } catch (e: any) {
-      inst._submitGuard = false;
-      setState(buildSubmitPreparationErrorState(e.message || 'No new or changed responses to submit.'));
-      throw e;
+      failPreparation(heldBack.size ? describeHeldBack() : e.message || 'No new or changed responses to submit.');
     }
 
-    const { questionIds, questionResponses, surveyId, surveyResponse }: SurveyQuestionsLegacyValue = filtered;
+    const { surveyId }: SurveyQuestionsLegacyValue = filtered;
+    let { questionIds, questionResponses, surveyResponse }: SurveyQuestionsLegacyValue = filtered;
 
     const submissionContext: SurveyQuestionsLegacyValue = resolveSubmissionGroupContext({
       questionIds,
@@ -2133,8 +2172,9 @@ export const createSurveyQuestionsRuntimeMethods = (
 
     // Rating encryption (importance/conviction):
     // - Preserve existing rating envelopes on non-rating edits (prevents wiping encrypted ratings).
-    // - When the response is encrypted (or rating already encrypted), ensure ratings are stored in envelopes
-    //   and remove plaintext copies from the uploaded payload.
+    // - When the answer or a non-blank comment is locked, or the ratings are saved encrypted and no
+    //   lock was turned off, ratings are stored in envelopes with the plaintext removed; otherwise
+    //   known ratings go public and undecrypted ones keep their envelope.
     try {
       const savedSource = stateRef.current.userAnswers;
       const savedResponses: SurveyQuestionsLegacyValue[] = Array.isArray(savedSource?.responses)
@@ -2142,31 +2182,37 @@ export const createSurveyQuestionsRuntimeMethods = (
         : savedSource
           ? [savedSource]
           : [];
-      const savedIds = new Set(
-        // Optimistic answer rows may omit ratings; they must not shadow the saved envelopes.
-        savedResponses
-          .filter(
-            (response) =>
-              (typeof response.importanceEncrypted === 'string' && response.importanceEncrypted) ||
-              (typeof response.convictionEncrypted === 'string' && response.convictionEncrypted) ||
-              getImportanceFromResponse(response) !== null ||
-              getConvictionFromResponse(response) !== null,
-          )
-          .map((response) => normalizeQuestionIdKey(response.questionID || response.questionId)),
-      );
       const cacheScope = resolveQuestionReadCacheContext(context.props || propsRef.current, submissionGroupKey);
       const cachedResponses =
         readQuestionsCache(submissionGroupKey)?.[cacheScope.networkIdStr]?.questionResponses || {};
-      const cachedRatingSources = questionResponses.flatMap((response: SurveyQuestionsLegacyValue) => {
-        const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
-        if (savedIds.has(qid)) return [];
+      const readCachedResponse = (qid: string): SurveyQuestionsLegacyValue => {
         const raw = cachedResponses[qid]?.[String(context.account || '').toLowerCase()];
         try {
           const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          return saved && typeof saved === 'object' ? [{ ...saved, questionID: qid }] : [];
+          return saved && typeof saved === 'object' ? saved : null;
         } catch (_) {
-          return [];
+          return null;
         }
+      };
+      // Per rating field, an envelope from either the saved row or the cache wins over a plaintext
+      // value: a row that lost its envelope must never publish a rating storage holds encrypted.
+      const ratingSources = questionResponses.map((response: SurveyQuestionsLegacyValue) => {
+        const qid = normalizeQuestionIdKey(response.questionID || response.questionId);
+        const rows = [
+          savedResponses.find((row) => normalizeQuestionIdKey(row?.questionID || row?.questionId) === qid),
+          readCachedResponse(qid),
+        ];
+        const source: SurveyQuestionsLegacyValue = { questionID: qid };
+        for (const [fieldKey, envelopeKey] of [
+          ['importance', 'importanceEncrypted'],
+          ['conviction', 'convictionEncrypted'],
+        ]) {
+          const row =
+            rows.find((candidate) => typeof candidate?.[envelopeKey] === 'string' && candidate[envelopeKey]) ||
+            rows.find((candidate) => candidate?.[fieldKey] != null);
+          if (row) Object.assign(source, { [fieldKey]: row[fieldKey] ?? null, [envelopeKey]: row[envelopeKey] || '' });
+        }
+        return source;
       });
       await processRatingEnvelopesForSubmit(
         {
@@ -2180,7 +2226,7 @@ export const createSurveyQuestionsRuntimeMethods = (
                   additionalComments: {},
                 },
           // A standalone pile may hydrate fields without populating userAnswers.
-          userAnswersSource: { responses: [...savedResponses, ...cachedRatingSources] },
+          userAnswersSource: { responses: ratingSources },
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {
@@ -2226,6 +2272,23 @@ export const createSurveyQuestionsRuntimeMethods = (
       throw new Error('Submission context changed before broadcast.');
     }
 
+    // The upload guard refuses a payload with a locked-value mismatch; hold back only that question.
+    questionResponses = questionResponses.filter((response: SurveyQuestionsLegacyValue) => {
+      try {
+        validateNoLockedPlaintextInPayload(response, {
+          family: 'question_response_payload',
+          path: 'question response',
+        });
+        return true;
+      } catch (_) {
+        heldBack.set(normalizeQuestionIdKey(response?.questionID), 'locked');
+        return false;
+      }
+    });
+    if (!questionResponses.length) failPreparation(describeHeldBack());
+    questionIds = questionResponses.map((response: SurveyQuestionsLegacyValue) => response.questionID);
+    if (surveyResponse) surveyResponse = { ...surveyResponse, responses: questionResponses };
+
     const hashDeps: SurveyQuestionsLegacyValue = {
       hashIdentifier: cryptoUtils?.hashIdentifier?.bind(cryptoUtils),
       isHexString: utils.isHexString,
@@ -2256,6 +2319,11 @@ export const createSurveyQuestionsRuntimeMethods = (
       submissionTarget,
     );
 
+    if (heldBack.size) {
+      inst._heldBackSubmitQids = Array.from(heldBack.keys());
+      inst._heldBackSubmitMessage = describeHeldBack();
+      setState({ submissionError: inst._heldBackSubmitMessage });
+    }
     return normalizeSubmitReceipt(tx, {
       questionResponses,
       surveyResponse,

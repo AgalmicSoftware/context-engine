@@ -145,6 +145,30 @@ describe('surveyResultsHydrationRuntime', () => {
     expect(instance._surveyModeSourceSignature).toContain('0xabc');
   });
 
+  it('keeps only string document URLs and titles from uploaded survey metadata', async () => {
+    const state = createState({ surveyId: '0xabc', viewMode: 'survey' });
+    const surveyCache = {
+      11155420: {
+        surveyResponses: { '0xabc': {} },
+        surveys: {
+          '0xabc': {
+            documentURLs: ['https://example.test/doc', { href: 'https://example.test/object' }, 42, '   '],
+            questionIDs: ['Q1'],
+            title: { text: 'Not a title' },
+          },
+        },
+      },
+    };
+    const harness = createPorts({ state, surveyCache });
+
+    await fetchSurveyResultsSurveyModeResponses({ instance: createInstance(), ports: harness.ports });
+
+    expect(harness.patchCalls[0].patch).toMatchObject({
+      surveyDocumentURLs: ['https://example.test/doc'],
+      surveyTitle: '',
+    });
+  });
+
   it('applies question-mode patch before reapplying active filters', async () => {
     const state = createState({
       filteredQuestionsCount: 1,

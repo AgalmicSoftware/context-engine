@@ -59,6 +59,7 @@ test('verifyPublicDocs rejects private markers, unavailable commands, and broken
       'Run `npm run ai:private-flow`.',
       'See [missing](missing.md).',
       'Stale source path: `client/src/missingFeature.js`.',
+      'Retired build output: `client/build-vite/`.',
       '',
     ].join('\n'));
 
@@ -73,6 +74,7 @@ test('verifyPublicDocs rejects private markers, unavailable commands, and broken
     assert.match(formatted, /missing public npm script: ai:private-flow/);
     assert.match(formatted, /broken local Markdown link: missing\.md/);
     assert.match(formatted, /missing inline repository path: client\/src\/missingFeature\.js/);
+    assert.match(formatted, /missing inline repository path: client\/build-vite\//);
   });
 });
 

@@ -60,9 +60,6 @@ export const canonicalizeLegacySessionAlias = (rawSlug: unknown): string => {
 export const getReservedLegacySessionSlugs = () =>
   new Set([...Object.keys(LEGACY_SESSION_ALIASES), ...Object.values(LEGACY_SESSION_ALIASES).filter(Boolean)]);
 
-export const isReservedLegacySessionSlug = (slug: unknown): boolean =>
-  getReservedLegacySessionSlugs().has(readTrimmedSessionSlug(slug).toLowerCase());
-
 export const getBaselineDemoSessionSlugs = () =>
   getBaselineDemoSessionKeys().map((key) => readDemoSessionSlugByKey(key));
 

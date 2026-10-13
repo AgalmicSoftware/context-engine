@@ -100,7 +100,8 @@ export const normalizeWorkerGroupDefaultTags = (sessionConfig: unknown): string[
     .slice(0, 20);
 };
 
-const isSafeHttpsUrl = (value: string): boolean => {
+// Mirrors the Worker's Group URL rule: public https only, no credentials, at most 2048 characters.
+export const isSafeHttpsUrl = (value: string): boolean => {
   try {
     const parsed = new URL(value);
     return parsed.protocol === 'https:' && !parsed.username && !parsed.password && value.length <= 2048;
@@ -780,23 +781,6 @@ export const listWorkerGroupsAdmin = ({
     ...payload,
     groups: normalizeGroups(payload.groups, sessionSlug),
   }));
-
-export const reconcileEmptyWorkerGroupsAdmin = ({
-  sessionId,
-  sessionSlug,
-  postSignedRequest,
-}: {
-  sessionId: unknown;
-  sessionSlug: unknown;
-  postSignedRequest: PostSignedWorkerGroupRequest;
-}): Promise<UnknownRecord> =>
-  runAdminAction({
-    action: 'groups/reconcile-empty',
-    body: {},
-    sessionId,
-    sessionSlug,
-    postSignedRequest,
-  });
 
 export const listWorkerGroupMembers = ({
   groupId,

@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { exportCloudflareEncryptedPayloadEnvelopes, readStorageUploadRequestPayload, storageRoute } from './storageRouteExecution.js';
+import {
+	exportCloudflareEncryptedPayloadEnvelopes,
+	readStorageUploadRequestPayload,
+	setCloudflareStorageResourceHidden,
+	storageRoute,
+} from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
 import { writeStorageEnvelopeKeyReleaseAudit } from './storageEnvelopeEncryption.js';
@@ -15,6 +20,7 @@ import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+const QUESTION_FIXTURE = Object.freeze({ id: 'q-fixture', type: 'binary', prompt: 'Should the pilot continue?' });
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
 const WORKER_GROUP_SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const CLOUDFLARE_WORKER_GATE_CONFIG = {
@@ -99,17 +105,31 @@ const createMockR2 = () => {
 	};
 };
 
-const createMockKv = () => {
+// Cloudflare KV takes one write per key per second and fails others with 429.
+// Given a request clock that tests advance between requests, the mock enforces
+// that, so a request that writes one key twice fails here as it would live.
+const createMockKv = ({ requestClock } = {}) => {
 	const store = new Map();
+	const lastWriteMs = new Map();
+	const recordWrite = (key) => {
+		if (!requestClock) return;
+		const nowMs = requestClock();
+		if (lastWriteMs.has(key) && nowMs - lastWriteMs.get(key) < 1_000) {
+			throw new Error('KV PUT failed: 429 Too Many Requests');
+		}
+		lastWriteMs.set(key, nowMs);
+	};
 	return {
 		store,
 		async put(key, value) {
+			recordWrite(key);
 			store.set(key, value);
 		},
 		async get(key) {
 			return store.get(key) || null;
 		},
 		async delete(key) {
+			recordWrite(key);
 			store.delete(key);
 		},
 		async list({ prefix = '' } = {}) {
@@ -118,7 +138,7 @@ const createMockKv = () => {
 	};
 };
 
-const attachSessionCoordinator = (env, setConfig) => {
+const attachSessionCoordinator = (env, setConfig, coordinatorDeps = {}) => {
 	env.__testProjectSessionConfig = setConfig;
 	if (env.CE_SESSION_COORDINATOR) return;
 	const instances = new Map();
@@ -149,14 +169,25 @@ const attachSessionCoordinator = (env, setConfig) => {
 				};
 				const coordinator = new SessionWriteCoordinator({ storage }, env, {
 					putSessionConfig: async (_env, _slug, nextConfig) => env.__testProjectSessionConfig(nextConfig),
+					...coordinatorDeps,
 				});
 				instances.set(id, {
+					values,
 					fetch: (input, init) => coordinator.fetch(input instanceof Request ? input : new Request(input, init)),
 				});
 			}
 			return instances.get(id);
 		},
+		instances,
 	};
+};
+
+// A value any test coordinator instance has stored under this key.
+const readCoordinatorValue = (env, key) => {
+	for (const instance of env.CE_SESSION_COORDINATOR.instances.values()) {
+		if (instance.values.has(key)) return structuredClone(instance.values.get(key));
+	}
+	return undefined;
 };
 
 const readStorageIndexMetadata = async (kv, slug, resource, id) => JSON.parse(await kv.get(`ce-storage:${slug}:${resource}:${id}`));
@@ -574,7 +605,7 @@ test('private response reads separate participant submission scope from non-owne
 			const upload = async (address, authScopes, extra = {}) => {
 				const response = await route('/storage/upload', new Request('https://worker.example/storage/upload', {
 					method: 'POST', headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ data: { answer: { value: `private answer from ${address}` }, responder: first }, resource: 'responses', ...extra }),
+					body: JSON.stringify({ data: { questionID: '0xq1', answer: { value: `private answer from ${address}` }, responder: first }, resource: 'responses', ...extra }),
 				}), address, authScopes);
 				assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
 				return (await response.json()).storageRef.id;
@@ -649,7 +680,7 @@ test('storageRoute delegates Arweave uploads and returns storageRef compatibilit
 	const request = new Request('https://worker.example/storage/upload', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ data: { ok: true }, contentType: 'application/json', resource: 'questions' }),
+		body: JSON.stringify({ data: QUESTION_FIXTURE, contentType: 'application/json', resource: 'questions' }),
 	});
 	let uploadContext = null;
 
@@ -757,7 +788,7 @@ test('authenticated storage binding loads production session secrets with env an
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: { ok: true }, resource: 'questions' }),
+			body: JSON.stringify({ data: QUESTION_FIXTURE, resource: 'questions' }),
 		}),
 		env,
 		config: { storageProfile: { backend: 'arweave' } },
@@ -818,7 +849,7 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'too-large', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'too-large', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: CLOUDFLARE_WORKER_GATE_CONFIG,
@@ -843,7 +874,7 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'ok', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'ok', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: CLOUDFLARE_WORKER_GATE_CONFIG,
@@ -866,7 +897,7 @@ test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap up
 for (const resource of ['questions', 'surveys', 'responses']) {
   const question = { id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
   const response = { questionID: 'q1', type: 'quadratic', answer: { value: [3, -4], encrypted: false } };
-  const payload = resource === 'questions' ? question : resource === 'responses' ? response : { title: 'Quadratic survey', questions: [question] };
+  const payload = resource === 'questions' ? question : resource === 'responses' ? response : { surveyID: 's1', title: 'Quadratic survey', questions: [question] };
 
 	test(`storageRoute round-trips quadratic ${resource} payloads through Cloudflare behind opaque refs`, async () => {
 		const r2 = createMockR2();
@@ -1012,7 +1043,7 @@ for (const contentType of ['application/json; charset=utf-8', 'application/ld+js
 				body: JSON.stringify({
 					data: { title: 'JSON payload', count: 1 },
 					contentType,
-					resource: 'questions',
+					resource: 'docsContext',
 				}),
 			}),
 			env,
@@ -1058,7 +1089,7 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question from KV storage?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question from KV storage?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1097,7 +1128,7 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
 	assert.equal(readResponse.status, 200);
 	assert.equal(readResponse.headers.get('Access-Control-Allow-Origin'), 'https://contextengine.sh');
 	assert.equal(readResponse.headers.get('X-CE-Storage-Backend'), 'cloudflare');
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Question from KV storage?', ok: true });
+	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Question from KV storage?', ok: true });
 
 	const listResponse = await storageRoute({
 		path: '/storage/list',
@@ -1115,6 +1146,85 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
 	assert.equal(listed.items[0].storageRef.id, CF_ID);
 	assert.equal(listed.items[0].metadata.payloadAccessMode, 'worker_sbt_gate');
 	assert.doesNotMatch(JSON.stringify(listed), /ce-storage-payload|bucket|token|secret/i);
+});
+
+const PUBLIC_CLOUDFLARE_STORAGE_CONFIG = {
+	storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+};
+
+const uploadAndReadKvPayload = async ({ resource = 'docsContext', contentType, data }) => {
+	const env = { CE_STORAGE_INDEX_KV: createMockKv() };
+	const routeArgs = {
+		env,
+		config: PUBLIC_CLOUDFLARE_STORAGE_CONFIG,
+		slug: 'session-a',
+		uploaderAddress: '0xabc',
+		baseHeaders: {},
+		deps: { json, randomBytes: fixedRandomBytes },
+	};
+	const upload = await storageRoute({
+		...routeArgs,
+		path: '/storage/upload',
+		method: 'POST',
+		request: new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ data, contentType, resource }),
+		}),
+	});
+	assert.equal(upload.status, 200, await upload.clone().text());
+	// Anonymous top-level navigation: no Origin, slug, or Authorization.
+	return storageRoute({
+		...routeArgs,
+		uploaderAddress: '',
+		path: '/storage/read',
+		method: 'GET',
+		request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
+	});
+};
+
+for (const [resource, contentType, data] of [
+	['docsContext', 'text/html', '<!doctype html><script>document.title=location.origin</script>'],
+	['images', 'image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
+	['docsContext', 'application/xhtml+xml', '<html xmlns="http://www.w3.org/1999/xhtml"><script>1</script></html>'],
+	['docsContext', 'text/markdown', '# Notes'],
+]) {
+	test(`storageRoute reads serve uploaded ${contentType} as a sandboxed download`, async () => {
+		const response = await uploadAndReadKvPayload({ resource, contentType, data });
+		assert.equal(response.status, 200);
+		// The declared type stays for fetch-based viewers; navigation downloads.
+		assert.equal(response.headers.get('Content-Type'), contentType);
+		assert.equal(response.headers.get('Content-Disposition'), 'attachment');
+		assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
+		assert.equal(response.headers.get('Content-Security-Policy'), "sandbox; default-src 'none'");
+		assert.equal(await response.text(), data);
+	});
+}
+
+for (const [resource, contentType, data] of [
+	['docsContext', 'application/json', { ok: true }],
+	['docsContext', 'text/plain; charset=utf-8', 'plain notes'],
+	['images', 'image/png', 'png-bytes'],
+	['media', 'audio/mpeg', 'audio-bytes'],
+	['media', 'video/mp4', 'video-bytes'],
+	['docsContext', 'application/pdf', '%PDF-1.7'],
+]) {
+	test(`storageRoute reads serve allow-listed ${contentType} inline with protective headers`, async () => {
+		const response = await uploadAndReadKvPayload({ resource, contentType, data });
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get('Content-Type'), contentType);
+		assert.equal(response.headers.get('Content-Disposition'), null);
+		assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
+		assert.equal(response.headers.get('Content-Security-Policy'), "sandbox; default-src 'none'");
+	});
+}
+
+test('storageRoute reads replace malformed uploaded content types with a download', async () => {
+	const response = await uploadAndReadKvPayload({ contentType: 'text/html, image/png', data: '<b>x</b>' });
+	assert.equal(response.status, 200);
+	assert.equal(response.headers.get('Content-Type'), 'application/octet-stream');
+	assert.equal(response.headers.get('Content-Disposition'), 'attachment');
+	assert.equal(await response.text(), '<b>x</b>');
 });
 
 for (const resource of ['media', 'images']) {
@@ -1207,7 +1317,7 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Aliased KV storage works', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Aliased KV storage works', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1242,7 +1352,7 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 	});
 
 	assert.equal(readResponse.status, 200);
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Aliased KV storage works', ok: true });
+	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Aliased KV storage works', ok: true });
 });
 
 test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs when randomBytes is absent', async () => {
@@ -1255,7 +1365,7 @@ test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs w
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question from Web Crypto entropy?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question from Web Crypto entropy?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1290,7 +1400,7 @@ test('storageRoute fails closed when Cloudflare storage ref entropy is unavailab
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question without entropy?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question without entropy?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1324,7 +1434,7 @@ test('storageRoute rejects short injected Cloudflare storage ref entropy without
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question with short entropy?', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question with short entropy?', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1358,7 +1468,7 @@ test('storageRoute reads Cloudflare list resource from POST JSON body', async ()
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question body resource', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question body resource', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1409,7 +1519,7 @@ test('storageRoute gives Cloudflare list query resource precedence over POST bod
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Question query resource', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Question query resource', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1481,7 +1591,7 @@ test('storageRoute reads legacy KV payloads after an R2 binding is added', async
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				data: { prompt: 'Still in KV after R2 attach', ok: true },
+				data: { id: 'q-fixture', type: 'binary', prompt: 'Still in KV after R2 attach', ok: true },
 				contentType: 'application/json',
 				resource: 'questions',
 			}),
@@ -1512,7 +1622,7 @@ test('storageRoute reads legacy KV payloads after an R2 binding is added', async
 	});
 
 	assert.equal(readResponse.status, 200);
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Still in KV after R2 attach', ok: true });
+	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Still in KV after R2 attach', ok: true });
 });
 
 test('storageRoute rejects Cloudflare storage when neither R2 nor KV payload storage is configured', async () => {
@@ -1522,7 +1632,7 @@ test('storageRoute rejects Cloudflare storage when neither R2 nor KV payload sto
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'missing storage', resource: 'questions' }),
+			body: JSON.stringify({ data: 'missing storage', resource: 'docsContext' }),
 		}),
 		env: {},
 		config: CLOUDFLARE_WORKER_GATE_CONFIG,
@@ -2575,7 +2685,7 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'public question', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'public question', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: publicConfig,
@@ -2616,7 +2726,7 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
 	const listResponse = await storageRoute({
 		path: '/storage/list',
 		method: 'GET',
-		request: new Request('https://worker.example/storage/list?resource=questions'),
+		request: new Request('https://worker.example/storage/list?resource=docsContext'),
 		env,
 		config: publicConfig,
 		slug: 'session-a',
@@ -2936,7 +3046,7 @@ test('storageRoute accepts v2 public-read payload access while preserving legacy
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'public v2', contentType: 'text/plain', resource: 'questions' }),
+			body: JSON.stringify({ data: 'public v2', contentType: 'text/plain', resource: 'docsContext' }),
 		}),
 		env,
 		config: publicV2Config,
@@ -2970,7 +3080,7 @@ test('storageRoute accepts v2 public-read payload access while preserving legacy
 	const listResponse = await storageRoute({
 		path: '/storage/list',
 		method: 'GET',
-		request: new Request('https://worker.example/storage/list?resource=questions'),
+		request: new Request('https://worker.example/storage/list?resource=docsContext'),
 		env,
 		config: publicV2Config,
 		slug: 'session-a',
@@ -3119,6 +3229,7 @@ test('storageRoute returns bounded cursor pages and filters every page independe
 	const listCalls = [];
 	const index = {
 		async list(options) {
+			if (options.prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
 			listCalls.push(options);
 			if (!options.cursor) {
 				return {
@@ -3184,6 +3295,7 @@ test('storageRoute accepts POST list cursors and gives query paging values prece
 	const listCalls = [];
 	const index = {
 		async list(options) {
+			if (options.prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
 			listCalls.push(options);
 			return { keys: [], list_complete: true };
 		},
@@ -4099,7 +4211,7 @@ for (const gate of ['role_gate', 'group_gate']) {
         baseHeaders: {}, deps: { json, randomBytes: fixedRandomBytes },
         request: new Request('https://worker.example/storage/upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: 'synthetic', resource: 'questions', ...extra }),
+          body: JSON.stringify({ data: QUESTION_FIXTURE, resource: 'questions', ...extra }),
         }),
       });
       assert.equal(response.status, 403);
@@ -4141,7 +4253,11 @@ test('storage lists read index rows concurrently with a bounded batch', async ()
   let listCalls = 0;
   const keys = Array.from({ length: 24 }, (_, i) => ({ name: `ce-storage:session-a:questions:${i}` }));
   const env = { CE_STORAGE_INDEX_KV: {
-    list: async () => { listCalls += 1; return { keys, list_complete: true }; },
+    list: async ({ prefix }) => {
+      if (prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
+      listCalls += 1;
+      return { keys, list_complete: true };
+    },
     get: async () => {
       active += 1;
       maximum = Math.max(active, maximum);
@@ -4173,7 +4289,7 @@ test('own-response listing uses authenticated ownership, preserves public rows, 
   for (const uploaderAddress of [account, other]) {
     const uploaded = await storageRoute({ ...common, uploaderAddress, path: '/storage/upload', method: 'POST',
       request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resource: 'responses', data: { answer: 'yes', responder: other } }),
+        body: JSON.stringify({ resource: 'responses', data: { questionID: '0xq1', answer: 'yes', responder: other } }),
       }),
     });
     assert.equal(uploaded.status, 200);
@@ -4194,4 +4310,358 @@ test('own-response listing uses authenticated ownership, preserves public rows, 
   const key = [...kv.store.keys()].find((key) => key.startsWith('ce-storage:'));
   await kv.put(key, '{bad');
   assert.equal((await list('&mine=true', account)).status, 503);
+});
+
+const OWNERSHIP_ADMIN = '0x00000000000000000000000000000000000000aa';
+const OWNERSHIP_AUTHOR = '0x00000000000000000000000000000000000000bb';
+const OWNERSHIP_OTHER = '0x00000000000000000000000000000000000000cc';
+
+const createOwnershipHarness = ({ enforceKvWriteRate = true } = {}) => {
+	// Each harness call is a separate request at least a second after the last.
+	let requestMs = Date.parse('2026-10-10T00:00:00.000Z');
+	const nextRequest = () => {
+		requestMs += 1_000;
+	};
+	const kv = createMockKv(enforceKvWriteRate ? { requestClock: () => requestMs } : {});
+	let clock = Date.parse('2026-10-10T00:00:00.000Z');
+	const common = {
+		env: { CE_STORAGE_INDEX_KV: kv },
+		slug: 'session-a',
+		config: {
+			adminAddress: OWNERSHIP_ADMIN,
+			storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+		},
+		baseHeaders: {},
+		deps: { json, randomBytes: createSequenceRandomBytes(), now: () => (clock += 1_000) },
+	};
+	const upload = async (uploaderAddress, data, resource = 'questions') => {
+		nextRequest();
+		const response = await storageRoute({
+			...common,
+			uploaderAddress,
+			path: '/storage/upload',
+			method: 'POST',
+			request: new Request('https://worker.example/storage/upload', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ data, contentType: 'application/json', resource }),
+			}),
+		});
+		return { status: response.status, body: await readJson(response) };
+	};
+	const list = async (resource = 'questions') => {
+		nextRequest();
+		return readJson(await storageRoute({
+			...common,
+			uploaderAddress: '',
+			path: '/storage/list',
+			method: 'GET',
+			request: new Request(`https://worker.example/storage/list?resource=${resource}`),
+		}));
+	};
+	const read = async (id) => {
+		nextRequest();
+		return storageRoute({
+			...common,
+			uploaderAddress: '',
+			path: '/storage/read',
+			method: 'GET',
+			request: new Request(`https://worker.example/storage/read?id=${id}`),
+		});
+	};
+	const hide = async (id, hidden = true, resource = 'questions') => {
+		nextRequest();
+		return setCloudflareStorageResourceHidden({ ...common, body: { resource, id, hidden }, actor: OWNERSHIP_ADMIN });
+	};
+	return { common, kv, upload, list, read, hide };
+};
+
+const ownedQuestion = (prompt, id = '0xQ1') => ({ id, type: 'binary', prompt, sessionSlug: 'session-a' });
+
+test('question and survey uploads record their authenticated uploader and id', async () => {
+	const { upload, list } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_AUTHOR, { surveyID: '0xS1', title: 'Survey' }, 'surveys')).status, 200);
+	const [question] = (await list()).items;
+	assert.equal(question.metadata.uploader, OWNERSHIP_AUTHOR);
+	assert.equal(question.metadata.resourceId, '0xq1');
+	const [survey] = (await list('surveys')).items;
+	assert.equal(survey.metadata.uploader, OWNERSHIP_AUTHOR);
+	assert.equal(survey.metadata.resourceId, '0xs1');
+});
+
+test('lists say whether each question or survey uploader is a session admin now', async () => {
+	const { common, upload, list } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('By the author', '0xq1'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('By a role admin', '0xq2'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
+	// A Worker role admin that the public adminAddress fields do not name.
+	common.config.workerRoles = { admin: [OWNERSHIP_OTHER] };
+	const flags = (items) => items.map((item) => [item.metadata.resourceId, item.metadata.uploaderIsAdmin]).sort();
+	assert.deepEqual(flags((await list()).items), [['0xq1', false], ['0xq2', true]]);
+	assert.deepEqual(flags((await list('surveys')).items), [['0xs1', true]]);
+	// The flag follows the current role set, not the one at upload time.
+	common.config.workerRoles = {};
+	assert.deepEqual(flags((await list()).items), [['0xq1', false], ['0xq2', false]]);
+});
+
+test('only the first author or a session admin can upload an existing question or survey id again', async () => {
+	const { upload, list } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+
+	const overwrite = await upload(OWNERSHIP_OTHER, ownedQuestion('ATTACKER rewrite', '0xq1'));
+	assert.equal(overwrite.status, 409);
+	assert.equal(overwrite.body.reason, 'storage_resource_id_owned');
+	assert.match(overwrite.body.error, /question id already belongs to another author/);
+
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Admin correction'))).status, 200);
+	assert.deepEqual((await list()).items.map((item) => item.metadata.uploader).sort(), [OWNERSHIP_AUTHOR, OWNERSHIP_AUTHOR, OWNERSHIP_ADMIN].sort());
+
+	assert.equal((await upload(OWNERSHIP_AUTHOR, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xS1', title: 'Hijacked' }, 'surveys')).status, 409);
+	// A new id is anyone's to create.
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xq2'))).status, 200);
+});
+
+// Strips what this release records, so the rows look like uploads from before it.
+const makeLegacyOwnedRows = (kv, resource, resourceIds) => {
+	for (const resourceId of resourceIds) kv.store.delete(`ce-storage-owner:session-a:${resource}:${resourceId}`);
+	for (const [key, value] of kv.store) {
+		if (!key.startsWith(`ce-storage:session-a:${resource}:`)) continue;
+		const metadata = JSON.parse(value);
+		if (!resourceIds.includes(metadata.resourceId)) continue;
+		delete metadata.resourceId;
+		delete metadata.uploader;
+		kv.store.set(key, JSON.stringify(metadata));
+	}
+};
+
+const countIndexScans = (kv, resource) => {
+	const scans = [];
+	const list = kv.list.bind(kv);
+	kv.list = async (options = {}) => {
+		if (String(options.prefix).startsWith(`ce-storage:session-a:${resource}:`)) scans.push(options.prefix);
+		return list(options);
+	};
+	return scans;
+};
+
+for (const coordinated of [false, true]) {
+	test(`ids stored before first-writer records are admin-only after an update (${coordinated ? 'coordinator' : 'inline'})`, async () => {
+		const { common, kv, upload } = createOwnershipHarness();
+		if (coordinated) attachSessionCoordinator(common.env, () => {});
+		// Rows the previous release stored (an admin upload never starts the backfill).
+		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Original?', '0xq1'))).status, 200);
+		assert.equal((await upload(OWNERSHIP_ADMIN, { surveyID: '0xs1', title: 'Survey' }, 'surveys')).status, 200);
+		makeLegacyOwnedRows(kv, 'questions', ['0xq1']);
+		makeLegacyOwnedRows(kv, 'surveys', ['0xs1']);
+		const scans = countIndexScans(kv, 'questions');
+
+		const [claim, fresh] = await Promise.all([
+			upload(OWNERSHIP_OTHER, { id: '0xQ1', type: 'binary', prompt: 'Rewritten by M', encryption: {} }),
+			upload(OWNERSHIP_OTHER, ownedQuestion('A new question', '0xq2')),
+		]);
+		assert.equal(claim.status, 409);
+		assert.equal(claim.body.reason, 'storage_resource_id_owned');
+		assert.match(claim.body.error, /only a session admin/);
+		assert.equal(fresh.status, 200);
+		assert.equal((await upload(OWNERSHIP_OTHER, { surveyID: '0xs1', title: 'Hijacked' }, 'surveys')).status, 409);
+		// Its first author was never recorded either.
+		assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Original edit', '0xq1'))).status, 409);
+		assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Admin edit', '0xq1'))).status, 200);
+		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Another new question', '0xq3'))).status, 200);
+		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Rewrite of a new one', '0xq2'))).status, 200);
+		// The coordinator scans once and keeps the answer. The scan writes no KV,
+		// so the admin's upload became the id's first recorded owner.
+		if (coordinated) assert.equal(scans.length, 1);
+		assert.equal(JSON.parse(kv.store.get('ce-storage-owner:session-a:questions:0xq1')).uploader, OWNERSHIP_ADMIN);
+	});
+}
+
+test('the legacy owner scan advances in bounded steps and keeps its progress', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const legacyIds = Array.from({ length: 30 }, (_, index) => `0xl${String(index).padStart(2, '0')}`);
+	for (const id of legacyIds) assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Legacy?', id))).status, 200);
+	makeLegacyOwnedRows(kv, 'questions', legacyIds);
+	attachSessionCoordinator(common.env, () => {}, { legacyScanRowsPerStep: 4 });
+	// Count the index rows and payloads each coordinator call reads.
+	const reads = { rows: 0, payloads: 0 };
+	const get = kv.get.bind(kv);
+	kv.get = async (key) => {
+		if (key.startsWith('ce-storage:session-a:questions:')) reads.rows += 1;
+		if (key.startsWith('ce-storage-payload:')) reads.payloads += 1;
+		return get(key);
+	};
+	const perCall = [];
+	const namespace = common.env.CE_SESSION_COORDINATOR;
+	const getStub = namespace.get.bind(namespace);
+	namespace.get = (id) => {
+		const stub = getStub(id);
+		return {
+			fetch: async (...args) => {
+				const before = { ...reads };
+				const response = await stub.fetch(...args);
+				perCall.push({ rows: reads.rows - before.rows, payloads: reads.payloads - before.payloads });
+				return response;
+			},
+		};
+	};
+
+	// Each upload asks the coordinator a few times; each call reads at most 4 rows.
+	const first = await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'));
+	assert.equal(first.status, 503);
+	assert.match(first.body.error, /still being indexed/);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Claim', legacyIds[29]))).status, 409);
+	assert.equal(perCall.every((call) => call.rows <= 4 && call.payloads <= 4), true, JSON.stringify(perCall));
+	// Progress is kept: every legacy row is read once in total.
+	assert.equal(reads.rows, 30);
+	assert.equal(reads.payloads, 30);
+});
+
+test('a payload read error fails the legacy scan step instead of skipping the id', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const legacyIds = ['0xl1', '0xl2', '0xl3'];
+	const stored = [];
+	for (const id of legacyIds) stored.push((await upload(OWNERSHIP_ADMIN, ownedQuestion('Legacy?', id))).body.id);
+	makeLegacyOwnedRows(kv, 'questions', legacyIds);
+	attachSessionCoordinator(common.env, () => {});
+	// One transient failure reading the second row's payload.
+	const failing = `ce-storage-payload:session-a:${stored[1]}`;
+	const get = kv.get.bind(kv);
+	let failed = false;
+	kv.get = async (key) => {
+		if (key === failing && !failed) {
+			failed = true;
+			throw new Error('KV GET failed: 500 Internal Server Error');
+		}
+		return get(key);
+	};
+	// Each upload tries a few steps; the failed step is retried from the same place.
+	const result = await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'));
+	assert.equal(failed, true);
+	assert.equal(result.status, 503);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'))).status, 200);
+	for (const id of legacyIds) {
+		assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Claim', id))).status, 409, id);
+	}
+});
+
+test('the legacy scan skips and counts a row whose payload is gone', async () => {
+	const { common, kv, upload } = createOwnershipHarness();
+	const stored = [];
+	for (const id of ['0xl1', '0xl2']) stored.push((await upload(OWNERSHIP_ADMIN, ownedQuestion('Legacy?', id))).body.id);
+	makeLegacyOwnedRows(kv, 'questions', ['0xl1', '0xl2']);
+	kv.store.delete(`ce-storage-payload:session-a:${stored[0]}`);
+	attachSessionCoordinator(common.env, () => {});
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xnew'))).status, 200);
+	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('Claim', '0xl2'))).status, 409);
+	const scan = readCoordinatorValue(common.env, 'storage-legacy-scan:questions');
+	assert.equal(scan.done, true);
+	assert.equal(scan.skippedRows, 1);
+});
+
+test('admins hide a question id without deleting it, and unhide restores it', async () => {
+	const { kv, upload, list, read, hide: setHidden } = createOwnershipHarness();
+	const first = await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'));
+	await upload(OWNERSHIP_AUTHOR, ownedQuestion('Kept?', '0xq2'));
+	// An upload from before this release has no resourceId in its index row.
+	const legacyKey = `ce-storage:session-a:questions:${first.body.id}`;
+	const legacyMetadata = JSON.parse(kv.store.get(legacyKey));
+	delete legacyMetadata.resourceId;
+	delete legacyMetadata.uploader;
+	kv.store.set(legacyKey, JSON.stringify(legacyMetadata));
+
+	const hide = await setHidden('0xQ9');
+	assert.deepEqual(hide.body, {
+		ok: true, resource: 'questions', id: '0xq9', hidden: true, matchedRows: 1, unreadableRows: 0, hiddenIds: ['0xq9'],
+	});
+	const audit = [...kv.store.entries()].find(([key]) => key.startsWith('ce-storage-audit:session-a:questions:0xq9:'));
+	assert.equal(JSON.parse(audit[1]).event, 'storage_resource_hidden');
+	assert.equal(JSON.parse(audit[1]).principal, OWNERSHIP_ADMIN);
+
+	const listed = (await list()).items;
+	assert.deepEqual(listed.find((item) => item.hidden), { hidden: true, metadata: { resource: 'questions', resourceId: '0xq9', hidden: true } });
+	assert.deepEqual(listed.filter((item) => item.storageRef).map((item) => item.metadata.resourceId), ['0xq2']);
+	// Soft hide: the stored record is still readable by its storage id.
+	assert.equal((await read(first.body.id)).status, 200);
+	// The author cannot re-upload a hidden id; an admin can, and it starts hidden.
+	const reupload = await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'));
+	assert.equal(reupload.status, 409);
+	assert.equal(reupload.body.reason, 'storage_resource_id_hidden');
+	assert.equal((await upload(OWNERSHIP_ADMIN, ownedQuestion('Spam?', '0xq9'))).status, 200);
+	assert.equal((await list()).items.filter((item) => item.hidden).length, 2);
+	// A version whose own flag the hide missed is still listed only as a marker.
+	const missedKey = [...kv.store.keys()].find((key) => key.startsWith('ce-storage:session-a:questions:') &&
+		JSON.parse(kv.store.get(key)).resourceId === '0xq9' && JSON.parse(kv.store.get(key)).uploader === OWNERSHIP_ADMIN);
+	const missed = JSON.parse(kv.store.get(missedKey));
+	delete missed.hidden;
+	kv.store.set(missedKey, JSON.stringify(missed));
+	assert.deepEqual((await list()).items.filter((item) => item.storageRef).map((item) => item.metadata.resourceId), ['0xq2']);
+
+	const unhide = await setHidden('0xq9', false);
+	assert.equal(unhide.body.matchedRows, 2);
+	assert.deepEqual(unhide.body.hiddenIds, []);
+	assert.equal((await list()).items.filter((item) => item.storageRef).length, 3);
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
+});
+
+test('hiding reads each legacy payload once and records its id for later scans', async () => {
+	const { kv, upload, hide } = createOwnershipHarness();
+	const stored = [];
+	for (const id of ['0xq1', '0xq2', '0xq3']) stored.push((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Legacy?', id))).body.id);
+	// Uploads from before this release have no resourceId in their index row.
+	for (const storageId of stored) {
+		const key = `ce-storage:session-a:questions:${storageId}`;
+		const metadata = JSON.parse(kv.store.get(key));
+		delete metadata.resourceId;
+		delete metadata.uploader;
+		kv.store.set(key, JSON.stringify(metadata));
+	}
+	const payloadReads = [];
+	const get = kv.get.bind(kv);
+	kv.get = async (key) => {
+		if (key.startsWith('ce-storage-payload:')) payloadReads.push(key);
+		return get(key);
+	};
+	// One request writes each row once: KV refuses a second write of a key
+	// within a second, which the harness's KV enforces.
+	assert.equal((await hide('0xq1')).body.matchedRows, 1);
+	assert.equal(payloadReads.length, 3);
+	assert.deepEqual(stored.map((storageId) => JSON.parse(kv.store.get(`ce-storage:session-a:questions:${storageId}`)).resourceId),
+		['0xq1', '0xq2', '0xq3']);
+	// Later hides and unhides of other ids read only the index.
+	assert.equal((await hide('0xq2')).body.matchedRows, 1);
+	assert.equal((await hide('0xq1', false)).body.matchedRows, 1);
+	assert.equal(payloadReads.length, 3);
+});
+
+test('a hide toggled again within a second asks the admin to retry', async () => {
+	const { common, upload, list, hide } = createOwnershipHarness();
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Spam?', '0xq9'))).status, 200);
+	assert.equal((await hide('0xq9')).status, 200);
+	// Same second: KV refuses a second write of the hidden marker with 429.
+	const again = await setCloudflareStorageResourceHidden({
+		...common, body: { resource: 'questions', id: '0xq9', hidden: false }, actor: OWNERSHIP_ADMIN,
+	});
+	assert.equal(again.ok, false);
+	assert.equal(again.status, 429);
+	assert.match(again.error, /Try again in a moment/);
+	// A moment later the unhide goes through.
+	assert.equal((await hide('0xq9', false)).body.hiddenIds.length, 0);
+	assert.equal((await list()).items.filter((item) => item.storageRef).length, 1);
+});
+
+test('hide requests validate the resource, id, and flag', async () => {
+	const { common } = createOwnershipHarness();
+	for (const [body, error] of [
+		[{ resource: 'responses', id: 'q1', hidden: true }, /Only questions and surveys/],
+		[{ resource: 'questions', id: 'bad id', hidden: true }, /Invalid questions id/],
+		[{ resource: 'surveys', id: 's1', hidden: 'yes' }, /hidden must be true or false/],
+	]) {
+		const result = await setCloudflareStorageResourceHidden({ ...common, body, actor: OWNERSHIP_ADMIN });
+		assert.equal(result.status, 400);
+		assert.match(result.error, error);
+	}
 });

@@ -4,7 +4,7 @@
 
 ## Deployment Profiles
 
-![Context Engine deployment modes](client/src/assets/img/readme-architecture-deployment-modes.png)
+![Context Engine deployment modes](docs/assets/readme-architecture-deployment-modes.jpg)
 
 App hosting, public/private session access, and session infrastructure are
 separate choices. A publicly hosted web app can open either a private
@@ -76,7 +76,7 @@ architecture.
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
-| **Lit Protocol** | Client-side encrypt/decrypt with EVM access-control conditions | Optional when Lit encryption is selected | External SDK |
+| **Lit Protocol (Chipotle)** | Wraps and releases content keys behind SBT gates; the browser encrypts content locally and the session Worker calls a registered Lit Action | Optional when Lit encryption is selected | Lit Chipotle API via the Session Worker |
 | **Organization adapters** | IAM, key release/KMS, storage, AI, networking, and observability | Planned Company-Operated profile; not shipped | Future adapter boundary |
 
 ## Data Flows
@@ -150,8 +150,11 @@ Hosted & Fast default:
   Worker roles/conditions gate future key release
 
 Lit opt-in:
-  Client encrypts with Lit access conditions
-  Lit nodes evaluate the selected EVM conditions before client-side decrypt
+  Client encrypts content locally with a fresh content key
+  Session Worker asks a registered Lit Action to wrap that key for the SBT gate
+  On read, the Lit Action checks the SBT gate and the Worker returns the key
+  The Worker sees the content key, and holders of the session's Lit API key
+  can request keys directly, so this is not end-to-end encryption
   Arweave or Cloudflare stores the resulting ciphertext according to the profile
 ```
 
@@ -248,6 +251,15 @@ a reusable password to generate fresh slots. Claim links still identify the
 group, with the code entered separately. `sbtAuthorization.ts` supplies the
 same signing implementation to the browser and the local contract smoke test;
 there is no legacy signature fallback or alternate contract generation.
+
+The client derives a group-password signer with PBKDF2-SHA256 (600,000
+iterations) over the NFKC-normalized password, salted by
+`keccak256(abi.encodePacked("sbt-group-password-v4", sbtAddress))`; the SBT
+stores only `keccak256(signer address)` as `groupPasswordHash`. Because the salt
+is the group's own address, group-password groups deploy through
+`SBTFactory.createSBTDeterministicConfigured` at their predicted CREATE2
+address, and the factory sets `groupPasswordHash` once during that deployment.
+See `client/src/utilities/crypto/groupPasswordDerivation.cjs`.
 
 The current CustomSBT source uses one mutable `admin`, rotated with `changeAdmin`.
 It exposes no transferable collection ownership. Zero admin permanently disables
@@ -356,7 +368,7 @@ Trustless & Slower (implemented opt-in)
 SessionRegistry / Surveys / SBTs   public identity, gates, hashes, membership
 Arweave                            metadata, payloads, tokenURI, documents
 Public EVM                         wallet transactions, gas, contract reads
-Lit (optional)                     selected EVM access conditions and decrypt
+Lit (optional)                     SBT-gated key release via the session Worker
 
 Company-Operated (planned)
 ──────────────────────────

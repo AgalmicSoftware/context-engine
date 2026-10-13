@@ -1,4 +1,7 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { readAnswerTooLongMessage, sessionStoresAnswersInWorker } from '../../utilities/survey/answerSizeBudget';
+import { getQuestionEncryptionGates } from './surveyToolAudienceDerivationController';
+import { resolveEditableQuestionList } from './surveyToolResponsePayloadController';
 import { resolveRevertPendingAnswerValue } from './surveyToolHydrationFlow';
 import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 
@@ -57,6 +60,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     renderQuestionTagDropdown,
     renderQuestionTagDropdownRow,
     renderSurveyQuestionsFullQuestionGatedPromptCard,
+    resolveEffectiveResponseGateConfig,
     resolveEffectiveSlug,
     resolveExplicitSessionContext,
     resolveGatedPromptGateNames,
@@ -305,7 +309,49 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     });
   };
 
-  const getQuestionRenderDisplayState = ({ questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
+  // The same pool the submit check reads, for callers that pass only an id.
+  const findQuestionById = (questionId: SurveyQuestionsLegacyValue): SurveyQuestionsLegacyValue => {
+    const key = String(questionId || '')
+      .trim()
+      .toLowerCase();
+    const pool: SurveyQuestionsLegacyValue = stateRef.current.questionPool?.length
+      ? stateRef.current.questionPool
+      : resolveEditableQuestionList(stateRef.current);
+    return (
+      (Array.isArray(pool) ? pool : []).find(
+        (entry: SurveyQuestionsLegacyValue) =>
+          String(entry?.id || '')
+            .trim()
+            .toLowerCase() === key,
+      ) || null
+    );
+  };
+
+  // The same budget the submit check enforces, shown while the answer is edited.
+  const getAnswerTooLongMessage = ({
+    question,
+    questionId,
+    responseSlice,
+    answer,
+    additional,
+  }: SurveyQuestionsLegacyValue) => {
+    const sizedQuestion: SurveyQuestionsLegacyValue = question || findQuestionById(questionId);
+    const message = readAnswerTooLongMessage({
+      question: sizedQuestion,
+      promptLocked: getQuestionEncryptionGates(sizedQuestion).length > 0,
+      answer,
+      comment: additional,
+      ratingCount: [responseSlice?.importance?.[questionId], responseSlice?.conviction?.[questionId]].filter(
+        (value) => value != null,
+      ).length,
+    });
+    if (!message) return '';
+    const slug: SurveyQuestionsLegacyValue =
+      (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') || resolveEffectiveSlug(propsRef.current);
+    return sessionStoresAnswersInWorker(resolveEffectiveResponseGateConfig(slug, propsRef.current)) ? message : '';
+  };
+
+  const getQuestionRenderDisplayState = ({ question, questionId, responseSlice }: SurveyQuestionsLegacyValue) => {
     const responseDisplayState: SurveyQuestionsLegacyValue = getQuestionResponseDisplayState({
       questionId,
       responseSlice,
@@ -316,10 +362,19 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
       additional: responseDisplayState.additional,
     });
 
-    return (buildQuestionRenderDisplayStateHelper as SurveyQuestionsLegacyValue)({
-      responseDisplayState,
-      fieldDisplayState,
-    });
+    return {
+      ...(buildQuestionRenderDisplayStateHelper as SurveyQuestionsLegacyValue)({
+        responseDisplayState,
+        fieldDisplayState,
+      }),
+      answerTooLongMessage: getAnswerTooLongMessage({
+        question,
+        questionId,
+        responseSlice,
+        answer: responseDisplayState.answer,
+        additional: responseDisplayState.additional,
+      }),
+    };
   };
 
   const isQuestionPromptMasked = (question: SurveyQuestionsLegacyValue): boolean =>
@@ -543,8 +598,23 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
       wrapperStyle,
     });
 
-    return (
+    const control = (
       <QuestionDecryptControl {...displayState} onClick={() => handleDecryptQuestionAnswer(questionId, fieldKey)} />
+    );
+    // A restored draft could not keep this field's unlock: drafts never store a locked value's plaintext.
+    const fields = fieldKey === 'additional' ? 'additionalComments' : 'answers';
+    const unlockLost = (stateRef.current.surveysResponseState || []).some((slice: SurveyQuestionsLegacyValue) => {
+      const field = slice?.[fields]?.[questionId];
+      return !!field?.unlockLostFor && field.unlockLostFor === field.encryptedPortion;
+    });
+    if (!unlockLost) return control;
+    return (
+      <>
+        {control}
+        <p className={styles.answerTooLongNotice} role="status">
+          {`Your unlock of this ${fieldKey === 'additional' ? 'comment' : 'answer'} wasn't kept after the page reloaded. Decrypt it and unlock it again.`}
+        </p>
+      </>
     );
   };
 

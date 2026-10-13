@@ -5,13 +5,20 @@ import {
   stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
-import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
+import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
+import { scanLegacyStorageOwnerIds } from './storageRouteExecution.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
 } from './sessionConfigMutation.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import { putSessionConfig } from './sessionConfigSecretsStore.js';
+import {
+  executeLitAuthorizationSignerEnsure,
+  executeLitAuthorizationFinalize,
+  executeSessionSecretsAfterLitRepair,
+  repairPendingLitAuthorizationSetup,
+} from './sessionLitAuthorizationCoordinator.js';
 import {
   normalizeWorkerSessionSlug,
   resolveCoordinatorSessionSlugStorageKey,
@@ -31,6 +38,13 @@ import {
 } from './workerGroups.js';
 
 const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
+const STORAGE_LEGACY_SCAN_KEY_PREFIX = 'storage-legacy-scan:';
+const STORAGE_LEGACY_OWNER_KEY_PREFIX = 'storage-legacy-owner:';
+// About two KV reads per row, so one step stays far below per-invocation limits.
+const LEGACY_SCAN_ROWS_PER_STEP = 200;
+const LEGACY_SCAN_STEPS_PER_UPLOAD = 4;
+const LEGACY_SCAN_PENDING_ERROR = 'Existing questions and surveys are still being indexed; retry shortly.';
+const LEGACY_SCAN_FAILED_ERROR = 'Recording the owners of existing questions and surveys failed; retry.';
 const DIRECT_DEPLOY_RECORD_KEY = 'direct-deploy';
 const SPONSORED_FAUCET_RECORD_KEY = 'sponsored-faucet';
 const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
@@ -52,6 +66,7 @@ const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
 const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
+const AUTH_NONCE_MAC_KEY = 'auth-nonce-mac-key';
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
 const WRAPPED_SESSION_KEY_FIELDS = [
   'alg',
@@ -87,6 +102,53 @@ const normalizeBoundedFutureTimestamp = (value, nowMs, maxAheadMs) => {
   const numeric = normalizePositiveSafeInteger(value);
   if (!numeric || numeric <= nowMs || numeric > nowMs + maxAheadMs) return 0;
   return numeric;
+};
+
+// Nonces issued before signed nonces were stored per address: version 1 kept
+// one, version 2 several, with the newest in the version-1 fields.
+const readActiveAuthNonces = (record, nowMs) => {
+  const entries = Array.isArray(record?.entries)
+    ? record.entries
+    : record?.nonce ? [{ nonce: record.nonce, expiresAtMs: record.expiresAtMs }] : [];
+  return entries
+    .map((entry) => ({ nonce: toTrimmedString(entry?.nonce), expiresAtMs: Number(entry?.expiresAtMs || 0) }))
+    .filter((entry) => entry.nonce && entry.expiresAtMs > nowMs);
+};
+
+const putActiveAuthNonces = async (transaction, entries) => {
+  if (!entries.length) {
+    await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
+    return;
+  }
+  const newest = entries[entries.length - 1];
+  await transaction.put(AUTH_NONCE_ACTIVE_KEY, {
+    version: 2,
+    nonce: newest.nonce,
+    expiresAtMs: newest.expiresAtMs,
+    entries,
+  });
+};
+
+// Signed nonces: "n1", 32 random hex characters from the Worker, the expiry as
+// 13 digits of epoch milliseconds, and a 128-bit HMAC of these for this
+// session and wallet under a key kept in this object. Issuing one stores
+// nothing, so others cannot use up a wallet's nonces; using one records it
+// until it expires, so each works once. Letters and digits only (EIP-4361).
+const SIGNED_AUTH_NONCE_RE = /^n1([0-9a-f]{32})(\d{13})([0-9a-f]{32})$/;
+
+const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+const hexToBytes = (hex) => Uint8Array.from(hex.match(/../g) || [], (pair) => parseInt(pair, 16));
+const equalText = (left, right) => {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+};
+
+const signAuthNonce = async ({ cryptoImpl, keyHex, slug, address, random, expiry }) => {
+  const key = await cryptoImpl.subtle.importKey('raw', hexToBytes(keyHex), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const message = new TextEncoder().encode(`ce-auth-nonce-v1\n${slug}\n${address}\n${random}\n${expiry}`);
+  return bytesToHex(new Uint8Array(await cryptoImpl.subtle.sign('HMAC', key, message))).slice(0, 32);
 };
 
 const isBase64url = (value, length) => (
@@ -285,6 +347,9 @@ export class SessionWriteCoordinator {
     this.sessionConfigTail = Promise.resolve();
     this.workerGroupTail = Promise.resolve();
     this.resultsAnalysisTail = Promise.resolve();
+    this.storageOwnerTail = Promise.resolve();
+    this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
+    this.legacyScanRowsPerStep = deps.legacyScanRowsPerStep || LEGACY_SCAN_ROWS_PER_STEP;
   }
 
   serializeSessionConfigOperation(operation) {
@@ -297,6 +362,60 @@ export class SessionWriteCoordinator {
     const run = this.workerGroupTail.then(operation);
     this.workerGroupTail = run.catch(() => undefined);
     return run;
+  }
+
+  serializeStorageOwnerOperation(operation) {
+    const run = this.storageOwnerTail.then(operation);
+    this.storageOwnerTail = run.catch(() => undefined);
+    return run;
+  }
+
+  // Answers whether a question or survey id was stored before first-writer
+  // records existed. The scan runs in bounded steps and keeps its progress and
+  // the ids found, so it finishes however large the session is; racing
+  // uploads wait their turn and read the same answers.
+  async executeStorageLegacyOwner(payload) {
+    const resource = toTrimmedString(payload?.resource);
+    const resourceId = toTrimmedString(payload?.resourceId).toLowerCase();
+    if (!['questions', 'surveys'].includes(resource) || !resourceId) {
+      return jsonResponse({ ok: false, error: 'Invalid legacy owner request.' }, 400);
+    }
+    return this.serializeStorageOwnerOperation(async () => {
+      const ownerKey = (id) => `${STORAGE_LEGACY_OWNER_KEY_PREFIX}${resource}:${id}`;
+      if (await this.state.storage.get(ownerKey(resourceId))) return jsonResponse({ ok: true, adminOnly: true }, 200);
+      const scanKey = `${STORAGE_LEGACY_SCAN_KEY_PREFIX}${resource}`;
+      const scan = await this.state.storage.get(scanKey);
+      if (scan?.done === true) return jsonResponse({ ok: true, adminOnly: false }, 200);
+      let step;
+      try {
+        step = await this.scanLegacyStorageOwnerIds({
+          env: this.env,
+          config: payload?.config,
+          slug: payload?.slug,
+          resource,
+          cursor: toTrimmedString(scan?.cursor),
+          lastKey: toTrimmedString(scan?.lastKey),
+          maxRows: this.legacyScanRowsPerStep,
+        });
+      } catch {
+        return jsonResponse({ ok: false, error: LEGACY_SCAN_FAILED_ERROR }, 503);
+      }
+      await this.state.storage.transaction(async (transaction) => {
+        for (const id of step.ids) await transaction.put(ownerKey(id), true);
+        // Rows skipped because their payload is gone or unreadable by design.
+        await transaction.put(scanKey, {
+          version: 1,
+          cursor: step.cursor,
+          lastKey: step.lastKey,
+          done: step.done === true,
+          skippedRows: (Number(scan?.skippedRows) || 0) + (Number(step.skippedRows) || 0),
+          updatedAtMs: Number(this.now()) || Date.now(),
+        });
+      });
+      if (step.ids.includes(resourceId)) return jsonResponse({ ok: true, adminOnly: true }, 200);
+      if (step.done === true) return jsonResponse({ ok: true, adminOnly: false }, 200);
+      return jsonResponse({ ok: false, pending: true, error: LEGACY_SCAN_PENDING_ERROR }, 503);
+    });
   }
 
   serializeResultsAnalysisOperation(operation) {
@@ -387,23 +506,6 @@ export class SessionWriteCoordinator {
     });
   }
 
-  resultsAnalysisPayloadLooksLocked(value, depth = 0) {
-    if (depth > 5) return false;
-    if (!isObjectRecord(value)) return false;
-    if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
-    const encryptedKeys = new Set(['ciphertext', 'cipherText', 'encryptedContent', 'encryptedKey', 'encryptedPortion', 'keyCipher', 'payloadCiphertext', 'wrappedKey']);
-    if (Object.entries(value).some(([key, entry]) => encryptedKeys.has(key) && this.resultsAnalysisEncryptedEnvelopeValueHasContent(entry))) return true;
-    return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
-  }
-
-  resultsAnalysisEncryptedEnvelopeValueHasContent(value) {
-    if (value == null || value === false) return false;
-    if (typeof value === 'string') return value.trim() !== '';
-    if (Array.isArray(value)) return value.length > 0;
-    if (isObjectRecord(value)) return Object.keys(value).length > 0;
-    return true;
-  }
-
   sanitizeResultsAnalysisAutoJob(payload = {}) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload.slug);
     const requestId = toTrimmedString(payload.requestId);
@@ -411,7 +513,8 @@ export class SessionWriteCoordinator {
       ? payload.committedResponses.slice(0, 1).map((entry) => {
           const metadata = isObjectRecord(entry?.metadata) ? entry.metadata : {};
           const payloadRecord = isObjectRecord(entry?.payload) ? entry.payload : {};
-          const payloadLooksLocked = this.resultsAnalysisPayloadLooksLocked(payloadRecord);
+          // Checked before sanitizing, which may drop a deeply nested envelope.
+          const payloadLooksLocked = valueLooksEncrypted(payloadRecord);
           const sanitizedPayload = this.sanitizeResultsAnalysisResponsePayload(payloadRecord);
           if (payloadLooksLocked) sanitizedPayload.locked = true;
           return {
@@ -1648,6 +1751,7 @@ export class SessionWriteCoordinator {
   }
 
   async repairPendingSessionConfigProjection() {
+    await repairPendingLitAuthorizationSetup(this);
     const authority = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
     if (authority?.projectionPending !== true) return;
     await this.projectSessionConfigAuthority(authority);
@@ -1809,38 +1913,36 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async readAuthNonceKey({ create = false } = {}) {
+    const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
+    if (/^[0-9a-f]{64}$/.test(toTrimmedString(existing?.key)) || !create) return toTrimmedString(existing?.key);
+    const candidate = { version: 1, key: bytesToHex(this.crypto.getRandomValues(new Uint8Array(32))) };
+    const record = await this.state.storage.transaction(async (transaction) => {
+      const current = await transaction.get(AUTH_NONCE_MAC_KEY);
+      if (/^[0-9a-f]{64}$/.test(toTrimmedString(current?.key))) return current;
+      await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
+      return candidate;
+    });
+    return record.key;
+  }
+
   async executeAuthNonceIssue(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString(payload?.address).toLowerCase();
-    const nonce = toTrimmedString(payload?.nonce);
+    const random = toTrimmedString(payload?.nonce);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.expiresAtMs,
       nowMs,
       MAX_AUTH_NONCE_LIFETIME_MS,
     );
-    const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
-      payload?.usedExpiresAtMs,
-      nowMs,
-      MAX_AUTH_NONCE_LIFETIME_MS,
-    );
-    if (!slug || !address || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
+    if (!slug || !address || !/^[0-9a-f]{32}$/.test(random) || !expiresAtMs) {
       return jsonResponse({ error: 'Invalid auth nonce issuance request.' }, 400);
     }
-
-    await this.state.storage.transaction(async (transaction) => {
-      const used = await transaction.get(AUTH_NONCE_USED_KEY);
-      const entries = Array.isArray(used?.entries)
-        ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs)
-        : [];
-      await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-      await transaction.put(AUTH_NONCE_ACTIVE_KEY, {
-        version: 1,
-        nonce,
-        expiresAtMs,
-      });
-    });
-    return jsonResponse({ ok: true });
+    const keyHex = await this.readAuthNonceKey({ create: true });
+    const expiry = String(expiresAtMs).padStart(13, '0');
+    const mac = await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address, random, expiry });
+    return jsonResponse({ ok: true, nonce: `n1${random}${expiry}${mac}` });
   }
 
   async executeAuthNonceConsume(payload) {
@@ -1856,6 +1958,19 @@ export class SessionWriteCoordinator {
     if (!slug || !address || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
       return jsonResponse({ error: 'Invalid auth nonce consumption request.' }, 400);
     }
+    // Check a signed nonce before the transaction; its key never changes.
+    const signed = nonce.match(SIGNED_AUTH_NONCE_RE);
+    let signedExpiresAtMs = 0;
+    if (signed) {
+      const keyHex = await this.readAuthNonceKey();
+      const expiresAtMs = Number(signed[2]);
+      const mac = keyHex
+        ? await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address, random: signed[1], expiry: signed[2] })
+        : '';
+      if (mac && equalText(mac, signed[3]) && expiresAtMs > nowMs && expiresAtMs <= nowMs + MAX_AUTH_NONCE_LIFETIME_MS) {
+        signedExpiresAtMs = expiresAtMs;
+      }
+    }
 
     const result = await this.state.storage.transaction(async (transaction) => {
       const used = await transaction.get(AUTH_NONCE_USED_KEY);
@@ -1866,23 +1981,24 @@ export class SessionWriteCoordinator {
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return { ok: false, error: 'Nonce already used.' };
       }
+      if (signed) {
+        // Kept past the nonce's own expiry too, for margin, as before.
+        if (signedExpiresAtMs) entries.push({ nonce, expiresAtMs: Math.max(signedExpiresAtMs, usedExpiresAtMs) });
+        await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+        return signedExpiresAtMs ? { ok: true } : { ok: false, error: 'Nonce mismatch or expired.' };
+      }
 
-      const active = await transaction.get(AUTH_NONCE_ACTIVE_KEY);
-      const activeMatches = (
-        active?.nonce === nonce &&
-        Number(active?.expiresAtMs || 0) > nowMs
-      );
-      if (!activeMatches) {
-        if (Number(active?.expiresAtMs || 0) <= nowMs) {
-          await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
-        }
+      // A nonce the previous release issued is consumed from its stored list.
+      const active = readActiveAuthNonces(await transaction.get(AUTH_NONCE_ACTIVE_KEY), nowMs);
+      const remaining = active.filter((entry) => entry.nonce !== nonce);
+      await putActiveAuthNonces(transaction, remaining);
+      if (remaining.length === active.length) {
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return { ok: false, error: 'Nonce mismatch or expired.' };
       }
 
       entries.push({ nonce, expiresAtMs: usedExpiresAtMs });
       await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
-      await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
       return { ok: true };
     });
     return jsonResponse(result, result.ok ? 200 : 409);
@@ -2227,6 +2343,18 @@ export class SessionWriteCoordinator {
     }
 
     const payload = await request.json().catch(() => null);
+    if (url.pathname.startsWith('/session-config/lit-authorization/') && url.hostname !== 'session-coordinator.internal') {
+      return jsonResponse({ error: 'Not found.' }, 404);
+    }
+    if (url.pathname === '/session-config/lit-authorization/ensure') {
+      return this.serializeSessionConfigOperation(() => executeLitAuthorizationSignerEnsure(this, payload));
+    }
+    if (url.pathname === '/session-config/lit-authorization/finalize') {
+      return this.serializeSessionConfigOperation(() => executeLitAuthorizationFinalize(this, payload));
+    }
+    if (url.pathname === '/session-config/lit-authorization/update-secrets') {
+      return this.serializeSessionConfigOperation(() => executeSessionSecretsAfterLitRepair(this, payload));
+    }
     if (url.pathname === '/session-config/storage-envelope-key/get-or-create') {
       return this.executeStorageEnvelopeKeyGetOrCreate(payload);
     }
@@ -2235,6 +2363,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/results-analysis/status') {
       return this.executeResultsAnalysisStatus();
+    }
+    if (url.pathname === '/storage/legacy-owner') {
+      return this.executeStorageLegacyOwner(payload);
     }
     if (url.pathname === '/results-analysis/reserve') {
       return this.executeResultsAnalysisReserve(payload);
@@ -2643,6 +2774,31 @@ export const finalizeCoordinatedSponsoredFaucet = async ({
   }
 };
 
+
+// Returns null when there is no coordinator binding, so callers can fall back.
+// Each coordinator call scans a bounded step; a few per upload finish most
+// sessions, and later uploads continue an unfinished scan.
+export const checkCoordinatedLegacyStorageOwner = async ({ env, config, slug, resource, resourceId } = {}) => {
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
+  if (!stub) return null;
+  const unavailable = { ok: false, status: 503, error: LEGACY_SCAN_FAILED_ERROR };
+  try {
+    for (let step = 0; step < LEGACY_SCAN_STEPS_PER_UPLOAD; step += 1) {
+      const response = await stub.fetch('https://session-coordinator.internal/storage/legacy-owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, config, resource, resourceId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result?.ok === true) return { ok: true, adminOnly: result.adminOnly === true };
+      if (result?.pending !== true) return unavailable;
+    }
+    return { ok: false, status: 503, error: LEGACY_SCAN_PENDING_ERROR };
+  } catch {
+    return unavailable;
+  }
+};
 
 export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);

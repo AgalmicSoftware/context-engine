@@ -437,8 +437,10 @@ export const parseEnvelope = (jsonStr) => {
       if (wrappedCekBytes.length === 0) {
         throw new Error(`${prefix} wrapped_cek must decode to non-empty bytes`);
       }
+      // A null nonce, like a missing one, means the key wrap signed no nonce.
       if (
-        Object.prototype.hasOwnProperty.call(recipient, 'nonce') &&
+        recipient.nonce !== undefined &&
+        recipient.nonce !== null &&
         (typeof recipient.nonce !== 'string' || recipient.nonce.length === 0)
       ) {
         throw new Error(`${prefix} nonce must be a non-empty string`);
@@ -465,7 +467,7 @@ export const parseEnvelope = (jsonStr) => {
 
 export const normalizeBindingValue = (value) => safeLower(value == null ? '' : String(value));
 
-export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } = {}) => {
+export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId, expectedFieldKey } = {}) => {
   if (!env || !isObj(env.aad)) return;
 
   if (expectedSurveyId !== undefined && expectedSurveyId !== null) {
@@ -483,9 +485,46 @@ export const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } =
       throw new Error('envelope binding mismatch: qId');
     }
   }
+
+  // CE-CC envelopes carry no field slot; check it only when the AAD has one.
+  if (
+    expectedFieldKey !== undefined &&
+    expectedFieldKey !== null &&
+    env.aad.fieldKey !== undefined &&
+    env.aad.fieldKey !== null &&
+    normalizeBindingValue(env.aad.fieldKey) !== normalizeBindingValue(expectedFieldKey)
+  ) {
+    throw new Error('envelope binding mismatch: fieldKey');
+  }
 };
 
 /* ---------------------------- Self-recipient wrap -------------------------- */
+
+// The key-wrap `types` carry no EIP712Domain entry. ethers hashes the domain
+// fields anyway, but MetaMask (eth-sig-util) then signs over an empty domain.
+// Changing the payload would change the signature and so the derived key.
+const EMPTY_EIP712_DOMAIN_SEPARATOR = utils.keccak256(utils.id('EIP712Domain()'));
+
+const recoverKeyWrapSigners = (typed, signature) => {
+  const signers = [];
+  try {
+    signers.push(utils.verifyTypedData(typed.domain, typed.types, typed.message, signature));
+  } catch (_) {}
+  try {
+    const structHash = utils._TypedDataEncoder.from(typed.types).hash(typed.message);
+    const digest = utils.keccak256(utils.concat(['0x1901', EMPTY_EIP712_DOMAIN_SEPARATOR, structHash]));
+    signers.push(utils.recoverAddress(digest, signature));
+  } catch (_) {}
+  return signers.map((signer) => signer.toLowerCase());
+};
+
+// The KEK comes from this signature. One from any other wallet would store a
+// key the account owner can never unwrap, so check the signer before HKDF.
+export const assertKeyWrapSigner = (typed, signature, account) => {
+  if (!recoverKeyWrapSigners(typed, signature).includes(safeLower(String(account || '')))) {
+    throw new Error('Key-wrap signature does not match the account. Reconnect the wallet and try again.');
+  }
+};
 
 export const wrapCekWithSelfRecipient = async ({
   signTypedData,
@@ -506,6 +545,7 @@ export const wrapCekWithSelfRecipient = async ({
   const nonce = BigInt(bytesToHex(nonceBytes)).toString();
   const typed = buildEip712KeyWrap(account, chainId, contextHex, nonce);
   const sig = await signTypedData(typed.domain, typed.types, typed.message);
+  assertKeyWrapSigner(typed, sig, account);
 
   const contextBytes = getContextBytes(contextHex);
   const kek = await deriveKekFromSig(sig, contextBytes);

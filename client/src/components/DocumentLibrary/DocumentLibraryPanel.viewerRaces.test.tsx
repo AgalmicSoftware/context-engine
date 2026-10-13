@@ -71,6 +71,66 @@ describe('DocumentLibraryPanel viewer race guards', () => {
     expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_DOWNLOAD)).toBeInTheDocument();
   });
 
+  it('opens script-capable documents only as text or a plain download', async () => {
+    // Blob URLs share the app's origin, so an SVG or XHTML document opened from
+    // one in a new tab would run its script as the app.
+    const createdBlobType = () => (jest.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).type;
+    const openDocument = async (contentType: string, bytes: string) => {
+      jest.mocked(URL.createObjectURL).mockClear();
+      jest.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        // jsdom's Blob has no text(), so the response body is a blob-like stand-in.
+        blob: async () => ({ type: contentType, size: bytes.length, text: async () => bytes }),
+        headers: { get: (name: string) => (name === 'content-type' ? contentType : null) },
+      } as unknown as Response);
+      mockListArweaveTransactionsByTags.mockResolvedValueOnce([
+        {
+          cursor: 'cursor-m',
+          txId: 'M'.repeat(43),
+          owner: 'owner',
+          tags: [],
+          tagMap: { 'CE-DocStorage': 'arweave', 'CE-DocKind': 'file', 'CE-DocName': 'upload' },
+          data: { size: bytes.length, type: contentType },
+          block: { height: 1, timestamp: 1710000009 },
+        },
+      ]);
+      const view = render(
+        <DocumentLibraryPanel
+          provider={{}}
+          network={{ id: 84532 }}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+          sessionSlug="edge"
+          sessionConfig={TEST_SESSION_CONFIG}
+          mode="session"
+          sessionIdHex={`0x${'2'.repeat(32)}`}
+        />,
+      );
+      fireEvent.click(await screen.findByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+      return view;
+    };
+
+    const svg = await openDocument('image/svg+xml;charset=utf-8', '<svg onload="alert(1)"/>');
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('<svg onload="alert(1)"/>');
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    svg.unmount();
+
+    const xhtml = await openDocument('application/xhtml+xml;charset=utf-8', '<html/>');
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('<html/>');
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    xhtml.unmount();
+
+    const binary = await openDocument('application/x-unknown-binary', 'MZ');
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_DOWNLOAD)).toBeInTheDocument();
+    expect(createdBlobType()).toBe('application/octet-stream');
+    binary.unmount();
+
+    await openDocument('image/png;charset=binary', 'png');
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_IMAGE)).toBeInTheDocument();
+    expect(createdBlobType()).toBe('image/png');
+  });
+
   it('keeps late document open requests from replacing the current viewer', async () => {
     const slowTxId = 'S'.repeat(43);
     const fastTxId = 'F'.repeat(43);

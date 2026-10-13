@@ -11,9 +11,7 @@ const { listTrackedClientCoverageFiles, normalizeRepoPath } = require('./clientC
 const METRICS = ['statements', 'branches', 'functions', 'lines'];
 const EPSILON = 0.000001;
 const DEFAULT_PATHS = Object.freeze({
-  legacyBaseline: 'scripts/coverage-baseline.json',
   fullBaseline: 'scripts/client-coverage-full-baseline.json',
-  legacyFiles: 'scripts/client-coverage-legacy-files.json',
   coverageFinal: 'client/coverage/coverage-final.json',
 });
 
@@ -116,42 +114,28 @@ export function collectClientCoverageFloorResult({
   const coverageFinal = readJson(resolvedRepoDir, paths.coverageFinal);
   const coverageIndex = buildCoverageIndex(resolvedRepoDir, coverageFinal);
   const productionFiles = currentProductionFiles || listTrackedClientCoverageFiles(resolvedRepoDir);
-  const legacyFileInventory = readJson(resolvedRepoDir, paths.legacyFiles);
-  const legacyFiles = (legacyFileInventory.files || []).filter((relativePath) => (
-    fs.existsSync(path.resolve(resolvedRepoDir, relativePath))
-  ));
-  const legacy = aggregateCoverageForFiles({ repoDir: resolvedRepoDir, coverageIndex, files: legacyFiles });
   const fullUniverse = aggregateCoverageForFiles({
     repoDir: resolvedRepoDir,
     coverageIndex,
     files: productionFiles,
   });
-  const findings = [
-    ...floorFindings('legacy-imported', legacy.metrics, readJson(resolvedRepoDir, paths.legacyBaseline)),
-    ...floorFindings('whole-production', fullUniverse.metrics, readJson(resolvedRepoDir, paths.fullBaseline)),
-  ];
-  if (legacy.missingFiles.length > 0) {
-    findings.push(`legacy-imported coverage is missing ${legacy.missingFiles.length} retained file${legacy.missingFiles.length === 1 ? '' : 's'}: ${legacy.missingFiles.join(', ')}`);
-  }
+  const findings = floorFindings('whole-production', fullUniverse.metrics, readJson(resolvedRepoDir, paths.fullBaseline));
   if (fullUniverse.missingFiles.length > 0) {
     findings.push(`whole-production coverage is missing ${fullUniverse.missingFiles.length} current production file${fullUniverse.missingFiles.length === 1 ? '' : 's'}: ${fullUniverse.missingFiles.join(', ')}`);
   }
   return {
     findings,
     metrics: {
-      legacy: legacy.metrics,
       fullUniverse: fullUniverse.metrics,
     },
     missingCoverageFiles: fullUniverse.missingFiles,
     zeroHitFiles: fullUniverse.zeroHitFiles,
     productionFileCount: productionFiles.length,
-    legacyFileCount: legacyFiles.length,
   };
 }
 
 function main() {
   const result = collectClientCoverageFloorResult();
-  console.log(`Legacy imported coverage (${result.legacyFileCount} fixed files): ${JSON.stringify(result.metrics.legacy)}`);
   console.log(`Whole-production coverage (${result.productionFileCount} files): ${JSON.stringify(result.metrics.fullUniverse)}`);
   console.log(`Whole-production zero-hit files (${result.zeroHitFiles.length}):`);
   result.zeroHitFiles.forEach((relativePath) => console.log(`- ${relativePath}`));
@@ -160,7 +144,7 @@ function main() {
     result.findings.forEach((finding) => console.error(`- ${finding}`));
     return 1;
   }
-  console.log('Client dual coverage floor check passed.');
+  console.log('Client coverage floor check passed.');
   return 0;
 }
 

@@ -330,11 +330,11 @@ export const createSurveyQuestionsDecryptRuntime = (
 
   const decryptQuestionRatingEnvelopes = async (
     ratingEnvelopes: SurveyQuestionsLegacyValue = null,
-    { chainId, lit, account, providerLike }: SurveyQuestionsLegacyValue = {},
+    { chainId, lit, account, providerLike, questionId }: SurveyQuestionsLegacyValue = {},
   ) =>
     (decryptQuestionRatingEnvelopesHelper as SurveyQuestionsLegacyValue)(
       ratingEnvelopes,
-      { chainId, lit, account, providerLike },
+      { chainId, lit, account, providerLike, questionId },
       {
         decryptEnvelopeValue: (value: unknown, options: SurveyQuestionsLegacyValue) =>
           (cryptoUtils as { decryptEnvelopeValue: DecryptEnvelopeValuePort }).decryptEnvelopeValue(value, {

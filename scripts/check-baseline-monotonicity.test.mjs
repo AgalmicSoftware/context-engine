@@ -34,11 +34,9 @@ function writeBaselines(
   {
     violations,
     counts,
-    legacyCoverage = { statements: 75.7, branches: 61, functions: 77, lines: 79.1 },
     fullCoverage = { statements: 70, branches: 55, functions: 70, lines: 72 },
     coverageRules = [{ id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' }],
     coverageExceptions = [],
-    legacyCoverageFiles = ['client/src/imported.ts'],
     typedDiagnostics = [{ signature: 'src/example.test.ts|TS2322|fixture', count: 1 }],
     typedClassifications = [{ id: 'test-source', pattern: 'client/src/**/*.test.ts' }],
     typedExclusions = [],
@@ -59,13 +57,11 @@ function writeBaselines(
   writeJson(repoDir, 'scripts/type-debt-baseline.json', {
     counts,
   });
-  writeJson(repoDir, 'scripts/coverage-baseline.json', { global: legacyCoverage });
   writeJson(repoDir, 'scripts/client-coverage-full-baseline.json', { global: fullCoverage });
   writeJson(repoDir, 'scripts/client-coverage-exclusions.json', {
     rules: coverageRules,
     explicitProductionFileExceptions: coverageExceptions,
   });
-  writeJson(repoDir, 'scripts/client-coverage-legacy-files.json', { files: legacyCoverageFiles });
   writeJson(repoDir, 'scripts/client-test-type-diagnostics-baseline.json', { diagnostics: typedDiagnostics });
   writeJson(repoDir, 'scripts/client-test-type-contract.json', {
     classifications: typedClassifications,
@@ -170,7 +166,7 @@ test('allows a newly introduced type-debt metric to establish its first baseline
   });
 });
 
-test('reports lowered coverage floors, broadened exclusions, and legacy-universe gains', () => {
+test('reports a lowered coverage floor and broadened exclusions', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
       violations: [],
@@ -182,23 +178,19 @@ test('reports lowered coverage floors, broadened exclusions, and legacy-universe
     writeBaselines(repoDir, {
       violations: [],
       counts: { colonAny: 0 },
-      legacyCoverage: { statements: 75.6, branches: 61, functions: 77, lines: 79.1 },
       fullCoverage: { statements: 69.9, branches: 55, functions: 70, lines: 72 },
       coverageRules: [
         { id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' },
         { id: 'new-exclusion', jestPatterns: ['!src/legacy/**'], reason: 'broader' },
       ],
       coverageExceptions: ['client/src/legacy/owner.ts'],
-      legacyCoverageFiles: ['client/src/imported.ts', 'client/src/newly-added.ts'],
     });
 
     const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
     assert.deepEqual(result.coverageRegressions.map((entry) => entry.kind), [
-      'legacy-floor-decrease',
       'full-floor-decrease',
       'exclusion-rule-gain',
       'exclusion-exception-gain',
-      'legacy-file-gain',
     ]);
   });
 });
@@ -248,31 +240,6 @@ test('reports typed-test diagnostic growth, classification loss, and contract ex
       'typed-classification-loss',
       'typed-exclusion-gain',
     ]);
-  });
-});
-
-test('legacy coverage inventory can shrink only when the production file is deleted', () => {
-  withTempRepo((repoDir) => {
-    fs.mkdirSync(path.join(repoDir, 'client/src'), { recursive: true });
-    fs.writeFileSync(path.join(repoDir, 'client/src/imported.ts'), 'export const imported = true;\n');
-    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      legacyCoverageFiles: [],
-    });
-    let result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.coverageRegressions, [{
-      kind: 'legacy-live-file-loss',
-      relativePath: 'client/src/imported.ts',
-    }]);
-
-    fs.rmSync(path.join(repoDir, 'client/src/imported.ts'));
-    result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.coverageRegressions, []);
   });
 });
 

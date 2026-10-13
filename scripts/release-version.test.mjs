@@ -10,10 +10,15 @@ import {
   assessReleaseImpact,
   compareVersions,
   incrementPatch,
+  listWorkerSourceChanges,
+  pinWorkerRelease,
   planReleaseVersion,
   readVersionSurfaces,
+  verifyWorkerReleasePin,
+  WORKER_RELEASE_SOURCE_PATHSPEC,
   writeVersionSurfaces,
 } from './release-version.mjs';
+import { resolveWorkerBundleTargets } from './worker-bundle.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('./release-version.mjs', import.meta.url));
 
@@ -196,6 +201,311 @@ test('verify-ref rejects an exact SemVer downgrade beyond the safe integer range
     assert.match(result.stderr, /must not be lower/);
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+const PIN_PATH = path.join('client', 'src', 'variables', 'workerReleasePin.json');
+const EXAMPLE_CONFIG_PATH = path.join('workers', 'deploy-helper', 'wrangler.example.toml');
+
+const writeRepoFile = (rootDir, relativePath, contents) => {
+  fs.mkdirSync(path.dirname(path.join(rootDir, relativePath)), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, relativePath), contents);
+};
+
+const commitAll = (rootDir, message) => {
+  git(rootDir, ['add', '-A']);
+  git(rootDir, ['commit', '--quiet', '-m', message]);
+  return git(rootDir, ['rev-parse', 'HEAD']);
+};
+
+const writePin = (rootDir, commit, manifestSha256 = 'a'.repeat(64)) => writeRepoFile(
+  rootDir,
+  PIN_PATH,
+  `${JSON.stringify({ commit, manifestSha256 }, null, 2)}\n`,
+);
+
+const writeExampleConfig = (rootDir, commit) => writeRepoFile(
+  rootDir,
+  EXAMPLE_CONFIG_PATH,
+  `WORKER_BUNDLE_URL = "https://github.com/o/r/releases/download/worker-bundles-${commit}/sessionCorsWorker.bundle.js"\n`,
+);
+
+// pin-worker-release moves the pin and the deploy-helper example together.
+const writePinnedRelease = (rootDir, commit) => {
+  writePin(rootDir, commit);
+  writeExampleConfig(rootDir, commit);
+};
+
+// Public main with three published releases and an unpublished tip:
+// release B only restamps the version, release C changes Worker code and
+// the tip changes only a Worker test.
+const createPublishedReleaseHistory = () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-pin-'));
+  git(rootDir, ['init', '--quiet', '--initial-branch', 'main']);
+  git(rootDir, ['config', 'user.name', 'Release Tester']);
+  git(rootDir, ['config', 'user.email', '[redacted-email]']);
+  const writeVersion = (version) => {
+    writeRepoFile(rootDir, 'package.json', packageJson('contextEngine', version));
+    writeRepoFile(rootDir, 'package-lock.json', packageLock('contextEngine', version));
+    writeRepoFile(rootDir, path.join('client', 'package.json'), packageJson('client', version));
+    writeRepoFile(rootDir, path.join('client', 'package-lock.json'), packageLock('client', version));
+  };
+  writeVersion('0.1.0');
+  writeRepoFile(rootDir, path.join('workers', 'sessionCorsWorker', 'worker.js'), 'export default 1;\n');
+  writeRepoFile(
+    rootDir,
+    EXAMPLE_CONFIG_PATH,
+    'WORKER_BUNDLE_URL = "https://github.com/o/r/releases/download/worker-bundles-' + 'f'.repeat(40) + '/sessionCorsWorker.bundle.js"\n',
+  );
+  const releaseA = commitAll(rootDir, 'release a');
+  writeVersion('0.1.1');
+  writeRepoFile(rootDir, 'docs/notes.md', 'notes\n');
+  const releaseB = commitAll(rootDir, 'release b');
+  writeRepoFile(rootDir, path.join('workers', 'sessionCorsWorker', 'worker.js'), 'export default 2;\n');
+  const releaseC = commitAll(rootDir, 'release c');
+  writeRepoFile(rootDir, path.join('workers', 'sessionCorsWorker', 'worker.test.mjs'), 'test\n');
+  const unpublishedTip = commitAll(rootDir, 'unpublished tip');
+  for (const commit of [releaseA, releaseB, releaseC]) git(rootDir, ['tag', `worker-bundles-${commit}`, commit]);
+  git(rootDir, ['tag', 'worker-bundles-stable', releaseC]);
+  return { rootDir, releaseA, releaseB, releaseC, unpublishedTip };
+};
+
+const commitCandidatePin = (rootDir, commit) => {
+  git(rootDir, ['checkout', '--quiet', '-B', 'candidate', 'main']);
+  writePinnedRelease(rootDir, commit);
+  return commitAll(rootDir, `pin ${commit}`);
+};
+
+test('Worker source comparison ignores version stamps and test-only changes', () => {
+  const { rootDir, releaseA, releaseB, releaseC, unpublishedTip } = createPublishedReleaseHistory();
+  try {
+    assert.deepEqual(listWorkerSourceChanges({ repoRoot: rootDir, fromRef: releaseA, toRef: releaseB }), []);
+    assert.deepEqual(listWorkerSourceChanges({ repoRoot: rootDir, fromRef: releaseB, toRef: releaseC }), [
+      'workers/sessionCorsWorker/worker.js',
+    ]);
+    assert.deepEqual(listWorkerSourceChanges({ repoRoot: rootDir, fromRef: releaseC, toRef: unpublishedTip }), []);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('the Worker release pin must carry the newest published Worker code', () => {
+  const { rootDir, releaseA, releaseC, unpublishedTip } = createPublishedReleaseHistory();
+  try {
+    const verify = (pinCommit) => verifyWorkerReleasePin({
+      repoRoot: rootDir,
+      candidateRef: commitCandidatePin(rootDir, pinCommit),
+      baselineRef: 'main',
+    });
+
+    assert.deepEqual(verify(releaseC), { pinCommit: releaseC, newestRelease: releaseC });
+    assert.throws(() => verify(releaseA), /pin [a-f0-9]{40} is stale: worker-bundles-[a-f0-9]{40}.*worker\.js/);
+    assert.throws(
+      () => verify(unpublishedTip),
+      /not a published worker-bundles release in main; fetch release tags \(git fetch --no-tags origin main '\+refs\/tags\/worker-bundles-\*:refs\/tags\/worker-bundles-\*'\)/,
+    );
+    assert.equal(
+      verifyWorkerReleasePin({ repoRoot: rootDir, candidateRef: 'main', baselineRef: 'main' }),
+      null,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('the release gate refuses a dropped, malformed or split Worker release pin', () => {
+  const { rootDir, releaseA, releaseC } = createPublishedReleaseHistory();
+  try {
+    // Public main ships the pin from here on.
+    writePinnedRelease(rootDir, releaseC);
+    commitAll(rootDir, 'pin on main');
+    const verifyCandidate = (edit) => {
+      git(rootDir, ['checkout', '--quiet', '-B', 'candidate', 'main']);
+      edit();
+      return verifyWorkerReleasePin({
+        repoRoot: rootDir,
+        candidateRef: commitAll(rootDir, 'candidate'),
+        baselineRef: 'main',
+      });
+    };
+
+    assert.throws(
+      () => verifyCandidate(() => fs.rmSync(path.join(rootDir, PIN_PATH))),
+      /workerReleasePin\.json is missing at [a-f0-9]{40} but present in main/,
+    );
+    assert.throws(
+      () => verifyCandidate(() => writePin(rootDir, releaseC, 'not-a-digest')),
+      /must pin a full lowercase commit and manifest SHA-256/,
+    );
+    assert.throws(
+      () => verifyCandidate(() => writeExampleConfig(rootDir, releaseA)),
+      new RegExp(`wrangler\\.example\\.toml at [a-f0-9]{40} names worker-bundles-${releaseA}, not the pinned ${releaseC}`),
+    );
+    assert.deepEqual(
+      verifyCandidate(() => writeRepoFile(rootDir, 'docs/release.md', 'notes\n')),
+      { pinCommit: releaseC, newestRelease: releaseC },
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('release preparation and release-ref verification refuse a stale Worker pin', () => {
+  const { rootDir, releaseA, releaseC } = createPublishedReleaseHistory();
+  const run = (args) => spawnSync(process.execPath, [SCRIPT_PATH, ...args, '--repo-root', rootDir], { encoding: 'utf8' });
+  try {
+    const staleCandidate = commitCandidatePin(rootDir, releaseA);
+    writeVersionSurfaces(rootDir, '0.1.2');
+    commitAll(rootDir, 'stamp');
+
+    const plan = run(['plan', '--main-ref', 'main']);
+    assert.notEqual(plan.status, 0, 'plan accepted a stale pin');
+    assert.match(plan.stderr, /Worker release pin [a-f0-9]{40} is stale/);
+    // A dry run reads the target base, not the replayed candidate.
+    assert.equal(run(['plan', '--main-ref', 'main', '--dry-run']).status, 0);
+
+    const verifyRef = run(['verify-ref', '--candidate-ref', 'HEAD', '--baseline-ref', 'main']);
+    assert.notEqual(verifyRef.status, 0, `verify-ref accepted a stale pin from ${staleCandidate}`);
+    assert.match(verifyRef.stderr, /is stale/);
+
+    writePinnedRelease(rootDir, releaseC);
+    commitAll(rootDir, 'move pin');
+    assert.equal(run(['plan', '--main-ref', 'main']).status, 0);
+    const fresh = run(['verify-ref', '--candidate-ref', 'HEAD', '--baseline-ref', 'main']);
+    assert.equal(fresh.status, 0, fresh.stderr);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('pin-worker-release pins the newest verified release and its deploy-helper example', async () => {
+  const { rootDir, releaseA, releaseB, releaseC } = createPublishedReleaseHistory();
+  try {
+    await assert.rejects(
+      pinWorkerRelease({ repoRoot: rootDir, mainRef: 'main', fetchRemote: '' }),
+      /workerReleasePin\.json was not found/,
+    );
+    writePin(rootDir, releaseA);
+    const verified = [];
+    const pin = await pinWorkerRelease({
+      repoRoot: rootDir,
+      mainRef: 'main',
+      fetchRemote: '',
+      verifyRelease: async ({ commit }) => {
+        verified.push(commit);
+        return { ok: true, failures: [], manifestSha256: 'b'.repeat(64) };
+      },
+    });
+
+    assert.deepEqual(verified, [releaseC]);
+    assert.deepEqual(pin, { commit: releaseC, manifestSha256: 'b'.repeat(64) });
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(rootDir, PIN_PATH), 'utf8')), pin);
+    assert.match(
+      fs.readFileSync(path.join(rootDir, EXAMPLE_CONFIG_PATH), 'utf8'),
+      new RegExp(`worker-bundles-${releaseC}/sessionCorsWorker`),
+    );
+    await assert.rejects(
+      pinWorkerRelease({
+        repoRoot: rootDir,
+        mainRef: 'main',
+        commit: releaseB,
+        fetchRemote: '',
+        verifyRelease: async () => ({ ok: false, failures: ['manifest: HTTP 404'] }),
+      }),
+      /failed verification: manifest: HTTP 404/,
+    );
+    await assert.rejects(
+      pinWorkerRelease({ repoRoot: rootDir, mainRef: 'main', commit: 'c'.repeat(40), fetchRemote: '' }),
+      /is not a published release in main history/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('pin-worker-release fetches moved release channel tags and reports git failures', async () => {
+  const { rootDir: publicDir, releaseA, releaseB, releaseC } = createPublishedReleaseHistory();
+  const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-pin-clone-'));
+  try {
+    git(publicDir, ['tag', 'v0.1.0', releaseA]);
+    git(cloneDir, ['clone', '--quiet', publicDir, '.']);
+    // Promote Worker Bundles moves worker-bundles-stable after this clone fetched it.
+    git(publicDir, ['tag', '-f', 'worker-bundles-stable', releaseB]);
+    // Tags outside the Worker release namespace are left as the clone has them.
+    git(publicDir, ['tag', '-f', 'v0.1.0', releaseB]);
+    git(publicDir, ['tag', 'v0.1.1', releaseC]);
+    writePin(cloneDir, releaseB);
+    const verifyRelease = async () => ({ ok: true, failures: [], manifestSha256: 'c'.repeat(64) });
+
+    const pin = await pinWorkerRelease({ repoRoot: cloneDir, mainRef: 'origin/main', verifyRelease });
+
+    assert.equal(pin.commit, releaseC);
+    assert.equal(git(cloneDir, ['rev-parse', 'worker-bundles-stable^{commit}']), releaseB);
+    assert.equal(git(cloneDir, ['rev-parse', 'v0.1.0^{commit}']), releaseA);
+    assert.equal(git(cloneDir, ['tag', '--list', 'v0.1.1']), '');
+    await assert.rejects(
+      pinWorkerRelease({ repoRoot: cloneDir, mainRef: 'origin/main', fetchRemote: 'missing-remote', verifyRelease }),
+      /Fetching release tags from missing-remote failed: .*missing-remote/s,
+    );
+  } finally {
+    fs.rmSync(publicDir, { recursive: true, force: true });
+    fs.rmSync(cloneDir, { recursive: true, force: true });
+  }
+});
+
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const repoHasGitHistory = spawnSync('git', ['rev-parse', '--git-dir'], { cwd: REPO_ROOT }).status === 0;
+
+test('the Worker source pathspec covers every local input of the release bundles', {
+  skip: !repoHasGitHistory,
+}, async () => {
+  const { build } = await import('esbuild');
+  const bundleInputs = new Set();
+  for (const target of resolveWorkerBundleTargets({ rootDir: REPO_ROOT })) {
+    // Same entry and options as scripts/worker-bundle.mjs; packages stay
+    // external because the lockfiles in the pathspec cover them.
+    const result = await build({
+      absWorkingDir: REPO_ROOT,
+      entryPoints: [target.entryRelativePath],
+      bundle: true,
+      write: false,
+      metafile: true,
+      platform: 'browser',
+      format: 'esm',
+      preserveSymlinks: true,
+      packages: 'external',
+      logLevel: 'silent',
+      target: [target.target || 'es2020'],
+      ...(target.mainFields ? { mainFields: target.mainFields } : {}),
+    });
+    Object.keys(result.metafile.inputs)
+      .filter((input) => !input.includes('node_modules') && !input.startsWith('('))
+      .forEach((input) => bundleInputs.add(input));
+  }
+  const covered = new Set(
+    git(REPO_ROOT, ['ls-files', '--', ...WORKER_RELEASE_SOURCE_PATHSPEC]).split(/\r?\n/).filter(Boolean),
+  );
+
+  assert.ok(bundleInputs.has('workers/sessionCorsWorker/worker.js'));
+  assert.deepEqual([...bundleInputs].filter((input) => !covered.has(input)), []);
+  // The native Cloudflare template the pin also selects.
+  for (const templateInput of [
+    'deploy/cloudflare/session-worker/worker.mjs',
+    'deploy/cloudflare/session-worker/wrangler.jsonc',
+    'deploy/cloudflare/session-worker/package.json',
+    'scripts/cloudflare-session-template.mjs',
+  ]) {
+    assert.ok(covered.has(templateInput), `${templateInput} is not in the Worker source pathspec`);
+  }
+  // Files no bundle imports would only force needless pin moves.
+  for (const nonInput of [
+    'shared/encryption/envelopeV1Core.mjs',
+    'shared/encryption/envelopeWriterFixtures.mjs',
+    'workers/agentBridgeWorker/agentOnlyLoadTest.mjs',
+    'workers/agentBridgeWorker/deployHelperApply.mjs',
+    'workers/agentBridgeWorker/deployHelperPlan.mjs',
+  ]) {
+    assert.ok(!covered.has(nonInput), `${nonInput} is not a bundle input`);
   }
 });
 

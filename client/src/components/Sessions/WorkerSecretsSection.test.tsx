@@ -7,6 +7,7 @@ const renderWorkerSecretsSection = (props = {}) =>
   render(
     <WorkerSecretsSection
       isNormalMode={false}
+      showUserPaidUsage
       translate={(key) => {
         if (key === 'gatesLower') return 'gates';
         if (key === 'gateLower') return 'gate';

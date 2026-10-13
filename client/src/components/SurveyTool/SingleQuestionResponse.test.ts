@@ -222,6 +222,62 @@ describe('SingleQuestionResponse card actions', () => {
     expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')?.props?.href).toContain(preferredTxId);
   });
 
+  it('never turns unsafe Arweave ids from uploaded questions or responses into links', () => {
+    const unsafe = 'javascript:alert(document.domain)';
+    const hostile = () => JSON.parse('{"toString":1}');
+    const responseWith = (fields: Record<string, unknown>) =>
+      createSubject({
+        mode: 'fullscreen',
+        question: { id: 'q-unsafe', prompt: 'Prompt', type: 'freeform' },
+        response: {
+          ...fields,
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      }).render();
+    const trees = [
+      // Other web links are not Arweave transactions, whatever the link says.
+      responseWith({ arweaveTxId: 'https://arweave-net.example/login?next=wallet' }),
+      // Fields whose text conversion throws must not break the card.
+      responseWith({ txId: hostile() }),
+      responseWith({ storageRef: { backend: 'arweave', id: hostile() } }),
+      createSubject({
+        aggregatorResponseMode: true,
+        question: {
+          id: 'q-unsafe',
+          type: 'binary',
+          storageRef: { backend: 'arweave', id: '/session/demo?worker=https://worker.attacker.example' },
+        },
+        allResponses: [],
+      }).render(),
+      createSubject({
+        mode: 'mini',
+        questionOnly: true,
+        question: { id: 'q-unsafe', prompt: 'Prompt', type: 'freeform', arweaveTxId: unsafe },
+        response: null,
+      }).render(),
+      createSubject({
+        mode: 'fullscreen',
+        question: { id: 'q-unsafe', prompt: 'Prompt', type: 'freeform' },
+        response: {
+          arweaveTxId: unsafe,
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      }).render(),
+      createSubject({
+        aggregatorResponseMode: true,
+        question: { id: 'q-unsafe', type: 'binary', storageRef: { backend: 'arweave', id: '//evil.example/x' } },
+        allResponses: [],
+      }).render(),
+    ];
+
+    trees.forEach((tree) => {
+      expect(findElement(tree, (node) => node?.props?.title === 'View on Arweave')).toBeNull();
+      expect(findElement(tree, (node) => node?.props?.title === 'View question page')).not.toBeNull();
+    });
+  });
+
   it('does not render an Arweave link for Cloudflare-only question storage refs', () => {
     const subject = createSubject({
       mode: 'mini',
@@ -641,6 +697,23 @@ describe('SingleQuestionResponse rating rendering', () => {
     expect(renderToStaticMarkup(label)).toContain('1/10');
     expect(renderToStaticMarkup(tree)).toContain('Strongly oppose');
     expect(renderToStaticMarkup(tree)).toContain('Strongly support');
+  });
+});
+
+describe('SingleQuestionResponse conviction display', () => {
+  it('shows legacy 0-100 interview conviction on the 0-10 scale', () => {
+    const subject = createSubject({
+      mode: 'fullscreen',
+      showImportance: true,
+      question: { id: 'q1', type: 'binary', prompt: 'Agree?' },
+      response: {
+        answer: { value: 'Agree', encrypted: false },
+        additional: { value: '', encrypted: false },
+        conviction: 75,
+      },
+    });
+
+    expect(renderToStaticMarkup(subject.renderSinglePersonView())).toContain('Conviction: 7.5');
   });
 });
 

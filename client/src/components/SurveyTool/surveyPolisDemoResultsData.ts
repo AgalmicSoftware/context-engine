@@ -1,6 +1,7 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
-import { hasSimulatedDemoResponses, resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets.js';
+import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets.js';
+import { hasSimulatedDemoResponses } from '../../utilities/demo/demoFixtureSessionSlugs';
 import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {

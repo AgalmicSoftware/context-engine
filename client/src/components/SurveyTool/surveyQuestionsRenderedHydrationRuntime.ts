@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { resolveEditableQuestionList } from './surveyToolResponsePayloadController.js';
 
 export type SurveyQuestionsRenderedHydrationRuntime = SurveyQuestionsLegacyRecord;
 
@@ -11,7 +12,6 @@ export const createSurveyQuestionsRenderedHydrationRuntime = (
     buildNormalizedRenderedQuestionIds,
     buildRenderedQuestionIdsFromQuestionPools,
     buildSubmissionGroupContext,
-    deepClone,
     engine,
     ensureQuestionsNet,
     executeSurveyDraftHydration,
@@ -131,7 +131,7 @@ export const createSurveyQuestionsRenderedHydrationRuntime = (
     return resolveQuestionSlugMapLookup({
       questionIds,
       questionPool: stateRef.current?.questionPool,
-      pileQuestions: stateRef.current?.pileQuestions,
+      pileQuestions: resolveEditableQuestionList(stateRef.current || {}),
       surveyId: Object.prototype.hasOwnProperty.call(opts || {}, 'surveyId') ? opts.surveyId : undefined,
       singleQuestionMode: propsRef.current.singleQuestionMode,
       propsSurveyId: propsRef.current.surveyId,
@@ -235,7 +235,6 @@ export const createSurveyQuestionsRenderedHydrationRuntime = (
       getPendingEditStats: () => getPendingEditStats?.() || null,
       getHydrationQuestionIds: () => getHydrationQuestionIds(),
       applyDraftHydrationEntryToSlice: inst._applyDraftHydrationEntryToSlice,
-      cloneBaseline: deepClone,
       setState: setStateForHydration,
       updateJsonPreview: updateJsonPreview,
       onError: (error: SurveyQuestionsLegacyValue) => {

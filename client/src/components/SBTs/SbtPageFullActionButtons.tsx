@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE } from '../../utilities/crypto/sbtAuthorization';
 import styles from './SBTPage.module.scss';
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
@@ -19,6 +20,7 @@ export type SbtPageFullMintActionExecutionProps = {
   onMint: (forceEventRefreshOnSuccess?: boolean) => unknown;
   onMintUnlimitedWithGroupPassword: () => unknown;
   onOpenMintTransaction: () => unknown;
+  onRetryGroupPasswordCheck: () => unknown;
 };
 
 export type SbtPageFullBurnActionExecutionProps = {
@@ -47,6 +49,7 @@ type SbtPageMintActionSurfaceProps = {
   onMint: (forceEventRefreshOnSuccess?: boolean) => unknown;
   onMintUnlimitedWithGroupPassword: () => unknown;
   onOpenMintTransaction: () => unknown;
+  onRetryGroupPasswordCheck: () => unknown;
 };
 
 export const SbtPageMintActionSurface = ({
@@ -59,6 +62,7 @@ export const SbtPageMintActionSurface = ({
   onMint,
   onMintUnlimitedWithGroupPassword,
   onOpenMintTransaction,
+  onRetryGroupPasswordCheck,
 }: SbtPageMintActionSurfaceProps): React.ReactElement | null => {
   const {
     manualClaimActionRequest,
@@ -72,6 +76,17 @@ export const SbtPageMintActionSurface = ({
 
   if (!mintActionPlan.shouldRenderMintButton) return null;
   if (mintFlowDisplayState.shouldSuppressMintControls) return null;
+
+  if (mintFlowDisplayState.shouldRenderGroupPasswordCheckRetry) {
+    return (
+      <div className={styles.mintProcess}>
+        <p role="status">{GROUP_PASSWORD_HASH_UNREADABLE_MESSAGE}</p>
+        <button type="button" className={buttonClassName} onClick={() => onRetryGroupPasswordCheck()}>
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (mintFlowDisplayState.shouldRenderGroupPasswordJoin) {
     return (
@@ -253,6 +268,7 @@ export const renderSbtPageFullActionSurfaces = ({
       onMint={mintExecution.onMint}
       onMintUnlimitedWithGroupPassword={mintExecution.onMintUnlimitedWithGroupPassword}
       onOpenMintTransaction={mintExecution.onOpenMintTransaction}
+      onRetryGroupPasswordCheck={mintExecution.onRetryGroupPasswordCheck}
     />
   ) : null,
 });

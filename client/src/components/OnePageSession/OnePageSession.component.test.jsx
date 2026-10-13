@@ -15,6 +15,9 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
+import * as demoSessionFixtureLoader from '../SurveyTool/demoSessionFixtureLoader';
+import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary';
+import * as bootRecovery from '../../bootRecovery.js';
 import { captureSessionRecruitmentSource, readSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
 import { writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -768,6 +771,24 @@ describe('OnePageSession view gating', () => {
     expect(fullCalls[fullCalls.length - 1]?.sessionSlugPinned).toBe(true);
   });
 
+  it('passes a failed saved-answer load to both embedded SurveyPage modes', async () => {
+    render(<OnePageSession {...buildProps()} cacheInitializationError />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('pile-view-all'));
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+    });
+
+    const calls = mockSurveyPage.mock.calls.map((args) => args[0]);
+    expect(calls.filter((childProps) => childProps?.minifiedMode === 'pile').at(-1)?.cacheInitializationError).toBe(
+      true,
+    );
+    expect(calls.filter((childProps) => childProps?.miniMode === true).at(-1)?.cacheInitializationError).toBe(true);
+  });
+
   it('passes slug-scoped Polis demo data through to the embedded report', async () => {
     const customEdgeData = {
       edge: {
@@ -796,6 +817,23 @@ describe('OnePageSession view gating', () => {
     expect(polisCalls.length).toBeGreaterThan(0);
     expect(polisCalls[polisCalls.length - 1]?.demoDataBySlug).toBe(customEdgeData);
     expect(polisCalls[polisCalls.length - 1]?.questionScanProgress).toBe(progress);
+  });
+
+  it('lets the embedded report retry a failed saved-response load', async () => {
+    const refreshQuestionResponses = jest.fn(async () => {});
+    render(
+      <OnePageSession {...buildProps()} cacheInitializationError refreshQuestionResponses={refreshQuestionResponses} />,
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+
+    const reportProps = mockPolisReport.mock.calls.map((args) => args[0]).at(-1);
+    expect(reportProps.cacheInitializationError).toBe(true);
+    await act(async () => reportProps.onRetryLoad());
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(null, { slug: 'edge' });
   });
 
   it('passes the built-in demo display slug to the embedded report', async () => {
@@ -860,6 +898,53 @@ describe('OnePageSession view gating', () => {
       }),
     );
     expect(questionResponses).toEqual({});
+  });
+
+  it('loads the demo fixtures for demo sessions and never for other sessions', async () => {
+    const loadSpy = jest.spyOn(demoSessionFixtureLoader, 'loadDemoSessionFixtures');
+    try {
+      const view = render(<OnePageSession {...buildProps()} slug="edge" />);
+      expect(loadSpy).not.toHaveBeenCalled();
+      view.unmount();
+
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo-2"
+          questionSessionSlug="demo-2"
+          sessionConfig={{ ...buildProps().sessionConfig, slug: 'demo-2' }}
+        />,
+      );
+      await waitFor(() => expect(demoSessionFixtureLoader.getLoadedDemoSessionFixtures()).not.toBeNull());
+    } finally {
+      loadSpy.mockRestore();
+    }
+  });
+
+  it('shows the new-version panel when the demo fixtures fail to load', async () => {
+    // A tab left open across a release asks for a chunk the new deploy no longer has.
+    const staleChunk = new TypeError(
+      'Failed to fetch dynamically imported module: https://app.example/assets/demoSessionFixtures-old.js',
+    );
+    jest.spyOn(demoSessionFixtureLoader, 'getLoadedDemoSessionFixtures').mockReturnValue(null);
+    jest.spyOn(demoSessionFixtureLoader, 'loadDemoSessionFixtures').mockRejectedValue(staleChunk);
+    const recover = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(false);
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <RouteErrorBoundary>
+        <OnePageSession
+          {...buildProps()}
+          slug="demo-2"
+          questionSessionSlug="demo-2"
+          sessionConfig={{ ...buildProps().sessionConfig, slug: 'demo-2' }}
+        />
+      </RouteErrorBoundary>,
+    );
+
+    expect(await screen.findByText('A new version of Context Engine is available')).toBeInTheDocument();
+    // The boundary's one-reload rule sees the failed chunk.
+    expect(recover).toHaveBeenCalledWith(staleChunk);
   });
 
   it('builds built-in demo live report responses only from the demo source bucket', async () => {
@@ -1421,6 +1506,29 @@ describe('OnePageSession view gating', () => {
     expect(contextSubtitle).toHaveClass(styles.sectionHeaderSubtitle);
     expect(contextTextWrap).toBeTruthy();
     expect(contextTextWrap.parentElement).toBe(contextHeader);
+  });
+
+  it('hides section subtitles while expanded and restores them when collapsed', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        sessionConfig={{ ...buildProps().sessionConfig, slug: 'demo', sessionName: 'Context Engine' }}
+      />,
+    );
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    for (const [testId, subtitle] of [
+      [E2E_TESTIDS.SESSION_GROUPS_TOGGLE, 'Join or Create'],
+      ['ce-demo-documents-toggle', 'View'],
+      [E2E_TESTIDS.SESSION_RESULTS_TOGGLE, 'View'],
+    ]) {
+      const header = screen.getByTestId(testId);
+      expect(within(header).getByText(subtitle)).toBeInTheDocument();
+      fireEvent.click(header);
+      expect(within(header).queryByText(subtitle)).not.toBeInTheDocument();
+      fireEvent.click(header);
+      expect(within(header).getByText(subtitle)).toBeInTheDocument();
+    }
   });
 
   it('keeps both words in compact expandable-section headings at the same size', () => {

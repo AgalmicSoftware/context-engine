@@ -15,10 +15,12 @@ import { Button, Input } from 'reactstrap';
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { toViewerBlob } from '../../utilities/ui/viewerMime';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -110,18 +112,6 @@ const copyToClipboard = async (text: unknown): Promise<boolean> => {
   }
 };
 
-const sanitizeHttpUrl = (raw: unknown): string => {
-  const value = toStr(raw).trim();
-  if (!value) return '';
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-    return parsed.toString();
-  } catch (_) {
-    return '';
-  }
-};
-
 const safeFilename = (name: unknown, fallback = 'document'): string => {
   const raw = toStr(name).trim();
   if (!raw) return fallback;
@@ -192,12 +182,15 @@ const DocRowImagePreview = ({
         });
 
         const blob = litStorage.decodeLitPayloadToBlob(payload);
-        if (!blob || !toStr(blob.type).trim().toLowerCase().startsWith('image/')) {
+        // Only inert raster images preview: "Open image in new tab" on an SVG blob
+        // would run its script as the app.
+        const preview = blob ? toViewerBlob(blob, blob.type) : null;
+        if (!preview || !preview.mime.startsWith('image/')) {
           throw new Error('Encrypted image preview unavailable.');
         }
         if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
 
-        objectUrl = URL.createObjectURL(blob);
+        objectUrl = URL.createObjectURL(preview.blob);
         if (cancelled) {
           if (objectUrl && typeof URL.revokeObjectURL === 'function') {
             URL.revokeObjectURL(objectUrl);
@@ -272,7 +265,7 @@ export const DocumentLibraryViewerBody = ({
       try {
         const parsed = JSON.parse(viewerText);
         if (parsed && parsed.kind === 'link' && parsed.url) {
-          const safeUrl = sanitizeHttpUrl(parsed.url);
+          const safeUrl = toSafeLinkHref(parsed.url, { contextLabel: 'doc_library_link' });
           return (
             <div className={styles.viewerLink}>
               <div className={styles.viewerLinkTitle}>{toStr(parsed.title).trim() || 'Link'}</div>
@@ -410,7 +403,6 @@ type DocumentLibraryUploadControlsProps = {
   requiresLitDocumentStorage: boolean;
   locked: boolean;
   onToggleLocked: () => void;
-  sessionGateUnsupportedMessage: string;
   audienceMode: string;
   onAudienceModeChange: (mode: string) => void;
   docUploadsGate: DocUploadsGateState;
@@ -451,7 +443,6 @@ export const DocumentLibraryUploadControls = ({
   requiresLitDocumentStorage,
   locked,
   onToggleLocked,
-  sessionGateUnsupportedMessage,
   audienceMode,
   onAudienceModeChange,
   docUploadsGate,
@@ -558,10 +549,6 @@ export const DocumentLibraryUploadControls = ({
             <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
           </button>
         </div>
-
-        {sessionGateUnsupportedMessage ? (
-          <div className={styles.noticeInline}>{sessionGateUnsupportedMessage}</div>
-        ) : null}
 
         {locked && showSbtAudienceControls ? (
           <div className={styles.encryptControls}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import WorkerGroupImage from './WorkerGroupImage';
 
 const originalCreateObjectURL = URL.createObjectURL;
@@ -92,6 +92,43 @@ describe('WorkerGroupImage', () => {
 
     unmount();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:private-group-image');
+  });
+
+  it('shows a private group image only when the Worker returns a raster image', async () => {
+    const createObjectURL = jest.fn().mockReturnValue('blob:private-group-image');
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: jest.fn() });
+    const renderWithType = (type: string) => {
+      const blob = jest.fn().mockResolvedValue(new Blob(['<svg onload="alert(1)"/>'], { type }));
+      const fetchImpl = jest.fn().mockResolvedValue({ ok: true, status: 200, blob });
+      const view = render(
+        <WorkerGroupImage
+          src="https://private-worker.example/storage/read?id=cf_group_image"
+          sessionConfig={privateConfig}
+          sessionSlug="private-session"
+          workerToken="participant-token"
+          workerUrl="https://private-worker.example"
+          fetchImpl={fetchImpl}
+          testId="group-image"
+        />,
+      );
+      return { blob, view };
+    };
+
+    // An SVG (or anything else) opened from a blob: URL would run as the app.
+    for (const type of ['image/svg+xml', 'image/svg+xml;charset=utf-8', 'text/html', '']) {
+      const { blob, view } = renderWithType(type);
+      await waitFor(() => expect(blob).toHaveBeenCalled());
+      await act(async () => {});
+      expect(screen.queryByTestId('group-image')).toBeNull();
+      view.unmount();
+    }
+    expect(createObjectURL).not.toHaveBeenCalled();
+
+    const { view } = renderWithType('image/png;charset=binary');
+    await waitFor(() => expect(screen.getByTestId('group-image')).toHaveAttribute('src', 'blob:private-group-image'));
+    expect(createObjectURL.mock.calls[0][0].type).toBe('image/png');
+    view.unmount();
   });
 
   it('does not send Worker credentials to external HTTPS image hosts', () => {

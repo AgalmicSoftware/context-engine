@@ -156,6 +156,59 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
     );
   });
 
+  it('flags an answer the session Worker would refuse as too long', () => {
+    const resolveEffectiveResponseGateConfig = jest.fn((_slug: string, _props: unknown): Record<string, unknown> => ({
+      storageProfile: { backend: 'cloudflare' },
+    }));
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext({ resolveEffectiveResponseGateConfig }));
+    // A locked answer of 49,162 bytes as a JSON string: 10 over the locked-text budget.
+    const responseSlice = { answers: { q1: { value: 'x'.repeat(49_160), encrypted: true } }, additionalComments: {} };
+
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe(
+      'This answer is too long to save. Shorten it by about 10 characters.',
+    );
+    expect(resolveEffectiveResponseGateConfig).toHaveBeenCalledWith('edge', expect.any(Object));
+
+    // Unlocked, the same text fits the stored answer.
+    const unlockedSlice = { answers: { q1: { value: 'x'.repeat(49_160) } }, additionalComments: {} };
+    expect(
+      runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice: unlockedSlice }).answerTooLongMessage,
+    ).toBe('');
+
+    resolveEffectiveResponseGateConfig.mockReturnValue({ storageProfile: { backend: 'arweave' } });
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe('');
+
+    const shortSlice = { answers: { q1: { value: 'short' } }, additionalComments: {} };
+    expect(
+      runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice: shortSlice }).answerTooLongMessage,
+    ).toBe('');
+  });
+
+  it('flags a question whose prompt leaves no room for an answer, given the question or only its id', () => {
+    const resolveEffectiveResponseGateConfig = jest.fn((_slug: string, _props: unknown): Record<string, unknown> => ({
+      storageProfile: { backend: 'cloudflare' },
+    }));
+    const context = createContext({ resolveEffectiveResponseGateConfig });
+    const question = { id: 'Q1', type: 'freeform', prompt: 'p'.repeat(96 * 1024) };
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(context);
+    const responseSlice = { answers: { q1: { value: '' } }, additionalComments: {} };
+    const promptTooLong =
+      "Answers to this question can't be saved because its prompt is too long. Ask the session admin to shorten it.";
+
+    expect(
+      runtime.getQuestionRenderDisplayState({ question, questionId: 'q1', responseSlice }).answerTooLongMessage,
+    ).toBe(promptTooLong);
+    // The pile view passes only the id; the question comes from the editable pool.
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe('');
+    const state = context.stateRef.current as Record<string, unknown>;
+    state.allQuestionsForFilter = [question];
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe(
+      promptTooLong,
+    );
+    state.questionPool = [{ ...question, encryption: { gates: [{ sbtAddress: '0xabc' }] } }];
+    expect(runtime.getQuestionRenderDisplayState({ questionId: 'q1', responseSlice }).answerTooLongMessage).toBe('');
+  });
+
   it('reuses per-question input handlers while preserving answer semantics', () => {
     const handleAnswer = jest.fn();
     const toggleAnswerEncryption = jest.fn();

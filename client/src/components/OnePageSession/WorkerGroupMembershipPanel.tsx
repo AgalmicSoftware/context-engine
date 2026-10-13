@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfinity, faLink, faQuestionCircle, faSyncAlt, faUser } from '@fortawesome/free-solid-svg-icons';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
@@ -102,15 +103,6 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
 const groupJoinHasEnded = (group: WorkerGroup): boolean =>
   Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
 
-const toSafeExternalUrl = (value: unknown): string => {
-  try {
-    const url = new URL(String(value || '').trim());
-    return url.protocol === 'https:' ? url.toString() : '';
-  } catch {
-    return '';
-  }
-};
-
 const WorkerGroupBackControl = ({
   onBack,
   sessionSlug,
@@ -176,7 +168,9 @@ const WorkerGroupDetailView = ({
   const safeGroupId = group.groupId.replace(/[^a-zA-Z0-9_-]/g, '-');
   const titleId = `worker-group-detail-${safeGroupId}-title`;
   const descriptionId = group.description ? `worker-group-detail-${safeGroupId}-description` : undefined;
-  const documentURLs = (group.documentURLs || []).map(toSafeExternalUrl).filter(Boolean);
+  const documentURLs = (group.documentURLs || [])
+    .map((url) => toSafeLinkHref(url, { contextLabel: 'worker_group_document' }))
+    .filter(Boolean);
   const [joinWindowNowMs, setJoinWindowNowMs] = useState(() => Date.now());
   const joinWindow = resolveWorkerGroupJoinWindowDisplay({
     joinEndsAt: group.joinEndsAt,

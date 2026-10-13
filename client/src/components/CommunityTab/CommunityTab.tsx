@@ -11,14 +11,19 @@ import {
   faChevronUp,
   faExclamationTriangle,
   faCog,
+  faLayerGroup,
+  faFilter,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CommunityTab.module.scss';
+import { renderCommunitySessionFilters } from './renderCommunitySessionFilters';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts, {
   getAllSessionSlugs,
+  getAllSessionEntries,
+  getSessionConfigBySlug,
   getDemoSessionConfigBySlug,
   getSessionChainId,
   getSessionLists,
@@ -66,9 +71,23 @@ import {
   type CommunityWorkerGroupCountCacheEntry,
 } from './communityWorkerGroupStats';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
+import { getAllDemoSessionConfigs } from '../../utilities/session/sessionSourceResolver';
+import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
+import { readSessionWorkerConfigCache } from '../../utilities/session/sessionWorkerConfigCache';
+import {
+  buildCommunitySessionCatalog,
+  countCommunitySessions,
+  createCommunitySessionFilters,
+  filterCommunitySessions,
+  isCommunitySessionDateUnavailable,
+  type CommunitySessionEntry,
+  type CommunitySessionFilters,
+} from './communitySessionStats';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
+const SESSION_FILTER_SUMMARY_ID = 'ce-community-session-filter-summary';
 const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
 type CacheReadOptions = { clone?: boolean };
 type SessionSelectorOption = { value: string; label: string };
@@ -112,6 +131,7 @@ const COMMUNITY_STAT_TEST_IDS: Record<string, string> = Object.freeze({
   Questions: E2E_TESTIDS.COMMUNITY_STAT_QUESTIONS,
   Surveys: E2E_TESTIDS.COMMUNITY_STAT_SURVEYS,
   Groups: E2E_TESTIDS.COMMUNITY_STAT_GROUPS,
+  Sessions: E2E_TESTIDS.COMMUNITY_STAT_SESSIONS,
 });
 
 const getDisplaySessionLists = (slugIn = '') => {
@@ -180,6 +200,9 @@ class CommunityTab extends Component<any, any> {
       lastSbtGroupsCount: null,
       initialLoadDone: false,
       showLeaderboardControls: false,
+      sessions: [],
+      showSessionFilters: false,
+      sessionFilters: createCommunitySessionFilters(),
     };
 
     this._holdersHydrationInFlight = false;
@@ -187,6 +210,7 @@ class CommunityTab extends Component<any, any> {
     this._holdersHydrationPromise = null;
     this._cacheRefIds = new WeakMap();
     this._nextCacheRefId = 1;
+    this._scopeLabelMemo = null;
     this._latestCacheSignature = '';
     this._latestCoarseCacheSignature = '';
     this._statsPollTimer = null;
@@ -217,6 +241,18 @@ class CommunityTab extends Component<any, any> {
   }
 
   // === Universe helpers (encapsulated) ===
+  _refreshSessionCatalog = () => {
+    if (this._isUnmounted) return;
+    const sessions = buildCommunitySessionCatalog({
+      entries: [
+        ...getAllSessionEntries(),
+        ...getAllDemoSessionConfigs().filter(([, config]) => claimsWorkerCanonicalAuthority(config)),
+      ],
+      workerRecords: Object.values(readSessionWorkerConfigCache().bySession),
+    });
+    if (JSON.stringify(sessions) !== JSON.stringify(this.state.sessions)) this.setState({ sessions });
+  };
+
   _readGlobalSelection = () => readStoredGlobalSessionSelection();
 
   _isUniverseEnabled = () => this._readGlobalSelection().selectedSessionScope === 'all';
@@ -289,6 +325,44 @@ class CommunityTab extends Component<any, any> {
   _labelForSessionSlug = (slugIn: unknown): string => {
     const slug = normalizeSessionSlug(slugIn || '');
     return slug || 'General';
+  };
+
+  _sessionDisplayName = (slugIn: unknown): string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const propConfig = this.props.sessionConfig;
+    const exactPropConfig =
+      typeof propConfig?.slug === 'string' && normalizeSessionSlug(propConfig.slug) === slug ? propConfig : null;
+    const config =
+      exactPropConfig || getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
+    const name = String(config?.sessionName || '').trim();
+    const slugLabel = slug || 'General';
+    return name && name.toLowerCase() !== slugLabel.toLowerCase() ? `${name} (${slugLabel})` : slugLabel;
+  };
+
+  // Render calls this every time, and each display name re-reads the session
+  // registry and Worker caches. Recompute only when one of its inputs changes;
+  // the catalog in state changes whenever the registry or Worker records do.
+  _communityScopeLabel = () => {
+    const universe = this._isUniverseEnabled();
+    const key = JSON.stringify([
+      universe,
+      this._readGlobalSelection(),
+      readSessionScanScope(),
+      readSessionScanSlugs(),
+      typeof window !== 'undefined' ? window.location.pathname : '',
+      this.props.activeSessionSlug ?? null,
+      this._getObjectRefId(this.props.sessionConfig),
+      this._getObjectRefId(this.state.sessions),
+    ]);
+    if (this._scopeLabelMemo?.key === key) return this._scopeLabelMemo.label;
+    let label = 'All sessions';
+    if (!universe) {
+      const slugs = this._getSelectedSessionSlugs();
+      const selected = slugs.length ? slugs : [this._currentSlug()];
+      label = `${selected.length === 1 ? 'Session' : 'Sessions'}: ${selected.map(this._sessionDisplayName).join(', ')}`;
+    }
+    this._scopeLabelMemo = { key, label };
+    return label;
   };
 
   _getDefaultSelectedSessionSlugs = () => {
@@ -1266,6 +1340,7 @@ class CommunityTab extends Component<any, any> {
 
   _runStatsRefreshCycle = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
+    this._refreshSessionCatalog();
 
     if (markLoading && (!this.state.loadingSbtsCreated || !this.state.loadingSurveyData)) {
       this.setState({ loadingSbtsCreated: true, loadingSurveyData: true });
@@ -1377,6 +1452,7 @@ class CommunityTab extends Component<any, any> {
   componentDidMount() {
     uiLog.log('CommunityTab mounted. Fetching initial data...');
     this._isUnmounted = false;
+    this._refreshSessionCatalog();
     this._statsPollStartedAtMs = Date.now();
     this._statsUnchangedStreak = 0;
     this._latestCacheSignature = '';
@@ -1429,6 +1505,7 @@ class CommunityTab extends Component<any, any> {
         this._queueCacheDrivenRefresh({ force: true });
       };
       window.addEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, this._globalSessionSelectionListener);
+      window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
     }
 
     // Eagerly start SBT holder hydration so uniqueUsers is complete before modal opens
@@ -1441,6 +1518,9 @@ class CommunityTab extends Component<any, any> {
 
   componentWillUnmount() {
     this._isUnmounted = true;
+    if (typeof window !== 'undefined') {
+      window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
+    }
     this._holdersHydrationAbort = true;
     if (this._eagerHydrationTimer) {
       clearTimeout(this._eagerHydrationTimer);
@@ -1539,6 +1619,7 @@ class CommunityTab extends Component<any, any> {
     const labelKey = String(stat.label || '')
       .toLowerCase()
       .replace(/\s+/g, '');
+    if (labelKey === 'sessions') this._refreshSessionCatalog();
     if (labelKey === 'users') {
       this.setState({
         modalTitle: `${stat.label} Details`,
@@ -2024,10 +2105,15 @@ class CommunityTab extends Component<any, any> {
     );
   }
 
-  renderQuestionSwarm() {
-    const points = this._getQuestionSwarmPoints();
+  renderQuestionSwarm(view = this._getQuestionSwarmView()) {
+    const { points, scopeLabel, isDemoFallback } = view;
     return (
       <section className={styles.beeswarmSection} data-testid="ce-community-beeswarm-section">
+        {isDemoFallback && (
+          <p className={styles.scopeLabel} data-testid="ce-community-beeswarm-session">
+            {scopeLabel}
+          </p>
+        )}
         <BeeswarmPlot
           points={points}
           className={styles.beeswarmPlot}
@@ -2039,18 +2125,31 @@ class CommunityTab extends Component<any, any> {
     );
   }
 
-  _getQuestionSwarmPoints = () => {
+  _getQuestionSwarmView = () => {
     if (this._shouldUseDemoBeeswarmData()) {
-      return this._buildDemoBeeswarmPoints();
+      const scopeEntries = this._iterScopeCaches({ clone: false });
+      const slug = scopeEntries[0]?.slug || this._currentSlug();
+      return {
+        points: this._buildDemoBeeswarmPoints(),
+        scopeLabel: `Demo session: ${this._sessionDisplayName(slug)}`,
+        isDemoFallback: false,
+      };
     }
     const points =
       Array.isArray(this._beeswarmPoints) && this._beeswarmPoints.length > 0
         ? this._beeswarmPoints
         : this._buildCommunityBeeswarmPoints();
-    return this._isZeroResponseBundledDemoPointSet(points)
-      ? this._buildDemoBeeswarmPoints(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG)
-      : points;
+    if (this._isZeroResponseBundledDemoPointSet(points)) {
+      return {
+        points: this._buildDemoBeeswarmPoints(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG),
+        scopeLabel: `Demo session: ${this._sessionDisplayName(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG)}`,
+        isDemoFallback: true,
+      };
+    }
+    return { points, scopeLabel: this._communityScopeLabel(), isDemoFallback: false };
   };
+
+  _getQuestionSwarmPoints = () => this._getQuestionSwarmView().points;
 
   renderQuestionsModalContent = () => {
     const points = this._getQuestionSwarmPoints();
@@ -2122,11 +2221,81 @@ class CommunityTab extends Component<any, any> {
     );
   }
 
+  _setSessionFilter = (key: keyof CommunitySessionFilters, value: string) => {
+    this.setState((state: any) => ({ sessionFilters: { ...state.sessionFilters, [key]: value } }));
+  };
+
+  renderSessionFilters = () =>
+    renderCommunitySessionFilters({
+      filters: this.state.sessionFilters,
+      isExpanded: this.state.showSessionFilters,
+      onFilterChange: this._setSessionFilter,
+      onClear: () => this.setState({ sessionFilters: createCommunitySessionFilters() }),
+    });
+
+  renderSessionsModalContent = () => {
+    const allSessions: CommunitySessionEntry[] = this.state.sessions;
+    const sessions = filterCommunitySessions(allSessions, this.state.sessionFilters);
+    const counts = countCommunitySessions(sessions);
+    const hasFilters = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
+    const kindLabels = { centralized: 'Centralized', decentralized: 'Decentralized', unknown: 'Type unavailable' };
+    return (
+      <div className={styles.sessionsContent}>
+        {this.renderSessionFilters()}
+        {hasFilters && (
+          <p id={SESSION_FILTER_SUMMARY_ID} className={styles.sessionFilterSummary} role="status">
+            Filtered: {sessions.length} of {allSessions.length} sessions
+          </p>
+        )}
+        <div className={styles.sessionCounts}>
+          <div>
+            <strong data-testid="ce-community-sessions-centralized">{counts.centralized}</strong>
+            <span>Centralized</span>
+          </div>
+          <div>
+            <strong data-testid="ce-community-sessions-decentralized">{counts.decentralized}</strong>
+            <span>Decentralized</span>
+          </div>
+          {counts.unknown > 0 && (
+            <div>
+              <strong>{counts.unknown}</strong>
+              <span>Type unavailable</span>
+            </div>
+          )}
+        </div>
+        {sessions.length ? (
+          <div className={styles.sessionListScroller} role="region" aria-label="Session list" tabIndex={0}>
+            <ul className={styles.sessionList}>
+              {sessions.map((session) => (
+                <li key={session.slug}>
+                  <a href={session.href} className={styles.sessionLink}>
+                    <span className={styles.sessionIdentity}>
+                      <strong>{session.name}</strong>
+                      <span>
+                        {session.slug || 'general'}
+                        {isCommunitySessionDateUnavailable(session, this.state.sessionFilters) && ' · date unavailable'}
+                      </span>
+                    </span>
+                    <span className={styles.sessionKind}>{kindLabels[session.kind]}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p>{allSessions.length ? 'No sessions match these filters.' : 'No sessions discovered yet.'}</p>
+        )}
+      </div>
+    );
+  };
+
   renderModalContent = () => {
     const { modalType, surveysList, filteredUsers, loadingFilter } = this.state;
     const { provider, network, account, loginComplete, toggleLoginModal } = this.props;
 
     switch (modalType) {
+      case 'sessions':
+        return this.renderSessionsModalContent();
       case 'sbtgroups':
       case 'sbts':
       case 'groups': {
@@ -2258,60 +2427,104 @@ class CommunityTab extends Component<any, any> {
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
     const participantCount = this.getMemoizedLeaderboardData().length;
+    const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
+    const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
+    const swarmView = this._getQuestionSwarmView();
 
     return (
       <div className={styles.communityTab}>
-        <div className={styles.leaderboardSection}>
-          <div className={styles.leaderboardTopBar}>
-            <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
-            <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
+        <div className={styles.statsSection}>
+          <div className={styles.statsHeader}>
+            <div className={styles.headerActionsRight}>
+              {!initialLoadDone && (
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  spin
+                  className={styles.statsHeaderSpinner}
+                  data-testid="ce-community-stats-loading-spinner"
+                />
+              )}
+            </div>
           </div>
-          <div className={styles.content}>
-            <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
+          <div className={styles.statsGrid}>
+            {displayStats.map((stat: any) => (
+              <button
+                type="button"
+                key={stat.label}
+                className={styles.statItem}
+                onClick={() => this.handleStatClick(stat)}
+                data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
+                data-ce-count={String(stat.count)}
+              >
+                <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
+                <span className={styles.statCount}>
+                  {stat.label === 'Groups' && loadingSbtsCreated ? (
+                    <FontAwesomeIcon icon={faSpinner} spin />
+                  ) : (
+                    stat.count
+                  )}
+                </span>
+                <span className={styles.statLabel}>{stat.label === 'Groups' ? t('sbts') : stat.label}</span>
+              </button>
+            ))}
           </div>
         </div>
-        <div className={styles.rightSection}>
-          <div className={styles.statsSection}>
-            <div className={styles.statsHeader}>
-              <div className={styles.headerActionsRight}>
-                {!initialLoadDone && (
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    className={styles.statsHeaderSpinner}
-                    data-testid="ce-community-stats-loading-spinner"
-                  />
-                )}
+        <section
+          className={styles.sessionSection}
+          data-testid="ce-community-session-section"
+          aria-labelledby="ce-community-session-scope"
+        >
+          <p id="ce-community-session-scope" className={styles.scopeLabel} data-testid="ce-community-session-scope">
+            {swarmView.isDemoFallback ? this._communityScopeLabel() : swarmView.scopeLabel}
+          </p>
+          <div className={styles.sessionContent}>
+            <div className={styles.leaderboardSection} data-testid="ce-community-leaderboard-section">
+              <div className={styles.leaderboardTopBar}>
+                <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
+                <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
+              </div>
+              <div className={styles.content}>
+                <div className={styles.leaderboard}>{this.renderLeaderboard()}</div>
               </div>
             </div>
-            <div className={styles.statsGrid}>
-              {stats.map((stat: any, index: any) => (
-                <div
-                  key={index}
-                  className={styles.statItem}
-                  onClick={() => this.handleStatClick(stat)}
-                  data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
-                  data-ce-count={String(stat.count)}
-                >
-                  <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
-                  <span className={styles.statCount}>
-                    {stat.label === 'Groups' && loadingSbtsCreated ? (
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                    ) : (
-                      stat.count
-                    )}
-                  </span>
-                  <span className={styles.statLabel}>{stat.label === 'Groups' ? t('sbts') : stat.label}</span>
-                </div>
-              ))}
-            </div>
+            {this.renderQuestionSwarm(swarmView)}
           </div>
-          {this.renderQuestionSwarm()}
-        </div>
+        </section>
 
-        <Modal isOpen={showModal} toggle={this.toggleModal} className={styles.modal} size="lg" centered scrollable>
-          <ModalHeader toggle={this.toggleModal} className={styles.modalHeader}>
-            {modalTitle}
+        <Modal
+          isOpen={showModal}
+          toggle={this.toggleModal}
+          className={`${styles.modal} ${this.state.modalType === 'sessions' ? styles.sessionsModal : ''}`}
+          size="lg"
+          centered
+          scrollable
+        >
+          <ModalHeader
+            toggle={this.toggleModal}
+            className={styles.modalHeader}
+            tag={this.state.modalType === 'sessions' ? 'div' : 'h5'}
+          >
+            {this.state.modalType === 'sessions' ? (
+              <div className={styles.sessionModalHeading}>
+                <h5>{modalTitle}</h5>
+                <button
+                  type="button"
+                  className={styles.sessionFilterToggle}
+                  aria-label="Session filters"
+                  aria-expanded={this.state.showSessionFilters}
+                  aria-controls="ce-community-session-filters"
+                  // A disclosure button is not a toggle button: the filtered
+                  // summary announces whether filters are active.
+                  aria-describedby={sessionFiltersActive ? SESSION_FILTER_SUMMARY_ID : undefined}
+                  data-active={sessionFiltersActive ? 'true' : undefined}
+                  onClick={() => this.setState((state: any) => ({ showSessionFilters: !state.showSessionFilters }))}
+                >
+                  <FontAwesomeIcon icon={faFilter} />
+                </button>
+              </div>
+            ) : (
+              modalTitle
+            )}
           </ModalHeader>
           <ModalBody className={styles.modalBody}>{this.renderModalContent()}</ModalBody>
         </Modal>

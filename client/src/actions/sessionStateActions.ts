@@ -8,7 +8,6 @@ import {
   TOGGLE_DEMO_MODE,
   CHANGE_ACTIVE_SESSION_SLUG,
   UPDATE_GLOBAL_SESSION_SELECTION,
-  SET_ONBOARDING_STEP,
 } from '../actions/types';
 import store from '../store.js';
 import { writeGlobalSessionSelection } from '../utilities/session/globalSessionState.js';
@@ -123,14 +122,5 @@ export const updateGlobalSessionSelection =
     dispatch({
       type: UPDATE_GLOBAL_SESSION_SELECTION,
       payload: persistedSelection,
-    });
-  };
-
-export const setOnboardingStep =
-  (step: unknown): SessionStateThunk =>
-  (dispatch) => {
-    dispatch({
-      type: SET_ONBOARDING_STEP,
-      payload: step,
     });
   };

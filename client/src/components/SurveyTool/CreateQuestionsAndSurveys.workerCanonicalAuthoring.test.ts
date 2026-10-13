@@ -9,6 +9,9 @@ import {
   writeCacheOptimisticMock,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
 import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
+import { loadWorkerCanonicalQuestionMatcher } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
+import { sha256Utf8 } from '../../utilities/crypto/sha256';
+import { buildCreateSurveyHashValue } from './createQuestionsAndSurveysSignatureHelpers';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import {
   resolveWorkerCanonicalCacheIdentity,
@@ -390,6 +393,63 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
     expect(surveysWorkerNode?.surveys).not.toHaveProperty('survey-a');
   });
 
+  it('lets the next hydration reread the canonical blob for seeded ids and skips already-published questions', async () => {
+    const sessionConfig = buildWorkerSessionConfig();
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+    const canonicalRef = { admin: false, createdAtMs: 1, storageRefId: 'cf_canonical', verified: true };
+    peekCacheSyncMock.mockImplementation((...args: unknown[]) => {
+      if (args[0] === 'questionsCache') {
+        return {
+          worker: withWorkerCanonicalCacheIdentity(
+            {
+              questions: {
+                '0xmine': { id: '0xmine', prompt: 'Canonical text', type: 'freeform' },
+                '0xshared': { id: '0xshared', prompt: 'Shared question', type: 'freeform', tags: ['theirs'] },
+              },
+              questionResponses: {},
+              workerQuestionMetadataRefs: { '0xmine': canonicalRef, '0xshared': { ...canonicalRef } },
+            },
+            identity,
+          ),
+        };
+      }
+      return null;
+    });
+    const instance = makeInstance({
+      account: '0x1111111111111111111111111111111111111111',
+      activeSessionSlug: 'worker-session',
+      sessionSlug: 'worker-session',
+      sessionConfig,
+    });
+
+    await expect(
+      instance.seedUploadedQuestionsCache({
+        questionDataArray: [
+          { id: '0xmine', prompt: 'Canonical text', type: 'freeform', tags: ['mine'] },
+          { id: '0xshared', prompt: 'Shared question', type: 'freeform', tags: ['mine'], encryption: { mode: 'lit' } },
+        ],
+        uploadedQuestions: [
+          { questionId: '0xmine', resource: 'questions', storageRef: { backend: 'cloudflare', id: 'cf_mine' } },
+          { questionId: '0xshared', resource: 'questions', alreadyPublished: true },
+        ],
+        sourceQuestions: [],
+      }),
+    ).resolves.toBe(true);
+    const questionsNode = (
+      writeCacheOptimisticMock.mock.calls.find(([namespace]) => namespace === 'questionsCache')?.[2] as any
+    )?.worker;
+    // The seeded row stays until hydration, which now rereads its canonical blob.
+    expect(questionsNode.questions['0xmine'].tags).toEqual(['mine']);
+    expect(questionsNode.workerQuestionMetadataRefs).not.toHaveProperty('0xmine');
+    // Another author's question keeps their copy and its ref untouched.
+    expect(questionsNode.questions['0xshared']).toEqual(
+      expect.objectContaining({ tags: ['theirs'], prompt: 'Shared question' }),
+    );
+    expect(questionsNode.questions['0xshared']).not.toHaveProperty('alreadyPublished');
+    expect(questionsNode.questions['0xshared']).not.toHaveProperty('encryption');
+    expect(questionsNode.workerQuestionMetadataRefs['0xshared']).toEqual(canonicalRef);
+  });
+
   it('publishes standalone questions through Worker storage without registry, contract, or chain calls', async () => {
     const sessionConfig = buildWorkerSessionConfig();
     const publishQuestions = jest.spyOn(workerCanonicalAuthoringPort, 'publishQuestions').mockResolvedValue({
@@ -442,22 +502,26 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
 
     await instance.createSurvey();
 
-    expect(publishQuestions).toHaveBeenCalledWith({
-      account: '0x1111111111111111111111111111111111111111',
-      providerLike: 'passkey_eoa',
-      questions: [
-        expect.objectContaining({
-          id: '0xquestion',
-          prompt: 'Worker-native prompt',
-          sessionSlug: 'worker-session',
+    expect(publishQuestions).toHaveBeenCalledWith(
+      {
+        account: '0x1111111111111111111111111111111111111111',
+        providerLike: 'passkey_eoa',
+        questions: [
+          expect.objectContaining({
+            id: '0xquestion',
+            prompt: 'Worker-native prompt',
+            sessionSlug: 'worker-session',
+          }),
+        ],
+        sessionConfig: expect.objectContaining({
+          sessionId: SESSION_ID,
+          slug: 'worker-session',
         }),
-      ],
-      sessionConfig: expect.objectContaining({
-        sessionId: SESSION_ID,
-        slug: 'worker-session',
-      }),
-      sessionSlug: 'worker-session',
-    });
+        sessionSlug: 'worker-session',
+      },
+      // Another author's question under the same id counts only if its stored content matches.
+      { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
+    );
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.getWalletChainId).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).not.toHaveBeenCalled();
@@ -527,6 +591,17 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
 
     await instance.createSurvey();
 
+    // Worker survey ids include the author, so another author's survey with the
+    // same title and documents never collides with this one.
+    const authorScopedSurveyId = buildCreateSurveyHashValue({
+      author: '0x1111111111111111111111111111111111111111',
+      digest: sha256Utf8,
+      documentURLs: [],
+      title: 'Worker survey',
+    });
+    expect(authorScopedSurveyId).not.toBe(
+      buildCreateSurveyHashValue({ digest: sha256Utf8, documentURLs: [], title: 'Worker survey' }),
+    );
     expect(publishSurvey).toHaveBeenCalledWith(
       expect.objectContaining({
         providerLike: 'passkey_eoa',
@@ -537,11 +612,13 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
         sessionSlug: 'worker-session',
         survey: expect.objectContaining({
           creationBlock: 0,
-          surveyID: '0xsurvey',
+          surveyID: authorScopedSurveyId,
           title: 'Worker survey',
         }),
       }),
+      { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
     );
+    expect(instance.state.lastSubmittedSurveyId).toBe(authorScopedSurveyId);
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.getWalletChainId).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).not.toHaveBeenCalled();
@@ -616,6 +693,7 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
         }),
         sessionSlug: 'worker-session',
       }),
+      { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
     );
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).toHaveBeenCalledWith(

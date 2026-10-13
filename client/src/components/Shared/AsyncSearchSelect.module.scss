@@ -158,3 +158,24 @@
 .optionSelected {
   background: var(--ce-async-select-option-selected);
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .wrapper,
+  .wrapper[data-ce-async-select-variant='admin'],
+  .wrapper[data-ce-async-select-variant='create'] {
+    --ce-async-select-text-color: var(--ce-control-text);
+    --ce-async-select-placeholder-color: var(--ce-document-text-muted);
+    --ce-async-select-control-bg: var(--ce-input-bg);
+    --ce-async-select-control-border: var(--ce-input-border-strong);
+    --ce-async-select-menu-bg: var(--ce-overlay-surface);
+    --ce-async-select-option-focused: color-mix(in srgb, var(--ce-action-submit) 12%, var(--ce-surface));
+    --ce-async-select-option-selected: color-mix(in srgb, var(--ce-action-submit) 18%, var(--ce-surface));
+    --ce-async-select-border-hover: var(--ce-link);
+  }
+
+  .control:disabled {
+    background: var(--ce-control-disabled-bg);
+    color: var(--ce-control-disabled-text);
+    opacity: 1;
+  }
+}

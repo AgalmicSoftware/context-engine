@@ -10,6 +10,14 @@ export type CryptoGateDecryptOptions = {
   litOpts?: CryptoGateLitOptions;
   preferLitRecipients?: boolean;
   providerLike?: unknown;
+  // Me + admin and Session fields unwrap their key through the session
+  // Worker, which needs the verified session context.
+  sessionConfig?: Record<string, unknown>;
+  sessionSlug?: string;
+  // Values the envelope's authenticated data must match.
+  expectedSurveyId?: unknown;
+  expectedQId?: unknown;
+  expectedFieldKey?: unknown;
 };
 
 export type CryptoGatePort = {

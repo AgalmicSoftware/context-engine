@@ -693,6 +693,19 @@ describe('sessionWizardWriteNormalization', () => {
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
   });
 
+  test('buildSessionWizardWorkerConfigPayload sends a blank worker-canonical end time as an explicit clear', () => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'cleared-end-time',
+      draft: {
+        sessionEndsAt: '  ',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload).toHaveProperty('sessionEndsAt', '');
+  });
+
   test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

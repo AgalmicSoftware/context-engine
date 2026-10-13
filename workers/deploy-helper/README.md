@@ -111,6 +111,18 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     expected digest in the stable request identity. The manifest and downloaded
     bytes are rechecked before resource mutation; a moved `latest` pointer cannot
     silently change retry bytes
+  - the new session Worker records the release it was deployed with in its
+    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` vars. Only a bundle
+    fetched from `bundleUrl` that matched its manifest is recorded;
+    `bundleText` records nothing. An Agents HTTP session also records
+    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when its
+    bridge bundle matched its manifest; the helper checks that bundle before
+    it uploads the session Worker. The vars pin the Worker's sponsored grant
+    deploys to that release only when the deployed release is 0.6.8 or later
+    code; older Worker code still deploys whatever bundle the redeemer sends.
+    Client builds outside Netlify default to the release in
+    `client/src/variables/workerReleasePin.json`, which can be older. See
+    "Sponsored deploy release" in `docs/session-cors-worker.md`
   - manifest and bundle URLs require HTTPS, no URL credentials, and a public
     hostname. Literal IPs, private/local hostnames, and unsafe redirects are
     rejected. Each of up to five redirects is checked before fetching. No

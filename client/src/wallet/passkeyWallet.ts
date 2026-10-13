@@ -72,6 +72,9 @@ type RestoreOptions = {
 
 type UnlockOptions = {
   selectCredential?: boolean;
+  // Background re-unlocks must restore this account or fail; they never
+  // adopt a different wallet saved by another tab.
+  expectedAddress?: string | null;
 };
 
 type PasskeyWalletClientDeps = {
@@ -107,6 +110,34 @@ const isPasskeyWalletLockedError = (error: unknown): boolean =>
     ? error.message === PASSKEY_WALLET_LOCKED_MESSAGE
     : String((error as { message?: unknown })?.message || error || '') === PASSKEY_WALLET_LOCKED_MESSAGE;
 
+// EIP-1193 4100: the requested account has not been authorized.
+const unauthorizedAccountError = (message: string): Error & { code: number } =>
+  Object.assign(new Error(message), { code: 4100 });
+
+const normalizeAccount = (value: unknown): string => {
+  try {
+    return ethers.utils.getAddress(String(value || '')).toLowerCase();
+  } catch (_) {
+    return '';
+  }
+};
+
+// EIP-1193 4901: the provider is no longer on the chain the request was for.
+const networkChangedError = (): Error & { code: number } =>
+  Object.assign(new Error('The network changed while signing; try again.'), { code: 4901 });
+
+// A lock can cut off a transaction after the session broadcast it.
+const TRANSACTION_METHODS = new Set(['eth_sendTransaction', 'eth_sendRawTransaction']);
+const transactionInterruptedError = (): Error =>
+  new Error(
+    'The passkey wallet locked before the transaction finished. It may already have been sent; check before trying again.',
+  );
+
+const assertExpectedAccount = (expectedAddress: unknown, address: unknown): void => {
+  if (!expectedAddress || normalizeAccount(address) === normalizeAccount(expectedAddress)) return;
+  throw unauthorizedAccountError('The passkey wallet in this browser changed to another account. Log in again.');
+};
+
 const defaultChain = (): ChainLike =>
   getChainById(getDefaultChainId()) ||
   getChainById(11155420) ||
@@ -127,6 +158,8 @@ const normalizeChain = (chainOrId?: unknown): ChainLike => {
 };
 
 const resolveRpcUrl = (chain: ChainLike): string => chainHttpRpcNoPath(chain) || chainHttpRpc(chain) || '';
+
+const chainIdOf = (chain: ChainLike): number => Number(chain?.id ?? chain?.chainId ?? 0) || 0;
 
 const normalizeTypedData = (payload: unknown): SignTypedDataPayload => {
   const typedData = typeof payload === 'string' ? JSON.parse(payload) : payload;
@@ -185,6 +218,12 @@ export class PasskeyEoaWalletClient {
   private activeChain: ChainLike = defaultChain();
   private lockTimer: ReturnType<typeof setTimeout> | null = null;
   private transitionInProgress = false;
+  private sessionChainId = 0;
+  // Bumped on every chain change; a request that sees it move never retries.
+  private chainEpoch = 0;
+  // Sessions a chain change replaced; each locks once its requests settle.
+  private readonly retiringSessions = new Set<SoftSessionClient>();
+  private readonly inFlightBySession = new Map<SoftSessionClient, number>();
 
   constructor(deps: PasskeyWalletClientDeps = {}) {
     this.config = deps.config || getPasskeyWalletConfig();
@@ -198,7 +237,14 @@ export class PasskeyEoaWalletClient {
   }
 
   setChain(chainOrId: unknown): ChainLike {
+    const wasUnlocked = this.isUnlocked();
+    const previousChainId = chainIdOf(this.activeChain);
     this.activeChain = normalizeChain(chainOrId);
+    if (chainIdOf(this.activeChain) !== previousChainId) this.chainEpoch += 1;
+    // The signer stays bound to the chain it unlocked on, so the next request
+    // re-unlocks on the new chain. Requests already sent finish on their own
+    // chain: a lock could cut off a transaction the session already broadcast.
+    if (wasUnlocked && !this.isUnlocked() && !this.transitionInProgress) this.retireSession();
     return this.activeChain;
   }
 
@@ -211,7 +257,9 @@ export class PasskeyEoaWalletClient {
   }
 
   isUnlocked(): boolean {
-    return !!this.activeAddress && this.unlockExpiresAt > this.now();
+    return (
+      !!this.activeAddress && this.unlockExpiresAt > this.now() && this.sessionChainId === chainIdOf(this.activeChain)
+    );
   }
 
   hasSigner(): boolean {
@@ -256,10 +304,14 @@ export class PasskeyEoaWalletClient {
 
       const salt = randomBase64Url(32);
       const saltBytes = new Uint8Array(base64URLToBuffer(salt));
+      // This mode keeps the only copy of a wallet's key in the saved record,
+      // so never mint a replacement passkey on the device that holds it.
+      const savedRecord = await this.storage.read();
       const credential = await createPasskeyCredential({
         config: this.config,
         salt: saltBytes,
         credentials: this.credentials,
+        excludeCredentialIds: savedRecord?.rpId === this.config.rpId ? [savedRecord.credentialId] : [],
       });
       const credentialId = bufferToBase64URL(credential.rawId);
       const prfOutput = await resolveCreatedCredentialPrfOutput({
@@ -301,6 +353,7 @@ export class PasskeyEoaWalletClient {
         if (storedRecord && !isPasskeyDerivedWalletRecord(storedRecord)) {
           throw new Error('Stored wallet metadata is not a passkey-derived wallet.');
         }
+        if (storedRecord) assertExpectedAccount(options.expectedAddress, storedRecord.evmAddress);
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
         const selectCredential = options.selectCredential === true;
         const { credential, prfOutput } = await authenticatePasskeyCredential({
@@ -320,6 +373,7 @@ export class PasskeyEoaWalletClient {
         if (!selectCredential && storedRecord && address.toLowerCase() !== storedRecord.evmAddress.toLowerCase()) {
           throw new Error('Passkey-derived wallet address does not match stored metadata.');
         }
+        assertExpectedAccount(options.expectedAddress, address);
         const record = createPasskeyDerivedWalletRecord({
           config: this.config,
           credentialId,
@@ -339,6 +393,7 @@ export class PasskeyEoaWalletClient {
       if (!isEncryptedWalletRecord(record)) {
         throw new Error('Stored wallet metadata is not an encrypted private-key wallet.');
       }
+      assertExpectedAccount(options.expectedAddress, record.evmAddress);
       const saltBytes = new Uint8Array(base64URLToBuffer(record.salt));
       const { prfOutput } = await authenticatePasskeyCredential({
         config: this.config,
@@ -374,42 +429,56 @@ export class PasskeyEoaWalletClient {
       this.unlockExpiresAt = 0;
       return record.evmAddress;
     }
-    return this.unlockWallet();
+    return this.unlockWallet({ expectedAddress: this.activeAddress });
   }
 
-  async signMessage(message: unknown): Promise<HexString> {
+  // `account` is the address the caller asked to sign with; a different
+  // address is rejected instead of signing as the unlocked wallet.
+  async signMessage(message: unknown, account?: unknown): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'personal_sign',
-        params: [message, this.activeAddress],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'personal_sign',
+          params: [message, this.activeAddress],
+        }),
+        account,
+      ),
     );
   }
 
-  async signTypedData(typedData: unknown): Promise<HexString> {
+  async signTypedData(typedData: unknown, account?: unknown): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'eth_signTypedData_v4',
-        params: [this.activeAddress, normalizeTypedData(typedData)],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'eth_signTypedData_v4',
+          params: [this.activeAddress, normalizeTypedData(typedData)],
+        }),
+        account,
+      ),
     );
   }
 
   async sendTransaction(tx: Record<string, unknown>): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'eth_sendTransaction',
-        params: [{ ...tx, from: tx.from || this.activeAddress }],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'eth_sendTransaction',
+          params: [{ ...tx, from: tx.from || this.activeAddress }],
+        }),
+        tx.from,
+      ),
     );
   }
 
   async signTransaction(tx: Record<string, unknown>): Promise<HexString> {
     return toHexString(
-      await this.requestUnlocked(() => ({
-        method: 'eth_signTransaction',
-        params: [{ ...tx, from: tx.from || this.activeAddress }],
-      })),
+      await this.requestUnlocked(
+        () => ({
+          method: 'eth_signTransaction',
+          params: [{ ...tx, from: tx.from || this.activeAddress }],
+        }),
+        tx.from,
+      ),
     );
   }
 
@@ -428,9 +497,9 @@ export class PasskeyEoaWalletClient {
       case 'net_version':
         return String(Number(this.activeChain?.id || this.activeChain?.chainId || 0));
       case 'personal_sign':
-        return this.signMessage(params[0]);
+        return this.signMessage(params[0], params[1]);
       case 'eth_signTypedData_v4':
-        return this.signTypedData(params[1] ?? params[0]);
+        return params[1] == null ? this.signTypedData(params[0]) : this.signTypedData(params[1], params[0]);
       case 'eth_sendTransaction':
         return this.sendTransaction((params[0] || {}) as Record<string, unknown>);
       case 'eth_signTransaction':
@@ -459,11 +528,9 @@ export class PasskeyEoaWalletClient {
   }
 
   async lock(): Promise<void> {
-    if (this.lockTimer) clearTimeout(this.lockTimer);
-    this.lockTimer = null;
-    this.unlockExpiresAt = 0;
-    await this.sessionClient.lock();
-    this.sessionClient = this.sessionClientFactory();
+    const retiring = [...this.retiringSessions];
+    this.retiringSessions.clear();
+    await Promise.all([this.lockCurrentSession(), ...retiring.map((session) => session.lock())]);
   }
 
   async disconnect(): Promise<void> {
@@ -486,7 +553,7 @@ export class PasskeyEoaWalletClient {
   }
 
   private async activate(record: PasskeyWalletRecord, privateKey: HexString): Promise<void> {
-    const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || 0;
+    const chainId = chainIdOf(this.activeChain);
     const rpcUrl = resolveRpcUrl(this.activeChain);
     if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
     const expiresAt = this.now() + this.config.unlockTtlSeconds * 1000;
@@ -514,6 +581,7 @@ export class PasskeyEoaWalletClient {
     this.activeRecord = record;
     this.activeAddress = record.evmAddress;
     this.unlockExpiresAt = expiresAt;
+    this.sessionChainId = chainId;
     if (this.lockTimer) clearTimeout(this.lockTimer);
     this.lockTimer = setTimeout(
       () => {
@@ -523,25 +591,87 @@ export class PasskeyEoaWalletClient {
     );
   }
 
-  private async ensureUnlocked(): Promise<void> {
-    if (this.isUnlocked()) return;
-    if (this.activeAddress) {
-      await this.lock();
-    }
-    await this.unlockWallet();
+  private assertRequestedAccount(requestedAccount: unknown): void {
+    if (requestedAccount == null || requestedAccount === '' || !this.activeAddress) return;
+    if (normalizeAccount(requestedAccount) === normalizeAccount(this.activeAddress)) return;
+    throw unauthorizedAccountError('The passkey wallet is unlocked for a different account than the request.');
   }
 
-  private async requestUnlocked(buildArgs: () => { method: string; params?: unknown[] }): Promise<unknown> {
-    await this.ensureUnlocked();
-    const args = buildArgs();
+  private async lockCurrentSession(): Promise<void> {
+    if (this.lockTimer) clearTimeout(this.lockTimer);
+    this.lockTimer = null;
+    this.unlockExpiresAt = 0;
+    await this.sessionClient.lock();
+    this.sessionClient = this.sessionClientFactory();
+  }
+
+  private retireSession(): void {
+    const session = this.sessionClient;
+    this.sessionClient = this.sessionClientFactory();
+    if (this.inFlightBySession.has(session)) this.retiringSessions.add(session);
+    else void session.lock().catch((error) => walletLog.warn('Passkey wallet chain-change lock failed:', error));
+  }
+
+  private async sendToSession(args: { method: string; params?: unknown[] }): Promise<unknown> {
+    const session = this.sessionClient;
+    this.inFlightBySession.set(session, (this.inFlightBySession.get(session) || 0) + 1);
     try {
-      return await this.sessionClient.request(args);
+      return await session.request(args);
+    } finally {
+      const remaining = (this.inFlightBySession.get(session) || 1) - 1;
+      if (remaining > 0) {
+        this.inFlightBySession.set(session, remaining);
+      } else {
+        this.inFlightBySession.delete(session);
+        if (this.retiringSessions.delete(session)) {
+          void session.lock().catch((error) => walletLog.warn('Passkey wallet chain-change lock failed:', error));
+        }
+      }
+    }
+  }
+
+  // Re-unlocking keeps the account the app already uses; a request naming an
+  // account unlocks only that account.
+  private async relockAndUnlock(requestedAccount: unknown): Promise<void> {
+    const expectedAddress = this.activeAddress || (requestedAccount ? String(requestedAccount) : null);
+    if (this.activeAddress) await this.lockCurrentSession();
+    await this.unlockWallet({ expectedAddress });
+  }
+
+  private async requestUnlocked(
+    buildArgs: () => { method: string; params?: unknown[] },
+    requestedAccount?: unknown,
+  ): Promise<unknown> {
+    // A request belongs to the chain it started on: never send or replay it on
+    // another chain. After a lock from TTL or idle expiry a signature re-unlocks
+    // and retries once; a transaction is never sent again.
+    const chainEpoch = this.chainEpoch;
+    const { method } = buildArgs();
+    const assertSameChain = (): void => {
+      if (this.chainEpoch !== chainEpoch) throw networkChangedError();
+    };
+    const send = async (): Promise<unknown> => {
+      try {
+        return await this.sendToSession(buildArgs());
+      } catch (error) {
+        if (!isPasskeyWalletLockedError(error)) throw error;
+        if (TRANSACTION_METHODS.has(method)) throw transactionInterruptedError();
+        assertSameChain();
+        throw error;
+      }
+    };
+    this.assertRequestedAccount(requestedAccount);
+    if (!this.isUnlocked()) await this.relockAndUnlock(requestedAccount);
+    assertSameChain();
+    this.assertRequestedAccount(requestedAccount);
+    try {
+      return await send();
     } catch (error) {
       if (!isPasskeyWalletLockedError(error)) throw error;
 
-      await this.lock();
-      await this.unlockWallet();
-      return this.sessionClient.request(buildArgs());
+      await this.relockAndUnlock(requestedAccount);
+      assertSameChain();
+      return send();
     }
   }
 

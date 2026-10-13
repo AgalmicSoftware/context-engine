@@ -13,15 +13,12 @@ import {
   normalizeCloudflareNativeDeployCommit,
 } from '../utilities/worker/cloudflareNativeDeploy.js';
 
-const EMPTY_PUBLIC_DEPLOYMENT_ENDPOINT = '';
 const DEFAULT_PROJECT_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/';
 const DEFAULT_DEMO_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev';
 
 export const DEFAULT_SHARED_WORKER_URL = readPublicEnv('REACT_APP_CE_SHARED_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
 
 export const DEPLOY_HELPER_URL = readPublicEnv('REACT_APP_CE_DEPLOY_HELPER_URL', DEFAULT_PROJECT_DEPLOY_HELPER_URL);
-
-export const HEALTHCHECK_WORKER_URL = readPublicEnv('REACT_APP_CE_HEALTHCHECK_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
 
 // Worker bundles, their release manifest and the native Cloudflare deploy come
 // from one immutable release: REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT

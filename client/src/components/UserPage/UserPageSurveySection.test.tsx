@@ -204,6 +204,89 @@ describe('UserPageSurveySection', () => {
     expect(onSurveyResponsesSectionToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('links survey documents in both cards only through safe hrefs', () => {
+    const unsafeUrl = 'javascript:alert(document.domain)';
+    const protocolRelativeUrl = '//evil.example/phish';
+    const { container } = render(
+      <UserPageSurveySection
+        {...createProps({
+          surveyCreationEntries: [
+            {
+              documentURLs: [unsafeUrl, protocolRelativeUrl, 'https://docs.example.test/created'],
+              id: 'survey-created',
+              questionIDs: [],
+              questionPreviews: [],
+              questionsCount: 1,
+              slug: 'alpha',
+              tags: [],
+              title: 'Created survey',
+            },
+          ],
+          surveyResponseEntries: [
+            {
+              documentURLs: [unsafeUrl, protocolRelativeUrl, 'https://docs.example.test/response'],
+              id: 'survey-response',
+              questionsCount: 1,
+              slug: 'beta',
+              tags: [],
+              title: 'Response survey',
+            },
+          ],
+        })}
+      />,
+    );
+
+    const hrefs = Array.from(container.querySelectorAll('a')).map((anchor) => anchor.getAttribute('href'));
+    expect(hrefs).not.toContain(unsafeUrl);
+    expect(hrefs).not.toContain(protocolRelativeUrl);
+    expect(screen.getAllByText(unsafeUrl)).toHaveLength(2);
+    screen.getAllByText(unsafeUrl).forEach((node) => expect(node.closest('a')).toBeNull());
+    screen.getAllByText(protocolRelativeUrl).forEach((node) => expect(node.closest('a')).toBeNull());
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/created' })).toHaveAttribute(
+      'href',
+      'https://docs.example.test/created',
+    );
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/response' })).toHaveAttribute(
+      'href',
+      'https://docs.example.test/response',
+    );
+  });
+
+  it('skips document URLs that are not text instead of crashing', () => {
+    const hostileUrl = JSON.parse('{"toString":1}');
+    render(
+      <UserPageSurveySection
+        {...createProps({
+          surveyCreationEntries: [
+            {
+              documentURLs: [hostileUrl, 'https://docs.example.test/created'],
+              id: 'survey-created',
+              questionIDs: [],
+              questionPreviews: [],
+              questionsCount: 1,
+              slug: 'alpha',
+              tags: [],
+              title: 'Created survey',
+            },
+          ],
+          surveyResponseEntries: [
+            {
+              documentURLs: [hostileUrl, 'https://docs.example.test/response'],
+              id: 'survey-response',
+              questionsCount: 1,
+              slug: 'beta',
+              tags: [],
+              title: 'Response survey',
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/created' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://docs.example.test/response' })).toBeInTheDocument();
+  });
+
   it('keeps gated cached survey responses visible and defers decrypt to the parent handler', () => {
     const onDecryptQuestion = jest.fn();
 

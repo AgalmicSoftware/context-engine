@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { dispatchAuthNonceRequest } from './authNonceRequestDispatch.js';
-import { checkNonceRateLimit } from './nonceLifecycle.js';
+import { buildNonce, checkNonceRateLimit, consumeNonce, issueNonce } from './nonceLifecycle.js';
+import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
+import { parseSiweMessage } from './siweMessageValidation.js';
 
 const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -29,7 +31,8 @@ const createNonceDeps = (overrides = {}) => ({
   }),
   resolveTrustedAdminOrigins: () => ['http://localhost:3000'],
   buildNonce: () => 'nonce-1',
-  issueNonce: async () => ({ ok: true }),
+  // The coordinator returns the signed nonce; tests echo the random part.
+  issueNonce: async (_env, _slug, _address, nonce) => ({ ok: true, nonce }),
   MISSING_SLUG_ERROR: 'Missing sessionSlug.',
   NONCE_TTL_SECONDS: 60 * 5,
   ...overrides,
@@ -413,9 +416,9 @@ test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN
         headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
         config: { allowOrigins: ['https://app.example'] },
       }),
-      issueNonce: async () => {
+      issueNonce: async (_env, _slug, _address, nonce) => {
         issueNonceCalled = true;
-        return { ok: true };
+        return { ok: true, nonce };
       },
       buildNonce: () => 'nonce-admin',
     }),
@@ -448,7 +451,6 @@ test('dispatchAuthNonceRequest does not use caller-controlled ids for auth nonce
       identities.push(value.identity);
       return { ok: true };
     },
-    issueNonce: async () => ({ ok: true }),
   });
 
   const first = await dispatchAuthNonceRequest({
@@ -471,6 +473,172 @@ test('dispatchAuthNonceRequest does not use caller-controlled ids for auth nonce
   assert.deepEqual(identities, ['anon:unknown', 'anon:unknown']);
 });
 
+
+test('dispatchAuthNonceRequest treats one IPv6 /64 as one caller for nonce limits', async () => {
+  const identities = [];
+  const deps = createNonceDeps({
+    checkNonceRateLimit: async (value) => {
+      identities.push(value.identity);
+      return { ok: true };
+    },
+  });
+  for (const ip of ['2001:db8:1:2:aaaa::1', '2001:0DB8:0001:0002:ffff:ffff:ffff:ffff', '2001:db8:1:3::1', '203.0.113.7', '::ffff:203.0.113.7', 'not-an-ip']) {
+    const result = await dispatchAuthNonceRequest({
+      request: {
+        json: async () => createNonceBody(),
+        headers: new Headers({ Origin: 'https://allowed.example', 'CF-Connecting-IP': ip }),
+        cf: {},
+      },
+      env: {},
+      baseHeaders: {},
+      slug: '',
+      deps,
+    });
+    assert.equal(result.status, 200);
+  }
+  assert.deepEqual(identities, [
+    'anon:2001:db8:1:2::/64',
+    'anon:2001:db8:1:2::/64',
+    'anon:2001:db8:1:3::/64',
+    'anon:203.0.113.7',
+    'anon:203.0.113.7',
+    'anon:not-an-ip',
+  ]);
+});
+
+// One in-memory coordinator per name, with serialized transactions.
+const createCoordinatorNamespace = (env, now) => {
+  const instances = new Map();
+  return {
+    idFromName: (name) => name,
+    get: (id) => {
+      if (!instances.has(id)) {
+        const values = new Map();
+        let tail = Promise.resolve();
+        const storage = {
+          get: async (key) => structuredClone(values.get(key)),
+          put: async (key, value) => values.set(key, structuredClone(value)),
+          delete: async (key) => values.delete(key),
+          transaction: (callback) => {
+            const run = tail.then(async () => {
+              const staged = new Map([...values].map(([key, value]) => [key, structuredClone(value)]));
+              const result = await callback({
+                get: async (key) => structuredClone(staged.get(key)),
+                put: async (key, value) => staged.set(key, structuredClone(value)),
+                delete: async (key) => staged.delete(key),
+              });
+              values.clear();
+              for (const [key, value] of staged) values.set(key, value);
+              return result;
+            });
+            tail = run.catch(() => undefined);
+            return run;
+          },
+        };
+        const coordinator = new SessionWriteCoordinator({ storage }, env, { now });
+        instances.set(id, { fetch: (input, init) => coordinator.fetch(input instanceof Request ? input : new Request(input, init)) });
+      }
+      return instances.get(id);
+    },
+  };
+};
+
+test('dispatchAuthNonceRequest keeps issuing a wallet nonces while strangers hold many', async () => {
+  let nowMs = Date.parse('2026-10-11T12:00:00.000Z');
+  const now = () => nowMs;
+  const env = {};
+  env.CE_SESSION_COORDINATOR = createCoordinatorNamespace(env, now);
+  const admin = '0x00000000000000000000000000000000000000aa';
+  const deps = createNonceDeps({
+    resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: 'session-a' }),
+    checkNonceRateLimit: (args) => checkNonceRateLimit({ ...args, now }),
+    NONCE_RATE_LIMIT_MAX: 5,
+    NONCE_SHARED_NETWORK_RATE_LIMIT_MAX: 300,
+    NONCE_RATE_LIMIT_WINDOW_MS: 60_000,
+    buildNonce: () => buildNonce(),
+    // Like the route shell, pass through anything else the dispatch sends.
+    issueNonce: (currentEnv, slug, address, nonce, ttl, caller) => issueNonce(currentEnv, slug, address, nonce, ttl, { now, caller }),
+    NONCE_TTL_SECONDS: 300,
+    now,
+  });
+  const requestNonce = (ip) => dispatchAuthNonceRequest({
+    request: {
+      json: async () => createNonceBody({ address: admin }),
+      headers: new Headers({ Origin: 'https://allowed.example', 'CF-Connecting-IP': ip }),
+      cf: {},
+    },
+    env,
+    baseHeaders: {},
+    slug: '',
+    deps,
+  });
+  // Strangers on 20 IPv6 networks each keep a nonce for the admin's wallet.
+  const attack = () => Promise.all(Array.from({ length: 20 }, (_, index) => requestNonce(`2001:db8:abcd:${(index + 1).toString(16)}::1`)));
+  assert.equal((await attack()).every((result) => result.status === 200), true);
+  const first = await requestNonce('198.51.100.7');
+  assert.equal(first.status, 200);
+  nowMs += 4 * 60_000;
+  await attack();
+  nowMs += 2 * 60_000;
+  const later = await requestNonce('2001:db8:9999:1::5');
+  assert.equal(later.status, 200);
+  // EIP-4361 nonces, consumable once by the wallet's signed sign-in.
+  assert.match(later.body.nonce, /^[A-Za-z0-9]{8,}$/);
+  const message = ['allowed.example wants you to sign in with your Ethereum account:', admin, '', 'Sign in.', '',
+    'URI: https://allowed.example', 'Version: 1', 'Chain ID: 1', `Nonce: ${later.body.nonce}`,
+    'Issued At: 2026-10-11T12:00:00.000Z'].join('\n');
+  assert.equal(parseSiweMessage(message).nonce, later.body.nonce);
+  assert.deepEqual(await consumeNonce(env, 'session-a', admin, later.body.nonce, { now }), { ok: true });
+  assert.equal((await consumeNonce(env, 'session-a', admin, later.body.nonce, { now })).error, 'Nonce already used.');
+  // The first nonce expired with its five-minute lifetime.
+  assert.equal((await consumeNonce(env, 'session-a', admin, first.body.nonce, { now })).error, 'Nonce mismatch or expired.');
+});
+
+test('dispatchAuthNonceRequest refuses successful issue results without a signed nonce', async () => {
+  const result = await dispatchAuthNonceRequest({
+    request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+    env: {},
+    baseHeaders: {},
+    slug: '',
+    deps: createNonceDeps({ issueNonce: async () => ({ ok: true }) }),
+  });
+  assert.equal(result.status, 503);
+  assert.equal(result.body.nonce, undefined);
+  assert.equal(result.body.error, 'Authorization state coordination is unavailable.');
+});
+
+test('dispatchAuthNonceRequest preserves production fail-closed behavior for old or unavailable coordinators', async () => {
+  for (const coordinatedResult of [{ ok: true }, { ok: true, nonce: '' }, { ok: false, status: 503 }]) {
+    const result = await dispatchAuthNonceRequest({
+      request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+      env: {},
+      baseHeaders: {},
+      slug: '',
+      deps: createNonceDeps({
+        issueNonce: (...args) => issueNonce(...args, {
+          issueCoordinatedAuthNonce: async () => coordinatedResult,
+        }),
+      }),
+    });
+    assert.equal(result.status, 503);
+    assert.equal(result.body.nonce, undefined);
+  }
+});
+
+test('dispatchAuthNonceRequest keeps a coordinator error status', async () => {
+  const result = await dispatchAuthNonceRequest({
+    request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+    env: {},
+    baseHeaders: {},
+    slug: '',
+    deps: createNonceDeps({ issueNonce: async () => ({ ok: false, status: 0 }) }),
+  });
+  assert.deepEqual(result, {
+    body: { error: 'Authorization state coordination is unavailable.' },
+    status: 503,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
 
 test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and nonce storage', async () => {
   let corsCalled = false;
@@ -566,7 +734,7 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
       }),
       issueNonce: async (...args) => {
         writes.push(args);
-        return { ok: true };
+        return { ok: true, nonce: args[3] };
       },
       buildNonce: () => 'nonce-success',
       NONCE_TTL_SECONDS: 123,
@@ -620,7 +788,7 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
       },
       issueNonce: async (...args) => {
         writes.push(args);
-        return { ok: true };
+        return { ok: true, nonce: args[3] };
       },
       buildNonce: () => 'nonce-general',
     }),

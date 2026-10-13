@@ -3,7 +3,6 @@ import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import store from '../store.js';
-import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
 import CEToaster from './Shared/CEToaster';
@@ -180,11 +179,12 @@ class App extends React.Component<AppProps> {
       store.dispatch({ type: 'SET_ONBOARDING_STEP', payload: 1 });
     }
 
-    // Dev/E2E-only agent interface (gated; no-op unless enabled).
-    try {
-      installCeAgent();
-    } catch (e) {
-      log.warn('App: fallback', e);
+    // Dev/E2E-only agent interface (gated; no-op unless enabled). Vite folds
+    // NODE_ENV, so production builds drop this import and the agent code.
+    if (process.env.NODE_ENV !== 'production') {
+      import('../utilities/ceAgent.js')
+        .then(({ installCeAgent }) => installCeAgent())
+        .catch((e) => log.warn('App: fallback', e));
     }
     // React Router updates do not cover direct history.replaceState/pushState calls,
     // so bridge the History API back into the same head-sync path.

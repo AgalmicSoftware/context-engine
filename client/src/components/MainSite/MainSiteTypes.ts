@@ -66,7 +66,6 @@ export type MainSiteState = {
   sessionInfoOverrides: MainSiteRecord;
   sessionNameOverrides: MainSiteRecord;
   sessionHeaderOverrides: MainSiteRecord;
-  groupCredentials: MainSiteRecord;
   sessionPathResolutionNonce: number;
   isCacheManagerReady: boolean;
   [key: string]: unknown;

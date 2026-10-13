@@ -1,11 +1,9 @@
 import {
-  buildPileCachePrefillStatePlan,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
 } from './surveyPileResponseController';
 import { buildPileComponentUpdatePlan, buildPileQuestionProgressSignals } from './surveyPileLifecycle';
-import { buildPileResponseWindow } from './surveyPileResponseWindow';
 
 const cloneValue = (value) => JSON.parse(JSON.stringify(value));
 
@@ -32,65 +30,11 @@ const createPileQuestions = (count) =>
     prompt: `Q${idx + 1}`,
   }));
 
-const applyCachedResponseEntryToSlice = ({ targetSlice, questionId, response }) => {
-  targetSlice.answers[questionId] = {
-    value: response?.answer?.value || '',
-    encrypted: !!response?.answer?.encrypted,
-  };
-  targetSlice.additionalComments[questionId] = {
-    value: response?.additional?.value || '',
-    encrypted: !!response?.additional?.encrypted,
-  };
-  return true;
-};
-
 describe('SurveyTool pile visible window hydration', () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     jest.useRealTimers();
-  });
-
-  it('rehydrates newly visible pile window answers when active index changes without nonce ticks', () => {
-    const pileQuestions = createPileQuestions(6);
-    const questionResponsesByQuestionId = {
-      q6: {
-        '0xabc': {
-          answer: { value: 'Hydrated q6', encrypted: false },
-          additional: { value: '', encrypted: false },
-        },
-      },
-    };
-
-    const initialWindow = buildPileResponseWindow({ pileQuestions, activePileIndex: 0 });
-    const initialPlan = buildPileCachePrefillStatePlan({
-      pileQuestions: initialWindow.visibleQuestions,
-      questionResponsesByQuestionId,
-      account: '0xabc',
-      currentSlice: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      pendingTotal: 0,
-      cloneValue,
-      applyCachedResponseEntryToSlice,
-    });
-
-    expect(initialWindow.visibleIdsSignature).toBe('q1|q2|q3');
-    expect(initialPlan.nextState.surveysResponseState?.[0]?.answers?.q6).toBeUndefined();
-
-    const nextWindow = buildPileResponseWindow({ pileQuestions, activePileIndex: 5 });
-    const nextPlan = buildPileCachePrefillStatePlan({
-      pileQuestions: nextWindow.visibleQuestions,
-      questionResponsesByQuestionId,
-      account: '0xabc',
-      currentSlice: initialPlan.nextState.surveysResponseState?.[0],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      pendingTotal: 0,
-      cloneValue,
-      applyCachedResponseEntryToSlice,
-    });
-
-    expect(nextWindow.visibleIdsSignature).toBe('q4|q5|q6');
-    expect(nextPlan.nextState.surveysResponseState?.[0]?.answers?.q6?.value).toBe('Hydrated q6');
   });
 
   it('backfills newly visible pile response slots without clearing the current auto-decrypt ledger', () => {

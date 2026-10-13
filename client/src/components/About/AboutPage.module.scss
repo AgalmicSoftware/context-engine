@@ -16,9 +16,9 @@ $modal-text: var(--ce-panel-text);
 $modal-muted: var(--ce-panel-text-muted);
 $logo-light-bg: var(--ce-text-inverse);
 $logo-dark-bg: var(--ce-overlay-surface);
-$related-pill-border: color-mix(in srgb, var(--ce-status-info) 45%, var(--ce-text-inverse));
-$related-pill-bg: color-mix(in srgb, var(--ce-status-info-text) 82%, var(--ce-text-inverse));
-$related-pill-text: color-mix(in srgb, var(--ce-overlay-surface) 78%, var(--ce-status-info));
+$related-pill-border: var(--ce-input-border);
+$related-pill-bg: var(--ce-control-face);
+$related-pill-text: var(--ce-control-text);
 $modal-close-text: var(--ce-text-inverse);
 $modal-cta-bg: var(--ce-action-submit);
 $modal-cta-hover-bg: var(--ce-action-submit-hover);
@@ -27,7 +27,7 @@ $modal-cta-text: var(--ce-action-submit-text);
 .aboutPageContainer {
   position: relative;
   overflow: hidden;
-  padding: 0 20px 56px;
+  padding: 16px 20px 56px;
   color: $text-color;
   font-family: var(--ce-font-mono);
 }
@@ -123,6 +123,7 @@ $modal-cta-text: var(--ce-action-submit-text);
 
 .mainTitle {
   margin: 0;
+  color: $text-color;
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   line-height: 1;
   letter-spacing: -0.02em;
@@ -1521,7 +1522,7 @@ button.recognitionModalCloseButton {
 
 @media (max-width: 640px) {
   .aboutPageContainer {
-    padding: 0 14px 40px;
+    padding: 16px 14px 40px;
   }
 
   .pageShell {

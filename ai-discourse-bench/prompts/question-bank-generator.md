@@ -50,10 +50,11 @@ the actual counts; do not assume these numbers are still current.
 
 ## Non-negotiable output contract
 
-Create a new directory without modifying the existing 200-question seed or the
-50-question candidate:
+Create a new directory without modifying the existing 200-question seed or any
+existing bank under `ai-discourse-bench/banks/ai-futures/` (`v0.1-candidate`,
+`v0.2-reviewed-candidate`, and `v0.3-candidate`):
 
-`ai-discourse-bench/banks/ai-futures/v0.2-500-candidate/`
+`ai-discourse-bench/banks/ai-futures/v0.4-candidate/`
 
 Write all of the following:
 
@@ -62,7 +63,7 @@ Write all of the following:
    - `schemaVersion: 2`.
    - `releaseStatus: "candidate"`, never `"validated"`.
    - `track: "ai-futures"`.
-   - `version: "0.2.0-candidate.1"`.
+   - `version: "0.4.0-candidate.1"`.
    - A run plan with 10 repeats per polarity, canonical and reversed polarities,
      and reversed answers normalized to canonical polarity.
    - Every question must pass `validateQuestionBank` from

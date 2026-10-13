@@ -830,3 +830,57 @@
     outline-offset: 2px;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .questionTitle,
+  .miniPromptAbbrev:not(.maskedPromptActionButton),
+  .checkboxOptionText,
+  .ratingLabelText,
+  .ratingValueLabel,
+  .importanceText,
+  .miniIdLabel,
+  .aggregatorText,
+  .multiChoiceOption,
+  .optionStats {
+    color: var(--ce-panel-text);
+    opacity: 1;
+  }
+
+  .additionalCommentsLabel,
+  .ratingEndpointLabel {
+    color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+
+  .additionalCommentsContent,
+  .aggregatorParagraph,
+  .encryptedResponseText {
+    color: var(--ce-panel-text) !important;
+    opacity: 1;
+  }
+
+  .freeformAnswer,
+  .additionalCommentsContent,
+  .miniAnswer,
+  .encryptedResponseText,
+  .readOnlyRating,
+  .readOnlyMultichoice .choiceItem {
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+    color: var(--ce-panel-text);
+  }
+
+  .aggregatorContainer {
+    background: var(--ce-card-bg);
+  }
+
+  .ratingTrack {
+    background: var(--ce-input-border);
+  }
+
+  .cardLinkButton,
+  .miniExpandButton,
+  .externalLink {
+    color: var(--ce-panel-text);
+  }
+}

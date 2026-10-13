@@ -1,5 +1,11 @@
+import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
 import { responseValuesEqual } from './responseValueEquality';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import {
+  buildDraftHydrationState,
+  buildLocalCacheRehydrationState,
+  isSavedAnswerRefreshHeld,
+} from './surveyToolHydrationFlow';
 
 export type SurveyQuestionsResponseStateRuntime = SurveyQuestionsLegacyRecord;
 
@@ -48,6 +54,8 @@ export const createSurveyQuestionsResponseStateRuntime = (
   } = context;
 
   const resetFormStateForAccountChange = (callback: SurveyQuestionsLegacyValue, persistCurrentIdentity = true) => {
+    // The reset form holds no saved answers, so every question loads its saved answers again.
+    inst._savedAnswersLoadedQids.clear();
     executeSurveyFormStateReset({
       props: propsRef.current,
       state: stateRef.current,
@@ -173,6 +181,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
       buildEmptyResponseFieldState: buildEmptyResponseFieldState,
       setState: setState.bind(engine),
       clearDraft: clearDraft,
+      persistDraft: persistDraft,
       recalculateEditStats: recalculateEditStats,
       updateJsonPreview: updateJsonPreview,
       onFailure: (error: SurveyQuestionsLegacyValue) => {
@@ -236,11 +245,11 @@ export const createSurveyQuestionsResponseStateRuntime = (
     });
   };
 
-  const buildSliceFromLocalCache = () => {
+  const buildSliceFromLocalCache = (questionIds: string[] | null = null) => {
     const slice: SurveyQuestionsLegacyValue = buildSurveyLocalCacheSlice({
       props: propsRef.current,
       rawSlug: inst._getEffectiveDraftSlug(),
-      renderedIds: getCurrentRenderedQuestionIds(),
+      renderedIds: questionIds || getCurrentRenderedQuestionIds(),
       localCacheSliceMemo: inst._localCacheSliceMemo,
       resolveResponseHydrationContext: (rawSlug: SurveyQuestionsLegacyValue) =>
         resolveResponseHydrationContext(propsRef.current, rawSlug),
@@ -291,14 +300,19 @@ export const createSurveyQuestionsResponseStateRuntime = (
     inst._localCacheRehydrateRunId = runId;
     const isStaleRun: SurveyQuestionsLegacyValue = () =>
       (inst._hasMounted && !inst._isMounted) || inst._localCacheRehydrateRunId !== runId;
-    await executeSurveyLocalCacheRehydrate({
+    const runQuestionIds = getLoadQuestionIds();
+    const savedAnswersKnown = areSavedAnswersKnown();
+    const result: SurveyQuestionsLegacyValue = await executeSurveyLocalCacheRehydrate({
       props: propsRef.current,
       state: stateRef.current,
       lastHydrationSig: inst._rehydrateLocalCacheLastSig,
-      getHydrationQuestionIds: () => getHydrationQuestionIds(),
+      getHydrationQuestionIds: () => runQuestionIds,
+      isQuestionLoaded: (questionId: SurveyQuestionsLegacyValue) =>
+        inst._savedAnswersLoadedQids.has(normalizeQuestionIdKey(questionId)),
       buildHydrationSignature: (idx: SurveyQuestionsLegacyValue, ids: SurveyQuestionsLegacyValue) =>
         buildLocalCacheHydrationSignature(idx, ids),
-      buildSliceFromLocalCache: () => buildSliceFromLocalCache(),
+      buildSliceFromLocalCache: (questionIds: string[] | null = null) =>
+        buildSliceFromLocalCache(questionIds || runQuestionIds),
       setLastHydrationSig: (value: SurveyQuestionsLegacyValue) => {
         inst._rehydrateLocalCacheLastSig = value;
       },
@@ -327,6 +341,108 @@ export const createSurveyQuestionsResponseStateRuntime = (
       },
       isStaleRun,
     });
+    // The cache read covered these questions; once saved answers are known they count as loaded.
+    if (savedAnswersKnown && ['applied', 'no-change', 'cache-miss'].includes(result?.reason)) {
+      (result.renderedQuestionIds || []).forEach((questionId: SurveyQuestionsLegacyValue) =>
+        inst._savedAnswersLoadedQids.add(normalizeQuestionIdKey(questionId)),
+      );
+    }
+  };
+
+  // Like the pre-upload gate: a Worker session knows its saved answers once its listing loaded.
+  const areSavedAnswersKnown = () =>
+    !!propsRef.current.isResponsesCacheReady || !isWorkerCanonicalSessionConfig(propsRef.current.sessionConfig);
+
+  /**
+   * The questions a load covers: the rendered ones, plus any question of this view with a stored
+   * draft (a withdrawal on a card outside the pile's window, say), so its saved answers load before
+   * the draft is restored over them and it is pending, uploadable and counted.
+   */
+  const getLoadQuestionIds = (): string[] => {
+    const rendered: string[] = (getHydrationQuestionIds() || []).map((questionId: unknown) =>
+      normalizeQuestionIdKey(questionId),
+    );
+    const { pileQuestions, questionPool } = stateRef.current || {};
+    const viewQuestions = Array.isArray(pileQuestions) && pileQuestions.length ? pileQuestions : questionPool;
+    const inView = new Set(
+      (Array.isArray(viewQuestions) ? viewQuestions : []).map((question: SurveyQuestionsLegacyValue) =>
+        normalizeQuestionIdKey(question?.id),
+      ),
+    );
+    const drafted = Object.keys(loadDraft()?.answers || {})
+      .map((questionId) => normalizeQuestionIdKey(questionId))
+      .filter((questionId) => questionId && inView.has(questionId) && !rendered.includes(questionId));
+    return [...rendered, ...drafted];
+  };
+
+  /**
+   * View all keeps each listed question in sync with its saved answers and its draft through one
+   * state update built from the latest state, so no other update can race it.
+   * - A question the view has not loaded yet always gets its saved answers; a held form (finished or
+   *   failed Submit, decrypt) only stops refreshing questions already loaded.
+   * - Then each question not restored yet gets its draft over them, unless the form starts fresh.
+   * - A question that leaves the list loses its answers there, so it starts over if it returns.
+   * `restoreAll` is for a form that was just reset.
+   */
+  const syncViewAllQuestions = ({ restoreAll = false } = {}) => {
+    const sync = inst._viewAllSync;
+    if (!sync) return;
+    const loadedIds: Set<string> = inst._savedAnswersLoadedQids;
+    if (restoreAll) sync.restored.clear();
+    const current = stateRef.current || {};
+    const listed = (getHydrationQuestionIds() || []).filter(
+      (questionId: string) => !!current.surveysResponseState?.[0]?.answers?.[questionId],
+    );
+    [loadedIds, sync.restored].forEach((ids: Set<string>) =>
+      ids.forEach((questionId) => {
+        if (!listed.includes(questionId)) ids.delete(questionId);
+      }),
+    );
+    const savedAnswersKnown = areSavedAnswersKnown();
+    const formHeld = isSavedAnswerRefreshHeld(current);
+    const loadIds = listed.filter((questionId: string) =>
+      savedAnswersKnown ? !loadedIds.has(questionId) || !formHeld : !formHeld,
+    );
+    const restoreIds = current.startFresh ? [] : listed.filter((questionId: string) => !sync.restored.has(questionId));
+    if (!loadIds.length && !restoreIds.length) return;
+    // Marked from the committed state; the update below skips any question no longer listed.
+    if (savedAnswersKnown) loadIds.forEach((questionId: string) => loadedIds.add(questionId));
+    restoreIds.forEach((questionId: string) => sync.restored.add(questionId));
+    const cacheSlice = (loadIds.length && buildSliceFromLocalCache(loadIds)) || {};
+    const draft = loadDraft();
+    setResponseHydrationState(
+      (prev: SurveyQuestionsLegacyValue) => {
+        const slice = prev.surveysResponseState?.[0];
+        const present = (questionId: string) => !!slice?.answers?.[questionId];
+        const loaded = buildLocalCacheRehydrationState({
+          renderedQuestionIds: loadIds.filter(present),
+          baseSlice: slice,
+          prevBaseline: prev.editBaseline,
+          cacheSlice,
+          draftAnswersByQuestionId: buildDraftAnswersByQuestionId(draft),
+          cloneBaseline: deepClone,
+          buildDraftAwareCacheHydrationState: (args: SurveyQuestionsLegacyValue) =>
+            buildDraftAwareCacheHydrationState({ ...args, areEnvelopesEquivalent }),
+          applyLocalCacheHydrationEntryToSlice: inst._applyLocalCacheHydrationEntryToSlice,
+        });
+        const restored = buildDraftHydrationState({
+          renderedQuestionIds: restoreIds.filter(present),
+          draft,
+          prevSlice: loaded.nextSlice,
+          prevBaseline: loaded.nextBaseline,
+          allowOverwrite: true,
+          applyDraftEntryToSlice: inst._applyDraftHydrationEntryToSlice,
+        });
+        if (!loaded.changed && !loaded.baselineChanged && !restored.changed) return null;
+        const surveysResponseState = [...(prev.surveysResponseState || [])];
+        surveysResponseState[0] = restored.nextSlice;
+        return { surveysResponseState, editBaseline: loaded.nextBaseline };
+      },
+      () => {
+        if (typeof updateJsonPreview === 'function') updateJsonPreview();
+        void ensurePriorResponsesForRenderedIds();
+      },
+    );
   };
 
   return {
@@ -339,6 +455,7 @@ export const createSurveyQuestionsResponseStateRuntime = (
     rehydrateLocalCacheAnswersForRenderedIds,
     resetFormStateForAccountChange,
     resolveDiffBaselineSlice,
+    syncViewAllQuestions,
     valuesEqual,
   };
 };

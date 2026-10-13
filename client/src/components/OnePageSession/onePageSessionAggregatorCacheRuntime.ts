@@ -9,9 +9,8 @@ import {
   workerCanonicalCacheIdentityMatches,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
-import { hasSimulatedDemoResponses, resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
-import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
-import { buildPolisDemoSurveyResultsAggregatorData } from '../SurveyTool/surveyPolisDemoResultsData';
+import { hasSimulatedDemoResponses } from '../../utilities/demo/demoFixtureSessionSlugs';
+import { getLoadedDemoSessionFixtures } from '../SurveyTool/demoSessionFixtureLoader';
 import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
@@ -117,13 +116,15 @@ export const buildDemoFixtureAggregatorRows = (
   if (!hasSimulatedDemoResponses(displaySlug) || (questionSourceSlug !== '' && questionSourceSlug !== displaySlug)) {
     return null;
   }
+  const fixtures = getLoadedDemoSessionFixtures();
+  if (!fixtures) return null;
 
   if (!demoFixtureAggregatorRowsBySlug.has(displaySlug)) {
     demoFixtureAggregatorRowsBySlug.set(
       displaySlug,
-      buildPolisDemoSurveyResultsAggregatorData(resolveDemoPolisDataset(displaySlug), {
+      fixtures.buildPolisDemoSurveyResultsAggregatorData(fixtures.resolveDemoPolisDataset(displaySlug), {
         sessionSlug: displaySlug,
-        questionIdsByIndex: getDemoFixtureQuestionIdsByIndex(displaySlug),
+        questionIdsByIndex: fixtures.getDemoFixtureQuestionIdsByIndex(displaySlug),
       }),
     );
   }
@@ -259,6 +260,9 @@ export const buildOnePageSessionAggregatorCacheResult = ({
     signature: '0:0:0',
     sourceSignature: `${sourcePrefix}|${reason}`,
   });
+  // Demo fallbacks are scoped by their fixtures; wait for them rather than
+  // show unscoped rows, and rebuild once they load.
+  if (useDemoFallback && !getLoadedDemoSessionFixtures()) return emptyResult('demo-fixtures-loading');
 
   if (!cacheScope || (!isQuestionCacheReady && !useDemoFallback)) {
     return fixtureRows

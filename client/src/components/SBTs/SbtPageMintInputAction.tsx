@@ -6,6 +6,7 @@ import styles from './SBTPage.module.scss';
 
 export type SbtPageMintInputActionContentState = {
   label?: string;
+  pendingLabel?: string;
   shouldRenderLabel?: boolean;
   shouldRenderPendingIcon?: boolean;
 };
@@ -43,6 +44,7 @@ const SbtPageMintInputAction = ({
     </div>
     <button onClick={onAction} disabled={disabled} className={buttonClassName}>
       {contentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
+      {contentState.pendingLabel && ` ${contentState.pendingLabel}`}
       {contentState.shouldRenderLabel && contentState.label}
     </button>
   </div>

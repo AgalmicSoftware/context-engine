@@ -1,4 +1,5 @@
 import React from 'react';
+import { render, screen } from '@testing-library/react';
 
 import { renderSurveyQuestionsFullQuestionDisplay } from './SurveyQuestionsFullQuestionDisplay';
 
@@ -154,5 +155,27 @@ describe('SurveyQuestionsFullQuestionDisplay', () => {
       busy: true,
     });
     expect(renderers.renderAdditionalLockControl).not.toHaveBeenCalled();
+  });
+
+  it('shows the too-long notice under the answer only when there is one', () => {
+    const renderArgs = (answerTooLongMessage?: string) => ({
+      ...buildRenderers(),
+      cardIcons: null,
+      cardKey: 'q3-0',
+      displayState: { answer: { value: 'long' }, answerTooLongMessage },
+      onToggleComments: jest.fn(),
+      qIndex: 0,
+      question: { id: 'q3' },
+      surveyIndex: 0,
+    });
+    const message = 'This answer is too long to save. Shorten it by about 12 characters.';
+
+    const { unmount } = render(<>{renderSurveyQuestionsFullQuestionDisplay(renderArgs(message))}</>);
+    expect(screen.getByRole('status')).toHaveTextContent(message);
+    unmount();
+
+    render(<>{renderSurveyQuestionsFullQuestionDisplay(renderArgs())}</>);
+    expect(screen.getByLabelText('Answer')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

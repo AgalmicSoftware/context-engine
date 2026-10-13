@@ -276,6 +276,63 @@ describe('surveyToolHydrationFlow local-cache hydration helpers', () => {
     expect(applyLocalCacheHydrationEntryToSlice).toHaveBeenCalledTimes(2);
   });
 
+  it('fills only fields the user left as loaded', () => {
+    // Fills an empty field from the cache, as the editor does.
+    const fillEmpty = jest.fn(({ targetSlice, questionId, cachedAnswer, cachedAdditional, cachedImportance }) => {
+      let filled = false;
+      if (cachedAnswer && !targetSlice.answers[questionId]?.value) {
+        targetSlice.answers[questionId] = { ...targetSlice.answers[questionId], ...cachedAnswer };
+        filled = true;
+      }
+      if (cachedAdditional && !targetSlice.additionalComments[questionId]?.value) {
+        targetSlice.additionalComments[questionId] = {
+          ...targetSlice.additionalComments[questionId],
+          ...cachedAdditional,
+        };
+        filled = true;
+      }
+      if (cachedImportance !== undefined && !(questionId in targetSlice.importance)) {
+        targetSlice.importance[questionId] = cachedImportance;
+        filled = true;
+      }
+      return filled;
+    });
+    const saved = {
+      answers: { q1: { value: 'Saved answer' }, q2: { value: 'Saved q2' } },
+      additionalComments: { q1: { value: 'Saved comment' }, q2: { value: '' } },
+      importance: { q1: 6, q2: 4 },
+      conviction: {},
+    };
+    const result = buildLocalCacheRehydrationState({
+      renderedQuestionIds: ['q1', 'q2'],
+      // q1 was loaded, then its comment and rating were cleared; q2 was never loaded.
+      baseSlice: {
+        answers: { q1: { value: 'Saved answer' }, q2: { value: '' } },
+        additionalComments: { q1: { value: '' }, q2: { value: '' } },
+        importance: {},
+        conviction: {},
+      },
+      prevBaseline: {
+        answers: { q1: { value: 'Saved answer' }, q2: { value: '' } },
+        additionalComments: { q1: { value: 'Saved comment' }, q2: { value: '' } },
+        importance: { q1: 6 },
+        conviction: {},
+      },
+      cacheSlice: saved,
+      cloneBaseline: (value: unknown) => JSON.parse(JSON.stringify(value)),
+      buildDraftAwareCacheHydrationState: ({ cachedAnswer, cachedAdditional }: Record<string, unknown>) => ({
+        effectiveAnswerState: cachedAnswer,
+        effectiveAdditionalState: cachedAdditional,
+      }),
+      applyLocalCacheHydrationEntryToSlice: fillEmpty,
+    });
+
+    expect(result.nextSlice.additionalComments).toEqual({ q1: { value: '' }, q2: { value: '' } });
+    expect(result.nextSlice.importance).toEqual({ q2: 4 });
+    expect(result.nextSlice.answers).toEqual({ q1: { value: 'Saved answer' }, q2: { value: 'Saved q2' } });
+    expect(result.nextBaseline.answers?.q2).toEqual({ value: 'Saved q2' });
+  });
+
   it('builds hydrated response slices from single or multi-response payloads', () => {
     const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses, parseValue }) => {
       const [first, second] = responses;

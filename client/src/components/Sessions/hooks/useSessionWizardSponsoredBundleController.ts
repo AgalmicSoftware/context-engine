@@ -29,7 +29,6 @@ type SponsoredBundleDeploymentStatePatch<TDeployForm> = {
 
 type SponsoredBundleWorkerSecretStatePatch = {
   workerSecretsEnabled?: boolean;
-  persistWorkerSecrets?: boolean;
 };
 
 type SponsoredBundleControllerRefs<TDeployForm, TProvisionedSponsoredContext> = {
@@ -43,7 +42,6 @@ type SponsoredBundleControllerRefs<TDeployForm, TProvisionedSponsoredContext> = 
   workerSecretsRef: MutableRefObject<WorkerSecretsLike>;
   advancedBundleFileInputRef: RefObject<HTMLInputElement>;
   normalModeRetryBundleFileInputRef: RefObject<HTMLInputElement>;
-  sponsoredPublishBundleFileInputRef: RefObject<HTMLInputElement>;
 };
 
 type UseSessionWizardSponsoredBundleControllerOptions<
@@ -70,7 +68,6 @@ type UseSessionWizardSponsoredBundleControllerOptions<
   setNormalModeBundleUrlOverride: Dispatch<SetStateAction<string>>;
   setWorkerUrlAutoFilled: Dispatch<SetStateAction<boolean>>;
   setWorkerSecretsEnabled: Dispatch<SetStateAction<boolean>>;
-  setPersistWorkerSecrets: Dispatch<SetStateAction<boolean>>;
   setBundleFile: Dispatch<SetStateAction<File | null>>;
   buildProvisionedSponsoredContextState: (value: unknown) => TProvisionedSponsoredContext;
 };
@@ -99,7 +96,6 @@ const useSessionWizardSponsoredBundleController = <
   setNormalModeBundleUrlOverride,
   setWorkerUrlAutoFilled,
   setWorkerSecretsEnabled,
-  setPersistWorkerSecrets,
   setBundleFile,
   buildProvisionedSponsoredContextState,
 }: UseSessionWizardSponsoredBundleControllerOptions<TDraft, TDeployForm, TProvisionedSponsoredContext>) => {
@@ -114,7 +110,6 @@ const useSessionWizardSponsoredBundleController = <
     workerSecretsRef,
     advancedBundleFileInputRef,
     normalModeRetryBundleFileInputRef,
-    sponsoredPublishBundleFileInputRef,
   } = refs;
 
   const getCurrentWorkerSecrets = useCallback(
@@ -237,18 +232,12 @@ const useSessionWizardSponsoredBundleController = <
   );
 
   const updateSponsoredBundleWorkerSecretState = useCallback(
-    ({
-      workerSecretsEnabled: nextWorkerSecretsEnabled,
-      persistWorkerSecrets: nextPersistWorkerSecrets,
-    }: SponsoredBundleWorkerSecretStatePatch = {}) => {
+    ({ workerSecretsEnabled: nextWorkerSecretsEnabled }: SponsoredBundleWorkerSecretStatePatch = {}) => {
       if (typeof nextWorkerSecretsEnabled === 'boolean') {
         setWorkerSecretsEnabled(nextWorkerSecretsEnabled);
       }
-      if (typeof nextPersistWorkerSecrets === 'boolean') {
-        setPersistWorkerSecrets(nextPersistWorkerSecrets);
-      }
     },
-    [setPersistWorkerSecrets, setWorkerSecretsEnabled],
+    [setWorkerSecretsEnabled],
   );
 
   const sponsoredBundleLifecycle = useSponsoredBundleLifecycle({
@@ -273,21 +262,12 @@ const useSessionWizardSponsoredBundleController = <
 
   const clearSelectedBundleFile = useCallback(() => {
     setBundleFile(null);
-    [
-      advancedBundleFileInputRef.current,
-      normalModeRetryBundleFileInputRef.current,
-      sponsoredPublishBundleFileInputRef.current,
-    ].forEach((input) => {
+    [advancedBundleFileInputRef.current, normalModeRetryBundleFileInputRef.current].forEach((input) => {
       if (input && typeof input.value === 'string') {
         input.value = '';
       }
     });
-  }, [
-    advancedBundleFileInputRef,
-    normalModeRetryBundleFileInputRef,
-    setBundleFile,
-    sponsoredPublishBundleFileInputRef,
-  ]);
+  }, [advancedBundleFileInputRef, normalModeRetryBundleFileInputRef, setBundleFile]);
 
   return {
     ...sponsoredBundleLifecycle,

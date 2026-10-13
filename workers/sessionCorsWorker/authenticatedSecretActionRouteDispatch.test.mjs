@@ -276,7 +276,7 @@ test('dispatchAuthenticatedSecretActionRoute executes session-scoped Lit Chipotl
   const result = await dispatchAuthenticatedSecretActionRoute({
     path: '/',
     action: 'lit_chipotle_execute',
-    body: { op: 'encrypt', message: '0x1234' },
+    body: { op: 'encrypt', message: '0x1234', sessionSlug: 'forged-session' },
     config: {
       litCredentials: {
         litActionCid: 'QmAction123',
@@ -302,8 +302,9 @@ test('dispatchAuthenticatedSecretActionRoute executes session-scoped Lit Chipotl
             },
           },
           secrets,
-          request: { op: 'encrypt', message: '0x1234' },
+          request: { op: 'encrypt', message: '0x1234', sessionSlug: 'forged-session' },
           requesterAddress: '0xabc',
+          sessionSlug: 'session-a',
           fetchImpl: undefined,
         });
         return {

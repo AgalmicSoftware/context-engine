@@ -429,7 +429,8 @@ describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
       blockedReason: 'invalid-slug',
       shouldResetPublishState: true,
       shouldOpenLoginModal: false,
-      statusMessage: 'Session slugs must use lowercase letters, numbers, "_" or "-".',
+      statusMessage:
+        'Session slugs must start with a lowercase letter or number and use at most 128 lowercase letters, numbers, "_" or "-".',
     });
   });
 

@@ -1,13 +1,17 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faClipboard, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './CreateSBTGroup.module.scss';
 import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildCreateSbtActiveClassName, resolveCreateSbtTooltipIconStyle } from './createSbtGroupHelpers';
+import {
+  buildCreateSbtActiveClassName,
+  CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH,
+  resolveCreateSbtTooltipIconStyle,
+} from './createSbtGroupHelpers';
 
 type CreateSbtDistributionState = Record<string, unknown> & {
   burnAdmin?: string;
@@ -310,18 +314,33 @@ export const renderCreateSbtMintOptionsSection = ({
 
 type RenderCreateSbtDistributionOptionsSectionArgs = {
   distributionOptions: SelectableDistributionOptionConfig[];
+  // Locked while a create runs, because the create reads the chosen mode as it goes.
+  distributionLocked: boolean;
   actionDisplayState: ActionDisplayState;
   groupPassword: string;
+  groupPasswordIsShort: boolean;
+  // Locked while a create runs (it uses the password captured at Create) and after it succeeds (the field then
+  // holds the only copy of the deployed password).
+  groupPasswordLocked: boolean;
+  groupPasswordRestoreNotice: boolean;
+  groupPasswordWeakConfirmed: boolean;
   sbtDistribution: CreateSbtDistributionState;
   handleInputChange: React.ChangeEventHandler<HTMLInputElement>;
+  onGenerateGroupPassword: () => void;
 };
 
 export const renderCreateSbtDistributionOptionsSection = ({
   distributionOptions,
+  distributionLocked,
   actionDisplayState,
   groupPassword,
+  groupPasswordIsShort,
+  groupPasswordLocked,
+  groupPasswordRestoreNotice,
+  groupPasswordWeakConfirmed,
   sbtDistribution,
   handleInputChange,
+  onGenerateGroupPassword,
 }: RenderCreateSbtDistributionOptionsSectionArgs) => (
   <div className={styles.distributionSection}>
     <div className={styles.distributionGrid}>
@@ -341,6 +360,7 @@ export const renderCreateSbtDistributionOptionsSection = ({
                 name="sbtDistribution.distributionOption"
                 value={option.value}
                 checked={option.selected}
+                disabled={distributionLocked}
                 onChange={handleInputChange}
               />
               <span>{option.label}</span>
@@ -363,14 +383,51 @@ export const renderCreateSbtDistributionOptionsSection = ({
 
     {actionDisplayState.shouldRenderGroupPasswordInput && (
       <div className={styles.groupPasswordInputContainer}>
-        <input
-          type="text"
-          name="groupPassword"
-          value={groupPassword}
-          onChange={handleInputChange}
-          placeholder="Enter the group password"
-          className={styles.groupPasswordInput}
-        />
+        <div className={styles.groupPasswordRow}>
+          <input
+            type="text"
+            name="groupPassword"
+            value={groupPassword}
+            onChange={handleInputChange}
+            placeholder="Enter the group password"
+            aria-label="Group password"
+            className={styles.groupPasswordInput}
+            disabled={groupPasswordLocked}
+            data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_INPUT}
+          />
+          <button
+            type="button"
+            onClick={onGenerateGroupPassword}
+            className={styles.exportButton}
+            disabled={groupPasswordLocked}
+            data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_GENERATE}
+          >
+            Generate new
+          </button>
+        </div>
+        {groupPasswordRestoreNotice && (
+          <p className={styles.fieldHelpText} role="status">
+            A new passphrase was generated; the previous one was not saved.
+          </p>
+        )}
+        {groupPasswordIsShort && (
+          <div className={styles.groupPasswordWarning} data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_WARNING}>
+            <p>
+              {`This group's password check is public on-chain, so a password shorter than ${CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH} characters can be guessed offline. Use the generated passphrase or a longer password.`}
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                name="groupPasswordWeakConfirmed"
+                checked={groupPasswordWeakConfirmed}
+                disabled={groupPasswordLocked}
+                onChange={handleInputChange}
+                data-testid={E2E_TESTIDS.SBT_CREATE_GROUP_PASSWORD_CONFIRM}
+              />
+              <span>I understand a short password can be guessed offline.</span>
+            </label>
+          </div>
+        )}
       </div>
     )}
 
@@ -396,5 +453,34 @@ export const renderCreateSbtDistributionOptionsSection = ({
         </CETooltip>
       </span>
     </label>
+  </div>
+);
+
+type RenderCreateSbtCreatedGroupPasswordArgs = {
+  copied: boolean;
+  groupPassword: string;
+  onCopy: () => void;
+};
+
+// Shown after an unlimited group-password create: nothing else keeps a copy of the password members join with.
+export const renderCreateSbtCreatedGroupPassword = ({
+  copied,
+  groupPassword,
+  onCopy,
+}: RenderCreateSbtCreatedGroupPasswordArgs) => (
+  <div className={styles.shareableBlock}>
+    <div className={styles.leftCol}>
+      <h3 className={styles.blockTitle}>Group password</h3>
+      <div className={styles.groupPasswordRow}>
+        <code className={styles.addressPreviewValue}>{groupPassword}</code>
+        <button type="button" onClick={onCopy} className={styles.exportButton} aria-label="Copy group password">
+          <FontAwesomeIcon icon={copied ? faCheck : faClipboard} /> {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className={styles.fieldHelpText}>
+        Members join with this password. Share it separately from the claim link, and keep a copy: it isn&apos;t saved
+        anywhere.
+      </p>
+    </div>
   </div>
 );

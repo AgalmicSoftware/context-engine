@@ -178,6 +178,19 @@ What it does not send directly:
 
 When a sponsored bundle is deploy-ready, the normal-mode wizard can skip the manual Worker step and go straight from Privacy to Deploy Session.
 
+A sponsoring Worker running 0.6.8 or later code deploys only the Worker
+release configured on it (its `WORKER_BUNDLE_URL` and
+`WORKER_BUNDLE_MANIFEST_URL`). The wizard still sends this build's configured
+release with a grant, never an uploaded file or a manual bundle URL, so
+sponsoring Workers running older code, which deploy the release a request
+names, keep working. If a 0.6.8 or later sponsoring Worker lacks either
+value, the wizard says the grant was not used and works once the sponsor
+sets both. An older sponsoring Worker with no release to deploy deploys
+nothing but keeps the grant reserved for that exact request: retry the same
+draft from the same site once the sponsor sets `WORKER_BUNDLE_URL` on that
+Worker. If the sponsor updates its Worker code instead, ask for a new grant;
+the updated code sees a different request and returns `409`.
+
 ### Temporary standard sponsored links fixture
 
 For short-lived demos or launches where the goal is "open the app and start
@@ -225,8 +238,10 @@ The deploy URL must pin an exact 40-character commit so the reviewed source is
 immutable. The hosted client uses the public commit it was built from
 (`REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`, set from Netlify's
 `COMMIT_REF`), the same commit whose release the wizard downloads Worker bundles
-from. Builds without it use the release pinned in
-`client/src/variables/workerReleasePin.json`. The private source commit
+from. Builds without it, such as local and self-hosted builds, use the release
+pinned in `client/src/variables/workerReleasePin.json`. Each release moves that
+pin to the newest published Worker release, which is the previous release
+because a release's own bundles are published after its merge. The private source commit
 is not interchangeable with its public replay SHA. Moving branches, tags,
 abbreviated hashes, and non-GitHub sources are rejected. The token-based helper procedure later in this guide applies only
 to the legacy fallback. See
@@ -367,10 +382,20 @@ custom settings in the draft. Profile settings follow the existing stages:
   Admin-only and public-redacted result modes remain visible as unavailable
   until their complete read paths are enforced.
 - Worker owns optional participation channels such as Telegram, Telegram Mini App, and
-  Agent Session Wrapped. The website remains enabled. Wrapped is off by
+  **Agents (HTTP API)** (Agent Session Wrapped). Each channel has a question-mark
+  tooltip explaining its purpose and dependencies. The website remains enabled. Agent access is off by
   default, deploys one additional dedicated per-session Bridge, and does not
-  implicitly enable Telegram. Telegram Mini App is independently selectable but
+  require or implicitly enable Telegram. The **Agent API access** status distinguishes
+  **Off** from **On after deployment**: authorized agents can use the HTTP API
+  once the service is deployed and verified, subject to session access rules.
+  Telegram Mini App is independently selectable but
   requires Telegram; disabling Telegram also disables its Mini App.
+- **Require users to pay for usage** appears only in the custom Worker settings
+  for decentralized (Ethereum registry + Arweave) sessions. Centralized Cloudflare
+  sessions, including those using Lit, do not show this option. The choice
+  applies only where the option shows: in normal mode and for other profiles,
+  Worker secrets stay on, and the saved choice applies again when you return to
+  the custom settings of a decentralized session.
 - Deploy owns the export policy. Selected-channel export remains visible as
   unavailable until the export runtime consumes that filter.
 
@@ -423,7 +448,7 @@ Enter the core session metadata:
   `Amber`; the compact preview updates immediately. This controls only
   documented session accents/chrome and does not change the app theme.
 - slug
-  Use lowercase letters, numbers, `_`, or `-`. The reserved aliases `general`, `debate`, and `rxc` are not allowed for new sessions.
+  Start with a lowercase letter or number, then use only lowercase letters, numbers, `_`, or `-`, up to 128 characters. Participant links open only slugs in this form. Slugs whose link opens a different session are reserved: `general` (the default session), `debate` (the session Worker opens `rxc` instead), `constructor` and `prototype`.
 - session ID
 - network/contract defaults for chain-backed profiles
 - `blockLimits.start` for chain-scanned profiles
@@ -465,7 +490,10 @@ What gets stored where:
   storage permanent.
 - Each **Session encryption** option has its own help tooltip. Advanced options
   are `none` (payload bytes are stored as provided), `lit` (data is encrypted
-  before upload and decryption follows on-chain access conditions), and
+  before upload and a Lit Action releases its key after an on-chain SBT check;
+  the key passes through the session worker, so the Worker operator and Lit
+  account administrators remain trusted; scoped usage keys alone cannot
+  authorize decryption, and it is not end-to-end), and
   Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it,
   and the session worker decrypts only after checking access. `lit` requires a
   registry network, RPC connection, and Lit credentials. `worker_envelope` is
@@ -804,7 +832,14 @@ High-level flow:
    decentralized profiles require signed config acceptance while their EVM
    registry and Arweave records remain canonical. Registry attachment requires
    the connected signer, requested Worker admin, and on-chain session admin to
-   match.
+   match. The template deploys with `DEPLOY_HELPER_ENABLED` set to `"0"`, so
+   when you generated setup values for this session slug and admin, the
+   wizard records that the Worker you verify has no embedded deploy helper
+   and `/sponsor` does not offer deploy grants from it. The wizard remembers
+   that you generated them, but not the values, across step changes and
+   reloads of this tab. An attached existing Worker without generated setup
+   values keeps the draft's embedded deploy-helper setting, because no route
+   reports the binding.
 
 The runtime secrets remain in the current tab and Cloudflare's encrypted
 Worker-secret store. They are not placed in the deployment URL, logs, analytics
@@ -931,8 +966,8 @@ want to avoid Wrangler and the native Git-template flow.
 
 Recommended source files:
 
-- Bundled release asset from the pinned release: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<pinned commit>/sessionCorsWorker.bundle.js`, where the pinned commit is in `client/src/variables/workerReleasePin.json`
-- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<pinned commit>/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
+- Bundled release asset: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/sessionCorsWorker.bundle.js`. The hosted client uses the commit it was built from (Netlify's `COMMIT_REF`); local and self-hosted builds use the commit in `client/src/variables/workerReleasePin.json`
+- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
 - Generated repo-local fallback bundle after `nvm use 20 && npm run worker:bundle`: `dist/sessionCorsWorker.bundle.js`
 - Canonical worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 
@@ -1113,9 +1148,15 @@ models and local overrides remain available; bundled demo defaults use Terra.
 
 Hosted Worker verification writes and reads back the prepared public configuration
 without finalizing publication. You can edit and verify again; Publish creates
-the final publication revision. The browser compares the shared public fields,
-including session appearance, while excluding the server-managed authorization
-epoch from its comparison.
+the final publication revision. Edits replace what an earlier verification
+stored: a blank end time is sent as `""` and blank request limits as `null`,
+so a cleared value does not stay on the Worker. The browser compares the shared
+public fields, including session appearance and the Worker URL's origin. It
+skips fields the Worker sets itself: the authorization epoch, the publication
+marker, the response field encryption it reports on every read, and, before
+publication, a revision the deploy helper staged. If verification fails, the
+wizard shows the reason: the Worker's error for a rejected write, or where the
+read-back config differs, naming the fields it lacks or adds.
 
 Retrying queued Group creation compares canonical HTTPS image and document URLs,
 so a host-only URL and the same URL with a trailing slash reuse the saved Group.

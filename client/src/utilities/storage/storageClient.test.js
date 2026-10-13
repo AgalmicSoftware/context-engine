@@ -299,6 +299,30 @@ describe('storageClient', () => {
     expect(result.storageRef.resource).toBe('images');
   });
 
+  test('keeps the Worker status and reason on a rejected upload', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: 'This question id already belongs to another author.',
+          reason: 'storage_resource_id_owned',
+        }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    await expect(
+      uploadDataToSessionStorage({ id: '0xq' }, 'json', {
+        sessionSlug: 'alpha',
+        resource: 'questions',
+        sessionConfig: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } } },
+      }),
+    ).rejects.toMatchObject({
+      message: 'This question id already belongs to another author.',
+      status: 409,
+      reason: 'storage_resource_id_owned',
+    });
+  });
+
   test('rejects plaintext uploads when Cloudflare lit_encrypted mode is selected', async () => {
     await expect(
       uploadDataToSessionStorage({ ok: true }, 'json', {

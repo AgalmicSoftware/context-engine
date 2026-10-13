@@ -5,6 +5,7 @@ import {
   proxyOpenAiRealtimeCall,
   readRealtimeCallRequestPayload,
 } from './realtimeCallExecution.js';
+import { dispatchAnonymousRoute } from './anonymousRouteDispatch.js';
 
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -93,5 +94,33 @@ test('sanitizes provider errors and rejects malformed successful connection answ
   for (const result of [new Response(JSON.stringify({ error: { message: 'private upstream details fixture-key' } }), { status: 403 }), Response.json({ session: { id: 'live_test' } })]) {
     const response = await proxyOpenAiRealtimeCall({ payload: { sdp: 'v=0\r\n', instructions: 'Interview.' }, secrets: { openaiKey: 'fixture-key' }, config: {}, deps: { json, fetch: async () => result } });
     assert.ok(response.status >= 400); assert.doesNotMatch(await response.text(), /private|fixture-key/);
+  }
+});
+
+// Resource presence reports voice as unavailable for these sessions, so the
+// voice route must not spend the session's OpenAI key on them either.
+test('the realtime route refuses non-OpenAI interview providers before calling OpenAI', async () => {
+  for (const interviewMode of [{ provider: 'gemini' }, { enabled: true, provider: ' OpenRouter ' }]) {
+    let fetched = 0;
+    const result = await dispatchAnonymousRoute({
+      path: '/realtime/call',
+      request: new Request('https://worker.example/realtime/call?slug=session-a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sdp: 'v=0\r\n', instructions: 'Interview carefully.' }),
+      }),
+      anonymousContext: { slug: 'session-a', config: { interviewMode }, headers: {} },
+      deps: {
+        evaluateAnonymousRouteAccess: async () => ({ ok: true }),
+        getSessionSecrets: async () => ({ openaiKey: 'test-secret' }),
+        proxyOpenAiRealtimeCall: (args) => proxyOpenAiRealtimeCall({
+          ...args,
+          deps: { ...args.deps, fetch: async () => { fetched += 1; return new Response('v=0\r\n'); } },
+        }),
+        json: (body, status) => ({ body, status }),
+      },
+    });
+    assert.deepEqual(result, { body: { error: 'Realtime interview voice currently requires the OpenAI provider.' }, status: 400 });
+    assert.equal(fetched, 0);
   }
 });

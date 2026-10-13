@@ -69,6 +69,42 @@ describe('SurveySelector document links', () => {
     expect(docLink?.props?.title).toBe('2 documents');
   });
 
+  it('keeps rendering when an uploaded survey lists a document URL that is not text', () => {
+    // JSON can carry an object whose text conversion throws; the Worker stores it as-is.
+    const hostileUrl = JSON.parse('{"toString":1}');
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'survey',
+      showLongLoading: false,
+      surveys: [
+        {
+          id: 'survey-with-hostile-doc',
+          title: 'Survey with an odd document',
+          documentURLs: [hostileUrl, 'https://example.com/docs/one'],
+        },
+      ],
+      selectedSurveyIndex: 0,
+    };
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.areSurveySpecificQuestionsLoaded = jest.fn(() => true);
+
+    const tree = subject.render();
+
+    expect(
+      findElement(tree, (element) => element?.type === 'a' && element?.props?.href === 'https://example.com/docs/one'),
+    ).toBeTruthy();
+  });
+
   it('renders SurveySelector dropdown survey-entry doc link when document URLs exist', () => {
     const subject = new SurveySelector({
       autoOpenResults: false,

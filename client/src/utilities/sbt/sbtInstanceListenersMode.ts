@@ -3,7 +3,7 @@
  * @description SBT event listener configuration — controls real-time mint/burn/transfer event
  *              subscriptions per SBT instance, with URL and localStorage overrides.
  *
- * Key exports: readSbtInstanceListenersMode, writeSbtInstanceListenersMode, normalizeSbtInstanceListenersMode
+ * Key exports: readSbtInstanceListenersMode, normalizeSbtInstanceListenersMode
  */
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
@@ -59,24 +59,4 @@ export const readSbtInstanceListenersMode = (): SbtInstanceListenersMode => {
   }
 
   return 'auto';
-};
-
-export const writeSbtInstanceListenersMode = (modeIn: unknown): SbtInstanceListenersMode => {
-  const mode = normalizeSbtInstanceListenersMode(modeIn);
-
-  try {
-    if (typeof globalThis !== 'undefined') {
-      (globalThis as Record<string, unknown>)[GLOBAL_KEY] = mode;
-    }
-  } catch (e) {
-    log.warn('sbtInstanceListenersMode: fallback', e);
-  }
-
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEY, mode);
-  } catch (e) {
-    log.warn('sbtInstanceListenersMode: fallback', e);
-  }
-
-  return mode;
 };

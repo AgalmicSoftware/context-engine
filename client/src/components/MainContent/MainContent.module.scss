@@ -704,7 +704,7 @@
 
   .mainTabsCardHeader :global(.nav-tabs) {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
     gap: 3px;
     min-height: 28px;
@@ -915,5 +915,61 @@
       min-height: 0;
       padding: 10px;
     }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .mainTabsCardHeader :global(.nav-tabs.nav-tabs-info > .nav-item > .nav-link) {
+    color: var(--ce-document-text-muted);
+
+    &:global(.active),
+    &:hover,
+    &:focus,
+    &:active {
+      color: var(--ce-action-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .welcomeArtworkStage,
+  .onboardingWalkthrough {
+    background: var(--ce-surface);
+  }
+
+  .onboardingWalkthrough .onboardingTitle {
+    color: var(--ce-panel-text);
+  }
+
+  .onboardingControls .takeSurveyButton,
+  .onboardingControls .openSidebarButton {
+    background: var(--ce-surface-subtle);
+    color: var(--ce-action-primary);
+    filter: none;
+    opacity: 1;
+    box-shadow: none;
+    border: 0;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-control-face);
+      color: var(--ce-action-submit);
+    }
+
+    &:empty {
+      background: transparent;
+      cursor: default;
+    }
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .mainAreaTabsAlt {
+    margin-top: 10px;
   }
 }

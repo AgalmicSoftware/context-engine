@@ -45,11 +45,6 @@ const pickRatingScaleRecord = (record: Record<string, unknown>): Record<string, 
   return scale || ratingScale || record;
 };
 
-export const hasRatingScaleMetadata = (source: unknown): boolean => {
-  const record = isRecord(source) ? source : {};
-  return recordHasRatingScaleMetadata(pickRatingScaleRecord(record)) || recordHasRatingScaleMetadata(record);
-};
-
 const toFiniteNumber = (value: unknown): number | null => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : null;

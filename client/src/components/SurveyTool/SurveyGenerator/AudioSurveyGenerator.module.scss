@@ -1276,3 +1276,11 @@ $input-border: var(--ce-input-border);
     pointer-events: none;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .databaseTool .viewModeCheckbox {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    border-color: transparent;
+  }
+}

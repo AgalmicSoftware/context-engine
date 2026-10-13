@@ -59,6 +59,8 @@ const baseWorkerSecrets = (overrides: Partial<WorkerSecretsLike> = {}): WorkerSe
   litGroupId: '',
   litPkpId: '',
   litActionCid: '',
+  litAuthorizationVersion: 'worker-signed-v1',
+  litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
   litAccountApiKey: '',
   litUsageApiKey: '',
   ...overrides,
@@ -186,6 +188,8 @@ describe('useSessionWizardWorkerSecretsController', () => {
       workerSecrets: baseWorkerSecrets({
         litApiBase: 'https://lit.example.test',
         litActionCid: 'lit-action-cid',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
       }),
     });
 
@@ -233,6 +237,8 @@ describe('useSessionWizardWorkerSecretsController', () => {
         litGroupId: 'group-1',
         litPkpId: 'pkp-1',
         litActionCid: 'bafy-action',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litUsageApiKey: 'lit-usage',
       }),
     });

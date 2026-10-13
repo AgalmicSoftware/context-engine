@@ -1,3 +1,4 @@
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import { formatTsForCsv, pickTimestampMs } from './surveyResultsHelpers.js';
 
 export type SurveyResultsExportOption = {
@@ -304,8 +305,16 @@ export const buildSurveyResultsExportBaseFileName = ({
   return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
 };
 
-const quoteCsvCell = (value: unknown): string =>
-  `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`;
+// Spreadsheet apps run a cell that starts with one of these characters as a
+// formula. Participant text must stay text, so it gets a leading apostrophe.
+const CSV_FORMULA_START = /^[=+\-@\t\r]/;
+const CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+
+const quoteCsvCell = (value: unknown): string => {
+  const text = String(value !== undefined && value !== null ? value : '');
+  const safeText = CSV_FORMULA_START.test(text) && !CSV_PLAIN_NUMBER.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+};
 
 const quoteResponseCsvCell = (value: unknown): string => {
   const cellValue = Array.isArray(value) ? JSON.stringify(value) : value;
@@ -333,19 +342,18 @@ const defaultParseResponseForCsv = (response: unknown): unknown => {
 const getResponseQuestionIdForCsv = (response: SurveyResultsRecord): string =>
   String(response.questionID || response.questionId || '').trim();
 
+// Question metadata wins; a participant's payload only fills gaps.
 const getResponseQuestionPromptForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
-  response.prompt || questionData.prompt || '';
+  questionData.prompt || response.prompt || '';
 
 const getResponseQuestionTypeForCsv = (response: SurveyResultsRecord, questionData: SurveyResultsRecord): unknown =>
-  response.type || questionData.type || '';
+  questionData.type || response.type || '';
 
-const getImportanceValueForCsv = (response: SurveyResultsRecord): unknown => {
-  if (response.importance !== undefined && response.importance !== null) return response.importance;
-  if (response.conviction !== undefined && response.conviction !== null) return response.conviction;
-  return '';
-};
+const getImportanceValueForCsv = (response: SurveyResultsRecord): unknown =>
+  readStoredRating(response.importance) ?? readStoredRating(response.conviction) ?? '';
 
-const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => response.conviction ?? '';
+const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown =>
+  readStoredRating(response.conviction) ?? '';
 
 const getResponseFieldValueForCsv = (
   response: SurveyResultsRecord,

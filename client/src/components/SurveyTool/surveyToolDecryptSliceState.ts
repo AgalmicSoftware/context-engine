@@ -145,12 +145,15 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     questionId,
     decryptedStateSlice,
     baselineSlice = null,
+    pendingBaseline = null,
     decryptedImportance = null,
     decryptedConviction = null,
   }: {
     questionId?: unknown;
     decryptedStateSlice?: unknown;
     baselineSlice?: unknown;
+    // The edit baseline; a rating that differs from it is a pending edit to keep.
+    pendingBaseline?: unknown;
     decryptedImportance?: unknown;
     decryptedConviction?: unknown;
   } = {},
@@ -212,13 +215,20 @@ export const applyDecryptedQuestionStateToSurveySlice = (
     };
   }
 
-  if (decryptedImportance !== null && decryptedImportance !== undefined) {
-    nextTargetStateSlice.importance = nextTargetStateSlice.importance || {};
-    asRecord(nextTargetStateSlice.importance)[qid] = decryptedImportance;
-  }
-  if (decryptedConviction !== null && decryptedConviction !== undefined) {
-    nextTargetStateSlice.conviction = nextTargetStateSlice.conviction || {};
-    asRecord(nextTargetStateSlice.conviction)[qid] = decryptedConviction;
+  const ratings = [
+    ['importance', decryptedImportance],
+    ['conviction', decryptedConviction],
+  ] as const;
+  for (const [ratingKey, decryptedValue] of ratings) {
+    if (decryptedValue === null || decryptedValue === undefined) continue;
+    const current = asRecord(nextTargetStateSlice[ratingKey]);
+    const pending =
+      !!pendingBaseline &&
+      current[qid] !== null &&
+      current[qid] !== undefined &&
+      current[qid] !== asRecord(asRecord(pendingBaseline)[ratingKey])[qid];
+    // Copy the map: it is shared with the previous React state.
+    if (!pending) nextTargetStateSlice[ratingKey] = { ...current, [qid]: decryptedValue };
   }
 
   return nextTargetStateSlice;
@@ -258,6 +268,7 @@ export const buildSelfQuestionDecryptSuccessState = (
         questionId,
         decryptedStateSlice,
         baselineSlice,
+        pendingBaseline: previous.editBaseline,
         decryptedImportance,
         decryptedConviction,
       },
@@ -372,6 +383,23 @@ export const buildSurveyDecryptSuccessState = (
   const savedConsent = asRecord(
     asRecord(baselineSlice).interviewProvenance ?? asRecord(previous.editBaseline).interviewProvenance,
   );
+  // A rating changed before decrypting stays pending; the decrypted saved rating goes to the baseline.
+  const previousBaseline = asRecord(previous.editBaseline);
+  const decryptedRatings = {
+    importance: { ...asRecord(slice.importance), ...asRecord(decryptedImportanceFromEnv) },
+    conviction: asRecord(decryptedConvictionFromEnv),
+  };
+  const withoutPendingRatings = (key: 'importance' | 'conviction') => {
+    // Without a baseline nothing is being edited yet, so every decrypted rating applies.
+    if (!previous.editBaseline) return decryptedRatings[key];
+    const current = asRecord(previousSlice[key]);
+    const saved = asRecord(previousBaseline[key]);
+    return Object.fromEntries(
+      Object.entries(decryptedRatings[key]).filter(
+        ([qid]) => current[qid] === null || current[qid] === undefined || current[qid] === saved[qid],
+      ),
+    );
+  };
   const nextSlice = {
     answers: {
       ...asRecord(previousSlice.answers),
@@ -382,15 +410,8 @@ export const buildSurveyDecryptSuccessState = (
         ]),
       ),
     },
-    importance: {
-      ...asRecord(previousSlice.importance),
-      ...asRecord(slice.importance),
-      ...asRecord(decryptedImportanceFromEnv),
-    },
-    conviction: {
-      ...asRecord(previousSlice.conviction),
-      ...asRecord(decryptedConvictionFromEnv),
-    },
+    importance: { ...asRecord(previousSlice.importance), ...withoutPendingRatings('importance') },
+    conviction: { ...asRecord(previousSlice.conviction), ...withoutPendingRatings('conviction') },
     additionalComments: {
       ...asRecord(previousSlice.additionalComments),
       ...Object.fromEntries(
@@ -433,6 +454,8 @@ export const buildSurveyDecryptSuccessState = (
     suppressPrefill: true,
     editBaseline: deepClone({
       ...nextSlice,
+      importance: { ...nextSlice.importance, ...decryptedRatings.importance },
+      conviction: { ...nextSlice.conviction, ...decryptedRatings.conviction },
       ...(Object.keys(savedConsent).length ? { interviewProvenance: savedConsent } : {}),
     }),
     isDirty: false,

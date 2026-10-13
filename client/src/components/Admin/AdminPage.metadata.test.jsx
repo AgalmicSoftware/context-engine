@@ -384,7 +384,8 @@ describe('AdminPage metadata controls', () => {
             registryChainId: 84532,
             chainId: 84532,
             adminAddress: ADMIN_ADDRESS,
-            metadataURI: 'ar://old-metadata',
+            // A well-formed Arweave id: only those become gateway links.
+            metadataURI: `ar://old-metadata${'0'.repeat(31)}`,
           },
         }),
       ],

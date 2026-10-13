@@ -12,6 +12,10 @@ import { loadWorkerResponses } from '../../utilities/survey/workerResponseHydrat
 import { createSessionResponseHydrationController } from '../../utilities/survey/sessionResponseHydrationController';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
+// These scenarios navigate between questions and submit twice using real
+// UI/cache timers. Leave room for those waits when the full suite is running.
+jest.setTimeout(15_000);
+
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({
   __esModule: true,

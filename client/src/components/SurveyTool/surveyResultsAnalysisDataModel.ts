@@ -1,4 +1,5 @@
 import { GROUP_FILTER_ROLES } from '../../domains/worker/workerGroupResultsFilter';
+import { readReportAnswer } from '../PolisReport/polisReportAnswers';
 import type { SessionResultsAnalysisResponseInput } from '../../utilities/sessionResultsExport';
 
 type SurveyResultsAnalysisRecord = Record<string, unknown>;
@@ -72,13 +73,14 @@ const defaultGetQuestionId = (response: unknown): string => {
   return String(record.questionID || record.questionId || '').trim();
 };
 
+// Question metadata wins; a participant's payload only fills gaps.
 const defaultGetQuestionPrompt = (
   response: unknown,
   questionData: SurveyResultsAnalysisRecord | null = null,
 ): unknown => {
   const responseRecord = toRecord(response);
   const questionRecord = toRecord(questionData);
-  return responseRecord.prompt || questionRecord.prompt || '';
+  return questionRecord.prompt || responseRecord.prompt || '';
 };
 
 const defaultGetQuestionType = (
@@ -87,7 +89,7 @@ const defaultGetQuestionType = (
 ): unknown => {
   const responseRecord = toRecord(response);
   const questionRecord = toRecord(questionData);
-  return responseRecord.type || questionRecord.type || questionRecord.questionType || '';
+  return questionRecord.type || questionRecord.questionType || responseRecord.type || '';
 };
 
 const isSurveyIndividualsMode = (viewMode: unknown, surveyViewMode: unknown): boolean =>
@@ -105,6 +107,17 @@ export const readSurveyResultsAnalysisTextField = (field: unknown): string => {
     return String(value).trim();
   }
   return '';
+};
+
+// Multiple-choice picks are validated as in the Report and the Worker analysis,
+// then joined with '; ' as the Worker formats them.
+const readMultichoiceAnalysisAnswer = (
+  response: SurveyResultsAnalysisRecord,
+  questionData: SurveyResultsAnalysisRecord,
+): string => {
+  const payload = Array.isArray(response.answer) ? { answer: { value: response.answer } } : response;
+  const picks = readReportAnswer(payload, { ...questionData, type: 'multichoice' });
+  return Array.isArray(picks) ? picks.join('; ') : '';
 };
 
 export const readSurveyResultsAnalysisSafeLabel = (value: unknown): string => {
@@ -148,7 +161,9 @@ export const buildSurveyResultsAnalysisResponsesForExport = ({
         ? Array.isArray(rawAnswer)
           ? rawAnswer
           : ''
-        : readSurveyResultsAnalysisTextField(response.answer);
+        : questionType === 'multichoice'
+          ? readMultichoiceAnalysisAnswer(response, questionData)
+          : readSurveyResultsAnalysisTextField(response.answer);
     const additional = readSurveyResultsAnalysisTextField(response.additional);
     if (!answer && !additional) return;
     rows.push({

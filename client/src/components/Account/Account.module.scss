@@ -4021,3 +4021,75 @@ h1 {
     display: none;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .navConnectContainer {
+    display: flex;
+    align-items: center;
+    height: auto;
+    margin: 0;
+  }
+
+  .navConnectButton {
+    background: var(--ce-action-submit) !important;
+    border: 0 !important;
+    box-shadow: none !important;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-action-submit-hover) !important;
+    }
+  }
+
+  .loginPromptText {
+    margin: 0;
+    padding: 0;
+    color: var(--ce-action-submit-text);
+    font-family: var(--ce-font-button);
+    font-weight: 600;
+    letter-spacing: normal;
+    line-height: 1.4;
+  }
+
+  .loginIcons {
+    display: none;
+  }
+
+  #closeModalIcon,
+  .Web3SettingsModalTitle,
+  .passkeyWalletStatus {
+    color: var(--ce-panel-text);
+  }
+
+  .passkeyButton,
+  .passkeyButtonPrimary,
+  .passkeyButtonOutline {
+    background: var(--ce-action-primary);
+    border: 1px solid transparent;
+    color: var(--ce-action-primary-text);
+    box-shadow: none;
+    transform: none;
+
+    &:hover,
+    &:focus,
+    &:active {
+      background: var(--ce-action-primary-hover);
+      color: var(--ce-action-primary-text);
+      box-shadow: none;
+      transform: none;
+    }
+  }
+
+  .passkeyButtonOutline {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    border-color: transparent;
+
+    &:hover,
+    &:focus,
+    &:active {
+      background: var(--ce-surface-subtle);
+      color: var(--ce-control-text);
+    }
+  }
+}

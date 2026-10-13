@@ -53,6 +53,10 @@ export const createSurveyQuestionsGateAudienceRuntime = (
     const statePileQuestions: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.pileQuestions)
       ? stateRef.current.pileQuestions
       : null;
+    // Questions hidden by the pile filter can still hold edits that submit must lock correctly.
+    const stateFilterQuestions: SurveyQuestionsLegacyValue = Array.isArray(stateRef.current.allQuestionsForFilter)
+      ? stateRef.current.allQuestionsForFilter
+      : null;
     const propsQuestionPool: SurveyQuestionsLegacyValue = Array.isArray(propsRef.current.questionPool)
       ? propsRef.current.questionPool
       : null;
@@ -62,6 +66,7 @@ export const createSurveyQuestionsGateAudienceRuntime = (
       cache &&
       cache.stateQuestionPool === stateQuestionPool &&
       cache.statePileQuestions === statePileQuestions &&
+      cache.stateFilterQuestions === stateFilterQuestions &&
       cache.propsQuestionPool === propsQuestionPool &&
       cache.value
     ) {
@@ -79,11 +84,13 @@ export const createSurveyQuestionsGateAudienceRuntime = (
     };
     addPool(stateQuestionPool);
     addPool(statePileQuestions);
+    addPool(stateFilterQuestions);
     addPool(propsQuestionPool);
 
     inst._questionByIdLookupCache = {
       stateQuestionPool,
       statePileQuestions,
+      stateFilterQuestions,
       propsQuestionPool,
       value: next,
     };

@@ -17,7 +17,9 @@ import {
   getStorageIndexBinding,
   listCloudflareMetadataRows,
   readStoredCloudflarePayloadBytes,
+  resolveSessionAdminAddresses,
 } from './storageRouteExecution.js';
+import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import {
   isModelAllowed,
   normalizeAiRequestPayload,
@@ -30,7 +32,7 @@ import {
 } from './aiProviderExecution.js';
 import { json as jsonResponse } from './responseKvHelpers.js';
 import { normalizePayloadAccessControl } from './payloadAccessControl.js';
-import { formatValidAnalysisAnswer } from './resultsAnalysisAnswerValidation.js';
+import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -122,10 +124,24 @@ const encryptedEnvelopeValueHasContent = (value) => {
   return true;
 };
 
-const valueLooksEncrypted = (value, depth = 0) => {
+const isBlankFieldValue = (value) => value == null ||
+  (typeof value === 'string' && !trim(value)) ||
+  (Array.isArray(value) && value.length === 0) ||
+  (isObj(value) && Object.keys(value).length === 0);
+
+// Clients up to 0.6.7 uploaded a cleared locked answer or comment as
+// { value: '', encrypted: true, encryptedPortion: '' }. A locked field always
+// keeps its envelope beside a '*' mask, so a blank one without any is cleared.
+const isClearedFieldWithLockFlag = (value) => hasOwn(value, 'value') &&
+  isBlankFieldValue(value.value) &&
+  !['envelope', ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
+
+// Also decides which committed responses the session coordinator marks locked.
+export const valueLooksEncrypted = (value, depth = 0) => {
   if (depth > 5) return false;
   if (!isObj(value)) return false;
-  if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
+  if (value.locked === true || value.payloadEncrypted === true) return true;
+  if (value.encrypted === true && !isClearedFieldWithLockFlag(value)) return true;
   if (Object.entries(value).some(([key, entry]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry))) return true;
   return Object.values(value).some((entry) => valueLooksEncrypted(entry, depth + 1));
 };
@@ -138,16 +154,23 @@ const valueFromAnswerLike = (value) => {
   return '';
 };
 
+// Only encryption flags and envelopes lock a field. The client's masks ('*',
+// '[encrypted]') always carry encrypted:true, so public text that looks like a
+// marker ("Locked", "***") is an answer. A mask without the flag is still a
+// placeholder rather than an answer: it reads as blank, as in the client report.
+const FIELD_MASKS = new Set(['*', '[encrypted]']);
+const withoutFieldMask = (value) => {
+  const raw = isObj(value) && hasOwn(value, 'value') ? value.value : value;
+  return typeof raw === 'string' && FIELD_MASKS.has(raw.trim()) ? '' : value;
+};
+
 const rowLooksLocked = (row) => {
   if (!isObj(row)) return true;
   if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
-  const answer = hasOwn(row, 'answer') ? row.answer : hasOwn(row, 'value') ? row.value : row.response;
-  if (valueLooksEncrypted(answer)) return true;
-  const value = isObj(answer) && hasOwn(answer, 'value') ? answer.value : answer;
-  const text = trim(value);
-  return text === '*' || /^\*+$/.test(text) || /^\[?(encrypted|locked|redacted)\]?$/i.test(text);
+  return valueLooksEncrypted(hasOwn(row, 'answer') ? row.answer : hasOwn(row, 'value') ? row.value : row.response);
 };
 
+const VALIDATED_QUESTION_TYPES = new Set(['binary', 'rating', 'multichoice', 'quadratic', 'freeform']);
 const normalizeQuestionId = (value) => trim(value).slice(0, 128);
 const normalizeQuestionPrompt = (value) => trim(value).replace(/\s+/g, ' ').slice(0, 1200);
 const normalizeQuestionType = (value) => trim(value).slice(0, 64) || 'text';
@@ -367,6 +390,14 @@ const selectRoundRobinResponses = ({ responseRows, questionIds, limit }) => {
   return out;
 };
 
+// Worker time orders a participant's answers. Equal times have no order, so
+// the immutable storage id breaks the tie, as the client does
+// (client/src/utilities/survey/workerResponseRecency.ts).
+const isNewerResponseRow = (candidate, current) => (
+  candidate.rowTime > current.rowTime ||
+  (candidate.rowTime === current.rowTime && candidate.storageRefId > current.storageRefId)
+);
+
 const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
   const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
   const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
@@ -376,8 +407,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     if (normalized) questionMap.set(normalized.questionId, normalized);
   });
 
-  const responseByQuestionParticipant = new Map();
-  const participantDigests = new Set();
+  // Each participant's latest row per question wins before any filter, so a
+  // newer locked, cleared or invalid answer withdraws an older public one.
+  // Superseded rows are not counted as excluded or locked.
+  const latestByQuestionParticipant = new Map();
   let excludedCount = 0;
   let lockedCount = 0;
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -389,15 +422,37 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       excludedCount += 1;
       continue;
     }
-    if (rowLooksLocked(row)) {
-      excludedCount += 1;
-      lockedCount += 1;
-      if (strictLocked) return { ok: false, status: 400, error: 'Encrypted or locked response rows cannot be used for admin snapshot generation.' };
-      continue;
+    if (strictLocked && rowLooksLocked(row)) {
+      return { ok: false, status: 400, error: 'Encrypted or locked response rows cannot be used for admin snapshot generation.' };
     }
     const questionId = normalizeQuestionId(row.questionId || row.questionID || row.id);
     if (!questionId || (requireKnownQuestion && !questionMap.has(questionId))) {
       excludedCount += 1;
+      continue;
+    }
+    const participantSource = trim(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || '');
+    if (!participantSource) {
+      excludedCount += 1;
+      continue;
+    }
+    const candidate = {
+      row,
+      questionId,
+      participantKey: await participantDigest(participantSource),
+      rowTime: Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0,
+      storageRefId: trim(row.__storageRefId),
+    };
+    const dedupeKey = `${questionId}:${candidate.participantKey}`;
+    const existing = latestByQuestionParticipant.get(dedupeKey);
+    if (!existing || isNewerResponseRow(candidate, existing)) latestByQuestionParticipant.set(dedupeKey, candidate);
+  }
+
+  const includedRows = [];
+  const participantDigests = new Set();
+  for (const { row, questionId, participantKey } of latestByQuestionParticipant.values()) {
+    if (rowLooksLocked(row)) {
+      excludedCount += 1;
+      lockedCount += 1;
       continue;
     }
     if (!questionMap.has(questionId)) {
@@ -408,50 +463,45 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       });
       if (inferred) questionMap.set(questionId, inferred);
     }
-    const participantSource = trim(row.__trustedParticipantId || row.participantId || row.responder || row.address || row.account || '');
-    if (!participantSource) {
-      excludedCount += 1;
-      continue;
-    }
-    const digest = await participantDigest(participantSource);
-    const answerValue = hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response);
+    const answerValue = withoutFieldMask(hasOwn(row, 'answer') ? row.answer : (hasOwn(row, 'value') ? row.value : row.response));
     const additionalValue = hasOwn(row, 'additional') ? row.additional : (hasOwn(row, 'additionalComments') ? row.additionalComments : (hasOwn(row, 'comments') ? row.comments : row.comment));
     const knownQuestion = questionMap.get(questionId) || {};
-    const validatedAnswer = requireKnownQuestion ? formatValidAnalysisAnswer(answerValue, knownQuestion) : valueFromAnswerLike(answerValue);
+    // Answers to the current question types are validated against the question
+    // in both sources: invalid answers are not evidence, and quadratic
+    // allocations reach the AI with option labels. Admin snapshots keep the
+    // legacy shapes of other types (such as "poll") as text, as before.
+    const validatedAnswer = requireKnownQuestion || VALIDATED_QUESTION_TYPES.has(knownQuestion.type)
+      ? formatValidAnalysisAnswer(answerValue, knownQuestion)
+      : valueFromAnswerLike(answerValue);
     if (validatedAnswer === null) {
       excludedCount += 1;
       continue;
     }
     const answer = validatedAnswer.slice(0, 4000);
-    const additionalLocked = valueLooksEncrypted(additionalValue) || /^\*+$/.test(valueFromAnswerLike(additionalValue));
-    const additionalComments = additionalLocked ? '' : valueFromAnswerLike(additionalValue).slice(0, 2000);
+    const additionalLocked = valueLooksEncrypted(additionalValue);
+    const additionalComments = additionalLocked ? '' : valueFromAnswerLike(withoutFieldMask(additionalValue)).slice(0, 2000);
     if (!answer && !additionalComments) {
       excludedCount += 1;
       if (additionalLocked) lockedCount += 1;
       continue;
     }
-    participantDigests.add(digest);
-    const rowTime = Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0;
-    const dedupeKey = `${questionId}:${digest}`;
-    const candidate = {
+    participantDigests.add(participantKey);
+    includedRows.push({
       questionId,
-      participantKey: digest,
+      participantKey,
       answer,
       additionalComments,
-      importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : safeNumber(row.importance),
-      conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : safeNumber(row.conviction),
+      importance: encryptedEnvelopeValueHasContent(row.importanceEncrypted) ? null : readStoredRating(row.importance),
+      conviction: encryptedEnvelopeValueHasContent(row.convictionEncrypted) ? null : readStoredRating(row.conviction),
       submittedAt: normalizeSubmittedAt(row.submittedAt || row.createdAt || row.timestamp),
       questionPrompt: knownQuestion.prompt || '',
       questionType: knownQuestion.type || 'text',
-      rowTime,
-    };
-    const existing = responseByQuestionParticipant.get(dedupeKey);
-    if (!existing || candidate.rowTime >= existing.rowTime) responseByQuestionParticipant.set(dedupeKey, candidate);
+    });
   }
   const sortedParticipantDigests = [...participantDigests].sort();
   const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, '0')}`]));
   const participants = sortedParticipantDigests.map((digest) => ({ syntheticId: participantLabels.get(digest) }));
-  const responseRows = [...responseByQuestionParticipant.values()]
+  const responseRows = includedRows
     .sort((a, b) => a.questionId.localeCompare(b.questionId) || (participantLabels.get(a.participantKey) || '').localeCompare(participantLabels.get(b.participantKey) || ''));
   const sanitizedResponses = responseRows.map((row, index) => ({
     responseId: `r${index + 1}`,
@@ -540,16 +590,37 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
   }
   const questionRows = await listCloudflareMetadataRows({ index, slug, resource: 'questions' });
-  const questions = [];
+  const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: 'questions' });
+  const candidates = [];
   for (const row of questionRows) {
     const metadata = row?.metadata;
-    if (!isObj(metadata) || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
+    if (!isObj(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
     const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata }));
     if (!isObj(payload)) continue;
     if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
-    const normalized = normalizeQuestionRecord(payload);
-    if (normalized) questions.push(normalized);
+    // Key on the id the upload route checked for ownership (stored lower case).
+    // Legacy rows without it read the payload id in the same order, id first,
+    // so a second id field in the payload cannot claim another question.
+    const payloadId = trim(payload.id || payload.questionId || payload.questionID);
+    const trustedId = lower(metadata.resourceId);
+    const normalized = normalizeQuestionRecord({
+      ...payload,
+      questionId: trustedId && lower(payloadId) !== trustedId ? trustedId : payloadId,
+    });
+    if (!normalized || hiddenQuestionIds.has(lower(normalized.questionId))) continue;
+    candidates.push({
+      resourceId: normalized.questionId,
+      createdAtMs: Date.parse(trim(metadata.createdAt)) || 0,
+      storageRefId: trim(metadata.id),
+      uploader: trim(metadata.uploader),
+      question: normalized,
+    });
   }
+  // A re-upload of an id by someone else never replaces the question people
+  // answered: keep the first upload unless a session admin uploaded a newer one.
+  const admins = resolveSessionAdminAddresses(config);
+  const questions = selectCanonicalStorageVersions(candidates, { isAdmin: (address) => admins.has(address) })
+    .map((candidate) => candidate.question);
 
   const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses' });
   const responseRows = [];
@@ -574,6 +645,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     responseRows.push({
       ...payload,
       __trustedParticipantId: metadata.responder,
+      __storageRefId: metadata.id,
       responder: metadata.responder,
       createdAt: metadata.createdAt,
       submittedAt: metadata.createdAt,
@@ -609,6 +681,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async ({ env, slug, conf
     responseRows.push({
       ...payload,
       __trustedParticipantId: metadata.responder,
+      __storageRefId: metadata.id,
       responder: metadata.responder,
       createdAt: metadata.createdAt,
       submittedAt: metadata.createdAt,

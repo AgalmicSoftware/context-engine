@@ -59,6 +59,20 @@ const RETRYABLE_CONFIG_READ_STATUSES = new Set([404, 408, 425, 429]);
 const isRetryableConfigReadStatus = (status: number): boolean =>
   RETRYABLE_CONFIG_READ_STATUSES.has(status) || (status >= 500 && status <= 599);
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
+// The Worker sets these public fields itself: the authorization epoch and the
+// publication marker on writes, and response field encryption on every read.
+// They are not config the wizard writes, so the readback check skips them.
+const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
+  'authzEpoch',
+  WORKER_CANONICAL_PUBLICATION_REVISION_KEY,
+  'responseFieldEncryption',
+]);
+// Only a finalizing write claims a revision. Before that, a stored revision
+// (such as one the deploy helper staged) is not part of the checked config.
+const resolveIgnoredPublicConfigFields = (finalizePublication: boolean): readonly string[] =>
+  finalizePublication
+    ? WORKER_MANAGED_PUBLIC_CONFIG_FIELDS
+    : [...WORKER_MANAGED_PUBLIC_CONFIG_FIELDS, 'configRevision'];
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;
 const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIELDS);
@@ -164,9 +178,9 @@ const clonePublicConfig = (value: unknown): UnknownRecord => {
   return clonePublicConfigValue(value, 'config', new WeakSet()) as UnknownRecord;
 };
 
-const buildExpectedPublicConfig = (config: UnknownRecord): UnknownRecord =>
+const buildExpectedPublicConfig = (config: UnknownRecord, ignoredFields: readonly string[]): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
-    if (key === 'authzEpoch' || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
+    if (ignoredFields.includes(key) || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
     if (key === 'ai') {
       const ai =
         config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
@@ -191,8 +205,17 @@ const verifyExpectedPublicConfigValue = (expected: unknown, actual: unknown, pat
     }
     const expectedKeys = Object.keys(expected as UnknownRecord).sort();
     const actualKeys = Object.keys(actual as UnknownRecord).sort();
-    if (expectedKeys.length !== actualKeys.length || expectedKeys.some((key, index) => key !== actualKeys[index])) {
-      throw new Error(`Worker config verification failed: public config mismatch at "${path}".`);
+    // Field names only: values are never part of the message.
+    const missingKeys = expectedKeys.filter((key) => !actualKeys.includes(key));
+    const unexpectedKeys = actualKeys.filter((key) => !expectedKeys.includes(key));
+    if (missingKeys.length || unexpectedKeys.length) {
+      const detail = [
+        missingKeys.length ? `missing ${missingKeys.join(', ')}` : '',
+        unexpectedKeys.length ? `unexpected ${unexpectedKeys.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join('; ');
+      throw new Error(`Worker config verification failed: public config mismatch at "${path}" (${detail}).`);
     }
     Object.entries(expected as UnknownRecord).forEach(([key, entry]) => {
       verifyExpectedPublicConfigValue(entry, (actual as UnknownRecord)[key], `${path}.${key}`);
@@ -204,15 +227,30 @@ const verifyExpectedPublicConfigValue = (expected: unknown, actual: unknown, pat
   }
 };
 
-const buildComparableActualPublicConfig = (config: UnknownRecord, revision: string): UnknownRecord => {
-  const comparableConfig = { ...config };
-  delete comparableConfig.authzEpoch;
-  if (Object.prototype.hasOwnProperty.call(comparableConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
-    if (toTrimmedString(comparableConfig[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]) !== revision) {
-      throw new Error('Worker config verification failed: publication revision mismatch.');
-    }
-    delete comparableConfig[WORKER_CANONICAL_PUBLICATION_REVISION_KEY];
+const buildComparableActualPublicConfig = ({
+  config,
+  revision,
+  workerOrigin,
+  ignoredFields,
+}: {
+  config: UnknownRecord;
+  revision: string;
+  workerOrigin: string;
+  ignoredFields: readonly string[];
+}): UnknownRecord => {
+  if (
+    Object.prototype.hasOwnProperty.call(config, WORKER_CANONICAL_PUBLICATION_REVISION_KEY) &&
+    toTrimmedString(config[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]) !== revision
+  ) {
+    throw new Error('Worker config verification failed: publication revision mismatch.');
   }
+  const comparableConfig = { ...config };
+  ignoredFields.forEach((key) => {
+    delete comparableConfig[key];
+  });
+  // The critical-field check has already matched this URL's origin; a
+  // trailing slash or letter case does not change the Worker it names.
+  comparableConfig.corsWorkerUrl = workerOrigin;
   return comparableConfig;
 };
 
@@ -307,6 +345,42 @@ const verifyCriticalWorkerConfigFields = ({
   }
 };
 
+const PUBLICATION_FINALIZED_ERROR_PATTERN = /publication is already finalized/i;
+
+// A publication commits before its readback. When that readback failed and
+// the draft changed since, the next attempt meets the committed publication;
+// it is this session's if the Worker still serves the same identity.
+const isPublishedForIdentity = async ({
+  fetchImpl,
+  workerOrigin,
+  slug,
+  sessionId,
+  adminAddress,
+  environment,
+}: {
+  fetchImpl: SessionWizardWorkerConfigFetchPort;
+  workerOrigin: string;
+  slug: string;
+  sessionId: string;
+  adminAddress: string;
+  environment?: DiscoveryEnvironment;
+}): Promise<boolean> => {
+  try {
+    const response = await fetchImpl(`${workerOrigin}/session-config`, {
+      method: 'GET',
+      credentials: 'omit',
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'X-Session-Slug': slug },
+    });
+    if (!response.ok) return false;
+    const config = getPublicConfigFromResponse(await readResponseJson(response));
+    verifyCriticalWorkerConfigFields({ config, slug, sessionId, workerOrigin, environment });
+    return normalizeAdminAddress(config.adminAddress) === adminAddress;
+  } catch {
+    return false;
+  }
+};
+
 export const persistAndVerifySessionWizardWorkerConfig = async ({
   workerUrl,
   slug,
@@ -364,7 +438,8 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
     corsWorkerUrl: workerOrigin,
     ...(finalizePublication ? { configRevision: revision } : {}),
   };
-  const expectedPublicConfig = buildExpectedPublicConfig(configToPersist);
+  const ignoredPublicConfigFields = resolveIgnoredPublicConfigFields(finalizePublication);
+  const expectedPublicConfig = buildExpectedPublicConfig(configToPersist, ignoredPublicConfigFields);
   const requestBody: SessionWizardWorkerConfigWriteBody = {
     sessionSlug: normalizedSlug,
     adminAddress: normalizedAdminAddress,
@@ -393,6 +468,24 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   if (!writeResponse.ok) {
     const writeBody = await readResponseJson(writeResponse);
     const detail = readResponseError(writeBody);
+    if (
+      finalizePublication &&
+      writeResponse.status === 409 &&
+      PUBLICATION_FINALIZED_ERROR_PATTERN.test(detail) &&
+      (await isPublishedForIdentity({
+        fetchImpl,
+        workerOrigin,
+        slug: normalizedSlug,
+        sessionId: normalizedSessionId,
+        adminAddress: normalizedAdminAddress,
+        environment,
+      }))
+    ) {
+      throw Object.assign(
+        new Error('This session is already published. Its earlier settings are live; later edits were not applied.'),
+        { workerCanonicalAlreadyPublished: true },
+      );
+    }
     throw new Error(`Worker config write failed (${writeResponse.status})${detail ? `: ${detail}` : '.'}`);
   }
 
@@ -445,7 +538,12 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
       try {
         verifyExpectedPublicConfigValue(
           expectedPublicConfig,
-          buildComparableActualPublicConfig(verifiedPublicConfig, revision),
+          buildComparableActualPublicConfig({
+            config: verifiedPublicConfig,
+            revision,
+            workerOrigin,
+            ignoredFields: ignoredPublicConfigFields,
+          }),
           'config',
         );
       } catch (error) {

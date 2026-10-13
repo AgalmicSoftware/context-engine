@@ -539,9 +539,17 @@ export const getCreateSurveyValidationError = ({
     return `Question ${blankQuestionIndex + 1} prompt cannot be blank.`;
   }
   for (const [index, question] of (Array.isArray(questions) ? questions : []).entries()) {
-    if (question?.type !== 'quadratic') continue;
-    const error = validateQuadraticQuestion(question);
-    if (error) return `Question ${index + 1}: ${error}`;
+    if (question?.type === 'quadratic') {
+      const error = validateQuadraticQuestion(question);
+      if (error) return `Question ${index + 1}: ${error}`;
+    }
+    // Blank options are dropped from the payload, so count only what participants would see.
+    if (
+      isMultichoiceQuestionType(question?.type) &&
+      (normalizePayloadQuestionOptions(question?.type, question?.options) || []).length < 2
+    ) {
+      return `Question ${index + 1}: Multichoice questions need at least two non-blank options.`;
+    }
   }
   const duplicateOption = findFirstDuplicateMultichoiceOptionQuestion(questions);
   if (duplicateOption.index !== -1) {
@@ -569,10 +577,6 @@ export const buildCreateSurveyFocusTargetPatch = (focusTargetUiKey: unknown = nu
 export const buildCreateSurveyTitleChangePatch = (title: unknown) => ({
   title: String(title ?? ''),
   formValidationError: '',
-});
-
-export const buildCreateSurveyAddingQuestionTypePatch = (addingQuestionType: unknown) => ({
-  addingQuestionType: String(addingQuestionType ?? ''),
 });
 
 export const buildCreateSurveyQuestionListPatch = (questions: unknown) => ({
@@ -1113,40 +1117,6 @@ export const normalizeAddressList = (values: unknown[] = []) => {
     out.push(address);
   });
   return out;
-};
-
-const getCreateSurveySbtAddressKey = (value: unknown): string => {
-  if (!value || typeof value !== 'object') return '';
-  const record = value as UnknownRecord;
-  return String(record.address || record.sbtAddress || '')
-    .trim()
-    .toLowerCase();
-};
-
-export const addCreateSurveyEncryptionGateSbt = <TSbt extends UnknownRecord = UnknownRecord>(
-  selectedSbts: unknown = [],
-  sbt: unknown = null,
-): TSbt[] => {
-  const current = Array.isArray(selectedSbts) ? (selectedSbts as TSbt[]) : [];
-  if (!sbt || typeof sbt !== 'object' || Array.isArray(sbt)) return [...current];
-  const nextSbt = sbt as TSbt;
-  const nextAddress = getCreateSurveySbtAddressKey(nextSbt);
-  if (nextAddress && current.some((entry) => getCreateSurveySbtAddressKey(entry) === nextAddress)) {
-    return [...current];
-  }
-  return [...current, nextSbt];
-};
-
-export const removeCreateSurveyEncryptionGateSbt = <TSbt extends UnknownRecord = UnknownRecord>(
-  selectedSbts: unknown = [],
-  address: unknown = '',
-): TSbt[] => {
-  const current = Array.isArray(selectedSbts) ? (selectedSbts as TSbt[]) : [];
-  const addressKey = String(address || '')
-    .trim()
-    .toLowerCase();
-  if (!addressKey) return [...current];
-  return current.filter((entry) => getCreateSurveySbtAddressKey(entry) !== addressKey);
 };
 
 export const normalizeTagList = (values: unknown = []) =>

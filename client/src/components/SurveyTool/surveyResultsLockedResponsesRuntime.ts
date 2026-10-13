@@ -128,7 +128,7 @@ export type SurveyResultsLockedResponsesRuntimeInstance = {
 export type SurveyResultsLockedResponsesRuntimePorts = {
   applyStatePatch: (patch: unknown, afterApply?: () => void) => void;
   decryptEnvelopeValue: (envelope: unknown, options: CryptoGateDecryptOptions) => Promise<unknown>;
-  getEffectiveSessionContext: () => { sessionConfig?: unknown; sessionSlug?: string };
+  getEffectiveSessionContext: () => { sessionConfig?: Record<string, unknown> | null; sessionSlug?: string };
   getEffectiveSlug: () => string;
   getNetworkQuestionsForCurrentContext: () => Record<string, SurveyResultsQuestionWithEncryption>;
   getProps: () => SurveyResultsProps;
@@ -383,10 +383,13 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     const props = ports.getProps();
     const litHooks = getDecryptLitHooks();
     const litOpts = litHooks && typeof litHooks.getKey === 'function' ? { getKey: litHooks.getKey } : undefined;
+    const { sessionConfig, sessionSlug } = ports.getEffectiveSessionContext();
     return {
       account: props.account,
       chainId: props.network?.id || props.networkChainId || null,
       providerLike: props.provider,
+      sessionConfig: sessionConfig || undefined,
+      sessionSlug,
       ...(litOpts ? { litOpts } : {}),
     };
   };
@@ -457,10 +460,11 @@ export const createSurveyResultsLockedResponsesRuntime = ({
         !hasOwn(override, 'importance')
       ) {
         try {
-          const importance = await ports.decryptEnvelopeValue(
-            response.importanceEncrypted,
-            getCryptoGateDecryptOptions(),
-          );
+          // Ratings are encrypted with qId `${fieldKey}:${questionId}`.
+          const importance = await ports.decryptEnvelopeValue(response.importanceEncrypted, {
+            ...getCryptoGateDecryptOptions(),
+            expectedQId: `importance:${row.questionId}`,
+          });
           override.importance = Number.isNaN(Number(importance)) ? importance : Number(importance);
           anyDecrypted = true;
         } catch (e) {
@@ -474,10 +478,10 @@ export const createSurveyResultsLockedResponsesRuntime = ({
         !hasOwn(override, 'conviction')
       ) {
         try {
-          const conviction = await ports.decryptEnvelopeValue(
-            response.convictionEncrypted,
-            getCryptoGateDecryptOptions(),
-          );
+          const conviction = await ports.decryptEnvelopeValue(response.convictionEncrypted, {
+            ...getCryptoGateDecryptOptions(),
+            expectedQId: `conviction:${row.questionId}`,
+          });
           override.conviction = Number.isNaN(Number(conviction)) ? conviction : Number(conviction);
           anyDecrypted = true;
         } catch (e) {

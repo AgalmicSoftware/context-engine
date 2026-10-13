@@ -5,7 +5,10 @@ import {
   readSbtListCacheMetaSnapshot as readSbtCacheMetaSnapshot,
 } from './sbtListHelpers';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+
+const ARWEAVE_DOC_TX_ID = 'bNbA3TEQVL60xlgCcqdz4ZPHFZ711cZ3hmkpGttDt_U';
 
 jest.mock('./SBTPage', () => () => null);
 jest.mock('./CreateSBTGroup', () => () => null);
@@ -106,13 +109,18 @@ describe('SBTsList cache watermark reads', () => {
       ],
       sbtInfo: {
         featuredSbtTags: [{ name: 'Research' }, { value: 'Signal' }],
-        documents: [{ docUrl: 'ar://abc123' }],
+        documents: [{ docUrl: `ar://${ARWEAVE_DOC_TX_ID}` }, { docUrl: 'ar://abc123' }],
       },
     });
 
     expect(details.tags).toEqual(['Builder', 'Research', 'Ops', 'Signal']);
     expect(details.documentUrls).toEqual([
-      { href: 'ar://abc123', label: 'ar://abc123' },
+      // A valid Arweave id opens through the gateway; a malformed one renders as text.
+      {
+        href: normalizeArweaveUrl(`ar://${ARWEAVE_DOC_TX_ID}`, { contextLabel: 'sbt_list_document' }),
+        label: `ar://${ARWEAVE_DOC_TX_ID}`,
+      },
+      { href: '', label: 'ar://abc123' },
       { href: 'https://ipfs.io/ipfs/bafy-doc', label: 'ipfs://bafy-doc' },
       { href: 'https://example.com/readme', label: 'https://example.com/readme' },
     ]);

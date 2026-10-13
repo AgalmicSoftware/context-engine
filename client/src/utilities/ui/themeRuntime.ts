@@ -69,9 +69,11 @@ export const applyResolvedTheme = (selection: ResolvedThemeSelection): ResolvedT
   hasAppliedThemeRuntime = true;
   if (!root) return selection;
 
+  const metadata = getThemeMetadata(selection.id);
   root.dataset.ceTheme = selection.id;
   root.dataset.ceThemeSource = selection.source;
-  root.style.colorScheme = getThemeMetadata(selection.id).colorScheme;
+  root.style.colorScheme = metadata.colorScheme;
+  root.ownerDocument.querySelector('meta[name="theme-color"]')?.setAttribute('content', metadata.themeColor);
 
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new CustomEvent<ResolvedThemeSelection>(CE_THEME_CHANGE_EVENT, { detail: selection }));

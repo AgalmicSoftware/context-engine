@@ -56,6 +56,7 @@ import {
   describeResearchCoverage,
   displayResponderContext,
   hasDraftValue,
+  responseCommentValue,
   responseFieldValue,
   type SessionInterviewModalRecord,
 } from './sessionInterviewModalState';
@@ -74,6 +75,7 @@ type InterviewDraftApplicationProps = InterviewQuestionControls & {
   onApplyAdditional: (questionId: string, comments: string) => void | Promise<void>;
   onApplyImportance: (questionId: string, importance: number) => void | Promise<void>;
   onApplyConviction: (questionId: string, conviction: number) => void | Promise<void>;
+  onCaptureResponses?: (questionIds: string[]) => () => void | Promise<void>;
   onRecordProvenance?: (
     drafts: InterviewDraftResponse[],
     source: InterviewPrefillPacket['source'] | null,
@@ -144,6 +146,7 @@ function SessionInterviewPanel({
   onApplyAdditional,
   onApplyImportance,
   onApplyConviction,
+  onCaptureResponses,
   onRecordProvenance,
   onSubmitResponses,
   onViewResults,
@@ -158,6 +161,8 @@ function SessionInterviewPanel({
   const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
   const catalogAbortRef = useRef<AbortController | null>(null);
   const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
+  // The question set a prefill link was last checked against.
+  const checkedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
@@ -173,6 +178,8 @@ function SessionInterviewPanel({
   const [transcript, setTranscript] = useState('');
   const transcriptRef = useRef('');
   const roundBaseTranscriptRef = useRef('');
+  // The transcript the current drafts came from; a later round that was not mapped can still be.
+  const [mappedTranscript, setMappedTranscript] = useState('');
   const receiveTranscript = (current: string) => {
     const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, current);
     transcriptRef.current = combined;
@@ -308,7 +315,8 @@ function SessionInterviewPanel({
     active: authenticatedForSubmit,
     onLoaded: reviewSavedConflicts,
   });
-  const existingResponseSlice = ownAnswers.slice || formResponseSlice;
+  // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
+  const existingResponseSlice = formResponseSlice || ownAnswers.slice;
   useEffect(() => {
     setConsentOverrides({});
   }, [activeSubmitContextToken]);
@@ -446,6 +454,7 @@ function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
+          checkedPrefillQuestionsRef.current = questions;
           catalogAbortRef.current = new AbortController();
           const matchedQuestions = await resolveInterviewPrefillQuestions({
             packet: prefillPacket,
@@ -465,7 +474,11 @@ function SessionInterviewPanel({
           : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions);
         const contextPacket: InterviewPrefillPacket | null =
           (prefillPacket
-            ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
+            ? scopeInterviewPrefillToQuestions(
+                prefillPacket,
+                validatedPrefillQuestionsRef.current || questions,
+                responderContext,
+              )
             : null) ||
           (responderContext.trim()
             ? {
@@ -523,21 +536,20 @@ function SessionInterviewPanel({
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', id)),
           importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
-          (id) => String(responseFieldValue(existingResponsesRef.current, 'additionalComments', id) || ''),
+          (id) => responseCommentValue(existingResponsesRef.current, id),
         );
         for (const draft of review.drafts) {
           if (!editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
             review.edited[draft.questionId] = {
               ...review.edited[draft.questionId],
-              additionalComments: String(
-                responseFieldValue(existingResponsesRef.current, 'additionalComments', draft.questionId) || '',
-              ),
+              additionalComments: responseCommentValue(existingResponsesRef.current, draft.questionId),
             };
           }
         }
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
+        setMappedTranscript(nextTranscript);
         if (review.drafts.length) {
           setGroupRecommendationRequest({
             requestId: Date.now(),
@@ -589,16 +601,28 @@ function SessionInterviewPanel({
     setGroupRecommendationRequest({
       requestId: Date.now(),
       transcript,
-      prefillPacket,
+      prefillPacket: prefillPacket
+        ? scopeInterviewPrefillToQuestions(
+            prefillPacket,
+            validatedPrefillQuestionsRef.current || questions,
+            responderContext,
+          )
+        : null,
       draftResponses: drafts.map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
     });
-  }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, transcript]);
+  }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, questions, responderContext, transcript]);
 
   useEffect(() => {
-    if (!prefillPacket || importedRef.current || !questions.length) return;
+    if (!prefillPacket || !questions.length || mapping) return;
+    // A link rejected against an older cached question set is checked again once the set refreshes.
+    const recheck =
+      !!prefillPacket.questionSetHash &&
+      validatedPrefillRef.current !== prefillPacket &&
+      checkedPrefillQuestionsRef.current !== questions;
+    if (importedRef.current && !recheck) return;
     importedRef.current = true;
     void runMapping({ nextTranscript: '' });
-  }, [prefillPacket, questions.length, runMapping]);
+  }, [mapping, prefillPacket, questions, runMapping]);
 
   useEffect(() => {
     if (drafts.length && !mapping && !importedRef.current) {
@@ -619,7 +643,11 @@ function SessionInterviewPanel({
     setShowTranscript(false);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
-        ? scopeInterviewPrefillToQuestions(prefillPacket, validatedPrefillQuestionsRef.current || questions)
+        ? scopeInterviewPrefillToQuestions(
+            prefillPacket,
+            validatedPrefillQuestionsRef.current || questions,
+            responderContext,
+          )
         : null;
     const importedDrafts = validatedPrefillPacket
       ? readImportedInterviewDraftResponses(validatedPrefillPacket, validatedPrefillQuestionsRef.current || questions)
@@ -699,6 +727,7 @@ function SessionInterviewPanel({
       onApplyAnswer,
       onApplyConviction,
       onApplyImportance,
+      onCaptureResponses,
       onRecordProvenance,
       onSubmitResponses,
       onSubmitted: () => {
@@ -732,6 +761,7 @@ function SessionInterviewPanel({
     onApplyAnswer,
     onApplyConviction,
     onApplyImportance,
+    onCaptureResponses,
     onRecordProvenance,
     onSubmitResponses,
     prefillPacket,
@@ -868,11 +898,12 @@ function SessionInterviewPanel({
         : 'Start voice interview';
   const canGenerateDrafts = Boolean(
     !isInterviewBusy &&
-    !drafts.length &&
     !mapping &&
     !mappingNotice &&
-    (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
-    (transcript.trim() || prefillPacket || responderContext.trim()),
+    (drafts.length
+      ? transcript.trim() && transcript !== mappedTranscript
+      : (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
+        (transcript.trim() || prefillPacket || responderContext.trim())),
   );
 
   return (
@@ -1004,9 +1035,7 @@ function SessionInterviewPanel({
                   question={questions.find((question) => question.id === draft.questionId)}
                   selected={Boolean(selected[draft.questionId])}
                   existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
-                  savedComment={String(
-                    responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || '',
-                  )}
+                  savedComment={responseCommentValue(existingResponseSlice, draft.questionId)}
                   disabled={applying}
                   onSelect={(value) => {
                     setSubmitSucceeded(false);

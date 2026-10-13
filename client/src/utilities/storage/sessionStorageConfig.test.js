@@ -7,7 +7,6 @@ import {
   resolveSessionStorageBackend,
   usesCloudflareSessionStorage,
   usesPublicReadCloudflareStorage,
-  usesWorkerSbtGateCloudflareStorage,
 } from './sessionStorageConfig.js';
 import { STORAGE_BACKENDS } from './storageRefs.js';
 
@@ -32,7 +31,6 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'surveys' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(usesCloudflareSessionStorage(sessionConfig)).toBe(true);
-    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(true);
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
       SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
     );
@@ -70,7 +68,6 @@ describe('sessionStorageConfig', () => {
     };
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(true);
-    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
       SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
     );
@@ -88,7 +85,6 @@ describe('sessionStorageConfig', () => {
     };
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'questions' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'questions' })).toBe(false);
-    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
     expect(usesPublicReadCloudflareStorage(sessionConfig)).toBe(true);
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
       SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ,
@@ -111,7 +107,6 @@ describe('sessionStorageConfig', () => {
     };
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(false);
-    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(true);
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl).toEqual({
       gate: SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
       encryption: SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,

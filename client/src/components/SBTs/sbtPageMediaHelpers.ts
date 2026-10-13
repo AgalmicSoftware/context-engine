@@ -1,4 +1,8 @@
-import { buildArweaveGatewayUrlCandidates, normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import {
+  buildArweaveGatewayUrlCandidates,
+  normalizeArweaveUrl,
+  toSafeLinkHref,
+} from '../../utilities/arweave/arweaveUrls.js';
 import { decodeSbtPageJsonDataUri } from './sbtPagePasswordExportHelpers';
 
 export type SbtPageInfoImageLike = Record<string, unknown> & {
@@ -125,16 +129,20 @@ export const getNextDisplayImageFallbackState = (
 };
 
 export const normalizeSbtPageCanonicalMetadataHref = (candidateRaw: unknown): string => {
-  const candidate = String(candidateRaw || '').trim();
+  // Token metadata is creator-supplied JSON; a non-text field could even throw on conversion.
+  if (typeof candidateRaw !== 'string') return '';
+  const candidate = candidateRaw.trim();
   if (!candidate) return '';
-  const normalized = normalizeArweaveUrl(candidate, { contextLabel: 'sbt_page_token_uri' });
-  if (!normalized || /^data:/i.test(normalized)) return '';
+  // The SBT creator sets the token URI, so only a safe link may come back. Unlike
+  // View on Arweave links, metadata hosted on any https site is fine here.
+  const normalized = toSafeLinkHref(normalizeArweaveUrl(candidate, { contextLabel: 'sbt_page_token_uri' }));
+  if (!normalized) return '';
   if (isSbtPageImageLikeUri(normalized)) return '';
   return normalized;
 };
 
 export const resolveSbtPageTokenMetadataHref = (tokenUriRaw: unknown): string => {
-  const raw = String(tokenUriRaw || '').trim();
+  const raw = typeof tokenUriRaw === 'string' ? tokenUriRaw.trim() : '';
   if (!raw) return '';
 
   const normalizedDirect = normalizeSbtPageCanonicalMetadataHref(raw);

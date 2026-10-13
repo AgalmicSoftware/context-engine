@@ -48,7 +48,6 @@ const {
   isForcedSbtSelectorDebugEnabled,
   emitMainSiteSbtDebug,
   buildMainSiteCacheManagerReadyStatePatch,
-  buildMainSiteLitHooksStatePatch,
   isRouteResponderAddress,
   hasCoreSbtMetadata,
   isMainSitePerfCountersEnabled,
@@ -205,17 +204,6 @@ describe('main site state patch helpers', () => {
   afterEach(() => {
     jest.clearAllMocks();
     clearMainSiteTestState();
-  });
-
-  it('builds the Lit hooks state patch without altering the hooks value', () => {
-    const hooks = { getKey: jest.fn(), network: 'test' };
-
-    expect(buildMainSiteLitHooksStatePatch(hooks)).toEqual({
-      litHooks: hooks,
-    });
-    expect(buildMainSiteLitHooksStatePatch(null)).toEqual({
-      litHooks: null,
-    });
   });
 
   it('builds cache-manager readiness patches with boolean-only semantics', () => {

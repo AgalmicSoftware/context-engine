@@ -224,6 +224,154 @@ describe('workerCanonicalAuthoringPort', () => {
     );
   });
 
+  const workerRejection = (reason: string) =>
+    Object.assign(new Error(`Worker refused the upload (${reason}).`), { status: 409, reason });
+
+  it("treats another author's identical question as already published", async () => {
+    const uploadData = jest
+      .fn()
+      .mockRejectedValueOnce(workerRejection('storage_resource_id_owned'))
+      .mockResolvedValueOnce({ storageRef: { backend: 'cloudflare', id: 'cf_question_new', resource: 'questions' } })
+      .mockResolvedValueOnce({ storageRef: { backend: 'cloudflare', id: 'cf_survey_new', resource: 'surveys' } });
+    const matches = jest.fn((question: Record<string, unknown>) => question.id === '0xshared');
+    const loadPublishedQuestionMatcher = jest.fn().mockResolvedValue(matches);
+
+    const result = await publishWorkerCanonicalSurvey(
+      {
+        account: '0x2222222222222222222222222222222222222222',
+        questions: [
+          { id: '0xshared', prompt: 'Shared question', type: 'freeform' },
+          { id: '0xnew', prompt: 'New question', type: 'freeform' },
+        ],
+        sessionConfig: buildWorkerSessionConfig(),
+        sessionSlug: 'worker-session',
+        survey: { surveyID: '0xsurvey', title: 'Second author survey', questionIDs: ['0xshared', '0xnew'] },
+      },
+      { uploadData, loadPublishedQuestionMatcher },
+    );
+
+    expect(loadPublishedQuestionMatcher).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: '0x2222222222222222222222222222222222222222',
+        sessionConfig: expect.objectContaining({ slug: 'worker-session' }),
+        sessionSlug: 'worker-session',
+      }),
+    );
+    expect(matches).toHaveBeenCalledWith(expect.objectContaining({ id: '0xshared', prompt: 'Shared question' }));
+    expect(uploadData).toHaveBeenCalledTimes(3);
+    expect(result.uploadedQuestions).toEqual([
+      { questionId: '0xshared', resource: 'questions', alreadyPublished: true },
+      expect.objectContaining({ questionId: '0xnew', storageRef: expect.objectContaining({ id: 'cf_question_new' }) }),
+    ]);
+    expect(result.surveyStorageRef).toEqual(expect.objectContaining({ id: 'cf_survey_new' }));
+  });
+
+  it('keeps the refusal when the question stored under that id differs or cannot be read', async () => {
+    const publishOwned = (deps: Record<string, unknown>) => {
+      const uploadData = jest.fn().mockRejectedValue(workerRejection('storage_resource_id_owned'));
+      return {
+        uploadData,
+        result: publishWorkerCanonicalSurvey(
+          {
+            questions: [
+              { id: '0xsquatted', prompt: 'Squatted question', type: 'freeform' },
+              { id: '0xother', prompt: 'Other question', type: 'freeform' },
+            ],
+            sessionConfig: buildWorkerSessionConfig(),
+            sessionSlug: 'worker-session',
+            survey: { surveyID: '0xsurvey', title: 'Survey' },
+          },
+          { uploadData, ...deps },
+        ),
+      };
+    };
+    const refusal = 'Worker refused the upload (storage_resource_id_owned).';
+
+    const different = publishOwned({ loadPublishedQuestionMatcher: jest.fn().mockResolvedValue(() => false) });
+    await expect(different.result).rejects.toThrow(refusal);
+    // The survey is never uploaded over a question readers would see differently.
+    expect(different.uploadData).toHaveBeenCalledTimes(1);
+
+    await expect(publishOwned({}).result).rejects.toThrow(refusal);
+    await expect(
+      publishOwned({ loadPublishedQuestionMatcher: jest.fn().mockRejectedValue(new Error('list failed')) }).result,
+    ).rejects.toThrow(refusal);
+  });
+
+  it('reads the stored questions once for several ids other authors own', async () => {
+    const uploadData = jest
+      .fn()
+      .mockRejectedValueOnce(workerRejection('storage_resource_id_owned'))
+      .mockRejectedValueOnce(workerRejection('storage_resource_id_owned'));
+    const loadPublishedQuestionMatcher = jest.fn().mockResolvedValue(() => true);
+
+    const result = await publishWorkerCanonicalQuestions(
+      {
+        questions: [
+          { id: '0xfirst', prompt: 'First', type: 'freeform' },
+          { id: '0xsecond', prompt: 'Second', type: 'freeform' },
+        ],
+        sessionConfig: buildWorkerSessionConfig(),
+        sessionSlug: 'worker-session',
+      },
+      { uploadData, loadPublishedQuestionMatcher },
+    );
+
+    expect(loadPublishedQuestionMatcher).toHaveBeenCalledTimes(1);
+    expect(result.uploadedQuestions.map((entry) => entry.alreadyPublished)).toEqual([true, true]);
+  });
+
+  it('explains when the session admin hid a question or survey', async () => {
+    const questionUpload = jest.fn().mockRejectedValueOnce(workerRejection('storage_resource_id_hidden'));
+    await expect(
+      publishWorkerCanonicalQuestions(
+        {
+          questions: [{ id: '0xhidden', prompt: 'Hidden question', type: 'freeform' }],
+          sessionConfig: buildWorkerSessionConfig(),
+          sessionSlug: 'worker-session',
+        },
+        { uploadData: questionUpload },
+      ),
+    ).rejects.toThrow(
+      'This question was hidden by the session admin and can\'t be published again: "Hidden question".',
+    );
+
+    const surveyUpload = jest
+      .fn()
+      .mockResolvedValueOnce({ storageRef: { backend: 'cloudflare', id: 'cf_question', resource: 'questions' } })
+      .mockRejectedValueOnce(workerRejection('storage_resource_id_hidden'));
+    await expect(
+      publishWorkerCanonicalSurvey(
+        {
+          questions: [{ id: '0xquestion', prompt: 'Question', type: 'freeform' }],
+          sessionConfig: buildWorkerSessionConfig(),
+          sessionSlug: 'worker-session',
+          survey: { surveyID: '0xhiddensurvey', title: 'Hidden survey' },
+        },
+        { uploadData: surveyUpload },
+      ),
+    ).rejects.toThrow("This survey was hidden by the session admin and can't be published again.");
+  });
+
+  it('keeps other upload failures, including a survey id owned by another author', async () => {
+    const uploadData = jest
+      .fn()
+      .mockResolvedValueOnce({ storageRef: { backend: 'cloudflare', id: 'cf_question', resource: 'questions' } })
+      .mockRejectedValueOnce(workerRejection('storage_resource_id_owned'));
+
+    await expect(
+      publishWorkerCanonicalSurvey(
+        {
+          questions: [{ id: '0xquestion', prompt: 'Question', type: 'freeform' }],
+          sessionConfig: buildWorkerSessionConfig(),
+          sessionSlug: 'worker-session',
+          survey: { surveyID: '0xlegacy', title: 'Legacy id survey' },
+        },
+        { uploadData },
+      ),
+    ).rejects.toThrow('Worker refused the upload (storage_resource_id_owned).');
+  });
+
   it.each(['sbt', 'lit'] as const)(
     'keeps a valid Worker/%s hybrid on the exact Worker-canonical authoring target',
     (kind) => {

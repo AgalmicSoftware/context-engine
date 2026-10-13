@@ -454,6 +454,16 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     });
     expect(
       buildCreateSbtInputChangePatch({
+        name: 'groupPassword',
+        value: 'new-password',
+      }),
+    ).toEqual({
+      groupPassword: 'new-password',
+      groupPasswordWeakConfirmed: false,
+      groupPasswordRestoreNotice: false,
+    });
+    expect(
+      buildCreateSbtInputChangePatch({
         name: 'sbtImageUrl',
         value: 'https://example.test/badge.png',
       }),

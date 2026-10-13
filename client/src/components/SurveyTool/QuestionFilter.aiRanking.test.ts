@@ -2,7 +2,9 @@ import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import * as aiClient from '../../utilities/ai/aiClient.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
+import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
 jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
@@ -10,7 +12,158 @@ jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
 const QuestionFilter: any = QuestionFilterComponent;
 const sponsoredAccessAny: any = sponsoredAccess;
 
+const workerAiConfig = () => ({
+  slug: 'worker-ai',
+  sessionId: '0x11111111111111111111111111111111',
+  corsWorkerUrl: 'https://worker-ai.example.test',
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  workerAuthority: { version: 1, participantScopes: ['ai'], anonymousScopes: [] },
+});
+
+const PARTICIPANT = '0x00000000000000000000000000000000000000a1';
+
 describe('QuestionFilter AI ranking lifecycle', () => {
+  beforeEach(() => {
+    QuestionFilter.clearAiRankingCache();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it.each([
+    [{ version: 1, participantScopes: ['ai'], anonymousScopes: [] }, PARTICIPANT],
+    [{ version: 1, participantScopes: [], anonymousScopes: ['ai'] }, ''],
+    [{ version: 1, participantScopes: [' AI '], anonymousScopes: [] }, PARTICIPANT],
+  ])('enables Worker AI without an on-chain gate for policy %j (account %j)', (workerAuthority, account) => {
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    try {
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'worker-ai',
+        account,
+        sessionConfig: { ...workerAiConfig(), workerAuthority },
+      });
+      expect(instance.getAiAccessState()).toMatchObject({ enabled: true, localKeyAvailable: false });
+    } finally {
+      localSpy.mockRestore();
+    }
+  });
+
+  it('requires an account for Worker AI unless signed-out visitors have the ai scope', () => {
+    jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    const participantOnly = new QuestionFilter({ activeSessionSlug: 'worker-ai', sessionConfig: workerAiConfig() });
+    expect(participantOnly.getAiAccessState()).toMatchObject({ enabled: false, workerAnonymousAvailable: false });
+
+    const anonymous = new QuestionFilter({
+      activeSessionSlug: 'worker-ai',
+      sessionConfig: {
+        ...workerAiConfig(),
+        workerAuthority: { version: 1, participantScopes: ['ai'], anonymousScopes: ['ai'] },
+      },
+    });
+    expect(anonymous.getAiAccessState()).toMatchObject({ enabled: true, workerAnonymousAvailable: true });
+  });
+
+  it('flags participant-only Worker AI as needing sign-in for signed-out visitors', () => {
+    jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    const signedOut = new QuestionFilter({ activeSessionSlug: 'worker-ai', sessionConfig: workerAiConfig() });
+    expect(signedOut.getAiAccessState()).toMatchObject({ enabled: false, needsSignIn: true });
+
+    const signedIn = new QuestionFilter({
+      activeSessionSlug: 'worker-ai',
+      account: PARTICIPANT,
+      sessionConfig: workerAiConfig(),
+    });
+    expect(signedIn.getAiAccessState()).toMatchObject({ enabled: true, needsSignIn: false });
+
+    // Signing in would not help when participants lack the ai scope too.
+    const noAiScope = new QuestionFilter({
+      activeSessionSlug: 'worker-ai',
+      sessionConfig: {
+        ...workerAiConfig(),
+        workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] },
+      },
+    });
+    expect(noAiScope.getAiAccessState()).toMatchObject({ enabled: false, needsSignIn: false });
+  });
+
+  it.each([
+    { workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] } },
+    { workerAuthority: { participantScopes: ['ai'] } },
+    { workerAuthority: null },
+    { scopes: { ai: false } },
+    { corsWorkerUrl: '' },
+    { sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+  ])('does not infer Worker AI access from an incomplete or disabled policy %j', (overrides) => {
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    try {
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'worker-ai',
+        sessionConfig: { ...workerAiConfig(), ...overrides },
+      });
+      expect(instance.getAiAccessState().enabled).toBe(false);
+    } finally {
+      localSpy.mockRestore();
+    }
+  });
+
+  it('ranks through the active Worker session without requiring registry gate metadata', async () => {
+    const sessionConfig = workerAiConfig();
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q2', 'q1']);
+    try {
+      const questions = [
+        { id: 'q1', type: 'binary', prompt: 'Question one' },
+        { id: 'q2', type: 'binary', prompt: 'Question two' },
+      ];
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'worker-ai',
+        account: PARTICIPANT,
+        sessionConfig,
+        questions,
+        questionResponses: {},
+      });
+      instance._isMounted = true;
+      instance.handleApplyFilters = jest.fn();
+      instance.setState = (next: Parameters<QuestionFilterComponent['setState']>[0], cb?: () => void) => {
+        instance.state = {
+          ...instance.state,
+          ...(typeof next === 'function' ? next(instance.state, instance.props) : next),
+        };
+        cb?.();
+      };
+      instance.state = { ...instance.state, mergedQuestions: questions, aiDraftQuery: 'governance', aiRankingCount: 2 };
+      expect(await instance.handleApplyAIFilter()).toBe(true);
+      expect(rankSpy).toHaveBeenCalledWith(
+        'governance',
+        questions,
+        2,
+        expect.objectContaining({
+          sessionSlug: 'worker-ai',
+          sessionConfig: expect.objectContaining({
+            corsWorkerUrl: sessionConfig.corsWorkerUrl,
+            workerAuthority: sessionConfig.workerAuthority,
+          }),
+          throwOnError: true,
+        }),
+      );
+      // A click may sign in; only automatic runs are limited to anonymous requests.
+      expect(rankSpy.mock.calls[0][3]).not.toHaveProperty('anonymousOnly');
+      expect(instance.state.aiRankedQuestionIds).toEqual(['q2', 'q1']);
+      expect(instance.state.aiFilterApplied).toBe(true);
+    } finally {
+      localSpy.mockRestore();
+      rankSpy.mockRestore();
+    }
+  });
+
   it('enables AI filter when sponsored gate is available or local key exists', () => {
     const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource');
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings');
@@ -264,7 +417,10 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
-    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    // A local key lets a filter click re-rank without any sign-in prompt.
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: { openai: { apiKey: 'sk-local' } } }));
     const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2']);
     const onFilter = jest.fn();
 
@@ -334,6 +490,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
         2,
         expect.objectContaining({
           sessionSlug: 'edge',
+          anonymousOnly: true,
         }),
       );
       expect(instance.state.aiRankedQuestionIds).toEqual(['q4', 'q2']);
@@ -353,12 +510,84 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     }
   });
 
+  it('asks for Apply when a filter click cannot re-rank without signing in', async () => {
+    jest.useFakeTimers();
+    jest
+      .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
+      .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
+    jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q4']);
+    const onFilter = jest.fn();
+    const questions = [
+      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
+      { id: 'q2', type: 'rating', tags: ['beta'], prompt: 'Q2' },
+    ];
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'edge',
+      account: PARTICIPANT,
+      questions,
+      questionResponses: {},
+      network: { id: 84532 },
+      provider: 'wagmi',
+      onFilter,
+    });
+    instance._isMounted = true;
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    instance.state = {
+      ...instance.state,
+      mergedQuestions: questions,
+      pendingSelectedTypes: [],
+      pendingSbtFilteredQuestions: null,
+      pendingShowTopQuestions: false,
+      pendingShowTopQuestionsByResponses: false,
+      selectedTags: [],
+      aiSearchQuery: 'climate',
+      aiDraftQuery: 'climate',
+      aiRankingCount: 2,
+      aiAppliedTopN: 2,
+      aiFilterApplied: true,
+      aiRankedQuestionIds: ['q1'],
+      aiCombineWithOtherFilters: true,
+    };
+    instance.state.aiLastAppliedSignature = instance.buildAiApplySignature({
+      queryOverride: 'climate',
+      candidateQuestions: questions,
+    });
+
+    instance.handleTagSelection('beta');
+    jest.runAllTimers();
+    await Promise.resolve();
+
+    // A sponsored registry session could prompt for a wallet signature, so no
+    // automatic request is made; the stale ranking is not applied either.
+    expect(rankSpy).not.toHaveBeenCalled();
+    expect(instance.state.aiApplyError).toBe('Click Apply to update the AI ranking for the current questions.');
+    expect(onFilter).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ id: 'q2' })],
+      expect.objectContaining({ selectedTags: ['beta'] }),
+    );
+
+    // Undoing the filter brings back the ranked set, so the hint goes away.
+    instance.handleTagSelection('beta');
+    jest.runAllTimers();
+    await Promise.resolve();
+    expect(rankSpy).not.toHaveBeenCalled();
+    expect(instance.state.aiApplyError).toBe('');
+  });
   it('refreshes AI ranking against the full pool when combined mode is disabled', async () => {
     jest.useFakeTimers();
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
-    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    // A local key lets a filter click re-rank without any sign-in prompt.
+    const localSpy = jest
+      .spyOn(aiSettings, 'getLocalAiSettings')
+      .mockReturnValue(aiSettings.normalizeAiSettings({ providers: { openai: { apiKey: 'sk-local' } } }));
     const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2', 'q3', 'q1']);
 
     const questions = [
@@ -422,6 +651,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
         4,
         expect.objectContaining({
           sessionSlug: 'edge',
+          anonymousOnly: true,
         }),
       );
       expect(instance.state.aiCombineWithOtherFilters).toBe(false);
@@ -499,43 +729,104 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(instance.queueAutoApplyAiFilter).toHaveBeenCalledWith('load-filter-input');
   });
 
-  it('auto-reapplies AI when external filter state carries aiFilter + aiTopN', async () => {
+  it.each(['url', 'saved'])('never starts AI ranking on mount from a %s AI filter', async (origin) => {
     jest.useFakeTimers();
-    const gateSpy = jest
+    const anonymousWorkerAi = {
+      ...workerAiConfig(),
+      workerAuthority: { version: 1, participantScopes: ['ai'], anonymousScopes: ['ai'] },
+    };
+    jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue(aiSettings.normalizeAiSettings({ providers: {} }));
+    const peekSpy = jest
+      .spyOn(cacheScriptsModule as any, 'peekCacheSync')
+      .mockReturnValue(
+        origin === 'saved'
+          ? { questionFilterState_questions: { aiSearchQuery: 'list everything', aiRankingCount: 2 } }
+          : null,
+      );
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q1']);
+    const questions = [
+      { id: 'q1', type: 'binary', prompt: 'Question one' },
+      { id: 'q2', type: 'binary', prompt: 'Question two' },
+    ];
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'worker-ai',
+      sessionConfig: anonymousWorkerAi,
+      questions,
+      questionResponses: {},
+      ...(origin === 'url'
+        ? { filterState: { aiFilter: 'list everything', aiTopN: 2 } }
+        : { enableLocalStorage: true }),
+    });
+    expect(instance.getAiAccessState().enabled).toBe(true);
+    instance.handleApplyFilters = jest.fn();
+    instance.computeFilteredQuestionsCount = jest.fn();
+    instance.checkIfCurrentFilterIsBookmarked = jest.fn();
+    instance.setState = (next: any, cb?: () => void) => {
+      instance.state = { ...instance.state, ...(typeof next === 'function' ? next(instance.state) : next) };
+      cb?.();
+    };
+    instance.state = { ...instance.state, mergedQuestions: questions };
+
+    await instance.componentDidMount();
+    jest.runOnlyPendingTimers();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    if (origin === 'saved') expect(peekSpy).toHaveBeenCalled();
+    expect(rankSpy).not.toHaveBeenCalled();
+    // The query stays in the box, ready for one click on Apply.
+    expect(instance.state.aiDraftQuery).toBe('list everything');
+    expect(instance.state.aiFilterApplied).toBe(false);
+  });
+
+  it('restores an external AI filter but ranks only from a cached ranking or a click', async () => {
+    jest.useFakeTimers();
+    jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
-    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q1']);
 
     const questions = [{ id: 'q1', type: 'binary', tags: [], prompt: 'Q1' }];
-    const instance = new QuestionFilter({
-      activeSessionSlug: 'edge',
-      questions,
-      questionResponses: {},
-      network: { id: 84532 },
-      provider: 'wagmi',
-    });
-    instance._isMounted = true;
-    instance.setState = jest.fn((next, cb) => {
-      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
-      instance.state = { ...instance.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-      return patch;
-    });
-    instance.handleApplyFilters = jest.fn();
-
-    instance.syncExternalFilterState({
+    const makeSubject = () => {
+      const instance = new QuestionFilter({
+        activeSessionSlug: 'edge',
+        questions,
+        questionResponses: {},
+        network: { id: 84532 },
+        provider: 'wagmi',
+      });
+      instance._isMounted = true;
+      instance.setState = jest.fn((next, cb) => {
+        const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+        instance.state = { ...instance.state, ...(patch || {}) };
+        if (typeof cb === 'function') cb();
+        return patch;
+      });
+      instance.handleApplyFilters = jest.fn();
+      instance.state = { ...instance.state, mergedQuestions: questions };
+      return instance;
+    };
+    const sharedFilter = {
       aiFilter: 'water',
       aiTopN: 3,
       questionTypes: [],
       selectedTags: [],
       sbtFilter: null,
       topQuestions: null,
-    });
+    };
 
+    const first = makeSubject();
+    first.syncExternalFilterState(sharedFilter);
     jest.runAllTimers();
     await Promise.resolve();
 
+    // A shared or saved AI filter never starts a paid ranking by itself.
+    expect(rankSpy).not.toHaveBeenCalled();
+    expect(first.state.aiDraftQuery).toBe('water');
+    expect(first.state.aiFilterApplied).toBe(false);
+
+    await first.handleApplyAIFilter({ auto: false, source: 'manual-click' });
     expect(rankSpy).toHaveBeenCalledTimes(1);
     expect(rankSpy).toHaveBeenCalledWith(
       'water',
@@ -544,13 +835,17 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       expect.objectContaining({ sessionSlug: 'edge' }),
     );
 
-    gateSpy.mockRestore();
-    localSpy.mockRestore();
-    rankSpy.mockRestore();
-    jest.useRealTimers();
+    // A remount with the same query and questions reuses that ranking.
+    const second = makeSubject();
+    second.syncExternalFilterState(sharedFilter);
+    jest.runAllTimers();
+    await Promise.resolve();
+    expect(rankSpy).toHaveBeenCalledTimes(1);
+    expect(second.state.aiFilterApplied).toBe(true);
+    expect(second.state.aiRankedQuestionIds).toEqual(['q1']);
   });
 
-  it('re-applies AI ranking when candidate questions change under same query/topN', async () => {
+  it('keeps the applied ranking and asks for Apply when the questions change', async () => {
     jest.useFakeTimers();
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
@@ -610,10 +905,13 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     jest.runAllTimers();
     await Promise.resolve();
 
-    expect(rankSpy).toHaveBeenCalledTimes(2);
-    expect(rankSpy.mock.calls[1][0]).toBe('water');
-    expect(rankSpy.mock.calls[1][2]).toBe(2);
-    expect(rankSpy.mock.calls[1][1]).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'q2' })]));
+    // New questions stay out of the ranking until the user clicks Apply again,
+    // and the AI-only view says so as the combined view does.
+    expect(instance.state.aiCombineWithOtherFilters).toBe(false);
+    expect(rankSpy).toHaveBeenCalledTimes(1);
+    expect(instance.state.aiFilterApplied).toBe(true);
+    expect(instance.state.aiRankedQuestionIds).toEqual(['q1']);
+    expect(instance.state.aiApplyError).toBe('Click Apply to update the AI ranking for the current questions.');
 
     gateSpy.mockRestore();
     localSpy.mockRestore();
@@ -691,7 +989,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     jest.useRealTimers();
   });
 
-  it('defers AI apply on empty candidates and auto-reapplies after question sync', async () => {
+  it('defers AI apply on empty candidates and waits for Apply after question sync', async () => {
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
@@ -754,6 +1052,12 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(instance.queueAutoApplyAiFilter).toHaveBeenCalledWith('update:questions-or-responses');
     await queuedAutoApplyPromise;
 
+    // Questions arriving later do not start a paid ranking; the query waits.
+    expect(rankSpy).not.toHaveBeenCalled();
+    expect(instance.state.aiSearchQuery).toBe('water');
+    expect(instance.state.aiFilterApplied).toBe(false);
+
+    await instance.handleApplyAIFilter({ auto: false, source: 'manual-click' });
     expect(rankSpy).toHaveBeenCalledTimes(1);
     expect(rankSpy).toHaveBeenCalledWith(
       'water',

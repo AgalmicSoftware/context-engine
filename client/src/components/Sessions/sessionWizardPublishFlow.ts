@@ -99,35 +99,22 @@ export const resolveSessionWizardBundleUrlForMode = ({
   return normalizedNormalModeBundleUrlOverride || toStr(normalModeDefaultBundleUrl).trim();
 };
 
+// A deploy grant deploys the release recorded on the sponsoring Worker, so a
+// sponsored deploy needs no bundle from this browser.
 export const resolveSponsoredBundleDeployReadiness = ({
-  wizardMode = 'advanced',
   sponsoredBundle = {},
   deployForm = {},
   workerSecretsEnabled = true,
   missingWorkerSecrets = [],
-  hasBundleFile = false,
-  normalModeBundleUrlOverride = '',
-  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
-  wizardMode?: string;
   sponsoredBundle?: AnyRecord | null;
   deployForm?: AnyRecord;
   workerSecretsEnabled?: boolean;
   missingWorkerSecrets?: unknown[];
-  hasBundleFile?: boolean;
-  normalModeBundleUrlOverride?: unknown;
-  normalModeDefaultBundleUrl?: unknown;
 } = {}) => {
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as AnyRecord;
   const hasAppliedSponsoredBundle = hasSponsoredBundleFields(normalizedBundle);
   const workerName = toStr(deployForm?.workerName || '').trim();
-  const bundleUrl = resolveSessionWizardBundleUrlForMode({
-    wizardMode,
-    bundleUrl: deployForm?.bundleUrl,
-    normalModeBundleUrlOverride,
-    normalModeDefaultBundleUrl,
-  });
-  const hasWorkerBundleSource = !!bundleUrl || !!hasBundleFile;
   const bootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedBundle);
   const deployGrantToken = toStr(normalizedBundle?.deployGrantToken || '').trim();
   const normalizedMissingWorkerSecrets = Array.isArray(missingWorkerSecrets)
@@ -139,7 +126,6 @@ export const resolveSponsoredBundleDeployReadiness = ({
   if (!workerName) missing.push('Worker name');
   if (!bootstrapWorkerUrl) missing.push('Bootstrap worker URL');
   if (!deployGrantToken) missing.push('Deploy grant token');
-  if (!hasWorkerBundleSource) missing.push('Worker bundle URL');
   missing.push(...normalizedMissingWorkerSecrets);
   return {
     active: hasAppliedSponsoredBundle,
@@ -217,37 +203,25 @@ export const buildSessionWizardPublishExecutionPlan = ({
 };
 
 export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
-  wizardMode = 'advanced',
   sponsoredBundle = {},
   deployForm = {},
   workerSecretsEnabled = true,
   currentWorkerSecrets = {},
   getMissingWorkerSecretsForDeploy = () => [],
-  hasBundleFile = false,
-  normalModeBundleUrlOverride = '',
-  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
-  wizardMode?: string;
   sponsoredBundle?: AnyRecord | null;
   deployForm?: AnyRecord;
   workerSecretsEnabled?: boolean;
   currentWorkerSecrets?: AnyRecord;
   getMissingWorkerSecretsForDeploy?: ((secretsSnapshot?: AnyRecord) => string[]) | null;
-  hasBundleFile?: boolean;
-  normalModeBundleUrlOverride?: unknown;
-  normalModeDefaultBundleUrl?: unknown;
 } = {}) => {
   const resolveMissingWorkerSecrets =
     typeof getMissingWorkerSecretsForDeploy === 'function' ? getMissingWorkerSecretsForDeploy : () => [];
   return resolveSponsoredBundleDeployReadiness({
-    wizardMode,
     sponsoredBundle,
     deployForm,
     workerSecretsEnabled,
     missingWorkerSecrets: workerSecretsEnabled ? resolveMissingWorkerSecrets(currentWorkerSecrets) : [],
-    hasBundleFile,
-    normalModeBundleUrlOverride,
-    normalModeDefaultBundleUrl,
   });
 };
 
@@ -359,21 +333,13 @@ export type SessionWizardSponsoredPublishSurfaceState = {
   shouldUseSponsoredAutoDeployFlow: boolean;
   showNormalModeManualBundleControls: boolean;
   showNormalModeWorkerStep: boolean;
-  showSponsoredBundleFallbackInput: boolean;
-  sponsoredAutoDeployBundleMode: string;
-  sponsoredAutoDeployMissingBundleUrl: boolean;
-  sponsoredLocalBundledAssetAvailable: boolean;
 };
 
 export const resolveSessionWizardSponsoredPublishSurfaceState = ({
   isNormalMode = false,
-  wizardMode = 'advanced',
   workerMode = 'default',
-  bundleMode = 'upload',
-  deployForm = {},
   sponsoredAutoDeployState = {},
   forceManualBundleFile = false,
-  hasBundleFile = false,
   normalModeBundleUrlOverride = '',
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
   hostedBundleHelpMessage = NORMAL_MODE_HOSTED_BUNDLE_HELP_MESSAGE,
@@ -381,13 +347,9 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
   missingHostedBundleMessage = '',
 }: {
   isNormalMode?: boolean;
-  wizardMode?: string;
   workerMode?: unknown;
-  bundleMode?: string;
-  deployForm?: AnyRecord;
   sponsoredAutoDeployState?: SessionWizardSponsoredAutoDeployStateLike;
   forceManualBundleFile?: boolean;
-  hasBundleFile?: boolean;
   normalModeBundleUrlOverride?: unknown;
   normalModeDefaultBundleUrl?: unknown;
   hostedBundleHelpMessage?: string;
@@ -396,33 +358,10 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
 } = {}): SessionWizardSponsoredPublishSurfaceState => {
   const normalizedWorkerMode = toStr(workerMode).trim();
   const shouldUseSponsoredAutoDeployFlow = normalizedWorkerMode !== 'default' && !!sponsoredAutoDeployState.ready;
-  const hasManualBundleFallbackFile = !!hasBundleFile;
-  const sponsoredAutoDeployBundleMode = resolveSessionWizardDeployBundleMode({
-    wizardMode,
-    bundleMode,
-    bundleUrl: deployForm?.bundleUrl,
-    sponsoredAutoDeployReady: shouldUseSponsoredAutoDeployFlow,
-    forceManualBundleFile,
-    hasBundleFile: hasManualBundleFallbackFile,
-    normalModeBundleUrlOverride,
-    normalModeDefaultBundleUrl,
-  });
   const showNormalModeWorkerStep = !(!!sponsoredAutoDeployState.active && normalizedWorkerMode !== 'default');
-  const sponsoredLocalBundledAssetAvailable = sponsoredAutoDeployBundleMode !== 'upload' || hasManualBundleFallbackFile;
-  const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow && sponsoredLocalBundledAssetAvailable;
+  // The grant deploys the sponsoring Worker's release, so no bundle source is needed.
+  const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow;
   const hasNormalModeBundleUrlOverride = !!toStr(normalModeBundleUrlOverride).trim();
-  const missing = Array.isArray(sponsoredAutoDeployState.missing)
-    ? sponsoredAutoDeployState.missing.map((entry) => toStr(entry).trim()).filter(Boolean)
-    : [];
-  const sponsoredAutoDeployMissingBundleUrl =
-    !!sponsoredAutoDeployState.active && missing.includes('Worker bundle URL');
-  const showSponsoredBundleFallbackInput =
-    !!isNormalMode &&
-    !showNormalModeWorkerStep &&
-    (!!forceManualBundleFile ||
-      hasManualBundleFallbackFile ||
-      hasNormalModeBundleUrlOverride ||
-      sponsoredAutoDeployMissingBundleUrl);
   const normalModeHostedBundleConfigured = !!toStr(normalModeDefaultBundleUrl).trim();
   const showNormalModeManualBundleControls =
     !!isNormalMode && (!!forceManualBundleFile || !normalModeHostedBundleConfigured);
@@ -442,10 +381,6 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
     shouldUseSponsoredAutoDeployFlow,
     showNormalModeManualBundleControls,
     showNormalModeWorkerStep,
-    showSponsoredBundleFallbackInput,
-    sponsoredAutoDeployBundleMode,
-    sponsoredAutoDeployMissingBundleUrl,
-    sponsoredLocalBundledAssetAvailable,
   };
 };
 
@@ -503,6 +438,27 @@ export const resolveSessionWizardDeployBundlePayload = async ({
     bundleManifestUrl,
     bundleSha256: undefined,
     bundleSource: normalizedBundleUrl ? 'url' : 'url-missing',
+  };
+};
+
+// A deploy grant sends this build's configured release, never an uploaded
+// file or a manual URL. A sponsoring Worker running 0.6.8 or later code ignores
+// it and deploys the release recorded on itself; an older one deploys it.
+export const resolveSessionWizardSponsoredReleaseBundlePayload = ({
+  releaseBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+  releaseManifestUrl = CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL,
+}: {
+  releaseBundleUrl?: unknown;
+  releaseManifestUrl?: unknown;
+} = {}) => {
+  const bundleUrl = toStr(releaseBundleUrl).trim();
+  const bundleManifestUrl = toStr(releaseManifestUrl).trim();
+  const complete = !!bundleUrl && !!bundleManifestUrl;
+  return {
+    bundleText: '',
+    bundleUrl: complete ? bundleUrl : undefined,
+    bundleManifestUrl: complete ? bundleManifestUrl : undefined,
+    bundleSha256: undefined,
   };
 };
 

@@ -1490,3 +1490,126 @@ $user-page-background: var(--ce-surface-sunken);
   border-radius: var(--ce-radius-8);
   padding: 6px 10px !important;
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .createSurveyContainer {
+    .typeSelectorLabel,
+    .typeTitle,
+    .inheritToggle,
+    .singleSelectLabel,
+    .questionMetadata,
+    .aiPromptMeta,
+    .documentUrlDisplay strong {
+      color: var(--ce-panel-text);
+      opacity: 1;
+    }
+
+    .typeButton,
+    .typeButton:hover,
+    .questionContainer,
+    .typeSelectorBlock {
+      background: var(--ce-document-surface);
+      border-color: var(--ce-document-border);
+      box-shadow: none;
+      opacity: 1;
+    }
+
+    .typePreviewRow,
+    .ratingPreviewEndpoint,
+    .jsonPromptBar,
+    .tooltip {
+      opacity: 1;
+    }
+
+    .pill,
+    .filterBubble,
+    .filterBubble:hover,
+    .removeOptionButton,
+    .removeOptionButton:hover,
+    .bookmarkQuestionButton,
+    .bookmarkQuestionButton:hover {
+      background: var(--ce-control-face);
+      color: var(--ce-control-text);
+      border-color: var(--ce-document-border);
+    }
+
+    .pillAgree {
+      background: var(--ce-response-agree-bg);
+      color: var(--ce-response-agree-text);
+      border-color: var(--ce-response-agree-text);
+    }
+
+    .pillUnsure {
+      background: var(--ce-response-unsure-bg);
+      color: var(--ce-response-unsure-text);
+      border-color: var(--ce-response-unsure-text);
+    }
+
+    .pillDisagree {
+      background: var(--ce-response-disagree-bg);
+      color: var(--ce-response-disagree-text);
+      border-color: var(--ce-response-disagree-text);
+    }
+
+    .surveyTitleInput::placeholder,
+    #newSurveyTitleInput::placeholder,
+    .questionPromptInput::placeholder,
+    #newQuestionInput::placeholder,
+    .docUrlInput::placeholder,
+    .optionInput::placeholder,
+    .tagInputField::placeholder {
+      color: var(--ce-authoring-input-placeholder);
+      opacity: 1;
+    }
+
+    .tagInputField,
+    .tagInputField:focus,
+    .tagInputGroup .tagInputField,
+    .tagInputGroup .tagInputField:focus {
+      color: var(--ce-authoring-input-text);
+    }
+
+    .tagInputGroup,
+    .tagInputGroup:focus-within,
+    .singleSelectLabel {
+      background: var(--ce-authoring-input-bg);
+      border-color: var(--ce-authoring-input-border);
+    }
+
+    .jsonDisplay {
+      background: var(--ce-document-surface);
+      color: var(--ce-document-text);
+      border-color: var(--ce-document-border);
+    }
+
+    .actionBtn,
+    .actionLink,
+    #miniCreateSurveyLabel {
+      color: var(--ce-control-text) !important;
+    }
+
+    .actionBtn,
+    .actionBtn:hover,
+    .addDocUrlButton:disabled {
+      background: var(--ce-control-face);
+      border-color: var(--ce-document-border);
+    }
+
+    .addDocUrlButton:disabled {
+      color: var(--ce-control-text);
+      opacity: 1;
+    }
+
+    .removeDocumentUrlButton {
+      color: var(--ce-status-danger-text);
+    }
+
+    .toggleSwitch {
+      background: var(--ce-control-face);
+    }
+
+    .createSurveyButton:disabled .buttonContent {
+      color: var(--ce-control-text);
+    }
+  }
+}

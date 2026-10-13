@@ -50,7 +50,14 @@ const LOCAL_OVERRIDE_SECTIONS = [
   { sectionKey: 'faucet', secretKey: 'privateKey' },
 ] as const;
 type MutableLocalOverrideSection = UnknownRecord & { useLocal: boolean };
-const WORKER_LIT_CREDENTIAL_FIELDS = ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid'] as const;
+const WORKER_LIT_CREDENTIAL_FIELDS = [
+  'litApiBase',
+  'litGroupId',
+  'litPkpId',
+  'litActionCid',
+  'litAuthorizationVersion',
+  'litAuthorizationSigner',
+] as const;
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const trimString = (value: unknown): string => toStr(value).trim();

@@ -10,8 +10,6 @@ export type SessionColorSchemeId = (typeof SESSION_COLOR_SCHEME_REGISTRY)[number
 
 export type SessionColorSchemeMetadata = (typeof SESSION_COLOR_SCHEME_REGISTRY)[number];
 
-export const SESSION_COLOR_SCHEME_IDS = Object.freeze(SESSION_COLOR_SCHEME_REGISTRY.map(({ id }) => id));
-
 const SCHEME_BY_ID = Object.freeze(
   SESSION_COLOR_SCHEME_REGISTRY.reduce<Record<string, SessionColorSchemeMetadata>>((registry, entry) => {
     registry[entry.id] = entry;

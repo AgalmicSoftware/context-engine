@@ -24,10 +24,12 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardSponsoredReleaseBundlePayload,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from '../sessionWizardPublishFlow';
 import {
+  describeSessionWizardSponsoredDeployFailure,
   normalizeSessionWizardDeployErrorMessage,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from '../sessionWizardDeployErrors';
@@ -183,6 +185,7 @@ const useSessionWizardWorkerDeploy = ({
       let helperBase = '';
       const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
       let effectiveBundleMode = 'upload';
+      let usesSponsoredDeploy = false;
       try {
         const runtime = readRuntime(runtimeRef);
         const currentDraft = runtime.draft && typeof runtime.draft === 'object' ? runtime.draft : {};
@@ -247,20 +250,14 @@ const useSessionWizardWorkerDeploy = ({
             throw new Error(`Missing required secrets before deploy: ${missing.join(', ')}`);
           }
         }
-        // Regression guard: deploy-ready sponsored links still force the URL path
-        // in normal mode, but manual retry must still be able to override that
-        // path with an uploaded bundle file after a remote fetch failure.
         const sponsoredAutoDeployReady =
           runtime.workerMode !== 'default' &&
           resolveSessionWizardSponsoredAutoDeployReadiness({
-            wizardMode: runtime.wizardMode,
             sponsoredBundle: sponsoredBundleAppliedBundleRef?.current || undefined,
             deployForm: currentDeployForm,
             workerSecretsEnabled: runtime.workerSecretsEnabled,
             currentWorkerSecrets,
             getMissingWorkerSecretsForDeploy,
-            hasBundleFile: !!runtime.bundleFile,
-            normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
           }).ready;
         effectiveBundleMode = resolveSessionWizardDeployBundleMode({
           wizardMode: runtime.wizardMode,
@@ -272,7 +269,16 @@ const useSessionWizardWorkerDeploy = ({
           hasBundleFile: !!runtime.bundleFile,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        if (effectiveBundleMode === 'upload' && !runtime.bundleFile) {
+        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+          sponsoredBundleAppliedBundleRef?.current,
+        );
+        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
+        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
+        usesSponsoredDeploy =
+          (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
+          !!sponsoredDeployGrantToken &&
+          !!sponsoredBootstrapWorkerUrl;
+        if (!usesSponsoredDeploy && effectiveBundleMode === 'upload' && !runtime.bundleFile) {
           throw new Error(
             effectiveBundleMode === 'upload' && runtime.wizardMode === 'normal'
               ? 'Upload a worker bundle file before deploy.'
@@ -284,12 +290,13 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } =
-          await resolveSessionWizardDeployBundlePayload({
-            effectiveBundleMode,
-            bundleFile: runtime.bundleFile,
-            bundleUrl: requestedBundleUrl,
-          });
+        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = usesSponsoredDeploy
+          ? resolveSessionWizardSponsoredReleaseBundlePayload()
+          : await resolveSessionWizardDeployBundlePayload({
+              effectiveBundleMode,
+              bundleFile: runtime.bundleFile,
+              bundleUrl: requestedBundleUrl,
+            });
         const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
         const { selectedSecrets: deploySecrets, requiredSecretFields: requiredWorkerSecretFields } =
           resolveSessionWizardWorkerSecretSelection({
@@ -299,15 +306,6 @@ const useSessionWizardWorkerDeploy = ({
           });
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildSessionWizardDeployStorageProfilePayload(currentDraft, {});
-        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
-          sponsoredBundleAppliedBundleRef?.current,
-        );
-        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
-        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
-        const usesSponsoredDeploy =
-          (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
-          !!sponsoredDeployGrantToken &&
-          !!sponsoredBootstrapWorkerUrl;
         // Persist only a digest-keyed generation counter. The scope deliberately
         // excludes tokens, secrets, and mutable config so an ambiguous response
         // cannot become a second deployment merely because the draft was edited.
@@ -424,11 +422,7 @@ const useSessionWizardWorkerDeploy = ({
           payload.secrets = deploySecrets;
         }
         const submitDeployPayload = async (deployPayload: AnyRecord) => {
-          if (
-            (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
-            sponsoredDeployGrantToken &&
-            sponsoredBootstrapWorkerUrl
-          ) {
+          if (usesSponsoredDeploy) {
             helperBase = sponsoredBootstrapWorkerUrl;
             const sponsoredDeployRes = await fetch(`${sponsoredBootstrapWorkerUrl}/sponsored/redeem-deploy`, {
               method: 'POST',
@@ -449,7 +443,10 @@ const useSessionWizardWorkerDeploy = ({
                 });
               }
               const err = new Error(
-                nextData?.error || `Worker deploy failed (${sponsoredDeployRes.status}).`,
+                describeSessionWizardSponsoredDeployFailure({
+                  status: sponsoredDeployRes.status,
+                  error: nextData?.error,
+                }),
               ) as Error & AnyRecord;
               err.statusCode = sponsoredDeployRes.status;
               err.responseError = nextData?.error || '';
@@ -605,11 +602,21 @@ const useSessionWizardWorkerDeploy = ({
                   }),
                 postBootstrap: postSessionWizardLitBootstrap,
                 ensureSessionConfig: ensureWorkerSessionConfig,
-                applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
+                applyBootstrappedConfig: async ({
+                  apiBase,
+                  litActionCid,
+                  litGroupId,
+                  litPkpId,
+                  litAuthorizationVersion,
+                  litAuthorizationSigner,
+                  result,
+                }) => {
                   const recoveredLitCredentials = resolveCompleteSessionWizardLitRuntime({
                     ...(workerConfigPayload?.litCredentials || {}),
                     litApiBase: apiBase || result?.apiBase || result?.litCredentials?.litApiBase,
                     litActionCid,
+                    litAuthorizationVersion,
+                    litAuthorizationSigner,
                     litGroupId,
                     litPkpId,
                   });
@@ -666,7 +673,12 @@ const useSessionWizardWorkerDeploy = ({
               return provisionData;
             },
             ensureSessionConfig: ensureWorkerSessionConfig,
-            applyProvisionedConfig: async ({ litActionCid, litGroupId }) => {
+            applyProvisionedConfig: async ({
+              litActionCid,
+              litGroupId,
+              litAuthorizationVersion,
+              litAuthorizationSigner,
+            }) => {
               const nextActionCid = toStr(litActionCid).trim();
               if (!nextActionCid) return;
               const nextGroupId = toStr(litGroupId).trim();
@@ -678,15 +690,21 @@ const useSessionWizardWorkerDeploy = ({
                     : {}),
                   ...(nextGroupId ? { litGroupId: nextGroupId } : {}),
                   litActionCid: nextActionCid,
+                  litAuthorizationVersion,
+                  litAuthorizationSigner,
                 },
               };
               currentWorkerSecrets = {
                 ...currentWorkerSecrets,
                 litActionCid: nextActionCid,
+                litAuthorizationVersion,
+                litAuthorizationSigner,
               };
               applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
                 ...prev,
                 litActionCid: nextActionCid,
+                litAuthorizationVersion,
+                litAuthorizationSigner,
               }));
               await ensureWorkerSessionConfig({
                 workerUrl: resolvedDeployWorkerUrl,
@@ -886,7 +904,10 @@ const useSessionWizardWorkerDeploy = ({
         };
       } catch (err) {
         const runtime = readRuntime(runtimeRef);
+        // A grant never uses this browser's bundle, so a manual bundle cannot
+        // help a failed sponsored deploy.
         if (
+          !usesSponsoredDeploy &&
           shouldForceSessionWizardNormalModeManualBundleRetry({
             err,
             wizardMode: runtime.wizardMode,
@@ -925,11 +946,20 @@ const useSessionWizardWorkerDeploy = ({
   );
 
   const verifyNativeWorker = useCallback(
-    ({ sessionSlug, workerQueryValue }: { sessionSlug: string; workerQueryValue: unknown }) =>
+    ({
+      sessionSlug,
+      workerQueryValue,
+      deployedFromTemplate = false,
+    }: {
+      sessionSlug: string;
+      workerQueryValue: unknown;
+      deployedFromTemplate?: boolean;
+    }) =>
       verifyNativeSessionWorker({
         runtimeRef,
         sessionSlug,
         workerQueryValue,
+        deployedFromTemplate,
         getCurrentWorkerSecrets,
         getMissingWorkerSecretsForDeploy,
         parseAllowOriginsInput,

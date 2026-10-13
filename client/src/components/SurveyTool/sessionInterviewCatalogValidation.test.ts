@@ -150,9 +150,26 @@ it('scopes imported predictions before AI consumption without mutating the origi
       { questionId: 'q20', answer: ['A', 'B'] },
     ],
   };
-  const scoped = scopeInterviewPrefillToQuestions(packet, publicQuestions);
+  const scoped = scopeInterviewPrefillToQuestions(packet, publicQuestions, '');
   expect(scoped.responses).toEqual([{ questionId: 'q20', answer: ['A', 'B'] }]);
   expect(packet.responses).toHaveLength(2);
+});
+
+it('replaces the imported responder context with the reviewed text', async () => {
+  const { args } = await setup();
+  const packet = {
+    ...args.packet,
+    responderContext: {
+      name: 'Fixture Person',
+      summary: 'Imported summary',
+      facts: [{ fact: 'Removed fact', evidence: 'inferred' }],
+    },
+  };
+  expect(scopeInterviewPrefillToQuestions(packet, publicQuestions, ' Reviewed text ').responderContext).toEqual({
+    summary: 'Reviewed text',
+  });
+  expect(scopeInterviewPrefillToQuestions(packet, publicQuestions, '').responderContext).toEqual({});
+  expect(packet.responderContext.name).toBe('Fixture Person');
 });
 
 it('also binds local selection metadata to the current v5 catalog when importing a v4 packet', async () => {

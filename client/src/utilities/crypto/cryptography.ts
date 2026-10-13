@@ -33,9 +33,10 @@
 import {
   positiveSbtUint,
   computeGroupMintMessageHash,
+  isGroupPasswordMismatchError,
   signGroupMintAuthorization,
   buildInviteMessageHash,
-  signInvite,
+  signInvites,
 } from './sbtAuthorization';
 import { Buffer } from 'buffer';
 import { assertResponseFieldAudience } from '@ce-shared/encryption/responseFieldPolicy.mjs';
@@ -44,6 +45,8 @@ import { ethers, utils } from 'ethers';
 import {
   aesGcmDecrypt,
   aesGcmEncrypt,
+  assertBytes32Hex,
+  assertKeyWrapSigner,
   buildCommitDomainBytes,
   buildEip712KeyWrap,
   buildEnvelopeObject,
@@ -58,12 +61,14 @@ import {
   hexToBytes,
   importAesGcmKey,
   normalizePoseidonHashOutput,
+  parseEnvelope,
   requireBigInt,
   safeLower,
   stableStringify,
   toField,
   utf8d,
   utf8e,
+  validateEnvelopeBinding,
   wrapCekWithSelfRecipient as wrapCekWithSharedSelfRecipient,
 } from '@ce-shared/encryption/envelopeV1Core.mjs';
 import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
@@ -161,6 +166,10 @@ type CryptoDecryptOptions = UnknownRecord & {
   litOpts?: LitOptions;
   throwOnError?: boolean;
   preferLitRecipients?: boolean;
+  // Values the envelope's authenticated data must match (case-insensitive).
+  expectedSurveyId?: unknown;
+  expectedQId?: unknown;
+  expectedFieldKey?: unknown;
 };
 type GroupPasswordInput = {
   password?: unknown;
@@ -171,7 +180,6 @@ type InviteInput = GroupPasswordInput & {
   chainId?: unknown;
   nonce?: unknown;
   signature?: unknown;
-  walletScopeSbtAddress?: unknown;
 };
 type InviteSignatureVerificationResult = {
   ok: boolean;
@@ -352,12 +360,12 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {(encryptedData: string | { iv?: string, salt?: string, ciphertext?: string }, password: string) => Promise<unknown>} decryptWithPassword
  * @property {(value: unknown, opts?: CryptoEncryptOptions) => Promise<string>} encryptEnvelopeValue
  * @property {(envelopeJson: string | Record<string, unknown>, opts?: CryptoDecryptOptions) => Promise<unknown>} decryptEnvelopeValue
- * @property {(input: { password?: string, sbtAddress?: string }) => string} computeGroupPasswordHash
- * @property {(input: { password?: string, sbtAddress?: string, groupPasswordHash?: string }) => string | null} resolveGroupPasswordWalletScopeAddress
+ * @property {(input: { password?: string, sbtAddress?: string }) => Promise<string>} computeGroupPasswordHash
+ * @property {(error: unknown) => boolean} isGroupPasswordMismatchError
  * @property {(sbtAddress: string, userAddress: string, chainId: unknown) => string} computeGroupMintMessageHash
- * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, walletScopeSbtAddress?: string }) => Promise<string>} signGroupMintAuthorization
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, groupPasswordHash: string }) => Promise<string>} signGroupMintAuthorization
  * @property {(input: { chainId?: unknown, sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
- * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonce?: string | number, walletScopeSbtAddress?: string }) => Promise<string>} signInvite
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonces?: Array<string | number>, groupPasswordHash: string }) => Promise<string[]>} signInvites
  * @property {(payload: Record<string, unknown>) => string} encodeInvite
  * @property {(inviteCode: string) => ({ chainId: string, sbtAddress: string, nonce: string, signature: string } | null)} decodeInvite
  * @property {() => string} generateInviteNonce
@@ -403,8 +411,7 @@ const decodeBase64Field = (value: unknown, fieldName: string): Uint8Array => {
   return new Uint8Array(Buffer.from(value, 'base64'));
 };
 
-const { buildGroupPasswordSalt, computeGroupPasswordHash, resolveGroupPasswordWalletScopeAddress } =
-  groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+const { computeGroupPasswordHash } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
 const encodeInvite = (payload: UnknownRecord) => {
   const json = JSON.stringify(payload || {});
@@ -970,12 +977,6 @@ const computeSaltedCommitments = async ({
 
 /* -------------------------- v1 envelope utilities ------------------------- */
 
-function assertBytes32Hex(hex: unknown): asserts hex is string {
-  if (typeof hex !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error('context must be 32-byte hex (0x + 64 hex chars)');
-  }
-}
-
 const isObj = (x: unknown): x is UnknownRecord => isRecord(x);
 
 const wrapCekWithSelfRecipient = async ({
@@ -991,7 +992,7 @@ const wrapCekWithSelfRecipient = async ({
   contextHex: string;
   cekRaw: Uint8Array;
 }) => {
-  assertBytes32Hex(contextHex);
+  assertBytes32Hex(contextHex, 'context');
   const provider = _getProvider(providerLike);
   if (!provider || typeof provider.request !== 'function') {
     throw new Error('No EIP-1193 provider available for self recipient.');
@@ -1154,94 +1155,6 @@ const buildEnvelope = ({
     kind,
   }) as Envelope;
 
-/**
- * Validate envelope shape and return parsed object.
- * Throws descriptive errors on malformed cases.
- */
-const parseEnvelope = (jsonStr: string): Envelope => {
-  let env: unknown = null;
-  try {
-    env = JSON.parse(jsonStr);
-  } catch (e) {
-    throw new Error('Encrypted payload is not valid JSON.');
-  }
-  if (!isObj(env)) throw new Error('Encrypted payload malformed.');
-  if (env.v !== 1) throw new Error('Unsupported envelope version (only v1 is accepted).');
-  if (env.cipher !== 'aes-gcm-256') throw new Error('Unsupported cipher (expected aes-gcm-256).');
-  if (!env.iv || !env.ciphertext || !isObj(env.aad) || !Array.isArray(env.recipients)) {
-    throw new Error('Envelope missing required fields.');
-  }
-  if (!isObj(env.commitments) || !env.commitments.keccak256) {
-    throw new Error('Envelope commitments missing.');
-  }
-  const ivBytes = b64decode(env.iv);
-  if (ivBytes.length !== 12) throw new Error('Envelope IV must be exactly 12 bytes (got ' + ivBytes.length + ').');
-  const ctBytes = b64decode(env.ciphertext);
-  if (!ctBytes || ctBytes.length === 0) throw new Error('Envelope ciphertext is empty after decode.');
-  for (const r of env.recipients) {
-    if (!r || !r.type) throw new Error('Envelope recipient missing type.');
-    if (r.type === 'lit-sbt-v1' && (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))) {
-      throw new Error('Lit recipient missing ciphertext or encryptedSymmetricKey.');
-    }
-    if (r.type === 'self-eip712-v1' && (!r.wrap_iv || !r.wrapped_cek)) {
-      throw new Error('Self-EIP712 recipient missing wrap_iv or wrapped_cek.');
-    }
-  }
-  if (!/^0x[0-9a-fA-F]{64}$/.test(String(env.commitments.keccak256 || ''))) {
-    throw new Error('Envelope keccak256 commitment has invalid format.');
-  }
-  if (env.commitments.poseidon && !/^0x[0-9a-fA-F]{64}$/.test(String(env.commitments.poseidon || ''))) {
-    throw new Error('Envelope poseidon commitment has invalid format.');
-  }
-  return env as Envelope;
-};
-
-const normalizeBindingValue = (value: unknown) => safeLower(value == null ? '' : String(value));
-
-const validateEnvelopeBinding = (
-  env: Envelope,
-  {
-    expectedSurveyId,
-    expectedQId,
-    expectedFieldKey,
-  }: {
-    expectedSurveyId?: unknown;
-    expectedQId?: unknown;
-    expectedFieldKey?: unknown;
-  } = {},
-) => {
-  if (!env || !isObj(env.aad)) return;
-
-  if (expectedSurveyId !== undefined && expectedSurveyId !== null) {
-    const actualSurveyId = normalizeBindingValue(env.aad.surveyId);
-    const boundSurveyId = normalizeBindingValue(expectedSurveyId);
-    if (actualSurveyId !== boundSurveyId) {
-      throw new Error('Encrypted payload is bound to a different survey field.');
-    }
-  }
-
-  if (expectedQId !== undefined && expectedQId !== null) {
-    const actualQId = normalizeBindingValue(env.aad.qId);
-    const boundQId = normalizeBindingValue(expectedQId);
-    if (actualQId !== boundQId) {
-      throw new Error('Encrypted payload is bound to a different survey field.');
-    }
-  }
-
-  if (
-    expectedFieldKey !== undefined &&
-    expectedFieldKey !== null &&
-    env.aad.fieldKey !== undefined &&
-    env.aad.fieldKey !== null
-  ) {
-    const actualFieldKey = normalizeBindingValue(env.aad.fieldKey);
-    const boundFieldKey = normalizeBindingValue(expectedFieldKey);
-    if (actualFieldKey !== boundFieldKey) {
-      throw new Error('Encrypted payload is bound to a different survey field.');
-    }
-  }
-};
-
 /* ------------------------- field encryption (v1) -------------------------- */
 
 /**
@@ -1290,7 +1203,7 @@ const encryptField = async ({
     account = identity.from;
   }
   const contextHex = computeContext({ chainId, account, surveyId, qId, fieldKey });
-  assertBytes32Hex(contextHex);
+  assertBytes32Hex(contextHex, 'context');
   const aadObj = buildAAD({ contextHex, chainId, surveyId, qId, fieldKey });
   const aadBytes = utf8e(stableStringify(aadObj));
 
@@ -1381,7 +1294,7 @@ const unwrapCekFromRecipients = async ({
   preferLitRecipients?: boolean;
 }) => {
   const contextHex = env?.aad?.context;
-  assertBytes32Hex(contextHex);
+  assertBytes32Hex(contextHex, 'context');
   const contextBytes = getContextBytes(contextHex);
   let lastErr = null;
 
@@ -1424,6 +1337,7 @@ const unwrapCekFromRecipients = async ({
       const typed = buildEip712KeyWrap(String(account || ''), chainId, contextHex, nonce);
       const provider = _getProvider(providerLike);
       const sig = await signEip712V4(provider, String(account || ''), typed);
+      assertKeyWrapSigner(typed, sig, account);
       const kek = await deriveKekFromSig(sig, contextBytes);
       const wrapIvBytes = b64decode(self.wrap_iv);
       const wrappedBytes = b64decode(self.wrapped_cek);
@@ -1468,6 +1382,30 @@ const DECRYPT_ENVELOPE_FAIL_TTL_MS = 3000;
 const DECRYPT_ENVELOPE_SUCCESS_TTL_MS = 1000 * 60 * 10;
 const _decryptEnvelopeCache = new Map<string, DecryptCacheEntry>(); // key -> { ok, ts, value? , errMsg? }
 const _decryptEnvelopeInFlight = new Map<string, Promise<DecryptEnvelopeResult>>(); // key -> Promise<{ value, kind, zkSalt }>
+// Bumped by clearDecryptCaches; a decrypt or Lit key fetch that started
+// before the bump never writes its result into a cache.
+let decryptCacheGeneration = 0;
+
+export const getDecryptCacheGeneration = (): number => decryptCacheGeneration;
+
+/**
+ * Drops decrypted plaintext and unwrapped content keys held in memory. Call
+ * on sign-out and on account change.
+ */
+export const clearDecryptCaches = (): void => {
+  decryptCacheGeneration += 1;
+  _decryptEnvelopeCache.clear();
+  _decryptEnvelopeInFlight.clear();
+  if (typeof window === 'undefined') return;
+  // Other Lit hook sets drop their keys on next use (see the generation).
+  [window.__litHooks, window.litHooks].forEach((hooks) => {
+    try {
+      hooks?.clearCache?.();
+    } catch (e) {
+      logCryptoFallback(e);
+    }
+  });
+};
 
 const normalizeEnvelopeJsonToString = (envelopeJson: unknown) =>
   typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
@@ -1561,7 +1499,7 @@ const decryptEnvelopeToValue = async ({
 }): Promise<DecryptEnvelopeResult> => {
   perfDebugDecryptEnvelope('attempt');
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
-  const env = parseEnvelope(jsonStr);
+  const env = parseEnvelope(jsonStr) as Envelope;
   validateEnvelopeBinding(env, { expectedSurveyId, expectedQId, expectedFieldKey });
   // Reuse the authenticated envelope domain when the session has no chain;
   // switching the wallet's current network must not change its wrapping key.
@@ -1603,6 +1541,7 @@ const decryptEnvelopeToValue = async ({
     return await inFlight;
   }
 
+  const generation = decryptCacheGeneration;
   const run = (async () => {
     const cekRaw = await unwrapCekFromRecipients({
       env,
@@ -1636,12 +1575,13 @@ const decryptEnvelopeToValue = async ({
   })();
 
   if (useCache) _decryptEnvelopeInFlight.set(cacheKey, run);
+  const canCache = () => useCache && generation === decryptCacheGeneration;
   try {
     const result = await run;
-    if (useCache) decryptCacheLruSet(cacheKey, { ok: true, ts: Date.now(), value: result });
+    if (canCache()) decryptCacheLruSet(cacheKey, { ok: true, ts: Date.now(), value: result });
     return { ...(result || {}) };
   } catch (err) {
-    if (useCache)
+    if (canCache())
       decryptCacheLruSet(cacheKey, { ok: false, ts: Date.now(), errMsg: toErrorMessage(err, 'Decryption failed.') });
     perfDebugDecryptEnvelope('error');
     throw err;
@@ -2030,7 +1970,16 @@ const decryptWithPassword = async (encryptedData: string | UnknownRecord, passwo
  */
 const decryptEnvelopeValue = async (envelopeJson: unknown, opts: CryptoDecryptOptions = {}) => {
   const jsonStr = typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
-  const { account, chainId, providerLike, litOpts, preferLitRecipients } = opts || {};
+  const {
+    account,
+    chainId,
+    providerLike,
+    litOpts,
+    preferLitRecipients,
+    expectedSurveyId,
+    expectedQId,
+    expectedFieldKey,
+  } = opts || {};
   const { value } = await decryptEnvelopeToValue({
     envelopeJson: jsonStr,
     account: toOptionalString(account),
@@ -2038,6 +1987,9 @@ const decryptEnvelopeValue = async (envelopeJson: unknown, opts: CryptoDecryptOp
     providerLike: providerLike as ProviderLike,
     litOpts,
     preferLitRecipients: !!preferLitRecipients,
+    expectedSurveyId,
+    expectedQId,
+    expectedFieldKey,
     workerContext: {
       sessionConfig: opts.sessionConfig,
       sessionSlug: opts.sessionSlug,
@@ -2110,16 +2062,16 @@ export const cryptoUtils = {
   decryptEnvelopeValue,
   /** @type {CryptoUtilsApi['computeGroupPasswordHash']} */
   computeGroupPasswordHash,
-  /** @type {CryptoUtilsApi['resolveGroupPasswordWalletScopeAddress']} */
-  resolveGroupPasswordWalletScopeAddress,
+  /** @type {CryptoUtilsApi['isGroupPasswordMismatchError']} */
+  isGroupPasswordMismatchError,
   /** @type {CryptoUtilsApi['computeGroupMintMessageHash']} */
   computeGroupMintMessageHash,
   /** @type {CryptoUtilsApi['signGroupMintAuthorization']} */
   signGroupMintAuthorization,
   /** @type {CryptoUtilsApi['buildInviteMessageHash']} */
   buildInviteMessageHash,
-  /** @type {CryptoUtilsApi['signInvite']} */
-  signInvite,
+  /** @type {CryptoUtilsApi['signInvites']} */
+  signInvites,
   /** @type {CryptoUtilsApi['encodeInvite']} */
   encodeInvite,
   /** @type {CryptoUtilsApi['decodeInvite']} */

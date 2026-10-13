@@ -1,5 +1,6 @@
-import { buildSavedInterviewConsent, consentSignature } from './sessionInterviewConsent';
+import { buildSavedInterviewConsent, consentSignature, keepConsentWithdrawals } from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
+import { withoutStaleDraftFields, withoutUnrestorableUnlocks } from './surveyDraftSavedBaseline';
 import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 import {
   buildEmptyResponseSlice,
@@ -22,7 +23,6 @@ type BuildDraftHydrationStateArgs = {
   prevSlice?: ResponseSlice | null;
   prevBaseline?: ResponseSlice | null;
   allowOverwrite?: boolean;
-  cloneBaseline?: ((baseline: ResponseSlice | null | undefined) => ResponseSlice) | null;
   applyDraftEntryToSlice?: ((args: DraftHydrationApplyArgs) => boolean) | null;
 };
 
@@ -189,6 +189,8 @@ type PrepareLocalCacheRehydrateRunArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   lastHydrationSig?: unknown;
   buildHydrationSignature?: ((surveyIndex: number, renderedIds: unknown[]) => string) | null;
+  // The run loads only questions this view has not loaded, so a held form does not stop it.
+  loadsUnloadedOnly?: boolean;
 };
 
 type ResolveRevertPendingBaselineSliceArgs = {
@@ -404,6 +406,7 @@ type ApplyResetFormStateEffectsArgs = {
 
 type ApplyRevertPendingEffectsArgs = {
   clearDraft?: (() => void) | null;
+  persistDraft?: (() => void) | null;
   recalculateEditStats?: (() => void) | null;
   updateJsonPreview?: (() => void) | null;
 };
@@ -585,6 +588,7 @@ type BuildMergedHydrationQuestionResponsesArgs = {
 
 type BuildRevertedResponseSliceArgs = {
   baselineSlice?: ResponseSlice | null;
+  currentSlice?: ResponseSlice | null;
   renderedQuestionIds?: Iterable<unknown> | unknown[];
   cloneFieldState?: ((value: unknown) => unknown) | null;
   buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
@@ -737,7 +741,6 @@ export const buildDraftHydrationState = ({
   prevSlice = null,
   prevBaseline = null,
   allowOverwrite = false,
-  cloneBaseline = null,
   applyDraftEntryToSlice = null,
 }: BuildDraftHydrationStateArgs = {}) => {
   const normalizedPrevSlice = prevSlice && typeof prevSlice === 'object' ? prevSlice : buildEmptyResponseSlice();
@@ -750,23 +753,22 @@ export const buildDraftHydrationState = ({
       ? { interviewProvenance: { ...(normalizedPrevSlice.interviewProvenance as Record<string, unknown>) } }
       : {}),
   };
-  const nextBaseline: ResponseSlice =
-    typeof cloneBaseline === 'function'
-      ? cloneBaseline(prevBaseline && typeof prevBaseline === 'object' ? prevBaseline : buildEmptyResponseSlice())
-      : buildEmptyResponseSlice();
 
   let changed = false;
-  let baselineChanged = false;
   const answers = draft && typeof draft === 'object' ? draft.answers || {} : {};
+  // The stored baseline only detects stale drafts; the loaded saved answers stay the baseline.
   const baseline = draft && typeof draft === 'object' ? draft.baseline || {} : {};
 
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
     const questionId = normalizeQuestionIdKey(rawQuestionId);
     if (!questionId || typeof applyDraftEntryToSlice !== 'function') return;
 
-    const answerEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
+    const storedEntry = answers && typeof answers === 'object' ? answers[questionId] : null;
+    if (!isRecord(storedEntry)) return;
+    const { entry: answerEntry, lostUnlocks } = withoutUnrestorableUnlocks(
+      withoutStaleDraftFields(storedEntry, baseline?.[questionId], prevBaseline, questionId),
+    );
     if (
-      answerEntry &&
       applyDraftEntryToSlice({
         targetSlice: nextSlice,
         questionId,
@@ -776,26 +778,22 @@ export const buildDraftHydrationState = ({
     ) {
       changed = true;
     }
-
-    const baselineEntry = baseline && typeof baseline === 'object' ? baseline[questionId] : null;
-    if (
-      baselineEntry &&
-      applyDraftEntryToSlice({
-        targetSlice: nextBaseline,
-        questionId,
-        draftEntry: baselineEntry,
-        allowOverwrite,
-      })
-    ) {
-      baselineChanged = true;
-    }
+    // The field stays locked as saved; mark it so the view can say the unlock was not kept.
+    lostUnlocks.forEach((field) => {
+      const fields = (field === 'answer' ? nextSlice.answers : nextSlice.additionalComments) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const current = fields[questionId];
+      if (!current?.encrypted || !current.encryptedPortion) return;
+      fields[questionId] = { ...current, unlockLostFor: current.encryptedPortion };
+      changed = true;
+    });
   });
 
   return {
     nextSlice,
-    nextBaseline,
     changed,
-    baselineChanged,
   };
 };
 
@@ -1297,6 +1295,8 @@ export const buildResetFormStatePatch = ({
   return {
     surveysResponseState,
     isEditing: false,
+    // A new identity starts with saved answers loaded, not with a signed-out "start fresh".
+    startFresh: false,
     submissionError: '',
     submissionComplete: false,
     submittedSinceLastEdit: !!nextSubmittedSinceLastEdit,
@@ -1311,15 +1311,23 @@ export const buildResetFormStatePatch = ({
   };
 };
 
+/**
+ * A finished or failed Submit, or a decrypt, holds the form: saved answers it already loaded are
+ * not refreshed over it. A question it has not loaded yet still gets its saved answers.
+ */
+export const isSavedAnswerRefreshHeld = (state: UnknownRecord | null | undefined): boolean =>
+  !!(state?.suppressPrefill || state?.submissionError || state?.submissionComplete);
+
 export const prepareLocalCacheRehydrateRun = ({
   state = null,
   surveyIndex = 0,
   renderedIds = [],
   lastHydrationSig = '',
   buildHydrationSignature = null,
+  loadsUnloadedOnly = false,
 }: PrepareLocalCacheRehydrateRunArgs = {}) => {
   const currentState = state && typeof state === 'object' ? state : {};
-  if (currentState.suppressPrefill || currentState.submissionError || currentState.submissionComplete) {
+  if (!loadsUnloadedOnly && isSavedAnswerRefreshHeld(currentState)) {
     return {
       shouldSkip: true,
       shouldBumpNoop: false,
@@ -1526,7 +1534,7 @@ export const buildDraftHydrationUpdatePlan = ({
   surveyIndex = 0,
   ...draftArgs
 }: BuildDraftHydrationUpdatePlanArgs = {}) => {
-  const { nextSlice, nextBaseline, changed, baselineChanged } = buildDraftHydrationState(draftArgs);
+  const { nextSlice, changed } = buildDraftHydrationState(draftArgs);
 
   const updates: UnknownRecord = {};
   if (changed) {
@@ -1536,15 +1544,10 @@ export const buildDraftHydrationUpdatePlan = ({
       nextSlice,
     });
   }
-  if (baselineChanged) {
-    updates.editBaseline = nextBaseline;
-  }
 
   return {
     nextSlice,
-    nextBaseline,
     changed,
-    baselineChanged,
     updates,
   };
 };
@@ -2021,11 +2024,16 @@ export const applyResetFormStateEffects = ({ callback = null }: ApplyResetFormSt
 
 export const applyRevertPendingEffects = ({
   clearDraft = null,
+  persistDraft = null,
   recalculateEditStats = null,
   updateJsonPreview = null,
 }: ApplyRevertPendingEffectsArgs = {}) => {
   if (typeof clearDraft === 'function') {
     clearDraft();
+  }
+  // Re-store what Clear changes keeps, so a kept consent withdrawal survives a reload.
+  if (typeof persistDraft === 'function') {
+    persistDraft();
   }
   if (typeof recalculateEditStats === 'function') {
     recalculateEditStats();
@@ -2748,6 +2756,7 @@ export const buildPrefilledSingleQuestionState = ({
 
 export const buildRevertedResponseSlice = ({
   baselineSlice = null,
+  currentSlice = null,
   renderedQuestionIds = [],
   cloneFieldState = null,
   buildEmptyResponseFieldState = null,
@@ -2761,6 +2770,12 @@ export const buildRevertedResponseSlice = ({
     conviction: { ...((baseline.conviction as Record<string, unknown>) || {}) },
     additionalComments: clone(baseline.additionalComments || {}) as Record<string, unknown>,
   };
+  // Clear changes discards edits but never a consent withdrawal: nothing becomes more disclosing.
+  const savedConsent = asHydrationRecord(baseline.interviewProvenance);
+  const keptWithdrawals = Object.entries(asHydrationRecord(currentSlice?.interviewProvenance))
+    .map(([questionId, pending]) => [questionId, keepConsentWithdrawals(savedConsent[questionId], pending)] as const)
+    .filter(([, withdrawal]) => withdrawal);
+  if (keptWithdrawals.length) nextSlice.interviewProvenance = Object.fromEntries(keptWithdrawals);
 
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
     const questionId = normalizeQuestionIdKey(rawQuestionId);
@@ -2920,14 +2935,23 @@ export const buildLocalCacheRehydrationState = ({
       baselineAdditional: nextBaseline.additionalComments?.[questionId],
     });
 
+    // A load fills only fields the user left as loaded: a saved comment they deleted stays
+    // deleted and pending, while the saved value still becomes its baseline below.
+    const edited = (key: 'answers' | 'additionalComments' | 'importance' | 'conviction') => {
+      const current = asHydrationRecord(nextSlice[key]);
+      const saved = asHydrationRecord(nextBaseline[key]);
+      const read = (map: Record<string, unknown>) =>
+        key === 'answers' || key === 'additionalComments' ? asHydrationRecord(map[questionId]).value : map[questionId];
+      return JSON.stringify(read(current) ?? '') !== JSON.stringify(read(saved) ?? '');
+    };
     if (
       applyLocalCacheHydrationEntryToSlice({
         targetSlice: nextSlice,
         questionId,
-        cachedAnswer: effectiveAnswerState,
-        cachedAdditional: effectiveAdditionalState,
-        cachedImportance,
-        cachedConviction,
+        cachedAnswer: edited('answers') ? null : effectiveAnswerState,
+        cachedAdditional: edited('additionalComments') ? null : effectiveAdditionalState,
+        cachedImportance: edited('importance') ? undefined : cachedImportance,
+        cachedConviction: edited('conviction') ? undefined : cachedConviction,
         allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
         allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
         debugLabel,

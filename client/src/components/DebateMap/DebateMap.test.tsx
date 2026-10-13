@@ -1387,6 +1387,7 @@ describe('DebateMap', () => {
   });
 
   it('opens a requested atlas node modal and notifies the parent when it closes', async () => {
+    mockNavigate.mockClear();
     const onModalClose = jest.fn();
 
     render(
@@ -1414,6 +1415,7 @@ describe('DebateMap', () => {
       expect(screen.queryByTitle('Copy Deep Link URL')).not.toBeInTheDocument();
     });
     expect(onModalClose).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('returns to the originating route when a deep-linked atlas modal closes', async () => {

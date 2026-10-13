@@ -9,8 +9,6 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
   resolveValidatedSessionScanWindow,
-  writeSessionScanScope,
-  writeSessionScanSlugs,
 } from './sessionScanScope.js';
 import { CE_SESSION_SCAN_SCOPE } from '../../variables/appConfig.js';
 
@@ -134,12 +132,6 @@ describe('sessionScanScope helpers', () => {
     expect(readSessionScanScope()).toBe(CE_SESSION_SCAN_SCOPE);
   });
 
-  it('writeSessionScanScope writes localStorage and globalThis without reload', () => {
-    expect(writeSessionScanScope('active')).toBe('active');
-    expect(localStorage.getItem('ce:sessionScanScope')).toBe('active');
-    expect(globalThis.CE_SESSION_SCAN_SCOPE).toBe('active');
-  });
-
   it('readSessionScanSlugs prefers URL param over localStorage and globalThis', () => {
     localStorage.setItem('ce:sessionScanSlugs', 'alpha,beta');
     globalThis.CE_SESSION_SCAN_SLUGS = ['gamma'];
@@ -160,12 +152,6 @@ describe('sessionScanScope helpers', () => {
     globalThis.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES = true;
     localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['Context Engine', 'general']));
     expect(readSessionScanSlugs()).toEqual(['']);
-  });
-
-  it('writeSessionScanSlugs writes localStorage and globalThis without reload', () => {
-    expect(writeSessionScanSlugs(['general', 'Alpha', 'alpha'])).toEqual(['', 'Alpha', 'alpha']);
-    expect(localStorage.getItem('ce:sessionScanSlugs')).toBe(JSON.stringify(['', 'Alpha', 'alpha']));
-    expect(globalThis.CE_SESSION_SCAN_SLUGS).toEqual(['', 'Alpha', 'alpha']);
   });
 
   it('getAllowedSessionSlugs is strict in list mode (no implicit general fallback)', () => {

@@ -1,6 +1,5 @@
 import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';
 
@@ -43,8 +42,7 @@ describe('SBTPage auto-mint routing', () => {
     subject.completeMintSuccessForTarget = jest.fn();
     const hash = `0x${'22'.repeat(32)}`;
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(hash);
-    jest.spyOn(cryptoUtils, 'resolveGroupPasswordWalletScopeAddress').mockReturnValue(sbtAddress);
-    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(hash);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockResolvedValue(hash);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
     const generate = jest
       .spyOn(contractScripts, 'generateInvitePayloads')
@@ -417,8 +415,6 @@ describe('SBTPage auto-mint routing', () => {
           return onchainHash;
         })
         .mockResolvedValue(onchainHash);
-      jest.spyOn(cryptoUtils, 'resolveGroupPasswordWalletScopeAddress').mockReturnValue(sbtAddress);
-      jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(onchainHash);
       jest.spyOn(contractScripts, 'signGroupMintAuthorization').mockResolvedValue('0xsig');
       jest.spyOn(contractScripts, 'mintWithGroupSignature').mockResolvedValue({ transactionHash: '0xgroupmint' });
       const loadSpy = jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
@@ -1057,6 +1053,79 @@ describe('SBTPage auto-mint routing', () => {
         expect.objectContaining({
           sessionSlugOverride: '',
         }),
+      );
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it.each([
+    ['metadata without a mint mode', { hasPasswordMint: false }, 0],
+    ['metadata that says the group is open', { hasPasswordMint: false, mintMode: 0 }, 1],
+  ])(
+    'claims a code-free auto-join link after a failed hash read only with %s',
+    async (_case, sbtInfo, expectedClaims) => {
+      const sbtAddress = '0x0000000000000000000000000000000000000106';
+      const previousHref = window.location.href;
+      window.history.replaceState(
+        {},
+        '',
+        `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+      );
+
+      try {
+        const subject = createSubject({
+          SBTAddress: sbtAddress,
+          account: '0x0000000000000000000000000000000000000abc',
+          loginComplete: true,
+        });
+        subject.state = { ...subject.state, sbtInfo, userHasSBT: false, mintingStatus: 'idle' };
+        subject.completeMintSuccessForTarget = jest.fn();
+        jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+        const claim = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+
+        await subject.handleUrlAutoMintIntent();
+
+        expect(claim).toHaveBeenCalledTimes(expectedClaims);
+        if (!expectedClaims) {
+          // The card then shows the unreadable check with Retry (see the mini-card and full-card tests).
+          expect(subject.state).toMatchObject({ groupPasswordCheckUnreadable: true, mintingStatus: 'idle' });
+        }
+      } finally {
+        window.history.replaceState({}, '', previousHref);
+      }
+    },
+  );
+
+  it('reports an unreadable URL group hash as a read failure instead of asking for an invite code', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000105';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=shared-secret`,
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: false },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(null);
+      const send = jest.spyOn(contractScripts, 'mintWithGroupSignature');
+
+      await expect(subject.handleUrlAutoMintIntent()).resolves.toBe(false);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(subject.state.error).toBe(
+        "Could not read this group's password check from the chain. Check the network and try again.",
       );
     } finally {
       window.history.replaceState({}, '', previousHref);

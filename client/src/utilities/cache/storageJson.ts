@@ -70,11 +70,6 @@ export type RemoveKeysResult = {
   status: 'ok' | 'partial-failure' | 'missing-storage';
 };
 
-export type StorageNamespace = {
-  base: string;
-  key: (name?: string) => string;
-};
-
 const byteLength = (value: unknown): number => {
   const text = String(value || '');
   if (typeof TextEncoder !== 'undefined') {
@@ -263,31 +258,5 @@ export const removeKeys = (
     removed,
     failed,
     status: failed === 0 ? 'ok' : 'partial-failure',
-  };
-};
-
-export const createStorageNamespace = ({
-  prefix,
-  version = 1,
-}: {
-  prefix?: unknown;
-  version?: unknown;
-} = {}): StorageNamespace => {
-  const normalizedPrefix = String(prefix || '')
-    .trim()
-    .replace(/:+$/g, '');
-  const normalizedVersion = String(version || 1)
-    .trim()
-    .replace(/^v/i, '');
-  const base = `${normalizedPrefix}:v${normalizedVersion}`;
-
-  return {
-    base,
-    key(name = '') {
-      const suffix = String(name || '')
-        .trim()
-        .replace(/^:+/g, '');
-      return suffix ? `${base}:${suffix}` : base;
-    },
   };
 };

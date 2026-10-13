@@ -395,7 +395,7 @@ describe('createSessionCacheReadinessController', () => {
       expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
     });
 
-    it('increments question responses nonce and marks responses ready', () => {
+    it('increments question responses nonce without marking an unfinished response load ready', () => {
       const host = createMockHost({
         initialState: {
           questionResponsesNonce: 2,
@@ -412,7 +412,7 @@ describe('createSessionCacheReadinessController', () => {
 
       expect(host.getState()).toMatchObject({
         questionResponsesNonce: 3,
-        isResponsesCacheReady: true,
+        isResponsesCacheReady: false,
       });
     });
 
@@ -436,7 +436,6 @@ describe('createSessionCacheReadinessController', () => {
       expect(host.getState()).toMatchObject({
         sbtCacheRevision: 0,
         questionResponsesNonce: 1,
-        isResponsesCacheReady: true,
       });
     });
 
@@ -587,7 +586,7 @@ describe('createSessionCacheReadinessController', () => {
     });
 
     it.each(['questionsCache', 'surveysCache'])('queues %s events as question response nonce updates', (namespace) => {
-      const host = createMockHost();
+      const host = createMockHost({ initialState: { isResponsesCacheReady: false } });
       const controller = createSessionCacheReadinessController(host);
 
       controller.handleCrossTabCacheUpdateEvent({
@@ -597,9 +596,10 @@ describe('createSessionCacheReadinessController', () => {
       });
       jest.runOnlyPendingTimers();
 
+      // Another tab's write is not this tab's completed load of saved answers.
       expect(host.getState()).toMatchObject({
         questionResponsesNonce: 1,
-        isResponsesCacheReady: true,
+        isResponsesCacheReady: false,
       });
     });
 

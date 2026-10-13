@@ -685,19 +685,6 @@ export const writeLocalAiSettingsEnvelope = (nextSettings: unknown = {}, { stora
   }
 };
 
-export const migrateLegacyLocalAiSettingsIfNeeded = ({ storage }: { storage?: unknown } = {}) => {
-  const current = readLocalAiSettingsEnvelope({ storage });
-  if (!current.ok || current.status !== 'legacy') return current;
-  if (current.metadata?.legacyPlaintextDetected && !current.metadata?.encryptedAvailable) {
-    return {
-      ...current,
-      status: 'skipped-plaintext-only',
-      reason: 'encrypted-key-missing',
-    };
-  }
-  return writeLocalAiSettingsEnvelope(current.settings, { storage });
-};
-
 const resolveSessionConfigEntry = (slugIn = '') => {
   const resolved = resolveSessionConfigFromSources({
     sessionSlug: slugIn,

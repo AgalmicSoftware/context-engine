@@ -1,4 +1,5 @@
 import React from 'react';
+import fs from 'fs';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
 import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
@@ -20,6 +21,7 @@ import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbackRedirect.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
+import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController';
 import {
@@ -658,7 +660,6 @@ const stubMainSiteMountSideEffects = (subject) => {
   subject.syncLitHooks = jest.fn();
   subject.refreshSessionInfo = jest.fn();
   subject.refreshSessionMetaFields = jest.fn();
-  subject.refreshGroupCredentials = jest.fn();
   subject.hasPersistedManagedCacheData = jest.fn(async () => false);
   subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
   subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -869,7 +870,13 @@ describe('AppShell route render smoke', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
-  it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', () => {
+  it('loads the built-in demo question pool only when the demo route seeds it', () => {
+    const source = fs.readFileSync(`${__dirname}/AppShell.tsx`, 'utf8');
+    expect(source).not.toMatch(/^import\s[^;]*surveyPolisDemoQuestionPool['"]/m);
+    expect(source).toContain("await import('../SurveyTool/surveyPolisDemoQuestionPool')");
+  });
+
+  it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', async () => {
     const subject = createSubject({
       path: '/session/demo',
       activeSessionSlug: 'demo',
@@ -897,7 +904,8 @@ describe('AppShell route render smoke', () => {
     const firstQuestion = demoQuestions[0];
     expect(firstQuestion?.id).toBeTruthy();
 
-    expect(subject.seedBuiltInDemoQuestionCache()).toBe(true);
+    subject._mounted = true;
+    await expect(subject.seedBuiltInDemoQuestionCache()).resolves.toBe(true);
 
     const generalQuestions = cacheStore['questionsCache:']?.['11155420']?.questions || {};
     const scopedQuestions = cacheStore['questionsCache:demo']?.['11155420']?.questions || {};
@@ -924,6 +932,89 @@ describe('AppShell route render smoke', () => {
       }),
       expect.any(Function),
     );
+  });
+
+  it('does not mark the next session ready when the visitor leaves the demo while its questions load', async () => {
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: { slug: 'demo', sessionName: 'Context Engine', networkChainId: 11155420 },
+    });
+    subject._mounted = true;
+    subject.getDisplaySessionChainId = jest.fn(() => 11155420);
+    subject.writeQuestionMetadataToCache = jest.fn(() => true);
+    subject.setReadinessStateIfChanged = jest.fn();
+
+    const leftDemo = subject.seedBuiltInDemoQuestionCache();
+    setRoute('/session/edge');
+    await expect(leftDemo).resolves.toBe(false);
+
+    setRoute('/session/demo');
+    const unmounted = subject.seedBuiltInDemoQuestionCache();
+    subject._mounted = false;
+    await expect(unmounted).resolves.toBe(false);
+
+    expect(subject.writeQuestionMetadataToCache).not.toHaveBeenCalled();
+    expect(subject.setReadinessStateIfChanged).not.toHaveBeenCalled();
+  });
+
+  it("clears the previous account's unsaved answers for every session when the account changes", () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    const ACCOUNT_A = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_B = '0x00000000000000000000000000000000000000bb';
+    const drafts = {
+      a: `dg:surveyDraft:edge:11155420:${ACCOUNT_A}:questions`,
+      aOtherSession: `dg:surveyDraft:other:84532:${ACCOUNT_A}:questions:q:0x01`,
+      b: `dg:surveyDraft:edge:11155420:${ACCOUNT_B}:questions`,
+      anon: 'dg:surveyDraft:edge:11155420:anon:questions',
+    };
+    Object.values(drafts).forEach((key) => sessionStorage.setItem(key, '{}'));
+    const update = (prevAccount, nextAccount) => {
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount };
+      subject.componentDidUpdate(prevProps, subject.state);
+    };
+
+    try {
+      update(ACCOUNT_A, ACCOUNT_B);
+      expect(sessionStorage.getItem(drafts.a)).toBeNull();
+      expect(sessionStorage.getItem(drafts.aOtherSession)).toBeNull();
+      expect(sessionStorage.getItem(drafts.b)).toBe('{}');
+
+      // Logout clears the store account.
+      update(ACCOUNT_B, undefined);
+      expect(sessionStorage.getItem(drafts.b)).toBeNull();
+      expect(sessionStorage.getItem(drafts.anon)).toBe('{}');
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
+  it('drops cached decrypts only when the signed-in account really changes', () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    const ACCOUNT_A = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_B = '0x00000000000000000000000000000000000000bb';
+    const update = (prevAccount, nextAccount) => {
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount };
+      subject.componentDidUpdate(prevProps, subject.state);
+    };
+    const start = getDecryptCacheGeneration();
+
+    update(ACCOUNT_A, ACCOUNT_A.toUpperCase().replace('0X', '0x'));
+    expect(getDecryptCacheGeneration()).toBe(start);
+
+    update(ACCOUNT_A, ACCOUNT_B);
+    expect(getDecryptCacheGeneration()).toBe(start + 1);
+
+    // Logout clears the store account.
+    update(ACCOUNT_B, undefined);
+    expect(getDecryptCacheGeneration()).toBe(start + 2);
+
+    update(undefined, undefined);
+    expect(getDecryptCacheGeneration()).toBe(start + 2);
   });
 
   it('forwards the active session cache context to the home tools explorer', () => {
@@ -1424,7 +1515,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -1679,7 +1769,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -1729,7 +1818,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
     subject.getSessionNetwork = jest.fn(() => null);
@@ -2645,7 +2733,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -2697,7 +2784,6 @@ describe('AppShell route render smoke', () => {
     subject.syncLitHooks = jest.fn();
     subject.refreshSessionInfo = jest.fn();
     subject.refreshSessionMetaFields = jest.fn();
-    subject.refreshGroupCredentials = jest.fn();
     subject.hasPersistedManagedCacheData = jest.fn(async () => false);
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
@@ -4448,7 +4534,6 @@ describe('AppShell live pathname updates', () => {
         'syncLitHooks',
         'refreshSessionInfo',
         'refreshSessionMetaFields',
-        'refreshGroupCredentials',
         'handleDeepLinkScan',
         'preloadAboutDemoSessionData',
         'checkAllCachesReady',
@@ -4458,6 +4543,7 @@ describe('AppShell live pathname updates', () => {
       this.getInitializableSessionNetwork = jest.fn(() => null);
       this.getSessionChainId = jest.fn(() => null);
       this.resolveSessionSlugFromPathToken = jest.fn((token) => token);
+      this.hasMaskedQuestionPayloadInCache = jest.fn(() => false);
     });
     jest.spyOn(AppShell.prototype, 'componentWillUnmount').mockImplementation(function () {
       this._mounted = false;
@@ -4470,11 +4556,11 @@ describe('AppShell live pathname updates', () => {
     localStorage.clear();
   });
 
-  const mountShell = () => {
+  const mountShell = (propOverrides = {}) => {
     const shell = React.createRef();
     const store = React.createRef();
     const dispatch = jest.fn();
-    const props = buildProps({ demoSurfaceMode: false });
+    const props = buildProps({ demoSurfaceMode: false, ...propOverrides });
     class SessionStore extends React.Component {
       state = { primarySessionSlug: '', primarySessionExplicit: true };
       changeActiveSessionSlug = (slug) => {
@@ -4517,6 +4603,20 @@ describe('AppShell live pathname updates', () => {
     h.commit('/session/route-alpha', 4);
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.shell.current.handleDeepLinkScan).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('checks masked questions once when a redirect runs ahead of the router path prop', () => {
+    const h = mountShell({ account: '0x00000000000000000000000000000000000000aa', loginComplete: true });
+    window.history.replaceState({}, '', '/session/route-alpha');
+    h.commit('/entry');
+    const maskedChecks = h.shell.current.hasMaskedQuestionPayloadInCache;
+    expect(maskedChecks).toHaveBeenCalledWith('route-alpha');
+
+    maskedChecks.mockClear();
+    h.commit('/entry', 2);
+    h.commit('/session/route-alpha', 3);
+    expect(maskedChecks).not.toHaveBeenCalled();
     h.unmount();
   });
 

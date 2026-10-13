@@ -12,9 +12,6 @@ type PerfCounterStore = Record<string, PerfCounterScope | unknown>;
 type MainSiteCacheManagerReadyStatePatch = {
   isCacheManagerReady: boolean;
 };
-type MainSiteLitHooksStatePatch<T> = {
-  litHooks: T;
-};
 type CoreSbtMetadataCandidate = {
   tokenURI?: unknown;
   tokenUri?: unknown;
@@ -135,10 +132,6 @@ export const hasCoreSbtMetadata = (info: unknown): boolean => {
     adminOk
   );
 };
-
-export const buildMainSiteLitHooksStatePatch = <T>(litHooks: T): MainSiteLitHooksStatePatch<T> => ({
-  litHooks,
-});
 
 export const buildMainSiteCacheManagerReadyStatePatch = ({
   ready = true,

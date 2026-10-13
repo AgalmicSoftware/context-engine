@@ -205,6 +205,20 @@ describe('surveyQuestionsDecryptRuntime', () => {
     );
   });
 
+  it('forwards the question a rating decrypt is bound to', async () => {
+    const context = createContext();
+    const runtime = createSurveyQuestionsDecryptRuntime(context);
+
+    await runtime.decryptQuestionRatingEnvelopes(
+      { importanceEncrypted: 'env' },
+      { account: '0xabc', questionId: 'q1' },
+    );
+
+    const [envelopes, ratingContext] = (context.decryptQuestionRatingEnvelopesHelper as jest.Mock).mock.calls[0];
+    expect(envelopes).toEqual({ importanceEncrypted: 'env' });
+    expect(ratingContext).toEqual(expect.objectContaining({ account: '0xabc', questionId: 'q1' }));
+  });
+
   it('binds rating key releases to the active session context', async () => {
     const context = createContext();
     Object.assign(context.propsRef.current, { sessionConfig: { sessionId: 'session-id' } });

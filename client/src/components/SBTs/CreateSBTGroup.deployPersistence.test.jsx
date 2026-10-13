@@ -1,4 +1,5 @@
 import { cryptoUtils } from '../../utilities/crypto/cryptography';
+import { useFastGroupPasswordKdf } from '../../utilities/crypto/groupPasswordKdf.testUtils';
 import {
   CreateSBTGroup,
   contractScripts,
@@ -165,15 +166,17 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     };
 
     instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
+    useFastGroupPasswordKdf();
     jest.spyOn(instance, 'generateSBTInviteLinks').mockResolvedValue(undefined);
-    jest.spyOn(contractScripts, 'countSBTCreated').mockResolvedValue(2);
-    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'33'.repeat(32)}`);
-    jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+    jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(sbtAddress);
+    const createSpy = jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
       logs: [makeFactoryReceiptLog('SBTCreated', [sbtAddress])],
     });
 
     await instance.mintSBT();
 
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash({ password: 'shared-secret', sbtAddress });
+    expect(createSpy.mock.calls[0][10]).toBe(groupPasswordHash);
     expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, instance.state.passwordList);
     expect(instance.state.passwordList).toHaveLength(1);
     expect(cryptoUtils.decodeInvite(instance.state.passwordList[0])).toMatchObject({

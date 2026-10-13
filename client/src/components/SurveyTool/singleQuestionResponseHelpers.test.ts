@@ -162,24 +162,28 @@ describe('singleQuestionResponseHelpers aggregator responses', () => {
     });
   });
 
-  it('builds binary counts for recognized answer values only', () => {
+  it('builds binary counts with the same vote reading as the Report', () => {
     expect(
       buildBinaryAggregatorSummary([
         { answer: { value: 'Agree' } },
-        { answer: { value: 'Agree' } },
-        { answer: { value: 'Unsure' } },
-        { answer: { value: 'Disagree' } },
         { answer: { value: 'agree' } },
-        { answer: { value: Object('Agree') } },
+        { answer: { value: 'yes' } },
+        { answer: { value: 1 } },
+        { answer: { value: 'Unsure' } },
+        { answer: { value: '0' } },
+        { answer: { value: 'Disagree' } },
+        { answer: { value: false } },
         { answer: { value: '' } },
+        { answer: { value: '*', encrypted: true } },
+        { answer: { value: 'maybe not' } },
       ]),
     ).toEqual({
       counts: {
-        Agree: 2,
-        Unsure: 1,
-        Disagree: 1,
+        Agree: 4,
+        Unsure: 2,
+        Disagree: 2,
       },
-      total: 4,
+      total: 8,
     });
     expect(buildBinaryAggregatorSummary(null)).toEqual({
       counts: {
@@ -374,6 +378,24 @@ describe('singleQuestionResponseHelpers aggregator responses', () => {
       },
       options: ['Yes', 'No', 'Maybe'],
       totalResponders: 2,
+    });
+  });
+
+  it('excludes multichoice answers with unknown or too many picks, as the Report does', () => {
+    expect(
+      buildMultichoiceAggregatorSummary(
+        [
+          { answer: { value: ['Yes', 'Unknown'] } },
+          { answer: { value: ['Yes', 'No'] } },
+          { answer: { value: ['No'] } },
+        ],
+        ['Yes', 'No'],
+        { singleSelect: true },
+      ),
+    ).toEqual({
+      counts: { Yes: 0, No: 1 },
+      options: ['Yes', 'No'],
+      totalResponders: 1,
     });
   });
 

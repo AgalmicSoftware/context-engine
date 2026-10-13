@@ -1,28 +1,12 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
-import { QuestionStanceCard, selectConcreteQuestionStances } from './QuestionStanceCard';
+import { QuestionStanceBar, selectConcreteQuestionStances } from './QuestionStanceCard';
 
-describe('QuestionStanceCard', () => {
-  it('shows the prompt, option metadata, and concrete stance totals', () => {
-    render(
-      <QuestionStanceCard
-        label="Q abcd…1234"
-        prompt="Should this proposal pass?"
-        metaLabel="Option: later"
-        votes={[1, 0, -1, 1, null, undefined, 2]}
-      />,
-    );
+describe('QuestionStanceBar', () => {
+  it('labels and fills concrete stance totals in agree, unsure, disagree order', () => {
+    render(<QuestionStanceBar votes={[1, 0, -1, 1, null, undefined, 2]} />);
 
-    expect(screen.getByText(/Q abcd…1234: Should this proposal pass\?/)).toBeInTheDocument();
-    expect(screen.getByText('Option: later')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        (_content, node) =>
-          node?.tagName === 'SPAN' &&
-          node.textContent?.replace(/\s+/g, ' ').trim() === 'Agree: 2 / Unsure: 1 / Disagree: 1',
-      ),
-    ).toBeInTheDocument();
     const bar = screen.getByRole('img', { name: 'Agree 2, unsure 1, disagree 1' });
     expect([...bar.querySelectorAll('rect')].slice(1).map((segment) => segment.getAttribute('fill'))).toEqual([
       'var(--ce-binary-choice-agree-bg)',
@@ -31,10 +15,11 @@ describe('QuestionStanceCard', () => {
     ]);
   });
 
-  it('ignores missing and unsupported values and reports an empty comparison', () => {
-    render(<QuestionStanceCard prompt="No shared answers" votes={[null, undefined, 2]} />);
+  it('ignores missing and unsupported values and draws only the outline when empty', () => {
+    render(<QuestionStanceBar votes={[null, undefined, 2]} />);
 
-    expect(screen.getByText('No responses in this comparison.')).toBeInTheDocument();
+    const bar = screen.getByRole('img', { name: 'Agree 0, unsure 0, disagree 0' });
+    expect(bar.querySelectorAll('rect')).toHaveLength(1);
     expect(selectConcreteQuestionStances([1, 0, -1, null, 2])).toEqual([1, 0, -1]);
   });
 });

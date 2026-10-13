@@ -78,7 +78,10 @@ jest.mock('./questionRouting.js', () => ({
   pickBetterQuestionPayload: jest.fn(),
 }));
 
-const { createSessionQuestionCacheController } = require('./sessionQuestionCacheController.js');
+const {
+  createSessionQuestionCacheController,
+  mayHaveTemporaryDemoQuestionFixtures,
+} = require('./sessionQuestionCacheController.js');
 const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
 const { canonicalizeSessionSlug: normalizeSessionSlug } = require('../session/sessionSlug.js');
@@ -809,6 +812,36 @@ describe('createSessionQuestionCacheController', () => {
         creator: '0xCreator',
         prompt: 'Prompt text',
       });
+    });
+
+    it('does not load demo question fixtures for non-demo sessions', async () => {
+      const host = createMockHost({
+        activeSlug: SESSION_SLUG,
+        sessionCfg: { networkChainId: NETWORK_ID, blockLimits: { start: 44967477, end: null } },
+      });
+      const controller = createSessionQuestionCacheController(host);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 44967477, toBlock: 44967476 });
+
+      await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalled();
+      expect(getTemporaryDemoSessionQuestionFixtures).not.toHaveBeenCalled();
+      controller.destroy();
+    });
+
+    it('treats every configured session with demo question fixtures as a demo slug', () => {
+      const { getTemporaryDemoSessionQuestionFixtures: buildDemoFixtures } = jest.requireActual(
+        '../session/demoSessionQuestionFixtures.js',
+      );
+      const demoSessions = jest.requireActual('../../variables/demo/demo_sessions.json');
+      const fixtureSlugs = Object.values(demoSessions)
+        .filter((config) => buildDemoFixtures(config.slug, config).length > 0)
+        .map((config) => config.slug);
+
+      expect(fixtureSlugs).toEqual(expect.arrayContaining(['demo-1', 'demo-2']));
+      fixtureSlugs.forEach((slug) => expect(mayHaveTemporaryDemoQuestionFixtures(slug)).toBe(true));
+      expect(mayHaveTemporaryDemoQuestionFixtures('rxc-ra-test')).toBe(false);
+      expect(mayHaveTemporaryDemoQuestionFixtures('')).toBe(false);
     });
 
     it('publishes temporary demo fixtures before block window resolution settles', async () => {

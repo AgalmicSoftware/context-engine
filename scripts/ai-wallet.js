@@ -34,12 +34,13 @@ const normalizeGroupPasswordInput = (raw) => {
   return compact;
 };
 
-const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
+const groupPasswordDerivation = createGroupPasswordDerivation(ethers);
 
 async function main() {
   const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
   const rpcUrl = process.env.RPC_URL || DEFAULT_RPC_URL;
   const groupPassword = normalizeGroupPasswordInput(process.env.GROUP_PASSWORD || '');
+  const sbtAddress = String(process.env.SBT_ADDRESS || '').trim();
   const showPrivateKey = toBool(process.env.SHOW_PRIVATE_KEY || 'false');
 
   const { rawIdBytes, privateKey, wallet } = buildPasskeyDerivedWallet(rawIdB64Url);
@@ -80,9 +81,16 @@ async function main() {
   }
 
   if (groupPassword) {
-    result.groupPasswordHash = computeGroupPasswordHash({ password: groupPassword, sbtAddress: '' });
-    result.groupPasswordDerivation = 'sbt-group-password-v3';
-    result.groupPasswordScope = 'zero-address';
+    // Group password hashes are scoped to one SBT contract; there is no unscoped form.
+    if (!sbtAddress) {
+      throw new Error('GROUP_PASSWORD needs SBT_ADDRESS: the group password hash is scoped to one SBT contract.');
+    }
+    result.groupPasswordHash = await groupPasswordDerivation.computeGroupPasswordHash({
+      password: groupPassword,
+      sbtAddress,
+    });
+    result.groupPasswordDerivation = groupPasswordDerivation.derivation;
+    result.groupPasswordScope = ethers.utils.getAddress(sbtAddress);
   }
 
   console.log(JSON.stringify(result, null, 2));

@@ -34,3 +34,30 @@ describe('importance is read before conviction', () => {
     expect(first.split(',')[importanceIndex]).toBe('"7"');
   });
 });
+
+describe('legacy 0-100 interview ratings', () => {
+  it('rank on the 0-10 scale in Polis "Top N by importance"', () => {
+    const widelyImportant = Array.from({ length: 8 }, (_, index) =>
+      row(`0x${String(index).padStart(40, '1')}`, 'widelyImportant', 9),
+    );
+    const out = applyFilterStateToAggregator(
+      { widelyImportant, oneLegacyRating: [row(`0x${'9'.repeat(40)}`, 'oneLegacyRating', 75)] },
+      { id: 84532 },
+      { topQuestions: { count: 1, by: 'importance' } },
+      '',
+    );
+    expect(Object.keys(out)).toEqual(['widelyImportant']);
+  });
+
+  it('fill the CSV importance and conviction columns on the 0-10 scale', () => {
+    const csv = buildSurveyResultsResponsesCsvExport({
+      aggregatorQuestionResponses: { q1: [row('0x1111111111111111111111111111111111111111', 'q1', 75, 80)] },
+      networkQuestions: { q1: { id: 'q1', prompt: 'Prompt', type: 'rating' } },
+    });
+    const [header, first] = csv.split('\n');
+    const columns = header.split(',');
+    const cells = first.split(',');
+    expect(cells[columns.indexOf('importance')]).toBe('"7.5"');
+    expect(cells[columns.indexOf('conviction')]).toBe('"8"');
+  });
+});

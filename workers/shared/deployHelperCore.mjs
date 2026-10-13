@@ -1262,6 +1262,18 @@ export const validateDeployHelperPublicConfigInputs = (body = {}) => {
     : '';
 };
 
+// The URL rule readBundle applies in agentSessionWrappedDeployment.mjs, so a
+// bridge URL this helper checks and records is one the bridge deploy accepts.
+const normalizeAgentBridgeBundleUrl = (value) => {
+  try {
+    const parsed = new URL(toStr(value).trim());
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+};
+
 const executeDeployHelperRequestCore = async ({
   body,
   env,
@@ -1296,9 +1308,13 @@ const executeDeployHelperRequestCore = async ({
     : toStr(body?.bundleText);
   const hasBundleText = bundleText.trim() !== '';
   const bundleUrl = toStr(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
+  const bundleManifestUrl = toStr(body?.bundleManifestUrl).trim();
   const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex(bundleText) : '';
   const suppliedBundleSha256 = toStr(body?.bundleSha256).trim();
   let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+  // Set only when the bundle comes from bundleUrl and the release manifest
+  // pins its digest; the Worker then records that release (see metadata).
+  let releaseManifestBundleSha256 = '';
   let bundleSource = hasBundleText ? bundleText : '';
   const bundleSourceKind = hasBundleText ? 'bundleText' : 'bundleUrl';
   let bundleDiagnostics = null;
@@ -1314,9 +1330,9 @@ const executeDeployHelperRequestCore = async ({
   const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
   const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
 
-  if (!hasBundleText && toStr(body?.bundleManifestUrl).trim()) {
+  if (!hasBundleText && bundleManifestUrl) {
     const manifestDigest = await fetchExpectedWorkerBundleDigest({
-      manifestUrl: toStr(body.bundleManifestUrl).trim(),
+      manifestUrl: bundleManifestUrl,
       artifactFile: 'sessionCorsWorker.bundle.js',
       artifactKind: 'session-cors-worker',
       fetchImpl,
@@ -1328,9 +1344,15 @@ const executeDeployHelperRequestCore = async ({
       return buildFailure(409, { error: 'Worker release manifest digest conflicts with bundleSha256.' });
     }
     expectedBundleSha256 = manifestDigest.digest;
+    releaseManifestBundleSha256 = manifestDigest.digest;
   }
 
-  if (expectedBundleSha256 && !bundleSource) {
+  // An earlier attempt may have staged resources, and the journal does not
+  // record their KV namespace. A replay therefore checks its bundle in the
+  // upload path (prepareBundleDiagnostics), once reconciliation has found what
+  // was staged, so a bad bundle keeps those resources pending.
+  const checkBundleBeforeCloudflare = idempotencyContext?.isReplay !== true;
+  if (checkBundleBeforeCloudflare && expectedBundleSha256 && !bundleSource) {
     try {
       bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
     } catch (error) {
@@ -1341,6 +1363,7 @@ const executeDeployHelperRequestCore = async ({
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
   }
   if (
+    checkBundleBeforeCloudflare &&
     expectedBundleSha256 &&
     (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256
   ) {
@@ -1437,7 +1460,9 @@ const executeDeployHelperRequestCore = async ({
       fallbackEligible: accountSubdomain.fallbackEligible,
     });
   }
-  const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
+  // Stage the bare origin, as the client writes it, so later signed config
+  // writes match the stored Worker identity.
+  const anticipatedWorkerOrigin = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev`;
   const allowOrigins = normalizeAllowList(
     allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
   );
@@ -1500,7 +1525,7 @@ const executeDeployHelperRequestCore = async ({
     allowOrigins,
     limits,
     scopes,
-    corsWorkerUrl: anticipatedWorkerUrl,
+    corsWorkerUrl: anticipatedWorkerOrigin,
     embeddedDeployHelperEnabled,
     ...(!workerCanonicalRequested
       ? {
@@ -1632,11 +1657,14 @@ const executeDeployHelperRequestCore = async ({
       toStr(bundleIdentityBindings[0]?.type).trim() === 'plain_text'
       ? toStr(bundleIdentityBindings[0]?.text).trim().toLowerCase()
       : '';
-    const expectedBundleSha256 = bundleDiagnostics?.sha256 ||
+    // A pinned digest always wins, so neither inline text nor a replay that
+    // has not fetched its bundle yet can resume bytes the pin does not allow.
+    const expectedWorkerBundleSha256 = expectedBundleSha256 ||
+      bundleDiagnostics?.sha256 ||
       expectedInlineBundleSha256 ||
       toStr(idempotencyContext?.bundleSha256).trim().toLowerCase();
     const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) &&
-      (ignoreBundleIdentity || !expectedBundleSha256 || observedBundleSha256 === expectedBundleSha256);
+      (ignoreBundleIdentity || !expectedWorkerBundleSha256 || observedBundleSha256 === expectedWorkerBundleSha256);
     const requestDigestMatches = requestMarker
       ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr(idempotencyContext?.requestDigest).trim())
       : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
@@ -1670,6 +1698,16 @@ const executeDeployHelperRequestCore = async ({
   let replaceRejectedWorker = idempotencyContext?.definitiveUploadRejected === true;
   let createdKvThisInvocation = false;
   let uploadedWorkerThisInvocation = false;
+  // Once an earlier attempt has staged this request's KV namespace, a bundle
+  // that fails its check keeps the request pending and reports what it kept,
+  // instead of ending it terminally with those resources orphaned.
+  const keepStagedResourcesPending = (failure) => (kvId
+    ? buildDeploymentFailure(failure.status, {
+        ...failure.body,
+        deploymentRequestPending: true,
+        orphanResources: { kvNamespaceId: kvId, kvCleanupStatus: 'retained-upload-pending', workerName },
+      }, { fallbackEligible: failure.fallbackEligible })
+    : failure);
   if (requestMarker) {
     const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
     if (!existingMarkedNamespaces.ok) {
@@ -1707,6 +1745,20 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
+  // A replay skipped the early bundle check, but uploaded bundle text needs no
+  // network: compare it with the pinned digest now that any staged KV
+  // namespace is known, before a resume can skip the upload path.
+  if (
+    !checkBundleBeforeCloudflare &&
+    hasBundleText &&
+    expectedBundleSha256 &&
+    expectedInlineBundleSha256 !== expectedBundleSha256
+  ) {
+    return keepStagedResourcesPending(buildFailure(409, {
+      error: 'Worker bundle SHA-256 does not match the verified release manifest.',
+    }));
+  }
+
   if (
     !resumeWorkerSettings &&
     workerNameConfirmedAbsent &&
@@ -1741,7 +1793,7 @@ const executeDeployHelperRequestCore = async ({
   if (resumeWorkerSettings) {
     if (idempotencyContext?.definitiveUploadRejected === true) {
       const preparedBundle = await prepareBundleDiagnostics();
-      if (!preparedBundle.ok) return preparedBundle.result;
+      if (!preparedBundle.ok) return keepStagedResourcesPending(preparedBundle.result);
       if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId, { ignoreBundleIdentity: true })) {
         return buildFailure(409, {
           error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
@@ -1765,12 +1817,24 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
+  // An Agents HTTP session also gets an Agent Bridge Worker after this one.
+  // When a release manifest pins that bundle (resolveDeploymentBundleProvenance
+  // set agentBridgeBundleSha256 from it), the upload below records it once the
+  // bytes are checked.
+  const agentHttpRequested = body?.sessionModeProfile?.surfaces?.agentHttp === true;
+  const agentBridgeBundleUrl = normalizeAgentBridgeBundleUrl(body?.agentBridgeBundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
+  const agentBridgeBundleManifestUrl = toStr(body?.agentBridgeBundleManifestUrl).trim();
+  const agentBridgeManifestSha256 = agentBridgeBundleManifestUrl
+    ? normalizeWorkerBundleSha256(body?.agentBridgeBundleSha256)
+    : '';
+  let agentBridgeReleaseVerified = false;
+
   // An exactly owned uploaded Worker already contains the requested module.
   // Do not make recovery depend on the original bundle host still being
   // reachable; bundle acquisition belongs only to the upload path.
   if (!resumeUploadedWorker) {
     const preparedBundle = await prepareBundleDiagnostics();
-    if (!preparedBundle.ok) return preparedBundle.result;
+    if (!preparedBundle.ok) return keepStagedResourcesPending(preparedBundle.result);
     if (
       idempotencyContext?.bundleSha256 &&
       toStr(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 &&
@@ -1780,6 +1844,24 @@ const executeDeployHelperRequestCore = async ({
         error: 'Deployment bundle content changed after this request started; upload was stopped.',
         deploymentRequestPending: true,
       });
+    }
+    // Check the bridge bytes before this upload, so a bad bridge release stops
+    // the deploy instead of leaving a session Worker without its bridge.
+    if (agentHttpRequested && agentBridgeBundleUrl && agentBridgeManifestSha256) {
+      let agentBridgeSource = '';
+      try {
+        agentBridgeSource = await fetchArtifactText(agentBridgeBundleUrl, { fetchImpl });
+      } catch (error) {
+        return keepStagedResourcesPending(buildFailure(502, {
+          error: `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+        }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) }));
+      }
+      if (await sha256Hex(agentBridgeSource) !== agentBridgeManifestSha256) {
+        return keepStagedResourcesPending(buildFailure(409, {
+          error: 'Agent Bridge bundle SHA-256 does not match the verified release manifest.',
+        }));
+      }
+      agentBridgeReleaseVerified = true;
     }
   }
 
@@ -1903,6 +1985,16 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
+  // Record the release this deploy verified, so the Worker's embedded helper
+  // can sponsor grant deploys of that same release
+  // (sponsoredBootstrapRedeemDispatch.js). Only a bundle fetched from a URL
+  // and matched to its release manifest qualifies; uploaded bundleText or an
+  // unpinned URL records nothing. The URLs come from the request, else the
+  // helper's own defaults, exactly as for the deployed bundle. Only uploads of
+  // the Worker this request creates carry them, so an existing Worker keeps
+  // any values set by hand.
+  const sessionReleaseVerified = !hasBundleText && !!bundleUrl && !!releaseManifestBundleSha256 &&
+    bundleDiagnostics?.sha256 === releaseManifestBundleSha256;
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -1928,6 +2020,18 @@ const executeDeployHelperRequestCore = async ({
         class_name: SESSION_COORDINATOR_CLASS_NAME,
       },
       { name: 'DEPLOY_HELPER_ENABLED', type: 'plain_text', text: embeddedDeployHelperEnabled ? '1' : '0' },
+      ...(sessionReleaseVerified
+        ? [
+            { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: bundleUrl },
+            { name: 'WORKER_BUNDLE_MANIFEST_URL', type: 'plain_text', text: bundleManifestUrl },
+          ]
+        : []),
+      ...(agentBridgeReleaseVerified
+        ? [
+            { name: 'AGENT_BRIDGE_BUNDLE_URL', type: 'plain_text', text: agentBridgeBundleUrl },
+            { name: 'AGENT_BRIDGE_BUNDLE_MANIFEST_URL', type: 'plain_text', text: agentBridgeBundleManifestUrl },
+          ]
+        : []),
     ],
     migrations: {
       old_tag: '',
@@ -2311,7 +2415,7 @@ const executeDeployHelperRequestCore = async ({
   if (workerUrl) {
     const configWithWorkerUrl = {
       ...config,
-      corsWorkerUrl: workerUrl,
+      corsWorkerUrl: normalizeOrigin(workerUrl),
     };
     const readbackMatches = (result) => {
       const readbackConfig = result?.data?.result || result?.data || {};
@@ -2507,7 +2611,7 @@ const executeDeployHelperRequestCore = async ({
     deploymentPayload.tokenSecretSet = true;
   }
 
-  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
+  if (agentHttpRequested) {
     const wrappedDeploy = await executeAgentSessionWrappedDeployment({
       body: {
         deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,

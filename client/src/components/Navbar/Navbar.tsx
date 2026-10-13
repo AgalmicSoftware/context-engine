@@ -2,15 +2,7 @@
 import React, { Component } from 'react';
 
 import styles from './Navbar.module.scss';
-import StaticLogo from 'assets/img/context_engine_logo_static.png';
-import AnimatedLogo from 'assets/img/context_engine_logo_animation.gif';
-import AnimatedLogoPingPong from 'assets/img/context_engine_logo_animation_pingpong.gif';
-import {
-  ENABLE_CE_LOGO_ANIMATION,
-  CE_LOGO_ANIMATION_MODE,
-  CE_LOGO_ANIMATION_DURATION_MS_FORWARD,
-  CE_LOGO_ANIMATION_DURATION_MS_PINGPONG,
-} from '../../variables/appConfig.js';
+import Logo from 'assets/img/context_engine_logo.svg';
 
 import AccountSectionRaw from './AccountSection';
 import withRouter from '../HooksHOC/withRouterBridge';
@@ -53,50 +45,7 @@ type NavbarProps = {
   };
 };
 
-type NavbarState = {
-  showAnimatedLogo: boolean;
-};
-
-type NavbarRuntimeWindow = Window & {
-  __ceLogoAnimationPlayed?: boolean;
-};
-
-export class Navbar extends Component<NavbarProps, NavbarState> {
-  logoTimeoutId: number | null = null;
-
-  constructor(props: NavbarProps) {
-    super(props);
-    const hasWindow = typeof window !== 'undefined';
-    const runtimeWindow = hasWindow ? (window as NavbarRuntimeWindow) : null;
-    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && !!runtimeWindow && !runtimeWindow.__ceLogoAnimationPlayed;
-    this.state = {
-      showAnimatedLogo: shouldAnimate,
-    };
-    if (shouldAnimate && runtimeWindow) {
-      runtimeWindow.__ceLogoAnimationPlayed = true;
-    }
-  }
-
-  componentDidMount() {
-    if (this.state.showAnimatedLogo) {
-      const animationDurationMs =
-        CE_LOGO_ANIMATION_MODE === 'pingpong'
-          ? CE_LOGO_ANIMATION_DURATION_MS_PINGPONG
-          : CE_LOGO_ANIMATION_DURATION_MS_FORWARD;
-      this.logoTimeoutId = window.setTimeout(() => {
-        this.setState({ showAnimatedLogo: false });
-      }, animationDurationMs);
-    }
-  }
-
-  componentWillUnmount() {
-    if (this.logoTimeoutId) {
-      window.clearTimeout(this.logoTimeoutId);
-    }
-  }
-
-  componentDidUpdate(_prevProps: NavbarProps) {}
-
+export class Navbar extends Component<NavbarProps> {
   navigateWithWindow = (target: string) => {
     if (typeof window !== 'undefined' && window.location) {
       window.location.assign(target);
@@ -128,10 +77,7 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
   };
 
   render() {
-    const animatedLogoSrc = CE_LOGO_ANIMATION_MODE === 'pingpong' ? AnimatedLogoPingPong : AnimatedLogo;
-    const logoSrc = this.state.showAnimatedLogo ? animatedLogoSrc : StaticLogo;
     const logoHref = getConfiguredBaseUrl();
-    const legacyFluidImgProp = { fluid: 'true' } as Record<string, string>;
 
     const beforeLogin = (
       <>
@@ -143,7 +89,7 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               aria-label="Context Engine home"
               onClick={this.handleLogoLinkClick}
             >
-              <img id={styles.mainLogo} src={logoSrc} {...legacyFluidImgProp} alt="" aria-hidden="true"></img>
+              <img id={styles.mainLogo} src={Logo} alt="" aria-hidden="true" />
             </a>
           </div>
           <div id={styles.accountSection}>
@@ -170,7 +116,7 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               aria-label="Context Engine home"
               onClick={this.handleLogoLinkClick}
             >
-              <img id={styles.mainLogoLoggedIn} src={logoSrc} {...legacyFluidImgProp} alt="" aria-hidden="true"></img>
+              <img id={styles.mainLogoLoggedIn} src={Logo} alt="" aria-hidden="true" />
             </a>
           </div>
           <div id={styles.accountSectionLoggedIn}>

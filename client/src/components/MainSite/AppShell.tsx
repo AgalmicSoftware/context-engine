@@ -34,7 +34,8 @@ import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { clearSurveyDraftsForAccount } from '../SurveyTool/surveyToolDraftState.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
@@ -119,7 +120,6 @@ import FooterRaw from '../Footer/Footer';
 import LazyFallbackRaw from '../Shared/LazyFallback';
 import DevE2eNavRaw from '../E2E/DevE2eNav';
 import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
-import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -633,7 +633,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     sessionInfoOverrides: {},
     sessionNameOverrides: {},
     sessionHeaderOverrides: {},
-    groupCredentials: {},
     sessionPathResolutionNonce: 0,
     isCacheManagerReady: false,
   };
@@ -1495,12 +1494,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   refreshSessionMetaFields: SessionMetaRefreshController['refreshSessionMetaFields'] = (...args) =>
     this._sessionMetaRefreshController.refreshSessionMetaFields(...args);
 
-  refreshGroupCredentials = async () => {
-    // Legacy metadata-backed Lit credentials are intentionally disabled so
-    // payer/delegation material cannot flow through public session metadata.
-    return;
-  };
-
   // Smart group resolver for deep-linked surveys
   getSurveyRouteSessionSlugHint = () => {
     try {
@@ -1663,7 +1656,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     return routePath === '/session/demo' || routePath.startsWith('/session/demo/');
   };
 
-  seedBuiltInDemoQuestionCache = (): boolean => {
+  seedBuiltInDemoQuestionCache = async (): Promise<boolean> => {
+    // The demo question pool ships in its own chunk, so only the built-in demo route loads it.
+    const { getPolisDemoQuestionPool } = await import('../SurveyTool/surveyPolisDemoQuestionPool');
+    // The visitor may have left the demo while the chunk loaded; the next
+    // session must not be marked ready by the demo's questions.
+    if (!this._mounted || !this.isBuiltInDemoSessionRoutePath()) return false;
     const questionPool = getPolisDemoQuestionPool();
     if (!Array.isArray(questionPool) || questionPool.length === 0) return false;
 
@@ -2312,7 +2310,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     this.syncLitHooks();
     this.refreshSessionInfo();
     this.refreshSessionMetaFields();
-    this.refreshGroupCredentials();
     const activeProjection = resolveSessionCapabilityProjection(bootstrapSessionConfig);
     const hasExplicitSessionTarget =
       !!this.getSessionTokenFromPath(bootstrapPath) ||
@@ -2595,7 +2592,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       } else if (isDemoPath) {
         // Demo prioritized: Questions -> (SBT partial) -> listeners -> Responses -> Surveys
         if (isBuiltInDemoSessionRoute) {
-          this.seedBuiltInDemoQuestionCache();
+          await this.seedBuiltInDemoQuestionCache();
         } else {
           await this.initializeQuestionCache();
         }
@@ -2755,6 +2752,17 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   }
 
   componentDidUpdate(prevProps: MainSiteProps, prevState: MainSiteState) {
+    // Decrypted plaintext and Lit content keys are cached for the whole tab.
+    // Every logout and account switch reaches the store's account, so drop them here.
+    const accountKey = (account: unknown) =>
+      String(account || '')
+        .trim()
+        .toLowerCase();
+    if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
+      clearDecryptCaches();
+      clearSurveyDraftsForAccount(prevProps.account);
+    }
+
     this.redirectLegacyDemoPath();
 
     // Handle auto-hash persistence (save on change)
@@ -2771,7 +2779,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this.syncLitHooks();
       this.refreshSessionInfo();
       this.refreshSessionMetaFields();
-      this.refreshGroupCredentials();
       this._questionCacheController?.pruneMaskedQuestionDecryptBackoff?.(Number.MAX_SAFE_INTEGER);
     }
     const authOrProviderChanged =
@@ -2794,8 +2801,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
 
     if (this.props.loginComplete && this.props.account) {
+      // Compare live paths like the session transition below: the router path prop
+      // can lag a redirect, which would rescan masked questions on every update.
       const prevPath = this.getEffectiveRoutePath(
-        prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
+        this._lastDidUpdatePathRaw ?? (prevProps.path || this.getCurrentPathname()),
       );
       const path = this.getEffectiveRoutePath(this.getCurrentPathname());
       const activeSlug = this.getActiveSessionSlug();
@@ -2970,7 +2979,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             } else {
               // Demo prioritized: Questions -> (SBT partial) -> listeners -> Responses -> Surveys
               if (isBuiltInDemoSessionRoute) {
-                this.seedBuiltInDemoQuestionCache();
+                await this.seedBuiltInDemoQuestionCache();
               } else {
                 await this.initializeQuestionCacheWithGeneralBackfill(nextActiveSlug);
               }
@@ -3257,8 +3266,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   ensureSessionRouteSbtDiscovery: SessionSbtCacheController['ensureSessionRouteSbtDiscovery'] = (...args) =>
     this._sbtCacheController.ensureSessionRouteSbtDiscovery(...args);
 
-  sendMessageToServer = () => {};
-
   ensureLightSbtDiscovery: SessionSbtCacheController['ensureLightSbtDiscovery'] = (...args) =>
     this._sbtCacheController.ensureLightSbtDiscovery(...args);
 
@@ -3383,7 +3390,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   ) => {
     const normalizedSlug = normalizeSessionSlug(slug || '');
     if (this.isBuiltInDemoSessionRoutePath() && (normalizedSlug === 'demo' || normalizedSlug === '')) {
-      this.seedBuiltInDemoQuestionCache();
+      await this.seedBuiltInDemoQuestionCache();
       return;
     }
     return this._questionCacheController.initializeQuestionCacheForGroup(slug, opts);
@@ -4071,7 +4078,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   refreshQuestionMetadataForGroup: RefreshQuestionMetadataForGroupFn = async (slug, opts) => {
     const normalizedSlug = normalizeSessionSlug(slug || '');
     if (this.isBuiltInDemoSessionRoutePath() && (normalizedSlug === 'demo' || normalizedSlug === '')) {
-      this.seedBuiltInDemoQuestionCache();
+      await this.seedBuiltInDemoQuestionCache();
       return;
     }
     return this._questionCacheController.refreshQuestionMetadataForGroup(slug, opts);

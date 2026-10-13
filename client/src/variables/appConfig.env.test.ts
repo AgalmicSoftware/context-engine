@@ -7,7 +7,6 @@ const ENV_KEYS = [
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
   'REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK',
-  'REACT_APP_ENABLE_CE_LOGO_ANIMATION',
   'REACT_APP_CE_SESSION_SCAN_SCOPE',
   'REACT_APP_CE_SESSION_SCAN_SLUGS',
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
@@ -23,7 +22,6 @@ const ENV_KEYS = [
   'REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS',
   'REACT_APP_USE_ONCHAIN_SESSION_REGISTRY',
   'REACT_APP_CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES',
-  'REACT_APP_SERVER',
   'REACT_APP_ARWEAVE_GATEWAY_URL',
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
   'REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA',
@@ -116,7 +114,6 @@ describe('appConfig env-backed config', () => {
   it('reads REACT_APP_* overrides across strings, booleans, numbers, and lists', () => {
     process.env.REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = 'false';
     process.env.REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK = 'true';
-    process.env.REACT_APP_ENABLE_CE_LOGO_ANIMATION = 'false';
     process.env.REACT_APP_CE_SESSION_SCAN_SCOPE = 'general';
     process.env.REACT_APP_CE_SESSION_SCAN_SLUGS = 'alpha,beta';
     process.env.REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = 'false';
@@ -131,7 +128,6 @@ describe('appConfig env-backed config', () => {
     process.env.REACT_APP_CE_DEMO_SESSION_SLUGS = 'demo-1,demo-3,demo-2,demo';
     process.env.REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS = 'demo,edge';
     process.env.REACT_APP_USE_ONCHAIN_SESSION_REGISTRY = 'false';
-    process.env.REACT_APP_SERVER = 'https://api.example.test';
     process.env.REACT_APP_ARWEAVE_GATEWAY_URL = 'https://gateway.example.test';
     process.env.REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO = 'false';
     process.env.REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA = 'true';
@@ -147,7 +143,6 @@ describe('appConfig env-backed config', () => {
 
       expect(config.DEFAULT_AUTO_REQUEST_TESTNET_FUNDS).toBe(false);
       expect(config.CE_ENABLE_WALLETCONNECT_FALLBACK).toBe(true);
-      expect(config.ENABLE_CE_LOGO_ANIMATION).toBe(false);
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('general');
       expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['alpha', 'beta']);
       expect(config.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED).toBe(false);
@@ -163,7 +158,6 @@ describe('appConfig env-backed config', () => {
       expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo', 'edge']);
       expect(config.USE_ONCHAIN_SESSION_REGISTRY).toBe(false);
       expect(config.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES).toBe(true);
-      expect(config.SERVER).toBe('https://api.example.test');
       expect(config.ARWEAVE_GATEWAY_URL).toBe('https://gateway.example.test');
       expect(config.CE_ARWEAVE_DIRECT_TO_AR_IO).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(true);

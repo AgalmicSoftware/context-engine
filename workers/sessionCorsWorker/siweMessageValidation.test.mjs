@@ -13,28 +13,94 @@ import {
   validateTrustedLoginRequestOrigin,
 } from './siweMessageValidation.js';
 
-test('parseSiweMessage trims and extracts SIWE fields from the signed message', () => {
-  const parsed = parseSiweMessage([
-    ' app.example wants you to sign in with your Ethereum account: ',
-    ' 0xAbC123 ',
-    '',
-    'URI: https://app.example/login ',
-    'Version: 1 ',
-    'Chain ID: 84532 ',
-    'Nonce: nonce-1 ',
-    'Issued At: 2026-03-11T00:00:00.000Z ',
-    'Expiration Time: 2026-03-12T00:00:00.000Z ',
-  ].join('\n'));
+const SIWE_ADDRESS = '0x00000000000000000000000000000000000000Ab';
+// The exact shape the current client builds in workerAuth.ts.
+const clientSiweLines = () => [
+  'app.example wants you to sign in with your Ethereum account:',
+  SIWE_ADDRESS,
+  '',
+  'Sign in to Context Engine.',
+  '',
+  'URI: https://app.example',
+  'Version: 1',
+  'Chain ID: 84532',
+  'Nonce: nonce0001',
+  'Issued At: 2026-03-11T00:00:00.000Z',
+  'Expiration Time: 2026-03-12T00:00:00.000Z',
+  'Resources:',
+  '- https://worker.example',
+  '- urn:context-engine:session:id:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+];
 
-  assert.deepEqual(parsed, {
+test('parseSiweMessage extracts the fields of the message the client signs', () => {
+  assert.deepEqual(parseSiweMessage(clientSiweLines().join('\n')), {
     domain: 'app.example',
-    address: '0xAbC123',
-    uri: 'https://app.example/login',
+    address: SIWE_ADDRESS,
+    statement: 'Sign in to Context Engine.',
+    uri: 'https://app.example',
     chainId: '84532',
-    nonce: 'nonce-1',
+    nonce: 'nonce0001',
     issuedAt: '2026-03-11T00:00:00.000Z',
     expirationTime: '2026-03-12T00:00:00.000Z',
+    resources: ['https://worker.example', 'urn:context-engine:session:id:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
   });
+  // EIP-4361 without a statement keeps both blank lines.
+  const withoutStatement = clientSiweLines();
+  withoutStatement.splice(3, 2, '');
+  assert.equal(parseSiweMessage(withoutStatement.join('\n')).statement, undefined);
+  assert.equal(parseSiweMessage(withoutStatement.join('\n')).nonce, 'nonce0001');
+});
+
+const withLines = (edit) => {
+  const lines = clientSiweLines();
+  edit(lines);
+  return lines.join('\n');
+};
+
+for (const [label, message] of [
+  ['an extra trailing line', withLines((lines) => lines.push('Reward code: 7731'))],
+  ['a trailing newline', `${clientSiweLines().join('\n')}\n`],
+  ['a duplicated URI line', withLines((lines) => lines.splice(6, 0, 'URI: https://b.example'))],
+  ['reordered fields', withLines((lines) => lines.splice(6, 2, lines[7], lines[6]))],
+  ['fields inside prose', [
+    'app.example wants you to sign in with your Ethereum account:',
+    SIWE_ADDRESS,
+    'Issued At: 2026-03-11T00:00:00.000Z',
+    'To verify your wallet for the giveaway, sign this text.',
+    'Nonce: nonce-1',
+    'Chain ID: 84532',
+    'URI: https://app.example',
+  ].join('\n')],
+  ['a missing Issued At line', withLines((lines) => lines.splice(9, 1))],
+  ['an unknown field', withLines((lines) => lines.splice(10, 0, 'Reward: 5'))],
+  ['padded values', withLines((lines) => { lines[5] = 'URI:  https://app.example'; })],
+  ['CRLF line breaks', clientSiweLines().join('\r\n')],
+  ['an invalid address', withLines((lines) => { lines[1] = '0xabc'; })],
+  ['an unsupported version', withLines((lines) => { lines[6] = 'Version: 2'; })],
+  ['a statement outside the EIP-4361 character set', withLines((lines) => { lines[3] = 'Claim your <reward>'; })],
+  ['a resource without the list prefix', withLines((lines) => { lines[12] = 'https://worker.example'; })],
+  // EIP-4361 nonces are at least eight letters or digits.
+  ['a nonce with a hyphen', withLines((lines) => { lines[8] = 'Nonce: nonce-0001'; })],
+  ['a nonce with an underscore', withLines((lines) => { lines[8] = 'Nonce: nonce_0001'; })],
+  ['a nonce shorter than eight characters', withLines((lines) => { lines[8] = 'Nonce: abc1234'; })],
+]) {
+  test(`parseSiweMessage rejects ${label}`, () => {
+    const parsed = parseSiweMessage(message);
+    assert.match(parsed.error, /^Malformed SIWE message: /);
+    assert.equal(parsed.nonce, '');
+    assert.equal(parsed.resources, undefined);
+    assert.deepEqual(validateSiwe(parsed), { ok: false, error: parsed.error });
+  });
+}
+
+test('validateSiwe rejects a message whose Not Before time has not arrived', () => {
+  const parsed = parseSiweMessage(withLines((lines) => lines.splice(11, 0, 'Not Before: 2026-03-11T12:00:00.000Z')));
+  assert.equal(parsed.notBefore, '2026-03-11T12:00:00.000Z');
+  assert.deepEqual(validateSiwe(parsed, { now: () => Date.parse('2026-03-11T06:00:00.000Z') }), {
+    ok: false,
+    error: 'SIWE message is not valid yet.',
+  });
+  assert.deepEqual(validateSiwe(parsed, { now: () => Date.parse('2026-03-11T13:00:00.000Z') }), { ok: true });
 });
 
 test('validateSiwe preserves required-field failures in order', () => {
@@ -433,20 +499,22 @@ test('validateAdminActionAudience trusts approved origins, configured allowOrigi
 });
 
 
-test('Resources require URI-list prefixes while legacy messages stay compatible', () => {
-  const legacy = 'app.example wants you to sign in with your Ethereum account:\n0xabc\n\nURI: https://app.example\nChain ID: 1\nNonce: nonce';
+test('Resources must be the final URI list while messages without them stay compatible', () => {
+  const legacy = withLines((lines) => lines.splice(11));
   assert.equal(parseSiweMessage(legacy).resources, undefined);
+  assert.equal(parseSiweMessage(legacy).error, undefined);
   const resources = ['https://worker.example', 'urn:context-engine:session:slug:fixture'];
-  assert.deepEqual(parseSiweMessage(legacy + '\nResources:\n' + resources.join('\n')).resources, []);
-  assert.deepEqual(parseSiweMessage(legacy + '\nResources:\n- ' + resources.join('\n- ')).resources, resources);
+  assert.match(parseSiweMessage(`${legacy}\nResources:\n${resources.join('\n')}`).error, /Malformed/);
+  assert.deepEqual(parseSiweMessage(`${legacy}\nResources:\n- ${resources.join('\n- ')}`).resources, resources);
 });
 
 test('injected Resources before SIWE fields cannot create a trusted binding', () => {
-  const binding = 'Resources:\n- https://worker.example\n- urn:context-engine:session:slug:fixture';
-  const fields = 'URI: https://app.example\nChain ID: 1\nNonce: nonce\nIssued At: 2026-10-01T00:00:00Z';
-  const head = 'app.example wants you to sign in with your Ethereum account:\n0xabc\n\n';
-  assert.deepEqual(parseSiweMessage(head + binding + '\n' + fields).resources, []);
-  assert.deepEqual(parseSiweMessage(head + fields.replace('Nonce: nonce', 'Nonce: nonce\n' + binding)).resources, []);
-  assert.deepEqual(parseSiweMessage(head + fields + '\n' + binding).resources,
+  const binding = ['Resources:', '- https://worker.example', '- urn:context-engine:session:slug:fixture'];
+  const legacy = clientSiweLines().slice(0, 11);
+  const beforeFields = [...legacy.slice(0, 5), ...binding, ...legacy.slice(5)].join('\n');
+  const betweenFields = [...legacy.slice(0, 9), ...binding, ...legacy.slice(9)].join('\n');
+  assert.match(parseSiweMessage(beforeFields).error, /Malformed/);
+  assert.match(parseSiweMessage(betweenFields).error, /Malformed/);
+  assert.deepEqual(parseSiweMessage([...legacy, ...binding].join('\n')).resources,
     ['https://worker.example', 'urn:context-engine:session:slug:fixture']);
 });

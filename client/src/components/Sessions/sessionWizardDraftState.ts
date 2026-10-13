@@ -483,6 +483,7 @@ export const buildSessionWizardCacheWritePayload = ({
   workerRequirementProof = null,
   provisionedSponsoredContext = null,
   pendingWorkerGroupDrafts = [],
+  nativeTemplateSetupIdentity = '',
 }: AnyRecord = {}): AnyRecord => {
   const workerSecretsRecord =
     workerSecrets && typeof workerSecrets === 'object' && !Array.isArray(workerSecrets)
@@ -534,5 +535,8 @@ export const buildSessionWizardCacheWritePayload = ({
     deployComplete: workerRequirementProof ? false : deployComplete,
     deployWorkerUrl,
     provisionedSponsoredContext,
+    ...(typeof nativeTemplateSetupIdentity === 'string' && nativeTemplateSetupIdentity
+      ? { nativeTemplateSetupIdentity }
+      : {}),
   };
 };

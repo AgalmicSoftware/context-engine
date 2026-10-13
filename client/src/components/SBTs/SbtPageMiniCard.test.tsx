@@ -57,6 +57,7 @@ const createProps = (overrides: Record<string, unknown> = {}) =>
     onMiniBurn: jest.fn(),
     onMiniMint: jest.fn(),
     onMintUnlimitedWithGroupPassword: jest.fn(),
+    onRetryGroupPasswordCheck: jest.fn(),
     onShowMiniPasswordInput: jest.fn(),
     sbtAddress: '0x00000000000000000000000000000000000000f1',
     sbtName: 'Access Badge',

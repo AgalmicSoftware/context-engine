@@ -234,9 +234,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             checkNonceRateLimit: deps?.checkNonceRateLimit,
             ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
             now: deps?.now,
-            buildNonce: () => deps?.buildNonce?.({
-              base64UrlEncode: deps?.base64UrlEncode,
-            }),
+            buildNonce: () => deps?.buildNonce?.(),
             issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (
               deps?.issueNonce || issueNonceBoundary
             )(

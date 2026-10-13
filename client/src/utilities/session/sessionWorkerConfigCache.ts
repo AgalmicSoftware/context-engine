@@ -893,16 +893,3 @@ export const getVerifiedWorkerCanonicalSessionBootstrap = ({
   });
   return verifiedKey && verifiedWorkerCanonicalBootstrapKeys.has(verifiedKey) ? cached : null;
 };
-
-export const clearCachedSessionWorkerConfig = (slugOrOptions: unknown = '', sessionConfig: unknown = null): void => {
-  const identity = resolveSessionWorkerCacheIdentity(normalizeCacheLookupArgs(slugOrOptions, sessionConfig));
-  const store = readSessionWorkerConfigCache();
-  const cacheKey = buildCacheKeyFromIdentity(identity);
-  const slugKey = buildSlugCacheKey(identity.slug);
-  const hadExactEntry = Object.prototype.hasOwnProperty.call(store.bySession, cacheKey);
-  const hadSlugEntry = cacheKey !== slugKey && Object.prototype.hasOwnProperty.call(store.bySession, slugKey);
-  if (!hadExactEntry && !hadSlugEntry) return;
-  delete store.bySession[cacheKey];
-  if (cacheKey !== slugKey) delete store.bySession[slugKey];
-  writeStore(finalizeStore(store.bySession));
-};

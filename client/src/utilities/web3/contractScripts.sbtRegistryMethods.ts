@@ -3,27 +3,6 @@ import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './con
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SignGroupMintAuthorizationInput = {
-  password?: unknown;
-  sbtAddress?: string | null;
-  userAddress?: string | null;
-  walletScopeSbtAddress?: string | null;
-};
-type GenerateInvitePayloadsInput = {
-  password?: unknown;
-  sbtAddress?: string | null;
-  nonces?: Array<string | number>;
-  walletScopeSbtAddress?: string | null;
-};
-type InvitePayloadResult = {
-  nonce: string;
-  signature: string;
-  inviteCode: string;
-};
-type EncodedInvitePayload = {
-  n: string;
-  s: string;
-};
 type SbtMintBurnCountsByAddressResult = {
   mintedCountByAddress: Record<string, number>;
   burnedCountByAddress: Record<string, number>;
@@ -205,6 +184,11 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
       const initializeGroupPasswordHash = !!createOptions?.initializeGroupPasswordHash;
       if (useConfiguredDeterministic && !initializeGroupPasswordHash && hasNonZeroHashValue(groupPasswordHash)) {
         throw new Error('Configured deterministic SBT deployment cannot preinitialize a group password hash.');
+      }
+      // A group password hash is bound to the predicted SBT address. Any other
+      // deploy's address depends on the hash itself, so the hash cannot be valid.
+      if (!useConfiguredDeterministic && hasNonZeroHashValue(groupPasswordHash)) {
+        throw new Error("This group can't be created with a password. Remove the group password and try again.");
       }
       if (useConfiguredDeterministic) {
         if (!ethers.utils.isAddress(String(adminAddress || ''))) {

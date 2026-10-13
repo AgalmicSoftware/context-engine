@@ -105,10 +105,14 @@ export const resolveInterviewPrefillQuestions = async ({
 export const scopeInterviewPrefillToQuestions = (
   packet: InterviewPrefillPacket,
   questions: InterviewQuestion[],
+  responderContext: string,
 ): InterviewPrefillPacket => {
   const ids = new Set(questions.map(({ id }) => id));
+  const summary = responderContext.trim();
   return {
     ...packet,
+    // AI calls get only the context the responder reviewed and edited, never the imported name or facts.
+    responderContext: summary ? { summary } : {},
     ...(packet.responses
       ? { responses: packet.responses.filter(({ questionId }) => ids.has(questionId.trim().toLowerCase())) }
       : {}),

@@ -181,6 +181,24 @@ describe('surveyResultsSummaryModels', () => {
     ]);
   });
 
+  it('excludes partial and over-limit multichoice picks, as the Report does', () => {
+    const summary = buildSurveyResultsMultichoiceSummaryModel(
+      [
+        { responder: '0xA', response: { answer: { value: ['Alpha', 'Unknown'] } } },
+        { responder: '0xB', response: { answer: { value: ['Alpha', 'Beta', 'Gamma'] } } },
+        { responder: '0xC', response: { answer: { value: ['beta', 'Gamma'] } } },
+      ],
+      { options: ['Alpha', 'Beta', 'Gamma'], maxSelections: 2 },
+    );
+
+    expect(summary.totalResponders).toBe(1);
+    expect(summary.options).toEqual([
+      { key: 'alpha', label: 'Alpha', count: 0 },
+      { key: 'beta', label: 'Beta', count: 1 },
+      { key: 'gamma', label: 'Gamma', count: 1 },
+    ]);
+  });
+
   it('derives fallback options only from public, unmasked answers', () => {
     const answers = [
       { value: '*', encrypted: true },

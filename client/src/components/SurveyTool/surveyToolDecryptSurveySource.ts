@@ -24,6 +24,13 @@ const normalizeQuestionKey = (questionId: unknown): string =>
     .trim()
     .toLowerCase();
 
+// Ratings are encrypted with qId `${fieldKey}:${questionId}`. Binding the
+// decrypt to it rejects envelopes moved between ratings or questions.
+const ratingBinding = (fieldKey: 'importance' | 'conviction', questionId: unknown) => {
+  const qid = normalizeQuestionKey(questionId);
+  return qid ? { expectedQId: `${fieldKey}:${qid}` } : {};
+};
+
 const toNum = (value: unknown): number | null => {
   if (value === undefined || value === null) return null;
   const next = Number(value);
@@ -32,7 +39,7 @@ const toNum = (value: unknown): number | null => {
 
 export const decryptQuestionRatingEnvelopes = async (
   ratingEnvelopes: unknown = null,
-  { chainId, lit, account, providerLike }: RatingEnvelopeDecryptContext = {},
+  { chainId, lit, account, providerLike, questionId }: RatingEnvelopeDecryptContext = {},
   { decryptEnvelopeValue, logWarn = () => {} }: RatingEnvelopeDecryptPorts = {},
 ): Promise<QuestionRatingEnvelopeDecryptResult> => {
   let decryptedImportance = null;
@@ -48,6 +55,7 @@ export const decryptQuestionRatingEnvelopes = async (
           chainId,
           providerLike,
           ...(litOpts ? { litOpts } : {}),
+          ...ratingBinding('importance', questionId),
         });
         decryptedImportance = toNum(value);
       } catch (error) {
@@ -61,6 +69,7 @@ export const decryptQuestionRatingEnvelopes = async (
           chainId,
           providerLike,
           ...(litOpts ? { litOpts } : {}),
+          ...ratingBinding('conviction', questionId),
         });
         decryptedConviction = toNum(value);
       } catch (error) {
@@ -95,6 +104,7 @@ export const decryptQuestionRatingEnvelopeMap = async (
             chainId,
             providerLike,
             ...(litOpts ? { litOpts } : {}),
+            ...ratingBinding('importance', questionId),
           });
           const next = toNum(value);
           if (next !== null) decryptedImportanceFromEnv[questionId] = next;
@@ -109,6 +119,7 @@ export const decryptQuestionRatingEnvelopeMap = async (
             chainId,
             providerLike,
             ...(litOpts ? { litOpts } : {}),
+            ...ratingBinding('conviction', questionId),
           });
           const next = toNum(value);
           if (next !== null) decryptedConvictionFromEnv[questionId] = next;

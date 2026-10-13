@@ -1,9 +1,9 @@
 /**
  * @module litGatePolicy
  * @description Lit Protocol gate policy builders — constructs access control condition sets
- *              for survey response encryption and upload gating based on SBT holdings.
+ *              for survey response encryption based on SBT holdings.
  *
- * Key exports: buildResponseGatePolicy, buildUploadGatePolicy, createLitRecipientFromGate
+ * Key exports: buildResponseGatePolicy, createLitRecipientFromGate
  */
 import { buildSbtAccessControlConditions, resolveLitChain } from './litProtocol.js';
 import {
@@ -66,20 +66,6 @@ type GatePolicyArgs = {
 
 type ResponseGatePolicyArgs = GatePolicyArgs & {
   isQuestionResponseFlow?: boolean;
-};
-
-type UploadTargets = {
-  survey?: boolean;
-  questions?: boolean;
-  questionTags?: boolean;
-  docUrls?: boolean;
-  [key: string]: unknown;
-};
-
-type UploadGatePolicyArgs = GatePolicyArgs & {
-  targets?: UploadTargets;
-  isStandaloneQuestion?: boolean;
-  manualGate?: LitGate | null;
 };
 
 type AppendGateRecipientArgs = {
@@ -241,92 +227,5 @@ export const buildResponseGatePolicy = ({
     gates: out.gates,
     recipients: out.recipients,
     allowFallbackConditions: !primaryGateIsExplicitOpen,
-  };
-};
-
-const resolveUploadResourceKeys = ({
-  targets = {},
-  isStandaloneQuestion = false,
-}: {
-  targets?: UploadTargets;
-  isStandaloneQuestion?: boolean;
-} = {}): string[] => {
-  const out: string[] = [];
-  if (isStandaloneQuestion) {
-    if (targets.questions || targets.questionTags) out.push('questionResponses');
-    return out;
-  }
-
-  if (targets.questions || targets.questionTags || targets.survey) out.push('surveyResponses');
-  if (targets.docUrls) out.push('docUrls');
-  return out;
-};
-
-export const buildUploadGatePolicy = ({
-  cfg = {},
-  targets = {},
-  isStandaloneQuestion = false,
-  fallbackChainId = null,
-  manualGate = null,
-}: UploadGatePolicyArgs = {}) => {
-  const resourceKeys = resolveUploadResourceKeys({ targets, isStandaloneQuestion });
-  const states = resourceKeys.map((resourceKey) => ({
-    resourceKey,
-    state: resolveSponsoredGateStateForResource(cfg, resourceKey),
-  }));
-
-  const out: GatePolicyAccumulator = { gates: [], recipients: [] };
-  const dedupe = new Set<string>();
-  const gateDedupe = new Set<string>();
-
-  let hasExplicitOpenResource = false;
-  states.forEach(({ resourceKey, state }) => {
-    if (state?.status === SPONSORED_GATE_STATES.OPEN) {
-      hasExplicitOpenResource = true;
-      return;
-    }
-    if (state?.status === SPONSORED_GATE_STATES.RESTRICTED && state.gate) {
-      appendGateRecipient({
-        out,
-        dedupe,
-        gateDedupe,
-        gate: state.gate,
-        fallbackChainId,
-        resourceKey,
-      });
-    }
-  });
-
-  const hasNonOpenResource = states.some(({ state }) => state?.status !== SPONSORED_GATE_STATES.OPEN);
-  if (hasNonOpenResource) {
-    const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
-    if (defaultState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultState.gate) {
-      appendGateRecipient({
-        out,
-        dedupe,
-        gateDedupe,
-        gate: defaultState.gate,
-        fallbackChainId,
-        resourceKey: 'default',
-      });
-    }
-  }
-
-  if (manualGate) {
-    appendGateRecipient({
-      out,
-      dedupe,
-      gateDedupe,
-      gate: manualGate,
-      fallbackChainId,
-      resourceKey: 'manual',
-    });
-  }
-
-  return {
-    resourceKeys,
-    gates: out.gates,
-    recipients: out.recipients,
-    hasExplicitOpenResource,
   };
 };

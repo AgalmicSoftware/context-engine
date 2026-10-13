@@ -5,7 +5,6 @@ import corpusSample from './corpus_sample.json';
 import demoAnalysisGenerationConfig from './demo_analysis_generation_config.json';
 import debateMapData from './debate_map_demo_data.json';
 import demoAnalysisData from './demo_analysis_data.json';
-import debates from './debates.json';
 import demoPolisData from './demo_polis_data.json';
 import loopholeHistoricalCases from './loophole_historical_cases.json';
 import loopholeHistoricalFigurePrinciples from './loophole_historical_figure_principles.json';
@@ -58,34 +57,6 @@ describe('demo data fixture cleanup', () => {
     expect(Object.keys(demoAnalysisGenerationConfig.questionOverridesByQuestionId).length).toBeGreaterThan(0);
     expect(Array.isArray(demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles)).toBe(true);
     expect(demoAnalysisGenerationConfig.syntheticParticipantConfig.variantProfiles.length).toBeGreaterThan(0);
-  });
-
-  it('merges the split debate fixtures into a single dataset', () => {
-    const demoDir = __dirname;
-
-    expect(fs.existsSync(path.join(demoDir, 'debates.json'))).toBe(true);
-    expect(fs.existsSync(path.join(demoDir, 'debates_part1.json'))).toBe(false);
-    expect(fs.existsSync(path.join(demoDir, 'debates_part2.json'))).toBe(false);
-    expect(Array.isArray(debates)).toBe(true);
-    expect(debates).toHaveLength(16);
-    expect(debates.map((debate) => debate.id)).toEqual([
-      'debate_exponential_progress',
-      'debate_reward_hacking_misalignment',
-      'debate_predeployment_eval_adequacy',
-      'debate_ai_rd_automation',
-      'debate_open_vs_closed_safety',
-      'debate_benchmark_validity',
-      'debate_regulation_speed',
-      'debate_deceptive_alignment',
-      'debate_ai_water_usage',
-      'debate_ai_labor_automation',
-      'debate_ai_education_integrity',
-      'debate_ai_copyright_training',
-      'debate_multimodal_deepfake_governance',
-      'debate_government_prerelease_access',
-      'debate_alignment_tractability_2026',
-      'debate_ai_labor_displacement_timeline',
-    ]);
   });
 
   it('keeps the client demo corpus sample curated around featured-first entries on visible tabs', () => {

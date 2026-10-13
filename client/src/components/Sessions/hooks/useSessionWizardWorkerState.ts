@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useState } from 'react';
 import type { WorkerPanelProps } from '../WorkerPanel';
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
@@ -29,6 +29,7 @@ type CachedWorkerState =
       workerAllowOrigins?: unknown;
       workerLimitPerWallet?: unknown;
       workerLimitPerAnonymousIp?: unknown;
+      nativeTemplateSetupIdentity?: unknown;
     }
   | null
   | undefined;
@@ -85,12 +86,8 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
     typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true,
   );
+  // Secret persistence is intentionally unsupported in every build.
   const persistWorkerSecrets = false;
-  const setPersistWorkerSecrets = useCallback<Dispatch<SetStateAction<boolean>>>((nextValue) => {
-    // Kept as a compatibility callback for sponsored-bundle state restoration.
-    // Secret persistence is intentionally unsupported in every build.
-    void nextValue;
-  }, []);
   const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(deployHelperUrlDefault));
   const [deployForm, setDeployForm] = useState<DeployFormState>({
     // Cloudflare deployment tokens are request-only. Ignore legacy cache values.
@@ -130,6 +127,12 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     return sanitizeSessionWizardWorkerSecretsForLitMode(safePublicConfig);
   });
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
+  // Non-secret "template setup values were generated for this slug and admin"
+  // marker. It outlives the Worker step's own state, so a Worker verified after
+  // a step change or reload is still known to come from the Cloudflare template.
+  const [nativeTemplateSetupIdentity, setNativeTemplateSetupIdentity] = useState(() =>
+    typeof cachedWizard?.nativeTemplateSetupIdentity === 'string' ? cachedWizard.nativeTemplateSetupIdentity : '',
+  );
   const [workerAllowOrigins, setWorkerAllowOrigins] = useState(() =>
     typeof cachedWizard?.workerAllowOrigins === 'string' ? cachedWizard.workerAllowOrigins : defaultAllowedOrigins,
   );
@@ -156,7 +159,6 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     workerSecretsEnabled,
     setWorkerSecretsEnabled,
     persistWorkerSecrets,
-    setPersistWorkerSecrets,
     deployHelperUrl,
     setDeployHelperUrl,
     deployForm,
@@ -185,6 +187,8 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     setWorkerSecrets,
     workerUrlAutoFilled,
     setWorkerUrlAutoFilled,
+    nativeTemplateSetupIdentity,
+    setNativeTemplateSetupIdentity,
     workerAllowOrigins,
     setWorkerAllowOrigins,
     workerLimitPerWallet,

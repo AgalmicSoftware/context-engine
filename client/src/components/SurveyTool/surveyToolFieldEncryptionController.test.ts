@@ -420,3 +420,54 @@ describe('surveyToolFieldEncryptionController', () => {
     });
   });
 });
+
+describe('unlocking fields that are still masked', () => {
+  const locked = (value: string, audienceMode = 'explicit'): TestFieldState => ({
+    value,
+    encrypted: true,
+    encryptionAudience: 'self_admin',
+    encryptionGateId: null,
+    audienceMode,
+  });
+
+  it('refuses to make a decrypted answer public while its Match Answer comment is masked', () => {
+    const slice = makeSlice({
+      answers: { q1: locked('Decrypted answer') },
+      additionalComments: { q1: locked('*', 'inherit') },
+    });
+    const plan = buildEncryptionTogglePlan('q1', 'answer', false, slice, makeDeps());
+
+    expect(plan.blockedReason).toMatch(/decrypt/i);
+    expect(plan.nextFieldState).toEqual(slice.answers.q1);
+    expect(plan.nextAdditionalState).toBeNull();
+  });
+
+  it('refuses to make a masked answer or comment public', () => {
+    const slice = makeSlice({ answers: { q1: locked('*') }, additionalComments: { q1: locked('*') } });
+
+    expect(buildEncryptionTogglePlan('q1', 'answer', false, slice, makeDeps()).blockedReason).toBeTruthy();
+    expect(buildEncryptionTogglePlan('q1', 'additional', false, slice, makeDeps()).blockedReason).toBeTruthy();
+    expect(buildAdditionalAudienceSelectionPlan('q1', 'none', '', slice, makeDeps()).blockedReason).toBeTruthy();
+  });
+
+  it('refuses to let a masked comment follow a public answer', () => {
+    const slice = makeSlice({
+      answers: { q1: { ...locked('Public answer'), encrypted: false } },
+      additionalComments: { q1: locked('*') },
+    });
+
+    expect(buildAdditionalAudienceSelectionPlan('q1', 'inherit', '', slice, makeDeps()).blockedReason).toBeTruthy();
+  });
+
+  it('still unlocks once both fields are decrypted', () => {
+    const slice = makeSlice({
+      answers: { q1: locked('Decrypted answer') },
+      additionalComments: { q1: locked('Decrypted comment', 'inherit') },
+    });
+    const plan = buildEncryptionTogglePlan('q1', 'answer', false, slice, makeDeps());
+
+    expect(plan.blockedReason).toBeUndefined();
+    expect(plan.nextFieldState.encrypted).toBe(false);
+    expect(plan.nextAdditionalState).toMatchObject({ value: 'Decrypted comment', encrypted: false });
+  });
+});

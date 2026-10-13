@@ -6,6 +6,7 @@ import { isBrowserOriginAllowedBySessionWorkerConfig } from '../../utilities/ses
 import { getChainById } from '../../variables/chains.js';
 import type { SessionConfigLike } from '../shellTypes';
 import type { AppShell } from './AppShell';
+import { initializeMainSiteWorkerCanonicalCaches } from './mainSiteWorkerCanonicalCacheRuntime.js';
 import { mergeMainSiteSessionDisplayConfig } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 
@@ -94,7 +95,6 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
   }
 
   try {
-    const { initializeMainSiteWorkerCanonicalCaches } = await import('./mainSiteWorkerCanonicalCacheRuntime.js');
     await initializeMainSiteWorkerCanonicalCaches({
       host,
       sessionConfig,
@@ -105,12 +105,13 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
   } catch (error: unknown) {
     if (isCurrent()) {
       logError('[WorkerCanonical] Cache initialization failed:', error);
+      // Response readiness belongs to the response hydration controller: a failed
+      // load proves nothing about saved answers, so uploads must keep waiting.
       host.setReadinessStateIfChanged(
         {
           isSBTCacheReady: true,
           isSurveyCacheReady: true,
           isQuestionCacheReady: true,
-          isResponsesCacheReady: true,
           surveyCacheInitializationError: true,
           questionCacheInitializationError: true,
         },

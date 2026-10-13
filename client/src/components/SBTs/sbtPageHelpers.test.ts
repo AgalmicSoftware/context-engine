@@ -729,6 +729,7 @@ describe('sbtPageHelpers', () => {
         hasPasswordMint: true,
       }),
     ).toEqual({
+      groupPasswordCheckUnreadable: false,
       hasGroupHash: true,
       hasInviteMint: true,
       hasGroupPasswordMint: false,
@@ -740,6 +741,7 @@ describe('sbtPageHelpers', () => {
         hasPasswordMint: false,
       }),
     ).toEqual({
+      groupPasswordCheckUnreadable: false,
       hasGroupHash: true,
       hasInviteMint: false,
       hasGroupPasswordMint: true,
@@ -751,6 +753,7 @@ describe('sbtPageHelpers', () => {
         hasPasswordMint: true,
       }),
     ).toEqual({
+      groupPasswordCheckUnreadable: false,
       hasGroupHash: false,
       hasInviteMint: false,
       hasGroupPasswordMint: false,
@@ -762,6 +765,33 @@ describe('sbtPageHelpers', () => {
     expect(resolveSbtPageCopyableErrorText({ message: 'object error' })).toBe('object error');
     expect(resolveSbtPageCopyableErrorText('')).toBe('');
     expect(buildSessionRoutePath(' Edge Session ', '/base/')).toBe('/base/session/Edge%20Session');
+  });
+
+  it.each([
+    [
+      'no mint mode: unknown, never open',
+      { hasPasswordMint: false },
+      { groupPasswordCheckUnreadable: true, hasGroupHash: true, hasInviteMint: false, hasGroupPasswordMint: true },
+    ],
+    [
+      'an open mint mode',
+      { hasPasswordMint: false, mintMode: 0 },
+      { groupPasswordCheckUnreadable: false, hasGroupHash: false, hasInviteMint: false, hasGroupPasswordMint: false },
+    ],
+    [
+      'a group-signature mint mode',
+      { hasPasswordMint: false, mintMode: 2 },
+      { groupPasswordCheckUnreadable: false, hasGroupHash: true, hasInviteMint: false, hasGroupPasswordMint: true },
+    ],
+    [
+      'an invite mint mode',
+      { hasPasswordMint: true, mintMode: 3 },
+      { groupPasswordCheckUnreadable: false, hasGroupHash: true, hasInviteMint: true, hasGroupPasswordMint: false },
+    ],
+  ])('classifies a failed group-hash read with %s', (_case, input, expected) => {
+    expect(resolveSbtPageGroupPasswordMintState({ groupPasswordHash: null, hashZero: '0x0', ...input })).toEqual(
+      expected,
+    );
   });
 
   it('normalizes SBT history summaries and epoch second values', () => {

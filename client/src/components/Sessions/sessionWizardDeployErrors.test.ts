@@ -1,12 +1,14 @@
 import {
   buildSessionWizardDeployHelperCorsMessage,
   buildSessionWizardDeployHelperWorkersDevStatusMessage,
+  describeSessionWizardSponsoredDeployFailure,
   formatSessionWizardDeployBundleDiagnostics,
   formatSessionWizardDeployOrphanResources,
   normalizeSessionWizardDeployErrorMessage,
   resolveSessionWizardDeployStatusDisplayState,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from './sessionWizardDeployErrors';
+import { completeSessionWizardWorkerPublicDeployment } from './sessionWizardWorkerPublicVerification';
 
 describe('sessionWizardDeployErrors', () => {
   it('builds the deploy-helper CORS message with origin and helper details', () => {
@@ -196,6 +198,57 @@ describe('sessionWizardDeployErrors', () => {
       }),
     ).toBe(
       'This deployment request is already bound to a different Cloudflare account. Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.',
+    );
+  });
+
+  it('explains how to recover a deploy grant when the sponsor has no Worker release set', () => {
+    expect(
+      describeSessionWizardSponsoredDeployFailure({
+        status: 400,
+        error:
+          'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker.',
+      }),
+    ).toBe(
+      'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker. Your deploy grant was not used. It will work once the sponsor sets these on their Worker.',
+    );
+    expect(
+      describeSessionWizardSponsoredDeployFailure({
+        status: 400,
+        error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).',
+      }),
+    ).toBe(
+      'The sponsoring Worker has no Worker release to deploy, so nothing was deployed. The grant now only works for ' +
+        'this exact request: retry this same draft here once the sponsor sets WORKER_BUNDLE_URL on that Worker. ' +
+        'If the sponsor updates its Worker code instead, ask for a new deploy grant.',
+    );
+    expect(describeSessionWizardSponsoredDeployFailure({ status: 400, error: 'Missing deployPayload.' })).toBe(
+      'Missing deployPayload.',
+    );
+    expect(describeSessionWizardSponsoredDeployFailure({ status: 502 })).toBe('Worker deploy failed (502).');
+  });
+
+  it('keeps session Worker verification failures out of deploy-helper hints', async () => {
+    const verificationError = await completeSessionWizardWorkerPublicDeployment({
+      workerUrl: 'https://worker.example.test',
+      slug: 'session',
+      sessionId: '0x00000000000000000000000000000001',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      config: {},
+      isWorkerCanonical: true,
+      signAdminAction: async () => ({}),
+      verify: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+    }).catch((error: unknown) => error);
+
+    expect(
+      normalizeSessionWizardDeployErrorMessage({
+        err: verificationError,
+        helperBase: 'https://helper.example.test',
+        currentOrigin: 'https://app.example.test',
+      }),
+    ).toBe(
+      'Worker infrastructure was created, but public config readback and browser-origin verification are still pending. Last error: Failed to fetch',
     );
   });
 

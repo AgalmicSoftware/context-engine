@@ -1,17 +1,22 @@
 import { webcrypto } from 'crypto';
-import { cryptoUtils } from './cryptography.js';
+import { ethers } from 'ethers';
+import { clearDecryptCaches, cryptoUtils } from './cryptography.js';
 
-const ACCOUNT = '0x00000000000000000000000000000000000000aa';
+const SIG_A = new ethers.Wallet(`0x${'11'.repeat(32)}`);
+const ACCOUNT = SIG_A.address;
 const CHAIN_ID = 84532;
 const SURVEY_ID = `0x${'34'.repeat(32)}`;
 const OTHER_SURVEY_ID = `0x${'56'.repeat(32)}`;
-const SIG_A = `0x${'11'.repeat(65)}`;
 
-const makeProvider = (signatureHex) => ({
-  request: jest.fn(async ({ method }) => {
+const makeProvider = (wallet) => ({
+  request: jest.fn(async ({ method, params }) => {
     if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [ACCOUNT];
     if (method === 'eth_chainId') return '0x14a34';
-    if (method === 'eth_signTypedData_v4') return signatureHex;
+    if (method === 'eth_signTypedData_v4') {
+      const { domain, types, message } = JSON.parse(params[1]);
+      delete types.EIP712Domain;
+      return wallet._signTypedData(domain, types, message);
+    }
     throw new Error(`Unexpected wallet method: ${method}`);
   }),
 });
@@ -151,7 +156,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         surveyId: SURVEY_ID,
         throwOnError: true,
       }),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
   });
 
   it('rejects decrypted envelopes when the caller expects a different survey id', async () => {
@@ -181,7 +186,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
         surveyId: OTHER_SURVEY_ID,
         throwOnError: true,
       }),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
   });
 
   it('rejects decrypted envelopes transplanted between answer and additional fields', async () => {
@@ -224,7 +229,7 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
           throwOnError: true,
         },
       ),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
 
     await expect(
       cryptoUtils.decryptSingleField(
@@ -245,8 +250,63 @@ describe('cryptoUtils decrypt envelope cache key scoping', () => {
           throwOnError: true,
         },
       ),
-    ).rejects.toThrow('Encrypted payload is bound to a different survey field.');
+    ).rejects.toThrow(/envelope binding mismatch/);
   });
+});
+
+it('checks the expected survey and question bindings on envelope values', async () => {
+  Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  const provider = makeProvider(SIG_A);
+  const envelope = await cryptoUtils.encryptEnvelopeValue(4, {
+    providerKind: provider,
+    account: ACCOUNT,
+    chainId: CHAIN_ID,
+    surveyId: SURVEY_ID,
+    kind: 'rating',
+    qId: 'importance:q1',
+  });
+  const decrypt = (binding) =>
+    cryptoUtils.decryptEnvelopeValue(envelope, {
+      providerLike: provider,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      ...binding,
+    });
+
+  await expect(decrypt({ expectedQId: 'conviction:q1' })).rejects.toThrow(/envelope binding mismatch/);
+  await expect(decrypt({ expectedQId: 'importance:q2' })).rejects.toThrow(/envelope binding mismatch/);
+  await expect(decrypt({ expectedSurveyId: OTHER_SURVEY_ID })).rejects.toThrow(/envelope binding mismatch/);
+  await expect(decrypt({ expectedQId: 'IMPORTANCE:Q1', expectedSurveyId: SURVEY_ID })).resolves.toBe(4);
+});
+
+it('drops cached plaintext, including decrypts still in flight, when caches are cleared', async () => {
+  Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+  const provider = makeProvider(SIG_A);
+  const envelope = await cryptoUtils.encryptEnvelopeValue('cached secret', {
+    providerKind: provider,
+    account: ACCOUNT,
+    chainId: CHAIN_ID,
+    qId: 'cache-clear',
+  });
+  const decrypt = () => cryptoUtils.decryptEnvelopeValue(envelope, { providerLike: provider, account: ACCOUNT });
+  const signCount = () =>
+    provider.request.mock.calls.filter(([payload]) => payload?.method === 'eth_signTypedData_v4').length;
+  const signsBeforeDecrypt = signCount();
+
+  await expect(decrypt()).resolves.toBe('cached secret');
+  await expect(decrypt()).resolves.toBe('cached secret');
+  expect(signCount() - signsBeforeDecrypt).toBe(1);
+
+  clearDecryptCaches();
+  await expect(decrypt()).resolves.toBe('cached secret');
+  expect(signCount() - signsBeforeDecrypt).toBe(2);
+
+  clearDecryptCaches();
+  const inFlight = decrypt();
+  clearDecryptCaches();
+  await expect(inFlight).resolves.toBe('cached secret');
+  await expect(decrypt()).resolves.toBe('cached secret');
+  expect(signCount() - signsBeforeDecrypt).toBe(4);
 });
 
 it('round-trips signed quadratic allocations through self-encrypted response envelopes', async () => {

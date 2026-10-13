@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
@@ -26,6 +26,10 @@ const SessionWizardInfoTooltip = ({
   testId = '',
   ariaLabel = 'Show more info',
 }: SessionWizardInfoTooltipProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  useEffect(() => {
+    if (!enabled) setIsOpen(false);
+  }, [enabled]);
   const tooltipText = toStr(content).trim();
   if (!enabled || !id || !tooltipText) return null;
 
@@ -39,12 +43,31 @@ const SessionWizardInfoTooltip = ({
         role="button"
         tabIndex={0}
         aria-label={ariaLabel}
+        aria-describedby={isOpen ? `${id}-content` : undefined}
+        onMouseEnter={() => setIsOpen(true)}
+        onMouseLeave={() => setIsOpen(false)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        onClick={() => setIsOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsOpen(false);
+          } else if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setIsOpen(true);
+          }
+        }}
       >
         <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} />
       </span>
+      {/* A tap can produce hover, focus, and click; each should open help rather than toggle it. */}
       <CETooltip
+        id={`${id}-content`}
+        isOpen={isOpen}
         placement={placement}
-        trigger="hover focus click"
+        trigger="manual"
         target={id}
         className={styles.tooltipBubble}
         delay={0}

@@ -93,6 +93,7 @@ type SbtPageOpenMintReadinessDescriptor = {
   isPending: boolean;
 };
 type ResolveSbtPagePasswordJoinButtonStateArgs = {
+  groupPasswordChecking?: unknown;
   groupPasswordInput?: unknown;
   mintingStatus?: unknown;
 };
@@ -103,9 +104,11 @@ type SbtPagePasswordJoinButtonState = {
 type ResolveSbtPagePendingButtonContentStateArgs = {
   isPending?: unknown;
   label?: unknown;
+  pendingLabel?: unknown;
 };
 export type SbtPagePendingButtonContentState = {
   label: string;
+  pendingLabel?: string;
   shouldRenderLabel: boolean;
   shouldRenderPendingIcon: boolean;
 };
@@ -222,6 +225,8 @@ type SbtPageMiniOpenMintButtonState = {
   isSuccess: boolean;
 };
 type ResolveSbtPageMiniMintFlowDisplayStateArgs = {
+  // The group's password check could not be read: offer Retry instead of any join.
+  groupPasswordCheckUnreadable?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
   hasPasswordMint?: unknown;
@@ -237,6 +242,7 @@ type ResolveSbtPageMiniMintActionPlanArgs = ResolveSbtPageMiniMintFlowDisplaySta
   miniPasswordJoinButtonState?: { disabled?: unknown } | null;
 };
 type SbtPageMiniMintFlowDisplayState = {
+  shouldRenderGroupPasswordCheckRetry: boolean;
   shouldRenderGroupPasswordDisclosureButton: boolean;
   shouldRenderGroupPasswordInput: boolean;
   shouldRenderInviteDisclosureButton: boolean;
@@ -251,11 +257,17 @@ type SbtPageMiniMintFlowDisplayState = {
 export type SbtPageMiniMintActionBlockedReason =
   'none' | 'already-has-token' | 'mini-mint-unavailable' | 'mint-ended' | 'no-visible-action';
 export type SbtPageMiniMintActionHandlerKind =
-  'none' | 'claim-with-invite-code' | 'mini-mint' | 'mint-unlimited-with-group-password' | 'show-password-input';
+  | 'none'
+  | 'claim-with-invite-code'
+  | 'mini-mint'
+  | 'mint-unlimited-with-group-password'
+  | 'retry-group-password-check'
+  | 'show-password-input';
 export type SbtPageMiniMintActionInertReason = 'none' | 'disabled' | 'hidden' | 'status-only';
-export type SbtPageMiniMintActionLabelKind = 'none' | 'countdown' | 'finish' | 'join' | 'minted' | 'status';
+export type SbtPageMiniMintActionLabelKind = 'none' | 'countdown' | 'finish' | 'join' | 'minted' | 'retry' | 'status';
 export type SbtPageMiniMintActionViewKind =
   | 'hidden'
+  | 'group-password-check-retry'
   | 'group-password-disclosure'
   | 'group-password-input'
   | 'invite-disclosure'
@@ -328,6 +340,8 @@ type ResolveSbtPageMiniCardDisplayStateArgs = {
   burningStatus?: unknown;
   burnButtonClassName?: unknown;
   claimCountdown?: unknown;
+  groupPasswordCheckUnreadable?: unknown;
+  groupPasswordChecking?: unknown;
   groupPasswordInput?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
@@ -384,6 +398,8 @@ type ResolveSbtPageAdminActionDisplayPlanArgs = ResolveSbtPageAdminActionStateAr
   sbtLabel?: unknown;
 };
 type ResolveSbtPageMintFlowDisplayStateArgs = {
+  // The group's password check could not be read: offer Retry instead of any join.
+  groupPasswordCheckUnreadable?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
   mintingStatus?: unknown;
@@ -413,6 +429,7 @@ export type SbtPageAdminActionDisplayPlan = SbtPageAdminActionState & {
 type SbtPageMintFlowDisplayState = {
   shouldRenderClaimCountdown: boolean;
   shouldRenderClaimSuccess: boolean;
+  shouldRenderGroupPasswordCheckRetry: boolean;
   shouldRenderGroupPasswordJoin: boolean;
   shouldRenderInviteJoin: boolean;
   shouldRenderManualClaimFinish: boolean;
@@ -433,6 +450,8 @@ type SbtPageMintActionPlan = {
 };
 type ResolveSbtPageMintButtonDisplayStateArgs = ShouldRenderSbtPageMintButtonArgs & {
   claimCountdown?: unknown;
+  groupPasswordCheckUnreadable?: unknown;
+  groupPasswordChecking?: unknown;
   groupPasswordInput?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
@@ -547,6 +566,7 @@ export const resolveSbtPageMiniActionFailureState = ({
 });
 
 export const resolveSbtPageMiniMintFlowDisplayState = ({
+  groupPasswordCheckUnreadable = false,
   hasGroupPasswordMint = false,
   hasInviteMint = false,
   hasPasswordMint = false,
@@ -557,12 +577,16 @@ export const resolveSbtPageMiniMintFlowDisplayState = ({
   showMiniPasswordInput = false,
 }: ResolveSbtPageMiniMintFlowDisplayStateArgs = {}): SbtPageMiniMintFlowDisplayState => {
   const canRenderMintFlow = !hasTokenMini && !!isMintingActive && !!miniMintable;
-  const isGroupPasswordFlow = canRenderMintFlow && !!hasGroupPasswordMint;
-  const isInviteFlow = canRenderMintFlow && !isGroupPasswordFlow && !!hasInviteMint;
-  const isManualPasswordFlow = canRenderMintFlow && !isGroupPasswordFlow && !isInviteFlow && !!hasPasswordMint;
+  // An unreadable password check replaces every join with Retry, so nothing claims openly by mistake.
+  const isCheckRetry = canRenderMintFlow && !!groupPasswordCheckUnreadable;
+  const canJoin = canRenderMintFlow && !isCheckRetry;
+  const isGroupPasswordFlow = canJoin && !!hasGroupPasswordMint;
+  const isInviteFlow = canJoin && !isGroupPasswordFlow && !!hasInviteMint;
+  const isManualPasswordFlow = canJoin && !isGroupPasswordFlow && !isInviteFlow && !!hasPasswordMint;
   const step = mintStep as number;
   const inputVisible = !!showMiniPasswordInput;
   return {
+    shouldRenderGroupPasswordCheckRetry: isCheckRetry,
     shouldRenderGroupPasswordDisclosureButton: isGroupPasswordFlow && !inputVisible,
     shouldRenderGroupPasswordInput: isGroupPasswordFlow && inputVisible,
     shouldRenderInviteDisclosureButton: isInviteFlow && !inputVisible,
@@ -572,7 +596,7 @@ export const resolveSbtPageMiniMintFlowDisplayState = ({
     shouldRenderManualPasswordDisclosureButton: isManualPasswordFlow && step === 0 && !inputVisible,
     shouldRenderManualPasswordFinishInput: isManualPasswordFlow && step === 2,
     shouldRenderManualPasswordStartInput: isManualPasswordFlow && step === 0 && inputVisible,
-    shouldRenderOpenMintButton: canRenderMintFlow && !isGroupPasswordFlow && !isInviteFlow && !isManualPasswordFlow,
+    shouldRenderOpenMintButton: canJoin && !isGroupPasswordFlow && !isInviteFlow && !isManualPasswordFlow,
   };
 };
 
@@ -628,6 +652,7 @@ const buildMiniMintStatusActionPlan = ({
 });
 
 export const resolveSbtPageMiniMintActionPlan = ({
+  groupPasswordCheckUnreadable = false,
   hasGroupPasswordMint = false,
   hasInviteMint = false,
   hasPasswordMint = false,
@@ -651,6 +676,7 @@ export const resolveSbtPageMiniMintActionPlan = ({
   }
 
   const flow = resolveSbtPageMiniMintFlowDisplayState({
+    groupPasswordCheckUnreadable,
     hasGroupPasswordMint,
     hasInviteMint,
     hasPasswordMint,
@@ -661,6 +687,13 @@ export const resolveSbtPageMiniMintActionPlan = ({
     showMiniPasswordInput,
   });
 
+  if (flow.shouldRenderGroupPasswordCheckRetry) {
+    return buildMiniMintActionPlan({
+      handlerKind: 'retry-group-password-check',
+      labelKind: 'retry',
+      viewKind: 'group-password-check-retry',
+    });
+  }
   if (flow.shouldRenderGroupPasswordDisclosureButton) {
     return buildMiniMintActionPlan({
       handlerKind: 'show-password-input',
@@ -857,10 +890,11 @@ export const resolveSbtPageOpenMintButtonState = ({
 };
 
 export const resolveSbtPagePasswordJoinButtonState = ({
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   mintingStatus = '',
 }: ResolveSbtPagePasswordJoinButtonStateArgs = {}): SbtPagePasswordJoinButtonState => {
-  const isPending = mintingStatus === 'pending';
+  const isPending = mintingStatus === 'pending' || groupPasswordChecking === true;
   return {
     disabled: isPending || String(groupPasswordInput || '').trim() === '',
     isPending,
@@ -870,14 +904,19 @@ export const resolveSbtPagePasswordJoinButtonState = ({
 export const resolveSbtPagePendingButtonContentState = ({
   isPending = false,
   label = '',
+  pendingLabel = '',
 }: ResolveSbtPagePendingButtonContentStateArgs = {}): SbtPagePendingButtonContentState => {
   const pending = !!isPending;
   return {
     label: String(label || ''),
+    ...(pending && pendingLabel ? { pendingLabel: String(pendingLabel) } : {}),
     shouldRenderLabel: !pending,
     shouldRenderPendingIcon: pending,
   };
 };
+
+// The group password KDF takes about a second, so say what the spinner is waiting on.
+const GROUP_PASSWORD_CHECKING_LABEL = 'Checking password…';
 
 export const resolveSbtPageStatusButtonContentState = ({
   failureLabel = 'Failed',
@@ -1017,6 +1056,8 @@ export const resolveSbtPageManualClaimActionRequest = ({
 export const resolveSbtPageMintButtonDisplayState = ({
   burningStatus = '',
   claimCountdown = '',
+  groupPasswordCheckUnreadable = false,
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1038,14 +1079,17 @@ export const resolveSbtPageMintButtonDisplayState = ({
     userHasSBT,
   });
   const passwordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
+    groupPasswordChecking,
     groupPasswordInput,
     mintingStatus,
   });
   const passwordJoinContentState = resolveSbtPagePendingButtonContentState({
     isPending: passwordJoinButtonState.isPending,
     label: 'Join',
+    pendingLabel: groupPasswordChecking === true ? GROUP_PASSWORD_CHECKING_LABEL : '',
   });
   const mintFlowDisplayState = resolveSbtPageMintFlowDisplayState({
+    groupPasswordCheckUnreadable,
     hasGroupPasswordMint,
     hasInviteMint,
     mintingStatus,
@@ -1093,6 +1137,8 @@ export const resolveSbtPageFullActionDisplayPlan = ({
   burnButtonClassName = '',
   burnLabel = 'Burn',
   claimCountdown = '',
+  groupPasswordCheckUnreadable = false,
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1111,6 +1157,8 @@ export const resolveSbtPageFullActionDisplayPlan = ({
   const mintButtonDisplayState = resolveSbtPageMintButtonDisplayState({
     burningStatus,
     claimCountdown,
+    groupPasswordCheckUnreadable,
+    groupPasswordChecking,
     groupPasswordInput,
     hasGroupPasswordMint,
     hasInviteMint,
@@ -1301,6 +1349,8 @@ export const resolveSbtPageMiniCardDisplayState = ({
   burningStatus = '',
   burnButtonClassName = '',
   claimCountdown = '',
+  groupPasswordCheckUnreadable = false,
+  groupPasswordChecking = false,
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1328,6 +1378,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     userHasSBT,
   });
   const miniPasswordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
+    groupPasswordChecking,
     groupPasswordInput,
     mintingStatus,
   });
@@ -1351,6 +1402,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     inputMaxWidth: '140px',
   });
   const miniMintActionPlan = resolveSbtPageMiniMintActionPlan({
+    groupPasswordCheckUnreadable,
     hasGroupPasswordMint,
     hasInviteMint,
     hasPasswordMint: info.hasPasswordMint,
@@ -1428,6 +1480,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     miniPasswordJoinContentState: resolveSbtPagePendingButtonContentState({
       isPending: miniPasswordJoinButtonState.isPending,
       label: 'Join',
+      pendingLabel: groupPasswordChecking === true ? GROUP_PASSWORD_CHECKING_LABEL : '',
     }),
     miniTokenActionDisplayState,
   };
@@ -1560,6 +1613,7 @@ export const resolveSbtPageAdminActionDisplayPlan = ({
 };
 
 export const resolveSbtPageMintFlowDisplayState = ({
+  groupPasswordCheckUnreadable = false,
   hasGroupPasswordMint = false,
   hasInviteMint = false,
   mintingStatus = '',
@@ -1567,16 +1621,19 @@ export const resolveSbtPageMintFlowDisplayState = ({
   sbtInfo = null,
 }: ResolveSbtPageMintFlowDisplayStateArgs = {}): SbtPageMintFlowDisplayState => {
   const hasSuccessfulMint = mintingStatus === 'success';
-  const isGroupPasswordFlow = !!hasGroupPasswordMint;
-  const isInviteFlow = !isGroupPasswordFlow && !!hasInviteMint;
+  // An unreadable password check replaces every join with Retry, so nothing claims openly by mistake.
+  const isCheckRetry = !!groupPasswordCheckUnreadable;
+  const isGroupPasswordFlow = !isCheckRetry && !!hasGroupPasswordMint;
+  const isInviteFlow = !isCheckRetry && !isGroupPasswordFlow && !!hasInviteMint;
   const info = isSbtPageActionRecord(sbtInfo) ? sbtInfo : {};
   const hasPasswordMint = !!info.hasPasswordMint;
-  const shouldRenderOpenMintButton = !isGroupPasswordFlow && !isInviteFlow && !hasPasswordMint;
-  const shouldRenderManualClaimFlow = !isGroupPasswordFlow && !isInviteFlow && hasPasswordMint;
+  const shouldRenderOpenMintButton = !isCheckRetry && !isGroupPasswordFlow && !isInviteFlow && !hasPasswordMint;
+  const shouldRenderManualClaimFlow = !isCheckRetry && !isGroupPasswordFlow && !isInviteFlow && hasPasswordMint;
   const step = Number(mintStep || 0);
   return {
     shouldRenderClaimCountdown: shouldRenderManualClaimFlow && step === 1,
     shouldRenderClaimSuccess: shouldRenderManualClaimFlow && step === 3,
+    shouldRenderGroupPasswordCheckRetry: isCheckRetry && !hasSuccessfulMint,
     shouldRenderGroupPasswordJoin: isGroupPasswordFlow && !hasSuccessfulMint,
     shouldRenderInviteJoin: isInviteFlow && !hasSuccessfulMint,
     shouldRenderManualClaimFinish: shouldRenderManualClaimFlow && step === 2,

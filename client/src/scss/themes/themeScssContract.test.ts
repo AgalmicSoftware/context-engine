@@ -55,6 +55,7 @@ describe('runtime SCSS theme contract', () => {
 
     expect(result.css).toContain(':root[data-ce-theme=context-engine]');
     expect(result.css).toContain(':root[data-ce-theme=classic-95]');
+    expect(result.css).toContain(':root[data-ce-theme=civic]');
     expect(result.css).toContain('--ce-canvas: #008080');
     expect(result.css).toContain('--ce-layout-profile: standard-app');
     expect(result.css).toContain('--ce-layout-profile: desktop-window');
@@ -101,12 +102,28 @@ describe('runtime SCSS theme contract', () => {
       '--ce-settings-panel-bg: color-mix(in srgb, var(--ce-overlay-surface) 92%, transparent)',
     );
     expect(result.css).toContain('--ce-color-primary: var(--ce-action-primary)');
+    const definedTokens = new Set([...result.css.matchAll(/(--ce-[\w-]+)\s*:/g)].map((match) => match[1]));
+    for (const filename of [
+      'components/CommunityTab/CommunityTab.module.scss',
+      'components/SBTs/SBTSelector.module.scss',
+      'components/SurveyTool/SingleQuestionResponse.module.scss',
+    ]) {
+      const source = fs.readFileSync(path.resolve(scssDir, filename), 'utf8');
+      const localTokens = new Set([...source.matchAll(/(--ce-[\w-]+)\s*:/g)].map((match) => match[1]));
+      const missing = [...source.matchAll(/var\((--ce-[\w-]+)\s*\)/g)]
+        .map((match) => match[1])
+        .filter((token) => !definedTokens.has(token) && !localTokens.has(token));
+      expect({ filename, missing }).toEqual({ filename, missing: [] });
+    }
   });
 
-  test.each(['_context-engine.scss', '_classic-95.scss'])('%s remains a values-only theme definition', (filename) => {
-    const source = fs.readFileSync(path.resolve(__dirname, filename), 'utf8');
-    expect(source).not.toMatch(/(?:^|\n)\s*(?::root|\.[a-z]|#[a-z]|\[[^\]]+\])[^\n]*\{/i);
-  });
+  test.each(['_context-engine.scss', '_classic-95.scss', '_civic.scss'])(
+    '%s remains a values-only theme definition',
+    (filename) => {
+      const source = fs.readFileSync(path.resolve(__dirname, filename), 'utf8');
+      expect(source).not.toMatch(/(?:^|\n)\s*(?::root|\.[a-z]|#[a-z]|\[[^\]]+\])[^\n]*\{/i);
+    },
+  );
 
   test('component styles contain no theme-ID selectors', () => {
     findScssFiles(path.resolve(scssDir, 'components')).forEach((filename) => {

@@ -279,8 +279,8 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', 
         assert.equal(value, env);
         return 'env-slug';
       },
-      buildNonce: ({ base64UrlEncode }) => {
-        assert.equal(base64UrlEncode, 'base64UrlEncode');
+      buildNonce: (...args) => {
+        assert.deepEqual(args, []);
         return 'nonce-built';
       },
       issueNonce: async (...args) => {

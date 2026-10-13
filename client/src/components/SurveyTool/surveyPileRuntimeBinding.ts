@@ -39,6 +39,7 @@ export const createPileViewInstanceFields = () => ({
   _pileScanDisplayBaselineKey: '',
   _pileScanDisplayBaselineRemaining: 0,
   _lastGatedEmptyRecoveryKey: '',
+  _voiceModeModalMounted: false,
 });
 
 export const bindPileEngineMethod =

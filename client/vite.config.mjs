@@ -16,6 +16,8 @@ const postsDir = path.resolve(__dirname, '..', 'posts');
 const groupPasswordDerivationCjsPath = path.resolve(srcDir, 'utilities', 'crypto', 'groupPasswordDerivation.cjs');
 const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
+const lightThemeIds = themeRegistry.themes.filter(({ colorScheme }) => colorScheme === 'light').map(({ id }) => id);
+const themeColors = themeRegistry.themes.map(({ id, themeColor }) => `${id}:${themeColor}`);
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -133,7 +135,6 @@ const manualChunkGroups = [
     patterns: [
       '/node_modules/d3',
       '/node_modules/delaunator/',
-      '/node_modules/dijkstrajs/',
       '/node_modules/internmap/',
       '/node_modules/java-random/',
       '/node_modules/ml-',
@@ -183,8 +184,6 @@ const manualChunkGroups = [
       '/node_modules/clsx/',
       '/node_modules/copy-to-clipboard/',
       '/node_modules/get-nonce/',
-      '/node_modules/qrcode/',
-      '/node_modules/qrcode.react/',
       '/node_modules/react-fast-compare/',
       '/node_modules/react-popper/',
       '/node_modules/react-remove-scroll',
@@ -195,6 +194,15 @@ const manualChunkGroups = [
       '/node_modules/use-callback-ref/',
       '/node_modules/use-sidecar/',
       '/node_modules/warning/',
+    ],
+  },
+  {
+    // Only lazy routes render QR codes, so keep them out of vendor-ui, which loads with AppShell.
+    name: 'vendor-qrcode',
+    patterns: [
+      '/node_modules/dijkstrajs/',
+      '/node_modules/qrcode/',
+      '/node_modules/qrcode.react/',
     ],
   },
   {
@@ -217,6 +225,8 @@ export const resolveManualChunk = (id) => {
   if (normalizedId.includes('/src/variables/demo/demo_polis_data.json')) {
     return 'demo-polis-data';
   }
+  // Test IDs are shared static data; keep them cacheable and out of the AppShell budget.
+  if (normalizedId.includes('/src/utilities/e2eTestIds.json')) return 'e2e-test-ids';
   if (!normalizedId.includes('/node_modules/')) return undefined;
   // Preserve import() boundaries for document export and its dependencies.
   if (isDocumentExportModule(normalizedId)) return undefined;
@@ -354,29 +364,6 @@ const jsToTsCompatibilityPlugin = () => ({
   },
 });
 
-const litContractsSubpathShim = () => ({
-  name: 'ce-lit-contracts-subpath-shim',
-  enforce: 'pre',
-  async resolveId(source, importer, options) {
-    const match = source.match(/^@lit-protocol\/contracts\/(prod|dev)\/(.+)$/);
-    if (!match) return null;
-
-    const nestedBase = path.resolve(
-      __dirname,
-      'node_modules',
-      '@lit-protocol',
-      'access-control-conditions',
-      'node_modules',
-      '@lit-protocol',
-      'contracts',
-    );
-    const rootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
-    const base = fs.existsSync(path.join(nestedBase, 'dist')) ? nestedBase : rootBase;
-    const candidate = path.join(base, 'dist', match[1], match[2]);
-    return this.resolve(candidate, importer, { ...options, skipSelf: true });
-  },
-});
-
 const jsxInJsCompatibilityPlugin = () => ({
   name: 'ce-jsx-in-js-compatibility',
   enforce: 'pre',
@@ -457,6 +444,53 @@ const publicAssetsCompatibilityPlugin = () => ({
   },
 });
 
+const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+// Netlify does not document how _headers paths with spaces, %, @ or non-ASCII match.
+const SAFE_HEADER_RULE_PATH = /^[A-Za-z0-9._/-]+$/;
+
+// One exact-path rule per emitted file. A wildcard /assets/* rule would also mark the
+// 404 for a missing file immutable, pinning it in browsers across a rollback. A file
+// with an unusual name gets no rule and just revalidates.
+export const buildImmutableAssetHeaderRules = (fileNames, { base = '/', assetsDir = 'assets' } = {}) => {
+  if (!String(base).startsWith('/')) return '';
+  const prefix = `${String(base).replace(/\/+$/, '')}/`;
+  return [...fileNames]
+    .filter((fileName) => fileName.startsWith(`${assetsDir}/`))
+    .map((fileName) => `${prefix}${fileName}`)
+    .filter((rulePath) => SAFE_HEADER_RULE_PATH.test(rulePath))
+    .sort()
+    .map((rulePath) => `${rulePath}\n  Cache-Control: ${IMMUTABLE_CACHE_CONTROL}\n`)
+    .join('');
+};
+
+export const immutableAssetHeadersPlugin = () => {
+  let resolvedConfig = null;
+  return {
+    name: 'ce-immutable-asset-headers',
+    apply: 'build',
+    configResolved(config) {
+      resolvedConfig = config;
+    },
+    // Runs after ce-public-assets-compatibility has copied public/_headers into outDir.
+    writeBundle: {
+      order: 'post',
+      sequential: true,
+      handler(options, bundle) {
+        const rules = buildImmutableAssetHeaderRules(Object.keys(bundle), {
+          base: resolvedConfig?.base,
+          assetsDir: resolvedConfig?.build?.assetsDir,
+        });
+        if (!rules) return;
+        const outDir = options.dir || resolvedConfig?.build?.outDir || path.resolve(__dirname, 'build');
+        fs.appendFileSync(
+          path.join(outDir, '_headers'),
+          `\n# Generated at build: hashed files only, so a missing file is never cached as immutable.\n${rules}`,
+        );
+      },
+    },
+  };
+};
+
 const postsAssetsCompatibilityPlugin = () => ({
   name: 'ce-posts-assets-compatibility',
   configureServer(server) {
@@ -498,13 +532,13 @@ export default defineConfig(({ mode }) => {
       jsxInJsCompatibilityPlugin(),
       react(),
       jsToTsCompatibilityPlugin(),
-      litContractsSubpathShim(),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
       lazyDocumentBuildPlugin(),
       ...(process.env.CE_BUNDLE_REPORT === '1'
         ? [createBundleReportPlugin({ rootDir: __dirname })]
         : []),
       publicAssetsCompatibilityPlugin(),
+      immutableAssetHeadersPlugin(),
       postsAssetsCompatibilityPlugin(),
       {
         name: 'ce-public-url-html-compatibility',
@@ -512,7 +546,9 @@ export default defineConfig(({ mode }) => {
           return html
             .replace(/__PUBLIC_URL__/g, normalizePublicUrlForHtml(clientEnv.PUBLIC_URL))
             .replace(/__CE_DEFAULT_THEME__/g, normalizeDeploymentThemeForHtml(clientEnv.REACT_APP_CE_DEFAULT_THEME))
-            .replace(/__CE_THEME_IDS__/g, themeIds.join(' '));
+            .replace(/__CE_THEME_IDS__/g, themeIds.join(' '))
+            .replace(/__CE_LIGHT_THEME_IDS__/g, lightThemeIds.join(' '))
+            .replace(/__CE_THEME_COLORS__/g, themeColors.join(' '));
         },
       },
     ],
@@ -530,10 +566,6 @@ export default defineConfig(({ mode }) => {
         { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
-        { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
-        { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
-        { find: /^node:worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
-        { find: /^source-map-support\/register$/, replacement: path.resolve(srcDir, 'shims', 'source-map-support-register.ts') },
       ],
     },
     server: {

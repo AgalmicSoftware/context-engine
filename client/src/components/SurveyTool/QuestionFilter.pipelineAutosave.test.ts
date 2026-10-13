@@ -372,7 +372,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
   it('uses incoming questionResponses props when nonce is unchanged', () => {
     const sharedQuestions = [{ id: 'q1', type: 'binary', prompt: 'Q1' }];
     const cachedResponses = { q1: { '0x1': '{"conviction":2}' } };
-    const churnedResponses = { q1: { '0x1': '{"conviction":99}' } };
+    const churnedResponses = { q1: { '0x1': '{"conviction":9}' } };
 
     const instance = new QuestionFilter({
       questions: sharedQuestions,
@@ -423,13 +423,13 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
     expect(instance.state.cachedQuestionResponses).toBe(churnedResponses);
 
     const second = instance.buildFilterPipelineResult(true);
-    expect(second.finalQuestions[0].totalImportance).toBe(99);
+    expect(second.finalQuestions[0].totalImportance).toBe(9);
   });
 
   it('uses live response props in results mode when nonce is unchanged', () => {
     const sharedQuestions = [{ id: 'q1', type: 'binary', prompt: 'Q1' }];
     const cachedResponses = { q1: { '0x1': '{"conviction":2}' } };
-    const refreshedResponses = { q1: { '0x1': '{"conviction":99}' } };
+    const refreshedResponses = { q1: { '0x1': '{"conviction":9}' } };
 
     const instance = new QuestionFilter({
       resultsMode: true,
@@ -465,7 +465,7 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
     };
 
     const second = instance.buildFilterPipelineResult(true);
-    expect(second.finalQuestions[0].totalImportance).toBe(99);
+    expect(second.finalQuestions[0].totalImportance).toBe(9);
   });
 
   it('batches question and response cache updates into one apply pass', () => {
@@ -1104,5 +1104,24 @@ describe('QuestionFilter pipeline and autosave helpers', () => {
       [{ id: 'q1', type: 'rating' }],
     );
     expect(stats.get('q1')).toEqual({ responseCount: 1, totalImportance: 3 });
+  });
+
+  it('totals legacy 0-100 interview importance on the 0-10 scale', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'rating' }],
+      questionResponses: {},
+      filterState: {},
+      isQuestionCacheReady: true,
+    });
+    const stats = instance.getMemoizedQuestionResponseStats(
+      {
+        q1: {
+          '0xabc': JSON.stringify({ answer: { value: 4 }, importance: 75 }),
+          '0xdef': JSON.stringify({ answer: { value: 6 }, importance: 9 }),
+        },
+      },
+      [{ id: 'q1', type: 'rating' }],
+    );
+    expect(stats.get('q1')).toEqual({ responseCount: 2, totalImportance: 16.5 });
   });
 });

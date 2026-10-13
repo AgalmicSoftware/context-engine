@@ -31,7 +31,7 @@ describe('theme runtime', () => {
       source: 'deployment',
     });
     expect(resolveThemeSelection({ deploymentTheme: 'unknown' })).toEqual({
-      id: 'context-engine',
+      id: 'civic',
       source: 'default',
     });
   });
@@ -71,5 +71,34 @@ describe('theme runtime', () => {
     unsubscribe();
     window.dispatchEvent(new CustomEvent(CE_THEME_CHANGE_EVENT));
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  test('sets the browser theme-color to each theme page background', () => {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#000000';
+    document.head.appendChild(meta);
+    try {
+      initializeThemeRuntime();
+      expect(meta.content).toBe('#ffffff');
+      setStoredThemePreference('context-engine');
+      expect(meta.content).toBe('#20204e');
+      setStoredThemePreference('classic-95');
+      expect(meta.content).toBe('#008080');
+    } finally {
+      meta.remove();
+    }
+  });
+
+  test('initializes Minimal for fresh users and preserves saved themes', () => {
+    initializeThemeRuntime();
+    expect(document.documentElement.dataset.ceTheme).toBe('civic');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    for (const theme of ['context-engine', 'classic-95', 'civic']) {
+      window.localStorage.setItem(CE_THEME_STORAGE_KEY, theme);
+      initializeThemeRuntime();
+      expect(document.documentElement.dataset.ceTheme).toBe(theme);
+      expect(document.documentElement.dataset.ceThemeSource).toBe('user');
+    }
   });
 });

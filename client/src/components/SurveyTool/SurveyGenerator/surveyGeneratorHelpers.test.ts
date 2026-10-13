@@ -7,7 +7,6 @@ import {
   SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE,
   SURVEY_GENERATOR_ERROR_STYLE,
   SURVEY_GENERATOR_TEXT_INPUT_STYLE,
-  buildManualLibraryTextFile,
   buildPhotoAnalysisFilename,
   buildPhotoAnalysisMarkdown,
   buildPhotoPreviewUrl,
@@ -37,7 +36,6 @@ import {
   getPhotoStatusLabel,
   hasDatabaseToolInputContent,
   isLikelyImageUrl,
-  isManualLibraryUploadableContent,
   isSingleHttpUrlInput,
   isSupportedAdditionalFile,
   isSupportedPhotoFile,
@@ -340,26 +338,9 @@ describe('surveyGeneratorHelpers', () => {
     expect(renameFileForLibraryUpload({ name: 'not-file.txt' }, 'Title')).toEqual({ name: 'not-file.txt' });
   });
 
-  it('builds manual library text files as markdown or plain text', () => {
-    const markdownFile = buildManualLibraryTextFile({ title: 'Agenda', text: '# Heading' });
-    const textFile = buildManualLibraryTextFile({ title: 'Note', text: 'plain note' });
-
-    expect(markdownFile.name).toBe('Agenda.md');
-    expect(markdownFile.type).toBe('text/markdown');
-    expect(markdownFile.size).toBe('# Heading'.length);
-    expect(textFile.name).toBe('Note.txt');
-    expect(textFile.type).toBe('text/plain');
-    expect(textFile.size).toBe('plain note'.length);
-  });
-
-  it('detects database and library input content', () => {
+  it('detects database tool input content', () => {
     expect(hasDatabaseToolInputContent({ audioFile: { name: 'clip.wav' } })).toBe(true);
     expect(hasDatabaseToolInputContent({ pastedText: '  ', additionalSources: [] })).toBe(false);
-    expect(isManualLibraryUploadableContent({ additionalUrlInput: 'https://example.test/doc' })).toBe(true);
-    expect(isManualLibraryUploadableContent({ additionalSources: [{ id: 'source-1' }] })).toBe(true);
-    expect(isManualLibraryUploadableContent({ pastedText: '', additionalUrlInput: '', additionalSources: [] })).toBe(
-      false,
-    );
   });
 
   it('formats configured AI prompt model labels', () => {
@@ -452,6 +433,40 @@ describe('surveyGeneratorHelpers', () => {
 
     expect(result.surveyTitle).toBe('Fallback Title');
     expect(result.statements.map((statement) => statement.prompt)).toEqual(['First']);
+  });
+
+  it('drops malformed AI questions before counting the requested statements', () => {
+    const result = buildGeneratedSurveyStatements({
+      aiData: {
+        questions: [
+          { questionType: 'binary', prompt: { text: 'Not a string' } },
+          { questionType: 'freeform', prompt: '   ' },
+          { questionType: 'multichoice', prompt: 'Options as text', options: 'A, B' },
+          { questionType: 'multichoice', prompt: 'Object options', options: [{ label: 'A' }, { label: 'B' }] },
+          { questionType: 'multichoice', prompt: 'One usable option', options: ['Only', ' '] },
+          { questionType: 'quadratic', prompt: 'No options' },
+          { questionType: 'multichoice', prompt: 'Pick one', options: ['A', 'B'] },
+          { questionType: 'binary', prompt: 'Keep this?' },
+        ],
+      } as unknown as Parameters<typeof buildGeneratedSurveyStatements>[0]['aiData'],
+      questionTypes: { binary: true, freeform: true, multichoice: true, quadratic: true },
+      count: 2,
+    });
+
+    expect(result.statements.map(({ prompt, options }) => ({ prompt, options }))).toEqual([
+      { prompt: 'Pick one', options: ['A', 'B'] },
+      { prompt: 'Keep this?', options: undefined },
+    ]);
+  });
+
+  it('returns no statements when the AI payload has no question array', () => {
+    const result = buildGeneratedSurveyStatements({
+      aiData: { questions: null } as unknown as Parameters<typeof buildGeneratedSurveyStatements>[0]['aiData'],
+      questionTypes: { binary: true },
+      count: 3,
+    });
+
+    expect(result.statements).toEqual([]);
   });
 
   it('builds generation prompts from selected question types and defaults', () => {

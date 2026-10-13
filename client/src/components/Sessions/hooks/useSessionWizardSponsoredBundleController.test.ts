@@ -67,7 +67,6 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
     },
     advancedBundleFileInputRef: createInputRef('advanced.bundle.js'),
     normalModeRetryBundleFileInputRef: createInputRef('retry.bundle.js'),
-    sponsoredPublishBundleFileInputRef: createInputRef('sponsored.bundle.js'),
   };
   const setters = {
     setWorkerSecrets: jest.fn(),
@@ -84,7 +83,6 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
     setNormalModeBundleUrlOverride: jest.fn(),
     setWorkerUrlAutoFilled: jest.fn(),
     setWorkerSecretsEnabled: jest.fn(),
-    setPersistWorkerSecrets: jest.fn(),
     setBundleFile: jest.fn(),
   };
 
@@ -257,6 +255,5 @@ describe('useSessionWizardSponsoredBundleController', () => {
     expect(setters.setBundleFile).toHaveBeenCalledWith(null);
     expect(refs.advancedBundleFileInputRef.current.value).toBe('');
     expect(refs.normalModeRetryBundleFileInputRef.current.value).toBe('');
-    expect(refs.sponsoredPublishBundleFileInputRef.current.value).toBe('');
   });
 });

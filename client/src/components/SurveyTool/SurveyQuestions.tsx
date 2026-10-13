@@ -134,7 +134,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { checkSponsoredAccess } from '../../domains/sessions/sponsoredAccess.js';
-import { getTemporaryDemoSessionQuestionFixtures } from '../../utilities/session/demoSessionQuestionFixtures.js';
+import { loadTemporaryDemoSessionQuestionFixtures } from './demoSessionFixtureLoader';
 import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
   buildQuestionRoutePath,
@@ -1391,7 +1391,7 @@ const SurveyQuestionsInner = (
     getSessionSlugPinnedFromProps,
     getShortenedAddress,
     getStrictSessionConfigBySlug,
-    getTemporaryDemoSessionQuestionFixtures,
+    loadTemporaryDemoSessionQuestionFixtures,
     getViewedResponseOverrideForQuestionHelper,
     hasCacheHydratedFlag,
     hasConvictionOrImportanceValueForQuestion,

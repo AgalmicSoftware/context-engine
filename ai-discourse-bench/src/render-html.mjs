@@ -2074,7 +2074,7 @@ const renderParticipantGraph = (report) => {
     const { agree, unsure, disagree, invalid } = answerTotals(summary);
     return `<g class="graph-statement" data-ce-searchable hidden>
       <circle cx="${escapeHtml(graphX(x).toFixed(2))}" cy="${escapeHtml(graphY(y).toFixed(2))}" r="3" fill="#000" />
-      <title>${escapeHtml(`${question.id}: ${question.prompt || ''} Agree: ${agree}, Disagree: ${disagree}, Unsure: ${unsure}, Invalid: ${invalid}`)}</title>
+      <title>${escapeHtml(`${question.id}: ${question.prompt || ''} Agree: ${agree}, Unsure: ${unsure}, Disagree: ${disagree}, Invalid: ${invalid}`)}</title>
     </g>`;
   }).join('');
   const strongestEdges = [...edges]
@@ -3327,9 +3327,10 @@ const renderQuestionExplorer = (report) => {
     const modelAnswers = modelAnswersForQuestion(report, question.id, participantVisuals);
     const { agree, unsure, disagree, invalid } = answerTotals(summary);
     const label = `#${index + 1}`;
-    const total = Number.isFinite(summary.total)
-      ? summary.total
-      : agree + unsure + disagree + invalid;
+    // Like the live row, count only answering participants. Models without a
+    // valid averaged answer keep the benchmark's Invalid label, as in the
+    // Debate Map legend, instead of the live No response.
+    const responses = agree + unsure + disagree;
     const anchors = [...(question.sourceAnchors || []), ...(question.agentVillageAnchors || [])]
       .map((anchor) => anchor.idOrUrl || anchor.corpus || anchor.sourceType || '')
       .filter(Boolean)
@@ -3349,9 +3350,10 @@ const renderQuestionExplorer = (report) => {
       <div class="questionVoteRow">
         <span class="questionVoteSummary">
           <strong>Agree:</strong> ${escapeHtml(agree)} /
-          <strong>Disagree:</strong> ${escapeHtml(disagree)} /
           <strong>Unsure:</strong> ${escapeHtml(unsure)} /
-          (Total: ${escapeHtml(total)})
+          <strong>Disagree:</strong> ${escapeHtml(disagree)} /
+          <strong>Responses:</strong> ${escapeHtml(responses)}${invalid > 0 ? ` /
+          <strong>Invalid:</strong> ${escapeHtml(invalid)}` : ''}
         </span>
         ${renderAtlasQuestionDistribution(summary, modelAnswers, {
           className: 'questionModelDistribution',
@@ -3363,7 +3365,7 @@ const renderQuestionExplorer = (report) => {
   return renderCollapsibleSection({
     id: 'all-questions',
     title: 'All Questions',
-    subtitle: 'Question prompts with aggregate agree, disagree, and unsure counts',
+    subtitle: 'Question prompts with aggregate agree, unsure, and disagree counts',
     bodyClassName: 'graphSection aidb-question-section',
     body: `<div class="questionModelLegend" aria-label="Model marker legend">${modelLegend}</div><div class="questionList">${items}</div>`,
   });
@@ -3703,6 +3705,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .ce-session-results-section > .sectionHeaderRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; max-width: 100%; min-width: 0; }
     .ce-session-results-section > .sectionHeaderRow > .sectionHeader { display: flex; flex-direction: row; align-items: flex-start; flex-wrap: wrap; gap: 10px; cursor: pointer; font-size: 2rem; margin: 0; font-weight: bold; color: rgba(255, 255, 255, 0.75); flex: 0 1 auto; min-width: 0; line-height: 1.1; }
     .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderText { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; min-width: 0; }
+    .sectionExpanded .sectionHeaderText { align-self: center; }
     .sectionHeaderTitle { display: block; max-width: 100%; line-height: 1; color: rgba(255, 255, 255, 0.5); }
     .sectionHeaderSubtitle { display: block; max-width: 100%; font-size: 0.63em; line-height: 1.12; font-weight: 600; color: rgba(255, 255, 255, 0.25); }
     .tooltip { position: relative; display: inline-block; cursor: pointer; font-size: 1.4em; z-index: 1000; opacity: 1; }
@@ -3720,7 +3723,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader .tooltip .tooltiptext { left: auto; right: -10px; transform: none; text-align: left; }
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader .tooltip .tooltiptext::after { left: auto; right: 15px; margin-left: 0; }
     }
-    .sectionHeaderTooltip { margin-left: 6px; margin-top: 2px; align-self: flex-start; flex: 0 0 auto; }
+    .sectionHeaderTooltip { display: inline-flex; align-items: center; font-size: 1em; line-height: 1; margin-left: 6px; align-self: center; flex: 0 0 auto; }
     .sectionHeaderActionsScroller { box-sizing: border-box; display: flex; flex: 1 1 320px; justify-content: flex-end; max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
     .sectionHeaderActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; min-width: max-content; }
     .sectionContainer { box-sizing: border-box; max-width: 100%; min-width: 0; margin-bottom: 20px; margin-top: 20px; background-color: #5c58a630; border: 0 solid #af95db; padding: 20px; border-radius: var(--ce-radius-6); }
@@ -4847,6 +4850,21 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .participantAddressFull { display: none; }
       .participantAddressShort { display: inline; }
     }
+    @media only screen and (max-width: 767px) {
+      .onePageDemoContainer { padding: 0 6px 20px; }
+      .sectionsGrid { gap: 8px; margin-top: 12px; }
+      .sectionsGrid .ce-session-results-section { min-height: 0; margin: 0; padding: 8px; }
+      .sectionsGrid .ce-session-results-section > .sectionHeaderRow { min-height: 44px; gap: 8px; }
+      .sectionsGrid .ce-session-results-section > .sectionHeaderRow > .sectionHeader { min-height: 44px; padding: 0; align-items: flex-start; }
+      .sectionsGrid .ce-session-results-section > .miniSectionContent { margin-top: 8px; padding: 0; }
+      .sectionsGrid .ce-session-results-section.sectionExpanded .resultsModeActionsScroller { padding: 4px 0; margin-block: -4px; }
+      .ce-session-results-section .resultsModeActions { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+      .ce-session-results-section .resultsModeActions .sectionHeaderViewModeButton { min-height: 44px; padding: 8px 10px; }
+      .ce-polis-report-shell { margin-top: 0; padding: 6px; max-width: 100%; overflow-x: auto; }
+      .ce-polis-report-shell .settingsRow { padding: 6px; gap: 8px; margin-bottom: 8px; }
+      .ce-polis-report-shell .reportInner:not(.pdfDesktopWidth) { padding: 8px; }
+      .ce-polis-report-shell .brandingHeader { margin-bottom: 12px; padding-bottom: 8px; }
+    }
   </style>
 </head>
 <body class="index-page ce-report-viewer aidb-report" data-ce-results-view-mode="report" data-ce-report-style="original">
@@ -4862,7 +4880,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           ${renderFontAwesomeIcon('caret-down', 'sectionToggleIcon sectionToggleIconClosed')}
           <span class="sectionHeaderText">
             <span class="sectionHeaderTitle">Results</span>
-            <span class="sectionHeaderSubtitle">View</span>
+            <span class="sectionHeaderSubtitle" data-ce-results-subtitle hidden>View</span>
           </span>
           <span class="tooltip sectionHeaderTooltip" tabindex="0" aria-label="Results view help" data-ce-results-tooltip>
             ${renderFontAwesomeIcon('question-circle')}
@@ -5469,6 +5487,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var nextOpen = !!isOpen;
         resultsSection.setAttribute('data-ce-results-open', nextOpen ? 'true' : 'false');
         resultsSection.classList.toggle('sectionExpanded', nextOpen);
+        var subtitle = resultsSection.querySelector('[data-ce-results-subtitle]');
+        if (subtitle) subtitle.hidden = nextOpen;
         if (resultsToggle) resultsToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
       }
       function setReportStyle(style) {
@@ -6068,8 +6088,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
         beeswarmTooltip.innerHTML = [
           '<div style="font-weight: bold; margin-bottom: 4px;">' + escapeText(point.dataset.questionId) + ': ' + escapeText(point.dataset.questionPrompt) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Agree:</strong> ' + escapeText(point.dataset.questionAgree) + ', ' +
-            '<strong>Disagree:</strong> ' + escapeText(point.dataset.questionDisagree) + ', ' +
-            '<strong>Unsure:</strong> ' + escapeText(point.dataset.questionUnsure) + '</div>',
+            '<strong>Unsure:</strong> ' + escapeText(point.dataset.questionUnsure) + ', ' +
+            '<strong>Disagree:</strong> ' + escapeText(point.dataset.questionDisagree) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Mean:</strong> ' + escapeText(point.dataset.questionMean) + ', ' +
             '<strong>' + escapeText(differenceLabel) + ':</strong> ' + escapeText(point.dataset.questionDifference) + '</div>',
           point.dataset.questionHasVotes === 'false'

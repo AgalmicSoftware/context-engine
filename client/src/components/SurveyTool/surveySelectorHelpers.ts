@@ -1,3 +1,5 @@
+import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
+
 type SurveyDocumentUrlSource = {
   documentURLs?: unknown;
 };
@@ -35,9 +37,10 @@ type SurveyQuestionsCache = Record<
   | undefined
 >;
 
+// Survey metadata can come from any uploader, so only safe link schemes become hrefs.
 export const getSurveyDocumentUrls = (survey: SurveyDocumentUrlSource | null = null): string[] =>
   (Array.isArray(survey?.documentURLs) ? survey.documentURLs : [])
-    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .map((value) => toSafeLinkHref(value, { contextLabel: 'survey_document' }))
     .filter(Boolean);
 
 export const getSurveyDocumentLinkTitle = (survey: SurveyDocumentUrlSource | null = null): string => {
@@ -124,7 +127,8 @@ export const buildSurveySelectorSubmittedSurveyList = (surveyBag: unknown = {}):
 
   Object.keys(bag).forEach((sid) => {
     const survey = bag[sid];
-    if (!survey || !survey.title || !Array.isArray(survey.questionIDs)) return;
+    // Uploaded metadata is untrusted; a non-string title would crash the selector render.
+    if (!survey || typeof survey.title !== 'string' || !survey.title || !Array.isArray(survey.questionIDs)) return;
 
     const qids = survey.questionIDs.map((questionId) => String(questionId || '').toLowerCase());
     if (qids.length === 0) return;

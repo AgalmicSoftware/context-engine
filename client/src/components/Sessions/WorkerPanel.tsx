@@ -54,6 +54,7 @@ export type WorkerPanelProps = {
   deployWorkerUrl?: string;
   deployComplete: boolean;
   deployVerifiedInUi?: boolean;
+  showUserPaidUsage?: boolean;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
   clearWorkerSecretFields: () => void;
@@ -102,6 +103,8 @@ export type WorkerPanelProps = {
   sessionModeProfileWorkerControl?: React.ReactNode;
   onNativeWorkerVerified?: (bootstrap: SessionWizardVerifiedWorkerConnection) => void;
   verifyNativeWorker?: WorkerDeploySectionProps['verifyNativeWorker'];
+  nativeTemplateSetupIdentity?: WorkerDeploySectionProps['nativeTemplateSetupIdentity'];
+  onNativeTemplateSetupGenerated?: WorkerDeploySectionProps['onNativeTemplateSetupGenerated'];
 };
 
 const WorkerPanel = ({
@@ -121,6 +124,7 @@ const WorkerPanel = ({
   deployWorkerUrl,
   deployComplete,
   deployVerifiedInUi,
+  showUserPaidUsage = false,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
   clearWorkerSecretFields,
@@ -169,6 +173,8 @@ const WorkerPanel = ({
   sessionModeProfileWorkerControl = null,
   onNativeWorkerVerified,
   verifyNativeWorker,
+  nativeTemplateSetupIdentity,
+  onNativeTemplateSetupGenerated,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =
@@ -263,6 +269,7 @@ const WorkerPanel = ({
             )}
           </div>
           <WorkerSecretsSection
+            showUserPaidUsage={showUserPaidUsage}
             isNormalMode={isNormalMode}
             translate={translate}
             renderInfoTooltip={renderInfoTooltip}
@@ -317,6 +324,8 @@ const WorkerPanel = ({
             displayedWorkerUrl={displayedWorkerUrl}
             onNativeWorkerVerified={onNativeWorkerVerified}
             verifyNativeWorker={verifyNativeWorker}
+            nativeTemplateSetupIdentity={nativeTemplateSetupIdentity}
+            onNativeTemplateSetupGenerated={onNativeTemplateSetupGenerated}
           />
 
           <WorkerConnectionSection

@@ -1,8 +1,7 @@
 import {
   buildQuestionRoutePath,
+  isKnownOrGeneralSessionSlug,
   isMaskedQuestionPayload,
-  isPinnableQuestionRouteSearchSlug,
-  isPinnableQuestionRouteSlug,
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
   pickBetterQuestionPayload,
@@ -250,13 +249,18 @@ describe('questionRouting helper regressions', () => {
     });
   });
 
-  it('does not treat unknown query slugs as pinnable', () => {
+  it('does not treat unknown query slugs as known sessions', () => {
     const getSessionConfigBySlug = (slug: string | null): KnownSessionConfig | null =>
       slug === 'test-65' ? { slug: 'test-65' } : null;
 
-    expect(isPinnableQuestionRouteSlug('test-65', getSessionConfigBySlug)).toBe(true);
-    expect(isPinnableQuestionRouteSlug('', getSessionConfigBySlug)).toBe(true);
-    expect(isPinnableQuestionRouteSearchSlug('?session=does-not-exist', getSessionConfigBySlug)).toBe(false);
+    expect(isKnownOrGeneralSessionSlug('test-65', getSessionConfigBySlug)).toBe(true);
+    expect(isKnownOrGeneralSessionSlug('', getSessionConfigBySlug)).toBe(true);
+    expect(
+      isKnownOrGeneralSessionSlug(
+        parseQuestionSessionSlugFromSearch('?session=does-not-exist'),
+        getSessionConfigBySlug,
+      ),
+    ).toBe(false);
   });
 
   it('keeps built question-route session decoration non-authoritative when strict slug lookup stays unresolved', () => {
@@ -268,7 +272,7 @@ describe('questionRouting helper regressions', () => {
     const getSessionConfigBySlug = jest.fn(() => ({ slug: 'edge-demo', __unresolved: true }));
 
     expect(route).toBe('/question/0xabc?session=edge-demo');
-    expect(isPinnableQuestionRouteSearchSlug(search, getSessionConfigBySlug)).toBe(false);
+    expect(isKnownOrGeneralSessionSlug(parseQuestionSessionSlugFromSearch(search), getSessionConfigBySlug)).toBe(false);
     expect(getSessionConfigBySlug).toHaveBeenCalledWith('edge-demo');
   });
 });

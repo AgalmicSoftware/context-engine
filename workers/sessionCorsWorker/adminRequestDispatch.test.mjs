@@ -180,6 +180,34 @@ const createAdminDeps = (overrides = {}) => {
       return { ok: true, status: 200, body: { ok: true } };
     };
   }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'ensureSessionLitAuthorizationSigner')) {
+    deps.ensureSessionLitAuthorizationSigner = async ({ proposedPrivateKey }) => proposedPrivateKey;
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'updateSessionSecretsAfterLitRepair')) {
+    deps.updateSessionSecretsAfterLitRepair = async ({ env, slug, incomingSecrets }) => {
+      await deps.putSessionSecrets(env, slug, { ...await deps.getSessionSecrets(env, slug), ...incomingSecrets });
+      return { ok: true, status: 200, body: { ok: true } };
+    };
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'finalizeSessionLitAuthorization')) {
+    deps.finalizeSessionLitAuthorization = async ({ env, slug, baseConfig, litCredentials, secretOutputs }) => {
+      const existingSecrets = await deps.getSessionSecrets(env, slug) || {};
+      if (secretOutputs) await deps.putSessionSecrets(env, slug, { ...existingSecrets, ...secretOutputs });
+      return deps.executeCoordinatedSessionConfigMutation({ env, slug, existingConfig: baseConfig,
+        mutation: { kind: 'merge-lit-credentials', litCredentials } });
+    };
+  }
+  if (overrides.provisionLitChipotleAction) {
+    deps.provisionLitChipotleAction = async (options) => {
+      const result = await overrides.provisionLitChipotleAction(options);
+      return result.litCredentials ? result : { ...result, litCredentials: {
+        ...(result.apiBase ? { litApiBase: result.apiBase } : {}),
+        ...(result.litActionCid ? { litActionCid: result.litActionCid } : {}),
+        ...(result.litGroupId ? { litGroupId: result.litGroupId } : {}),
+        ...(result.litPkpId ? { litPkpId: result.litPkpId } : {}),
+      } };
+    };
+  }
   return deps;
 };
 
@@ -941,6 +969,29 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
   });
 });
 
+test('set-secrets sends only the normalized patch and propagates pending repair failures', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ secrets: {
+      openaiKey: '  fixture-provider-key  ', litAccountApiKey: null,
+      litAuthorizationPrivateKey: 'must-not-be-admin-settable', unexpected: 'ignored',
+    } }) },
+    env: {}, baseHeaders: {}, slug: '', action: 'set-secrets',
+    deps: createAdminDeps({
+      getSessionSecrets: () => assert.fail('Dispatcher must not pre-read a stale whole-secrets snapshot'),
+      putSessionSecrets: () => assert.fail('Dispatcher must use coordinated persistence'),
+      normalizeSecretValue: (value) => value == null ? '' : String(value).trim(),
+      updateSessionSecretsAfterLitRepair: async (options) => {
+        calls.push(options);
+        return { ok: false, status: 503, body: { error: 'Lit setup projection is pending; retry before using the new authority.' } };
+      },
+    }),
+  });
+  assert.deepEqual(calls, [{ env: {}, slug: 'session-a', incomingSecrets: { openaiKey: 'fixture-provider-key', litAccountApiKey: '' } }]);
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /projection is pending/);
+});
+
 test('dispatchAdminRequest returns allowed-key secret presence without exposing values', async () => {
   let putCalled = false;
 
@@ -1217,9 +1268,16 @@ test('dispatchAdminRequest rejects unsafe Lit Chipotle status API bases before s
   });
 });
 
+// A deploy grant deploys the release recorded on the sponsoring Worker.
+const SPONSOR_RELEASE_ENV = Object.freeze({
+  WORKER_BUNDLE_URL: 'https://releases.example.test/sessionCorsWorker.bundle.js',
+  WORKER_BUNDLE_MANIFEST_URL: 'https://releases.example.test/worker-release-manifest.json',
+});
+
 test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', async () => {
   const kvCalls = [];
   const env = {
+    ...SPONSOR_RELEASE_ENV,
     DEPLOY_HELPER_ENABLED: '1',
     GROUP_KV: {
       put: async (key, value, opts) => {
@@ -1311,6 +1369,7 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
       }),
     },
     env: {
+      ...SPONSOR_RELEASE_ENV,
       DEPLOY_HELPER_ENABLED: '1',
       GROUP_KV: {
         put: async () => {
@@ -1344,6 +1403,7 @@ test('dispatchAdminRequest returns a CORS-safe error when sponsored grant persis
 test('dispatchAdminRequest allows sponsored deploy grants without a standalone helper when embedded deploy-helper is enabled at deploy time', async () => {
   const kvCalls = [];
   const env = {
+    ...SPONSOR_RELEASE_ENV,
     DEPLOY_HELPER_ENABLED: '1',
     GROUP_KV: {
       put: async (key, value, opts) => {
@@ -1434,6 +1494,7 @@ test('dispatchAdminRequest ignores unexpected helper/account fields and still st
       }),
     },
     env: {
+      ...SPONSOR_RELEASE_ENV,
       DEPLOY_HELPER_ENABLED: '1',
       GROUP_KV: {
         put: async (key, value, opts) => {
@@ -1454,6 +1515,83 @@ test('dispatchAdminRequest ignores unexpected helper/account fields and still st
   assert.equal(kvCalls[0][1].cloudflareApiToken, 'cf-sponsored-token');
   assert.equal(Object.prototype.hasOwnProperty.call(kvCalls[0][1], 'deployHelperUrl'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(kvCalls[0][1], 'cloudflareAccountId'), false);
+});
+
+test('dispatchAdminRequest refuses deploy grants until the Worker records its release', async () => {
+  for (const releaseEnv of [
+    {},
+    { WORKER_BUNDLE_URL: SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL },
+    { WORKER_BUNDLE_URL: '  ', WORKER_BUNDLE_MANIFEST_URL: SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL },
+  ]) {
+    const kvCalls = [];
+    const result = await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody({
+          grantRequest: {
+            bootstrapWorkerUrl: 'https://source-worker.example.test',
+            deploy: { cloudflareApiToken: 'cf-sponsored-token' },
+            faucet: { faucetPrivateKey: '0xfaucet' },
+          },
+        }),
+      },
+      env: {
+        ...releaseEnv,
+        DEPLOY_HELPER_ENABLED: '1',
+        GROUP_KV: {
+          put: async (key, value, opts) => {
+            kvCalls.push([key, JSON.parse(value), opts]);
+          },
+        },
+      },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      action: 'issue-sponsored-grants',
+      deps: createAdminDeps(),
+    });
+
+    assert.deepEqual(result, {
+      body: {
+        error: 'Deploy grants need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on this Worker, because a grant deploys the release recorded there. Set both, then issue the grant again.',
+        reason: 'sponsored_release_missing',
+      },
+      status: 409,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    });
+    // Nothing is issued, not even the faucet grant in the same request.
+    assert.equal(kvCalls.length, 0);
+  }
+});
+
+test('dispatchAdminRequest issues faucet-only grants without a recorded release', async () => {
+  const kvCalls = [];
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        grantRequest: {
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
+          faucet: { faucetPrivateKey: '0xfaucet' },
+        },
+      }),
+    },
+    env: {
+      DEPLOY_HELPER_ENABLED: '1',
+      GROUP_KV: {
+        put: async (key, value, opts) => {
+          kvCalls.push([key, JSON.parse(value), opts]);
+        },
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'issue-sponsored-grants',
+    deps: createAdminDeps(),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.deployGrantToken, '');
+  assert.equal(typeof result.body.faucetGrantToken, 'string');
+  assert.equal(kvCalls.length, 1);
+  assert.equal(kvCalls[0][1].type, 'faucet-tx');
 });
 
 test('dispatchAdminRequest merges limits and persists the result for set-limits', async () => {
@@ -1507,6 +1645,60 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest hides a question id for the signed session admin', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ resource: 'questions', id: '0xq1', hidden: true }) },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'storage/set-hidden',
+    deps: createAdminDeps({
+      now: () => 123,
+      setCloudflareStorageResourceHidden: async (value) => {
+        calls.push(value);
+        return { ok: true, status: 200, body: { ok: true, resource: 'questions', id: '0xq1', hidden: true, hiddenIds: ['0xq1'] } };
+      },
+    }),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].actor, '0xabc');
+  assert.deepEqual(calls[0].config, { adminAddress: '0xabc' });
+  assert.equal(calls[0].body.id, '0xq1');
+  assert.equal(calls[0].deps.now(), 123);
+  assert.deepEqual(result, {
+    body: { ok: true, resource: 'questions', id: '0xq1', hidden: true, hiddenIds: ['0xq1'] },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest refuses storage hides without admin authority', async () => {
+  let called = false;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ resource: 'questions', id: '0xq1', hidden: true }) },
+    env: {},
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'storage/set-hidden',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: false,
+        response: { body: { error: 'Admin authorization failed.' }, status: 403 },
+      }),
+      recordAbuseEvent: async () => {},
+      setCloudflareStorageResourceHidden: async () => {
+        called = true;
+        return { ok: true, status: 200, body: {} };
+      },
+    }),
+  });
+  assert.equal(called, false);
+  assert.deepEqual(result, { body: { error: 'Admin authorization failed.' }, status: 403 });
 });
 
 test('dispatchAdminRequest exports encrypted storage envelopes through the admin gate', async () => {
@@ -1789,8 +1981,6 @@ test('dispatchAdminRequest bootstraps a per-session Lit account and writes both 
   });
 
   assert.deepEqual(calls, [
-    ['normalizeSecretValue', 'account-key'],
-    ['normalizeSecretValue', 'usage-key'],
     ['putSessionSecrets', { GROUP_KV: {} }, 'session-a', {
       openaiKey: 'sk-existing',
       litAccountApiKey: 'account-key',
@@ -2176,4 +2366,62 @@ test('opening refresh requires admin authority and respects the session switch',
   assert.equal(refreshed.status, 200);
   assert.equal(refreshed.body.openingPrompt, 'What is your AI expertise?');
   assert.equal(generationCalls, 1);
+});
+
+test('Lit bootstrap reserves the coordinator signer before upstream calls and keeps failures private', async () => {
+  const env = { GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
+  const existingConfig = { slug: 'session-a', adminAddress: '0xabc', litCredentials: {} };
+  await putSessionConfig(env, 'session-a', existingConfig);
+  await putSessionSecrets(env, 'session-a', { litAccountApiKey: 'account-key' });
+  let winner;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let reserved = false;
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody() }, env, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig, headers: {}, targetSlug: 'session-a' }),
+        getSessionSecrets, putSessionSecrets, putSessionConfig, mergeWorkerConfigRecords,
+        ensureSessionLitAuthorizationSigner: async ({ proposedPrivateKey, slug }) => {
+          assert.equal(slug, 'session-a');
+          winner ||= proposedPrivateKey;
+          reserved = true;
+          return winner;
+        },
+        fetchImpl: async () => {
+          assert.equal(reserved, true);
+          assert.equal((await getSessionSecrets(env, 'session-a')).litAuthorizationPrivateKey, undefined);
+          throw new Error('Simulated provider outage');
+        },
+      }),
+    });
+    assert.equal(result.status, 502);
+    assert.equal(JSON.stringify(result).includes(winner), false);
+    assert.deepEqual((await getSessionConfig(env, 'session-a')).litCredentials, {});
+  }
+});
+
+test('manual Lit provisioning strips generated secret outputs and persists only public authorization metadata in config', async () => {
+  const env = { GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
+  const existingConfig = { slug: 'session-a', adminAddress: '0xabc', litCredentials: {} };
+  await putSessionConfig(env, 'session-a', existingConfig);
+  const privateKey = `0x${'12'.repeat(32)}`;
+  const credentials = { litApiBase: 'https://api.chipotle.litprotocol.com', litGroupId: '8', litPkpId: 'fresh-pkp', litActionCid: 'fresh-action',
+    litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: '0x00000000000000000000000000000000000000aa' };
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env, baseHeaders: {}, slug: '', action: 'lit-chipotle-provision',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets, putSessionSecrets, putSessionConfig, mergeWorkerConfigRecords,
+      provisionLitChipotleAction: async ({ persistAuthorizationSecret, sessionSlug }) => {
+        assert.equal(sessionSlug, 'session-a');
+        await persistAuthorizationSecret(privateKey);
+        return { ok: true, litCredentials: credentials, secretOutputs: { litAuthorizationPrivateKey: privateKey, litUsageApiKey: 'fresh-key' } };
+      },
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, { ok: true });
+  assert.deepEqual((await getSessionConfig(env, 'session-a')).litCredentials, credentials);
+  assert.equal((await getSessionSecrets(env, 'session-a')).litAuthorizationPrivateKey, privateKey);
+  assert.equal((await getSessionSecrets(env, 'session-a')).litUsageApiKey, 'fresh-key');
 });

@@ -1,4 +1,14 @@
-export const toStr = (val: unknown): string => (typeof val === 'string' ? val : val == null ? '' : String(val));
+export const toStr = (val: unknown): string => {
+  if (typeof val === 'string') return val;
+  if (val == null) return '';
+  // Uploaded JSON can hold objects whose conversion throws ({"toString":1});
+  // those read as empty text instead of breaking the caller.
+  try {
+    return String(val);
+  } catch {
+    return '';
+  }
+};
 export const normalizeSlug = (raw: unknown): string =>
   toStr(raw)
     .trim()
@@ -9,5 +19,4 @@ export const normalizeSessionIdHex = (hex: unknown): string => {
   if (!s || s === '0x' || /^0x0+$/.test(s)) return '';
   return s.startsWith('0x') ? s : '0x' + s;
 };
-export const isValidEthAddress = (addr: unknown): boolean => /^0x[0-9a-fA-F]{40}$/.test(toStr(addr).trim());
 export const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);

@@ -229,7 +229,7 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
     resource: 'responses',
     id: 'r4',
     metadata: { responder: '0x3333333333333333333333333333333333333333', createdAt: '2026-09-17T00:03:00.000Z' },
-    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: '*' },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: { value: '*', encrypted: true, encryptedPortion: 'ciphertext' } },
   });
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
   assert.equal(source.ok, true);
@@ -239,6 +239,249 @@ test('worker-canonical source trusts metadata responder, dedupes latest per ques
   assert.equal(source.snapshot.responses[0].answer, 'new');
   assert.equal(source.snapshot.responses[0].submittedAt, '2026-09-17T00:01:00.000Z');
   assert.equal(source.snapshot.responses[0].participantId, 'participant_001');
+});
+
+test('admin snapshots validate and label answers like the worker-canonical source', async () => {
+  const questions = [
+    { id: 'quadratic', prompt: 'Allocate', type: 'quadratic', options: ['A', 'B'], voiceCredits: 25 },
+    { id: 'binary', prompt: 'Agree?', type: 'binary' },
+    { id: 'rating', prompt: 'Rate', type: 'rating', scale: { min: 1, max: 10 } },
+    { id: 'multi', prompt: 'Pick', type: 'multichoice', options: ['Bus', 'Tram'], singleSelect: true },
+  ];
+  const rows = [
+    ['quadratic', [3, -4]], ['binary', 'yes'], ['rating', '7'], ['multi', ['bus']],
+    ['quadratic', [500, 500]], ['binary', 'invented'], ['rating', 99], ['multi', ['Bus', 'Tram']], ['multi', ['Car']],
+  ];
+  const source = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId, questions,
+      responses: rows.map(([questionId, answer], index) => ({ questionId, participantId: `p${index}`, answer })) } } },
+  });
+  assert.equal(source.ok, true);
+  assert.deepEqual(
+    source.snapshot.responses.map((row) => [row.questionId, row.answer]).sort(),
+    [['binary', 'Agree'], ['multi', 'Bus'], ['quadratic', 'A: +3; B: -4'], ['rating', '7']],
+  );
+  assert.equal(source.aiSnapshot.responses.find((row) => row.questionId === 'quadratic').answer, 'A: +3; B: -4');
+  assert.equal(source.counts.excludedCount, 5);
+});
+
+test('admin snapshots keep the legacy answer shapes of other question types', async () => {
+  const source = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'poll', prompt: 'Which?', type: 'poll' }, { id: 'untyped', prompt: 'Notes?' }],
+      responses: [
+        { questionId: 'poll', participantId: 'p1', answer: ['Alpha', 'Beta'] },
+        { questionId: 'untyped', participantId: 'p2', answer: ['one', 'two'] },
+        { questionId: 'untyped', participantId: 'p3', answer: 7 },
+      ] } } },
+  });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.responses.map((row) => [row.questionId, row.answer]).sort(), [
+    ['poll', 'Alpha; Beta'],
+    ['untyped', '7'],
+    ['untyped', 'one; two'],
+  ]);
+});
+
+test('worker-canonical source breaks equal-time ties by storage id, not list order', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qmeta1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' },
+  });
+  const responder = '0x1111111111111111111111111111111111111111';
+  const createdAt = '2026-09-17T00:00:00.000Z';
+  const answer = (id) => ({
+    metadata: { id, responder, createdAt },
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `from ${id}` },
+  });
+  // The KV mock lists keys in insertion order, so the higher id is listed first.
+  for (const id of ['ref-b', 'ref-a']) await putPayload({ kv, resource: 'responses', id, ...answer(id) });
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.deepEqual(source.snapshot.responses.map((row) => row.answer), ['from ref-b']);
+  // Queued rows are read before index rows; the same rule applies across both.
+  const queued = await loadWorkerCanonicalResultsAnalysisSource({
+    env, slug: 'session-a', config, committedResponses: [answer('ref-c')],
+  });
+  assert.deepEqual(queued.snapshot.responses.map((row) => row.answer), ['from ref-c']);
+});
+
+test('worker-canonical source lets a newer locked, cleared or invalid answer withdraw an older public one', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Agree?', type: 'binary' },
+  });
+  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'AAAA', iv: 'BBBB' });
+  const base = { sessionSlug: 'session-a', sessionId, questionId: 'q1', type: 'binary', additional: { value: '', encrypted: false } };
+  const putAnswer = (id, responder, createdAt, answer) => putPayload({
+    kv, resource: 'responses', id, metadata: { responder, createdAt }, payload: { ...base, answer },
+  });
+  const [A, B, C, D] = ['1', '2', '3', '4'].map((digit) => `0x${digit.repeat(40)}`);
+  const before = '2026-09-17T00:00:00.000Z';
+  const after = '2026-09-18T00:00:00.000Z';
+  // A answers in public, then locks the answer.
+  await putAnswer('a0', A, before, { value: 'Agree', encrypted: false });
+  await putAnswer('a1', A, after, { value: '*', encrypted: true, encryptedPortion: envelope });
+  // B answers in public, then clears the answer.
+  await putAnswer('b0', B, before, { value: 'Disagree', encrypted: false });
+  await putAnswer('b1', B, after, { value: '', encrypted: false });
+  // C answers once in public.
+  await putAnswer('c0', C, before, { value: 'Agree', encrypted: false });
+  // D answers in public, then submits an answer the question does not allow.
+  await putAnswer('d0', D, before, { value: 'Agree', encrypted: false });
+  await putAnswer('d1', D, after, { value: 'invented', encrypted: false });
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.responses.map(({ answer, submittedAt }) => ({ answer, submittedAt })), [
+    { answer: 'Agree', submittedAt: before },
+  ]);
+  assert.equal(source.aiSnapshot.responses.length, 1);
+  // Superseded rows are not counted; each participant's latest row is.
+  assert.deepEqual(
+    [source.counts.responseCount, source.counts.participantCount, source.counts.lockedCount, source.counts.excludedCount],
+    [1, 1, 1, 3],
+  );
+});
+
+test('public text that looks like a lock marker is analysed; only encryption flags and envelopes lock', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Thoughts?', type: 'freeform' },
+  });
+  await putPayload({
+    kv,
+    resource: 'questions',
+    id: 'qm2',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q2', prompt: 'Pick one', type: 'multichoice', options: ['Locked', 'Open'] },
+  });
+  const rows = [
+    ['q1', { value: 'Redacted', encrypted: false }],
+    ['q1', '***'],
+    ['q1', { value: '[locked]' }],
+    ['q2', { value: ['Locked'] }],
+    ['q1', { value: 'plain' }, { value: '***' }],
+    // A client mask without its encryption flag is a placeholder, not an answer.
+    ['q1', '*'],
+    ['q1', { value: '[encrypted]' }],
+  ];
+  for (const [index, [questionId, answer, additional = '']] of rows.entries()) {
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `r${index}`,
+      metadata: { responder: `0x${String(index + 1).repeat(40)}` },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer, additional },
+    });
+  }
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(
+    source.snapshot.responses.map((row) => [row.questionId, row.answer, row.additional || '']).sort(),
+    [['q1', '***', ''], ['q1', 'Redacted', ''], ['q1', '[locked]', ''], ['q1', 'plain', '***'], ['q2', 'Locked', '']],
+  );
+  assert.deepEqual([source.counts.excludedCount, source.counts.lockedCount], [2, 0]);
+
+  const admin = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'q1', prompt: 'Thoughts?', type: 'freeform' }],
+      responses: [
+        { questionId: 'q1', participantId: 'p1', answer: 'A plain answer' },
+        { questionId: 'q1', participantId: 'p2', answer: 'Locked' },
+      ] } } },
+  });
+  assert.equal(admin.ok, true, JSON.stringify(admin));
+  assert.deepEqual(admin.snapshot.responses.map((row) => row.answer).sort(), ['A plain answer', 'Locked']);
+});
+
+test('worker-canonical source keeps the first or admin version of each question and skips hidden ids', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const admin = '0x00000000000000000000000000000000000000aa';
+  const author = '0x00000000000000000000000000000000000000bb';
+  const attacker = '0x00000000000000000000000000000000000000cc';
+  const question = (questionId, prompt) => ({ sessionSlug: 'session-a', sessionId, questionId, prompt, type: 'text' });
+  const putQuestion = (id, createdAt, metadata, payload) => putPayload({
+    kv, resource: 'questions', id, metadata: { createdAt, ...metadata }, payload,
+  });
+  await putQuestion('zz-official', '2026-09-17T00:00:00.000Z', { uploader: author, resourceId: 'q1' }, question('q1', 'Official prompt'));
+  // Index keys sort by storage id, so the attacker row is read first.
+  await putQuestion('aa-attacker', '2026-09-17T00:05:00.000Z', { uploader: attacker, resourceId: 'q1' }, question('q1', 'ATTACKER prompt'));
+  await putQuestion('mm-legacy', '2026-09-16T00:00:00.000Z', {}, question('q2', 'Participant draft'));
+  await putQuestion('nn-admin', '2026-09-18T00:00:00.000Z', { uploader: admin, resourceId: 'q2' }, question('q2', 'Admin correction'));
+  await putQuestion('hh-hidden', '2026-09-17T00:00:00.000Z', { uploader: author, resourceId: 'q3', hidden: true }, question('q3', 'Hidden by flag'));
+  await putQuestion('ii-marked', '2026-09-17T00:00:00.000Z', {}, question('q4', 'Hidden by marker'));
+  await kv.put('ce-storage-hidden:session-a:questions:q4', JSON.stringify({ version: 1, hidden: true }));
+  for (const [index, questionId] of ['q1', 'q2', 'q3', 'q4'].entries()) {
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `r${index}`,
+      metadata: { responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-19T00:00:00.000Z' },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer: 'yes' },
+    });
+  }
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: { ...config, adminAddress: admin } });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.questions.map((entry) => [entry.id, entry.prompt]), [
+    ['q1', 'Official prompt'],
+    ['q2', 'Admin correction'],
+  ]);
+  assert.deepEqual(source.snapshot.responses.map((entry) => entry.questionId).sort(), ['q1', 'q2']);
+});
+
+test('worker-canonical source keys questions on the id the upload route trusted', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const author = '0x00000000000000000000000000000000000000bb';
+  const attacker = '0x00000000000000000000000000000000000000cc';
+  const putQuestion = (id, metadata, payload) => putPayload({
+    kv, resource: 'questions', id, metadata, payload: { sessionSlug: 'session-a', sessionId, type: 'freeform', ...payload },
+  });
+  // Ownership saw "fresh" (id comes first); the payload also claims the victim id.
+  await putQuestion('s1', { uploader: attacker, resourceId: 'fresh' }, { id: 'fresh', questionId: 'victim', prompt: 'ATTACKER prompt' });
+  // Legacy rows have no trusted id and fall back to the same payload order.
+  await putQuestion('s2', {}, { id: 'legacy-id', questionId: 'other', prompt: 'Legacy prompt' });
+  // The trusted id is lower case; responses keep matching the payload's own spelling.
+  await putQuestion('s3', { uploader: author, resourceId: 'mixed' }, { id: 'MiXed', prompt: 'Mixed case' });
+  await putQuestion('s4', { uploader: author, resourceId: 'hidden-q' }, { id: 'Hidden-Q', prompt: 'Hidden by marker' });
+  await kv.put('ce-storage-hidden:session-a:questions:hidden-q', JSON.stringify({ version: 1, hidden: true }));
+  for (const [index, questionId] of ['victim', 'legacy-id', 'MiXed', 'Hidden-Q'].entries()) {
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `r${index}`,
+      metadata: { responder: `0x${String(index + 1).repeat(40)}` },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer: `answer for ${questionId}` },
+    });
+  }
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.questions.map((entry) => [entry.id, entry.prompt]).sort(), [
+    ['MiXed', 'Mixed case'],
+    ['fresh', 'ATTACKER prompt'],
+    ['legacy-id', 'Legacy prompt'],
+  ]);
+  assert.deepEqual(source.snapshot.responses.map((entry) => entry.questionId).sort(), ['MiXed', 'legacy-id']);
 });
 
 test('worker-canonical source accepts public response envelopes with empty encrypted fields while rejecting non-empty encrypted envelopes', async () => {
@@ -449,7 +692,9 @@ test('AI input response cap samples round-robin across answered questions and pr
     Array.from({ length: 30 }, (_, index) => ({
       questionId: question.questionId,
       participantId: `participant-${String(index + 1).padStart(2, '0')}`,
-      answer: question.type === 'quadratic' ? [2, -1, 0] : question.type === 'rating' ? 7 : `answer ${index + 1} for ${question.questionId}`,
+      answer: question.type === 'quadratic' ? [2, -1, 0]
+        : question.type === 'rating' ? 7
+          : question.type === 'binary' ? 'Agree' : `answer ${index + 1} for ${question.questionId}`,
     })));
   const body = {
       source: {

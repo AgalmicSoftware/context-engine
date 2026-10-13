@@ -191,6 +191,30 @@ test('set-config preserves legacy registry identity during authority-mode migrat
   });
 });
 
+test('set-config compares the Worker URL identity as an origin', () => {
+  const existingConfig = {
+    ...cloneJson(profileBearingConfig),
+    // The deploy helper used to stage the URL with a trailing slash.
+    corsWorkerUrl: 'https://session-worker.example.test/',
+  };
+  const write = (corsWorkerUrl) => applySessionConfigMutation({
+    existingConfig: cloneJson(existingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { corsWorkerUrl } },
+    slug: 'session-a',
+  });
+  for (const same of ['https://session-worker.example.test', 'HTTPS://Session-Worker.example.test:443/']) {
+    const result = write(same);
+    assert.equal(result.ok, true, `${same}: ${JSON.stringify(result)}`);
+  }
+  for (const other of ['https://other-worker.example.test', 'https://session-worker.example.test/other', 'not a url']) {
+    assert.deepEqual(write(other), {
+      ok: false,
+      status: 409,
+      error: 'Worker-canonical session identity cannot be changed after initialization.',
+    }, other);
+  }
+});
+
 test('set-config rejects caller-controlled authorization epochs', () => {
   const result = applySessionConfigMutation({
     existingConfig: baseConfig,
@@ -304,6 +328,68 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
     realtimeModel: 'gpt-realtime-2.1',
   });
   assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
+});
+
+test('set-config sets optional field encryption and linked groups on Worker sessions', () => {
+  const linkedWorkerGroups = [{
+    sessionSlug: 'source-session',
+    sessionId: `0x${'11'.repeat(16)}`,
+    workerUrl: 'https://source.example.test/',
+    groupId: 'community',
+  }];
+  const apply = (existingConfig, incomingConfig) => applySessionConfigMutation({
+    existingConfig: cloneJson(existingConfig),
+    mutation: { kind: 'set-config', incomingConfig },
+    slug: 'session-a',
+  });
+  // A patch may carry only the new field; the merged record is checked.
+  const patched = apply(profileBearingConfig, { responseFieldEncryption: { mode: 'optional' }, linkedWorkerGroups });
+  assert.equal(patched.ok, true, JSON.stringify(patched));
+  assert.deepEqual(patched.config.responseFieldEncryption, { mode: 'optional' });
+  assert.deepEqual(patched.config.linkedWorkerGroups, linkedWorkerGroups);
+  const full = apply(profileBearingConfig, { ...cloneJson(profileBearingConfig), responseFieldEncryption: { mode: 'none' } });
+  assert.equal(full.ok, true, JSON.stringify(full));
+
+  for (const [incomingConfig, path] of [
+    [{ responseFieldEncryption: { mode: 'always' } }, 'responseFieldEncryption'],
+    [{ linkedWorkerGroups: [{ ...linkedWorkerGroups[0], workerUrl: 'http://source.example.test/' }] }, 'linkedWorkerGroups.workerUrl'],
+  ]) {
+    assert.deepEqual(apply(profileBearingConfig, incomingConfig), {
+      ok: false, status: 400, error: `Invalid session config mode at ${path}.`,
+    });
+  }
+  // Optional field encryption still needs a Worker-canonical Cloudflare session.
+  const registry = { ...baseConfig, sessionModeProfile: registryModeProfile, storageProfile: { backend: 'arweave' } };
+  assert.deepEqual(apply(registry, { responseFieldEncryption: { mode: 'optional' } }), {
+    ok: false, status: 400, error: 'Invalid session config mode at responseFieldEncryption.mode.',
+  });
+});
+
+test('set-config lets an edit clear the end time and a limit', () => {
+  const apply = (existingConfig, incomingConfig) => applySessionConfigMutation({
+    existingConfig,
+    mutation: { kind: 'set-config', incomingConfig },
+    slug: 'session-a',
+  });
+  const first = apply(cloneJson(profileBearingConfig), {
+    sessionEndsAt: '2030-01-02T03:04:00Z',
+    limits: { perWalletPerDay: 100, perAnonymousIpPerDay: 5 },
+  });
+  assert.equal(first.ok, true);
+  // A supplied limits object replaces the stored one; an explicit '' clears the end time.
+  const cleared = apply(first.config, { sessionEndsAt: '', limits: { perWalletPerDay: 100 } });
+  assert.equal(cleared.ok, true, JSON.stringify(cleared));
+  assert.equal(cleared.config.sessionEndsAt, '');
+  assert.deepEqual(cleared.config.limits, { perWalletPerDay: 100 });
+  assert.deepEqual(apply(cleared.config, { limits: {} }).config.limits, {});
+  // Patches without limits keep them, and /admin/set-limits still merges.
+  assert.deepEqual(apply(first.config, { sessionName: 'Renamed' }).config.limits, { perWalletPerDay: 100, perAnonymousIpPerDay: 5 });
+  const merged = applySessionConfigMutation({
+    existingConfig: first.config,
+    mutation: { kind: 'set-limits', incomingLimits: { perAnonymousIpPerDay: 7 } },
+    slug: 'session-a',
+  });
+  assert.deepEqual(merged.config.limits, { perWalletPerDay: 100, perAnonymousIpPerDay: 7 });
 });
 
 test('set-config rejects malformed or unsupported interview mode config', () => {

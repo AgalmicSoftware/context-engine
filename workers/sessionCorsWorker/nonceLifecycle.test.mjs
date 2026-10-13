@@ -8,23 +8,17 @@ import {
   issueNonce,
 } from './nonceLifecycle.js';
 
-test('buildNonce fills a 16-byte buffer and encodes it with the provided base64url helper', () => {
-  const calls = [];
-
+// EIP-4361 nonces are alphanumeric; wallet parsers reject "-" and "_".
+test('buildNonce issues 32 hex characters from 16 random bytes', () => {
   const nonce = buildNonce({
     getRandomValues: (bytes) => {
       assert.equal(bytes.length, 16);
-      bytes.set([1, 2, 3, 4]);
+      bytes.set([1, 2, 254, 255]);
       return bytes;
     },
-    base64UrlEncode: (bytes) => {
-      calls.push(Array.from(bytes));
-      return 'encoded-nonce';
-    },
   });
-
-  assert.equal(nonce, 'encoded-nonce');
-  assert.deepEqual(calls, [[1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]);
+  assert.equal(nonce, '0102feff000000000000000000000000');
+  for (let index = 0; index < 50; index += 1) assert.match(buildNonce(), /^[0-9a-f]{32}$/);
 });
 
 test('issueNonce requires durable coordination before writing the KV compatibility mirror', async () => {
@@ -44,13 +38,19 @@ test('issueNonce requires durable coordination before writing the KV compatibili
     usedNonceTtlSeconds: 600,
     issueCoordinatedAuthNonce: async (value) => {
       calls.push(value);
-      return { ok: true, status: 200 };
+      return { ok: true, status: 200, nonce: 'n1signed' };
     },
   });
-  assert.equal(issued.ok, true);
+  assert.deepEqual(issued, { ok: true, nonce: 'n1signed' });
   assert.equal(calls[0].slug, 'session-a');
   assert.equal(calls[0].usedNonceTtlSeconds, 600);
   assert.equal(calls.length, 1);
+  // Only a nonce the coordinator signed can be consumed later.
+  const unsigned = await issueNonce(env, 'session-a', '0xabc', 'nonce-1', 300, {
+    issueCoordinatedAuthNonce: async () => ({ ok: true, status: 200 }),
+  });
+  assert.equal(unsigned.ok, false);
+  assert.equal(unsigned.status, 503);
 });
 
 test('consumeNonce trusts the durable verdict without redundant KV writes', async () => {
@@ -88,7 +88,7 @@ test('consumeNonce records durable replay verdicts without mutating KV mirrors',
   assert.equal(events[0].type, 'nonce_replays');
 });
 
-test('checkNonceRateLimit enforces wallet and shared-network buckets separately', async () => {
+test('checkNonceRateLimit enforces caller-wallet and shared-network buckets separately', async () => {
   const calls = [];
   const result = await checkNonceRateLimit({
     env: {},
@@ -104,7 +104,7 @@ test('checkNonceRateLimit enforces wallet and shared-network buckets separately'
       calls.push(value);
       return {
         ok: true,
-        allowed: value.route === 'authNonceWallet',
+        allowed: value.route === 'authNonceCallerWallet',
         status: 200,
       };
     },
@@ -116,7 +116,7 @@ test('checkNonceRateLimit enforces wallet and shared-network buckets separately'
     retryAfterSeconds: 61,
   });
   assert.deepEqual(calls.map(({ route, identity }) => [route, identity]), [
-    ['authNonceWallet', '0xvictimwallet'],
+    ['authNonceCallerWallet', 'anon:cid:client_abc12345|0xvictimwallet'],
     ['authNonceNetwork', 'anon:cid:client_abc12345'],
   ]);
   assert.equal(calls[0].windowMs, 60_000);
@@ -138,7 +138,29 @@ test('checkNonceRateLimit blocks a hot wallet before consuming shared-network he
   });
 
   assert.equal(result.ok, false);
-  assert.deepEqual(calls.map(({ route }) => route), ['authNonceWallet']);
+  assert.deepEqual(calls.map(({ route }) => route), ['authNonceCallerWallet']);
+});
+
+test('checkNonceRateLimit keeps one caller from using up another caller budget for the same wallet', async () => {
+  const counts = new Map();
+  const checkCoordinatedAuthRateLimit = async ({ route, identity, limit }) => {
+    const key = `${route}:${identity}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+    return { ok: true, allowed: counts.get(key) <= limit, status: 200 };
+  };
+  const request = (identity) => checkNonceRateLimit({
+    env: {},
+    slug: 'session-a',
+    identity,
+    address: '0xVictimWallet',
+    limit: 5,
+    sharedNetworkLimit: 300,
+    checkCoordinatedAuthRateLimit,
+  });
+
+  for (let index = 0; index < 6; index += 1) await request('anon:203.0.113.9');
+  assert.equal((await request('anon:203.0.113.9')).ok, false);
+  assert.deepEqual(await request('anon:198.51.100.7'), { ok: true });
 });
 
 test('checkNonceRateLimit fails closed distinctly when durable coordination is unavailable', async () => {

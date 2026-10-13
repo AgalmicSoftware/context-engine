@@ -852,7 +852,8 @@ describe('userPageGateHelpers', () => {
       }),
     ).toEqual({
       value: 'clear',
-      encrypted: false,
+      encrypted: true,
+      decryptedLocally: true,
       keep: 'yes',
       zkSalt: 'salt-1',
     });
@@ -876,8 +877,8 @@ describe('userPageGateHelpers', () => {
         },
       }),
     ).toEqual({
-      answer: { value: 'answer clear', encrypted: false },
-      additional: { value: 'additional clear', encrypted: false },
+      answer: { value: 'answer clear', encrypted: true, decryptedLocally: true },
+      additional: { value: 'additional clear', encrypted: true, decryptedLocally: true },
       untouched: true,
     });
     expect(

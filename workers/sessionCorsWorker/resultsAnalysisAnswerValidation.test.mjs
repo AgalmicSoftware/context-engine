@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
 import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource } from './resultsAnalysisGeneration.js';
+import { readStoredRating } from './resultsAnalysisAnswerValidation.js';
 
 const slug = 'validation-session';
 const sessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -93,4 +94,48 @@ test('empty choice without a comment is excluded, while a comment-only choice su
   assert.equal(source.counts.excludedCount, 1);
   assert.equal(source.snapshot.responses[0].answer, '');
   assert.equal(source.snapshot.responses[0].additional, 'A relevant comment');
+});
+
+// Same cases as client/src/utilities/survey/storedRating.test.ts.
+test('stored ratings read like the client: legacy 0-100 values scale down, unrated stays null', () => {
+  for (const [value, expected] of [[0, 0], [7, 7], [10, 10], [' 4 ', 4], [{ value: 6 }, 6]]) {
+    assert.equal(readStoredRating(value), expected);
+  }
+  for (const [value, expected] of [[75, 7.5], ['100', 10], [10.5, 1.05], [-3, 0], [150, 10]]) {
+    assert.equal(readStoredRating(value), expected);
+  }
+  for (const value of [null, undefined, '', '  ', '*', 'high', Number.NaN, true, [], {}, { value: '*', encrypted: true },
+    { value: 9, encrypted: true }, '{"v":1,"recipients":[]}']) {
+    assert.equal(readStoredRating(value), null, JSON.stringify(value));
+  }
+});
+
+test('canonical analysis publishes no rating for unrated answers and scales legacy ratings', async () => {
+  const store = new Map();
+  const kv = {
+    async put(key, value) { store.set(key, value); },
+    async get(key) { return store.get(key) ?? null; },
+    async list({ prefix }) { return { keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
+  };
+  const put = async (resource, id, payload, metadata = {}) => {
+    const info = { id, resource, backend: 'cloudflare', contentType: 'application/json', encrypted: false, createdAt: '2026-09-20T00:00:00.000Z', ...metadata };
+    await kv.put(buildIndexKey({ slug, resource, id }), JSON.stringify(info));
+    await kv.put(buildPayloadKey({ slug, id }), JSON.stringify({ metadata: info, payloadBase64url: Buffer.from(JSON.stringify({ sessionSlug: slug, sessionId, ...payload })).toString('base64url') }));
+  };
+  await put('questions', 'q', { id: 'freeform', type: 'freeform', prompt: 'Why?' });
+  const ratings = [[null, null], [7, 3], [75, ''], ['*', { value: 4 }]];
+  for (const [index, [importance, conviction]] of ratings.entries()) {
+    await put('responses', `r${index}`, { questionId: 'freeform', answer: { value: `answer ${index}` }, importance, conviction },
+      { responder: `0x${(index + 1).toString(16).padStart(40, '0')}` });
+  }
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: kv }, slug, config });
+  assert.deepEqual(
+    source.snapshot.responses.map(({ answer, importance, conviction }) => ({ answer, importance, conviction })).sort((a, b) => a.answer.localeCompare(b.answer)),
+    [
+      { answer: 'answer 0', importance: undefined, conviction: undefined },
+      { answer: 'answer 1', importance: 7, conviction: 3 },
+      { answer: 'answer 2', importance: 7.5, conviction: undefined },
+      { answer: 'answer 3', importance: undefined, conviction: 4 },
+    ],
+  );
 });

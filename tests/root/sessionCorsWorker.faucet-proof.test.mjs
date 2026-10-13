@@ -113,28 +113,39 @@ const buildSiweMessage = ({
   chainId = 84532,
   issuedAt,
   expirationTime,
+  sessionSlug = '',
+  sessionId = '',
 }) => {
   const resolvedIssuedAt = issuedAt || new Date(Date.now() - 60 * 1000).toISOString();
   const resolvedExpirationTime = expirationTime || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const sessionResource = sessionId
+    ? `urn:context-engine:session:id:${encodeURIComponent(String(sessionId).toLowerCase())}`
+    : `urn:context-engine:session:slug:${encodeURIComponent(sessionSlug)}`;
   return `${domain} wants you to sign in with your Ethereum account:
 ${address}
+
+Sign in to Context Engine.
 
 URI: https://${domain}
 Version: 1
 Chain ID: ${chainId}
 Nonce: ${nonce}
 Issued At: ${resolvedIssuedAt}
-Expiration Time: ${resolvedExpirationTime}`;
+Expiration Time: ${resolvedExpirationTime}
+Resources:
+- https://worker.example
+- ${sessionResource}`;
 };
 
 const { computeGroupPasswordHash, deriveGroupPasswordWallet } = (
   groupPasswordDerivation.createGroupPasswordDerivation(ethers)
 );
 
-const buildGroupPasswordHash = (password) => computeGroupPasswordHash({ password, sbtAddress: '' });
+// Group password signers are derived per SBT address (v4 KDF), the same way the client derives them.
+const buildGroupPasswordHash = (password, sbtAddress) => computeGroupPasswordHash({ password, sbtAddress });
 
 const signGroupMintAuthorization = async ({ password, sbtAddress, recipientAddress }) => {
-  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: '' });
+  const tmpWallet = await deriveGroupPasswordWallet({ password, sbtAddress });
   const messageHash = ethers.utils.solidityKeccak256(['address', 'address'], [sbtAddress, recipientAddress]);
   return tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
 };
@@ -258,6 +269,8 @@ const issueWorkerLoginToken = async ({
   const message = buildSiweMessage({
     address: wallet.address,
     nonce: noncePayload.nonce,
+    sessionSlug,
+    sessionId,
   });
   const signature = await wallet.signMessage(message);
 
@@ -548,7 +561,7 @@ test('group-password faucet proofs reject public groupPasswordHash values withou
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
   const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
   const groupPassword = 'shared-secret';
-  const onChainGroupPasswordHash = buildGroupPasswordHash(groupPassword);
+  const onChainGroupPasswordHash = await buildGroupPasswordHash(groupPassword, sbtAddress);
   const env = installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(buildSessionConfig()),
@@ -629,7 +642,7 @@ test('group-password faucet proofs accept a valid group mint signature', async (
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
   const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
   const groupPassword = 'shared-secret';
-  const onChainGroupPasswordHash = buildGroupPasswordHash(groupPassword);
+  const onChainGroupPasswordHash = await buildGroupPasswordHash(groupPassword, sbtAddress);
   const signature = await signGroupMintAuthorization({
     password: groupPassword,
     sbtAddress,

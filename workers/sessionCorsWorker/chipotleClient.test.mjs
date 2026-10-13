@@ -1,9 +1,10 @@
+import { buildWorkerAuthorizedLitAction } from '../../shared/litChipotleAction.mjs';
+import { authorizeLitRequest, litAuthorizationMessage, openLitReply } from './litWorkerAuthorization.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { ethers } from 'ethers';
+import { createRequire } from 'node:module';
+const ethersV5 = createRequire(new URL('../../package.json', import.meta.url))('ethers').ethers;
 
 import {
   bootstrapLitChipotleSession,
@@ -23,22 +24,16 @@ import {
   fingerprintLitChipotlePolicy,
 } from './litChipotlePolicyCore.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const ethersUtils = ethers?.utils || ethers;
 const TEST_ACTION_CID = 'QmAction123';
 const TEST_PKP_ID = '0xpkp123';
 const TEST_GATE_ADDRESS = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
 const TEST_REQUESTER = '0x00000000000000000000000000000000000000aa';
 
-const readDefaultChipotleActionCode = () => {
-  const catalogPath = resolve(__dirname, '../../client/src/utilities/crypto/litChipotleCatalog.ts');
-  const catalogSource = readFileSync(catalogPath, 'utf8');
-  const match = catalogSource.match(/export const DEFAULT_CHIPOTLE_ACTION_CODE = `([\s\S]*?)`;/);
-  assert.ok(match, 'client Lit Chipotle catalog must export DEFAULT_CHIPOTLE_ACTION_CODE');
-  return match[1];
-};
-
-const DEFAULT_CHIPOTLE_ACTION_CODE = readDefaultChipotleActionCode();
+const TEST_WALLET = ethers.Wallet.createRandom();
+const AUTH_CONFIG = { litAuthorizationVersion: 'worker-signed-v1', litAuthorizationSigner: TEST_WALLET.address };
+const AUTH_SECRETS = { litAuthorizationPrivateKey: TEST_WALLET.privateKey };
+const DEFAULT_CHIPOTLE_ACTION_CODE = buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, pkpId: TEST_PKP_ID, sessionSlug: '' });
 
 const makePolicy = (overrides = {}) => buildLitChipotlePolicy({
   chainId: 11155420,
@@ -59,6 +54,12 @@ const jsonResponse = (body, { ok = true, status = 200 } = {}) => ({
   text: async () => JSON.stringify(body),
 });
 
+const validateExistingActionOnly = ({ pkpId = TEST_PKP_ID, sessionSlug = '', cid = TEST_ACTION_CID } = {}) => async (url, options) => {
+  assert.ok(url.endsWith('/get_lit_action_ipfs_id'), 'An already provisioned authority must not mutate remote resources');
+  assert.equal(JSON.parse(options.body), buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug, pkpId }));
+  return jsonResponse(cid);
+};
+
 const mockBalance = (value = 0) => ({
   isZero: () => BigInt(value || 0) === 0n,
   toString: () => String(value || 0),
@@ -75,7 +76,7 @@ const createDefaultActionHarness = ({
     decryptCiphertexts: [],
   };
   const mockEthers = {
-    utils: ethersUtils,
+    utils: ethersV5.utils,
     providers: {
       JsonRpcProvider: class JsonRpcProvider {
         constructor(rpcUrl) {
@@ -118,13 +119,15 @@ const createDefaultActionHarness = ({
   return { main, calls };
 };
 
-const makeActionParams = ({
+const makeActionParams = async ({
   op,
   policy = makePolicy(),
   rpcUrl = 'https://op-sepolia.example.test',
   message,
   ciphertext,
-} = {}) => ({
+  signed = true,
+} = {}) => {
+const params = {
   op,
   pkpId: policy.litPkpId,
   litActionCid: policy.litActionCid,
@@ -137,7 +140,10 @@ const makeActionParams = ({
   ...(rpcUrl ? { rpcUrl } : {}),
   ...(message ? { message } : {}),
   ...(ciphertext ? { ciphertext } : {}),
-});
+};
+if (signed) await authorizeLitRequest({ wallet: TEST_WALLET, jsParams: params, sessionSlug: '' });
+return params;
+};
 
 test('normalizeLitChipotleApiBase trims trailing slashes and core prefix', () => {
   assert.equal(
@@ -265,7 +271,7 @@ test('default Chipotle action lets a non-holder encrypt for an SBT gate', async 
     },
   });
 
-  const result = await main(makeActionParams({
+  const result = await main(await makeActionParams({
     op: 'encrypt',
     policy,
     rpcUrl: '',
@@ -287,7 +293,7 @@ test('default Chipotle action still enforces the SBT gate for decrypt', async ()
     decryptPlaintext: makeWrappedPlaintext(policy),
   });
 
-  const result = await main(makeActionParams({
+  const result = await main(await makeActionParams({
     op: 'decrypt',
     policy,
     ciphertext: 'wrapped-cek',
@@ -313,7 +319,7 @@ test('default Chipotle action denies decrypt when the embedded policy is tampere
   });
 
   await assert.rejects(
-    () => main(makeActionParams({
+    async () => main(await makeActionParams({
       op: 'decrypt',
       policy: gateB,
       ciphertext: 'wrapped-cek',
@@ -333,7 +339,7 @@ test('default Chipotle action rejects RPC endpoints that report the wrong chain 
   });
 
   await assert.rejects(
-    () => main(makeActionParams({
+    async () => main(await makeActionParams({
       op: 'decrypt',
       policy,
       ciphertext: 'wrapped-cek',
@@ -352,7 +358,7 @@ test('default Chipotle action rejects legacy bare-hex wrapped keys', async () =>
   });
 
   await assert.rejects(
-    () => main(makeActionParams({
+    async () => main(await makeActionParams({
       op: 'decrypt',
       policy,
       ciphertext: 'wrapped-cek',
@@ -387,6 +393,7 @@ test('resolveLitChipotleRuntime prefers request, then session secret, then worke
     allowLocalApiBase: false,
     litUsageApiKey: 'request-key',
     apiKeySource: 'request',
+    authorizationReady: false,
     litGroupId: 'group_123',
     litPkpId: 'pkp_123',
     litActionCid: 'bafy123',
@@ -438,6 +445,7 @@ test('readLitChipotleStatus reads balance plus group memberships from the config
 
   const status = await readLitChipotleStatus({
     runtime: {
+      authorizationReady: true,
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litUsageApiKey: 'lit-secret',
       apiKeySource: 'session-secret',
@@ -481,6 +489,7 @@ test('readLitChipotleStatus tolerates status endpoints that a scoped key cannot 
 
   const status = await readLitChipotleStatus({
     runtime: {
+      authorizationReady: true,
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litUsageApiKey: 'lit-secret',
       apiKeySource: 'session-secret',
@@ -533,7 +542,8 @@ test('executeLitChipotleAction posts the configured Lit Action CID and js params
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.request, {
+  assert.equal(result.request, undefined);
+  assert.deepEqual(JSON.parse(calls[0][1].body), {
     ipfs_id: 'bafy123',
     js_params: { hello: 'world' },
   });
@@ -583,13 +593,13 @@ test('executeSessionLitChipotleAction validates source code and executes the con
 
   const result = await executeSessionLitChipotleAction({
     config: {
-      litCredentials: {
+      litCredentials: { ...AUTH_CONFIG,
         litApiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: TEST_ACTION_CID,
         litPkpId: TEST_PKP_ID,
       },
     },
-    secrets: {
+    secrets: { ...AUTH_SECRETS,
       litUsageApiKey: 'usage-key',
     },
     request: {
@@ -642,13 +652,13 @@ test('executeSessionLitChipotleAction rejects malformed explicit gate chains ins
       () => executeSessionLitChipotleAction({
         config: {
           networkChainId: 11155420,
-          litCredentials: {
+          litCredentials: { ...AUTH_CONFIG,
             litApiBase: 'https://api.chipotle.litprotocol.com',
             litActionCid: TEST_ACTION_CID,
             litPkpId: TEST_PKP_ID,
           },
         },
-        secrets: { litUsageApiKey: 'usage-key' },
+        secrets: { ...AUTH_SECRETS, litUsageApiKey: 'usage-key' },
         request: {
           actionCode: 'async function main() { return { ok: true }; }',
           op: 'encrypt',
@@ -695,13 +705,13 @@ test('executeSessionLitChipotleAction submits verified source code when configur
   const actionCode = 'async function main() { return { ok: true }; }';
   const result = await executeSessionLitChipotleAction({
     config: {
-      litCredentials: {
+      litCredentials: { ...AUTH_CONFIG,
         litApiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: TEST_ACTION_CID,
         litPkpId: TEST_PKP_ID,
       },
     },
-    secrets: {
+    secrets: { ...AUTH_SECRETS,
       litUsageApiKey: 'usage-key',
     },
     request: {
@@ -722,7 +732,7 @@ test('executeSessionLitChipotleAction submits verified source code when configur
   assert.equal(cidBody.code, undefined);
   const inlineBody = JSON.parse(calls[2][1].body);
   assert.equal(inlineBody.ipfs_id, undefined);
-  assert.equal(inlineBody.code, actionCode);
+  assert.equal(inlineBody.code, DEFAULT_CHIPOTLE_ACTION_CODE);
   assert.equal(inlineBody.js_params.op, 'encrypt');
 });
 
@@ -753,13 +763,13 @@ test('executeSessionLitChipotleAction falls back to worker env Lit API keys for 
       LIT_USAGE_API_KEY: 'env-usage-key',
     },
     config: {
-      litCredentials: {
+      litCredentials: { ...AUTH_CONFIG,
         litApiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: TEST_ACTION_CID,
         litPkpId: TEST_PKP_ID,
       },
     },
-    secrets: {},
+    secrets: { ...AUTH_SECRETS,},
     request: {
       actionCode: 'async function main() { return { ok: true }; }',
       op: 'encrypt',
@@ -788,13 +798,13 @@ test('executeSessionLitChipotleAction rejects unapproved request RPC URLs for de
   await assert.rejects(
     () => executeSessionLitChipotleAction({
       config: {
-        litCredentials: {
+        litCredentials: { ...AUTH_CONFIG,
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litActionCid: TEST_ACTION_CID,
           litPkpId: TEST_PKP_ID,
         },
       },
-      secrets: {
+      secrets: { ...AUTH_SECRETS,
         litUsageApiKey: 'usage-key',
       },
       request: {
@@ -814,6 +824,34 @@ test('executeSessionLitChipotleAction rejects unapproved request RPC URLs for de
   assert.equal(calls.length, 1);
 });
 
+test('Worker RPC authorization preserves path and query case while normalizing the hostname', async () => {
+  const executed = [];
+  const base = {
+    config: { litCredentials: { ...AUTH_CONFIG, litActionCid: TEST_ACTION_CID, litPkpId: TEST_PKP_ID } },
+    secrets: { ...AUTH_SECRETS, litUsageApiKey: 'usage-key', customRpcUrl: 'https://rpc.example.test/rpc/TenantA?key=CaseSensitive' },
+    requesterAddress: TEST_REQUESTER,
+    fetchImpl: async (url, options) => {
+      if (url.endsWith('/get_lit_action_ipfs_id')) return jsonResponse(TEST_ACTION_CID);
+      executed.push(JSON.parse(options.body).js_params.rpcUrl);
+      return jsonResponse({ has_error: false, response: { ok: true, allowed: true } });
+    },
+  };
+  const request = { op: 'check', sbtAddresses: [TEST_GATE_ADDRESS], chainId: 11155420 };
+  for (const rpcUrl of ['https://rpc.example.test/rpc/tenanta?key=CaseSensitive', 'https://rpc.example.test/rpc/TenantA?key=casesensitive']) {
+    await assert.rejects(executeSessionLitChipotleAction({ ...base, request: { ...request, rpcUrl } }), /request RPC URL is not approved/);
+  }
+  assert.deepEqual(executed, []);
+  await executeSessionLitChipotleAction({ ...base, request: { ...request, rpcUrl: 'https://RPC.EXAMPLE.TEST/rpc/TenantA?key=CaseSensitive' } });
+  assert.deepEqual(executed, [base.secrets.customRpcUrl]);
+  // Two explicitly approved endpoints can differ only by a case-sensitive path.
+  await executeSessionLitChipotleAction({
+    ...base,
+    config: { ...base.config, rpcUrlsByChainId: { 11155420: ['https://rpc.example.test/rpc/tenanta?key=CaseSensitive'] } },
+    request: { ...request, rpcUrl: 'https://rpc.example.test/rpc/tenanta?key=CaseSensitive' },
+  });
+  assert.equal(executed[1], 'https://rpc.example.test/rpc/tenanta?key=CaseSensitive');
+});
+
 test('executeSessionLitChipotleAction rejects legacy v1 Chipotle wrapped-key metadata', async () => {
   const calls = [];
   const fetchImpl = async (url) => {
@@ -827,13 +865,13 @@ test('executeSessionLitChipotleAction rejects legacy v1 Chipotle wrapped-key met
   await assert.rejects(
     () => executeSessionLitChipotleAction({
       config: {
-        litCredentials: {
+        litCredentials: { ...AUTH_CONFIG,
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litActionCid: TEST_ACTION_CID,
           litPkpId: TEST_PKP_ID,
         },
       },
-      secrets: {
+      secrets: { ...AUTH_SECRETS,
         litUsageApiKey: 'usage-key',
       },
       request: {
@@ -863,13 +901,13 @@ test('executeSessionLitChipotleAction rejects action code that does not match th
   await assert.rejects(
     () => executeSessionLitChipotleAction({
       config: {
-        litCredentials: {
+        litCredentials: { ...AUTH_CONFIG,
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litActionCid: 'QmAction123',
           litPkpId: '0xpkp123',
         },
       },
-      secrets: {
+      secrets: { ...AUTH_SECRETS,
         litUsageApiKey: 'usage-key',
       },
       request: {
@@ -907,13 +945,13 @@ test('executeSessionLitChipotleAction falls back to a default public RPC for the
 
   const result = await executeSessionLitChipotleAction({
     config: {
-      litCredentials: {
+      litCredentials: { ...AUTH_CONFIG,
         litApiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: 'QmAction123',
         litPkpId: '0xpkp123',
       },
     },
-    secrets: {
+    secrets: { ...AUTH_SECRETS,
       litUsageApiKey: 'usage-key',
     },
     request: {
@@ -930,7 +968,9 @@ test('executeSessionLitChipotleAction falls back to a default public RPC for the
   const body = JSON.parse(calls[1][1].body);
   const expectedPolicy = makePolicy();
   assert.equal(body.ipfs_id, TEST_ACTION_CID);
-  assert.deepEqual(body.js_params, {
+  assert.ok(body.js_params.authorization.signature);
+  assert.deepEqual({ ...body.js_params, authorization: undefined }, {
+    authorization: undefined,
     op: 'check',
     pkpId: TEST_PKP_ID,
     litActionCid: TEST_ACTION_CID,
@@ -964,13 +1004,13 @@ test('executeSessionLitChipotleAction prefers the session-secret custom RPC over
   await executeSessionLitChipotleAction({
     config: {
       networkChainId: 11155420,
-      litCredentials: {
+      litCredentials: { ...AUTH_CONFIG,
         litApiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: 'QmAction123',
         litPkpId: '0xpkp123',
       },
     },
-    secrets: {
+    secrets: { ...AUTH_SECRETS,
       litUsageApiKey: 'usage-key',
       customRpcUrl: 'https://rpc.example.test',
     },
@@ -1075,7 +1115,7 @@ test('bootstrapLitChipotleSession creates a per-session account, group, wallet, 
       ]);
     }
     if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
-      assert.equal(JSON.parse(options.body), 'async function main() { return { ok: true }; }');
+      assert.equal(JSON.parse(options.body), buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug: 'session-a', pkpId: TEST_PKP_ID }));
       return jsonResponse('QmAction123');
     }
     if (String(url).endsWith('/core/v1/list_actions?page_number=0&page_size=100')) {
@@ -1136,8 +1176,9 @@ test('bootstrapLitChipotleSession creates a per-session account, group, wallet, 
   };
 
   const result = await bootstrapLitChipotleSession({
+    secrets: AUTH_SECRETS,
     config: {
-      litCredentials: {
+      litCredentials: { ...AUTH_CONFIG,
         litApiBase: 'https://api.chipotle.litprotocol.com',
       },
     },
@@ -1155,6 +1196,7 @@ test('bootstrapLitChipotleSession creates a per-session account, group, wallet, 
     ok: true,
     bootstrapMode: 'session-account',
     alreadyBootstrapped: false,
+    ...AUTH_CONFIG,
     apiBase: 'https://api.chipotle.litprotocol.com',
     litActionCid: 'QmAction123',
     litGroupId: '7',
@@ -1164,13 +1206,13 @@ test('bootstrapLitChipotleSession creates a per-session account, group, wallet, 
       balance_cents: 0,
       balance_display: '$0.00',
     },
-    litCredentials: {
+    litCredentials: { ...AUTH_CONFIG,
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litActionCid: 'QmAction123',
       litGroupId: '7',
       litPkpId: '0xpkp123',
     },
-    secretOutputs: {
+    secretOutputs: { ...AUTH_SECRETS,
       litAccountApiKey: 'account-key',
       litUsageApiKey: 'usage-key',
     },
@@ -1220,7 +1262,7 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
       ]);
     }
     if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
-      assert.equal(JSON.parse(options.body), 'async function main() { return { ok: true }; }');
+      assert.equal(JSON.parse(options.body), buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug: 'session-a', pkpId: TEST_PKP_ID }));
       return jsonResponse('QmAction123');
     }
     if (String(url).endsWith('/core/v1/list_actions?page_number=0&page_size=100')) {
@@ -1281,12 +1323,13 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
   };
 
   const result = await bootstrapLitChipotleSession({
+    secrets: AUTH_SECRETS,
     env: {
       LIT_API_BASE: 'http://localhost:8787/core/v1/',
       LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: 'true',
     },
     config: {
-      litCredentials: {},
+      litCredentials: { ...AUTH_CONFIG,},
     },
     request: {
       litAccountApiKey: 'account-key',
@@ -1303,6 +1346,7 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
     ok: true,
     bootstrapMode: 'existing-account',
     alreadyBootstrapped: false,
+    ...AUTH_CONFIG,
     apiBase: 'http://localhost:8787',
     litActionCid: 'QmAction123',
     litGroupId: '7',
@@ -1311,13 +1355,13 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
       balance_cents: 0,
       balance_display: '$0.00',
     },
-    litCredentials: {
+    litCredentials: { ...AUTH_CONFIG,
       litApiBase: 'http://localhost:8787',
       litActionCid: 'QmAction123',
       litGroupId: '7',
       litPkpId: '0xpkp123',
     },
-    secretOutputs: {
+    secretOutputs: { ...AUTH_SECRETS,
       litAccountApiKey: 'account-key',
       litUsageApiKey: 'usage-key',
     },
@@ -1340,80 +1384,312 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
   assert.equal(calls[0][1].headers.Authorization, 'Bearer account-key');
 });
 
-test('provisionLitChipotleAction derives, registers, and attaches a Lit action to the configured group', async () => {
-  const calls = [];
-  const fetchImpl = async (url, options = {}) => {
-    calls.push([String(url), options]);
-    if (String(url).endsWith('/core/v1/list_groups?page_number=0&page_size=100')) {
-      return jsonResponse([{ id: '7', name: 'ce-session-content-prod', description: 'prod' }]);
-    }
-    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
-      assert.equal(JSON.parse(options.body), 'async function main() { return { ok: true }; }');
-      return jsonResponse('QmAction123');
-    }
-    if (String(url).endsWith('/core/v1/list_actions?page_number=0&page_size=100')) {
-      return jsonResponse([]);
-    }
-    if (String(url).endsWith('/core/v1/add_action')) {
-      assert.deepEqual(JSON.parse(options.body), {
-        action_ipfs_cid: 'QmAction123',
-        name: 'ce-sbt-gated-crypto-v3',
-        description: 'Context Engine smoke action',
-      });
-      return jsonResponse({ success: true });
-    }
-    if (String(url).endsWith('/core/v1/list_actions?group_id=7&page_number=0&page_size=100')) {
-      return jsonResponse([]);
-    }
-    if (String(url).endsWith('/core/v1/add_action_to_group')) {
-      assert.deepEqual(JSON.parse(options.body), {
-        group_id: 7,
-        action_ipfs_cid: 'QmAction123',
-      });
-      return jsonResponse({ success: true });
-    }
-    if (String(url).endsWith('/core/v1/list_wallets_in_group?group_id=7&page_number=0&page_size=100')) {
-      return jsonResponse([]);
-    }
-    if (String(url).endsWith('/core/v1/add_pkp_to_group')) {
-      assert.deepEqual(JSON.parse(options.body), {
-        group_id: 7,
-        pkp_id: '0xpkp123',
-      });
-      return jsonResponse({ success: true });
-    }
-    throw new Error(`Unexpected URL: ${url}`);
+test('manual provisioning keeps only hardened authority and rejects legacy reuse', async () => {
+  const config = { litCredentials: { ...AUTH_CONFIG, litGroupId: '7', litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } };
+  const secrets = { ...AUTH_SECRETS, litAccountApiKey: 'account-key', litUsageApiKey: 'usage-key' };
+  const runtime = { litApiBase: 'https://api.chipotle.litprotocol.com', litManagementApiKey: 'account-key' };
+  const result = await provisionLitChipotleAction({ runtime, config, secrets, fetchImpl: validateExistingActionOnly() });
+  assert.equal(result.alreadyBootstrapped, true);
+  assert.equal(result.litCredentials.litAuthorizationSigner, TEST_WALLET.address);
+  await assert.rejects(provisionLitChipotleAction({ runtime, config: { litCredentials: { litPkpId: TEST_PKP_ID } }, secrets }), /reprovision Lit/);
+});
+
+test('Worker-account bootstrap explicitly clears the session account in fresh and repeated finalization', async () => {
+  const env = { LIT_ACCOUNT_API_KEY: 'env-account-key' };
+  const secrets = { ...AUTH_SECRETS, litAccountApiKey: '', litUsageApiKey: 'old-usage' };
+  const result = await bootstrapLitChipotleSession({
+    env, secrets, sessionSlug: 'session-a', request: { freshAuthority: true },
+    config: { litCredentials: { litGroupId: 'old-group', litPkpId: 'old-pkp', litActionCid: 'old-action' } },
+    fetchImpl: async (url, options = {}) => {
+      const path = new URL(url).pathname.replace('/core/v1', '');
+      if (path !== '/get_lit_action_ipfs_id') assert.equal(options.headers.Authorization, 'Bearer env-account-key');
+      if (path === '/add_group') return jsonResponse({ group_id: 8 });
+      if (path === '/create_wallet') return jsonResponse({ wallet_address: 'fresh-wallet' });
+      if (path === '/list_wallets') return jsonResponse([{ id: 'fresh-pkp', wallet_address: 'fresh-wallet' }]);
+      if (path === '/get_lit_action_ipfs_id') return jsonResponse('fresh-action');
+      if (path === '/list_actions' || path === '/list_wallets_in_group') return jsonResponse([]);
+      if (['/add_action', '/add_action_to_group', '/add_pkp_to_group'].includes(path)) return jsonResponse({ success: true });
+      if (path === '/add_usage_api_key') return jsonResponse({ usage_api_key: 'fresh-usage' });
+      if (path === '/billing/balance') return jsonResponse({ balance_cents: 0 });
+      assert.fail(`Unexpected ${path}`);
+    },
+  });
+  assert.equal(result.secretOutputs.litAccountApiKey, '');
+  assert.equal(result.secretOutputs.litUsageApiKey, 'fresh-usage');
+  const retry = await bootstrapLitChipotleSession({
+    env, config: { litCredentials: result.litCredentials }, secrets: { ...secrets, ...result.secretOutputs },
+    sessionSlug: 'session-a', fetchImpl: validateExistingActionOnly({ pkpId: 'fresh-pkp', sessionSlug: 'session-a', cid: 'fresh-action' }),
+  });
+  assert.equal(retry.alreadyBootstrapped, true);
+  assert.equal(retry.secretOutputs.litAccountApiKey, '');
+});
+
+test('direct unsigned Action cannot impersonate a holder or choose a balance oracle', async () => {
+  const policy = makePolicy();
+  const { main, calls } = createDefaultActionHarness({
+    balances: { [TEST_GATE_ADDRESS.toLowerCase()]: 1 },
+    decryptPlaintext: makeWrappedPlaintext(policy),
+  });
+  await assert.rejects(main(await makeActionParams({
+    op: 'decrypt', policy, ciphertext: 'captured-wrapped-key', signed: false,
+    rpcUrl: 'https://attacker.example.test',
+  })), /authorization/i);
+  assert.deepEqual(calls.decryptCiphertexts, []);
+});
+
+test('signed decrypt returns an opaque reply on every replay, readable only with the original Worker key', async () => {
+  const { main } = createDefaultActionHarness({ balances: { [TEST_GATE_ADDRESS.toLowerCase()]: 1 }, decryptPlaintext: makeWrappedPlaintext() });
+  const params = await makeActionParams({ op: 'decrypt', ciphertext: 'captured-wrapped-key' });
+  const context = await authorizeLitRequest({ wallet: TEST_WALLET, jsParams: params, sessionSlug: '' });
+  for (let replay = 0; replay < 2; replay += 1) {
+    const response = await main(params);
+    assert.equal(response.plaintext, undefined);
+    assert.equal(await openLitReply(response.encryptedReply, context), `0x${'11'.repeat(32)}`);
+    const unrelatedContext = await authorizeLitRequest({ wallet: TEST_WALLET, jsParams: { ...params }, sessionSlug: '' });
+    await assert.rejects(openLitReply(response.encryptedReply, unrelatedContext));
+    await assert.rejects(openLitReply({ ...response.encryptedReply, iv: `0x${'00'.repeat(12)}` }, context));
+  }
+});
+
+test('Action authenticates every authorization field before any membership or key operation', async () => {
+  const { main, calls } = createDefaultActionHarness({ balances: { [TEST_GATE_ADDRESS.toLowerCase()]: 1 }, decryptPlaintext: makeWrappedPlaintext() });
+  const original = await makeActionParams({ op: 'decrypt', ciphertext: 'captured-wrapped-key' });
+  const mutations = [
+    (p) => { p.requesterAddress = '0x00000000000000000000000000000000000000bb'; },
+    (p) => { p.rpcUrl = 'https://attacker.example.test'; },
+    (p) => { p.ciphertext += '-substituted'; },
+    (p) => { p.op = 'encrypt'; },
+    (p) => { p.expectedChainId = 84532; },
+    (p) => { p.expectedPolicyFingerprint = `0x${'00'.repeat(32)}`; },
+    (p) => { p.pkpId = 'another-pkp'; },
+    (p) => { p.litActionCid = 'another-action'; },
+    (p) => { p.authorization.sessionSlug = 'another-session'; },
+    (p) => { p.authorization.requestId = `0x${'00'.repeat(32)}`; },
+    (p) => { p.authorization.replyPublicKey = `0x04${'00'.repeat(64)}`; },
+    (p) => { p.authorization.issuedAt -= 1; },
+    (p) => { p.authorization.expiresAt += 1; },
+    (p) => { p.authorization.signature = '0x1234'; },
+  ];
+  for (const mutate of mutations) {
+    const params = structuredClone(original);
+    mutate(params);
+    await assert.rejects(main(params), /authorization/i);
+  }
+  const impostor = structuredClone(original);
+  impostor.authorization.signature = await ethers.Wallet.createRandom().signMessage(litAuthorizationMessage(impostor));
+  await assert.rejects(main(impostor), /authorization/i);
+  for (const now of [Math.floor(Date.now() / 1000) - 61, Math.floor(Date.now() / 1000) + 60]) {
+    const params = structuredClone(original);
+    await authorizeLitRequest({ wallet: TEST_WALLET, jsParams: params, sessionSlug: '', now });
+    await assert.rejects(main(params), /expired Worker authorization/i);
+  }
+  assert.deepEqual(calls.providers, []);
+  assert.deepEqual(calls.decryptCiphertexts, []);
+});
+
+test('valid Worker signatures preserve Any and All gate decisions', async () => {
+  const otherGate = '0x00000000000000000000000000000000000000bb';
+  const { main, calls } = createDefaultActionHarness({ balances: { [TEST_GATE_ADDRESS.toLowerCase()]: 1 } });
+  for (const gateMode of ['any', 'all']) {
+    const policy = makePolicy({ gateMode, sbtAddresses: [TEST_GATE_ADDRESS, otherGate] });
+    const result = await main(await makeActionParams({ op: 'check', policy }));
+    assert.equal(result.allowed, gateMode === 'any');
+  }
+  assert.equal(calls.providers.length, 2);
+});
+
+test('Worker executes its own specialized Action and returns only decrypted CEK to its authenticated caller', async () => {
+  const { main } = createDefaultActionHarness({ balances: { [TEST_GATE_ADDRESS.toLowerCase()]: 1 }, decryptPlaintext: makeWrappedPlaintext() });
+  let submitted;
+  const result = await executeSessionLitChipotleAction({
+    config: { litCredentials: { ...AUTH_CONFIG, litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } },
+    secrets: { ...AUTH_SECRETS, litUsageApiKey: 'scoped-key' },
+    sessionSlug: '', requesterAddress: TEST_REQUESTER,
+    request: { op: 'decrypt', ciphertext: 'captured-wrapped-key', chainId: 11155420,
+      sbtAddresses: [TEST_GATE_ADDRESS], code: 'return secrets', requesterAddress: 'attacker', authorization: { signer: 'attacker' } },
+    fetchImpl: async (url, options) => {
+      if (url.endsWith('/get_lit_action_ipfs_id')) {
+        assert.equal(JSON.parse(options.body), DEFAULT_CHIPOTLE_ACTION_CODE);
+        return jsonResponse(TEST_ACTION_CID);
+      }
+      submitted = JSON.parse(options.body).js_params;
+      return jsonResponse({ has_error: false, logs: 'do not reflect logs', response: await main(submitted) });
+    },
+  });
+  assert.equal(submitted.requesterAddress, TEST_REQUESTER);
+  assert.equal(result.response.plaintext, `0x${'11'.repeat(32)}`);
+  assert.equal(result.request, undefined);
+  const serialized = JSON.stringify(result);
+  for (const secret of [submitted.authorization.signature, submitted.authorization.replyPublicKey, TEST_WALLET.privateKey, 'encryptedReply', 'do not reflect logs']) {
+    assert.equal(serialized.includes(secret), false);
+  }
+});
+
+test('Worker rejects missing authorization config and unencrypted legacy replies', async () => {
+  const options = {
+    config: { litCredentials: { ...AUTH_CONFIG, litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } },
+    secrets: { ...AUTH_SECRETS, litUsageApiKey: 'scoped-key' },
+    request: { op: 'decrypt', ciphertext: 'captured-wrapped-key', chainId: 11155420, sbtAddresses: [TEST_GATE_ADDRESS] },
+    requesterAddress: TEST_REQUESTER,
+    fetchImpl: async (url) => jsonResponse(url.endsWith('/get_lit_action_ipfs_id') ? TEST_ACTION_CID : { has_error: false, response: { ok: true, allowed: true, plaintext: `0x${'11'.repeat(32)}` } }),
   };
+  await assert.rejects(executeSessionLitChipotleAction(options), /Invalid encrypted Lit authorization reply/);
+  await assert.rejects(executeSessionLitChipotleAction({ ...options, secrets: { litUsageApiKey: 'scoped-key' } }), /reprovision Lit/);
+  await assert.rejects(executeSessionLitChipotleAction({ ...options, config: { litCredentials: { litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } } }), /reprovision Lit/);
+});
 
-  const result = await provisionLitChipotleAction({
-    runtime: {
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litManagementApiKey: 'account-key',
-      apiKeySource: 'worker-env',
-      litGroupId: 'ce-session-content-prod',
-      litPkpId: '0xpkp123',
-    },
-    request: {
-      actionCode: 'async function main() { return { ok: true }; }',
-      actionName: 'ce-sbt-gated-crypto-v3',
-      actionDescription: 'Context Engine smoke action',
-    },
-    fetchImpl,
+test('fresh-authority bootstrap isolates the new PKP from every old Action permission', async () => {
+  const oldConfig = { litCredentials: { litApiBase: 'https://api.chipotle.litprotocol.com', litGroupId: '7', litPkpId: 'old-pkp', litActionCid: 'old-action' } };
+  const persisted = { ...AUTH_SECRETS, litAccountApiKey: 'account-key', litUsageApiKey: 'old-usage' };
+  const groups = new Map([['7', { actions: ['old-action'], pkps: ['old-pkp'] }]]);
+  const usageGroups = new Map([['old-usage', ['7']]]);
+  let specializedSource;
+  let persistCount = 0;
+  const fetchImpl = async (url, options = {}) => {
+    const path = new URL(url).pathname.replace('/core/v1', '');
+    const body = options.body ? JSON.parse(options.body) : {};
+    assert.ok(persistCount > 0, 'signer persisted before any remote side effect');
+    if (path === '/add_group') {
+      assert.deepEqual(body.pkp_ids_permitted, []);
+      assert.deepEqual(body.cid_hashes_permitted, []);
+      groups.set('8', { actions: [], pkps: [] });
+      return jsonResponse({ group_id: 8 });
+    }
+    if (path === '/create_wallet') return jsonResponse({ wallet_address: 'fresh-wallet' });
+    if (path === '/list_wallets') return jsonResponse([{ id: 'fresh-pkp', wallet_address: 'fresh-wallet' }]);
+    if (path === '/get_lit_action_ipfs_id') {
+      specializedSource = body;
+      assert.equal(body, buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug: 'session-a', pkpId: 'fresh-pkp' }));
+      return jsonResponse('fresh-action');
+    }
+    if (path === '/list_actions' || path === '/list_wallets_in_group') return jsonResponse([]);
+    if (path === '/add_action') return jsonResponse({ success: true });
+    if (path === '/add_action_to_group') {
+      groups.get(String(body.group_id)).actions.push(body.action_ipfs_cid);
+      return jsonResponse({ success: true });
+    }
+    if (path === '/add_pkp_to_group') {
+      groups.get(String(body.group_id)).pkps.push(body.pkp_id);
+      return jsonResponse({ success: true });
+    }
+    if (path === '/add_usage_api_key') {
+      assert.deepEqual(body.execute_in_groups, [8]);
+      for (const field of ['can_create_groups', 'can_delete_groups', 'can_create_pkps']) assert.equal(body[field], false);
+      for (const field of ['manage_ipfs_ids_in_groups', 'add_pkp_to_groups', 'remove_pkp_from_groups']) assert.deepEqual(body[field], []);
+      usageGroups.set('fresh-usage', body.execute_in_groups.map(String));
+      return jsonResponse({ usage_api_key: 'fresh-usage' });
+    }
+    if (path === '/billing/balance') return jsonResponse({ balance_cents: 0 });
+    if (path === '/lit_action') {
+      const key = options.headers.Authorization.replace('Bearer ', '');
+      const permitted = key === 'account-key' ? [...groups.keys()] : usageGroups.get(key) || [];
+      // Lit authorizes the actual executed CID and PKP together, never a CID claimed in jsParams.
+      const permittedKeyOperation = permitted.some((id) => groups.get(id).actions.includes(body.ipfs_id) && groups.get(id).pkps.includes(body.js_params.pkpId));
+      if (!permittedKeyOperation) return jsonResponse({ error: 'Action/PKP is not permitted in a common group' }, { ok: false, status: 403 });
+      return jsonResponse({ has_error: false, response: { ok: true } });
+    }
+    throw new Error(`Unexpected ${path}`);
+  };
+  await assert.rejects(bootstrapLitChipotleSession({ config: oldConfig, secrets: persisted, fetchImpl }), /reprovision Lit/);
+  assert.equal(persistCount, 0);
+  const result = await bootstrapLitChipotleSession({
+    config: oldConfig, secrets: persisted, request: { freshAuthority: true }, sessionSlug: 'session-a', fetchImpl,
+    persistAuthorizationSecret: async (key) => { persistCount += 1; persisted.litAuthorizationPrivateKey = key; },
   });
+  assert.equal(result.litPkpId, 'fresh-pkp');
+  assert.equal(result.litGroupId, '8');
+  assert.equal(result.secretOutputs.litUsageApiKey, 'fresh-usage');
+  assert.equal(result.secretOutputs.litAuthorizationPrivateKey, TEST_WALLET.privateKey);
+  assert.ok(specializedSource);
+  assert.deepEqual(groups.get('8'), { actions: ['fresh-action'], pkps: ['fresh-pkp'] });
+  for (const usageKey of ['old-usage', 'fresh-usage', 'account-key']) {
+    await assert.rejects(executeLitChipotleAction({
+      runtime: { litApiBase: oldConfig.litCredentials.litApiBase, litUsageApiKey: usageKey },
+      request: { ipfsId: 'old-action', jsParams: { pkpId: 'fresh-pkp', litActionCid: 'fresh-action' } }, fetchImpl,
+    }), /not permitted/);
+  }
+  const retry = await bootstrapLitChipotleSession({
+    config: { litCredentials: result.litCredentials }, secrets: { ...persisted, ...result.secretOutputs }, sessionSlug: 'session-a',
+    fetchImpl: validateExistingActionOnly({ pkpId: 'fresh-pkp', sessionSlug: 'session-a', cid: 'fresh-action' }),
+  });
+  assert.equal(retry.alreadyBootstrapped, true);
+  assert.equal(retry.litAuthorizationSigner, TEST_WALLET.address);
+});
 
-  assert.deepEqual(result, {
-    ok: true,
-    apiBase: 'https://api.chipotle.litprotocol.com',
-    apiKeySource: 'worker-env',
-    litActionCid: 'QmAction123',
-    litGroupId: '7',
-    litPkpId: '0xpkp123',
-    steps: {
-      derivedCid: true,
-      registeredAction: true,
-      addedActionToGroup: true,
-      addedPkpToGroup: true,
-    },
+test('invalid private signer state is redacted and legacy status never claims readiness', async () => {
+  const malformed = 'private-material-that-must-never-appear-in-errors';
+  const config = { litCredentials: { ...AUTH_CONFIG, litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } };
+  const secrets = { litUsageApiKey: 'usage-key', litAuthorizationPrivateKey: malformed };
+  await assert.rejects(executeSessionLitChipotleAction({ config, secrets }), (error) => {
+    assert.match(error.message, /session admin/);
+    assert.equal(error.message.includes(malformed), false);
+    return true;
   });
-  assert.equal(calls[0][1].headers['X-Api-Key'], 'account-key');
+  const runtime = resolveLitChipotleRuntime({ config, secrets });
+  assert.equal(runtime.authorizationReady, false);
+  const status = await readLitChipotleStatus({ runtime, fetchImpl: async () => jsonResponse([]) });
+  assert.equal(status.ready, false);
+  assert.equal(status.needsFreshAuthority, true);
+});
+
+test('legacy status remains actionable without execution or account keys and makes no provider calls', async () => {
+  const runtime = resolveLitChipotleRuntime({
+    config: { litCredentials: { litGroupId: '7', litPkpId: 'old-pkp', litActionCid: 'old-action' } },
+  });
+  const status = await readLitChipotleStatus({
+    runtime,
+    fetchImpl: () => assert.fail('Missing credentials must be reported locally'),
+  });
+  assert.equal(status.ok, true);
+  assert.equal(status.ready, false);
+  assert.equal(status.needsFreshAuthority, true);
+  assert.equal(status.apiKeySource, 'missing');
+  assert.equal(status.groupSummary.hasConfiguredAction, null);
+  assert.match(status.warnings[0].message, /API key.*not configured/i);
+});
+
+for (const complete of [false, true]) {
+  test(`provisioning rejects a mismatched stored Action before mutation (${complete ? 'complete' : 'partial'} authority)`, async () => {
+    const calls = [];
+    await assert.rejects(provisionLitChipotleAction({
+      runtime: { litApiBase: 'https://api.chipotle.litprotocol.com', litManagementApiKey: 'account-key' },
+      config: { litCredentials: { ...AUTH_CONFIG, litPkpId: TEST_PKP_ID, litActionCid: 'old-unsigned-action', ...(complete ? { litGroupId: '7' } : {}) } },
+      secrets: { ...AUTH_SECRETS, litAccountApiKey: 'account-key', ...(complete ? { litUsageApiKey: 'usage-key' } : {}) },
+      sessionSlug: 'session-a',
+      fetchImpl: async (url, options) => {
+        calls.push(new URL(url).pathname);
+        assert.ok(url.endsWith('/get_lit_action_ipfs_id'), 'No account, metadata, group, key, or permission mutation');
+        assert.equal(JSON.parse(options.body), buildWorkerAuthorizedLitAction({ signer: TEST_WALLET.address, sessionSlug: 'session-a', pkpId: TEST_PKP_ID }));
+        return jsonResponse(TEST_ACTION_CID);
+      },
+    }), /does not match the configured Lit Action CID/);
+    assert.deepEqual(calls, ['/core/v1/get_lit_action_ipfs_id']);
+  });
+}
+
+test('fresh-authority provisioning without an account key explains the missing management credential', async () => {
+  await assert.rejects(provisionLitChipotleAction({
+    config: { litCredentials: { litPkpId: 'old-pkp' } },
+    secrets: { litUsageApiKey: 'usage-key' },
+    request: { freshAuthority: true },
+    fetchImpl: () => assert.fail('Provisioning needs a management credential before contacting Lit'),
+  }), /Lit account API key not configured/);
+});
+
+test('provider errors cannot reflect signed tickets back to the participant', async () => {
+  let signature;
+  await assert.rejects(executeSessionLitChipotleAction({
+    config: { litCredentials: { ...AUTH_CONFIG, litPkpId: TEST_PKP_ID, litActionCid: TEST_ACTION_CID } },
+    secrets: { ...AUTH_SECRETS, litUsageApiKey: 'usage-key' },
+    request: { op: 'check', chainId: 11155420, sbtAddresses: [TEST_GATE_ADDRESS] }, requesterAddress: TEST_REQUESTER,
+    fetchImpl: async (url, options) => {
+      if (url.endsWith('/get_lit_action_ipfs_id')) return jsonResponse(TEST_ACTION_CID);
+      signature = JSON.parse(options.body).js_params.authorization.signature;
+      return jsonResponse({ error: options.body }, { ok: false, status: 502 });
+    },
+  }), (error) => {
+    assert.match(error.message, /Lit Action execution failed/);
+    assert.equal(error.message.includes(signature), false);
+    return true;
+  });
 });

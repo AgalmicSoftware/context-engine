@@ -3,7 +3,7 @@
  * @description SBT full-scan trigger policy — controls when a complete re-scan of SBT holdings
  *              is triggered vs. relying on cached data, with URL and localStorage overrides.
  *
- * Key exports: readSbtFullScanPolicy, writeSbtFullScanPolicy, normalizeSbtFullScanPolicy
+ * Key exports: readSbtFullScanPolicy, normalizeSbtFullScanPolicy
  */
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
@@ -59,24 +59,4 @@ export const readSbtFullScanPolicy = (): SbtFullScanPolicy => {
   }
 
   return 'auto';
-};
-
-export const writeSbtFullScanPolicy = (policyIn: unknown): SbtFullScanPolicy => {
-  const policy = normalizeSbtFullScanPolicy(policyIn);
-
-  try {
-    if (typeof globalThis !== 'undefined') {
-      (globalThis as Record<string, unknown>)[GLOBAL_KEY] = policy;
-    }
-  } catch (e) {
-    log.warn('sbtFullScanPolicy: fallback', e);
-  }
-
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEY, policy);
-  } catch (e) {
-    log.warn('sbtFullScanPolicy: fallback', e);
-  }
-
-  return policy;
 };

@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -36,7 +36,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-redux": "8.0.5",
-    "react-router-dom": "6.30.2",
+    "react-router-dom": "6.30.6",
     "react-simple-maps": "3.0.0",
     "reactstrap": "9.2.3",
     "recordrtc": "5.6.2",
@@ -52,7 +52,6 @@
     "dev": "PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000",
     "analyze": "CE_BUNDLE_REPORT=1 npm run build",
     "start": "npm run preview",
-    "prebuild": "node scripts/clean-legacy-vite-output.mjs",
     "build": "PUBLIC_URL=/ vite build",
     "verify:passkey-only-bundle": "node scripts/verify-passkey-only-bundle.mjs",
     "preview": "vite preview --host 0.0.0.0",
@@ -132,7 +131,7 @@
     "react-simple-maps": {
       "d3-zoom": "3.0.0"
     },
-    "@remix-run/router": "1.23.2",
+    "@remix-run/router": "1.23.4",
     "follow-redirects": "1.16.0",
     "@metamask/utils": "9.2.0",
     "ws@^8.0.0": "8.21.0",

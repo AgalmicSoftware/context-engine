@@ -5,10 +5,10 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import {
   createPileViewRuntimeStrategy,
-  loadSessionInterviewOwnAnswers,
   recordInterviewProvenance,
   submitSessionInterviewResponses,
 } from './SurveyPileViewMode';
+import { loadSessionInterviewOwnAnswers } from './surveySavedAnswerGate';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {

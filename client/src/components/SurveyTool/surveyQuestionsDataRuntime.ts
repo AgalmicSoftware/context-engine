@@ -1,5 +1,7 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsCacheQuestion, SurveyQuestionsRecord } from './surveyQuestionsInstanceFields';
+import { hasDemoQuestionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
+import { showDemoFixtureLoadError } from './demoSessionFixtureLoader';
 
 export type SurveyQuestionsDataRuntime = SurveyQuestionsLegacyRecord;
 
@@ -37,11 +39,11 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
     executeViewedSingleQuestionResponseBootstrap,
     fetchSingleQuestionMetadataCandidates,
     getBlockedQuestionIdsSet,
-    getTemporaryDemoSessionQuestionFixtures,
     inst,
     invalidateResponseHydrationRuns,
     isMaskedQuestionPayload,
     isPendingQuestionMetadataPlaceholder,
+    loadTemporaryDemoSessionQuestionFixtures,
     mergeDecryptedViewedResponse,
     normalizeQuestionIdKey,
     normalizeSessionSlugValue,
@@ -231,7 +233,17 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
     let temporaryDemoFixtureSlug: SurveyQuestionsLegacyValue = '';
     let temporaryDemoFixtureQuestions: SurveyQuestionsLegacyValue[] = [];
     for (const candidateSlug of temporaryDemoSlugCandidates) {
-      const candidateQuestions = getTemporaryDemoSessionQuestionFixtures(candidateSlug, temporaryDemoSessionConfig);
+      // Only demo slugs load the fixtures, in their own chunk; other sessions skip the await.
+      if (!hasDemoQuestionFixtures(candidateSlug)) continue;
+      let candidateQuestions: SurveyQuestionsLegacyValue[];
+      try {
+        candidateQuestions = await loadTemporaryDemoSessionQuestionFixtures(candidateSlug, temporaryDemoSessionConfig);
+      } catch (error) {
+        // The demo pool comes only from the fixtures; show the failure rather than an empty pool.
+        surveyLog.warn('SurveyQuestions: demo fixtures failed to load', error);
+        showDemoFixtureLoadError(setQuestionPoolState, error);
+        return;
+      }
       if (!candidateQuestions.length) continue;
       temporaryDemoFixtureSlug = normalizeSessionSlugValue(candidateSlug);
       temporaryDemoFixtureQuestions = candidateQuestions;

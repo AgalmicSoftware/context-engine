@@ -35,16 +35,12 @@ const fillRandomValues = (bytes, deps) => {
   return crypto.getRandomValues(bytes);
 };
 
+// EIP-4361 nonces are letters and digits only, and wallet parsers reject
+// base64url's "-" and "_", so nonces are hex.
 export const buildNonce = (deps) => {
   const bytes = new Uint8Array(16);
   fillRandomValues(bytes, deps);
-
-  const encode = typeof deps?.base64UrlEncode === 'function'
-    ? deps.base64UrlEncode
-    : () => {
-      throw new Error('base64UrlEncode unavailable');
-    };
-  return encode(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
 export const issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {}) => {
@@ -58,14 +54,16 @@ export const issueNonce = async (env, slug, address, nonce, ttlSeconds, deps = {
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
     now: deps?.now,
   });
-  if (!result?.ok) {
+  // The coordinator signs the random part; only its signed nonce can be used.
+  const signed = typeof result?.nonce === 'string' ? result.nonce.trim() : '';
+  if (!result?.ok || !signed) {
     return {
       ok: false,
-      status: Number(result?.status || 0) || 503,
+      status: Number(result?.status || 0) >= 400 ? Number(result.status) : 503,
       error: result?.error || 'Authorization state coordination is unavailable.',
     };
   }
-  return { ok: true };
+  return { ok: true, nonce: signed };
 };
 
 export const consumeNonce = async (env, slug, address, nonce, deps = {}) => {
@@ -155,9 +153,11 @@ export const checkNonceRateLimit = async ({
     return result;
   };
 
+  // The strict bucket belongs to this caller and target wallet together. A
+  // stranger who only knows a wallet address cannot use up its owner's budget.
   const walletResult = await runLimitCheck({
-    route: 'authNonceWallet',
-    rateIdentity: walletIdentity,
+    route: 'authNonceCallerWallet',
+    rateIdentity: `${networkIdentity}|${walletIdentity}`,
     numericLimit: numericWalletLimit,
   });
   if (!walletResult?.ok) return walletResult;

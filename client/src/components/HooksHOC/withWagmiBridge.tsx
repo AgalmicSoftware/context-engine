@@ -6,6 +6,7 @@ import { useConnectModal, useAccountModal, useChainModal } from '../../app/runti
 import { base, baseSepolia } from '../../variables/chains.js';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
 import { createLogger } from 'utilities/logging.js';
 
 export interface WagmiInjectedProps {
@@ -228,6 +229,10 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
             });
             changeAccount({});
             lastHydratedRef.current.key = `|${chainId == null ? 'null' : chainId}`;
+            // Like a logout, so the start-up restore cannot sign a saved passkey wallet back in.
+            logoutPasskeyWallet().catch((error: unknown) =>
+              accountLog.warn('Saved passkey wallet disconnect failed after the wallet disconnected:', error),
+            );
           }
         }
       } catch (e) {

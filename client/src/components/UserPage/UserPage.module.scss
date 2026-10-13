@@ -1083,6 +1083,23 @@ $icon-size-standard: 1.25rem;
   }
 }
 
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .switchDivider,
+  .switchWordInactive {
+    color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+
+  .switchWordInactive {
+    text-decoration-color: currentColor;
+
+    &:hover {
+      color: var(--ce-link);
+      opacity: 1;
+    }
+  }
+}
+
 /* --- Brighter bookmark pills used in CompareAddresses --- */
 .bookmarkPill {
   padding: 6px 12px;

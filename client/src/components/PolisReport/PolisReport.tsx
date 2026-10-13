@@ -90,6 +90,7 @@ import {
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromDemo,
   buildRatingMatrixFromRealData,
+  buildUmapParticipantData,
   clusterUMAPPointsKmeansTyped,
   d3Report,
   doUMAPTyped,
@@ -101,6 +102,8 @@ import {
   getPolisHistoricalParticipantBlockie,
   getRenderableParticipantList,
   getUTCDataTimestamp,
+  isBuiltInPolisDemoDataset,
+  rememberClusterAnalysis,
   resolveExploratoryClusterCount,
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
@@ -146,15 +149,19 @@ export const buildPolisParticipantProfileHref = ({
   address = '',
   displayName = '',
   sessionSlug = '',
+  simulated = false,
 }: {
   address?: unknown;
   displayName?: unknown;
   sessionSlug?: unknown;
+  simulated?: boolean;
 } = {}): string => {
   const name = String(displayName || '').trim();
   const addr = String(address || '').trim();
   const isEth = /^0x[0-9a-fA-F]{40}$/.test(addr);
-  const base = name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
+  // Simulated-user pages exist only for built-in demo participants. A real
+  // participant's chosen name is only a label for their own profile.
+  const base = simulated && name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
   if (!base) return '';
   const normalizedSlug = normalizeSessionSlug(sessionSlug || '');
   return normalizedSlug ? `${base}?session=${encodeURIComponent(normalizedSlug)}` : base;
@@ -174,10 +181,8 @@ export default function PolisReport({
   sessionHeader = null, // --> NEW: Optional header image path
   sessionInfo = null, // Optional session info (string or object)
   onePageDemo = false, // whether we are embedded in demo page
-  demoMode = false, // optional: external demo flag
   demoDataFirstLoad = false,
   demoDataBySlug = null,
-  miniMode = false,
   // NEW: loading flag – default true to preserve existing behavior where this prop isn't passed
   isQuestionCacheReady = false,
   isResponsesCacheReady = false,
@@ -188,8 +193,11 @@ export default function PolisReport({
   slug = '',
   sessionSlug = '',
   sessionConfig = null,
+  cacheInitializationError = false,
+  onRetryLoad,
 }: PolisReportProps) {
   const [ratingMatrix, setRatingMatrix] = useState<RatingMatrix | null>(null);
+  const [retryingLoad, setRetryingLoad] = useState(false);
   const [allResponders, setAllResponders] = useState<string[]>([]);
   const [allQuestions, setAllQuestions] = useState<string[]>([]);
   const [stats, setStats] = useState<PolisStats | null>(null);
@@ -276,6 +284,7 @@ export default function PolisReport({
   // Toggling between demo data or real data
   const [useDemoData, setUseDemoData] = useState<boolean>(() => autoUseDemoData);
   const effectiveUseDemoData = useDemoData;
+  const usesSimulatedProfiles = effectiveUseDemoData && isBuiltInPolisDemoDataset(activeDemoData);
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
     return doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), reportProgressSlug)
@@ -298,14 +307,9 @@ export default function PolisReport({
   const [embeddingChoice, setEmbeddingChoice] = useState<EmbeddingChoice>(
     () => defaultEmbeddingChoice as EmbeddingChoice,
   );
-  const embeddingChoiceRef = useRef<EmbeddingChoice>(defaultEmbeddingChoice as EmbeddingChoice);
   const [manualClusterCount, setManualClusterCount] = useState<string>(() => defaultManualClusterCount);
   const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<number[]>([]);
   const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState<PolisRepQuestionsMap>({});
-
-  useEffect(() => {
-    embeddingChoiceRef.current = embeddingChoice;
-  }, [embeddingChoice]);
 
   // Representative questions
   const [repQuestions, setRepQuestions] = useState<PolisRepQuestionsMap>({});
@@ -422,23 +426,6 @@ export default function PolisReport({
   const [showParticipants, setShowParticipants] = useState<boolean>(true);
   const [showGroupOutline, setShowGroupOutline] = useState<boolean>(true);
 
-  // NEW: toggle for showing Ethereum addresses in participant graph (non-demo only)
-  const [showAddresses, setShowAddresses] = useState<boolean>(() => {
-    try {
-      localStorage.setItem('ceReport_showAddresses', localStorage.getItem('ceReport_showAddresses') || 'false');
-      return localStorage.getItem('ceReport_showAddresses') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('ceReport_showAddresses', showAddresses ? 'true' : 'false');
-    } catch (e) {
-      surveyLog.warn('PolisReport: fallback', e);
-    }
-  }, [showAddresses]);
-
   // PDF capture ref
   const reportRef = useRef<HTMLDivElement | null>(null);
 
@@ -528,7 +515,11 @@ export default function PolisReport({
     manualClusterCountValue === null
   );
   const isExploratoryMode = embeddingChoice !== 'POLIS' || manualClusterCountValue !== null;
-  const activeParticipantCoords = embeddingChoice === 'UMAP' ? umapParticipantCoords : participantCoords;
+  const isUmapView = embeddingChoice === 'UMAP';
+  // UMAP needs two neighbours, fewer than the number of participants, so a pair
+  // keeps the PCA layout.
+  const activeParticipantCoords =
+    isUmapView && (ratingMatrix?.[0]?.length || 0) !== 2 ? umapParticipantCoords : participantCoords;
   const activeStatementCoords = embeddingChoice === 'SVD' ? statementCoords : [];
   const activeClusterCount = useMemo(() => {
     if (manualClusterCountValue !== null) return manualClusterCountValue;
@@ -630,8 +621,7 @@ export default function PolisReport({
         activeClusterCount,
         activeRepQuestions,
         embeddingChoice,
-        useDemoData: effectiveUseDemoData,
-        questionResponsesNonce,
+        ratingMatrix,
         questionPrompts,
         allQuestions,
         allResponders,
@@ -641,8 +631,7 @@ export default function PolisReport({
       activeClusterCount,
       activeRepQuestions,
       embeddingChoice,
-      effectiveUseDemoData,
-      questionResponsesNonce,
+      ratingMatrix,
       questionPrompts,
       allQuestions,
       allResponders,
@@ -789,6 +778,7 @@ export default function PolisReport({
     );
     return {
       filtered,
+      metadata,
       responseStats: buildReportResponseStats(filtered, metadata, {
         sessionSlug: activeReportSlug,
         allowDemo: effectiveUseDemoData,
@@ -818,21 +808,34 @@ export default function PolisReport({
   /***************************************************************
    * Build rating matrix from real or demo
    ***************************************************************/
+  const ratingMatrixSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    setErrorMessage(null);
     let buildResult: RatingMatrixBuildResult;
     try {
       if (!effectiveUseDemoData) {
-        buildResult = buildRatingMatrixFromRealData(reportData.filtered, { sessionSlug: activeReportSlug });
+        buildResult = buildRatingMatrixFromRealData(reportData.filtered, {
+          sessionSlug: activeReportSlug,
+          metadata: reportData.metadata,
+        });
       } else {
         const demoResult = buildRatingMatrixFromDemo(activeDemoData);
         buildResult = hasActiveReportFilters
           ? {
-              ...buildRatingMatrixFromRealData(reportData.filtered, { sessionSlug: activeReportSlug, allowDemo: true }),
+              ...buildRatingMatrixFromRealData(reportData.filtered, {
+                sessionSlug: activeReportSlug,
+                allowDemo: true,
+                metadata: reportData.metadata,
+              }),
               displayNamesMap: demoResult.displayNamesMap,
             }
           : demoResult;
       }
+      // Refreshes often rebuild identical data. Keeping the same matrix object
+      // skips recomputing PCA, clusters and UMAP for nothing.
+      const signature = JSON.stringify(buildResult);
+      if (signature === ratingMatrixSignatureRef.current) return;
+      ratingMatrixSignatureRef.current = signature;
+      setErrorMessage(null);
       if (!buildResult.matrix || !buildResult.matrix.length) {
         setRatingMatrix(null);
         setAllResponders([]);
@@ -857,6 +860,7 @@ export default function PolisReport({
       const labels = buildResult.questions.map((_q, idx) => `#${idx + 1}`);
       setQuestionLabels(labels);
     } catch (e: unknown) {
+      ratingMatrixSignatureRef.current = null;
       setErrorMessage(`Error building rating matrix: ${getErrorMessage(e)}`);
     }
   }, [
@@ -921,38 +925,20 @@ export default function PolisReport({
     }
   }, [polisMathError, polisMathResult, ratingMatrix, shouldUsePrecomputedDemoClusters]);
 
+  // UMAP is the slowest step: run it only for the UMAP view, once per matrix.
+  const umapMatrixRef = useRef<RatingMatrix | null>(null);
   useEffect(() => {
-    if (!ratingMatrix || !ratingMatrix.length) {
+    if (!isUmapView || umapMatrixRef.current === ratingMatrix) return;
+    umapMatrixRef.current = ratingMatrix;
+    const nParticipants = ratingMatrix?.[0]?.length || 0;
+    if (!ratingMatrix || nParticipants < 3) {
       setUmapParticipantCoords([]);
       return;
     }
 
     try {
-      const nComments = ratingMatrix.length;
-      const nParticipants = ratingMatrix[0]?.length || 0;
-      if (nParticipants < 2) {
-        setUmapParticipantCoords([]);
-        return;
-      }
-
-      if (nParticipants === 2) {
-        // UMAP needs at least two neighbors, fewer than the number of samples.
-        // Use the existing PCA projection for a pair instead of an empty graph.
-        setUmapParticipantCoords(polisMathResult?.participantCoords || []);
-        return;
-      }
-
-      const participantData: number[][] = [];
-      for (let participantIndex = 0; participantIndex < nParticipants; participantIndex += 1) {
-        const row: number[] = [];
-        for (let commentIndex = 0; commentIndex < nComments; commentIndex += 1) {
-          row.push(ratingMatrix[commentIndex][participantIndex] ?? 0);
-        }
-        participantData.push(row);
-      }
-
       const nNeighbors = Math.max(2, Math.min(15, nParticipants - 1));
-      const embedding = doUMAPTyped(participantData, nNeighbors, DETERMINISTIC_SEED);
+      const embedding = doUMAPTyped(buildUmapParticipantData(ratingMatrix), nNeighbors, DETERMINISTIC_SEED);
       setUmapParticipantCoords(
         embedding.map((point, index) => ({
           x: point[0],
@@ -962,12 +948,10 @@ export default function PolisReport({
       );
     } catch (e: unknown) {
       surveyLog.error('UMAP error caught:', e);
-      if (embeddingChoiceRef.current === 'UMAP') {
-        setErrorMessage(`UMAP error: ${getErrorMessage(e)}`);
-      }
+      setErrorMessage(`UMAP error: ${getErrorMessage(e)}`);
       setUmapParticipantCoords([]);
     }
-  }, [DETERMINISTIC_SEED, ratingMatrix, polisMathResult]);
+  }, [DETERMINISTIC_SEED, isUmapView, ratingMatrix]);
 
   useEffect(() => {
     if (!ratingMatrix || !ratingMatrix.length) {
@@ -1049,17 +1033,13 @@ export default function PolisReport({
   useEffect(() => {
     if (!shouldUsePrecomputedDemoClusters) return;
     setAnalysisLoadingKey(null);
-    setAnalysisErrorsByKey((prev) => ({
-      ...prev,
-      [currentAnalysisKey]: {},
-    }));
-    setAnalysisCacheByKey((prev) => ({
-      ...prev,
-      [currentAnalysisKey]: {
+    setAnalysisErrorsByKey((prev) => rememberClusterAnalysis(prev, currentAnalysisKey, {}));
+    setAnalysisCacheByKey((prev) =>
+      rememberClusterAnalysis(prev, currentAnalysisKey, {
         ...(prev[currentAnalysisKey] || {}),
         ...precomputedDemoClusterState.analysisCacheByClusterIndex,
-      },
-    }));
+      }),
+    );
   }, [currentAnalysisKey, precomputedDemoClusterState, shouldUsePrecomputedDemoClusters]);
 
   /***************************************************************
@@ -1261,8 +1241,9 @@ export default function PolisReport({
       const agrees = votes.filter((v) => v === 1).length;
       const disagrees = votes.filter((v) => v === -1).length;
       const unsures = votes.filter((v) => v === 0).length;
-      const noresp = votes.filter((v) => v === null || v === undefined).length;
-      const total = votes.length;
+      const responses = agrees + unsures + disagrees;
+      // Report participants who voted on other questions but skipped this one.
+      const noResponse = votes.length - responses;
 
       return (
         <div
@@ -1282,7 +1263,13 @@ export default function PolisReport({
           <div className={styles.questionVoteRow}>
             <span style={{ fontSize: '0.8rem', marginRight: '8px' }}>
               <strong>Agree:</strong> {agrees} / <strong>Unsure:</strong> {unsures} / <strong>Disagree:</strong>{' '}
-              {disagrees} / (Total: {total})
+              {disagrees} / <strong>Responses:</strong> {responses}
+              {noResponse > 0 ? (
+                <>
+                  {' '}
+                  / <strong>No response:</strong> {noResponse}
+                </>
+              ) : null}
             </span>
             <QuestionStanceBar votes={votes} />
           </div>
@@ -1321,13 +1308,15 @@ export default function PolisReport({
       <div className={styles.participantsList}>
         {unique.map((addr, idx) => {
           const displayName = demoDisplayNames[addr];
+          const simulatedName = usesSimulatedProfiles ? displayName : '';
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
-          const imgSrc = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : getBlockieFor(addr);
+          const imgSrc = simulatedName ? getPolisHistoricalParticipantAvatar(simulatedName, addr) : getBlockieFor(addr);
           const shortAddr = getShortenedAddress(addr, false) || addr;
           const linkHref = buildPolisParticipantProfileHref({
             address: isEth ? addr : '',
             displayName,
             sessionSlug: resolvedSessionSlug,
+            simulated: usesSimulatedProfiles,
           });
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
@@ -1341,10 +1330,10 @@ export default function PolisReport({
                   width={24}
                   height={24}
                   className={styles.participantBlockie}
-                  data-testid={displayName ? `ce-polis-participant-avatar-${displayName}` : undefined}
+                  data-testid={simulatedName ? `ce-polis-participant-avatar-${simulatedName}` : undefined}
                   onError={(event: React.SyntheticEvent<HTMLImageElement>) => {
-                    const fallbackSrc = displayName
-                      ? getPolisHistoricalParticipantBlockie(displayName, addr)
+                    const fallbackSrc = simulatedName
+                      ? getPolisHistoricalParticipantBlockie(simulatedName, addr)
                       : getBlockieFor(addr);
                     if (fallbackSrc && event.currentTarget.src !== fallbackSrc) {
                       event.currentTarget.src = fallbackSrc;
@@ -1477,7 +1466,7 @@ export default function PolisReport({
       analysisStartTimesRef.current = {};
 
       // Prepare fresh error bucket and mark as loading for this key
-      setAnalysisErrorsByKey((prev) => ({ ...prev, [key]: {} }));
+      setAnalysisErrorsByKey((prev) => rememberClusterAnalysis(prev, key, {}));
       setAnalysisLoadingKey(key);
 
       // Optional all-clusters context (sizes only) for the template
@@ -1533,25 +1522,23 @@ export default function PolisReport({
           }
           usedNames.push(proposed);
 
-          setAnalysisCacheByKey((prev) => ({
-            ...prev,
-            [key]: {
+          setAnalysisCacheByKey((prev) =>
+            rememberClusterAnalysis(prev, key, {
               ...(prev[key] || {}),
               [clusterKey]: {
                 short: String(aiRes.short || ''),
                 long: String(aiRes.long || ''),
                 name: proposed,
               },
-            },
-          }));
+            }),
+          );
         } catch (err: unknown) {
-          setAnalysisErrorsByKey((prev) => ({
-            ...prev,
-            [key]: {
+          setAnalysisErrorsByKey((prev) =>
+            rememberClusterAnalysis(prev, key, {
               ...(prev[key] || {}),
               [clusterKey]: getErrorMessage(err, 'AI request failed'),
-            },
-          }));
+            }),
+          );
         }
       }
     } catch (e) {
@@ -1855,7 +1842,7 @@ export default function PolisReport({
   }
 
   /***************************************************************
-   * renderParticipantGraph (UPDATED hover + links + showAddresses)
+   * renderParticipantGraph (UPDATED hover + links)
    ***************************************************************/
   function renderParticipantGraph() {
     try {
@@ -1899,8 +1886,6 @@ export default function PolisReport({
 
       const centerX = w / 2;
       const centerY = h / 2;
-
-      const isDemoLike = effectiveUseDemoData || onePageDemo || demoMode;
 
       return (
         <div className={styles.graphItem}>
@@ -1981,24 +1966,17 @@ export default function PolisReport({
                   const px = xScale(d.x);
                   const py = yScale(d.y);
                   const addr = allResponders?.[d.index];
-                  const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
                   const displayName = demoDisplayNames?.[addr];
-                  const hasLink = isEth || !!displayName;
                   const linkHref = buildPolisParticipantProfileHref({
                     address: addr,
                     displayName,
                     sessionSlug: resolvedSessionSlug,
+                    simulated: usesSimulatedProfiles,
                   });
+                  const hasLink = !!linkHref;
                   const linkLabel = displayName || getShortenedAddress(addr, false);
-                  const historicalAvatar = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
-
-                  const textShort = displayName
-                    ? showAddresses
-                      ? displayName
-                      : null
-                    : isEth && showAddresses
-                      ? getShortenedAddress(addr, false)
-                      : null;
+                  const historicalAvatar =
+                    usesSimulatedProfiles && displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 
                   return (
                     <g key={i}>
@@ -2059,12 +2037,6 @@ export default function PolisReport({
                           fontWeight="600"
                         >
                           {d.index + 1}
-                        </text>
-                      )}
-                      {/* Optional text labels below points when not miniMode */}
-                      {!miniMode && textShort && (
-                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="var(--ce-document-text)">
-                          {textShort}
                         </text>
                       )}
                     </g>
@@ -2406,6 +2378,19 @@ export default function PolisReport({
   const isRefreshing =
     !effectiveUseDemoData && !hasCompletedScopedBlockScan && (!isQuestionCacheReady || !isResponsesCacheReady);
   const isLoading = isRefreshing && !hasRenderableReport;
+  // A failed session load never settles on its own; say so and offer a retry instead of spinning.
+  const loadFailed = isLoading && !!cacheInitializationError && typeof onRetryLoad === 'function';
+  const retryLoad = async () => {
+    if (retryingLoad || typeof onRetryLoad !== 'function') return;
+    setRetryingLoad(true);
+    try {
+      await onRetryLoad();
+    } catch (_) {
+      // The load stays failed, so the message and Retry stay visible.
+    } finally {
+      setRetryingLoad(false);
+    }
+  };
   const showLoadingProgress = isLoading && (loadingScanProgress.requestedTotalBlocks > 0 || isHydratingLoading);
   const showLoadingProgressDetails = !isHydratingLoading || hasHydrateProgressDetails;
   const loadingProgressPercent = isHydratingLoading
@@ -2426,7 +2411,10 @@ export default function PolisReport({
    ***************************************************************/
   if (groupResolution.cohort.active && groupResolution.cohort.status !== 'ready')
     return (
-      <div className={styles.polisReportContainer} data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}>
+      <div
+        className={`${styles.polisReportContainer} ${onePageDemo ? styles.sessionEmbeddedReport : ''}`}
+        data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}
+      >
         <p role={groupResolution.cohort.status === 'error' ? 'alert' : 'status'}>{groupResolution.cohort.message}</p>
         <button type="button" onClick={groupResolution.refresh}>
           Retry Group filter
@@ -2435,7 +2423,7 @@ export default function PolisReport({
     );
   return (
     <div
-      className={`${styles.polisReportContainer} ${isModernStyle ? styles.polisReportModern : ''} ${isDarkStyle ? styles.polisReportDark : ''}`}
+      className={`${styles.polisReportContainer} ${onePageDemo ? styles.sessionEmbeddedReport : ''} ${isModernStyle ? styles.polisReportModern : ''} ${isDarkStyle ? styles.polisReportDark : ''}`}
       data-testid={E2E_TESTIDS.POLIS_REPORT_ROOT}
       ref={containerRef}
       onMouseMove={handleContainerMouseMove}
@@ -2589,7 +2577,14 @@ export default function PolisReport({
           </div>
         )}
 
-        {isLoading ? (
+        {loadFailed ? (
+          <p className={styles.noData} role="alert">
+            Responses could not be loaded, so the report can&apos;t be shown yet.{' '}
+            <button type="button" className={styles.downloadButton} onClick={retryLoad} disabled={retryingLoad}>
+              {retryingLoad ? 'Retrying…' : 'Retry'}
+            </button>
+          </p>
+        ) : isLoading ? (
           <div className={styles.loadingState}>
             <FontAwesomeIcon
               icon={faSpinner}
@@ -2870,18 +2865,6 @@ export default function PolisReport({
                             />
                             Participants
                           </label>
-
-                          {/* NEW: toggle for addresses (disabled in demo) */}
-                          {/* <label style={{ cursor: (useDemoData || onePageDemo || demoMode) ? 'not-allowed' : 'pointer', opacity: (useDemoData || onePageDemo || demoMode) ? 0.6 : 1 }}>
-                        <input
-                          type="checkbox"
-                          checked={showAddresses && !(useDemoData || onePageDemo || demoMode)}
-                          onChange={(e) => setShowAddresses(e.target.checked)}
-                          disabled={useDemoData || onePageDemo || demoMode}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Show addresses
-                      </label> */}
 
                           <label style={{ cursor: 'pointer' }}>
                             <input

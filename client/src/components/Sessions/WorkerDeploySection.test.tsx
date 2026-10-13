@@ -178,6 +178,7 @@ describe('WorkerDeploySection', () => {
     expect(verifyNativeWorker).toHaveBeenCalledWith({
       sessionSlug: 'demo-sh',
       workerQueryValue: 'https://demo-sh.example.workers.dev',
+      deployedFromTemplate: true,
     });
     expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
       /verified at revision revision-7/i,
@@ -207,12 +208,56 @@ describe('WorkerDeploySection', () => {
       expect(verifyNativeWorker).toHaveBeenCalledWith({
         sessionSlug: 'demo-worker',
         workerQueryValue: 'https://existing.example.workers.dev',
+        deployedFromTemplate: false,
       });
       expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
         'Session Worker verified. You can deploy the session.',
       );
     });
     expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).not.toHaveTextContent(/revision/i);
+  });
+
+  it('remembers generated template setup values for this slug and admin after a remount', async () => {
+    const adminAddress = '0x0000000000000000000000000000000000000001';
+    const onNativeTemplateSetupGenerated = jest.fn();
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: '',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    const props = {
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: adminAddress,
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+      onNativeTemplateSetupGenerated,
+    };
+    const first = renderWorkerDeploySection(props);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    expect(onNativeTemplateSetupGenerated).toHaveBeenCalledWith(`demo-sh\n${adminAddress}`);
+    const marker = onNativeTemplateSetupGenerated.mock.calls[0][0];
+    // Leaving the Worker step unmounts the section and its setup values.
+    first.unmount();
+
+    const remounted = renderWorkerDeploySection({ ...props, nativeTemplateSetupIdentity: marker });
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    await waitFor(() =>
+      expect(verifyNativeWorker).toHaveBeenLastCalledWith(expect.objectContaining({ deployedFromTemplate: true })),
+    );
+    remounted.unmount();
+
+    // A marker for another admin does not apply.
+    renderWorkerDeploySection({
+      ...props,
+      nativeTemplateSetupIdentity: 'demo-sh\n0x00000000000000000000000000000000000000ff',
+    });
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    await waitFor(() =>
+      expect(verifyNativeWorker).toHaveBeenLastCalledWith(expect.objectContaining({ deployedFromTemplate: false })),
+    );
   });
 
   it('keeps the legacy deployment flow when native verification is not eligible', () => {
@@ -385,13 +430,36 @@ describe('WorkerDeploySection', () => {
     expect(screen.getByTestId('ce-wizard-cloudflare-native-verify')).toHaveTextContent('Verify Session Worker');
   });
 
+  it('shows why the Worker rejected verification', async () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('Worker config write failed (409): Worker-canonical session identity cannot be changed.'),
+        ),
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    expect(await screen.findByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      'Worker verification failed: Worker config write failed (409): Worker-canonical session identity cannot be changed. Check the Worker URL and session identity, then retry.',
+    );
+  });
+
   it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {
     renderWorkerDeploySection({
       isNormalMode: true,
       shouldUseSponsoredAutoDeployFlow: true,
     });
 
-    expect(screen.getByText(/Sponsored deploy bundle is ready\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Sponsored deploy bundle is ready\./i)).toHaveTextContent(
+      'The sponsor selects the Worker release for this deployment. Manual bundle URLs and uploads do not change that release.',
+    );
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).not.toBeInTheDocument();
   });
 

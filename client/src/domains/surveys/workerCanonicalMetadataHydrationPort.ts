@@ -1,3 +1,5 @@
+import { peekCacheSync } from '../../utilities/cache/cacheScripts';
+import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import { listSessionStorageRefsPage, readSessionStorageBlob } from '../../utilities/storage/storageClient';
@@ -12,6 +14,7 @@ import { resolveWorkerCanonicalStorageTarget } from './workerCanonicalAuthoringP
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
   type WorkerCanonicalCacheIdentity,
+  resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
   workerCanonicalCacheIdentityMatches,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
@@ -44,17 +47,36 @@ export type WorkerCanonicalMetadataRow = {
   payload: UnknownRecord;
   storageRef: StorageRef;
   storageRefId: string;
+  // The uploader the Worker recorded is a session admin. Older Workers record
+  // no uploader, so their rows never count as admin uploads.
+  uploaderIsAdmin?: boolean;
 };
+
+// An admin hid this id on the Worker; merges drop any cached copy.
+export type WorkerCanonicalHiddenMetadataRow = {
+  hidden: true;
+  id: string;
+};
+
+export type WorkerCanonicalMetadataEntry = WorkerCanonicalMetadataRow | WorkerCanonicalHiddenMetadataRow;
 
 export type WorkerCanonicalMetadataHydrationPort = {
   loadQuestions: (
     input?: WorkerCanonicalMetadataHydrationInput,
     deps?: WorkerCanonicalMetadataHydrationDeps,
-  ) => Promise<WorkerCanonicalMetadataRow[]>;
+  ) => Promise<WorkerCanonicalMetadataEntry[]>;
   loadSurveys: (
     input?: WorkerCanonicalMetadataHydrationInput,
     deps?: WorkerCanonicalMetadataHydrationDeps,
-  ) => Promise<WorkerCanonicalMetadataRow[]>;
+  ) => Promise<WorkerCanonicalMetadataEntry[]>;
+};
+
+type CachedVersion = {
+  admin: boolean;
+  createdAtMs: number;
+  storageRefId: string;
+  // Whether a plaintext question hashes to its id; null when it cannot be checked.
+  verified: boolean | null;
 };
 
 const MAX_METADATA_LIST_PAGES = 50;
@@ -65,7 +87,107 @@ const METADATA_READ_CONCURRENCY = 8;
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const readString = (value: unknown): string => String(value || '').trim();
+// Stored payloads are any uploader's JSON, and converting an object with a
+// broken toString throws, so only strings count as text here.
+const readString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+
+const isTextOrAbsent = (value: unknown): boolean => value == null || typeof value === 'string';
+
+const isHiddenEntry = (entry: WorkerCanonicalMetadataEntry): entry is WorkerCanonicalHiddenMetadataRow =>
+  (entry as WorkerCanonicalHiddenMetadataRow).hidden === true;
+
+const METADATA_CACHE_NAMESPACES = {
+  [STORAGE_RESOURCE_KEYS.QUESTIONS]: 'questionsCache',
+  [STORAGE_RESOURCE_KEYS.SURVEYS]: 'surveysCache',
+} as const;
+
+const METADATA_REFS_FIELDS = {
+  [STORAGE_RESOURCE_KEYS.QUESTIONS]: 'workerQuestionMetadataRefs',
+  [STORAGE_RESOURCE_KEYS.SURVEYS]: 'workerSurveyMetadataRefs',
+} as const;
+
+const listAddresses = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.flatMap(listAddresses);
+  if (isRecord(value)) return listAddresses(value.addresses);
+  const address = readString(value).toLowerCase();
+  return /^0x[0-9a-f]{40}$/.test(address) ? [address] : [];
+};
+
+// The public session config names the admins the Worker trusts for uploads.
+const resolveSessionAdminAddresses = (sessionConfig: UnknownRecord): Set<string> =>
+  new Set([...listAddresses(sessionConfig.adminAddress), ...listAddresses(sessionConfig.adminAddresses)]);
+
+const isLockedQuestionPayload = (payload: UnknownRecord): boolean =>
+  !!payload.promptEncrypted || isRecord(payload.encryption) || readString(payload.prompt) === '[encrypted]';
+
+// Plaintext question ids are hashes of their authoring inputs, so a version
+// whose content does not hash to its id is a rewrite. Locked questions keep
+// their plaintext private, so their check is unknown (null), never a pass.
+const questionPayloadMatchesId = (id: string, payload: UnknownRecord): boolean | null => {
+  if (isLockedQuestionPayload(payload)) return null;
+  try {
+    const options = Array.isArray(payload.options) ? payload.options : [];
+    const voiceCredits = Number(payload.voiceCredits ?? 99);
+    const singleSelect = !!(payload.singleSelect || payload.oneSelectionOnly);
+    return (
+      String(generateQuestionId(payload.type, payload.prompt, options, singleSelect, voiceCredits)).toLowerCase() === id
+    );
+  } catch {
+    return false;
+  }
+};
+
+// One version per id: a session admin's newest upload wins, otherwise the
+// earliest upload. Between two plaintext questions, one that matches its id
+// hash beats one that does not; a locked version cannot be checked, so then
+// age decides. The Worker's readers apply the same admin-then-earliest order.
+const isPreferredVersion = (candidate: CachedVersion, current: CachedVersion | null): boolean => {
+  if (!current || candidate.storageRefId === current.storageRefId) return true;
+  if (candidate.admin !== current.admin) return candidate.admin;
+  const age = candidate.createdAtMs - current.createdAtMs || candidate.storageRefId.localeCompare(current.storageRefId);
+  if (candidate.admin) return age > 0;
+  if (candidate.verified !== null && current.verified !== null && candidate.verified !== current.verified) {
+    return candidate.verified;
+  }
+  return age < 0;
+};
+
+// Storage refs are immutable, so blobs already merged into the managed cache
+// never need another read. The hydration merge writes that same cache.
+const readCachedStorageRefIds = (
+  resource: WorkerCanonicalMetadataResource,
+  sessionSlug: unknown,
+  identity: WorkerCanonicalCacheIdentity,
+): Set<string> => {
+  const cache = peekCacheSync<UnknownRecord>(METADATA_CACHE_NAMESPACES[resource], readString(sessionSlug), {
+    clone: false,
+  });
+  const node = isRecord(cache) ? cache[WORKER_CANONICAL_CACHE_SCOPE_KEY] : null;
+  if (!isRecord(node) || !workerCanonicalCacheIdentityMatches(node, identity)) return new Set();
+  const items = node[resource === STORAGE_RESOURCE_KEYS.QUESTIONS ? 'questions' : 'surveys'];
+  const refs = node[METADATA_REFS_FIELDS[resource]];
+  if (!isRecord(items) || !isRecord(refs)) return new Set();
+  return new Set(
+    Object.entries(refs)
+      .filter(([id, ref]) => isRecord(items[id]) && isRecord(ref))
+      .map(([, ref]) => readString((ref as UnknownRecord).storageRefId))
+      .filter(Boolean),
+  );
+};
+
+const mapWithConcurrency = async <T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> => {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  const runWorker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await task(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runWorker));
+  return results;
+};
 
 const readPayloadResourceId = (payload: UnknownRecord, resource: WorkerCanonicalMetadataResource): string => {
   const rawId =
@@ -75,10 +197,18 @@ const readPayloadResourceId = (payload: UnknownRecord, resource: WorkerCanonical
   return readString(rawId).toLowerCase();
 };
 
+type ListedStorageRef = {
+  createdAtMs: number;
+  storageRef: StorageRef;
+  uploader: string;
+  // Newer Workers mark admin uploads from their full role set.
+  uploaderIsAdmin: boolean | null;
+};
+
 const normalizeListedStorageRef = (
   item: UnknownRecord,
   resource: WorkerCanonicalMetadataResource,
-): { createdAtMs: number; storageRef: StorageRef } | null => {
+): ListedStorageRef | null => {
   const metadata = isRecord(item.metadata) ? item.metadata : {};
   const listedResource = readString(metadata.resource);
   if (listedResource && listedResource !== resource) return null;
@@ -104,7 +234,16 @@ const normalizeListedStorageRef = (
   return {
     createdAtMs: Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs : 0,
     storageRef,
+    uploader: readString(metadata.uploader).toLowerCase(),
+    uploaderIsAdmin: typeof metadata.uploaderIsAdmin === 'boolean' ? metadata.uploaderIsAdmin : null,
   };
+};
+
+const readHiddenMarkerId = (item: UnknownRecord, resource: WorkerCanonicalMetadataResource): string => {
+  const metadata = isRecord(item.metadata) ? item.metadata : {};
+  if (item.hidden !== true && metadata.hidden !== true) return '';
+  if (readString(metadata.resource) && readString(metadata.resource) !== resource) return '';
+  return readString(metadata.resourceId).toLowerCase();
 };
 
 const payloadMatchesTarget = (
@@ -131,7 +270,7 @@ const loadWorkerCanonicalMetadata = async (
   resource: WorkerCanonicalMetadataResource,
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
-): Promise<WorkerCanonicalMetadataRow[]> => {
+): Promise<WorkerCanonicalMetadataEntry[]> => {
   const target = resolveWorkerCanonicalStorageTarget({
     sessionConfig: input.sessionConfig,
     sessionSlug: input.sessionSlug,
@@ -173,63 +312,89 @@ const loadWorkerCanonicalMetadata = async (
     }
   }
 
-  const uniqueItems: Array<{ createdAtMs: number; storageRef: StorageRef }> = [];
+  const cachedStorageRefIds = readCachedStorageRefIds(
+    resource,
+    input.sessionSlug,
+    resolveWorkerCanonicalCacheIdentity({ sessionConfig: target.sessionConfig, sessionSlug: target.sessionSlug }),
+  );
+  const admins = resolveSessionAdminAddresses(target.sessionConfig);
+  const hiddenIds = new Set<string>();
+  const uniqueItems: ListedStorageRef[] = [];
   const seenStorageRefs = new Set<string>();
   listedItems.forEach((item) => {
+    const hiddenId = readHiddenMarkerId(item, resource);
+    if (hiddenId) {
+      hiddenIds.add(hiddenId);
+      return;
+    }
     const normalized = normalizeListedStorageRef(item, resource);
     const storageRefId = readString(normalized?.storageRef.id);
     if (!normalized || !storageRefId || seenStorageRefs.has(storageRefId)) return;
     seenStorageRefs.add(storageRefId);
-    uniqueItems.push(normalized);
+    if (!cachedStorageRefIds.has(storageRefId)) uniqueItems.push(normalized);
   });
 
-  const rows: WorkerCanonicalMetadataRow[] = [];
-  for (let offset = 0; offset < uniqueItems.length; offset += METADATA_READ_CONCURRENCY) {
-    const batch = uniqueItems.slice(offset, offset + METADATA_READ_CONCURRENCY);
-    const batchRows = await Promise.all(
-      batch.map(async ({ createdAtMs, storageRef }): Promise<WorkerCanonicalMetadataRow | null> => {
-        const response = await readBlob({
-          storageRef,
-          sessionSlug: target.sessionSlug,
-          sessionConfig: target.sessionConfig,
-          context,
-          workerUrl: target.workerUrl,
-        });
-        const payload = await response.json().catch(() => null);
-        if (!isRecord(payload) || !payloadMatchesTarget(payload, target)) return null;
-        const id = readPayloadResourceId(payload, resource);
-        if (!id) return null;
-        const compatiblePayload = attachStorageRefCompatibilityFields(
-          {
-            ...payload,
-            id,
-            ...(resource === STORAGE_RESOURCE_KEYS.QUESTIONS ? {} : { surveyID: id }),
-            sessionId: target.sessionId,
-            sessionSlug: target.sessionSlug,
-            sessionSlugExplicit: true,
-            source: 'worker-session-storage',
-            storageRef,
-          },
-          { resource },
-        );
-        return {
-          createdAtMs,
-          id,
-          payload: compatiblePayload,
-          storageRef,
-          storageRefId: storageRef.id,
-        };
-      }),
+  const readRow = async ({
+    createdAtMs,
+    storageRef,
+    uploader,
+    uploaderIsAdmin,
+  }: ListedStorageRef): Promise<WorkerCanonicalMetadataRow | null> => {
+    const response = await readBlob({
+      storageRef,
+      sessionSlug: target.sessionSlug,
+      sessionConfig: target.sessionConfig,
+      context,
+      workerUrl: target.workerUrl,
+    });
+    const payload = await response.json().catch(() => null);
+    if (!isRecord(payload) || !payloadMatchesTarget(payload, target)) return null;
+    // A non-text title crashes survey views; such a row cannot be a survey.
+    if (resource === STORAGE_RESOURCE_KEYS.SURVEYS && typeof payload.title !== 'string') return null;
+    // Likewise a non-text prompt or type crashes question cards.
+    if (
+      resource === STORAGE_RESOURCE_KEYS.QUESTIONS &&
+      !(isTextOrAbsent(payload.prompt) && isTextOrAbsent(payload.type))
+    ) {
+      return null;
+    }
+    const id = readPayloadResourceId(payload, resource);
+    if (!id || hiddenIds.has(id)) return null;
+    const compatiblePayload = attachStorageRefCompatibilityFields(
+      {
+        ...payload,
+        id,
+        ...(resource === STORAGE_RESOURCE_KEYS.QUESTIONS ? {} : { surveyID: id }),
+        sessionId: target.sessionId,
+        sessionSlug: target.sessionSlug,
+        sessionSlugExplicit: true,
+        source: 'worker-session-storage',
+        storageRef,
+      },
+      { resource },
     );
-    rows.push(...batchRows.filter((row): row is WorkerCanonicalMetadataRow => !!row));
-  }
-
-  return rows.sort(
-    (left, right) =>
-      left.createdAtMs - right.createdAtMs ||
-      left.storageRefId.localeCompare(right.storageRefId) ||
-      left.id.localeCompare(right.id),
-  );
+    // Prefer the Worker's own admin flag; older Workers only list the uploader,
+    // so fall back to the admins named in the public session config.
+    const isAdminUpload = uploaderIsAdmin ?? (!!uploader && admins.has(uploader));
+    return {
+      createdAtMs,
+      id,
+      payload: compatiblePayload,
+      storageRef,
+      storageRefId: storageRef.id,
+      ...(isAdminUpload ? { uploaderIsAdmin: true } : {}),
+    };
+  };
+  const readRows = await mapWithConcurrency(uniqueItems, METADATA_READ_CONCURRENCY, readRow);
+  const rows = readRows
+    .filter((row): row is WorkerCanonicalMetadataRow => !!row)
+    .sort(
+      (left, right) =>
+        left.createdAtMs - right.createdAtMs ||
+        left.storageRefId.localeCompare(right.storageRefId) ||
+        left.id.localeCompare(right.id),
+    );
+  return [...[...hiddenIds].map((id): WorkerCanonicalHiddenMetadataRow => ({ hidden: true, id })), ...rows];
 };
 
 const createWorkerQuestionCacheNode = (): UnknownRecord => ({
@@ -255,16 +420,62 @@ const createWorkerSurveyCacheNode = (): UnknownRecord => ({
   workerSurveyMetadataRefs: {},
 });
 
-const shouldReplaceMetadata = (existing: unknown, row: WorkerCanonicalMetadataRow): boolean => {
-  if (!isRecord(existing)) return true;
-  const existingCreatedAtMs = Number(existing.createdAtMs || 0);
-  if (row.createdAtMs !== existingCreatedAtMs) return row.createdAtMs > existingCreatedAtMs;
-  return row.storageRefId.localeCompare(readString(existing.storageRefId)) >= 0;
+const readCachedVersion = (ref: unknown, verifyCachedItem: () => boolean | null): CachedVersion | null => {
+  if (!isRecord(ref)) return null;
+  return {
+    admin: ref.admin === true,
+    createdAtMs: Number(ref.createdAtMs || 0),
+    storageRefId: readString(ref.storageRefId),
+    // Always re-check the cached copy: older refs have no flag, or a flag that
+    // counted a locked rewrite as verified.
+    verified: verifyCachedItem(),
+  };
+};
+
+const mergeMetadataEntries = ({
+  entries,
+  items,
+  pending,
+  refs,
+  toItem,
+  verify,
+}: {
+  entries: WorkerCanonicalMetadataEntry[];
+  items: UnknownRecord;
+  pending: UnknownRecord;
+  refs: UnknownRecord;
+  toItem: (row: WorkerCanonicalMetadataRow, base: UnknownRecord) => UnknownRecord;
+  verify: (id: string, payload: UnknownRecord) => boolean | null;
+}): void => {
+  const hiddenIds = new Set(entries.filter(isHiddenEntry).map((entry) => entry.id));
+  hiddenIds.forEach((id) => {
+    delete items[id];
+    delete refs[id];
+    delete pending[id];
+  });
+  entries.forEach((entry) => {
+    if (isHiddenEntry(entry) || hiddenIds.has(entry.id)) return;
+    const existing = isRecord(items[entry.id]) ? (items[entry.id] as UnknownRecord) : null;
+    const current = readCachedVersion(refs[entry.id], () => (existing ? verify(entry.id, existing) : null));
+    const candidate: CachedVersion = {
+      admin: entry.uploaderIsAdmin === true,
+      createdAtMs: entry.createdAtMs,
+      storageRefId: entry.storageRefId,
+      verified: verify(entry.id, entry.payload),
+    };
+    if (!isPreferredVersion(candidate, current)) return;
+    // Refresh the same version in place; a different version replaces the
+    // cached copy outright so none of the old version's fields linger.
+    const base = existing && current?.storageRefId === entry.storageRefId ? existing : {};
+    items[entry.id] = toItem(entry, base);
+    refs[entry.id] = candidate;
+    delete pending[entry.id];
+  });
 };
 
 export const mergeWorkerCanonicalQuestionMetadata = (
   current: unknown,
-  rows: WorkerCanonicalMetadataRow[],
+  rows: WorkerCanonicalMetadataEntry[],
   identity: WorkerCanonicalCacheIdentity,
 ): UnknownRecord => {
   const next = isRecord(current) ? { ...current } : {};
@@ -279,19 +490,13 @@ export const mergeWorkerCanonicalQuestionMetadata = (
   const pending = isRecord(network.pendingQuestionMetadata) ? { ...network.pendingQuestionMetadata } : {};
   const refs = isRecord(network.workerQuestionMetadataRefs) ? { ...network.workerQuestionMetadataRefs } : {};
 
-  rows.forEach((row) => {
-    if (!shouldReplaceMetadata(refs[row.id], row)) return;
-    const existingQuestion = isRecord(questions[row.id]) ? (questions[row.id] as UnknownRecord) : {};
-    questions[row.id] = {
-      ...existingQuestion,
-      ...row.payload,
-      id: row.id,
-    };
-    refs[row.id] = {
-      createdAtMs: row.createdAtMs,
-      storageRefId: row.storageRefId,
-    };
-    delete pending[row.id];
+  mergeMetadataEntries({
+    entries: rows,
+    items: questions,
+    pending,
+    refs,
+    toItem: (row, base) => ({ ...base, ...row.payload, id: row.id }),
+    verify: questionPayloadMatchesId,
   });
 
   next[WORKER_CANONICAL_CACHE_SCOPE_KEY] = withWorkerCanonicalCacheIdentity(
@@ -309,7 +514,7 @@ export const mergeWorkerCanonicalQuestionMetadata = (
 
 export const mergeWorkerCanonicalSurveyMetadata = (
   current: unknown,
-  rows: WorkerCanonicalMetadataRow[],
+  rows: WorkerCanonicalMetadataEntry[],
   identity: WorkerCanonicalCacheIdentity,
 ): UnknownRecord => {
   const next = isRecord(current) ? { ...current } : {};
@@ -324,20 +529,13 @@ export const mergeWorkerCanonicalSurveyMetadata = (
   const pending = isRecord(network.pendingSurveyMetadata) ? { ...network.pendingSurveyMetadata } : {};
   const refs = isRecord(network.workerSurveyMetadataRefs) ? { ...network.workerSurveyMetadataRefs } : {};
 
-  rows.forEach((row) => {
-    if (!shouldReplaceMetadata(refs[row.id], row)) return;
-    const existingSurvey = isRecord(surveys[row.id]) ? (surveys[row.id] as UnknownRecord) : {};
-    surveys[row.id] = {
-      ...existingSurvey,
-      ...row.payload,
-      id: row.id,
-      surveyID: row.id,
-    };
-    refs[row.id] = {
-      createdAtMs: row.createdAtMs,
-      storageRefId: row.storageRefId,
-    };
-    delete pending[row.id];
+  mergeMetadataEntries({
+    entries: rows,
+    items: surveys,
+    pending,
+    refs,
+    toItem: (row, base) => ({ ...base, ...row.payload, id: row.id, surveyID: row.id }),
+    verify: () => true,
   });
 
   next[WORKER_CANONICAL_CACHE_SCOPE_KEY] = withWorkerCanonicalCacheIdentity(
@@ -356,12 +554,71 @@ export const mergeWorkerCanonicalSurveyMetadata = (
 export const loadWorkerCanonicalQuestions = (
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
-): Promise<WorkerCanonicalMetadataRow[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.QUESTIONS, input, deps);
+): Promise<WorkerCanonicalMetadataEntry[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.QUESTIONS, input, deps);
 
 export const loadWorkerCanonicalSurveys = (
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
-): Promise<WorkerCanonicalMetadataRow[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.SURVEYS, input, deps);
+): Promise<WorkerCanonicalMetadataEntry[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.SURVEYS, input, deps);
+
+// The authoring inputs a question id is hashed from, compared exactly: the
+// hash trims and lowercases the prompt, skips options for most types and joins
+// multichoice options with commas, so equal ids can hide different questions.
+// Surrounding spaces in the prompt or options are ignored, as the hash ignores
+// them, and voice credits may be stored as text ("120"); everything else,
+// including case, must match.
+const trimText = (value: unknown): unknown => (typeof value === 'string' ? value.trim() : value);
+const readVoiceCredits = (value: unknown): number =>
+  value == null ? 99 : typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
+  JSON.stringify([
+    payload.type,
+    trimText(payload.prompt),
+    Array.isArray(payload.options) ? payload.options.map(trimText) : [],
+    !!(payload.singleSelect || payload.oneSelectionOnly),
+    readVoiceCredits(payload.voiceCredits),
+  ]);
+
+// Loads the session's questions once and returns a check for whether readers
+// already see a given question under its id: a stored Worker version won that
+// id and has exactly the same authoring inputs. Response hydration also writes
+// placeholder questions from responders' payloads; those have no stored version
+// and never match. Locked or unknown questions never match either.
+export const loadWorkerCanonicalQuestionMatcher = async (
+  input: WorkerCanonicalMetadataHydrationInput = {},
+  deps: WorkerCanonicalMetadataHydrationDeps = {},
+): Promise<(question: UnknownRecord) => boolean> => {
+  const target = resolveWorkerCanonicalStorageTarget({
+    sessionConfig: input.sessionConfig,
+    sessionSlug: input.sessionSlug,
+  });
+  const rows = await loadWorkerCanonicalQuestions(input, deps);
+  const cache = peekCacheSync<UnknownRecord>(
+    METADATA_CACHE_NAMESPACES[STORAGE_RESOURCE_KEYS.QUESTIONS],
+    readString(input.sessionSlug),
+    { clone: false },
+  );
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig: target.sessionConfig,
+    sessionSlug: target.sessionSlug,
+  });
+  const node = mergeWorkerCanonicalQuestionMetadata(cache, rows, identity)[WORKER_CANONICAL_CACHE_SCOPE_KEY];
+  const questions = isRecord(node) && isRecord(node.questions) ? node.questions : {};
+  const refs =
+    isRecord(node) && isRecord(node[METADATA_REFS_FIELDS[STORAGE_RESOURCE_KEYS.QUESTIONS]])
+      ? (node[METADATA_REFS_FIELDS[STORAGE_RESOURCE_KEYS.QUESTIONS]] as UnknownRecord)
+      : {};
+  return (question) => {
+    const id = readPayloadResourceId(question, STORAGE_RESOURCE_KEYS.QUESTIONS);
+    const stored = id ? questions[id] : null;
+    return (
+      isRecord(refs[id]) &&
+      isRecord(stored) &&
+      questionPayloadMatchesId(id, question) === true &&
+      readQuestionAuthoringInputs(stored) === readQuestionAuthoringInputs(question)
+    );
+  };
+};
 
 export const workerCanonicalMetadataHydrationPort: WorkerCanonicalMetadataHydrationPort = {
   loadQuestions: loadWorkerCanonicalQuestions,

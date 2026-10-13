@@ -9,10 +9,8 @@ export const BASELINE_GROWTH_APPROVAL_LABEL = 'baseline-growth-approved';
 
 const BOUNDARY_BASELINE = 'scripts/client-boundaries-baseline.json';
 const TYPE_DEBT_BASELINE = 'scripts/type-debt-baseline.json';
-const LEGACY_COVERAGE_BASELINE = 'scripts/coverage-baseline.json';
 const FULL_COVERAGE_BASELINE = 'scripts/client-coverage-full-baseline.json';
 const COVERAGE_EXCLUSIONS_BASELINE = 'scripts/client-coverage-exclusions.json';
-const LEGACY_COVERAGE_FILES_BASELINE = 'scripts/client-coverage-legacy-files.json';
 const TEST_TYPE_DIAGNOSTICS_BASELINE = 'scripts/client-test-type-diagnostics-baseline.json';
 const TEST_TYPE_CONTRACT_BASELINE = 'scripts/client-test-type-contract.json';
 const CLIENT_BUNDLE_BUDGET_BASELINE = 'scripts/client-bundle-budget.json';
@@ -24,8 +22,8 @@ function usage() {
 Fails if baseline files grow relative to a base ref:
   - ${BOUNDARY_BASELINE} must not gain violation entries.
   - ${TYPE_DEBT_BASELINE} must not increase any count.
-  - Client coverage floors must not decrease, exclusion rules must not broaden,
-    and the fixed legacy comparable file set must not grow.
+  - The client coverage floor must not decrease and coverage exclusion rules
+    must not broaden.
   - Typed-test diagnostics must not grow, classifications must not shrink, and
     explicit test-source exclusions must not grow.
   - Client bundle caps and warning coverage must not loosen, and exception,
@@ -178,30 +176,14 @@ function stableCoverageRuleKey(rule) {
 }
 
 function coverageContractRegressions({
-  repoDir,
-  baseLegacyCoverage,
-  currentLegacyCoverage,
   baseFullCoverage,
   currentFullCoverage,
   baseExclusions,
   currentExclusions,
-  baseLegacyFiles,
-  currentLegacyFiles,
 }) {
-  const regressions = baseLegacyCoverage && currentLegacyCoverage
-    ? coverageFloorDecreases(
-      baseLegacyCoverage,
-      currentLegacyCoverage,
-      'legacy-floor-decrease',
-    )
+  const regressions = baseFullCoverage && currentFullCoverage
+    ? coverageFloorDecreases(baseFullCoverage, currentFullCoverage, 'full-floor-decrease')
     : [];
-  if (baseFullCoverage && currentFullCoverage) {
-    regressions.push(...coverageFloorDecreases(
-      baseFullCoverage,
-      currentFullCoverage,
-      'full-floor-decrease',
-    ));
-  }
   if (baseExclusions && currentExclusions) {
     const baseRuleKeys = new Set((baseExclusions.rules || []).map(stableCoverageRuleKey));
     (currentExclusions.rules || []).forEach((rule) => {
@@ -213,23 +195,6 @@ function coverageContractRegressions({
     (currentExclusions.explicitProductionFileExceptions || []).forEach((relativePath) => {
       if (!baseExceptions.has(relativePath)) {
         regressions.push({ kind: 'exclusion-exception-gain', relativePath });
-      }
-    });
-  }
-  if (baseLegacyFiles && currentLegacyFiles) {
-    const baseFiles = new Set(baseLegacyFiles.files || []);
-    const currentFiles = new Set(currentLegacyFiles.files || []);
-    (currentLegacyFiles.files || []).forEach((relativePath) => {
-      if (!baseFiles.has(relativePath)) {
-        regressions.push({ kind: 'legacy-file-gain', relativePath });
-      }
-    });
-    (baseLegacyFiles.files || []).forEach((relativePath) => {
-      if (
-        !currentFiles.has(relativePath)
-        && fs.existsSync(path.resolve(repoDir, relativePath))
-      ) {
-        regressions.push({ kind: 'legacy-live-file-loss', relativePath });
       }
     });
   }
@@ -408,10 +373,8 @@ export function collectBaselineMonotonicityFindings({
   const currentBoundary = readCurrentJson(resolvedRepoDir, BOUNDARY_BASELINE);
   const currentTypeDebt = readCurrentJson(resolvedRepoDir, TYPE_DEBT_BASELINE);
   const optionalCoverageBaselines = [
-    LEGACY_COVERAGE_BASELINE,
     FULL_COVERAGE_BASELINE,
     COVERAGE_EXCLUSIONS_BASELINE,
-    LEGACY_COVERAGE_FILES_BASELINE,
     TEST_TYPE_DIAGNOSTICS_BASELINE,
     TEST_TYPE_CONTRACT_BASELINE,
     CLIENT_BUNDLE_BUDGET_BASELINE,
@@ -436,15 +399,10 @@ export function collectBaselineMonotonicityFindings({
     boundaryGains: boundaryViolationGains(baseBoundary, currentBoundary),
     typeDebtIncreases: typeDebtIncreases(baseTypeDebt, currentTypeDebt),
     coverageRegressions: coverageContractRegressions({
-      repoDir: resolvedRepoDir,
-      baseLegacyCoverage: baseOptionalCoverage[LEGACY_COVERAGE_BASELINE],
-      currentLegacyCoverage: currentOptionalCoverage[LEGACY_COVERAGE_BASELINE],
       baseFullCoverage: baseOptionalCoverage[FULL_COVERAGE_BASELINE],
       currentFullCoverage: currentOptionalCoverage[FULL_COVERAGE_BASELINE],
       baseExclusions: baseOptionalCoverage[COVERAGE_EXCLUSIONS_BASELINE],
       currentExclusions: currentOptionalCoverage[COVERAGE_EXCLUSIONS_BASELINE],
-      baseLegacyFiles: baseOptionalCoverage[LEGACY_COVERAGE_FILES_BASELINE],
-      currentLegacyFiles: currentOptionalCoverage[LEGACY_COVERAGE_FILES_BASELINE],
     }),
     testTypeRegressions: testTypeContractRegressions({
       baseDiagnostics: baseOptionalCoverage[TEST_TYPE_DIAGNOSTICS_BASELINE],

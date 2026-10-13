@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'fs';
+import path from 'path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import type { AtlasViewProps } from '../DebateMap/debateMapTypes';
@@ -49,4 +51,15 @@ it('uses shared read-only Circles with twelve empty topics and lets participants
   expect(within(screen.getByRole('status')).getByText('Law and liberties')).toBeVisible();
   expect(within(screen.getByRole('status')).getByText('No questions or responses assigned yet.')).toBeVisible();
   expect(screen.queryByRole('button', { name: /generate|process/i })).not.toBeInTheDocument();
+});
+
+it('loads DebateMap styles with the lazy circles instead of with every session page', async () => {
+  const source = fs.readFileSync(path.join(__dirname, 'ReverseAlignmentTopicMap.tsx'), 'utf8');
+  expect(source).not.toMatch(/^import\s[^;]*DebateMap\.module\.scss['"]/m);
+
+  render(<ReverseAlignmentTopicMap />);
+  const [topic] = await screen.findAllByRole('button');
+  const circlesHost = topic.parentElement?.parentElement;
+  expect(circlesHost).toHaveClass('debateMap');
+  expect(circlesHost).toHaveClass('canvas');
 });

@@ -191,6 +191,43 @@ describe('surveyToolResponseMutationController', () => {
       expect(plan.nextAnswerState.value).toBe('');
     });
 
+    it('keeps the lock but drops the saved envelope when a locked answer is cleared', () => {
+      const plan = buildAnswerUpdatePlan(
+        'q1',
+        '',
+        {
+          answers: {
+            q1: { value: 'Old secret', encrypted: true, encryptedPortion: 'old-envelope', hash: '0xsalted' },
+          },
+          additionalComments: {
+            q1: { value: 'Note', encrypted: true, encryptedPortion: 'note-envelope', audienceMode: 'explicit' },
+          },
+        },
+        defaultDeps({ normalizeFieldAudienceMode: (value) => String(value || 'explicit') }),
+      );
+
+      expect(plan.changed).toBe(true);
+      expect(plan.nextAnswerState).toMatchObject({ value: '', encrypted: true });
+      expect(plan.nextAnswerState).not.toHaveProperty('encryptedPortion');
+    });
+
+    it('drops the saved envelope when a locked comment is cleared', () => {
+      const plan = buildAdditionalUpdatePlan(
+        'q1',
+        '',
+        {
+          answers: {},
+          additionalComments: {
+            q1: { value: 'Old note', encrypted: true, encryptedPortion: 'note-envelope', audienceMode: 'explicit' },
+          },
+        },
+        defaultDeps({ normalizeFieldAudienceMode: (value) => String(value || 'explicit') }),
+      );
+
+      expect(plan.nextAdditionalState).toMatchObject({ value: '', encrypted: true });
+      expect(plan.nextAdditionalState).not.toHaveProperty('encryptedPortion');
+    });
+
     it('skips hash for array answers', () => {
       const plan = buildAnswerUpdatePlan(
         'q1',

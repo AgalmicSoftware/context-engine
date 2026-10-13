@@ -101,6 +101,8 @@ type PileEmptyStateProps = {
 
 export type PileInteractionSurfaceProps = {
   submissionError?: string;
+  // Shown when the session's saved answers failed to load, so earlier answers may be missing.
+  savedAnswersNotice?: { retrying: boolean; onRetry: VoidHandler } | null;
   showHologramAssistant: boolean;
   toggleHologramAssistant: VoidHandler;
   showMiniBackgroundSpinner: boolean;
@@ -544,6 +546,7 @@ const renderPileEmptyState = ({
 
 export const renderPileInteractionSurface = ({
   submissionError,
+  savedAnswersNotice,
   showHologramAssistant,
   toggleHologramAssistant,
   showMiniBackgroundSpinner,
@@ -625,6 +628,21 @@ export const renderPileInteractionSurface = ({
           }
         />
       </div>
+    )}
+
+    {savedAnswersNotice && !showHologramAssistant && (
+      <p className={styles.pileSubmitError} role="status">
+        Your saved answers did not load, so answers you saved earlier may be missing.{' '}
+        <Button
+          color="link"
+          size="sm"
+          className="p-0 align-baseline"
+          onClick={savedAnswersNotice.onRetry}
+          disabled={savedAnswersNotice.retrying}
+        >
+          {savedAnswersNotice.retrying ? 'Retrying…' : 'Retry'}
+        </Button>
+      </p>
     )}
 
     <div className={styles.pileCardContainer}>

@@ -1,40 +1,15 @@
-import { getRelevantDefaultTags, hasAnyTagOverlap, isDefaultTagRelevant, parseDefaultTags } from './defaultTags';
+import { getRelevantDefaultTags, isDefaultTagRelevant, normalizeTagList } from './defaultTags';
 
 describe('defaultTags helpers', () => {
-  it('parseDefaultTags normalizes, trims, and de-dupes', () => {
-    expect(parseDefaultTags(' Foo,bar,  ,BAR ,baz ')).toEqual(['foo', 'bar', 'baz']);
+  it('normalizeTagList lowercases, trims, and de-dupes tags', () => {
+    expect(normalizeTagList([' Foo', 'bar', '  ', 'BAR ', 'baz '])).toEqual(['foo', 'bar', 'baz']);
   });
 
-  it('parseDefaultTags returns [] for non-strings', () => {
-    expect(parseDefaultTags(null)).toEqual([]);
-    expect(parseDefaultTags(undefined)).toEqual([]);
-  });
-
-  it('hasAnyTagOverlap returns true when requiredTags is empty (no gating)', () => {
-    expect(hasAnyTagOverlap(['a'], [])).toBe(true);
-    expect(hasAnyTagOverlap([], [])).toBe(true);
-    expect(hasAnyTagOverlap(null, [])).toBe(true);
-  });
-
-  it('hasAnyTagOverlap returns false when question tags are empty but requiredTags is not', () => {
-    expect(hasAnyTagOverlap([], ['a'])).toBe(false);
-    expect(hasAnyTagOverlap(null, ['a'])).toBe(false);
-  });
-
-  it('hasAnyTagOverlap uses OR semantics across requiredTags', () => {
-    expect(hasAnyTagOverlap(['a'], ['a', 'b'])).toBe(true);
-    expect(hasAnyTagOverlap(['b'], ['a', 'b'])).toBe(true);
-    expect(hasAnyTagOverlap(['c'], ['a', 'b'])).toBe(false);
-  });
-
-  it('hasAnyTagOverlap matches case-insensitively and ignores whitespace', () => {
-    expect(hasAnyTagOverlap(['  RXC '], ['rxc'])).toBe(true);
-    expect(hasAnyTagOverlap(['rxc'], [' RXC '])).toBe(true);
-  });
-
-  it('hasAnyTagOverlap accepts non-array iterable tag inputs', () => {
-    expect(hasAnyTagOverlap(new Set(['alpha', 'beta']), [' BETA '])).toBe(true);
-    expect(hasAnyTagOverlap('alpha,beta', ['alpha'])).toBe(false);
+  it('normalizeTagList accepts iterables and ignores strings and nullish input', () => {
+    expect(normalizeTagList(new Set(['alpha', ' BETA ']))).toEqual(['alpha', 'beta']);
+    expect(normalizeTagList('alpha,beta')).toEqual([]);
+    expect(normalizeTagList(null)).toEqual([]);
+    expect(normalizeTagList(undefined)).toEqual([]);
   });
 
   it('isDefaultTagRelevant matches exact words and compacted variants', () => {

@@ -55,41 +55,6 @@ export const buildPileBaselineCheckPlan = ({
   };
 };
 
-export type PilePrefillReadPlan = {
-  shouldSkip: boolean;
-  shouldBumpNoop: boolean;
-  reason: 'anon' | 'dirty' | 'missing-network' | 'empty-pile' | 'prefill';
-};
-
-export const buildPilePrefillReadPlan = ({
-  account = '',
-  isDirty = false,
-  modifiedCount = 0,
-  networkIdStr = '',
-  pileQuestions = [],
-}: {
-  account?: string | null;
-  isDirty?: boolean;
-  modifiedCount?: number | null;
-  networkIdStr?: string | null;
-  pileQuestions?: PileQuestionLike[] | null;
-} = {}): PilePrefillReadPlan => {
-  if (!String(account || '').trim()) {
-    return { shouldSkip: true, shouldBumpNoop: false, reason: 'anon' };
-  }
-  if (isDirty || Number(modifiedCount || 0) > 0) {
-    return { shouldSkip: true, shouldBumpNoop: true, reason: 'dirty' };
-  }
-  if (!String(networkIdStr || '')) {
-    return { shouldSkip: true, shouldBumpNoop: false, reason: 'missing-network' };
-  }
-  if (!Array.isArray(pileQuestions) || pileQuestions.length === 0) {
-    return { shouldSkip: true, shouldBumpNoop: false, reason: 'empty-pile' };
-  }
-
-  return { shouldSkip: false, shouldBumpNoop: false, reason: 'prefill' };
-};
-
 export const readPileScopedQuestionResponses = ({
   scopeSlugs = [],
   networkIdStr = '',

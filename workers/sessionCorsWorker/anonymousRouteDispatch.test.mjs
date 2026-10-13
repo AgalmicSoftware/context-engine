@@ -260,6 +260,50 @@ test('dispatchAnonymousRoute validates and proxies realtime calls with session w
   assert.equal(result, response);
 });
 
+for (const disabledConfig of [{ interviewModeEnabled: false }, { interviewMode: { enabled: false } }]) {
+  test(`dispatchAnonymousRoute refuses realtime calls when ${Object.keys(disabledConfig)[0]} disables interviews`, async () => {
+    const called = [];
+    const result = await dispatchAnonymousRoute({
+      path: '/realtime/call',
+      request: new Request('https://worker.example/realtime/call?slug=session-a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sdp: 'v=0\r\n', instructions: 'You are a free voice assistant.' }),
+      }),
+      anonymousContext: {
+        ...createAnonymousContext(),
+        config: { ...createAnonymousContext().config, ...disabledConfig },
+      },
+      deps: {
+        readRealtimeCallRequestPayload: async () => {
+          called.push('read');
+          return { ok: true, payload: { sdp: 'v=0\r\n', instructions: 'x' } };
+        },
+        evaluateAnonymousRouteAccess: async () => {
+          called.push('access');
+          return { ok: true, reason: 'open-default-ai-gates' };
+        },
+        getSessionSecrets: async () => {
+          called.push('secrets');
+          return { openaiKey: 'sk-worker-openai' };
+        },
+        proxyOpenAiRealtimeCall: async () => {
+          called.push('proxy');
+          return new Response('v=0\r\nanswer');
+        },
+        json: (body, status, headers) => ({ body, status, headers }),
+      },
+    });
+
+    assert.deepEqual(result, {
+      body: { error: 'Interview mode is disabled for this session.' },
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    });
+    assert.deepEqual(called, []);
+  });
+}
+
 test('dispatchAnonymousRoute preserves ai parse error passthrough', async () => {
   let accessCalled = false;
 

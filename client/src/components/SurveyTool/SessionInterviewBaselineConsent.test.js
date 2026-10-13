@@ -330,6 +330,39 @@ it.each([
   40000,
 );
 
+it.each(['name', 'AI attribution'])(
+  'keeps a %s withdrawal when Submit is retried after a rejection',
+  async (choice) => {
+    mockCaches();
+    mockOwnAnswerListing(true);
+    const submitResponses = mockSubmit();
+    const getEngine = await mountPileEngine();
+    await openReplacementDraft(getEngine, 'Disagree');
+    fireEvent.click(
+      choice === 'name'
+        ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
+        : screen.getByLabelText(/Include platform\/model provenance/i),
+    );
+    submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
+    await settle();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(2));
+    await settle();
+    const uploaded = submitResponses.mock.calls[1][2][0];
+    expect(uploaded.answer.value).toBe('Disagree');
+    if (choice === 'name') {
+      expect(uploaded).not.toHaveProperty('responderName');
+      expect(uploaded.interviewProvenance).toMatchObject({ source: { modelId: 'new-model' } });
+    } else {
+      expect(uploaded).not.toHaveProperty('interviewProvenance');
+      expect(uploaded.responderName).toBe('Participant A');
+    }
+  },
+  40000,
+);
+
 it.each([false, true])(
   'uses a directly recorded pending withdrawal with own listing %s',
   async (available) => {

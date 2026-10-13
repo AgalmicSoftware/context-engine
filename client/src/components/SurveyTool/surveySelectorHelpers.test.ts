@@ -31,7 +31,36 @@ describe('surveySelectorHelpers document URLs', () => {
       getSurveyDocumentUrls({
         documentURLs: [' https://example.com/one ', '', '   ', 12, 'ar://abc123'],
       }),
-    ).toEqual(['https://example.com/one', 'ar://abc123']);
+    ).toEqual(['https://example.com/one']);
+  });
+
+  it('keeps only http, https, and ar:// document links', () => {
+    const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
+    const urls = getSurveyDocumentUrls({
+      documentURLs: [
+        'javascript:alert(document.domain)',
+        'data:text/html,hi',
+        `ar://${txId}`,
+        'http://example.com/two',
+      ],
+    });
+
+    expect(urls).toEqual([expect.stringMatching(new RegExp(`^https://[^/]+/${txId}$`)), 'http://example.com/two']);
+    expect(getSurveyDocumentLinkTitle({ documentURLs: ['javascript:alert(1)'] })).toBe('');
+  });
+
+  it('links same-site document paths, such as saved doc-library viewer links', () => {
+    expect(
+      getSurveyDocumentUrls({
+        documentURLs: ['/session/demo/docs?__ceDocTx=abc', '//evil.example/phish', '/\\evil.example/phish'],
+      }),
+    ).toEqual([`${window.location.origin}/session/demo/docs?__ceDocTx=abc`]);
+  });
+
+  it('skips document URLs that are not text, even ones whose conversion throws', () => {
+    expect(getSurveyDocumentUrls({ documentURLs: [JSON.parse('{"toString":1}'), 'https://example.com/ok'] })).toEqual([
+      'https://example.com/ok',
+    ]);
   });
 
   it('returns an empty list when no document URL array exists', () => {
@@ -307,6 +336,18 @@ describe('surveySelectorHelpers submitted survey list building', () => {
 
     expect(submittedSurveys).toEqual([first, blankQuestionId]);
     expect(first.id).toBe('Survey-A');
+  });
+
+  it('skips surveys whose title is not a string', () => {
+    const named = { id: 'named', title: 'Named survey', questionIDs: ['q1'] };
+
+    expect(
+      buildSurveySelectorSubmittedSurveyList({
+        objectTitle: { id: 'object-title', title: { pwned: true }, questionIDs: ['q2'] },
+        numberTitle: { id: 'number-title', title: 7, questionIDs: ['q3'] },
+        named,
+      }),
+    ).toEqual([named]);
   });
 
   it('returns an empty list for non-object survey bags', () => {

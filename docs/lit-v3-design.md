@@ -1,6 +1,6 @@
 # Lit v3 Design and Migration Record: Chipotle Worker-Mediated SBT-Gated Encryption
 
-_Last updated: July 10, 2026._
+_Last updated: October 11, 2026._
 
 ## Why this doc exists
 
@@ -60,7 +60,9 @@ So the exact v2 contract `browser -> Lit ACC encrypt/decrypt APIs` is not the ri
 
 ## Minimum viable v3 design
 
-The smallest design that preserves "only holders of this SBT can decrypt" is:
+The smallest design that keeps key release gated on SBT ownership is below. It
+does not hide keys from the session Worker or Lit account administrators; see the
+v3 trust boundary.
 
 1. Keep CE's existing local content encryption shape.
 2. Move Lit key release / decrypt authority behind the session worker.
@@ -91,12 +93,28 @@ Worker:
 - authenticates the requester with existing CE worker auth
 - holds or resolves the scoped Chipotle usage key
 - forwards only the minimum request payload to the configured Lit Action
+- sees the CEK in plaintext: the browser sends it to the Worker to be wrapped,
+  and the Worker relays the unwrapped CEK back after a passing decrypt
 
 Lit Action / PKP:
 
 - checks whether the requester satisfies the required SBT gate
-- unwraps or decrypts the protected CEK only after the gate check passes
-- returns either decrypted plaintext or a requester-specific release payload, depending on the final CE envelope design
+- unwraps the protected CEK only after the gate check passes
+- verifies Worker-signed authorization before the gate check and encrypts the CEK to the original Worker request; the Worker decrypts and relays it to the authenticated requester
+
+What this means for the `gate` audience: content wrapped for `lit-sbt-v1`
+recipients can be read by:
+
+- SBT holders who pass the gate;
+- whoever operates the session Worker (normally the session admin);
+- Lit account administrators or others able to alter PKP/Action permissions.
+
+New authorities reject direct calls made with a scoped usage key alone. A
+signature pinned in the Action binds the authenticated wallet, approved HTTPS
+RPC, full request, and ephemeral reply key. Captured signed requests return an
+opaque reply to the original Worker. See [the protocol and upgrade runbook](lit-worker-authorization.md).
+
+This is SBT-gated key release, not end-to-end encryption between SBT holders.
 
 ## Proposed v3 envelope direction
 
@@ -114,10 +132,10 @@ Recommended v3 envelope shape:
 
 This keeps the user data format close to CE's current envelope model while swapping only the Lit recipient mechanism.
 
-Operationally, default Lit Action source changes require re-running
-`lit-chipotle-provision` or `lit-chipotle-bootstrap-session` for each
-Chipotle-enabled session. The worker verifies submitted action source against
-the configured `litActionCid` and does not fall back to old action CIDs.
+Operationally, unsigned authorities require an explicit fresh PKP/group/usage-key
+cutover. Worker source is specialized with session/signing constants before CID
+derivation; participant source is never authoritative. Old ciphertext and old
+permissions require separate retirement decisions, described in the runbook.
 
 ## First real vertical slice
 
@@ -251,9 +269,9 @@ Session Wizard now has two Chipotle automation paths:
    - derives/registers the canonical CE Lit action
    - attaches the action and PKP to the group
    - creates the scoped runtime usage key
-   - writes the resulting `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }` into worker config
+   - writes the resulting `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }` into worker config
 
-2. **Existing-account provisioning**: when the wizard already has `litGroupId` and `litPkpId`, it can still call worker admin `lit-chipotle-provision` to register the default CE action into an existing Lit account. That route now prefers a stored session `litAccountApiKey` before falling back to a deployment-level worker env key.
+2. **Existing-account provisioning**: `lit-chipotle-provision` uses the same bootstrap path. An explicit `freshAuthority: true` request creates a new group, PKP, and scoped usage key under the existing account. It never attaches hardened source to an old authority. The independent Worker signer stays in encrypted session secrets and is reused on retries.
 
 This keeps account/master credentials server-side while eliminating the manual Lit Dashboard setup loop for both the default per-session-account flow and future shared-account / sponsored-account flows.
 
@@ -261,8 +279,8 @@ This keeps account/master credentials server-side while eliminating the manual L
 
 The default CE Lit action now lives in repo code rather than as an out-of-band dashboard snippet:
 
-- name: `ce-sbt-gated-crypto-v3`
-- source: `client/src/utilities/crypto/litChipotleCatalog.ts`
+- name: `ce-sbt-gated-crypto-v4`
+- source: `shared/litChipotleAction.mjs`; client and CE-CC catalogs re-export it
 - bundled params example: `DEFAULT_CHIPOTLE_ACTION_PARAMS_EXAMPLE`
 
 That gives CE a code-reviewed action catalog surface for future Lit action families such as group prompting or additional gated decrypt/sign flows.

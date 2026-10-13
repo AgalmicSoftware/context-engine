@@ -123,6 +123,16 @@ describe('useSessionWizardIdentityEffects', () => {
     expect(blocked.setDraft).not.toHaveBeenCalled();
   });
 
+  it('starts an auto-generated slug with a letter or digit', () => {
+    const { setDraft } = renderIdentityEffects({
+      draftSessionName: '🚀 Launch Week',
+      draftSlug: '',
+    });
+
+    const updater = setDraft.mock.calls[0][0];
+    expect(updater({ slug: '' })).toEqual({ slug: 'launch-week' });
+  });
+
   it('toggles private slug mode when a private SBT appears for the first time', () => {
     const { lastHasPrivateSbtNameRef, togglePrivateSlugMode } = renderIdentityEffects({
       hasPrivateSbtName: true,

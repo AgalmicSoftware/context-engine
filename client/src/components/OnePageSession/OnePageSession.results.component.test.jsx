@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
+import { loadDemoSessionFixtures } from '../SurveyTool/demoSessionFixtureLoader';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -32,12 +33,14 @@ const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
 const originalResizeObserver = global.ResizeObserver;
-beforeAll(() => {
+beforeAll(async () => {
   global.ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
   };
+  // Results UI tests start from ready demo data; loader transitions have their own suite.
+  await loadDemoSessionFixtures();
 });
 afterAll(() => {
   global.ResizeObserver = originalResizeObserver;
@@ -948,7 +951,7 @@ describe('OnePageSession results routing', () => {
     expect(atlas).toBeVisible();
     expect(
       within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
-        name: /^Context View/,
+        name: /^Context(?! View)/,
         level: 2,
       }),
     ).toBeVisible();

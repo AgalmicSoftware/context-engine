@@ -244,6 +244,44 @@ export const buildArweaveGatewayUrl = (
   options: { gateway?: unknown; contextLabel?: unknown } = {},
 ): string => normalizeArweaveUrl(value, options);
 
+// Render-time guard for stored or uploaded links: only http(s) URLs,
+// ar://<txId> (mapped to the gateway) and paths on this site (such as saved
+// doc-library viewer links) may become an href. Anything else, such as
+// javascript: or //other.host, returns '' so callers render plain text instead.
+export const toSafeLinkHref = (
+  value: unknown,
+  { gateway = '', contextLabel = 'ui_link' }: { gateway?: unknown; contextLabel?: unknown } = {},
+): string => {
+  // Uploaded JSON can hold objects whose text conversion throws, so only strings can be links.
+  if (typeof value !== 'string') return '';
+  const raw = value.trim();
+  if (!raw) return '';
+  if (raw.startsWith('ar://')) return parseArweaveTxId(raw) ? normalizeArweaveUrl(raw, { gateway, contextLabel }) : '';
+  try {
+    if (raw.startsWith('/')) {
+      // Return the absolute URL: a resolved path such as //host would leave the site again.
+      const origin = typeof window === 'undefined' ? '' : window.location.origin;
+      const url = new URL(raw, origin);
+      return url.origin === origin ? url.href : '';
+    }
+    const url = new URL(raw);
+    // A user name or password hides the real host (https://[redacted-email]/).
+    if (url.username || url.password) return '';
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : '';
+  } catch {
+    return '';
+  }
+};
+
+// Gateway link for a stored Arweave reference (a txId, ar://txId or a known
+// gateway URL). Uploaded records can set these fields to anything, so every
+// other value, including other web links and same-site paths, returns ''.
+export const toSafeArweaveLinkHref = (
+  value: unknown,
+  options: { gateway?: unknown; contextLabel?: unknown } = {},
+): string =>
+  typeof value === 'string' && parseArweaveTxId(value) ? toSafeLinkHref(normalizeArweaveUrl(value, options)) : '';
+
 export const buildArweaveGatewayUrlCandidates = (
   value: unknown,
   { gateway = '' }: { gateway?: unknown } = {},

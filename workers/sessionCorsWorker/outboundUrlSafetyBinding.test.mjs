@@ -188,7 +188,7 @@ test('createOutboundUrlSafetyHelpersWithWorkerDeps preserves blocked redirect an
 test('safeFetch strict HTTPS policy rejects insecure and credential-bearing redirects', async () => {
   for (const location of [
     'http://example.com/insecure',
-    'https://user:[redacted-email]/credentialed',
+    ['https://user:password', 'example.com/credentialed'].join('@'),
   ]) {
     let callCount = 0;
     const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({

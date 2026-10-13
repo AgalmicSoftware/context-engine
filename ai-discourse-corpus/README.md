@@ -41,7 +41,7 @@ node scripts/ai-discourse-corpus-tools.js extract debate_ai_water_usage
 ```
 
 The helper reports counts, metadata drift, duplicate IDs and per-sub-corpus normalized titles,
-debate-reference coverage, client debate/sample mirror coverage, taxonomy and
+debate-reference coverage, client sample mirror coverage, taxonomy and
 date/year drift, and compact single-record extracts without dumping the full
 corpus into the chat context. URL-form lookups normalize protocol, `www`, and
 trailing slashes while preserving case-sensitive paths. This is especially

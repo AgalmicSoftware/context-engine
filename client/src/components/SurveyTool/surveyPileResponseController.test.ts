@@ -1,5 +1,4 @@
 import {
-  buildPileCachePrefillStatePlan,
   buildPileInitializeResponseStatePatch,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
@@ -156,91 +155,6 @@ describe('surveyPileResponseController', () => {
         autoDecryptReason: 'pile-hydration',
       }),
     );
-  });
-
-  it('seeds pile baseline from cache-prefilled responses when no edit baseline exists', () => {
-    const plan = buildPileCachePrefillStatePlan({
-      pileQuestions: [{ id: 'q1' }],
-      questionResponsesByQuestionId: {
-        q1: {
-          '0xabc': {
-            answer: { value: 'cached-answer', encrypted: false },
-            additional: { value: 'cached-note', encrypted: false },
-          },
-        },
-      },
-      account: '0xAbC',
-      currentSlice: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      editBaseline: null,
-      pendingTotal: 0,
-      cloneValue,
-      applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => {
-        const responseRecord = response as CachedResponseRecord;
-        targetSlice.answers[questionId] = { value: responseRecord.answer?.value || '', encrypted: false };
-        targetSlice.additionalComments[questionId] = {
-          value: responseRecord.additional?.value || '',
-          encrypted: false,
-        };
-        return true;
-      },
-    });
-    const nextState = plan.nextState as unknown as SeedBaselineNextState;
-
-    expect(plan.reason).toBe('seed-baseline');
-    expect(nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
-    expect(nextState.editBaseline?.answers?.q1?.value).toBe('cached-answer');
-    expect(nextState.baselineResponses?.additionalComments?.q1?.value).toBe('cached-note');
-    expect(nextState.modifiedCount).toBe(0);
-    expect(nextState.isDirty).toBe(false);
-  });
-
-  it('patches the live pile slice from cache prefill without replacing an existing baseline', () => {
-    const plan = buildPileCachePrefillStatePlan({
-      pileQuestions: [{ id: 'q1' }],
-      questionResponsesByQuestionId: {
-        q1: {
-          '0xabc': {
-            answer: { value: 'cached-answer', encrypted: false },
-            additional: { value: '', encrypted: false },
-          },
-        },
-      },
-      account: '0xabc',
-      currentSlice: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-      editBaseline: {
-        answers: { q1: { value: '', encrypted: false } },
-        importance: {},
-        conviction: {},
-        additionalComments: { q1: { value: '', encrypted: false } },
-      },
-      pendingTotal: 0,
-      cloneValue,
-      applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => {
-        const responseRecord = response as CachedResponseRecord;
-        targetSlice.answers[questionId] = { value: responseRecord.answer?.value || '', encrypted: false };
-        targetSlice.additionalComments[questionId] = {
-          value: responseRecord.additional?.value || '',
-          encrypted: false,
-        };
-        return true;
-      },
-    });
-    const nextState = plan.nextState as unknown as PatchLiveNextState;
-
-    expect(plan.reason).toBe('patch-live');
-    expect(nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
-    expect(nextState).not.toHaveProperty('editBaseline');
-    expect(nextState).not.toHaveProperty('baselineResponses');
   });
 
   it('builds pile response initialization state patches with a normalized baseline', () => {

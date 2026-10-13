@@ -48,6 +48,27 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
     ).toBe('Question 1 has duplicate multichoice option "alpha". Option labels must be unique.');
   });
 
+  it.each([[[]], [['', '  ']], [['Only']], [undefined]])(
+    'rejects a multichoice question with fewer than two non-blank options (%j)',
+    (options) => {
+      expect(
+        getCreateSurveyValidationError({
+          title: 'Survey',
+          questions: [{ type: 'multichoice', prompt: 'Pick one', options }],
+        }),
+      ).toBe('Question 1: Multichoice questions need at least two non-blank options.');
+    },
+  );
+
+  it('accepts a multichoice question with two non-blank options among blank rows', () => {
+    expect(
+      getCreateSurveyValidationError({
+        title: 'Survey',
+        questions: [{ type: 'multichoice', prompt: 'Pick one', options: ['Alpha', '', 'Beta'] }],
+      }),
+    ).toBe('');
+  });
+
   it('omits payload options when a multichoice question has no option array', () => {
     expect(normalizePayloadQuestionOptions('multichoice', undefined)).toBeUndefined();
   });
@@ -451,6 +472,24 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
         title: 'Survey title',
         documentURLs: ['https://docs.example/a', '/local/doc'],
       }),
+    );
+  });
+
+  it('scopes new survey ids to their author and keeps the legacy id without one', () => {
+    const digest = (value: string) => `digest:${value}`;
+    const base = { digest, documentURLs: ['https://docs.example/a'], title: 'Survey title' };
+    const authorA = `0x${'Ab'.repeat(20)}`;
+    const authorB = `0x${'cd'.repeat(20)}`;
+
+    const idA = buildCreateSurveyHashValue({ ...base, author: authorA });
+    expect(idA).toBe(
+      `0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a"],"author":"${authorA.toLowerCase()}"}`,
+    );
+    // The same author re-publishing keeps one id; another author never shares it.
+    expect(buildCreateSurveyHashValue({ ...base, author: authorA.toLowerCase() })).toBe(idA);
+    expect(buildCreateSurveyHashValue({ ...base, author: authorB })).not.toBe(idA);
+    expect(buildCreateSurveyHashValue({ ...base, author: '' })).toBe(
+      '0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a"]}',
     );
   });
 

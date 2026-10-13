@@ -16,8 +16,9 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 
 `REACT_APP_CE_DEFAULT_THEME` selects a bundled theme for a custom frontend.
 Supported values currently come from `client/src/scss/themes/registry.json`:
-`context-engine` (default) and `classic-95`. Unknown values fall back to
-`context-engine`; this setting cannot load a URL, remote stylesheet, or custom
+`civic` (Minimal, the default white theme), `context-engine` (dark), and `classic-95`.
+The stable `civic` ID preserves existing saved selections. Unknown values fall back to
+Minimal; this setting cannot load a URL, remote stylesheet, or custom
 CSS. It is embedded into the document for the pre-paint bootstrap, so changing
 it requires a rebuild/redeploy.
 
@@ -58,7 +59,7 @@ protocol, pinned-authority, and durable-config checks.
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
-2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. Helper and healthcheck URLs are legacy/self-host overrides.
+2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. The deploy-helper URL is a legacy/self-host override.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
@@ -73,6 +74,10 @@ server.
 Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.ts`,
 and `client/src/variables/appConfig.ts`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
+The entry point installs browser globals in `client/src/browserGlobals.ts`
+before its theme and application configuration imports run. This makes the
+first configuration read honor build overrides, including the release commit
+and a self-hosted deploy-helper URL.
 
 For a custom-domain self-host, the values to check first are:
 
@@ -103,8 +108,6 @@ For a custom-domain self-host, the values to check first are:
   default bundle downloads are disabled rather than falling back to `latest`.
 - `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own
   deploy-helper for the explicit legacy fallback.
-- `REACT_APP_CE_HEALTHCHECK_WORKER_URL` when worker diagnostics should target a
-  specific worker.
 - `REACT_APP_CE_WORKER_BUNDLE_URL` and `REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL`
   only when deploy flows should fetch Worker bundles from non-default URLs.
 - `REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL` alongside any Worker bundle URL
@@ -136,8 +139,6 @@ npm run build
 ```
 
 The output directory is `client/build/`.
-Before building, the build script removes stale legacy `client/build-vite/` and
-`client/vite-build/` directories if they exist locally.
 
 ### 3. Publish to Netlify
 
@@ -158,7 +159,8 @@ pairs everything with the exact public commit it was built from: the native
 Cloudflare Deploy Button replays that commit, and the Session and Agent Bridge
 bundles and their manifest come from its immutable `worker-bundles-<sha>`
 release, never from GitHub's moving `latest` release. CI publishes that release
-about 20 minutes after the push to `main`. Until then, deploy-helper and
+after the required checks and `Publish Worker Bundles` complete; there is no
+fixed publication delay. Until then, deploy-helper and
 wrapped deploys fail closed; the native button works at once. After `Publish
 Worker Bundles` finishes, check the release with
 `CE_RELEASE_COMMIT=<sha> npm run verify:release-assets` from the repository
@@ -177,23 +179,23 @@ wildcard preview origin. Helper-based Worker deployments fail in Deploy
 Previews: the PR commit has no immutable Worker release assets. Test those
 deployments using a client built for an existing verified release.
 
-For a manual fallback, drag `client/build/` into Netlify's deploy UI. Do not
-upload `client/build-vite/` or `client/vite-build/`. Those names are legacy
-ignored artifacts from older local builds and can contain partial or stale CSS
-output. Run `npm run verify:release-assets` from the repository root before a
-manual build so the uploaded client references a verified release (the pin, or
-the commit you set in `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`). If a deploy
+For a manual fallback, drag `client/build/` into Netlify's deploy UI. Run
+`npm run verify:release-assets` from the repository root before a manual build
+so the uploaded client references a verified release (the pin, or the commit
+you set in `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT`). If a deploy
 looks unstyled or low-contrast, rebuild from `client/` and upload the fresh
 `client/build/` directory.
 
-Because the app uses client-side routing, the root `netlify.toml` owns the Git
-deploy redirects. The matching `client/public/_redirects` file is retained in
-the published bundle for manual deploys and other Netlify-compatible static
-uploads:
+Because the app uses client-side routing, `client/public/_redirects` (copied
+into the published bundle) and the root `netlify.toml` carry the same redirect
+rules. Netlify applies `_redirects` first, so its rules answer in both Git and
+manual deploys; keep the two files identical:
 
 ```text
 /demo/dacc /about 301
-/*    /index.html   200
+/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301
+/assets/* /404.html 404
+/* /index.html 200
 ```
 
 The connected-build equivalent is:
@@ -205,12 +207,25 @@ The connected-build equivalent is:
   status = 301
 
 [[redirects]]
+  from = "/assets/img/context-engine-social-preview-square.png"
+  to = "/context-engine-social-preview-square.png"
+  status = 301
+
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 ```
 
-Keep specific legacy redirects above the SPA fallback rule in both files.
+Keep specific legacy redirects above the SPA fallback rule in both files. The
+`/assets/*` rule makes a missing hashed file return 404 (with
+`client/public/404.html`) instead of the SPA HTML. It is not forced, so files
+that exist are still served.
 
 For rollback, use Netlify's deploy history to republish the previous known-good
 production deploy, then correct `main` normally. A frontend rollback does not
@@ -227,17 +242,33 @@ be scoped to the same deployed base path by the hosting platform.
 Relative mount paths are normalized directly; route lookups avoid repeatedly
 parsing them as absolute URLs during question-list rendering.
 
-Set browser cache headers so search-result clicks and fresh navigations
-revalidate the deployed files after each deploy. For manual drag-and-drop
-deploys, keep the `_headers` file inside `client/public/` so Vite copies it into
-the uploaded `client/build/` directory:
+Cache Vite's content-hashed files for a year and let everything else
+revalidate. `client/public/_headers` sets no cache header itself; the production
+build appends one exact-path rule to `client/build/_headers` for each hashed
+file it emits under `/assets/`:
 
 ```text
-/*
-  Cache-Control: no-cache, max-age=0, must-revalidate
-  Pragma: no-cache
-  Expires: 0
+/assets/AppShell-0123abcd.js
+  Cache-Control: public, max-age=31536000, immutable
 ```
+
+A wildcard `/assets/*` rule would also send that header with the 404 for a
+missing file, and browsers would keep the 404 for a year, even after a rollback
+or revert brings the file back. With per-file rules, a missing file gets
+Netlify's default `Cache-Control: public, max-age=0, must-revalidate`, which
+also covers `index.html` and other unhashed files; the `/*` rule sets no cache
+header because overlapping rules could combine values. For manual drag-and-drop
+deploys, upload the built `client/build/` directory so its generated `_headers`
+goes with it. Keep unhashed files out of an `assets/` folder in
+`client/public/`, so `/assets/` holds only hashed build output. After a
+deploy, `curl -sI https://<site>/assets/missing.js` should return 404 without
+`immutable` in `cache-control`.
+
+The same `_headers` file enforces a baseline Content Security Policy
+(`frame-ancestors`, `object-src`, `base-uri`, and `form-action`). It also sends
+a stricter policy that allows scripts only from this origin as
+`Content-Security-Policy-Report-Only`. That policy has no report endpoint, so
+its violations appear only in the browser console.
 
 This cannot replace already-running JavaScript in an open tab. It makes the
 browser re-check the app shell on the next navigation, reload, or new visit.
@@ -269,7 +300,10 @@ Smoke-test the deployed domain with:
 - login/auth flows, including gated flows if the session uses SBT gates
 
 Vercel, Cloudflare Pages, and GitHub Pages use the same static build output and
-SPA fallback concept, but their redirect config syntax differs.
+SPA fallback concept, but their redirect config syntax differs. The generated
+caching rules in `_headers` target Netlify: Cloudflare Pages reads the same file
+but caps it at 100 rules, fewer than the one rule per hashed file that the build
+writes (about 240), so set up caching there separately.
 
 ## Notes
 
@@ -277,7 +311,6 @@ SPA fallback concept, but their redirect config syntax differs.
   defaults from `publicDeploymentConfig.ts` and `appConfig.ts`.
 - Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
 - The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
-- Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
 - Only `REACT_APP_*` keys are exposed to the browser in the Vite client
   compatibility env.
 - `publicDeploymentConfig.ts` is the single owner of deployment endpoint
@@ -297,15 +330,16 @@ SPA fallback concept, but their redirect config syntax differs.
   - `litGroupId`
   - `litPkpId`
   - `litActionCid`
+  - `litAuthorizationVersion` and `litAuthorizationSigner`
 - Those values are authored through the Session Wizard / Admin flows and persist in worker config as `litCredentials`, not in the public client bundle.
 - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but CE still treats them as worker-side operational metadata by default:
   - exposing them can reveal app architecture and action identity
   - they also make abuse easier if a scoped usage key later leaks
 - Do not rely on hiding those identifiers as the main security boundary. The real boundary is the Lit API key scope, the permitted group/PKP/action relationship, and the Lit Action code itself.
-- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_USAGE_API_KEY`, `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
+- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_USAGE_API_KEY`, `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, `litAuthorizationPrivateKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
 - If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit Lit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit key per bundle, not one long-lived deployment key copied into many bundles.
 - Chipotle v2 metadata may store the non-secret policy fields and policy fingerprint needed to bind a wrapped CEK to an audience, but it must not store secret-bearing RPC URLs. Decrypt/check RPC selection is derived from worker-approved config, secrets, or defaults.
-- Re-provision Chipotle-enabled sessions after default Lit Action source changes so `litActionCid` matches the currently bundled action source. Old v1 / bare-hex Chipotle wrapped keys are not a compatibility target.
+- New Lit authorities require a Worker-generated per-session signing secret in encrypted KV. Public runtime descriptors never transfer that secret. Old authorities require an explicit fresh PKP/group/usage-key cutover; see [Lit authorization and cutover](lit-worker-authorization.md). Old ciphertext is not automatically migrated.
 - Current public prod/dev Chipotle environments both report Base mainnet, so environment isolation should come from separate Chipotle accounts, usage keys, groups, and PKPs rather than from shipping different public chain IDs alone.
 - The default CE automation path is now one new Lit account per session. Groups are reserved for internal trust boundaries or future action families inside that session account rather than as the primary cross-session isolation primitive.
 - There is no longer a client-side Lit payer-wallet feature gate in `/new`; the manual `/new` Lit card asks only for one Lit API key. E2E/deploy env should prefer `LIT_USAGE_API_KEY`; `litAccountApiKey` remains the internal worker-secret field backing that visible input for backward compatibility.

@@ -1,17 +1,26 @@
 {
-  "defaultThemeId": "context-engine",
+  "defaultThemeId": "civic",
   "themes": [
     {
       "id": "context-engine",
       "label": "Context Engine",
       "colorScheme": "dark",
+      "themeColor": "#20204e",
       "layoutProfile": "standard-app"
     },
     {
       "id": "classic-95",
       "label": "Classic 95",
       "colorScheme": "light",
+      "themeColor": "#008080",
       "layoutProfile": "desktop-window"
+    },
+    {
+      "id": "civic",
+      "label": "Minimal",
+      "colorScheme": "light",
+      "themeColor": "#ffffff",
+      "layoutProfile": "minimal-app"
     }
   ]
 }

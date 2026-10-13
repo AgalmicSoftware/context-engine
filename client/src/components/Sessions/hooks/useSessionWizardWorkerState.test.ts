@@ -41,6 +41,8 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.workerMode).toBe('default');
     expect(result.current.workerSecretsEnabled).toBe(true);
     expect(result.current.persistWorkerSecrets).toBe(false);
+    // Secret persistence is unsupported, so no setter is offered.
+    expect(result.current).not.toHaveProperty('setPersistWorkerSecrets');
     expect(result.current.deployHelperUrl).toBe('https://deploy-helper.example');
     expect(result.current.deployForm).toEqual({
       apiToken: '',
@@ -127,6 +129,21 @@ describe('useSessionWizardWorkerState', () => {
       expect(result.current.workerAllowOrigins).toBe(origins);
     },
   );
+
+  it('keeps the native template setup marker across a cache round trip', () => {
+    const marker = 'demo-session\n0x00000000000000000000000000000000000000aa';
+    const first = renderWorkerState();
+    expect(first.result.current.nativeTemplateSetupIdentity).toBe('');
+    act(() => first.result.current.setNativeTemplateSetupIdentity(marker));
+
+    const cachedWizard = buildSessionWizardCacheWritePayload({
+      nativeTemplateSetupIdentity: first.result.current.nativeTemplateSetupIdentity,
+    });
+    const { result } = renderWorkerState({ cachedWizard });
+
+    expect(cachedWizard.nativeTemplateSetupIdentity).toBe(marker);
+    expect(result.current.nativeTemplateSetupIdentity).toBe(marker);
+  });
 
   it('uses upload bundle mode when no hosted worker bundle default exists', () => {
     const { result } = renderWorkerState({

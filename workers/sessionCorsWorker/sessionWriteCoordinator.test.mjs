@@ -139,35 +139,106 @@ const createWrappedCandidate = (suffix, { slug = 'session-a', createdAt = '2026-
 	wrappedKey: suffix.repeat(64).slice(0, 64),
 });
 
-test('SessionWriteCoordinator consumes one issued auth nonce exactly once under concurrency', async () => {
-	const { state, store } = createTransactionalState();
-	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
-	const issue = await coordinator.fetch(
+const RANDOM_PART = (digit) => digit.repeat(32);
+
+const issueAuthNonce = async (coordinator, random = RANDOM_PART('a'), { address = '0xabc', expiresAtMs = 301_000 } = {}) => {
+	const response = await coordinator.fetch(
 		createCoordinatorRequest('/auth-state/nonce/issue', {
 			slug: 'session-a',
-			address: '0xabc',
-			nonce: 'nonce-1',
-			expiresAtMs: 301_000,
+			address,
+			nonce: random,
+			expiresAtMs,
 			usedExpiresAtMs: 601_000,
 		}),
 	);
-	assert.equal(issue.status, 200);
+	return { status: response.status, body: await response.json() };
+};
+const consumeAuthNonce = async (coordinator, nonce, address = '0xabc', usedExpiresAtMs = 601_000) => {
+	const response = await coordinator.fetch(
+		createCoordinatorRequest('/auth-state/nonce/consume', {
+			slug: 'session-a',
+			address,
+			nonce,
+			usedExpiresAtMs,
+		}),
+	);
+	return response.json();
+};
 
-	const consume = () =>
-		coordinator.fetch(
-			createCoordinatorRequest('/auth-state/nonce/consume', {
-				slug: 'session-a',
-				address: '0xabc',
-				nonce: 'nonce-1',
-				usedExpiresAtMs: 601_000,
-			}),
-		);
-	const responses = await Promise.all([consume(), consume()]);
-	const bodies = await Promise.all(responses.map((response) => response.json()));
+test('SessionWriteCoordinator consumes one issued auth nonce exactly once under concurrency', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const issue = await issueAuthNonce(coordinator);
+	assert.equal(issue.status, 200);
+	// A signed EIP-4361 nonce: letters and digits only.
+	assert.match(issue.body.nonce, /^n1[0-9a-f]{32}\d{13}[0-9a-f]{32}$/);
+
+	const consume = () => consumeAuthNonce(coordinator, issue.body.nonce);
+	const bodies = await Promise.all([consume(), consume()]);
 
 	assert.deepEqual(bodies.map((body) => body.ok).sort(), [false, true]);
 	assert.deepEqual(bodies.map((body) => body.error || '').sort(), ['', 'Nonce already used.']);
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /session-a|0xabc/i);
+});
+
+test('SessionWriteCoordinator keeps issuing nonces however many others are pending', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const owner = await issueAuthNonce(coordinator, RANDOM_PART('0'));
+	// Anyone may ask for nonces for a public address; issuing stores nothing per nonce.
+	for (let index = 0; index < 40; index += 1) {
+		assert.equal((await issueAuthNonce(coordinator, index.toString(16).padStart(32, 'f'))).status, 200);
+	}
+	const later = await issueAuthNonce(coordinator, RANDOM_PART('1'));
+	assert.equal(later.status, 200);
+	assert.deepEqual([...store.keys()], ['auth-nonce-mac-key']);
+
+	assert.deepEqual(await consumeAuthNonce(coordinator, owner.body.nonce), { ok: true });
+	assert.deepEqual(await consumeAuthNonce(coordinator, owner.body.nonce), { ok: false, error: 'Nonce already used.' });
+	assert.deepEqual(await consumeAuthNonce(coordinator, later.body.nonce), { ok: true });
+});
+
+test('SessionWriteCoordinator rejects forged, foreign and expired nonces and accepts a pre-upgrade one', async () => {
+	const { state, store } = createTransactionalState();
+	let nowMs = 1_000;
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => nowMs });
+	const mismatch = { ok: false, error: 'Nonce mismatch or expired.' };
+	const issued = (await issueAuthNonce(coordinator, RANDOM_PART('b'), { expiresAtMs: 2_000 })).body.nonce;
+	const flipped = `${issued.slice(0, -1)}${issued.endsWith('0') ? '1' : '0'}`;
+	assert.deepEqual(await consumeAuthNonce(coordinator, flipped), mismatch);
+	const later = `${issued.slice(0, 34)}${'9'.repeat(13)}${issued.slice(47)}`;
+	assert.deepEqual(await consumeAuthNonce(coordinator, later), mismatch);
+	// The signature binds the nonce to its wallet.
+	assert.deepEqual(await consumeAuthNonce(coordinator, issued, '0xdef'), mismatch);
+	nowMs = 3_000;
+	assert.deepEqual(await consumeAuthNonce(coordinator, issued), mismatch);
+
+	// A nonce the previous release issued and stored is still accepted once.
+	store.set('auth-nonce-active', { version: 1, nonce: 'issuedBeforeUpgrade', expiresAtMs: 301_000 });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'issuedBeforeUpgrade'), { ok: true });
+	assert.deepEqual(await consumeAuthNonce(coordinator, 'issuedBeforeUpgrade'), { ok: false, error: 'Nonce already used.' });
+	// Consumed nonces are kept only until they expire.
+	nowMs = 700_000;
+	assert.deepEqual(await consumeAuthNonce(coordinator, issued, '0xabc', 1_300_000), mismatch);
+	assert.deepEqual(store.get('auth-nonce-used').entries, []);
+});
+
+test('SessionWriteCoordinator remembers a used nonce for at least the used-nonce lifetime', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const issued = (await issueAuthNonce(coordinator, RANDOM_PART('c'), { expiresAtMs: 301_000 })).body.nonce;
+	assert.deepEqual(await consumeAuthNonce(coordinator, issued, '0xabc', 601_000), { ok: true });
+	// Kept until the later of the nonce's expiry and now plus the used-nonce TTL.
+	assert.deepEqual(store.get('auth-nonce-used').entries, [{ nonce: issued, expiresAtMs: 601_000 }]);
+});
+
+test('SessionWriteCoordinator refuses an unsigned or malformed random part', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	for (const random of ['nonce-1', 'ABC', 'g'.repeat(32), `${'a'.repeat(32)}0`]) {
+		assert.equal((await issueAuthNonce(coordinator, random)).status, 400, random);
+	}
+	assert.equal(store.size, 0);
 });
 
 test('SessionWriteCoordinator rejects malformed slugs before writing durable state', async () => {
@@ -2263,6 +2334,30 @@ test('SessionWriteCoordinator keeps empty public encrypted envelopes unlocked an
 	const lockedJob = lockedState.store.get('results-analysis-auto-job-v1');
 	assert.equal(lockedJob.committedResponses[0].payload.locked, true);
 	assert.equal(lockedJob.committedResponses[0].payload.answer.encryptedPortion, 'ciphertext');
+});
+
+test('SessionWriteCoordinator does not lock a response for a cleared field that kept its lock flag', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	// Clients up to 0.6.7 uploaded a cleared locked answer like this.
+	const cleared = { value: '', encrypted: true, encryptionAudience: 'self_admin', hash: '', encryptedPortion: '' };
+	const result = await coordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-cleared',
+		committedResponses: [{
+			metadata: { id: 'cleared', responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+			payload: {
+				sessionSlug: 'session-a',
+				questionId: 'q1',
+				answer: cleared,
+				additional: { value: 'public note', encrypted: false, hash: '', encryptedPortion: '' },
+			},
+		}],
+	});
+	assert.equal(result.ok, true);
+	const job = store.get('results-analysis-auto-job-v1');
+	assert.equal(job.committedResponses[0].payload.locked, undefined);
+	assert.deepEqual(job.committedResponses[0].payload.answer, cleared);
 });
 
 

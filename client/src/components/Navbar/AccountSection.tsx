@@ -1,12 +1,18 @@
 /** @file AccountSection.tsx */
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
-import { toggleLoginModal } from '../../actions/sessionStateActions.js';
+import { changeAccount } from '../../actions/accountActions.js';
+import { toggleLoginModal, updateLoginInfo } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
 
 import styles from './Navbar.module.scss';
 
 import LoginButtonRaw from 'components/Account/LoginButton';
+import {
+  buildPasskeyWalletNetwork,
+  restorePasskeyLoginPassively,
+  type PassivePasskeyRestoreDeps,
+} from '../Account/loginAndSettingsPasskeyActions';
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -16,6 +22,8 @@ const accountLog = createLogger('account');
 
 type AccountSectionProps = {
   toggleLoginModal: (isOpen: boolean) => void;
+  changeAccount?: PassivePasskeyRestoreDeps['changeAccount'];
+  updateLoginInfo?: PassivePasskeyRestoreDeps['updateLoginInfo'];
   loginModalToggled?: boolean;
   userImageURL?: string | null;
   account?: string;
@@ -33,10 +41,46 @@ const LoginAndSettingsModal = React.lazy(() => import('../Account/LoginAndSettin
 
 class AccountSection extends Component<AccountSectionProps> {
   state = {};
+  _passkeyRestoreId = 0;
 
-  componentDidMount() {}
+  componentDidMount() {
+    void this.restorePasskeyLogin();
+  }
 
-  componentDidUpdate() {}
+  componentDidUpdate(prevProps: AccountSectionProps) {
+    // Any login activity, or the modal's own restore, supersedes a pending start-up restore.
+    if (
+      prevProps.loginComplete !== this.props.loginComplete ||
+      prevProps.loginInProgress !== this.props.loginInProgress ||
+      prevProps.loginModalToggled !== this.props.loginModalToggled
+    ) {
+      this._passkeyRestoreId += 1;
+    }
+  }
+
+  componentWillUnmount() {
+    this._passkeyRestoreId += 1;
+  }
+
+  // Regression guard: the lazy login modal stays closed on most loads, so a
+  // saved passkey account must be restored here rather than only on modal mount.
+  restorePasskeyLogin = async () => {
+    if (this.props.loginComplete || this.props.loginInProgress || this.props.loginModalToggled) return;
+    const restoreId = ++this._passkeyRestoreId;
+    try {
+      const passkeyWallet = await import('../../wallet/passkeyWallet.js');
+      if (restoreId !== this._passkeyRestoreId) return;
+      await restorePasskeyLoginPassively({
+        changeAccount: (payload) => this.props.changeAccount?.(payload),
+        getNetwork: () => buildPasskeyWalletNetwork(passkeyWallet.getPasskeyWalletChain()),
+        isCurrent: () => restoreId === this._passkeyRestoreId,
+        restoreSession: (options) => passkeyWallet.restorePasskeyWalletSession(options),
+        updateLoginInfo: (payload) => this.props.updateLoginInfo?.(payload),
+      });
+    } catch (error) {
+      accountLog.warn('Saved passkey account restore failed:', error);
+    }
+  };
 
   launchAccountSettings = () => {
     const open = true;
@@ -96,6 +140,7 @@ const mapStateToProps = (state: RootState) => ({
   loginModalToggled: state.sessionState.loginModalToggled,
   userImageURL: state.profile.userImageURL,
   loginComplete: state.sessionState.loginComplete,
+  loginInProgress: state.sessionState.loginInProgress,
 });
 
-export default connect(mapStateToProps, { toggleLoginModal })(AccountSection);
+export default connect(mapStateToProps, { toggleLoginModal, changeAccount, updateLoginInfo })(AccountSection);

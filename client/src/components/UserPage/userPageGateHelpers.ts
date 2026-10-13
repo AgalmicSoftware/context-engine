@@ -843,10 +843,13 @@ export const applyUserPageDecryptedPatchToResponseField = (
   if (!Object.prototype.hasOwnProperty.call(patchRecord, 'value')) {
     return field;
   }
+  // The reader sees the decrypted text, but the field stays marked encrypted so
+  // profile analysis and other public-only readers keep skipping it.
   const nextField: UserPageUnknownRecord = {
     ...toAnalysisRecord(field),
     value: patchRecord.value,
-    encrypted: false,
+    encrypted: true,
+    decryptedLocally: true,
   };
   if (Object.prototype.hasOwnProperty.call(patchRecord, 'zkSalt')) {
     nextField.zkSalt = patchRecord.zkSalt;

@@ -219,9 +219,11 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   let foundTitle = '';
   let foundDocURLs: string[] = [];
   if (surveyNetCache?.surveys?.[currentSurveyID]) {
-    foundTitle = surveyNetCache.surveys[currentSurveyID].title || '';
-    foundDocURLs = Array.isArray(surveyNetCache.surveys[currentSurveyID].documentURLs)
-      ? (surveyNetCache.surveys[currentSurveyID].documentURLs as string[])
+    // Uploaded metadata is untrusted; non-string values would break the header render.
+    const { documentURLs, title } = surveyNetCache.surveys[currentSurveyID];
+    foundTitle = typeof title === 'string' ? title : '';
+    foundDocURLs = Array.isArray(documentURLs)
+      ? documentURLs.filter((url): url is string => typeof url === 'string' && url.trim() !== '')
       : [];
   }
 

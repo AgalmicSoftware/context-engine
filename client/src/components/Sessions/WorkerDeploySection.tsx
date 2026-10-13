@@ -95,7 +95,10 @@ export type WorkerDeploySectionProps = {
   verifyNativeWorker?: (input: {
     sessionSlug: string;
     workerQueryValue: unknown;
+    deployedFromTemplate?: boolean;
   }) => Promise<SessionWizardVerifiedWorkerConnection>;
+  nativeTemplateSetupIdentity?: string;
+  onNativeTemplateSetupGenerated?: (identity: string) => void;
 };
 
 const WorkerDeploySection = ({
@@ -137,6 +140,8 @@ const WorkerDeploySection = ({
   displayedWorkerUrl = '',
   onNativeWorkerVerified,
   verifyNativeWorker,
+  nativeTemplateSetupIdentity = '',
+  onNativeTemplateSetupGenerated,
 }: WorkerDeploySectionProps) => {
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
     tokenHmacSecret: string;
@@ -235,6 +240,7 @@ const WorkerDeploySection = ({
     try {
       setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
       setNativeSetupSecretsIdentity(nativeSetupIdentity);
+      onNativeTemplateSetupGenerated?.(nativeSetupIdentity);
       setNativeSetupError('');
       setNativeProgress('generated');
       setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
@@ -277,6 +283,11 @@ const WorkerDeploySection = ({
       const bootstrap = await verifyNativeWorker({
         sessionSlug: nativeSessionSlug,
         workerQueryValue: candidate,
+        // Setup values generated for this slug and admin, now or before the
+        // Worker step remounted, mean the Worker comes from the template.
+        deployedFromTemplate:
+          !!currentNativeSetupSecrets ||
+          (!!nativeTemplateSetupIdentity && nativeTemplateSetupIdentity === nativeSetupIdentity),
       });
       if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
       const returnedOrigin = normalizeNativeWorkerOrigin(bootstrap.workerOrigin);
@@ -302,10 +313,13 @@ const WorkerDeploySection = ({
       if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
       setVerifiedNativeIdentity('');
       setNativeProgress('opened');
+      // Show the Worker's reason (a rejected write, a readback mismatch) so
+      // the user can tell what to fix.
+      const detail = error instanceof Error ? error.message.trim().replace(/\.$/, '') : '';
       setNativeStatus(
         error instanceof TypeError
           ? 'The Worker could not be reached, or its CORS policy rejected this browser origin. Check Cloudflare and retry.'
-          : 'Worker verification failed. Check the Worker URL and session identity, then retry.',
+          : `Worker verification failed${detail ? `: ${detail}` : ''}. Check the Worker URL and session identity, then retry.`,
       );
     }
   };
@@ -454,10 +468,8 @@ const WorkerDeploySection = ({
       )}
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
-          Sponsored deploy bundle is ready. Guided setup will use the GitHub-hosted worker bundle automatically. If a
-          retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload
-          override after a fetch failure. While customizing, you can switch between Upload file and Use URL for manual
-          testing.
+          Sponsored deploy bundle is ready. The sponsor selects the Worker release for this deployment. Manual bundle
+          URLs and uploads do not change that release. Contact the sponsor if you need a different version.
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (

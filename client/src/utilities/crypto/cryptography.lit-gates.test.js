@@ -1,20 +1,27 @@
 import { webcrypto } from 'crypto';
+import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
 import { buildSbtAccessControlConditions } from './litProtocol.js';
 
-const ACCOUNT = '0x00000000000000000000000000000000000000aa';
+// SIG_A signs as ACCOUNT. SIG_B is another wallet, so its key-wrap signature
+// fails the signer check and decrypts must use the Lit recipient.
+const SIG_A = new ethers.Wallet(`0x${'11'.repeat(32)}`);
+const SIG_B = new ethers.Wallet(`0x${'22'.repeat(32)}`);
+const ACCOUNT = SIG_A.address;
 const CHAIN_ID = 84532;
 const SURVEY_ID = `0x${'12'.repeat(32)}`;
-const SIG_A = `0x${'11'.repeat(65)}`;
-const SIG_B = `0x${'22'.repeat(65)}`;
 const GATE_A = '0x0000000000000000000000000000000000000101';
 const GATE_B = '0x0000000000000000000000000000000000000102';
 
-const makeProvider = (signatureHex) => ({
-  request: jest.fn(async ({ method }) => {
+const makeProvider = (wallet) => ({
+  request: jest.fn(async ({ method, params }) => {
     if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [ACCOUNT];
     if (method === 'eth_chainId') return '0x14a34';
-    if (method === 'eth_signTypedData_v4') return signatureHex;
+    if (method === 'eth_signTypedData_v4') {
+      const { domain, types, message } = JSON.parse(params[1]);
+      delete types.EIP712Domain;
+      return wallet._signTypedData(domain, types, message);
+    }
     throw new Error(`Unexpected wallet method: ${method}`);
   }),
 });
@@ -398,7 +405,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     const envelopeJson = await makeEnvelopeJson({ iv: 'AQIDBAUGBwg=' });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope IV must be exactly 12 bytes (got 8).',
+      'envelope iv must decode to exactly 12 bytes (got 8)',
     );
   });
 
@@ -406,7 +413,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     const envelopeJson = await makeEnvelopeJson({ ciphertext: '====' });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope ciphertext is empty after decode.',
+      'envelope ciphertext must decode to non-empty bytes',
     );
   });
 
@@ -418,7 +425,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(litEnvelope))).rejects.toThrow(
-      'Lit recipient missing ciphertext or encryptedSymmetricKey.',
+      'Unable to unwrap CEK (self and lit paths failed).',
     );
 
     const selfEnvelope = {
@@ -427,7 +434,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(selfEnvelope))).rejects.toThrow(
-      'Self-EIP712 recipient missing wrap_iv or wrapped_cek.',
+      'envelope recipient[0] self-eip712-v1 is missing wrap_iv',
     );
   });
 
@@ -468,7 +475,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     });
 
     await expect(cryptoUtils.decryptEnvelopeValue(envelopeJson)).rejects.toThrow(
-      'Envelope keccak256 commitment has invalid format.',
+      'envelope commitments.keccak256 must be 32-byte hex',
     );
   });
 });

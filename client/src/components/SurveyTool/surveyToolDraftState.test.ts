@@ -13,6 +13,7 @@ import {
   parsePersistedDraftStorageValue,
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
+  clearSurveyDraftsForAccount,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   removeQuestionFromPersistedDraftPayload,
@@ -145,7 +146,7 @@ describe('surveyToolDraftState', () => {
     });
   });
 
-  it('builds persisted draft maps by preserving previous non-rendered entries and replacing allowed ids', () => {
+  it('persists only edited fields, keeps non-rendered entries, and stores the saved baseline', () => {
     const resolvers = {
       resolveFieldEncryptionAudience: jest.fn((_field, qid, fieldKey) =>
         fieldKey === 'additional' ? `${qid}:additional` : `${qid}:answer`,
@@ -160,51 +161,65 @@ describe('surveyToolDraftState', () => {
 
     expect(
       buildPersistedDraftMapsForAllowedIds({
-        allowedQuestionIds: ['q1'],
+        allowedQuestionIds: ['q1', 'q3'],
         slice: {
-          answers: { q1: { value: '' } },
-          additionalComments: { q1: { value: '' } },
-          importance: {},
+          answers: { q1: { value: '' }, q3: { value: 'untouched' } },
+          additionalComments: { q1: { value: 'same comment' } },
+          importance: { q1: 4 },
           conviction: {},
         },
         baselineSlice: {
-          answers: { q1: { value: 'baseline answer' } },
-          additionalComments: {},
-          importance: {},
+          answers: { q1: { value: 'baseline answer' }, q3: { value: 'untouched' } },
+          additionalComments: { q1: { value: 'same comment' } },
+          importance: { q1: 4 },
           conviction: {},
         },
+        changedFieldsByQid: { q1: { answer: 1 } },
         prevAnswers: {
           q1: { value: 'stale rendered answer' },
           q2: { value: 'keep me' },
+          q3: { value: 'stale untouched snapshot' },
         },
         prevBaseline: {
           q1: { value: 'stale baseline' },
           q2: { value: 'keep baseline' },
+          q3: { value: 'stale untouched baseline' },
         },
         resolvers,
       }),
     ).toEqual({
       answersObj: {
-        q2: { value: 'keep me' },
-      },
-      baselineObj: {
+        // A cleared answer is still an edit; the unchanged comment and rating are left out.
         q1: {
-          value: 'baseline answer',
-          answerEncrypted: undefined,
+          value: '',
           answerEncryptionAudience: 'q1:answer',
           answerEncryptionGateId: 'q1:gate:answer',
           answerAudienceMode: 'explicit',
-          additional: undefined,
-          additionalEncrypted: undefined,
-          additionalEncryptionAudience: 'q1:additional',
-          additionalEncryptionGateId: 'q1:gate:add',
-          additionalAudienceMode: 'inherit',
-          importance: null,
-          conviction: null,
         },
+        q2: { value: 'keep me' },
+      },
+      baselineObj: {
+        q1: { value: 'baseline answer', additional: 'same comment', importance: 4 },
         q2: { value: 'keep baseline' },
       },
     });
+  });
+
+  it("clears one account's drafts for every session, network and scope", () => {
+    const kept = ['dg:surveyDraft:edge:84532:anon:questions', 'dg:surveyDraft:edge:84532:0xdef:questions', 'unrelated'];
+    [
+      ...kept,
+      'dg:surveyDraft:edge:84532:0xabc:questions',
+      'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
+      'dg:surveyDraft:other:84532:0xabc:questions',
+    ].forEach((key) => sessionStorage.setItem(key, '{}'));
+
+    clearSurveyDraftsForAccount('');
+    clearSurveyDraftsForAccount('anon');
+    expect(Object.keys(sessionStorage)).toHaveLength(6);
+    clearSurveyDraftsForAccount('0xABC');
+    expect(Object.keys(sessionStorage).sort()).toEqual([...kept].sort());
+    sessionStorage.clear();
   });
 
   it('round-trips interview model provenance through the anonymous draft entry', () => {
@@ -228,6 +243,7 @@ describe('surveyToolDraftState', () => {
         conviction: {},
         interviewProvenance: { q1: provenance },
       },
+      changedFieldsByQid: { q1: { answer: 1, interviewConsent: 1 } },
     });
 
     expect(answersObj.q1).toMatchObject({

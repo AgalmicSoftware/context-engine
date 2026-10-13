@@ -230,3 +230,31 @@ it('keeps the explicit Join when the parent rerenders with a fresh config object
   await waitFor(() => expect(joinTokens()).toEqual(['token-a']));
   expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
 });
+
+it('finishes a Join clicked while signed out once that sign-in completes', async () => {
+  const toggleLoginModal = jest.fn();
+  const props = panelProps({ toggleLoginModal });
+  const view = render(<WorkerSessionGroupsPanel {...props} account="" />);
+  await tick(100);
+  await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' })));
+  expect(toggleLoginModal).toHaveBeenCalledWith(true);
+  expect(getWorkerSessionToken).not.toHaveBeenCalled();
+
+  // The login modal signs the visitor in; the same panel now has an account.
+  view.rerender(<WorkerSessionGroupsPanel {...props} account={A} />);
+  await waitFor(() => expect(joinWorkerGroup).toHaveBeenCalledTimes(1));
+  await tick(80);
+  expect(joinTokens()).toEqual(['token']);
+  expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
+});
+
+it('drops a signed-out Join when the visitor signs in to a different session', async () => {
+  const props = panelProps({ toggleLoginModal: jest.fn() });
+  const view = render(<WorkerSessionGroupsPanel {...props} account="" />);
+  await tick(100);
+  await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' })));
+  const otherSession = { ...configFor(true), sessionIdHex: `0x${'55'.repeat(16)}` };
+  view.rerender(<WorkerSessionGroupsPanel {...props} sessionConfig={otherSession} account={A} />);
+  await tick(150);
+  expect(joinWorkerGroup).not.toHaveBeenCalled();
+});

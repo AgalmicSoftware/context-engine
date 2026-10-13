@@ -1,10 +1,17 @@
 import {
+  loadWorkerCanonicalQuestionMatcher,
   loadWorkerCanonicalQuestions,
   loadWorkerCanonicalSurveys,
   mergeWorkerCanonicalQuestionMetadata,
   mergeWorkerCanonicalSurveyMetadata,
+  type WorkerCanonicalMetadataEntry,
 } from './workerCanonicalMetadataHydrationPort';
+import { peekCacheSync } from '../../utilities/cache/cacheScripts';
+import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { resolveWorkerCanonicalCacheIdentity } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { mergeWorkerQuestionResponses } from '../../utilities/survey/workerResponseHydration';
+
+jest.mock('../../utilities/cache/cacheScripts', () => ({ peekCacheSync: jest.fn(() => null) }));
 
 const SESSION_ID = `0x${'2'.repeat(32)}`;
 const WORKER_URL = 'https://metadata-worker.example.test';
@@ -413,6 +420,514 @@ describe('workerCanonicalMetadataHydrationPort', () => {
     ).rejects.toThrow('worker_metadata_storage_invalid_cursor');
     expect(listSessionStorageRefsPage).toHaveBeenCalledTimes(2);
     expect(readSessionStorageBlob).not.toHaveBeenCalled();
+  });
+
+  describe('question and survey ownership', () => {
+    const ADMIN = '0x00000000000000000000000000000000000000aa';
+    const AUTHOR = '0x00000000000000000000000000000000000000bb';
+    const ATTACKER = '0x00000000000000000000000000000000000000cc';
+    const PROMPT = 'Should the pilot continue?';
+    const QUESTION_ID = String(generateQuestionId('binary', PROMPT, [], false, 99)).toLowerCase();
+    const sessionConfig = { ...buildWorkerSessionConfig(), adminAddress: ADMIN };
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+    const question = (overrides: Record<string, unknown> = {}) => ({
+      id: QUESTION_ID,
+      type: 'binary',
+      prompt: PROMPT,
+      sessionId: SESSION_ID,
+      sessionSlug: 'worker-session',
+      ...overrides,
+    });
+    const listedItem = (
+      id: string,
+      createdAt: string,
+      uploader = '',
+      resource: 'questions' | 'surveys' = 'questions',
+    ) => ({
+      storageRef: { backend: 'cloudflare', id, resource },
+      metadata: { createdAt, resource, ...(uploader ? { uploader } : {}) },
+    });
+    const loadFrom = async (
+      items: Array<Record<string, unknown>>,
+      payloads: Record<string, Record<string, unknown>>,
+      resource: 'questions' | 'surveys' = 'questions',
+    ) => {
+      const readSessionStorageBlob = jest.fn(
+        async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
+      );
+      const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+      const rows = await load(
+        { sessionConfig, sessionSlug: 'worker-session' },
+        {
+          listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+          readSessionStorageBlob,
+        },
+      );
+      return { rows, readSessionStorageBlob };
+    };
+
+    afterEach(() => {
+      (peekCacheSync as jest.Mock).mockReset();
+      (peekCacheSync as jest.Mock).mockReturnValue(null);
+    });
+
+    it('keeps the first upload of a question id when someone uploads it again later', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_attacker', '2026-10-02T00:00:00.000Z', ATTACKER),
+          listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+        ],
+        {
+          cf_official: question(),
+          cf_attacker: question({ prompt: 'ATTACKER rewrite', options: ['No', 'Yes'] }),
+        },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
+      expect(cache.worker.questions[QUESTION_ID].options).toBeUndefined();
+      expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID]).toEqual({
+        admin: false,
+        createdAtMs: Date.parse('2026-10-01T00:00:00.000Z'),
+        storageRefId: 'cf_official',
+        verified: true,
+      });
+    });
+
+    it('lets a session admin upload replace the first version', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+          listedItem('cf_admin', '2026-10-03T00:00:00.000Z', ADMIN),
+          listedItem('cf_attacker', '2026-10-04T00:00:00.000Z', ATTACKER),
+        ],
+        {
+          cf_official: question(),
+          cf_admin: question({ tags: ['moderated'] }),
+          cf_attacker: question({ prompt: 'ATTACKER rewrite' }),
+        },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID].tags).toEqual(['moderated']);
+      expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID].storageRefId).toBe('cf_admin');
+    });
+
+    it('prefers the version whose content hashes to its id over an earlier rewrite', async () => {
+      const { rows } = await loadFrom(
+        [listedItem('cf_front_run', '2026-10-01T00:00:00.000Z'), listedItem('cf_author', '2026-10-02T00:00:00.000Z')],
+        { cf_front_run: question({ prompt: 'Spoofed text under a predicted id' }), cf_author: question() },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID].prompt).toBe(PROMPT);
+      // A lone legacy question whose id used another hash input still shows.
+      const legacy = await loadFrom([listedItem('cf_legacy_poll', '2026-10-01T00:00:00.000Z')], {
+        cf_legacy_poll: question({ id: '0xlegacypoll', type: 'multichoice', options: ['A', 'B'] }),
+      });
+      const legacyCache = mergeWorkerCanonicalQuestionMetadata(null, legacy.rows, identity) as any;
+      expect(legacyCache.worker.questions['0xlegacypoll'].prompt).toBe(PROMPT);
+    });
+
+    it('never lets a locked rewrite beat an earlier plaintext question it cannot be checked against', async () => {
+      // Legacy demo question ids were hashed from other inputs, so the original
+      // fails the content check; a locked rewrite cannot be checked at all.
+      const LEGACY_ID = '0xlegacypoll';
+      const original = question({ id: LEGACY_ID, type: 'multichoice', options: ['A', 'B'] });
+      const lockedRewrite = question({
+        id: LEGACY_ID,
+        prompt: '[encrypted]',
+        promptEncrypted: { ciphertext: 'rewrite' },
+        encryption: { mode: 'lit' },
+      });
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_locked', '2026-10-02T00:00:00.000Z', ATTACKER),
+          listedItem('cf_original', '2026-10-01T00:00:00.000Z', AUTHOR),
+        ],
+        { cf_original: original, cf_locked: lockedRewrite },
+      );
+      const cache = mergeWorkerCanonicalQuestionMetadata(null, rows, identity) as any;
+      expect(cache.worker.questions[LEGACY_ID].prompt).toBe(PROMPT);
+      expect(cache.worker.workerQuestionMetadataRefs[LEGACY_ID]).toEqual(
+        expect.objectContaining({ storageRefId: 'cf_original', verified: false }),
+      );
+
+      // A cache that kept the locked rewrite because its ref said "verified" is corrected.
+      const stale = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
+      stale.worker.questions[LEGACY_ID] = { ...lockedRewrite };
+      stale.worker.workerQuestionMetadataRefs[LEGACY_ID] = {
+        admin: false,
+        createdAtMs: Date.parse('2026-10-02T00:00:00.000Z'),
+        storageRefId: 'cf_locked',
+        verified: true,
+      };
+      const originalOnly = rows.filter((row: any) => row.storageRefId === 'cf_original');
+      const corrected = mergeWorkerCanonicalQuestionMetadata(stale, originalOnly, identity) as any;
+      expect(corrected.worker.questions[LEGACY_ID].prompt).toBe(PROMPT);
+      expect(corrected.worker.questions[LEGACY_ID].encryption).toBeUndefined();
+    });
+
+    it('corrects a cache that kept a later rewrite under the old newest-wins rule', async () => {
+      const staleCache = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
+      staleCache.worker.questions[QUESTION_ID] = { ...question({ prompt: 'ATTACKER rewrite' }), voiceCredits: 1 };
+      staleCache.worker.workerQuestionMetadataRefs[QUESTION_ID] = {
+        createdAtMs: Date.parse('2026-10-02T00:00:00.000Z'),
+        storageRefId: 'cf_attacker',
+      };
+      (peekCacheSync as jest.Mock).mockReturnValue(staleCache);
+      const { rows, readSessionStorageBlob } = await loadFrom(
+        [listedItem('cf_attacker', '2026-10-02T00:00:00.000Z'), listedItem('cf_official', '2026-10-01T00:00:00.000Z')],
+        { cf_official: question(), cf_attacker: question({ prompt: 'ATTACKER rewrite' }) },
+      );
+      expect(readSessionStorageBlob.mock.calls.map(([options]: any) => options.storageRef.id)).toEqual(['cf_official']);
+      const cache = mergeWorkerCanonicalQuestionMetadata(staleCache, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID]).toEqual(expect.objectContaining({ prompt: PROMPT }));
+      expect(cache.worker.questions[QUESTION_ID].voiceCredits).toBeUndefined();
+    });
+
+    it('replaces a placeholder built from a response payload with the real question', async () => {
+      const responseCache = mergeWorkerQuestionResponses(
+        null,
+        [
+          {
+            questionId: QUESTION_ID,
+            responder: AUTHOR,
+            response: { questionID: QUESTION_ID, prompt: 'Payload headline', type: 'freeform', answer: { value: 'x' } },
+            storageRefId: 'response-ref',
+            timestamp: 10,
+          },
+        ],
+        'worker-session',
+        identity,
+      ) as any;
+      expect(responseCache.worker.questions[QUESTION_ID].source).toBe('worker-response-payload');
+
+      const { rows } = await loadFrom([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+        cf_official: question(),
+      });
+      const cache = mergeWorkerCanonicalQuestionMetadata(responseCache, rows, identity) as any;
+      const merged = cache.worker.questions[QUESTION_ID];
+      expect(merged).toEqual({ ...(rows[0] as any).payload, id: QUESTION_ID });
+      expect(merged).toEqual(expect.objectContaining({ prompt: PROMPT, type: 'binary' }));
+      expect(merged.question).toBeUndefined();
+      expect(merged.text).toBeUndefined();
+      expect(merged.source).not.toBe('worker-response-payload');
+      expect(cache.worker.questionResponses[QUESTION_ID][AUTHOR]).toEqual(
+        expect.objectContaining({ prompt: 'Payload headline' }),
+      );
+    });
+
+    it('drops ids the Worker lists as hidden, including cached copies', async () => {
+      const cached = mergeWorkerCanonicalQuestionMetadata(
+        null,
+        (await loadFrom([listedItem('cf_spam', '2026-10-01T00:00:00.000Z')], { cf_spam: question() })).rows,
+        identity,
+      ) as any;
+      expect(cached.worker.questions[QUESTION_ID]).toBeDefined();
+      const { rows, readSessionStorageBlob } = await loadFrom(
+        [
+          { hidden: true, metadata: { resource: 'questions', resourceId: QUESTION_ID, hidden: true } },
+          listedItem('cf_unmarked_copy', '2026-10-05T00:00:00.000Z'),
+        ],
+        { cf_unmarked_copy: question() },
+      );
+      expect(rows).toEqual([{ hidden: true, id: QUESTION_ID }]);
+      expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
+      const cache = mergeWorkerCanonicalQuestionMetadata(cached, rows, identity) as any;
+      expect(cache.worker.questions[QUESTION_ID]).toBeUndefined();
+      expect(cache.worker.workerQuestionMetadataRefs[QUESTION_ID]).toBeUndefined();
+    });
+
+    it('skips survey rows whose title is not text', async () => {
+      const survey = (title: unknown) => ({
+        surveyID: '0xsurvey',
+        title,
+        sessionId: SESSION_ID,
+        sessionSlug: 'worker-session',
+      });
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_object_title', '2026-10-01T00:00:00.000Z', '', 'surveys'),
+          listedItem('cf_text_title', '2026-10-02T00:00:00.000Z', '', 'surveys'),
+        ],
+        { cf_object_title: survey({ text: 'crash' }), cf_text_title: survey('Readable survey') },
+        'surveys',
+      );
+      expect(
+        rows.map((row: WorkerCanonicalMetadataEntry) => ('storageRefId' in row ? row.storageRefId : row.id)),
+      ).toEqual(['cf_text_title']);
+      const cache = mergeWorkerCanonicalSurveyMetadata(null, rows, identity) as any;
+      expect(cache.worker.surveys['0xsurvey'].title).toBe('Readable survey');
+    });
+
+    it('rereads only storage refs the cache does not already hold, through a rolling pool', async () => {
+      const items = Array.from({ length: 20 }, (_, index) =>
+        listedItem(`cf_q_${index}`, `2026-10-01T00:00:${String(index).padStart(2, '0')}.000Z`),
+      );
+      const cachedCache = mergeWorkerCanonicalQuestionMetadata(null, [], identity) as any;
+      cachedCache.worker.questions['0xq0'] = question({ id: '0xq0' });
+      cachedCache.worker.workerQuestionMetadataRefs['0xq0'] = { createdAtMs: 1, storageRefId: 'cf_q_0' };
+      cachedCache.worker.workerQuestionMetadataRefs['0xorphan'] = { createdAtMs: 1, storageRefId: 'cf_q_1' };
+      (peekCacheSync as jest.Mock).mockReturnValue(cachedCache);
+
+      let active = 0;
+      let maxActive = 0;
+      let releaseSlowRead: () => void = () => {};
+      const slowRead = new Promise<void>((resolve) => {
+        releaseSlowRead = resolve;
+      });
+      const started: string[] = [];
+      const readSessionStorageBlob = jest.fn(async ({ storageRef }: any) => {
+        started.push(storageRef.id);
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        if (storageRef.id === 'cf_q_2') await slowRead;
+        else await new Promise((resolve) => setTimeout(resolve, 0));
+        if (started.length === 18) releaseSlowRead();
+        active -= 1;
+        const index = Number(storageRef.id.split('_').pop());
+        return { json: async () => question({ id: `0xq${index}`, prompt: `Question ${index}` }) } as Response;
+      });
+
+      const rows = await loadWorkerCanonicalQuestions(
+        { sessionConfig, sessionSlug: 'worker-session' },
+        {
+          listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+          readSessionStorageBlob,
+        },
+      );
+      expect(peekCacheSync).toHaveBeenCalledWith('questionsCache', 'worker-session', { clone: false });
+      // cf_q_0 is cached; cf_q_1's ref has no cached question, so it is read.
+      expect(started).toHaveLength(19);
+      expect(started).not.toContain('cf_q_0');
+      // One slow read did not hold back the rest: later reads started first.
+      expect(started.indexOf('cf_q_19')).toBeGreaterThan(-1);
+      expect(maxActive).toBeLessThanOrEqual(8);
+      expect(rows).toHaveLength(19);
+    });
+
+    it('drops a stored row with non-text fields instead of failing the whole load', async () => {
+      // JSON can carry an object whose text conversion throws.
+      const hostile = () => JSON.parse('{"toString":1}');
+      const otherId = String(generateQuestionId('binary', 'Other question', [], false, 99)).toLowerCase();
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+          listedItem('cf_bad_slug', '2026-10-01T00:00:01.000Z', ATTACKER),
+          listedItem('cf_bad_session', '2026-10-01T00:00:02.000Z', ATTACKER),
+          listedItem('cf_bad_id', '2026-10-01T00:00:03.000Z', ATTACKER),
+          listedItem('cf_bad_prompt', '2026-10-01T00:00:04.000Z', ATTACKER),
+          listedItem('cf_object_type', '2026-10-01T00:00:05.000Z', ATTACKER),
+        ],
+        {
+          cf_official: question(),
+          cf_bad_slug: question({ id: otherId, sessionSlug: hostile() }),
+          cf_bad_session: question({ id: otherId, sessionId: hostile() }),
+          cf_bad_id: question({ id: hostile() }),
+          // A prompt or type that is not text crashes question cards, so the row is no question.
+          cf_bad_prompt: question({ id: otherId, prompt: hostile() }),
+          cf_object_type: question({ id: otherId, type: { kind: 'binary' } }),
+        },
+      );
+      // A non-text session id counts as missing, as in legacy payloads, and the
+      // row takes this session's own id; the other bad rows are dropped.
+      expect(rows.map((row: any) => row.storageRefId)).toEqual(['cf_official', 'cf_bad_session']);
+      expect((rows[1] as any).payload.sessionId).toBe(SESSION_ID);
+
+      const surveys = await loadFrom(
+        [
+          listedItem('cf_survey', '2026-10-01T00:00:00.000Z', AUTHOR, 'surveys'),
+          listedItem('cf_bad_survey', '2026-10-01T00:00:01.000Z', ATTACKER, 'surveys'),
+        ],
+        {
+          cf_survey: { surveyID: '0xsurvey', title: 'Survey', sessionId: SESSION_ID, sessionSlug: 'worker-session' },
+          cf_bad_survey: { surveyID: hostile(), title: 'Survey', sessionId: SESSION_ID, sessionSlug: 'worker-session' },
+        },
+        'surveys',
+      );
+      expect(surveys.rows.map((row: any) => row.storageRefId)).toEqual(['cf_survey']);
+    });
+
+    it('marks rows from a listed session admin uploader', async () => {
+      const { rows } = await loadFrom(
+        [
+          listedItem('cf_admin', '2026-10-01T00:00:00.000Z', ADMIN),
+          listedItem('cf_author', '2026-10-01T00:00:01.000Z', AUTHOR),
+        ],
+        { cf_admin: question({ id: '0xadminq' }), cf_author: question() },
+      );
+      expect(rows.map((row: any) => [row.storageRefId, row.uploaderIsAdmin === true])).toEqual([
+        ['cf_admin', true],
+        ['cf_author', false],
+      ]);
+    });
+
+    it("prefers the Worker's own admin flag over the session config admin list", async () => {
+      const flagged = (item: ReturnType<typeof listedItem>, uploaderIsAdmin: boolean) => ({
+        ...item,
+        metadata: { ...item.metadata, uploaderIsAdmin },
+      });
+      const { rows } = await loadFrom(
+        [
+          // A Worker role admin who is not named in the public session config.
+          flagged(listedItem('cf_role_admin', '2026-10-01T00:00:00.000Z', AUTHOR), true),
+          // A config-listed address the Worker no longer treats as an admin.
+          flagged(listedItem('cf_former_admin', '2026-10-01T00:00:01.000Z', ADMIN), false),
+          // Older Workers send no flag, so the config list still decides.
+          listedItem('cf_config_admin', '2026-10-01T00:00:02.000Z', ADMIN),
+        ],
+        {
+          cf_role_admin: question({ id: '0xrole' }),
+          cf_former_admin: question({ id: '0xformer' }),
+          cf_config_admin: question({ id: '0xconfig' }),
+        },
+      );
+      expect(rows.map((row: any) => [row.storageRefId, row.uploaderIsAdmin === true])).toEqual([
+        ['cf_role_admin', true],
+        ['cf_former_admin', false],
+        ['cf_config_admin', true],
+      ]);
+    });
+
+    describe('published question matcher', () => {
+      const loadMatcher = (items: Array<Record<string, unknown>>, payloads: Record<string, Record<string, unknown>>) =>
+        loadWorkerCanonicalQuestionMatcher(
+          { sessionConfig, sessionSlug: 'worker-session' },
+          {
+            listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
+            readSessionStorageBlob: jest.fn(
+              async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
+            ),
+          },
+        );
+
+      it('matches only when the question readers see has the same content', async () => {
+        const matches = await loadMatcher([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_official: question(),
+        });
+        expect(matches(question({ tags: ['local tag'] }))).toBe(true);
+        // A local edit that kept the old id, a locked copy, and an unknown id never match.
+        expect(matches(question({ prompt: 'Edited prompt' }))).toBe(false);
+        expect(matches(question({ prompt: '[encrypted]', promptEncrypted: { ciphertext: 'x' } }))).toBe(false);
+        const otherId = String(generateQuestionId('binary', 'Another question', [], false, 99)).toLowerCase();
+        expect(matches(question({ id: otherId, prompt: 'Another question' }))).toBe(false);
+      });
+
+      it('does not match an id another author filled with different content', async () => {
+        const squatted = await loadMatcher([listedItem('cf_squat', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_squat: question({ prompt: 'Spoofed text under a predicted id' }),
+        });
+        expect(squatted(question())).toBe(false);
+
+        const locked = await loadMatcher([listedItem('cf_locked', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_locked: question({ prompt: '[encrypted]', promptEncrypted: { ciphertext: 'x' } }),
+        });
+        expect(locked(question())).toBe(false);
+
+        const hidden = await loadMatcher(
+          [
+            { hidden: true, metadata: { resource: 'questions', resourceId: QUESTION_ID, hidden: true } },
+            listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR),
+          ],
+          { cf_official: question() },
+        );
+        expect(hidden(question())).toBe(false);
+      });
+
+      it('ignores a placeholder question built from a response payload', async () => {
+        // An attacker owns the id with a row readers drop (another session), then
+        // answers it with the predicted prompt, so responses alone describe it.
+        const responseCache = mergeWorkerQuestionResponses(
+          null,
+          [
+            {
+              questionId: QUESTION_ID,
+              responder: ATTACKER,
+              response: { questionID: QUESTION_ID, prompt: PROMPT, type: 'binary', answer: { value: 'yes' } },
+              storageRefId: 'cf_response',
+              timestamp: 1,
+            },
+          ],
+          'worker-session',
+          identity,
+        ) as any;
+        expect(responseCache.worker.questions[QUESTION_ID].source).toBe('worker-response-payload');
+        (peekCacheSync as jest.Mock).mockReturnValue(responseCache);
+
+        const matches = await loadMatcher([listedItem('cf_squat', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_squat: question({ sessionSlug: 'elsewhere' }),
+        });
+        expect(matches(question())).toBe(false);
+      });
+
+      it('needs the exact authoring inputs, not only the same id hash', async () => {
+        const variants: Array<Record<string, unknown>> = [
+          { prompt: `  ${PROMPT.toUpperCase()}  ` },
+          { options: ['Yes, obviously', 'No'] },
+          { singleSelect: true },
+          { voiceCredits: 5 },
+        ];
+        for (const variant of variants) {
+          const matches = await loadMatcher([listedItem('cf_variant', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+            cf_variant: question(variant),
+          });
+          expect(matches(question())).toBe(false);
+        }
+
+        // Multichoice options are joined with commas in the hash, so a re-split
+        // list shares the id but is a different question.
+        const MULTI_PROMPT = 'Which budget?';
+        const realOptions = ['$1,000', '$2,000'];
+        const splitOptions = ['$1', '000', '$2', '000'];
+        const multiId = String(generateQuestionId('multichoice', MULTI_PROMPT, realOptions, false, 99)).toLowerCase();
+        expect(String(generateQuestionId('multichoice', MULTI_PROMPT, splitOptions, false, 99)).toLowerCase()).toBe(
+          multiId,
+        );
+        const multi = (options: string[]) =>
+          question({ id: multiId, type: 'multichoice', prompt: MULTI_PROMPT, options });
+        const resplit = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', ATTACKER)], {
+          cf_multi: multi(splitOptions),
+        });
+        expect(resplit(multi(realOptions))).toBe(false);
+        const same = await loadMatcher([listedItem('cf_multi', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_multi: multi(realOptions),
+        });
+        expect(same(multi(realOptions))).toBe(true);
+      });
+
+      it('ignores surrounding spaces and voice credits written as text, but not case', async () => {
+        const QUAD_PROMPT = 'Spend credits';
+        const quadId = String(generateQuestionId('quadratic', QUAD_PROMPT, ['A', 'B'], false, 120)).toLowerCase();
+        const quadratic = (overrides: Record<string, unknown> = {}) =>
+          question({
+            id: quadId,
+            type: 'quadratic',
+            prompt: QUAD_PROMPT,
+            options: ['A', 'B'],
+            voiceCredits: 120,
+            ...overrides,
+          });
+        // The id hash trims the prompt and options, so these are the same question.
+        const stored = await loadMatcher([listedItem('cf_quad', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_quad: quadratic({ prompt: ` ${QUAD_PROMPT} `, options: ['A ', ' B'], voiceCredits: '120' }),
+        });
+        expect(stored(quadratic())).toBe(true);
+        // Case is kept: readers would see different text.
+        expect(stored(quadratic({ prompt: QUAD_PROMPT.toUpperCase() }))).toBe(false);
+        expect(stored(quadratic({ options: ['a', 'B'] }))).toBe(false);
+      });
+
+      it('uses the cached copy of a version it does not read again', async () => {
+        const cached = mergeWorkerCanonicalQuestionMetadata(
+          null,
+          (await loadFrom([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], { cf_official: question() }))
+            .rows,
+          identity,
+        );
+        (peekCacheSync as jest.Mock).mockReturnValue(cached);
+
+        const matches = await loadMatcher([listedItem('cf_official', '2026-10-01T00:00:00.000Z', AUTHOR)], {});
+        expect(matches(question())).toBe(true);
+      });
+    });
   });
 
   it('replaces same-slug question and survey caches when the exact Worker authority changes', () => {

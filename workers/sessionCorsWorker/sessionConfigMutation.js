@@ -62,6 +62,8 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'embeddedDeployHelperEnabled',
   'litCredentials',
   'resultsAnalysis',
+  'responseFieldEncryption',
+  'linkedWorkerGroups',
   WORKER_GROUPS_BOOTSTRAP_KEY,
 ]);
 
@@ -198,6 +200,19 @@ const normalizeConfigRevision = (value) => {
   return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : '';
 };
 
+// A Worker URL names its origin: a trailing slash, letter case or the default
+// port does not move the session to another Worker. Any other path stays
+// part of the identity.
+const normalizeWorkerUrlIdentity = (value) => {
+  const raw = toTrimmedString(value);
+  try {
+    const url = new URL(raw);
+    return url.pathname === '/' && !url.search && !url.hash ? url.origin : url.href;
+  } catch {
+    return raw;
+  }
+};
+
 const changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
   if (getWorkerAuthorityMode(existingConfig) !== 'worker_canonical') return false;
   if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return true;
@@ -207,9 +222,9 @@ const changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfi
   if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
   if (existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value) return true;
 
-  return ['slug', 'corsWorkerUrl'].some((key) => {
-    const existingValue = toTrimmedString(existingConfig?.[key]);
-    return !!existingValue && toTrimmedString(mergedConfig?.[key]) !== existingValue;
+  return [['slug', toTrimmedString], ['corsWorkerUrl', normalizeWorkerUrlIdentity]].some(([key, normalize]) => {
+    const existingValue = normalize(existingConfig?.[key]);
+    return !!existingValue && normalize(mergedConfig?.[key]) !== existingValue;
   });
 };
 

@@ -50,6 +50,7 @@ const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage, _pathname?:
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn((_props?: any) => null);
+const mockInstallCeAgent = jest.fn();
 let MockAppShellComponent: React.ComponentType<any> = () => null;
 let routeProps: any[] = [];
 let mockWalletConnectFallbackEnabled = false;
@@ -113,10 +114,9 @@ const mockAppDependencies = () => {
     },
   }));
   jest.doMock('../variables/appConfig.js', () => ({
-    SERVER: 'http://localhost',
     CE_ENABLE_WALLETCONNECT_FALLBACK: mockWalletConnectFallbackEnabled,
   }));
-  jest.doMock('../utilities/ceAgent.js', () => ({ installCeAgent: jest.fn() }));
+  jest.doMock('../utilities/ceAgent.js', () => ({ installCeAgent: mockInstallCeAgent }));
   jest.doMock('../utilities/logging', () => ({
     createLogger: () => ({
       log: jest.fn(),
@@ -161,13 +161,6 @@ const mockAppDependencies = () => {
     createClient: mockCreateClient,
     createStorage: jest.fn(({ storage }: { storage: unknown }) => ({ storage })),
     WagmiConfig: ({ children }: { children: React.ReactNode }) => children,
-  }));
-  jest.doMock('@wagmi/core', () => ({
-    noopStorage: {
-      getItem: jest.fn(() => null),
-      setItem: jest.fn(),
-      removeItem: jest.fn(),
-    },
   }));
   jest.doMock('wagmi/connectors/metaMask', () => ({
     MetaMaskConnector: mockMetaMaskConnector,
@@ -386,6 +379,27 @@ describe('App wagmi auto-connect persistence', () => {
         },
       }),
     );
+  });
+
+  it('loads the dev agent outside production builds only', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const mountApp = async (nodeEnv: string) => {
+      (process.env as Record<string, string | undefined>).NODE_ENV = nodeEnv;
+      const { default: App } = loadAppModule();
+      render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
+      await act(async () => undefined);
+      cleanup();
+    };
+
+    try {
+      await mountApp('production');
+      expect(mockInstallCeAgent).not.toHaveBeenCalled();
+
+      await mountApp('test');
+      expect(mockInstallCeAgent).toHaveBeenCalledTimes(1);
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
+    }
   });
 
   it('syncs the public page head on mount', () => {

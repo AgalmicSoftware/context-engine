@@ -1,6 +1,5 @@
 import {
   getRatingFillPercent,
-  hasRatingScaleMetadata,
   normalizeRatingScale,
   normalizeRatingValue,
   RATING_MAX,
@@ -39,16 +38,12 @@ describe('ratingValue', () => {
     expect(getRatingFillPercent(5.5, scale.min, scale)).toBe(50);
   });
 
-  it('matches catalog scale presence for aliases and label-only metadata', () => {
-    expect(hasRatingScaleMetadata({})).toBe(false);
-    expect(hasRatingScaleMetadata({ scale: {}, ratingScale: {} })).toBe(false);
-
+  it('reads label-only metadata from an aliased scale record', () => {
     const aliasedScale = {
       scale: {},
       ratingScale: { lowLabel: 'Strongly oppose', highLabel: 'Strongly support' },
     };
 
-    expect(hasRatingScaleMetadata(aliasedScale)).toBe(true);
     expect(normalizeRatingScale(aliasedScale)).toEqual({
       min: 0,
       max: 10,
@@ -58,7 +53,6 @@ describe('ratingValue', () => {
   });
 
   it('normalizes invalid explicit scale ranges to the default scale', () => {
-    expect(hasRatingScaleMetadata({ scale: { min: 10, max: 1 } })).toBe(true);
     expect(normalizeRatingScale({ scale: { min: 10, max: 1, minLabel: 'High', maxLabel: 'Low' } })).toEqual({
       min: 0,
       max: 10,

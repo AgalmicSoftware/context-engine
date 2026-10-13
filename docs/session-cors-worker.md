@@ -316,6 +316,84 @@ deleted speculatively.
   - `POST /admin/origins` with the same bearer token and JSON `{ "origins": ["https://example.com"] }` stores the normalized allowlist in `DEPLOY_HELPER_KV`.
   - Posting an empty `origins` array clears the KV override, so the helper falls back to `env.ALLOWED_ORIGINS` or the localhost default.
 
+### Sponsored deploy release
+
+From 0.6.8, a sponsoring session Worker's own code pins every grant-backed
+deploy to the release recorded on that Worker, never code chosen by the person
+who redeems the grant. The pinning is in the Worker's code, not in its
+settings: a sponsoring Worker running code older than 0.6.8 still deploys
+whatever bundle the redeemer sends, whether or not the variables below are
+set. The first-party wizard sends its own build's release with each grant (the
+Worker bundle URL and manifest, plus the Agent Bridge pair for Agents HTTP
+sessions), never an uploaded file or a manual bundle URL. Older sponsoring
+Workers deploy that release; 0.6.8 or later code ignores it. Before issuing
+deploy grants from such a Worker, update it to 0.6.8 or
+later code: replace only its code with a 0.6.8 or later release's
+`sessionCorsWorker.bundle.js` and keep its bindings, variables and secrets.
+The deploy helper cannot do this, because it only creates new Workers
+(in-place redeploy is disabled; see [Self-deploy](#self-deploy)).
+
+The Worker keeps its release in four plain-text variables, where `<release>`
+is
+`https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-<commit>`:
+
+| Variable                           | Value                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| `WORKER_BUNDLE_URL`                | `<release>/sessionCorsWorker.bundle.js`                                    |
+| `WORKER_BUNDLE_MANIFEST_URL`       | `<release>/worker-release-manifest.json`                                   |
+| `AGENT_BRIDGE_BUNDLE_URL`          | `<release>/agentBridgeWorker.bundle.js` (to sponsor Agents HTTP sessions)  |
+| `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` | `<release>/worker-release-manifest.json` (to sponsor Agents HTTP sessions) |
+
+Each sponsored deploy downloads the manifest and bundles again and stops if a
+bundle's SHA-256 differs from the digest the manifest lists.
+
+The 0.6.8 or later deploy helper records these variables on each new session
+Worker it deploys:
+
+- The helper sets `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` only
+  when it downloaded the Worker bundle from a URL and the bundle matched its
+  release manifest. An uploaded bundle file (`bundleText`), or a bundle URL
+  without a manifest, records nothing.
+- It sets the Agent Bridge pair only when the new session enables Agents HTTP
+  and the bridge bundle matched its manifest. The helper checks that bundle
+  before it uploads the session Worker: a first attempt stops before creating
+  the session's KV namespace or Worker, and a retry that already staged
+  resources stays pending.
+- The recorded URLs are the ones that deploy used. A release named in the
+  deploy request takes precedence over the helper's own `WORKER_BUNDLE_URL`
+  and `WORKER_BUNDLE_MANIFEST_URL` defaults. A sponsored deploy always uses
+  the sponsoring Worker's variables, so each new Worker records its sponsor's
+  release.
+- The helper writes these variables only into the upload of a Worker it is
+  creating. It never changes an existing Worker, so values set by hand stay
+  as they are.
+- Recording does not change the code a Worker runs. The variables pin grant
+  deploys only once the Worker runs 0.6.8 or later code. Local and self-hosted
+  client builds deploy the release pinned in
+  `client/src/variables/workerReleasePin.json` by default, which can be older
+  (see [Release bundle](#release-bundle)).
+
+A Worker running 0.6.8 or later code can still lack the variables: it was
+deployed by an older deploy helper, from an uploaded bundle file, or from a
+bundle URL without a manifest. It also records the Agent Bridge pair only when
+its own session enabled Agents HTTP at deploy time. Such a Worker refuses
+grant deploys with `400` before using the grant, and refuses Agents HTTP grant
+deploys the same way without the bridge pair, until you set the missing
+variables once:
+
+1. Choose the release new sessions should run, usually the
+   `worker-bundles-<commit>` release the sponsoring Worker itself runs. Check
+   it with `CE_RELEASE_COMMIT=<commit> npm run verify:release-assets`. Its
+   GitHub release page
+   `https://github.com/AgalmicSoftware/context-engine/releases/tag/worker-bundles-<commit>`
+   lists the assets.
+2. In the Cloudflare dashboard, open the sponsoring Worker's **Settings** >
+   **Variables and Secrets**, add `WORKER_BUNDLE_URL` and
+   `WORKER_BUNDLE_MANIFEST_URL` as **Text** variables with the values above,
+   and deploy. If you sponsor sessions that enable Agents HTTP, add the Agent
+   Bridge pair too; both manifest variables use the same
+   `worker-release-manifest.json`, which lists both bundles.
+
 ## Sponsored bundle flow (`/sponsor` -> `/new?sponsored=<txId>` + separate key handoff)
 
 - `/sponsor` is a dedicated paste-first UI for creating sponsored-session handoffs; it does not read back worker KV secrets.
@@ -353,21 +431,37 @@ deleted speculatively.
 - When the wizard opens with `sponsored`, it asks for the separately delivered key, downloads the envelope, validates `type` / `version` / `encryptedData`, decrypts client-side, rejects expired bundles, forces worker-secret mode back on, disables local secret persistence for that navigation, and auto-applies the supported sponsored fields.
 - Decrypted bundles, decryption keys, and bootstrap funding grants are memory-only. Startup and bundle reads purge legacy sponsored-bundle ciphertext/sessionStorage entries and the former IndexedDB key database. Reloading the page therefore requires the key again.
 - While a sponsored bundle is active in normal mode, the dedicated Worker step is hidden and the flow jumps straight from Privacy to Deploy Session.
-- Advanced mode still keeps the bundle-source controls visible for sponsored flows, so admins can switch between the default bundle URL and a manual Upload file override while testing.
+- Advanced mode may show bundle-source controls for manual deployments. Grant-backed sponsored deployments ignore those controls and use the release pinned on the sponsoring Worker; ask the sponsor to update that release when different code is needed.
 - Sponsored links only switch Publish into the streamlined "auto-deploy on Publish" worker path when the applied bundle is actually deploy-ready:
   - supported sponsored bundle is active,
   - worker secrets mode is still enabled,
   - a worker name has been generated from the current session name,
-  - worker bundle URL resolves,
   - and grant-backed deploy fields are present (`deployGrantToken` plus `bootstrapWorkerUrl` / source worker URL),
   - and `getMissingWorkerSecretsForDeploy(...)` is empty for the current session config.
 - Sponsored deploy grants now keep only the Cloudflare API token plus the source worker bootstrap context on the sponsoring worker; the encrypted bundle itself carries only the resulting `deployGrantToken` and bootstrap worker URL. Grants do not snapshot account ID or a standalone helper URL.
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
+  - A grant lends the sponsor's Cloudflare token, not a code upload. The
+    sponsoring Worker ignores the redeemer's `bundleText`, `bundleUrl`,
+    `bundleSha256`, `bundleManifestUrl`, `deploymentKind` and agent-bridge
+    bundle fields, and deploys only the release recorded on it: the
+    `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` plain-text vars, plus
+    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when the
+    new session enables the Agents HTTP surface. The manifest pins the bundle
+    digest. Without these vars the route returns `400` before the grant is used.
+    This pinning is the sponsoring Worker's own code from 0.6.8; a sponsoring
+    Worker running older code still deploys the redeemer's bundle, so update
+    it first. The first-party wizard sends its configured release for such
+    Workers and never an uploaded file or manual bundle URL. An older Worker
+    with no bundle to deploy deploys nothing but keeps the grant reserved for
+    that exact request, so the wizard says to retry the same draft once the
+    sponsor sets `WORKER_BUNDLE_URL`, or to ask for a new grant if the sponsor
+    updates its Worker code, which then returns `409` for that grant.
+    See [Sponsored deploy release](#sponsored-deploy-release) for
+    how the vars are recorded and how to set missing ones.
   - In that deploy-ready state, Publish deploys the worker first. A
     worker-canonical profile then persists and verifies Worker KV config; a
     decentralized profile keeps the existing metadata upload and on-chain
-    registration steps. Both paths default to the hosted GitHub release asset
-    URL.
+    registration steps.
 - `POST /sponsored/redeem-faucet` accepts the one-time `faucetGrantToken` plus
   a recipient address, validates the grant and the source session's CORS
   policy, and reserves the transfer in `SessionWriteCoordinator` before calling
@@ -378,8 +472,8 @@ deleted speculatively.
   remains pending and the action is not repeated; inspect the first attempt and
   issue a new grant instead of retrying the same bearer.
 
-- The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
-  - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
+- The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding. Workers from the native Cloudflare template run with `DEPLOY_HELPER_ENABLED` set to `"0"`; when setup values were generated for the session slug and admin it verifies, the wizard records the Worker with `embeddedDeployHelperEnabled: false`. It keeps a non-secret marker of that generation across step changes and reloads, and an attached Worker without generated setup values keeps the draft's setting.
+  - If the hosted release-asset fetch fails, the normal-mode worker step keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override. Grant-backed sponsored deploys send this build's configured release, never the manual bundle URL or an uploaded file; a sponsoring Worker running 0.6.8 or later ignores it and deploys its own configured release.
   - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
   - Scoped Chipotle identifiers and `litUsageApiKey` already flow through the worker-mediated Lit execution path.
@@ -580,12 +674,36 @@ Admin test panel:
   Legacy configurations without a group policy retain their previous behavior.
   Older artifacts with truncated membership citations may need regeneration to
   show a group above the former 16-citation limit.
-- Canonical generated-analysis input validates readable answers against the full
-  stored question before counting them: rating bounds, exact choice options and
-  selection limits, and signed quadratic allocations within the question budget.
-  Invalid answers are excluded even when accompanied by a comment; genuinely
-  unanswered comment-only rows remain supported. This does not change opaque
-  storage admission or the historical admin-snapshot format.
+- Generated-analysis input validates readable answers to the current question
+  types (binary, rating, multiple choice, quadratic, freeform) against the full
+  question before counting them: rating bounds, exact choice options and
+  selection limits, and signed quadratic allocations within the question
+  budget, which reach the model with option labels. This applies to canonical
+  input and admin snapshots alike; admin snapshots keep answers to older types,
+  such as polls, as text. Invalid answers are excluded even when accompanied by
+  a comment; genuinely unanswered comment-only rows remain supported. This does
+  not change opaque storage admission or the historical admin-snapshot format.
+- Only each participant's latest readable row per question is analysed,
+  ordered by Worker time and then storage id, as the client orders them. A
+  newer answer that is locked field by field, cleared, or invalid therefore
+  withdraws an older public one, and superseded rows are not counted as
+  excluded or locked. Rows whose whole payload is encrypted, or that were
+  stored for a different audience than the session's current one, are set
+  aside before this step: they do not withdraw an older public answer, and
+  each counts as excluded (whole-payload encrypted rows also as locked) even
+  when a newer row replaced it. Current clients never write either kind into a
+  public session. Canonical questions are keyed by the id the upload route
+  checked for ownership.
+- Only encryption flags and envelopes lock an answer or comment. Public text
+  such as "Locked", "Redacted", or "***" is analysed like any other answer; a
+  `*` or `[encrypted]` mask without its encryption flag reads as no answer. An
+  answer or comment flagged `encrypted: true` but blank and without an
+  envelope, as clients up to 0.6.7 uploaded a cleared locked field, reads as
+  cleared: it is not counted as locked, does not fail an admin snapshot, and
+  as the latest row still withdraws an older public answer.
+- Importance and conviction follow the client's stored-rating rule: unrated
+  values are omitted rather than published as `0`, and interview ratings saved
+  on the old 0-100 scale are read on the 0-10 scale.
 - The Worker source snapshot keeps the full submitted-response counts distinct
   from the bounded AI input counts. The AI input keeps rating endpoint metadata
   (`scale.min`/`max` and endpoint labels) and quadratic `voiceCredits`, then
@@ -641,6 +759,37 @@ Authenticated clients can use the worker as the session storage boundary:
     rewrite stored data or revoke plaintext already downloaded. Aggregate-only
     visibility does not authorize raw reads to compute a client-side summary;
     a combined summary needs an authorized server-generated aggregate.
+  - For `questions` and `surveys`, the Worker records the authenticated
+    uploader as `uploader` and the payload id as `resourceId` in the index
+    metadata, and keeps a first-writer record per session, resource, and id.
+    Uploading an id that already exists returns `409` with
+    `reason: "storage_resource_id_owned"` unless the uploader is that id's
+    first author or a current session admin. Because KV is eventually
+    consistent, readers pick one canonical version per id using a session
+    admin's newest upload, otherwise the earliest upload. Client hydration also
+    prefers a plaintext non-admin question whose generated hash matches its id
+    over a mismatching plaintext version. The Worker interview catalog and
+    results analysis use the admin/age rule. Uploads stored before this release have no
+    uploader, so they never count as admin uploads, and their ids have no
+    first-writer record. When a non-admin uploads a question or survey id
+    that has no owner record, the session coordinator checks whether that id
+    was stored before this release. It scans the resource's index in steps
+    of 200 rows, keeping its progress and the ids it finds, so the scan
+    finishes however large the session is; a step reads at most about 400 KV
+    keys and writes none. Each such id is admin-only: only a session admin can
+    upload it again (`409`, `reason: "storage_resource_id_owned"`). An upload
+    runs up to four steps; while a larger session is still being scanned, an
+    upload of a new id returns `503` ("Existing questions and surveys are
+    still being indexed; retry shortly."). If reading a stored payload fails,
+    the step fails with `503` ("Recording the owners of existing questions
+    and surveys failed; retry.") and the next upload repeats it from the same
+    place, so a passing storage error never leaves an id open. Rows whose
+    payload is gone, or that the Worker cannot read by design
+    (client-encrypted, undecryptable, or not JSON), are skipped and counted
+    in the coordinator's scan record. KV lists can lag recent writes by up to
+    about a minute, so a row the previous release stored just before the
+    scan read that part of the index may be missed. New ids stay open to
+    anyone.
   - JSON and multipart uploads share per-upload policy validation. Group IDs
     accept `groupIds`, `groups`, `groupId`, or `workerGroupId`, in that order
     of precedence, using the first nonempty list. Multipart `groupIds` and
@@ -670,6 +819,24 @@ Authenticated clients can use the worker as the session storage boundary:
     behind another supplied policy. Omitted, null, or blank optional policies
     retain the existing fallback behavior.
   - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
+  - Questions, surveys, and responses are small JSON records that every
+    reader downloads, so they also have tighter caps: 128 KiB per question,
+    256 KiB per survey, and 2 MiB per response upload, with at most 96 KiB per
+    answer as stored. A survey submission bundles its answers in a `responses`
+    list, and each bundled answer has the same 96 KiB cap. Locking a field
+    pads, base64-encodes and wraps it, so clients keep an answer's text plus
+    its comment within 48 KiB (49,152 bytes, counting each as a JSON string in
+    UTF-8); that stays under the cap even with answer, comment and ratings
+    locked. Oversized uploads return
+    `413`. These records must be JSON objects with a basic shape, or the
+    upload returns `400`: a question needs a string `id` (or `questionId` /
+    `questionID`) of up to 128 `a-z`, `0-9`, `.`, `_`, `:`, or `-`
+    characters and a string `type`, with a text `prompt` and a list of
+    `options` when present; a survey needs a string `surveyID` (or `id`) and a
+    string `title`, with `questionIDs` as a list of strings when present; each
+    answer needs a `questionID`. Client-encrypted (`payloadEncrypted=true`)
+    responses are only size-checked; questions and surveys must be plaintext
+    JSON so the Worker can check their ids.
   - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
     encoding: the serialized value must be at most 24 MiB, leaving 1 MiB below
@@ -678,7 +845,16 @@ Authenticated clients can use the worker as the session storage boundary:
     Raising `CE_MAX_UPLOAD_BYTES` cannot raise this KV ceiling; use R2 for
     larger payloads.
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. For R2 bytes, the matching KV index row is authoritative for per-item authorization metadata, and the session's `storageProfile.payloadAccessControl` must also pass; R2 custom metadata is only a locator and is never an access-policy fallback. The worker validates the row's id/resource and authorizes it before consuming object body methods. A missing index binding returns `501`, a cleanly absent row returns `404`, and an unreadable, malformed, or mismatched row returns `503` without returning payload bytes. Public-read sessions may be served anonymously only when both the session policy and any additional per-item restrictions allow it; gated sessions require authenticated route preflight. Successful reads return the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
-- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+  - Uploaders choose the stored content type, so every read also sends
+    `X-Content-Type-Options: nosniff` and
+    `Content-Security-Policy: sandbox; default-src 'none'`. Only JSON, plain
+    text, raster images, audio, video, and PDF are served inline. Every other
+    declared type, including HTML, SVG, and XML, keeps its declared
+    `Content-Type` for fetch-based readers but adds
+    `Content-Disposition: attachment`, so opening the URL downloads it instead
+    of rendering it on the Worker origin. A malformed declared type is served
+    as `application/octet-stream`.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploaderIsAdmin`, which says whether that uploader is a session admin under the Worker's current role set (including role-map admins the public config does not name). A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
     contract. Fresh clients paginate the `questions` and `surveys` indexes,
@@ -1468,7 +1644,7 @@ Runtime:
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
     - `limits.perWalletPerDay` remains the authenticated per-wallet daily route budget and the legacy anonymous fallback. `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): omitted keeps the legacy `perWalletPerDay` fallback, `0` explicitly makes those anonymous route buckets unlimited, and a positive integer enforces that per-session/per-route anonymous identity budget. Malformed values fall back to `perWalletPerDay` rather than disabling limits.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
-    - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
+    - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes. A supplied `limits` object replaces the stored one.
     - writes fail closed when open config subtrees contain secret-like keys,
       Cloudflare deployment tokens, URL credentials, RPC/faucet values, or
       provider credential aliases.
@@ -1673,28 +1849,56 @@ login, and signed admin request bodies must carry that config's canonical
    compatibility may omit `sessionId`.
    - Nonce request dispatch now also routes through a shared helper:
      it preserves nonce JSON parse failures, address validation, body/env slug resolution,
-     missing-slug selection, existing-session CORS passthrough, lowercase nonce KV storage,
+     missing-slug selection, existing-session CORS passthrough,
      and the response contract. Worker-canonical responses are
      `{ nonce, sessionSlug, sessionId }`, and a missing or mismatched canonical
      session ID is rejected before nonce issue.
    - Nonce generation/consumption now also route through a shared helper:
-     it preserves 16-byte base64url nonce creation, lowercase nonce KV keys,
+     it creates signed nonces from 16 random bytes (see below), and preserves
+     lowercase keys for consuming legacy stored nonces,
      `Nonce mismatch or expired.`, `Nonce already used.`, used-nonce TTL writes,
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
    - Nonce request rate limiting uses two coordinated fixed-window buckets per
-     session: a strict wallet bucket capped at 5 requests per address per
-     minute, and a shared-network bucket capped at 300 requests per minute.
-     In native Cloudflare runtime the shared-network bucket uses the platform
-     `CF-Connecting-IP`; outside that runtime, forwarded IP headers are ignored
-     and requests fall back to the bounded `anon:unknown` bucket.
+     session: a strict bucket capped at 5 requests per minute for each caller
+     network and target address pair, and a shared-network bucket capped at
+     300 requests per minute. Because the strict bucket includes the caller,
+     someone who only knows a wallet address cannot use up its owner's budget.
+     In native Cloudflare runtime the caller network is the platform
+     `CF-Connecting-IP`, with an IPv6 address counted as its `/64` and an
+     IPv4-mapped address as its IPv4 address; outside that runtime, forwarded
+     IP headers are ignored and requests fall back to the bounded
+     `anon:unknown` bucket.
+   - Nonces are signed, not stored: `n1`, 32 random hex characters, the expiry
+     as 13 digits of epoch milliseconds, and a 128-bit HMAC of these for the
+     session and wallet, under a random key the session coordinator creates
+     on first use (no new secret or binding). Issuing a nonce stores nothing,
+     so no number of other callers can stop a wallet from getting one. A used
+     nonce is recorded until it expires or for ten minutes after use,
+     whichever is later, so each works once; a forged,
+     foreign, or expired nonce gets `Nonce mismatch or expired.`. A nonce
+     the previous release issued and stored is still accepted once. If the
+     coordinator cannot issue a signed nonce during an update or rollback,
+     `/auth/nonce` fails closed with a retryable 503; it does not issue a legacy
+     stored nonce. Nonces contain only letters and digits, as EIP-4361 requires.
 2. Build a SIWE message client-side and sign with `personal_sign`.
+   The Worker parses it as strict EIP-4361 so that wallets recognize every
+   accepted message as a sign-in request: the header, the address, a blank
+   line, an optional statement and blank line, then `URI`, `Version` (`1`),
+   `Chain ID`, `Nonce`, and `Issued At`, then optional `Expiration Time`,
+   `Not Before`, and `Request ID`, all in that order, and an optional final
+   `Resources:` list. Reordered, duplicated, unknown, padded, or trailing
+   lines, CRLF line breaks, statements outside the EIP-4361 character set, and
+   nonces other than at least eight letters or digits are rejected with `400`
+   before the nonce is consumed.
    Include exactly two `Resources:` URI-list entries with a `- ` prefix: the
    receiving Worker origin and `urn:context-engine:session:id:<encoded-id>` for
    Worker-canonical sessions, or `urn:context-engine:session:slug:<encoded-slug>`
-   for registry sessions (`general` uses the empty slug). `/auth/login` checks
-   these signed resources before consuming the nonce. Messages without a
-   Resources section remain accepted for legacy-client compatibility.
+   for registry sessions (`general` uses the empty slug). `/auth/login` and
+   bootstrap uploads check these signed resources before consuming the nonce,
+   and reject a message without them with `403`, so a signature made for
+   another Worker or session cannot be replayed here. Browser tabs that still
+   run a client from before this binding existed must reload.
 3. `POST /auth/login` body:
    `{ address, message, signature, sessionSlug, sessionId }` for
    `worker_canonical`; registry compatibility may omit `sessionId`.
@@ -1723,9 +1927,9 @@ login, and signed admin request bodies must carry that config's canonical
      cached HMAC key reuse, the exact token verification error strings,
      non-empty `jti` validation, and `exp` comparison in epoch seconds.
    - SIWE message parsing/validation now also routes through a shared helper:
-     it preserves trimmed `URI` / `Chain ID` / `Nonce` / `Issued At` / `Expiration Time` extraction,
-     required field checks, URI host vs domain matching, and invalid/expired expiration rejection
-     across login, signed admin requests, and bootstrap admin verification.
+     it applies the strict line order above, required field checks, URI host
+     vs domain matching, invalid/expired expiration and future `Not Before`
+     rejection across login and bootstrap admin verification.
 
 On success, the worker returns
 `{ token, exp, sessionSlug, sessionId? }`, where `exp` is now + 4h.
@@ -1817,6 +2021,40 @@ token):
 - `POST /admin/secret-presence`
 - `POST /admin/set-limits`
 - `POST /admin/lit-chipotle-status`
+- `POST /admin/storage/set-hidden`
+
+`/admin/storage/set-hidden` notes:
+
+- The signed body adds `{ "resource": "questions" | "surveys", "id": "<payload id>", "hidden": true | false }`.
+- This uses the signed-admin boundary: the configured `adminAddress` or
+  configured admin Hat after chain verification. Role-map upload privileges
+  alone do not authorize this endpoint.
+- It is a soft hide. Every stored version stays readable by its storage id,
+  but `/storage/list` returns only a hidden marker for it, and the interview
+  catalog and results analysis skip the id. Only a session admin can upload a
+  hidden id again (anyone else gets `409` with
+  `reason: "storage_resource_id_hidden"`), and that upload starts hidden.
+  Lists also check the hide records, so a version stored while a hide was in
+  progress is listed only as a marker too. Unhiding restores all versions.
+- Historical responses remain in Raw Results and CSV exports; hiding is not
+  deletion or redaction. An already-open cached view may need a reload before
+  it reflects the hide.
+- The Worker marks every stored version of the id. Versions stored before this
+  release have no `resourceId` in their index row, so the first hide reads
+  those payloads once and records each row's id in the single write it makes
+  to that row (KV takes one write per key per second); later hides and
+  unhides read only the index. In a session with several hundred such
+  versions, the first hide can stop partway at the Worker's per-request
+  limit; repeat it, and each attempt gets further.
+- Changing the same id again within about a second returns `429` ("This id
+  changed less than a second ago. Try again in a moment."), because KV takes
+  one write per key per second. The audit entry is already written;
+  repeating the request completes the change.
+- Each change writes an audit entry (`storage_resource_hidden` or
+  `storage_resource_unhidden`, with the admin address) to the storage audit
+  KV before it takes effect.
+- The response is `{ ok, resource, id, hidden, matchedRows, unreadableRows, hiddenIds }`,
+  where `hiddenIds` lists every hidden id for that resource.
 
 Never return secrets in responses.
 
@@ -1830,7 +2068,8 @@ Never return secrets in responses.
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
 - After a worker-canonical session is initialized, its slug, worker URL, authority
   mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
-  to retarget that Worker return `409`.
+  to retarget that Worker return `409`. The worker URL is compared as an origin,
+  so a trailing slash, letter case or the default port is not a change.
 - The first signed worker-canonical publish carrying a `configRevision` finalizes
   that publication in the server-managed KV record. A sequential exact
   same-revision retry is an idempotent no-op; a different revision returns
@@ -1838,11 +2077,19 @@ Never return secrets in responses.
   with first-use worker-envelope key selection. Revision-free signed Admin
   patches remain supported; upload retry receipts and key-changing maintenance
   actions are not part of this config boundary.
+- Worker-canonical sessions accept `responseFieldEncryption` and
+  `linkedWorkerGroups` through signed `set-config`, as a patch on their own or
+  with the full config. The optional field-encryption mode is checked against
+  the merged record, so it still needs a Worker-canonical Cloudflare session.
 - A successful worker-canonical publish is terminal in `/new`, including after a
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.
 - Legacy string `allowOrigins` payloads are accepted and normalized into arrays.
-- `limits` and `scopes` only merge from object payloads; malformed non-object patches are ignored rather than corrupting stored branches.
+- A supplied `limits` object replaces the stored one, so leaving a limit out
+  clears it; `/admin/set-limits` still merges limit keys. `scopes` merge from
+  object payloads. Malformed non-object `limits` or `scopes` patches are ignored
+  rather than corrupting stored branches.
+- An explicit `sessionEndsAt: ""` clears a Worker-canonical session's end time.
 - Signed request validation is shared with login/bootstrap flows:
   - the recovered signer must match request `address`
   - the SIWE message address must also match request `address`
@@ -1877,7 +2124,7 @@ Never return secrets in responses.
 - Lit sponsorship now adds:
   - `litUsageApiKey` as a supported worker-secret field for scoped Chipotle execution
   - `litAccountApiKey` as a server-only session secret for per-session-account provisioning and later action management
-  - `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }` as worker config
+  - `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }` as worker config
     metadata; these are not cryptographic secrets, but they stay worker-side by
     default because they still reveal operational topology
   - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
@@ -1915,10 +2162,22 @@ litActionCid, litPkpId }` into the encrypted plaintext via a policy
     `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
     fresh group / PKP / usage key for each redeemed session, then keep using
     only the scoped runtime during day-to-day execution
-  - after default action-source changes, operators must re-run
-    `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` so session
-    `litCredentials.litActionCid` points at the newly derived action CID; there
-    is no compatibility fallback to the old action source
+  - Worker-generated `litAuthorizationPrivateKey` is reserved in an encrypted
+    session coordinator record, then projected with matching Lit credentials
+    into encrypted session secrets. It is not admin-settable, sponsor-exported, or returned by
+    either provisioning endpoint. Public signer/version descriptors travel with
+    the runtime config.
+  - Every Action call requires short-lived Worker authorization binding the
+    authenticated requester, operation, policy, approved HTTPS RPC, and reply
+    key. Decrypt replies are encrypted to that Worker request; signed tickets
+    and response internals are not reflected to participants.
+  - unsigned authorities fail closed. Admin status reports `ready: false` and
+    `needsFreshAuthority: true` when the private/public authorization state is
+    missing or invalid. An explicit signed `freshAuthority: true` bootstrap or
+    provision request allocates a fresh PKP, group, and execution-only usage key.
+    Retire old permissions separately; do not attach old Actions to the new PKP.
+    See [Lit authorization and cutover](lit-worker-authorization.md) for the
+    protocol, historical-data limits, and operator steps.
 
 ## Gating on login (on-chain)
 
@@ -2088,6 +2347,13 @@ Signed login/bootstrap requests:
     conflicting payloads; missing coordination fails closed before the deploy
     or faucet side effect.
 - `POST /ai` or `POST /` with JSON `{ action: "ai", provider: "anthropic"|"openai"|"openrouter"|"custom", ... }`
+  - The question filter uses the matching session-page configuration for its
+    AI request. Worker-canonical sessions expose the filter when their valid
+    version-1 authority policy declares an `ai` participant or anonymous scope,
+    a Worker URL is configured, and `scopes.ai` is not explicitly disabled.
+    Registry SBT metadata is not required for this UI availability check;
+    the Worker still enforces authentication, scope access, and provider-key
+    availability when the request runs.
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).
   - Anonymous `apiKey` + `provider: "custom"` requires `rpcUrl`; worker secret `customRpcUrl` is not used for this bypass path.
@@ -2126,6 +2392,8 @@ Signed login/bootstrap requests:
     establish which version a deployed Worker serves.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
+    it reads up to 200 stored rows so it can keep the canonical version of a
+    re-uploaded id (see `POST /storage/upload`) and skips hidden ids;
     on-chain discovery requires configured block limits and is capped at a
     two-million-block range.
   - Applies the session's anonymous rate-limit bucket before reading questions.
@@ -2157,6 +2425,9 @@ Signed login/bootstrap requests:
 - `POST /admin/refresh-interview-opening`
   - Uses the existing signed admin request body and authority checks. Regenerates the cached opening when `interviewMode.allowManualRefresh` is enabled (default true). Owner-written openings are preserved.
 - `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
+  - Returns `403` without contacting OpenAI when `interviewModeEnabled=false`
+    or `interviewMode.enabled=false`, the same switch `/resource-presence`
+    reports.
   - Uses the anonymous AI eligibility policy above and the Worker-held
     `openaiKey`. The key is never accepted from or returned to the browser.
   - Defaults to `gpt-live-1`. Posts JSON to OpenAI `/v1/live/sessions` with
@@ -2407,6 +2678,11 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   visible and temporarily hidden replacements preserve `secret_text` bindings,
   and any later non-success remains pending. The helper returns/replays success
   only after the terminal receipt commits and the rejection marker is removed.
+- A same-ID retry whose earlier attempt already staged the KV namespace checks
+  the Worker and Agent Bridge bundles just before upload. If a bundle is
+  unavailable or does not match its manifest, the request stays pending (`502`
+  or `409` with `deploymentRequestPending` and the retained `orphanResources`)
+  instead of ending, so a later retry can finish once the bundle is fixed.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
@@ -2426,7 +2702,7 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 
 ## Release bundle
 
-- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection.
+- Default bundle and manifest URLs use `releases/download/worker-bundles-<commit>/`. Client builds select `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` (Netlify `COMMIT_REF`), falling back to `client/src/variables/workerReleasePin.json`. The bundle, manifest and native Cloudflare deploy files use that same commit. Deploy-helper scripts use the pin or their explicit `--release-commit` selection. Each release moves the pin to the newest published release (`npm run release:worker-pin`), and release preparation refuses a pin that a newer published release has superseded.
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
 - Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.

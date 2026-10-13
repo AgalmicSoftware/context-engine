@@ -31,11 +31,10 @@ const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof v
 
 const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
-const hashMix = (seed: unknown, text: unknown) => {
-  let h = Number(seed) >>> 0;
-  const str = String(text || '');
-  for (let i = 0; i < str.length; i += 1) {
-    h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0;
+const hashMix = (seed: number, text: string) => {
+  let h = seed >>> 0;
+  for (let i = 0; i < text.length; i += 1) {
+    h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
   }
   return h >>> 0;
 };
@@ -72,8 +71,8 @@ const computeAggregatorDataSignatureFromRows = (
   let hash = 2166136261;
   let totalEntries = 0;
   normalizedQids.forEach((qid) => {
-    hash = hashMix(hash, qid);
     const qidKey = String(qid);
+    hash = hashMix(hash, qidKey);
     const rowSignatures = Array.isArray(rowSignaturesByQuestion[qidKey])
       ? [...rowSignaturesByQuestion[qidKey]].sort()
       : [];
@@ -102,18 +101,9 @@ export const computeAggregatorSourceSnapshotSignature = (questionResponses: unkn
     responders.forEach((resAddr) => {
       hash = hashMix(hash, resAddr);
       const rawResponse = responderMap[resAddr];
-      if (typeof rawResponse === 'string') {
-        hash = hashMix(hash, rawResponse);
-        return;
-      }
-      const responseRecord = asRecord(rawResponse);
-      const answer = asRecord(responseRecord.answer);
-      hash = hashMix(hash, responseRecord.type || '');
-      hash = hashMix(hash, answer.value ?? '');
-      hash = hashMix(hash, answer.encrypted ? '1' : '0');
-      hash = hashMix(hash, answer.encryptedPortion || '');
-      hash = hashMix(hash, responseRecord.importance ?? '');
-      hash = hashMix(hash, responseRecord.conviction ?? '');
+      // Hash the whole payload: a comment or display-name edit must refresh the
+      // Report, and JSON keeps 0, false and '' distinct.
+      hash = hashMix(hash, typeof rawResponse === 'string' ? rawResponse : JSON.stringify(rawResponse) || '');
     });
   });
 
@@ -169,7 +159,7 @@ export const computeAggregatorQuestionMetadataSignature = (questions: unknown = 
     const question = asRecord(questions[qid]);
     hash = hashMix(hash, qid);
     hash = hashMix(hash, isPendingQuestionMetadataPlaceholder(question) ? 'pending' : 'ready');
-    hash = hashMix(hash, question.sessionSlug || '');
+    hash = hashMix(hash, String(question.sessionSlug || ''));
     hash = hashMix(hash, getQuestionSessionSlugExplicitSignature(question));
   });
   return `${qids.length}:${hash >>> 0}`;

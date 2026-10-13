@@ -8,6 +8,7 @@ import {
   isUserPageSbtAggregateEntry,
   readUserPageDirectNetworkCacheBucket,
 } from './userPageAnalysisContentHelpers';
+import { buildUserPageDecryptedResponsePatch } from './userPageGateHelpers';
 
 describe('userPageAnalysisContentHelpers', () => {
   it('detects aggregate SBT entries', () => {
@@ -245,4 +246,74 @@ it('keeps quadratic option order and budgets in profile analysis and excludes ma
     options: question.options,
     voiceCredits: 25,
   });
+});
+
+// Shaped like the answers surveyToolResponsePayloadController stores: the
+// writer stamps every answer with the audience it resolved, public ones too.
+const writerAnswer = (value: unknown, encryptionAudience: string) => ({
+  value,
+  encrypted: false,
+  encryptionAudience,
+  encryptionGateId: null,
+  audienceMode: 'explicit',
+  hash: '',
+  encryptedPortion: '',
+});
+const writerLockedAnswer = (encryptionAudience: string) => ({
+  value: '*',
+  encrypted: true,
+  encryptionAudience,
+  encryptionGateId: null,
+  audienceMode: 'explicit',
+  hash: `0x${'ab'.repeat(32)}`,
+  encryptedPortion: '{"v":1}',
+});
+
+it('sends public answers to profile analysis but never answers this browser decrypted', () => {
+  const decrypted = buildUserPageDecryptedResponsePatch({
+    responseObj: { answer: writerLockedAnswer('self'), additional: writerLockedAnswer('self') },
+    questionId: 'q1',
+    fieldToDecrypt: 'both',
+    decryptedResult: {
+      answers: { q1: { value: 'only-me answer' } },
+      additionalComments: { q1: { value: 'only-me note' } },
+    },
+  });
+  expect(decrypted?.answer).toMatchObject({ value: 'only-me answer', encrypted: true, decryptedLocally: true });
+
+  const responses: Record<string, unknown> = {
+    q1: decrypted,
+    q2: {
+      answer: writerAnswer('public under a Me + admin default', 'self_admin'),
+      additional: writerAnswer('a public comment', 'self_admin'),
+    },
+    q3: { answer: writerLockedAnswer('gate') },
+    q4: { answer: writerAnswer('public under an Only me default', 'self') },
+    q5: { answer: writerAnswer('public in a gated session', 'gate') },
+    q6: { answer: { value: 'public from the companion', encrypted: false, encryptionAudience: 'none' } },
+  };
+  const questionResponseInfo = Object.keys(responses).map((id) => ({ id, type: 'freeform', prompt: id }));
+  const questions = buildUserPageAnalysisQuestions({ detailedQuestionResponses: responses, questionResponseInfo });
+  const surveys = buildUserPageAnalysisSurveys({
+    surveyResponseInfo: [{ id: 's1', title: 'Survey' }],
+    detailedSurveyResponses: {
+      s1: questionResponseInfo.map((questionData) => ({ questionData, responseData: responses[questionData.id] })),
+    },
+  });
+
+  const publicAnswers = [
+    'public under a Me + admin default',
+    'public under an Only me default',
+    'public in a gated session',
+    'public from the companion',
+  ];
+  expect(questions.map((question) => question.answer)).toEqual(publicAnswers);
+  expect(questions.map((question) => question.additionalComment)).toEqual([
+    'a public comment',
+    undefined,
+    undefined,
+    undefined,
+  ]);
+  expect(surveys[0]).toMatchObject({ answeredCount: 4, additionalCommentsSample: ['a public comment'] });
+  expect(JSON.stringify({ questions, surveys })).not.toMatch(/only-me/);
 });

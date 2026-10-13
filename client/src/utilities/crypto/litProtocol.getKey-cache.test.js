@@ -1,3 +1,4 @@
+import { clearDecryptCaches } from './cryptography.js';
 import { __test__wrapLitGetKeyWithCache } from './litProtocol.js';
 
 const ADDR_A = '0x00000000000000000000000000000000000000aa';
@@ -38,6 +39,33 @@ describe('litProtocol getKey memoization', () => {
     expect(getKeyUncached).toHaveBeenCalledTimes(1);
     expect(r1).toBe(cek);
     expect(r2).toBe(cek);
+  });
+
+  it('drops cached keys on sign-out, including fetches still in flight', async () => {
+    const cek = new Uint8Array(32).fill(9);
+    const getKeyUncached = jest.fn(async () => cek);
+    const { getKey } = __test__wrapLitGetKeyWithCache(getKeyUncached, { account: ADDR_A });
+    const globalHooks = { clearCache: jest.fn() };
+    window.__litHooks = globalHooks;
+
+    try {
+      await getKey({ ...BASE_OPTS, requesterAddress: ADDR_A });
+      await getKey({ ...BASE_OPTS, requesterAddress: ADDR_A });
+      expect(getKeyUncached).toHaveBeenCalledTimes(1);
+
+      clearDecryptCaches();
+      expect(globalHooks.clearCache).toHaveBeenCalledTimes(1);
+      await getKey({ ...BASE_OPTS, requesterAddress: ADDR_A });
+      expect(getKeyUncached).toHaveBeenCalledTimes(2);
+
+      const inFlight = getKey({ ...BASE_OPTS, requesterAddress: ADDR_B });
+      clearDecryptCaches();
+      await expect(inFlight).resolves.toBe(cek);
+      await getKey({ ...BASE_OPTS, requesterAddress: ADDR_B });
+      expect(getKeyUncached).toHaveBeenCalledTimes(4);
+    } finally {
+      delete window.__litHooks;
+    }
   });
 
   it('does not share cache entries across requester addresses', async () => {

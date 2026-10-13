@@ -18,7 +18,7 @@ import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets';
+import { hasDemoAnalysisFixture } from '../../utilities/demo/demoFixtureSessionSlugs';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
@@ -82,6 +82,7 @@ type OnePageSessionStandardShellProps = {
   autoOpenResults: boolean;
   blockLimits: UnknownRecord | null;
   cacheHasLoaded: unknown;
+  cacheInitializationError?: unknown;
   contracts: UnknownRecord | null;
   corpusViewerLoadRequestNonce: number;
   corpusViewerLoadState: CorpusViewerLoadState;
@@ -278,6 +279,7 @@ export default function OnePageSessionStandardShell({
   autoOpenResults,
   blockLimits,
   cacheHasLoaded,
+  cacheInitializationError,
   contracts,
   corpusViewerLoadRequestNonce,
   corpusViewerLoadState,
@@ -534,6 +536,7 @@ export default function OnePageSessionStandardShell({
               isQuestionCacheReady={isQuestionCacheReady}
               isResponsesCacheReady={isResponsesCacheReady}
               cacheHasLoaded={cacheHasLoaded}
+              cacheInitializationError={cacheInitializationError}
               sbtCacheRevision={sbtCacheRevision}
               questionResponsesNonce={questionResponsesNonce}
               questionScanProgress={questionScanProgress}
@@ -597,6 +600,7 @@ export default function OnePageSessionStandardShell({
                 isSurveyCacheReady={isSurveyCacheReady}
                 isResponsesCacheReady={isResponsesCacheReady}
                 cacheHasLoaded={cacheHasLoaded}
+                cacheInitializationError={cacheInitializationError}
                 onFilterChange={onFilterChange}
                 filterState={filterState}
                 hideSessionSelector={true}
@@ -665,7 +669,7 @@ export default function OnePageSessionStandardShell({
                 ) : (
                   <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                 )}
-                {renderSectionHeading('Context', 'View')}
+                {renderSectionHeading('Context', showDocuments ? null : 'View')}
                 {showDocuments && (
                   <div
                     className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
@@ -741,7 +745,7 @@ export default function OnePageSessionStandardShell({
               ) : (
                 <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
               )}
-              {renderSectionHeading('Results', 'View')}
+              {renderSectionHeading('Results', showResults ? null : 'View')}
               {showResults && (
                 <div
                   className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
@@ -852,6 +856,12 @@ export default function OnePageSessionStandardShell({
                       defaultTags={defaultTags}
                       isQuestionCacheReady={isQuestionCacheReady}
                       isResponsesCacheReady={isResponsesCacheReady}
+                      cacheInitializationError={cacheInitializationError}
+                      onRetryLoad={
+                        typeof refreshQuestionResponses === 'function'
+                          ? () => refreshQuestionResponses(null, { slug: embeddedQuestionSessionSlug })
+                          : undefined
+                      }
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}

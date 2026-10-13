@@ -112,6 +112,63 @@ describe('surveyResultsAnalysisDataModel', () => {
     ]);
   });
 
+  it('prefers question metadata over the prompt and type a participant payload claims', () => {
+    const rows = buildSurveyResultsAnalysisResponsesForExport({
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xAAA',
+            response: { answer: { value: 'Agree' }, prompt: 'Spoofed headline', type: 'freeform' },
+          },
+        ],
+        q2: [{ responder: '0xAAA', response: { answer: { value: 'Text' }, prompt: 'Payload-only prompt' } }],
+      },
+      networkQuestions: { q1: { prompt: 'Canonical prompt', type: 'binary' } },
+    });
+
+    expect(rows.map(({ questionPrompt, questionType }) => ({ questionPrompt, questionType }))).toEqual([
+      { questionPrompt: 'Canonical prompt', questionType: 'binary' },
+      { questionPrompt: 'Payload-only prompt', questionType: '' },
+    ]);
+  });
+
+  it('keeps valid multiple-choice answers for the AI analysis', () => {
+    const row = (responder: string, questionId: string, value: unknown, additional = '') => ({
+      responder,
+      response: { questionID: questionId, answer: { value }, additional: { value: additional } },
+    });
+    const rows = buildSurveyResultsAnalysisResponsesForExport({
+      aggregatorQuestionResponses: {
+        mc: [
+          row('0x1', 'mc', ['Option A', 'option b']),
+          row('0x2', 'mc', ['Option C'], 'why C'),
+          row('0x3', 'mc', ['Option A', 'Unknown'], 'partly unknown'),
+          row('0x4', 'mc', ['Unknown']),
+        ],
+        single: [row('0x1', 'single', ['Yes', 'No'], 'two picks'), row('0x2', 'single', 'Yes')],
+      },
+      networkQuestions: {
+        mc: { type: 'multichoice', options: ['Option A', 'Option B', 'Option C'] },
+        single: { type: 'multichoice', options: ['Yes', 'No'], singleSelect: true },
+      },
+    });
+
+    expect(
+      rows.map(({ participantAddress, questionId, answer, additional }) => [
+        participantAddress,
+        questionId,
+        answer,
+        additional,
+      ]),
+    ).toEqual([
+      ['0x1', 'mc', 'Option A; Option B', ''],
+      ['0x2', 'mc', 'Option C', 'why C'],
+      ['0x3', 'mc', '', 'partly unknown'],
+      ['0x1', 'single', '', 'two picks'],
+      ['0x2', 'single', 'Yes', ''],
+    ]);
+  });
+
   it('uses injected parse and question metadata ports without owning lookup semantics', () => {
     const rows = buildSurveyResultsAnalysisResponsesForExport({
       aggregatorQuestionResponses: {

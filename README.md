@@ -3,7 +3,7 @@
 ![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)
 
 <p align="center">
-  <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card asking whether humans and agents need better tools for debate, negotiation, and sensemaking, with Agree selected." />
+  <img src="docs/assets/readme-header.jpg" alt="Context Engine interface showing a survey card asking whether humans and agents need better tools for debate, negotiation, and sensemaking, with Agree selected." />
 </p>
 
 **Live demo:** [contextengine.sh](https://contextengine.sh)
@@ -13,7 +13,7 @@ Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and n
 ## Architecture At A Glance
 
 <p align="center">
-  <img src="client/src/assets/img/readme-architecture-deployment-modes.png" alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes." />
+  <img src="docs/assets/readme-architecture-deployment-modes.jpg" alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes." />
 </p>
 
 Context Engine separates how the web app is hosted from how each session establishes authority and stores data. **EVM and Arweave are profile-specific options, not baseline dependencies.** The current Hosted & Fast profile uses a per-session Cloudflare Worker and Cloudflare storage as its canonical backend, so it can run public or private sessions without an EVM transaction, RPC endpoint, gas, Arweave, or Lit. The Trustless & Slower profile deliberately opts into public EVM contracts and Arweave, with Lit required only when that encryption path is selected. The planned Company-Operated edition is intended to connect internal identity and key management, storage, networking, AI, and observability services, and can be entirely off-chain. For current profile requirements and publish behavior, see the [session creation guide](docs/session-creation-guide.md).

@@ -24,14 +24,6 @@ const isRecord = (value: unknown): value is UnknownRecord =>
 
 const readString = (value: unknown = ''): string => String(value || '').trim();
 
-const normalizePathname = (value: unknown = ''): string =>
-  readString(value).split('?')[0].split('#')[0].replace(/\/+$/, '').toLowerCase();
-
-const isBuiltInDemoPathname = (value: unknown = ''): boolean => {
-  const routePath = normalizePathname(value);
-  return routePath === '/session/demo' || routePath.startsWith('/session/demo/');
-};
-
 const normalizePolisQuestionType = (value: unknown = ''): string => {
   const type = readString(value).toLowerCase();
   if (type === 'poll') return 'multichoice';
@@ -109,28 +101,3 @@ export const getPolisDemoQuestionPool = (): PolisDemoQuestionPoolEntry[] => {
   }
   return memoizedDefaultPolisDemoQuestionPool;
 };
-
-export const shouldUseBuiltInPolisDemoQuestionPool = ({
-  displaySlug = '',
-  sourceSlug = '',
-  pathname = '',
-}: {
-  displaySlug?: unknown;
-  sourceSlug?: unknown;
-  pathname?: unknown;
-} = {}): boolean => {
-  const isBuiltInDemoRoute = readString(displaySlug).toLowerCase() === 'demo' || isBuiltInDemoPathname(pathname);
-  if (!isBuiltInDemoRoute) return false;
-  return readString(sourceSlug).toLowerCase() === '' || isBuiltInDemoPathname(pathname);
-};
-
-export const resolvePolisDemoQuestionPool = ({
-  displaySlug = '',
-  sourceSlug = '',
-  pathname = typeof window !== 'undefined' ? window.location?.pathname : '',
-}: {
-  displaySlug?: unknown;
-  sourceSlug?: unknown;
-  pathname?: unknown;
-} = {}): PolisDemoQuestionPoolEntry[] =>
-  shouldUseBuiltInPolisDemoQuestionPool({ displaySlug, sourceSlug, pathname }) ? getPolisDemoQuestionPool() : [];

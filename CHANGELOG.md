@@ -2,6 +2,266 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.8] - 2026-10-12
+
+### Client — available when the site deploys
+
+- Apply build-time deployment settings before theme and app configuration load,
+  so hosted Worker release commits and self-hosted helper URLs take effect on
+  the first browser load. Keep the pinned defaults when no override is set.
+- Keep standalone benchmark Results headings, help controls, mobile spacing,
+  and vote counts aligned with session reports: vote rows read Agree, Unsure,
+  Disagree, and Responses, with Invalid shown when any run gave no usable
+  answer.
+- Make Minimal the default light theme with readable controls, dialogs, response
+  cards, reports, group pages, and article charts. Preserve saved theme
+  selections and binary answer colors.
+- Add a Sessions directory to community Stats with authority totals and filters
+  for session type, creation date, recorded activity, and admin address. Show the
+  chart and leaderboard's session scope above each section. Undated sessions stay
+  in date-filtered views, labelled "date unavailable".
+- Improve mobile session spacing, section help icons, filter checkboxes, and
+  narrow-screen logo display. Hide section subtitles while their content is open.
+- Show one lightweight vector logo in every theme, sized and placed like the
+  previous default logo. Remove the animated logo and the hidden per-theme
+  copies that a first visit downloaded (up to about 8 MB).
+- Enable the AI question filter for Worker sessions with configured AI access.
+  Signed-out visitors in participant-only AI sessions are asked to sign in. When
+  questions change, both AI filter views keep their ranking and ask you to click
+  Apply to update it.
+- Rename the Tools entry to Debate Map, retain its embedded view when a detail
+  closes, and remove the disabled Suggest Tool card.
+
+Answering and saved answers:
+
+- Preserve a saved comment when an interview import leaves that field blank;
+  explicitly cleared comments remain cleared.
+- Keep edits to questions hidden by a filter when you submit, instead of marking
+  them saved and discarding them.
+- Wait for saved answers to load before any upload, in the pile, View all and
+  single-question editors, including after a failed or capped listing, a failed
+  start-up load, or a change in another tab.
+- Load each question's saved answers before restoring its unsaved changes, in
+  the pile, View all, and single-question editors, including questions that
+  appear after a Submit (even when the refresh after it fails), a failed Submit,
+  a decrypt, a filter change, or a sign-in after Clear changes. Submit no longer
+  replaces saved answers with blanks, filtering a question out and back in keeps
+  its draft, and an edit typed just before its question is filtered out is kept.
+- Keep drafts to unsaved changes only. When restoring them, drop only the fields
+  whose saved value changed since, and keep drafts written before saved answers
+  loaded. Never store decrypted ratings in a draft while the saved ratings stay
+  encrypted.
+- Clear the previous account's answers, comments, ratings, and unsaved drafts for
+  every session on sign-out or account switch.
+- Make clearing a saved answer or comment take effect and stay cleared when
+  saved answers reload, upload a cleared locked answer as cleared, keep encrypted ratings intact across repeated submits, keep a pending
+  rating through Decrypt & Edit, and never publish a "*" placeholder.
+- Keep saved encrypted ratings encrypted unless you turn a lock off, including
+  when a locked comment's text is deleted or another question is submitted. A
+  Submit leaves the saved answers of questions it didn't upload unchanged.
+- After a reload, keep an answer or comment that was unlocked but not submitted
+  locked as saved, with a note to decrypt and unlock it again.
+- Hold back and name a question that can't be uploaded, such as an answer that
+  is too long for the session Worker or a locked answer whose new audience needs
+  a decrypt first, and upload the rest. A held-back answer keeps its draft and
+  its consent choices.
+- Size answers as the session Worker stores them, including the question text
+  each answer repeats, locked fields, saved locked ratings, and interview
+  records, and say how much to shorten an answer before submitting. Unlocked
+  answers can use the full stored size.
+- Never revert a consent withdrawal: withdrawn names, AI attribution, and
+  research sharing stay withdrawn through undo, Clear changes, reloads, and
+  failed or partial submits. After a reload, every stored withdrawal is pending
+  and uploads with the next Submit.
+- Send interview edits to the imported context (removed facts and names) to the
+  AI, include unsaved pile edits in the interview review, and stop uploading
+  interview drafts removed after a failed submit or discard.
+- Show the saved-answers loading notice on session pages, keep the first pile
+  card stable on a fresh visit, and skip re-reading cached question files on
+  reload.
+
+Sign-in, wallets, and privacy:
+
+- Restore passkey sign-in after a reload without opening the login window.
+  Logging out, or disconnecting from a wallet extension, also signs out a saved
+  passkey wallet.
+- Clear decrypted session names, information, headers, answers, and Lit keys
+  from memory on logout or account switch.
+- Send profile Analyze your public answers and public comments, but never
+  answers you decrypted in this browser ("Only me", "Me + admin", Session or
+  SBT-gated), and never cache an analysis built from them.
+- Passkey wallet: reject a signing request for another account (error 4100);
+  keep your account on a background re-unlock or ask you to log in again;
+  relock when the app switches chains, finishing a request already in flight on
+  its original chain; never resend a transaction after a lock; and give each new
+  passkey a random user handle.
+- Check that your own account signed the key wrap before deriving "Only me"
+  keys, for MetaMask and passkey signatures alike. Envelopes written with 0.6.7
+  still decrypt.
+- Bind importance and conviction decrypts to their rating and question.
+- Explain sign-in rate limits ("Too many sign-in attempts…") and retry once on
+  an expired sign-in nonce.
+- Keep Lit debug helpers out of production builds and load the Poseidon library
+  only when a commitment is first computed.
+
+Results and reports:
+
+- Let admins decrypt "Me + admin" and Session answers from Results.
+- Keep non-voters and comment-only participants out of the Report's opinion map;
+  UMAP no longer treats skipped questions as "Unsure".
+- Link named participants to their own profile.
+- Prefer question metadata over answer payloads in the Report, CSV, and HTML AI
+  analysis, and include multiple-choice answers in the HTML AI analysis.
+- Show responses and non-responses for binary questions, count Breakdown choices
+  once per person and option, and make the Raw Results summary line count like
+  the Report.
+- Stop recomputing the Report on idle refreshes, refresh it when comments or
+  names change, and keep AI cluster summaries across live refreshes.
+- Neutralize spreadsheet formulas in CSV exports, and read legacy 0–100 ratings
+  on the 0–10 scale.
+- Offer Retry in Results when responses fail to load, instead of loading
+  indefinitely.
+
+Authoring, sessions, and links:
+
+- Show document, Arweave, token, and metadata links from uploaded surveys,
+  questions, responses, SBTs, and session records only when they are safe web,
+  Arweave, or same-site links; show other values as plain text. "View on
+  Arweave" links only to Arweave transactions.
+- Open uploaded, decrypted, and group files that could run script (SVG, HTML,
+  XML) only as text or downloads; only raster images display as images.
+- Keep one malformed upload from crashing the survey list or stopping new
+  questions and surveys from loading for everyone.
+- Treat reusing another author's question as published only when the stored
+  question has exactly the same type, wording, and options; otherwise show the
+  Worker's refusal. Scope new Worker survey ids to their author.
+- Append generated questions to a non-empty draft, and don't let a slow registry
+  check block publishing.
+- Session creation: verify and publish Worker-backed sessions again (broken
+  since 0.6.4); send cleared end times and limits; accept only slugs that
+  participant links can open; keep Worker secrets on wherever "Require users to
+  pay" is hidden; show why verification failed; and link the live session after
+  a lost readback.
+- Deploy grants send this build's configured Worker release, never an uploaded
+  file or manual URL, and explain clearly when a sponsor has no release to
+  deploy. /sponsor refuses grants up front when the sponsoring Worker has no
+  release recorded.
+- Builds without a Netlify commit deploy the 0.6.7 Worker release by default
+  (previously 0.6.4).
+- Show when a Lit authority needs replacement and let admins acknowledge the
+  content-access limits before creating a fresh authority.
+
+SBT groups:
+
+- Protect group passwords against offline guessing: the client stretches each
+  password with PBKDF2-SHA256 (600,000 rounds), salted by the group's contract
+  address, before deriving the on-chain password check. Group-password groups
+  always deploy to their predicted address.
+- Start new group-password groups with a generated five-word passphrase and a
+  Generate new button. Warn about custom passwords shorter than 16 characters
+  and ask for confirmation. Lock the password during and after creation, and
+  show it in the success panel for unlimited groups.
+- Explain wrong, unreadable, and unsupported group passwords clearly, and offer
+  Retry instead of an open Join when a group's password check can't be read.
+
+App shell and performance:
+
+- Recover from a stale deploy: reload once when a section fails to load, then
+  show "A new version of Context Engine is available" with a Reload button.
+  Never reload automatically while offline, more than once a minute, or twice
+  for the same failure in the same deployed version.
+- Cache only files that are part of the current deploy for a year; a missing
+  /assets file now returns 404 instead of the app page.
+- Enforce a baseline Content Security Policy (frame-ancestors, object-src,
+  base-uri, form-action) and report a stricter scripts-only-from-this-site
+  policy.
+- Load fonts in one request with font-display: swap, give Minimal real Open Sans
+  bold weights, and match the browser bar color to the theme.
+- Smaller loads: the dev agent no longer ships in production; QR code libraries,
+  DebateMap styles, the voice modal, and (on first load of non-demo sessions)
+  the demo datasets load only where needed. If a demo's data can't load, the
+  page shows the new-version panel instead of staying empty. The About demo
+  video is about half the size, and About, post, and social preview images are
+  smaller.
+
+Docs:
+
+- Describe the trusted operators for Lit-encrypted data: the session Worker and
+  Lit account administrators. New authorities require Worker authorization;
+  scoped usage keys alone do not grant key release. Lit is not end-to-end encryption.
+
+### Worker — requires a session Worker update
+
+- Authenticate Lit Action requests with a per-session Worker signature and
+  encrypt decrypt replies to that request. A leaked scoped usage key cannot
+  impersonate an SBT holder or substitute an RPC. Existing unsigned authorities
+  fail closed and need a fresh PKP/group/key cutover; old permissions and
+  historical ciphertext require separate handling. See the
+  [Lit cutover guide](docs/lit-worker-authorization.md).
+- Verify a reused Lit Action CID matches the Worker's signer, session, and PKP
+  before granting permissions or returning the existing authority.
+- Let only a question's or survey's first uploader or a session admin replace
+  it, and add admin hide and unhide for questions and surveys. Ids stored before
+  this release become admin-only; very large sessions finish indexing them over
+  a few uploads, which may briefly return 503.
+- Serve stored files with nosniff and a sandbox CSP, and download script-capable
+  types instead of rendering them.
+- Sign sign-in nonces instead of storing them, so other people can neither
+  cancel a pending sign-in nor stop a wallet from getting a nonce; nonces are
+  EIP-4361 compliant.
+- Parse sign-in messages as strict EIP-4361 and require the signed Worker and
+  session binding.
+- Refuse voice calls when interviews are off, compare the deploy-helper secret
+  in constant time, and cap and shape-check uploads (128 KiB per question,
+  256 KiB per survey, 2 MiB per response upload, 96 KiB per stored answer).
+- Results analysis: superseded public answers no longer return after a
+  participant locks or clears them; only encryption flags lock a row; ratings
+  read like the client; ties break deterministically; admin snapshots validate
+  current question types and keep older types such as polls; answers that older
+  clients cleared while locked read as cleared.
+- Validate set-config against the merged config, replace limits on set-config,
+  and compare origins ignoring case, default ports, and a trailing slash.
+- Sponsored grant deploys use only the sponsoring Worker's recorded release. The
+  0.6.8 deploy helper records the verified release on each new session Worker,
+  and a retried deploy whose bundle check fails stays pending instead of
+  orphaning its staged resources.
+
+### Agent Bridge — requires an Agent Bridge Worker update
+
+- Sign the Worker and session in sign-in messages. Update the Agent Bridge
+  **before** session Workers: the new bridge works with both Worker versions,
+  while 0.6.8 session Workers refuse the older bridge's sign-ins. This order
+  keeps Telegram, Mini App, agent, and managed-faucet sign-ins available.
+- Preserve established session aliases in those bindings and reject a named
+  session mismatch without retrying against an unspecified session.
+
+### Upgrade notes
+
+- Breaking: password joins and new invite links no longer work for SBT groups
+  created before 0.6.8; a clear message explains this. Invite codes already
+  issued keep working. Admins who want password joins need a new group.
+- Sponsoring Workers must run 0.6.8 or later code, with WORKER_BUNDLE_URL and
+  WORKER_BUNDLE_MANIFEST_URL set, before their grants deploy a pinned release.
+- Update each session Worker before editing questions or surveys with the new
+  client. Rows written by 0.6.7 and earlier have no trusted uploader metadata,
+  so readers use the earliest version, subject to the client's plaintext
+  question hash-integrity check. Reapply any edits made during the
+  upgrade window after the Worker update; updating alone does not recover them.
+- Export required readable Lit content **before** updating that session's
+  Worker. The new Worker rejects unsigned authorities, and creating a fresh
+  authority does not migrate or restore access to historical ciphertext.
+- During an in-place session Worker update or rollback, sign-in and new-id
+  uploads can fail briefly while the update propagates. Nonce issuance fails
+  closed with a retryable 503 when the coordinator cannot issue a signed nonce;
+  it does not fall back to issuing a legacy stored nonce. Previously issued
+  stored nonces remain consumable once.
+- Fresh listings omit hidden question and survey ids. Older cached clients may
+  retain entries until updated or reloaded. Unauthorized rewrites of an owned
+  id return 409.
+- Hiding removes a question or survey from discovery, new-answer views,
+  interviews, and analysis. It does not delete historical responses or remove
+  them from Raw Results and CSV exports; already-open cached views may need a reload.
+
 ## [0.6.7] - 2026-10-09
 
 ### Client — available when the site deploys

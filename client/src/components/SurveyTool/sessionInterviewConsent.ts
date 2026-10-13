@@ -88,3 +88,43 @@ export const getChangedInterviewConsentQids = (
   });
   return changed;
 };
+
+const SAVED_CONSENT_KEYS = ['consentSavedAt', 'consentStorageRefId', 'consentReadAuthority'];
+const AI_ATTRIBUTION_KEYS = ['source', 'promptVersion', 'questionSetHash'];
+const PREDICTION_RESEARCH_KEYS = [
+  'questionId',
+  'selection',
+  'originalPrediction',
+  'predictionRevisions',
+  'userEditedFields',
+  'unselectedDrafts',
+  'submissionValueSnapshot',
+  'predictionComparison',
+];
+
+// Undoing or restoring edits never makes a response more disclosing: a name, AI attribution
+// or research consent that was withdrawn stays withdrawn from the consent it had before.
+export const keepConsentWithdrawals = (before: unknown, attempted: unknown): Record<string, unknown> | null => {
+  const prior = asRecord(before);
+  const tried = asRecord(attempted);
+  if (!Object.keys(prior).length || !Object.keys(tried).length) return null;
+  const priorFlags = resolveConsentFlags(prior);
+  const triedFlags = resolveConsentFlags(tried);
+  const withdrawName = !!prior.responderName && !tried.responderName;
+  const withdrawAi = priorFlags.includeAiProvenance && !triedFlags.includeAiProvenance;
+  const withdrawResearch = priorFlags.includePredictionComparison && !triedFlags.includePredictionComparison;
+  if (!withdrawName && !withdrawAi && !withdrawResearch) return null;
+  const kept: Record<string, unknown> = {
+    ...prior,
+    version: 1,
+    includeAiProvenance: priorFlags.includeAiProvenance && !withdrawAi,
+    includePredictionComparison: priorFlags.includePredictionComparison && !withdrawResearch,
+  };
+  [
+    ...SAVED_CONSENT_KEYS,
+    ...(withdrawName ? ['responderName'] : []),
+    ...(withdrawAi ? AI_ATTRIBUTION_KEYS : []),
+    ...(withdrawResearch ? PREDICTION_RESEARCH_KEYS : []),
+  ].forEach((key) => delete kept[key]);
+  return kept;
+};

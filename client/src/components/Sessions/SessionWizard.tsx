@@ -169,7 +169,6 @@ import {
   NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE,
   NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
   SESSION_WIZARD_DEFAULT_TEMPLATE,
-  SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE,
 } from './sessionWizardConfig';
 import { getSessionSlugValidationError, isReservedSessionSlug } from './sessionWizardSlugValidation';
 import {
@@ -568,10 +567,9 @@ const SessionWizard = ({
   const {
     workerMode,
     setWorkerMode,
-    workerSecretsEnabled,
+    workerSecretsEnabled: savedWorkerSecretsEnabled,
     setWorkerSecretsEnabled,
     persistWorkerSecrets,
-    setPersistWorkerSecrets,
     deployHelperUrl,
     setDeployHelperUrl,
     deployForm,
@@ -600,6 +598,8 @@ const SessionWizard = ({
     setWorkerSecrets,
     workerUrlAutoFilled,
     setWorkerUrlAutoFilled,
+    nativeTemplateSetupIdentity,
+    setNativeTemplateSetupIdentity,
     workerAllowOrigins,
     setWorkerAllowOrigins,
     workerLimitPerWallet,
@@ -613,6 +613,15 @@ const SessionWizard = ({
     defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
     buildProvisionedSponsoredContextState,
   });
+  // "Require users to pay for usage" is a custom setting for decentralized
+  // sessions. Its saved choice applies only where its toggle shows; elsewhere
+  // (normal mode, other profiles) Worker secrets stay on, so the AI-key inputs
+  // never lock without a control. The saved choice returns with the toggle.
+  const userPaidUsageAvailable =
+    resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile).authorityMode ===
+    'evm_registry_canonical';
+  const userPaidUsageToggleShown = wizardMode === 'advanced' && userPaidUsageAvailable;
+  const workerSecretsEnabled = savedWorkerSecretsEnabled || !userPaidUsageToggleShown;
 
   useEffect(() => {
     const limits = draft?.limits;
@@ -634,7 +643,6 @@ const SessionWizard = ({
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
   const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const normalModeRetryBundleFileInputRef = useRef<HTMLInputElement | null>(null);
-  const sponsoredPublishBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const deployCompleteRef = useRef(deployComplete);
   const deployWorkerUrlRef = useRef(normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
   deployCompleteRef.current = deployComplete;
@@ -642,7 +650,8 @@ const SessionWizard = ({
   const provisionedSponsoredContextRef = useRef<ProvisionedSponsoredContextState>(
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );
-  const workerSecretsEnabledRef = useRef(workerSecretsEnabled);
+  // Holds the saved choice: sponsored-bundle restore puts it back as it was.
+  const workerSecretsEnabledRef = useRef(savedWorkerSecretsEnabled);
   const persistWorkerSecretsRef = useRef(persistWorkerSecrets);
   const workerSecretsRef = useRef<WorkerSecretsLike>(
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets),
@@ -711,7 +720,6 @@ const SessionWizard = ({
       workerSecretsRef,
       advancedBundleFileInputRef,
       normalModeRetryBundleFileInputRef,
-      sponsoredPublishBundleFileInputRef,
     },
     setWorkerSecrets,
     setDraft,
@@ -727,7 +735,6 @@ const SessionWizard = ({
     setNormalModeBundleUrlOverride,
     setWorkerUrlAutoFilled,
     setWorkerSecretsEnabled,
-    setPersistWorkerSecrets,
     setBundleFile,
     buildProvisionedSponsoredContextState,
   });
@@ -934,7 +941,7 @@ const SessionWizard = ({
       manualGasPriceGwei,
       manualMaxFeePerGasGwei,
       manualMaxPriorityFeePerGasGwei,
-      workerSecretsEnabled,
+      workerSecretsEnabled: savedWorkerSecretsEnabled,
       effectivePersistWorkerSecrets,
       workerSecrets,
       workerAllowOrigins,
@@ -946,6 +953,7 @@ const SessionWizard = ({
       workerRequirementProof,
       provisionedSponsoredContext,
       pendingWorkerGroupDrafts,
+      nativeTemplateSetupIdentity,
     });
     const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
     if (result.ok && result.status !== 'preserved-foreign-draft') wizardCacheSnapshotRef.current = cachePayload;
@@ -964,7 +972,7 @@ const SessionWizard = ({
     manualGasPriceGwei,
     manualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
-    workerSecretsEnabled,
+    savedWorkerSecretsEnabled,
     effectivePersistWorkerSecrets,
     workerSecrets,
     workerAllowOrigins,
@@ -976,6 +984,7 @@ const SessionWizard = ({
     workerRequirementProof,
     provisionedSponsoredContext,
     pendingWorkerGroupDrafts,
+    nativeTemplateSetupIdentity,
     workerCanonicalSettlement.isSettled,
   ]);
 
@@ -1406,7 +1415,7 @@ const SessionWizard = ({
     deployWorkerUrlRef,
     provisionedSponsoredContext,
     provisionedSponsoredContextRef,
-    workerSecretsEnabled,
+    workerSecretsEnabled: savedWorkerSecretsEnabled,
     workerSecretsEnabledRef,
     persistWorkerSecrets,
     persistWorkerSecretsRef,
@@ -2030,14 +2039,11 @@ const SessionWizard = ({
           return;
         }
         const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
-          wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
           deployForm: deployFormRef.current,
-          workerSecretsEnabled: workerSecretsEnabledRef.current,
+          workerSecretsEnabled: workerSecretsEnabledRef.current || !userPaidUsageToggleShown,
           currentWorkerSecrets,
           getMissingWorkerSecretsForDeploy,
-          hasBundleFile: !!bundleFile,
-          normalModeBundleUrlOverride,
         });
         const publishRequestDescriptor = resolveSessionWizardPublishRequestDescriptor({
           pendingDraftSnapshot,
@@ -2600,14 +2606,11 @@ const SessionWizard = ({
       workerMode,
     });
   const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
-    wizardMode,
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
     deployForm,
     workerSecretsEnabled,
     currentWorkerSecrets,
     getMissingWorkerSecretsForDeploy,
-    hasBundleFile: !!bundleFile,
-    normalModeBundleUrlOverride,
   });
   const normalModeBundleUrl = toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim();
   const { showSponsoredFaucetNotice, showSponsoredDeployAccessNotice } = resolveSponsoredBundleAdvancedFieldNotices({
@@ -2639,16 +2642,11 @@ const SessionWizard = ({
     shouldUseSponsoredAutoDeployFlow,
     showNormalModeManualBundleControls,
     showNormalModeWorkerStep,
-    showSponsoredBundleFallbackInput,
   } = resolveSessionWizardSponsoredPublishSurfaceState({
     isNormalMode,
-    wizardMode,
     workerMode,
-    bundleMode,
-    deployForm,
     sponsoredAutoDeployState,
     forceManualBundleFile,
-    hasBundleFile: !!bundleFile,
     normalModeBundleUrlOverride,
     normalModeDefaultBundleUrl: normalModeBundleUrl,
     manualBundleRetryMessage: NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE,
@@ -2900,6 +2898,8 @@ const SessionWizard = ({
       handleCopyAdminUrl={handleCopyAdminUrl}
       handleDeployWorker={handleDeployWorker}
       verifyNativeWorker={verifyNativeWorker}
+      nativeTemplateSetupIdentity={nativeTemplateSetupIdentity}
+      onNativeTemplateSetupGenerated={setNativeTemplateSetupIdentity}
       handleGateAddSbt={handleGateAddSbt}
       handleGateRemoveSbt={handleGateRemoveSbt}
       handleSavePendingSbtDraft={handleSavePendingSbtDraft}
@@ -2948,7 +2948,6 @@ const SessionWizard = ({
       onManualMaxFeePerGasGweiChange={setManualMaxFeePerGasGwei}
       onManualMaxPriorityFeePerGasGweiChange={setManualMaxPriorityFeePerGasGwei}
       onManualMetadataUrlChange={setManualMetadataUrl}
-      onNormalModeBundleUrlOverrideChange={setNormalModeBundleUrlOverride}
       onPublish={handlePublish}
       onRegistryChainIdChange={handleRegistryChainIdChange}
       onRetrySponsoredBundle={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
@@ -3013,7 +3012,6 @@ const SessionWizard = ({
       showNormalModeManualBundleControls={showNormalModeManualBundleControls}
       showNormalModeWorkerStep={showNormalModeWorkerStep}
       showSharedWorkerChoice={showSharedWorkerChoice}
-      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
       showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
       showWorkerUrlField={showWorkerUrlField}
       showNetworkSelector={sessionModeRequirements.requiresRpc}
@@ -3023,8 +3021,6 @@ const SessionWizard = ({
       signBootstrapAdminAction={signBootstrapAdminAction}
       sponsoredBundleKey={sponsoredBundleKeyInput}
       sponsoredBundleStatus={sponsoredBundleStatus}
-      sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
-      sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}
       status={status}
       t={t}
       toggleLoginModal={toggleLoginModal}
@@ -3038,6 +3034,7 @@ const SessionWizard = ({
       workerLimitPerAnonymousIp={workerLimitPerAnonymousIp}
       setWorkerLimitPerAnonymousIp={setWorkerLimitPerAnonymousIp}
       workerMode={workerMode}
+      showUserPaidUsage={userPaidUsageAvailable}
       workerSecretsEnabled={workerSecretsEnabled}
       workerUrlAutoFilled={workerUrlAutoFilled}
       workerUrlSource={workerUrlSource}

@@ -250,6 +250,21 @@ describe('surveyPileQuestionFlow', () => {
     });
   });
 
+  it('keeps the reached cards and place when a filtered pile only re-sorts', () => {
+    const plan = buildPileFilterResultPlan({
+      currentVisibleSignature: 'q1|q2|q3|q4',
+      currentPileQuestions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }],
+      currentActivePileIndex: 1,
+      nextVisibleQuestions: [{ id: 'q4' }, { id: 'q3' }, { id: 'q2' }, { id: 'q1' }],
+      currentFilterState: { tags: ['featured'] },
+      nextFilterState: { tags: ['featured'] },
+      buildQuestionListSignature: (questions) => questions.map((question) => String(question.id)).join('|'),
+    });
+
+    expect(plan.nextState.pileQuestions.map((question) => question.id)).toEqual(['q1', 'q2', 'q4', 'q3']);
+    expect(plan.nextState.activePileIndex).toBe(1);
+  });
+
   it('keeps filtered pile load plans pinned to the existing visible window when only metadata stays the same', () => {
     expect(
       buildPileLoadResultPlan({

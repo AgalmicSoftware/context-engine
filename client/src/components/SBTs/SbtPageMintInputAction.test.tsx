@@ -45,4 +45,26 @@ describe('SbtPageMintInputAction', () => {
     expect(screen.getByPlaceholderText('Claim Code')).toHaveAttribute('type', 'text');
     expect(screen.getByRole('button', { name: 'Start Claim' })).toBeDisabled();
   });
+
+  it('names what a pending button is waiting on when a pending label is given', () => {
+    render(
+      <SbtPageMintInputAction
+        buttonClassName="mint-button"
+        contentState={{
+          label: 'Join',
+          pendingLabel: 'Checking password…',
+          shouldRenderLabel: false,
+          shouldRenderPendingIcon: true,
+        }}
+        disabled
+        inputType="password"
+        inputValue="secret"
+        onAction={jest.fn()}
+        onInputChange={jest.fn()}
+        placeholder="Group Password"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Checking password…' })).toBeDisabled();
+  });
 });

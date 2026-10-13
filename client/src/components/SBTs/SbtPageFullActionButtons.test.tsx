@@ -34,6 +34,7 @@ const createMintProps = (
   onMint: jest.fn(),
   onMintUnlimitedWithGroupPassword: jest.fn(),
   onOpenMintTransaction: jest.fn(),
+  onRetryGroupPasswordCheck: jest.fn(),
   ...overrides,
 });
 
@@ -135,6 +136,30 @@ describe('SbtPageMintActionSurface', () => {
 
     expect(onMint).toHaveBeenCalledTimes(1);
     expect(onMint).toHaveBeenCalledWith(true);
+  });
+
+  it('offers Retry, not Join, while the group password check could not be read', () => {
+    const onMint = jest.fn();
+    const onRetryGroupPasswordCheck = jest.fn();
+    render(
+      <SbtPageMintActionSurface
+        {...createMintProps(
+          createMintDisplayState({ groupPasswordCheckUnreadable: true, hasGroupPasswordMint: true }),
+          {
+            onMint,
+            onRetryGroupPasswordCheck,
+          },
+        )}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Could not read this group's password check from the chain. Check the network and try again.",
+    );
+    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetryGroupPasswordCheck).toHaveBeenCalledTimes(1);
+    expect(onMint).not.toHaveBeenCalled();
   });
 
   it('renders no mint controls when the descriptor is hidden', () => {
@@ -241,6 +266,7 @@ describe('renderSbtPageFullActionSurfaces', () => {
         onMint,
         onMintUnlimitedWithGroupPassword: jest.fn(),
         onOpenMintTransaction: jest.fn(),
+        onRetryGroupPasswordCheck: jest.fn(),
       },
     });
 
@@ -282,6 +308,7 @@ describe('renderSbtPageFullActionSurfaces', () => {
         onMint: jest.fn(),
         onMintUnlimitedWithGroupPassword: jest.fn(),
         onOpenMintTransaction: jest.fn(),
+        onRetryGroupPasswordCheck: jest.fn(),
       },
     });
 

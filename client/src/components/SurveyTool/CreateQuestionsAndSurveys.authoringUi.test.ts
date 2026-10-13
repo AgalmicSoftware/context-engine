@@ -268,6 +268,61 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(treeHasText(modeToggles[0], 'Questions')).toBe(true);
   });
 
+  it('adds generated questions after a manual draft instead of replacing it', () => {
+    const instance = makeInstance();
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    const manual = { id: 'manual-id', uiKey: 'manual', type: 'freeform', prompt: 'My own question', tags: [] };
+    instance.state = {
+      ...instance.state,
+      title: 'My survey',
+      isStandaloneQuestion: false,
+      documentURLs: ['https://docs.example.test/mine'],
+      questions: [manual],
+    };
+
+    instance.handleAutoQuestionsGenerated(
+      [
+        { id: 'manual-id', type: 'freeform', prompt: 'My own question', tags: [] },
+        { type: 'binary', prompt: 'Generated question?', tags: [] },
+      ],
+      ['https://docs.example.test/source'],
+      'AI title',
+    );
+
+    expect(instance.state.questions.map((question) => question.prompt)).toEqual([
+      'My own question',
+      'Generated question?',
+    ]);
+    expect(instance.state.title).toBe('My survey');
+    expect(instance.state.isStandaloneQuestion).toBe(false);
+    expect(instance.state.documentURLs).toEqual(['https://docs.example.test/mine', 'https://docs.example.test/source']);
+    expect(instance.state.focusTargetUiKey).toBe(instance.state.questions[1].uiKey);
+  });
+
+  it('keeps standalone mode when generated questions join an untitled draft', () => {
+    const instance = makeInstance();
+    instance.clearUnfinishedSurveyDraft = jest.fn();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.state = {
+      ...instance.state,
+      title: '',
+      isStandaloneQuestion: true,
+      questions: [{ id: 'manual-id', uiKey: 'manual', type: 'freeform', prompt: 'My own question', tags: [] }],
+    };
+
+    instance.handleAutoQuestionsGenerated(
+      [{ type: 'binary', prompt: 'Generated question?', tags: [] }],
+      [],
+      'AI title',
+    );
+
+    expect(instance.state.questions).toHaveLength(2);
+    expect(instance.state.isStandaloneQuestion).toBe(true);
+  });
+
   it('renders labeled manual and AI mode switch text instead of icon-only toggle', () => {
     const instance = makeInstance();
 

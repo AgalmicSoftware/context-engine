@@ -95,6 +95,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
       toggleLoginModal: jest.fn(),
     },
   },
+  resolveDiffBaselineSlice: jest.fn(() => ({ answers: {}, additionalComments: {}, importance: {}, conviction: {} })),
   resolveEffectiveSlug: jest.fn(() => 'route-edge'),
   resolveEffectiveResponseGateConfig: jest.fn((_slug, props) => props?.sessionConfig || {}),
   resolveFieldEncryptionAudience: jest.fn(),
@@ -142,7 +143,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuest
     },
   },
   submitSurveyResponse: jest.fn(async () => ({
-    __ceQuestionResponses: [],
+    __ceQuestionResponses: [{ questionID: 'q1' }],
     __ceSubmissionGroupKey: 'draft-edge',
     __ceSurveyId: 'survey-1',
     __ceSurveyResponse: {},
@@ -396,6 +397,17 @@ describe('quadratic submission boundary', () => {
     expect(context.runSurveyQuestionsSubmitFailureController).not.toHaveBeenCalled();
   });
 
+  it('validates a quadratic answer whose pool id differs in case from the edited key', async () => {
+    const context = createContext();
+    context.stateRef.current.questionPool = [
+      { id: 'Q1', type: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 99 },
+    ];
+    context.stateRef.current.surveysResponseState[2].answers.q1.value = [8, -6];
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+    expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalled();
+  });
+
   it('allows a comment-only edit while the existing allocation remains encrypted', async () => {
     const context = createContext();
     context.stateRef.current.questionPool = [{ id: 'q1', type: 'quadratic', options: ['Parks', 'Transit'] }];
@@ -420,6 +432,7 @@ it('ranks submitted consent using the Worker receipt instead of the browser cloc
     responses: [{ questionID: 'q1', responderName: 'Participant' }],
   });
   context.submitSurveyResponse.mockResolvedValue({
+    __ceQuestionResponses: [{ questionID: 'q1' }],
     questionResponseRefs: [
       { questionId: 'q1', storageRef: { id: 'server-ref', createdAt: '2026-10-02T10:00:00.000Z' } },
     ],
@@ -429,5 +442,378 @@ it('ranks submitted consent using the Worker receipt instead of the browser cloc
   expect(editBaseline.interviewProvenance.q1).toMatchObject({
     consentSavedAt: Date.parse('2026-10-02T10:00:00.000Z'),
     consentStorageRefId: 'server-ref',
+  });
+});
+
+it('marks only the uploaded questions saved and keeps other changes drafted', async () => {
+  const context = createContext();
+  context.getChangedQidsAndFields.mockReturnValue({
+    changedQids: new Set(['q1', 'q2']),
+    changedMap: { q1: { answer: 1 }, q2: { answer: 1 } },
+  });
+  context.resolveDiffBaselineSlice.mockReturnValue({
+    answers: { q1: { value: 'Old' }, q2: { value: 'Saved' } },
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  });
+  context.stateRef.current.surveysResponseState[2] = {
+    answers: { q1: { value: 'Yes' }, q2: { value: '' } },
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  };
+
+  await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+    status: 'submitted',
+  });
+
+  expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
+  const { editBaseline } = context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0];
+  expect(editBaseline.answers).toEqual({ q1: { value: 'Yes' }, q2: { value: 'Saved' } });
+});
+
+describe('answer size budget', () => {
+  const KIB = 1024;
+  const half = 49_152 / 2;
+  // Counted as JSON strings: these fill half the locked-text budget each, quotes included.
+  const fill = (bytes: number, char = 'x') => char.repeat(bytes - 2);
+  const locked = (value: string) => ({ value, encrypted: true, encryptionAudience: 'self_admin' });
+  const TOO_LONG = /This answer( or comment)? is too long to save\. Shorten (it|them) by about [\d,]+ characters?\./;
+  const prepare = (
+    mode: 'cloudflare' | 'smart-contracts',
+    answer: unknown,
+    comment: unknown,
+    questionPool: Array<Record<string, unknown>> = [{ id: 'q1', type: 'freeform', prompt: 'Tell us more' }],
+  ) => {
+    const context = createContext();
+    context.propsRef.current.sessionConfig =
+      mode === 'cloudflare' ? makeWorkerConfig('https://worker.example', '0x00112233445566778899aabbccddeeff') : {};
+    context.stateRef.current.questionPool = questionPool;
+    context.stateRef.current.surveysResponseState[2] = {
+      answers: { q1: typeof answer === 'string' ? { value: answer } : answer },
+      additionalComments: { q1: typeof comment === 'string' ? { value: comment } : comment },
+      importance: {},
+      conviction: {},
+    };
+    return context;
+  };
+
+  it('refuses an oversized Worker answer before locking or upload, by name', async () => {
+    const context = prepare('cloudflare', locked(fill(half)), locked(fill(half + 10)));
+    const message =
+      "“Tell us more” wasn't submitted. This answer or comment is too long to save. Shorten them by about 10 characters.";
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message,
+    });
+    expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+    expect(context.verifyEncryption).not.toHaveBeenCalled();
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+    expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.objectContaining({ message }) }),
+    );
+  });
+
+  it('keeps the plain message on a single-question page', async () => {
+    const context = prepare('cloudflare', locked(fill(half)), locked(fill(half + 10)));
+    context.propsRef.current.singleQuestionMode = true;
+    // A single-question page keeps its answers in the first slice.
+    context.stateRef.current.surveysResponseState[0] = context.stateRef.current.surveysResponseState[2];
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: 'This answer or comment is too long to save. Shorten them by about 10 characters.',
+    });
+  });
+
+  it('submits a Worker answer that exactly fills the budget', async () => {
+    const context = prepare('cloudflare', locked(fill(half)), locked(fill(half)));
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+    expect(context.submitSurveyResponse).toHaveBeenCalled();
+  });
+
+  it('lets unlocked text use the whole stored answer', async () => {
+    const context = prepare('cloudflare', fill(40 * KIB), fill(20 * KIB, 'c'));
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+  });
+
+  it('leaves answers stored outside the Worker unchanged', async () => {
+    const context = prepare('smart-contracts', locked(fill(half)), locked(fill(half + 10)));
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(context.submitSurveyResponse).toHaveBeenCalled();
+  });
+
+  it('holds back only the oversized answers, names them, and submits the rest', async () => {
+    const context = prepare('cloudflare', 'Yes', '', [
+      { id: 'q1', type: 'freeform', prompt: 'First question' },
+      { id: 'q2', type: 'freeform', prompt: 'Second question' },
+    ]);
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q1', 'q2']),
+      changedMap: { q1: { answer: 1 }, q2: { answer: 1 } },
+    });
+    const slice = context.stateRef.current.surveysResponseState[2];
+    slice.answers.q2 = { value: fill(100 * KIB) };
+    slice.additionalComments.q2 = { value: '' };
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+
+    expect(context.submitSurveyResponse).toHaveBeenCalledWith(expect.anything(), new Set(['q1']), expect.anything());
+    expect(context.inst._heldBackSubmitQids).toEqual(['q2']);
+    expect(context.inst._heldBackSubmitMessage).toMatch(
+      /^“Second question” wasn't submitted\. This answer is too long/,
+    );
+    expect(context.setState).toHaveBeenCalledWith({ submissionError: context.inst._heldBackSubmitMessage });
+    // The held-back answer keeps its draft; only the uploaded one is cleared.
+    expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
+  });
+
+  it('keeps a held-back answer out of the saved answers it reports', async () => {
+    const context = prepare('cloudflare', 'Yes', '', [
+      { id: 'q1', type: 'freeform', prompt: 'First question' },
+      { id: 'q2', type: 'freeform', prompt: 'Second question' },
+      { id: 'q3', type: 'freeform', prompt: 'Third question' },
+    ]);
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q1', 'q2', 'q3']),
+      changedMap: { q1: { answer: 1 }, q2: { answer: 1 }, q3: { answer: 1 } },
+    });
+    const slice = context.stateRef.current.surveysResponseState[2];
+    slice.answers.q2 = { value: fill(100 * KIB) };
+    slice.answers.q3 = { value: fill(100 * KIB, 'z') };
+    const builtRow = (questionID: string, value: string) => ({ questionID, answer: { value } });
+    context.prepareJsonAndHash.mockImplementation((_index: number, _account: unknown, overrideSlice: any) => ({
+      responses: Object.entries(overrideSlice?.answers || {}).map(([qid, field]: [string, any]) =>
+        builtRow(qid, field.value),
+      ),
+    }));
+    // q2 has a saved answer; q3 was never saved.
+    const savedQ2 = { questionID: 'q2', answer: { value: 'Saved second answer' } };
+    context.stateRef.current.userAnswers = { responses: [savedQ2] };
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+
+    const [{ userAnswers }] = context.runSurveyQuestionsSubmitSuccessController.mock.calls[0];
+    expect(userAnswers.responses).toEqual([expect.objectContaining(builtRow('q1', 'Yes')), savedQ2]);
+  });
+
+  it('names every oversized answer when none can be submitted', async () => {
+    const context = prepare('cloudflare', fill(100 * KIB), '', [
+      { id: 'q1', type: 'freeform', prompt: 'First question' },
+      { id: 'q2', type: 'freeform', prompt: '[encrypted]' },
+    ]);
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q1', 'q2']),
+      changedMap: { q1: { answer: 1 }, q2: { answer: 1 } },
+    });
+    const slice = context.stateRef.current.surveysResponseState[2];
+    slice.answers.q2 = { value: fill(100 * KIB) };
+    slice.additionalComments.q2 = { value: '' };
+
+    const result = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+
+    expect(result.status).toBe('failed');
+    expect(result.message).toMatch(/^“First question” wasn't submitted\. This answer is too long/);
+    expect(result.message).toMatch(/ Question q2… wasn't submitted\. This answer is too long/);
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('keeps a held-back answer named when the rest then fails', async () => {
+    const context = prepare('cloudflare', 'Yes', '', [
+      { id: 'q1', type: 'freeform', prompt: 'First question' },
+      { id: 'q2', type: 'freeform', prompt: 'Second question' },
+    ]);
+    context.getChangedQidsAndFields.mockReturnValue({
+      changedQids: new Set(['q1', 'q2']),
+      changedMap: { q1: { answer: 1 }, q2: { answer: 1 } },
+    });
+    context.stateRef.current.surveysResponseState[2].answers.q2 = { value: fill(100 * KIB) };
+    context.submitSurveyResponse.mockRejectedValueOnce(new Error('Upload failed.'));
+
+    const result = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+
+    expect(result.status).toBe('failed');
+    expect(result.message).toMatch(/^Upload failed\. “Second question” wasn't submitted\./);
+  });
+
+  it('counts the prompt copy and locking against the stored answer cap', async () => {
+    // Inside the locked-text budget, but the 40 KiB prompt each stored answer
+    // repeats plus both locked envelopes pass the Worker's 96 KiB cap.
+    const context = prepare('cloudflare', locked(fill(24 * KIB)), locked(fill(23 * KIB)), [
+      { id: 'Q1', type: 'freeform', prompt: 'p'.repeat(40 * KIB) },
+    ]);
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: expect.stringMatching(TOO_LONG),
+    });
+    expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('counts the saved rating envelopes the upload keeps', async () => {
+    // The answer's lock is unchanged and the comment is newly locked; both saved
+    // ratings keep their envelopes, which take the stored answer over the cap.
+    const savedEnvelope = 'e'.repeat(3 * KIB);
+    const answer = {
+      value: '*',
+      encrypted: true,
+      encryptionAudience: 'self_admin',
+      encryptedPortion: 'a'.repeat(2 * KIB),
+    };
+    const context = prepare('cloudflare', answer, locked(fill(46 * KIB)), [
+      { id: 'q1', type: 'freeform', prompt: 'p'.repeat(28 * KIB) },
+    ]);
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
+
+    const withSavedRatings = prepare('cloudflare', answer, locked(fill(46 * KIB)), [
+      { id: 'q1', type: 'freeform', prompt: 'p'.repeat(28 * KIB) },
+    ]);
+    withSavedRatings.stateRef.current.userAnswers = {
+      responses: [{ questionID: 'q1', importanceEncrypted: savedEnvelope, convictionEncrypted: savedEnvelope }],
+    };
+    await expect(createSurveyQuestionsSubmitRuntime(withSavedRatings).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: expect.stringMatching(TOO_LONG),
+    });
+  });
+
+  it('counts saved rating envelopes kept under a blank locked comment', async () => {
+    // The comment's lock still covers the ratings, so the upload keeps their
+    // saved envelopes even though the comment itself is sent empty.
+    const savedEnvelope = 'e'.repeat(3 * KIB);
+    const answerText = fill(93 * KIB);
+    const run = async (commentLocked: boolean) => {
+      const context = prepare('cloudflare', answerText, {
+        value: '',
+        ...(commentLocked ? { encrypted: true, encryptionAudience: 'self_admin' } : {}),
+      });
+      const slice = context.stateRef.current.surveysResponseState[2];
+      slice.importance = { q1: 4 };
+      slice.conviction = { q1: 7 };
+      context.stateRef.current.userAnswers = {
+        responses: [
+          {
+            questionID: 'q1',
+            importance: null,
+            conviction: null,
+            importanceEncrypted: savedEnvelope,
+            convictionEncrypted: savedEnvelope,
+          },
+        ],
+      };
+      // The built answer sends a blank comment unlocked.
+      context.prepareJsonAndHash.mockReturnValue({
+        responses: [
+          {
+            questionID: 'q1',
+            prompt: 'Tell us more',
+            importance: 4,
+            conviction: 7,
+            answer: { value: answerText, encrypted: false, encryptedPortion: '' },
+            additional: { value: '', encrypted: false, encryptionAudience: 'self_admin', encryptedPortion: '' },
+          },
+        ],
+      });
+      return createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    };
+
+    await expect(run(true)).resolves.toEqual({ status: 'failed', message: expect.stringMatching(TOO_LONG) });
+    // Unlocked, the known ratings go public and their envelopes are dropped.
+    await expect(run(false)).resolves.toEqual({ status: 'submitted' });
+  });
+
+  it('sizes a gate lock by the SBTs its recipients list', async () => {
+    const gateRecipient = (sbtCount: number) => ({
+      chain: 'optimismSepolia',
+      accessControlConditions: Array.from({ length: sbtCount }, (_, index) => ({
+        contractAddress: `0x${String(index + 1).padStart(40, '0')}`,
+      })),
+    });
+    const run = async (sbtCount: number) => {
+      const gated = { value: fill(23 * KIB), encrypted: true, encryptionAudience: 'gate' };
+      const context = prepare('cloudflare', gated, { ...gated }, [
+        { id: 'q1', type: 'freeform', prompt: 'p'.repeat(12 * KIB) },
+      ]);
+      context.stateRef.current.surveysResponseState[2].importance = { q1: 4 };
+      context.stateRef.current.surveysResponseState[2].conviction = { q1: 7 };
+      context.buildFieldEncryptionWorkGroupsCore.mockReturnValue({
+        groups: [
+          {
+            recipients: [gateRecipient(sbtCount)],
+            qids: ['q1'],
+            slice: { answers: { q1: gated }, additionalComments: { q1: gated } },
+          },
+        ],
+        missingRecipients: [],
+      });
+      return createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    };
+
+    await expect(run(8)).resolves.toEqual({ status: 'failed', message: expect.stringMatching(TOO_LONG) });
+    await expect(run(1)).resolves.toEqual(expect.objectContaining({ status: 'submitted' }));
+  });
+
+  it('counts copies of the answer in the built upload, such as an interview record', async () => {
+    const text = fill(33 * KIB);
+    const run = async (withRecord: boolean) => {
+      const context = prepare('cloudflare', text, '');
+      context.prepareJsonAndHash.mockReturnValue({
+        responses: [
+          {
+            questionID: 'q1',
+            prompt: 'Tell us more',
+            answer: { value: text, encrypted: false, encryptedPortion: '' },
+            additional: { value: '', encrypted: false, encryptedPortion: '' },
+            ...(withRecord
+              ? {
+                  interviewProvenance: {
+                    finalSubmitted: { answer: text },
+                    predictionComparison: { submitted: { answer: text } },
+                  },
+                }
+              : {}),
+          },
+        ],
+      });
+      return createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    };
+
+    await expect(run(false)).resolves.toEqual({ status: 'submitted' });
+    await expect(run(true)).resolves.toEqual({ status: 'failed', message: expect.stringMatching(TOO_LONG) });
+  });
+
+  it('refuses answers to a question whose prompt alone fills the stored answer', async () => {
+    const context = prepare('cloudflare', 'Yes', '', [{ id: 'q1', type: 'freeform', prompt: 'p'.repeat(96 * KIB) }]);
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: expect.stringMatching(
+        /wasn't submitted\. Answers to this question can't be saved because its prompt is too long\. Ask the session admin to shorten it\.$/,
+      ),
+    });
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('counts a locked question by its masked prompt copy', async () => {
+    const context = prepare('cloudflare', 'Yes', '', [
+      { id: 'q1', type: 'freeform', prompt: 'p'.repeat(96 * KIB), encryption: { gates: [{ sbtAddress: '0xabc' }] } },
+    ]);
+
+    await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+      status: 'submitted',
+    });
   });
 });

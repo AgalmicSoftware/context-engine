@@ -134,6 +134,25 @@ export const buildPileQuestionPipelineState = ({
   };
 };
 
+// Cards the responder has already reached keep their places when the pile re-sorts, so the
+// visible card never changes under them; only cards they have not reached follow the new order.
+export const keepReachedPileCards = <Question extends PileQuestionLike>(
+  nextQuestions: Question[],
+  shownQuestions: PileQuestionLike[] | null | undefined,
+  activePileIndex: unknown,
+): Question[] => {
+  const shown = Array.isArray(shownQuestions) ? shownQuestions : [];
+  if (!shown.length || !nextQuestions.length) return nextQuestions;
+  const idOf = (question: PileQuestionLike) => String(question?.id || '').toLowerCase();
+  const nextById = new Map(nextQuestions.map((question) => [idOf(question), question]));
+  const reached = shown
+    .slice(0, Math.max(0, Number(activePileIndex) || 0) + 1)
+    .map((question) => nextById.get(idOf(question)))
+    .filter((question): question is Question => !!question);
+  const reachedIds = new Set(reached.map(idOf));
+  return [...reached, ...nextQuestions.filter((question) => !reachedIds.has(idOf(question)))];
+};
+
 export const buildPileQuestionLoadState = ({
   visibleQuestions = [],
   hiddenQuestions = [],
@@ -233,6 +252,8 @@ export type PileFilterResultPlan = {
 
 export const buildPileFilterResultPlan = ({
   currentVisibleSignature = '',
+  currentPileQuestions = [],
+  currentActivePileIndex = 0,
   nextVisibleQuestions = [],
   currentFilterState = {},
   nextFilterState = {},
@@ -242,6 +263,8 @@ export const buildPileFilterResultPlan = ({
   serializeFilterState = (filterState: unknown) => JSON.stringify(filterState || {}),
 }: {
   currentVisibleSignature?: string | null;
+  currentPileQuestions?: PileQuestionLike[] | null;
+  currentActivePileIndex?: number | null;
   nextVisibleQuestions?: PileQuestionLike[] | null;
   currentFilterState?: PileFilterStateLike | null;
   nextFilterState?: PileFilterStateLike | null;
@@ -250,9 +273,7 @@ export const buildPileFilterResultPlan = ({
   buildQuestionListSignature?: BuildQuestionListSignature;
   serializeFilterState?: (filterState: unknown) => string;
 } = {}): PileFilterResultPlan => {
-  const normalizedVisibleQuestions = Array.isArray(nextVisibleQuestions) ? nextVisibleQuestions : [];
   const normalizedCurrentVisibleSignature = String(currentVisibleSignature || '');
-  const nextVisibleSignature = buildQuestionListSignature(normalizedVisibleQuestions);
   const normalizedCurrentFilterState = (
     currentFilterState && typeof currentFilterState === 'object' ? currentFilterState : {}
   ) as PileFilterStateLike;
@@ -261,6 +282,13 @@ export const buildPileFilterResultPlan = ({
   ) as PileFilterStateLike;
   const currentFilterSignature = serializeFilterState(normalizedCurrentFilterState);
   const nextFilterSignature = serializeFilterState(normalizedNextFilterState);
+  // A new filter starts at its first card; a data refresh keeps the responder's place.
+  const filterChanged = currentFilterSignature !== nextFilterSignature;
+  const sortedVisibleQuestions = Array.isArray(nextVisibleQuestions) ? nextVisibleQuestions : [];
+  const normalizedVisibleQuestions = filterChanged
+    ? sortedVisibleQuestions
+    : keepReachedPileCards(sortedVisibleQuestions, currentPileQuestions, currentActivePileIndex);
+  const nextVisibleSignature = buildQuestionListSignature(normalizedVisibleQuestions);
   const shouldSkipStateUpdate = shouldSkipPileFilterStateUpdate({
     nextVisibleSignature,
     currentVisibleSignature: normalizedCurrentVisibleSignature,
@@ -273,7 +301,12 @@ export const buildPileFilterResultPlan = ({
   return {
     nextState: {
       pileQuestions: normalizedVisibleQuestions,
-      activePileIndex: 0,
+      activePileIndex: filterChanged
+        ? 0
+        : Math.min(
+            Math.max(0, Number(currentActivePileIndex) || 0),
+            Math.max(normalizedVisibleQuestions.length - 1, 0),
+          ),
       filterState: normalizedNextFilterState,
       hasHiddenGatedQuestions: !!nextHiddenGated,
     },

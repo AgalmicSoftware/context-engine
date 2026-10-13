@@ -25,7 +25,7 @@
     ? storedTheme
     : isAllowed(deploymentTheme)
       ? deploymentTheme
-      : 'context-engine';
+      : 'civic';
 
   root.dataset.ceTheme = themeId;
   root.dataset.ceColorVision = colorBlindMode ? 'color-blind' : 'standard';
@@ -34,5 +34,18 @@
     : isAllowed(deploymentTheme)
       ? 'deployment'
       : 'default';
-  root.style.colorScheme = themeId === 'classic-95' ? 'light' : 'dark';
+  var lightThemeIds = String(root.dataset.ceLightThemes || '')
+    .split(' ')
+    .filter(Boolean);
+  root.style.colorScheme = lightThemeIds.indexOf(themeId) !== -1 ? 'light' : 'dark';
+
+  // Match the browser bar to the theme's page background before the app loads.
+  var themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  var themeColors = String(root.dataset.ceThemeColors || '').split(' ');
+  for (var index = 0; themeColorMeta && index < themeColors.length; index += 1) {
+    var separator = themeColors[index].lastIndexOf(':');
+    if (separator > 0 && themeColors[index].slice(0, separator) === themeId) {
+      themeColorMeta.setAttribute('content', themeColors[index].slice(separator + 1));
+    }
+  }
 })();

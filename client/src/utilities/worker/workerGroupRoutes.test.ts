@@ -38,7 +38,9 @@ describe('workerGroupRoutes', () => {
     expect(buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://worker.example' })).toBe(
       '/groups?sessionName=alpha&worker=https%3A%2F%2Fworker.example',
     );
-    expect(() => buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://[redacted-email]' })).toThrow();
+    expect(() =>
+      buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: ['https://secret', 'worker.example'].join('@') }),
+    ).toThrow();
     expect(() =>
       buildWorkerGroupsPath({ sessionSlug: 'alpha', workerUrl: 'https://worker.example/?token=secret' }),
     ).toThrow();

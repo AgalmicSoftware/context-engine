@@ -7,12 +7,11 @@ import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
   buildPileRuntimeInitialState,
-  buildSessionInterviewSubmitContextToken,
   createPileViewRuntimeStrategy,
   recordInterviewProvenance,
   submitSessionInterviewResponses,
-  loadSessionInterviewOwnAnswers,
 } from './SurveyPileViewMode';
+import { buildSessionInterviewSubmitContextToken, loadSessionInterviewOwnAnswers } from './surveySavedAnswerGate';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
   buildNoPendingPileSubmitFeedbackPlan,
@@ -584,6 +583,24 @@ describe('SurveyPileViewMode runtime surface', () => {
     }
   });
 
+  it('mounts the voice-mode modal on first open and keeps it mounted after closing', async () => {
+    mockVoiceModeProps = undefined;
+    renderPile({}, { route: '/session/demo' });
+    const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    // A closed modal is never rendered, so its code is not loaded on a plain visit.
+    expect(mockVoiceModeProps).toBeUndefined();
+
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+    await act(async () => mockVoiceModeProps.onClose());
+    await waitFor(() => expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument());
+    expect(mockVoiceModeProps.isOpen).toBe(false);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE));
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+  });
+
   it('opens interview and group conversation directly from their mode query values', async () => {
     const first = renderPile({}, { route: '/session/demo?foo=1&mode=interview' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
@@ -1042,6 +1059,29 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await submitSessionInterviewResponses(engine, ['q1'])).toEqual({ status: 'submitted' });
     expect(engine.getSessionInterviewResponseReadinessToken).toHaveBeenCalledTimes(1);
     expect(engine.handlePileSubmitClick).toHaveBeenCalledTimes(3);
+  });
+
+  it('checks questions the last upload left out against the saved baseline', async () => {
+    const engine = {
+      props: { loginComplete: true },
+      state: {
+        // After a Submit, userAnswers holds only the rows that upload sent.
+        userAnswers: { responses: [{ questionId: 'q1' }] },
+        editBaseline: { answers: { q1: { value: 'Agree' }, q2: { value: 'Disagree' } } },
+        surveysResponseState: [{ answers: { q1: { value: 'Agree' }, q2: { value: 'Disagree' } } }],
+        isSubmitting: false,
+      },
+      valuesEqual: (a, b) => a === b,
+      getSubmitCount: jest.fn(() => 0),
+      buildSliceFromUserAnswers: jest.fn(() => ({ answers: { q1: { value: 'Agree' } } })),
+      handlePileSubmitClick: jest
+        .fn()
+        .mockResolvedValue({ status: 'failed', message: 'No new or changed responses to submit.' }),
+    };
+    expect(await submitSessionInterviewResponses(engine, ['q1', 'q2'])).toEqual({ status: 'already-saved' });
+    // A question with no saved row and no saved baseline is still not saved.
+    expect(await submitSessionInterviewResponses(engine, ['q2', 'q3'])).toMatchObject({ status: 'failed' });
+    expect(engine.handlePileSubmitClick).toHaveBeenCalledTimes(1);
   });
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {

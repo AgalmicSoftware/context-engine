@@ -1,4 +1,4 @@
-import { normalizeSbtFullScanPolicy, readSbtFullScanPolicy, writeSbtFullScanPolicy } from './sbtFullScanPolicy.js';
+import { normalizeSbtFullScanPolicy, readSbtFullScanPolicy } from './sbtFullScanPolicy.js';
 
 describe('sbtFullScanPolicy helpers', () => {
   beforeEach(() => {
@@ -46,11 +46,5 @@ describe('sbtFullScanPolicy helpers', () => {
     // localStorage still wins, even when invalid.
     localStorage.setItem('ce:sbtFullScanPolicy', 'not-valid');
     expect(readSbtFullScanPolicy()).toBe('auto');
-  });
-
-  it('writeSbtFullScanPolicy writes localStorage and globalThis without reload', () => {
-    expect(writeSbtFullScanPolicy('sbts')).toBe('sbts');
-    expect(localStorage.getItem('ce:sbtFullScanPolicy')).toBe('sbts');
-    expect((globalThis as Record<string, unknown>).CE_SBT_FULL_SCAN_POLICY).toBe('sbts');
   });
 });

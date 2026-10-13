@@ -1,6 +1,6 @@
 import { useInterviewReadiness } from './useInterviewReadiness';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -1682,7 +1682,8 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed answer'));
-    expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'Existing explanation');
+    // The AI proposed no comment and none was edited, so the existing comment is left as it is.
+    expect(baseProps.onApplyAdditional).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Original prediction' })]),
@@ -1697,6 +1698,38 @@ describe('SessionVoiceModeModal', () => {
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+  });
+
+  it('treats a masked comment as locked instead of showing or re-sending "*"', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', confidence: 0.81 },
+    ]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v1',
+          source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
+          responderContext: { summary: 'Relevant context' },
+        }}
+        existingResponseSlice={{
+          answers: { q1: { value: 'Existing answer' } },
+          additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: '{"v":1}' } },
+        }}
+      />,
+    );
+
+    const review = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(within(review).queryByText('*')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Original prediction'));
+    expect(baseProps.onApplyAdditional).not.toHaveBeenCalled();
   });
 
   it.each(['submitted', 'already-saved'])(
@@ -1990,6 +2023,96 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).not.toContain('claude-example');
   });
 
+  it('sends only the reviewed responder context to the interviewer and the draft mapper', async () => {
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      options.onTranscript?.('Responder: I mostly care about local policy.', []);
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: 'Responder: I mostly care about local policy.', turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => '',
+      };
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v5',
+          source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+          responderContext: {
+            name: 'Fixture Person',
+            facts: [
+              { fact: 'Works on local policy', evidence: 'stated', relatedQuestionIds: ['q1'] },
+              { fact: 'Removed private detail', evidence: 'inferred', relatedQuestionIds: ['q1'] },
+            ],
+          },
+          responses: [{ questionId: 'q1', answer: 'Local policy', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT), {
+      target: { value: 'Works on local policy' },
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const instructions = mockedStartSessionRealtimeInterview.mock.calls[0][0].instructions;
+    expect(instructions).toContain('Works on local policy');
+    expect(instructions).not.toContain('Removed private detail');
+    expect(instructions).not.toContain('Fixture Person');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    const { prefillPacket } = mockedMapInterviewEvidenceToResponses.mock.calls[0][0];
+    expect(prefillPacket?.responderContext).toEqual({ summary: 'Works on local policy' });
+  });
+
+  it('offers drafts for a later round whose connection dropped after earlier drafts exist', async () => {
+    const rounds: Array<Parameters<typeof startSessionRealtimeInterview>[0]> = [];
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      rounds.push(options);
+      const text = `Responder: Round ${rounds.length} answer.`;
+      options.onRecordingState?.('recording');
+      options.onTranscript?.(text, []);
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: text, turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => text,
+      };
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Round 1 draft', confidence: 0.8 },
+    ]);
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    await act(async () => {
+      rounds[1].onError?.(new Error('Interview connection lost. Generate drafts from the captured transcript.'));
+      rounds[1].onRecordingState?.('stopped');
+    });
+
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(2));
+    expect(mockedMapInterviewEvidenceToResponses.mock.calls[1][0].transcript).toContain('Round 2 answer.');
+    await waitFor(() => expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument());
+  });
+
   it('uses the pile-view Agree, Unsure, and Disagree control for binary drafts', async () => {
     const prefillPacket = {
       version: 1 as const,
@@ -2248,6 +2371,50 @@ describe('SessionVoiceModeModal', () => {
     expect(mapInterviewEvidenceToResponses).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
+  });
+
+  it('checks a prefill link again once a stale cached question set refreshes', async () => {
+    const fresh = [
+      { id: 'q1', prompt: 'What matters?', type: 'freeform' },
+      { id: 'q2', prompt: 'Added since the last visit?', type: 'freeform' },
+    ];
+    mockedHashInterviewQuestions.mockImplementation(async (questions) =>
+      questions.length === 2 ? 'a'.repeat(64) : 'b'.repeat(64),
+    );
+    jest.mocked(globalThis.fetch).mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            type: 'context-engine.interview-question-catalog',
+            version: 1,
+            sessionSlug: 'demo',
+            prefillPromptVersion: 'ce-interview-brief-v5',
+            questionSetHash: 'a'.repeat(64),
+            questions: fresh.map((question) => ({ ...question, options: [] })),
+          }),
+        ),
+    );
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        questionSetHash: 'a'.repeat(64),
+        promptVersion: 'ce-interview-brief-v5',
+        source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
+        responderContext: {},
+        responses: [{ questionId: 'q2', answer: 'Fresh answer', confidence: 0.8 }],
+      },
+    };
+    // The pile first shows a cached question set that predates the link.
+    const view = render(<SessionVoiceModeModal {...props} questionPool={[fresh[0]]} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/older or different question set/i);
+
+    view.rerender(<SessionVoiceModeModal {...props} questionPool={fresh} />);
+
+    await expectReadableDraftText('Draft answer for Added since the last visit?', 'Fresh answer');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('accepts a fresh bounded Worker catalog when the local session contains 101 questions', async () => {

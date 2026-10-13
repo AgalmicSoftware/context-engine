@@ -83,6 +83,7 @@ const createPileEngine = () => {
     valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b, true),
   });
   const engine = {
+    props: {},
     get state() {
       return stateRef.current;
     },
@@ -174,6 +175,16 @@ describe('interview draft resubmission', () => {
 
     await applySessionInterviewAnswer(engine, 'q-binary', 'Disagree');
     expect(answerOf('q-binary')).toBe('Disagree');
+  });
+
+  it('does not apply a draft after the account changes during an already-ready cache check', async () => {
+    const { engine, answerOf } = createPileEngine();
+    engine.props = { account: '0x00000000000000000000000000000000000000a1' };
+    const applying = applySessionInterviewAnswer(engine, 'q-binary', 'Agree');
+    engine.props = { account: '0x00000000000000000000000000000000000000b2' };
+
+    await expect(applying).rejects.toThrow('The signed-in account or session changed.');
+    expect(answerOf('q-binary')).toBeUndefined();
   });
 
   it('leaves the ordinary binary input toggle unchanged', () => {

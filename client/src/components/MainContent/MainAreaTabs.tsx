@@ -2,7 +2,7 @@
 
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCompass, faGlobe, faPlay, faTools } from '@fortawesome/free-solid-svg-icons';
+import { faCompass, faGlobe, faTools } from '@fortawesome/free-solid-svg-icons';
 import { createLogger } from '../../utilities/logging';
 
 import styles from './MainContent.module.scss';
@@ -20,14 +20,15 @@ const OnboardingWalkthrough = React.lazy(() => import('./OnboardingWalkthrough')
 const CommunityTab = React.lazy(() => import('../CommunityTab/CommunityTab'));
 
 export const MAIN_AREA_TABS = Object.freeze({
-  LATEST: 1,
   COMMUNITY: 3,
   TOOLS: 4,
   WELCOME: 5,
 });
 
+// Keep the remaining tab IDs stable; a retained Latest selection opens the default Tools view.
+const resolveFocusedTab = (focusedTab: number) => (focusedTab === 1 ? MAIN_AREA_TABS.TOOLS : focusedTab);
+
 const MAIN_AREA_TAB_TITLES = Object.freeze({
-  [MAIN_AREA_TABS.LATEST]: 'Latest',
   [MAIN_AREA_TABS.COMMUNITY]: 'Stats',
   [MAIN_AREA_TABS.TOOLS]: 'Tools',
   [MAIN_AREA_TABS.WELCOME]: 'Welcome',
@@ -73,7 +74,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
     this.setState((prevState) => ({
       mountedTabs: {
         ...(prevState.mountedTabs || {}),
-        [this.props.focusedTab]: true,
+        [resolveFocusedTab(this.props.focusedTab)]: true,
       },
     }));
   }
@@ -87,7 +88,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
       this.setState((prevState) => ({
         mountedTabs: {
           ...(prevState.mountedTabs || {}),
-          [this.props.focusedTab]: true,
+          [resolveFocusedTab(this.props.focusedTab)]: true,
         },
       }));
     }
@@ -105,6 +106,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
   };
 
   render() {
+    const focusedTab = resolveFocusedTab(this.props.focusedTab);
     const activeClassName = (isActive: boolean) => (isActive ? 'active' : '');
     return (
       <div className={styles.mainAreaTabsAlt}>
@@ -113,23 +115,11 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
             <Nav className="nav-tabs-info" role="tablist" tabs>
               <NavItem>
                 <NavLink
-                  className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
-                  onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
-                  role="tab"
-                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]}
-                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.LATEST}
-                >
-                  <FontAwesomeIcon icon={faPlay} className={styles.navTabIcon} />
-                  <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]} </div>
-                </NavLink>
-              </NavItem>
-              <NavItem>
-                <NavLink
-                  className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY)}
+                  className={activeClassName(focusedTab === MAIN_AREA_TABS.COMMUNITY)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.COMMUNITY)}
                   role="tab"
                   aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]}
-                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY}
+                  aria-selected={focusedTab === MAIN_AREA_TABS.COMMUNITY}
                   data-testid={E2E_TESTIDS.MAIN_STATS_TAB}
                 >
                   <FontAwesomeIcon icon={faGlobe} className={styles.navTabIcon} />
@@ -138,11 +128,11 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
               </NavItem>
               <NavItem>
                 <NavLink
-                  className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.TOOLS)}
+                  className={activeClassName(focusedTab === MAIN_AREA_TABS.TOOLS)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.TOOLS)}
                   role="tab"
                   aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]}
-                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.TOOLS}
+                  aria-selected={focusedTab === MAIN_AREA_TABS.TOOLS}
                 >
                   <FontAwesomeIcon icon={faTools} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]} </div>
@@ -150,11 +140,11 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
               </NavItem>
               <NavItem>
                 <NavLink
-                  className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
+                  className={activeClassName(focusedTab === MAIN_AREA_TABS.WELCOME)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
                   role="tab"
                   aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]}
-                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.WELCOME}
+                  aria-selected={focusedTab === MAIN_AREA_TABS.WELCOME}
                 >
                   <FontAwesomeIcon icon={faCompass} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]} </div>
@@ -163,7 +153,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
             </Nav>
           </CardHeader>
           <CardBody className={styles.mainAreaCardBody}>
-            <TabContent className="tab-space" activeTab={'link' + this.props.focusedTab}>
+            <TabContent className="tab-space" activeTab={'link' + focusedTab}>
               <TabPane tabId={'link' + MAIN_AREA_TABS.COMMUNITY}>
                 {this.state.mountedTabs[MAIN_AREA_TABS.COMMUNITY] ? (
                   <Suspense fallback={<LazyFallback label="Loading..." />}>

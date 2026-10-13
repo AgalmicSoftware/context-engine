@@ -1,6 +1,11 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
-import { recoverFromStaleChunkLoadError } from '../../bootRecovery.js';
+import {
+  isBrowserOffline,
+  isStaleChunkLoadError,
+  recoverFromStaleChunkLoadError,
+  reloadForStaleChunk,
+} from '../../bootRecovery.js';
 
 type RouteErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -10,6 +15,8 @@ type RouteErrorBoundaryProps = {
 type RouteErrorBoundaryState = {
   hasError: boolean;
   errorMessage: string;
+  staleChunk: boolean;
+  offline: boolean;
 };
 
 class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
@@ -18,13 +25,18 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
     this.state = {
       hasError: false,
       errorMessage: '',
+      staleChunk: false,
+      offline: false,
     };
   }
 
   static getDerivedStateFromError(error: Error | null): RouteErrorBoundaryState {
+    const staleChunk = isStaleChunkLoadError(error);
     return {
       hasError: true,
       errorMessage: error && error.message ? error.message : 'An unexpected error occurred.',
+      staleChunk,
+      offline: staleChunk && isBrowserOffline(),
     };
   }
 
@@ -35,19 +47,28 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
 
   componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
     if (this.state.hasError && this.props.resetKey && this.props.resetKey !== prevProps.resetKey) {
-      this.setState({ hasError: false, errorMessage: '' });
+      this.setState({ hasError: false, errorMessage: '', staleChunk: false, offline: false });
     }
   }
 
   handleTryAgain = () => {
+    // Regression guard: React.lazy caches a rejected chunk import, so a re-render
+    // cannot recover from a deploy; reload the page to fetch the new chunks.
+    if (this.state.staleChunk) {
+      reloadForStaleChunk();
+      return;
+    }
     this.setState({
       hasError: false,
       errorMessage: '',
+      staleChunk: false,
+      offline: false,
     });
   };
 
   render() {
     if (this.state.hasError) {
+      const { staleChunk, offline } = this.state;
       return (
         <div
           style={{
@@ -68,8 +89,21 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
               padding: '20px',
             }}
           >
-            <h3 style={{ margin: '0 0 10px 0', color: 'var(--ce-panel-text)' }}>This section encountered an error</h3>
-            <p style={{ margin: '0 0 16px 0', color: 'var(--ce-panel-text-muted)' }}>{this.state.errorMessage}</p>
+            {/* A stale chunk is a new deploy or a lost connection, not a bug: skip the raw module URL. */}
+            <h3 style={{ margin: '0 0 10px 0', color: 'var(--ce-panel-text)' }}>
+              {offline
+                ? 'You appear to be offline'
+                : staleChunk
+                  ? 'A new version of Context Engine is available'
+                  : 'This section encountered an error'}
+            </h3>
+            <p style={{ margin: '0 0 16px 0', color: 'var(--ce-panel-text-muted)' }}>
+              {offline
+                ? 'Reconnect, then reload the page to finish loading this section.'
+                : staleChunk
+                  ? 'Reload the page to finish loading this section.'
+                  : this.state.errorMessage}
+            </p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"
@@ -84,7 +118,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
                   cursor: 'pointer',
                 }}
               >
-                Try again
+                {staleChunk ? 'Reload' : 'Try again'}
               </button>
               <button
                 type="button"
@@ -100,25 +134,27 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
               >
                 Go back
               </button>
-              <a
-                href={PUBLIC_REPO_NEW_ISSUE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="ce-error-report-github"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '8px 14px',
-                  borderRadius: '8px',
-                  color: 'var(--ce-action-accent)',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  border: '1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent)',
-                  background: 'color-mix(in srgb, var(--ce-action-accent) 8%, transparent)',
-                }}
-              >
-                Report this issue on GitHub
-              </a>
+              {staleChunk ? null : (
+                <a
+                  href={PUBLIC_REPO_NEW_ISSUE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="ce-error-report-github"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    color: 'var(--ce-action-accent)',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    border: '1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent)',
+                    background: 'color-mix(in srgb, var(--ce-action-accent) 8%, transparent)',
+                  }}
+                >
+                  Report this issue on GitHub
+                </a>
+              )}
             </div>
           </div>
         </div>

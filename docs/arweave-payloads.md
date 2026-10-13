@@ -414,7 +414,8 @@ await contractScripts.submitResponses(
   groupCfg
 );
 
-// SBT create (tokenURI is the Arweave tx id)
+// SBT create (tokenURI is the Arweave tx id). Groups without a group password
+// pass a zero groupPasswordHash here.
 await contractScripts.createSBT(
   'wagmi',
   sbtName,
@@ -426,7 +427,23 @@ await contractScripts.createSBT(
   burnAuth,
   hashedPasswords,
   tokenUriTxId,
-  groupPasswordHash,
+  ethers.constants.HashZero,
   groupCfg
+);
+
+// Group passwords: the v4 hash is salted by the group's own address, so predict
+// the configured CREATE2 address, derive the hash for it, then deploy with the
+// same salt and options from the admin wallet.
+const deployOptions = { useConfiguredDeterministic: true, initializeGroupPasswordHash: true };
+const sbtAddress = await contractScripts.predictSBTAddress(
+  'wagmi', sbtName, sbtSymbol, limitedNumber, adminAddress, mintingEndTime,
+  hasPasswordMint, burnAuth, hashedPasswords, '', ethers.constants.HashZero,
+  groupCfg, create2Salt, deployOptions
+);
+const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash({ password, sbtAddress });
+await contractScripts.createSBT(
+  'wagmi', sbtName, sbtSymbol, limitedNumber, adminAddress, mintingEndTime,
+  hasPasswordMint, burnAuth, hashedPasswords, tokenUriTxId, groupPasswordHash,
+  groupCfg, create2Salt, deployOptions
 );
 ```

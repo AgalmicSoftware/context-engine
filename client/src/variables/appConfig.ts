@@ -30,22 +30,14 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
 // fresh installs / no-storage cases honor this env default.
 export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', false);
 // Bundled runtime theme selected when no explicit user preference is stored.
-// Unknown values fail closed to `context-engine` in the theme registry.
-export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'context-engine');
-// Opt-in exposure gate. Keep false until the deployment's route and
-// accessibility matrix has passed for every bundled app theme.
+// Unknown values fall back to Minimal (`civic`) in the theme registry.
+export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'civic');
+// Shows the bundled app-theme selector in Settings. Set false only when a
+// deployment intentionally hides user theme selection.
 export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', true);
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
 // Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
 export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv('REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK', false);
-// Animate CE logo on first page load before swapping to static image
-export const ENABLE_CE_LOGO_ANIMATION = readPublicBoolEnv('REACT_APP_ENABLE_CE_LOGO_ANIMATION', true);
-// Options: "forward" (play once) | "pingpong" (play forward then backward)
-export const CE_LOGO_ANIMATION_MODE = 'pingpong';
-// Matches context_engine_logo_animation.gif duration (ms)
-export const CE_LOGO_ANIMATION_DURATION_MS_FORWARD = 12870;
-// Matches context_engine_logo_animation_pingpong.gif duration (ms)
-export const CE_LOGO_ANIMATION_DURATION_MS_PINGPONG = 25750;
 
 // Debug flags (defaults). Override in dev console (window.*), e.g. window.ENABLE_RPC_DEBUG_STATS = true.
 // Flags: ENABLE_RPC_DEBUG_LOGGING (RPC logs), ENABLE_RPC_DEBUG_STATS (counts+recent), ENABLE_RPC_DEBUG_TRACE (stack snippets),
@@ -165,7 +157,7 @@ export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv('REACT_APP_POLIS
 ]);
 // One-shot testing flag: clamps cross-session fanout defaults to general/list.
 export const CE_RPC_TESTING_MODE = readPublicBoolEnv('REACT_APP_CE_RPC_TESTING_MODE', false);
-// On-chain session registry (kept off by default during the migration).
+// Resolve sessions through the on-chain SessionRegistry (the normal runtime path).
 export const USE_ONCHAIN_SESSION_REGISTRY = readPublicBoolEnv('REACT_APP_USE_ONCHAIN_SESSION_REGISTRY', true);
 // When true, CE_SESSION_SCAN_SLUGS list entries can resolve through demoSessions aliases
 // (session key, session slug, or sessionName) before scope checks.
@@ -177,7 +169,6 @@ export const CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES = readPublicBoolEnv(
 export const DEFAULT_SESSION_SLUG = readPublicEnv('REACT_APP_DEFAULT_SESSION_SLUG', '');
 // URL/on-chain alias used when the slug is empty.
 export const DEFAULT_SESSION_SLUG_ALIAS = readPublicEnv('REACT_APP_DEFAULT_SESSION_SLUG_ALIAS', 'general');
-export const SERVER = readPublicEnv('REACT_APP_SERVER', 'http://localhost:5000');
 
 export const ARWEAVE_ACTIVE = readPublicBoolEnv('REACT_APP_ARWEAVE_ACTIVE', true);
 // Preferred Arweave gateway for user-facing links and normalized tx URLs.
@@ -221,5 +212,3 @@ export const CLOUDFLARE_DEPLOY_HELPER_URL = DEPLOY_HELPER_URL;
 export const CLOUDFLARE_WORKER_BUNDLE_URL = WORKER_BUNDLE_URL;
 export const CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL = WORKER_RELEASE_MANIFEST_URL;
 export const CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED;
-// WALLECT CONNECT PROJECT ID (ReOwn - needed if upgrading rainbowkit / wagmi)
-// export const WALLETCONNECT_PROJECT_ID = "13b8465ab2e356ef5cf655f6a9061738";

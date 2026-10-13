@@ -1,3 +1,4 @@
+import { consentSignature } from './sessionInterviewConsent';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
 export type SurveyQuestionsDraftPersistenceRuntime = SurveyQuestionsLegacyRecord;
@@ -16,10 +17,12 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
     buildPersistedDraftTrackingClearedState,
     buildPersistedDraftTrackingOnKeyChange,
     buildPersistedDraftWritePlan,
+    buildRatingEnvelopeQidSetFromUserAnswers,
     buildSurveyDraftLoadPlan,
     buildSurveyDraftSemanticSignature,
     buildSurveyDraftStorageKey,
     buildSurveyDraftStorageVariantKeys,
+    getChangedQidsAndFields,
     getHydrationQuestionIds,
     inst,
     loadPreviousPersistedDraftSnapshot,
@@ -252,29 +255,38 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           additionalComments: {},
         };
 
-        // Only persist rendered (or all if none rendered)
-        const renderedIds: SurveyQuestionsLegacyValue = getHydrationQuestionIds();
-        const dirtyQids: SurveyQuestionsLegacyValue = inst._draftDirtyQids ? [...inst._draftDirtyQids] : [];
-        const allowed: SurveyQuestionsLegacyValue = buildPersistDraftAllowedQuestionIds({
-          renderedQuestionIds: renderedIds,
-          dirtyQuestionIds: dirtyQids,
-          slice,
-        });
-
         const baselineSlice: SurveyQuestionsLegacyValue = stateRef.current.editBaseline || {
           answers: {},
           importance: {},
           conviction: {},
           additionalComments: {},
         };
+        // Only persist rendered (or all if none rendered), edited questions, and every pending
+        // consent change: the pile renders only a few cards, but a withdrawal must outlive a reload.
+        const renderedIds: SurveyQuestionsLegacyValue = getHydrationQuestionIds();
+        const pendingConsentQids = Object.entries(slice.interviewProvenance || {})
+          .filter(
+            ([qid, consent]) =>
+              consentSignature(consent) !== consentSignature(baselineSlice.interviewProvenance?.[qid]),
+          )
+          .map(([qid]) => qid);
+        const dirtyQids: SurveyQuestionsLegacyValue = [...(inst._draftDirtyQids || []), ...pendingConsentQids];
+        const allowed: SurveyQuestionsLegacyValue = buildPersistDraftAllowedQuestionIds({
+          renderedQuestionIds: renderedIds,
+          dirtyQuestionIds: dirtyQids,
+          slice,
+        });
         // Start from previous draft answers/baseline so non-rendered QIDs survive,
-        // then overwrite only the currently allowed question set.
+        // then overwrite only the currently allowed question set with its edited fields.
         const { answersObj, baselineObj }: SurveyQuestionsLegacyValue = buildPersistedDraftMapsForAllowedIds({
           allowedQuestionIds: allowed,
           slice,
           baselineSlice,
+          changedFieldsByQid: getChangedQidsAndFields(surveyIndex)?.changedMap,
           prevAnswers,
           prevBaseline,
+          savedAnswersKnown: !!propsRef.current?.isResponsesCacheReady,
+          encryptedRatingQids: buildRatingEnvelopeQidSetFromUserAnswers(stateRef.current.userAnswers),
           resolvers: {
             resolveFieldEncryptionAudience: resolveFieldEncryptionAudience,
             resolveFieldEncryptionGateId: resolveFieldEncryptionGateId,

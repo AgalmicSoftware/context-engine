@@ -3,6 +3,7 @@ import { Modal, ModalBody } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExclamationCircle, faExpand, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import styles from './CompactImageChooser.module.scss';
+import { isInertRasterImageMime } from '../../utilities/ui/viewerMime';
 
 type CompactImageStatusTone = 'default' | 'loading' | 'error';
 
@@ -110,7 +111,14 @@ const CompactImageChooser = ({
       setGeneratedPreviewSrc('');
       return undefined;
     }
-    if (!previewFile || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    // Only raster images preview: an SVG (which a fetched image URL can return)
+    // opened from its blob: URL would run its script as the app.
+    if (
+      !previewFile ||
+      !isInertRasterImageMime(previewFile.type) ||
+      typeof URL === 'undefined' ||
+      typeof URL.createObjectURL !== 'function'
+    ) {
       setGeneratedPreviewSrc('');
       return undefined;
     }

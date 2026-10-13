@@ -5,7 +5,6 @@ const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CORPUS_DIR = path.join(ROOT_DIR, 'ai-discourse-corpus', 'corpuses');
-const CLIENT_DEBATES_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'debates.json');
 const CLIENT_CORPUS_SAMPLE_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'corpus_sample.json');
 
 const CLIENT_SAMPLE_CORPUS_KEYS = Object.freeze({
@@ -391,7 +390,6 @@ function countEntriesForKey(index, corpusKey, id) {
 
 function collectSummary(rootDir = ROOT_DIR) {
   const corpusFiles = loadCorpusFiles(rootDir);
-  const clientDebates = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_DEBATES_PATH)));
 
   return {
     corpuses: corpusFiles.map((file) => ({
@@ -405,10 +403,6 @@ function collectSummary(rootDir = ROOT_DIR) {
           .map((key) => [key, file.data.meta[key]])
       ),
     })),
-    clientDebates: {
-      path: path.relative(rootDir, CLIENT_DEBATES_PATH),
-      count: Array.isArray(clientDebates) ? clientDebates.length : 0,
-    },
   };
 }
 
@@ -492,9 +486,6 @@ function collectValidation(rootDir = ROOT_DIR) {
   const corpusFiles = loadCorpusFiles(rootDir);
   const index = buildRecordIndex(corpusFiles);
   const crossCorpusFile = corpusFiles.find((file) => file.corpusKey === 'cross-corpus');
-  const crossCorpusDebateIds = new Set(crossCorpusFile.entries.map((debate) => debate.id));
-  const clientDebates = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_DEBATES_PATH)));
-  const clientDebateIds = new Set((Array.isArray(clientDebates) ? clientDebates : []).map((debate) => debate.id));
   const clientCorpusSample = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_CORPUS_SAMPLE_PATH)));
   const metaCountDrift = [];
   const malformedYears = [];
@@ -646,10 +637,6 @@ function collectValidation(rootDir = ROOT_DIR) {
     unknownCorpusKeys,
     debateReferences: allReferenceIssues,
     targetDebateReferences: targetReferenceIssues,
-    clientDebateMirror: {
-      missingFromClient: [...crossCorpusDebateIds].filter((id) => !clientDebateIds.has(id)),
-      extraInClient: [...clientDebateIds].filter((id) => !crossCorpusDebateIds.has(id)),
-    },
     clientSampleMirror: {
       countDrift: clientSampleCountDrift,
       missingEntries: missingClientSampleEntries,
@@ -747,7 +734,6 @@ if (require.main === module) {
 
 module.exports = {
   CLIENT_CORPUS_SAMPLE_PATH,
-  CLIENT_DEBATES_PATH,
   CORPUS_FILES,
   TARGET_DEBATE_IDS,
   TAXONOMY_ENUMS,

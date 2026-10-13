@@ -5,7 +5,6 @@ import {
   getBaselineDemoSessionSlugs,
   getDemoTemplateSeed,
   getReservedLegacySessionSlugs,
-  isReservedLegacySessionSlug,
 } from './sessionDemoCompat.js';
 
 describe('sessionDemoCompat', () => {
@@ -20,11 +19,6 @@ describe('sessionDemoCompat', () => {
 
     expect(reserved).toBeInstanceOf(Set);
     expect([...reserved]).toEqual(['general']);
-  });
-
-  it('checks reserved legacy session slugs', () => {
-    expect(isReservedLegacySessionSlug('general')).toBe(true);
-    expect(isReservedLegacySessionSlug('my-session')).toBe(false);
   });
 
   it('returns baseline demo session slugs for every demo session entry', () => {

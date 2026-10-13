@@ -721,7 +721,8 @@ describe('PostsPage', () => {
     expect(within(packedSlide).getByText('Second body.')).toBeInTheDocument();
     expect(within(packedSlide).getByText('Rider body.')).toBeInTheDocument();
     const riderLabel = within(packedSlide).getByText('P1');
-    expect(riderLabel).toHaveStyle({ color: '#4dffa4' });
+    expect(riderLabel.style.color).toBe('');
+    expect(riderLabel.querySelector('[aria-hidden="true"]')).toHaveStyle({ backgroundColor: '#4dffa4' });
   });
 
   it('renders stack-layout groups vertically without carousel controls', async () => {

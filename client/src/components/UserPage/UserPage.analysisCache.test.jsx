@@ -5,6 +5,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -89,7 +90,16 @@ const makeAnalysisCacheInstance = (props = {}) => {
     ],
     detailedQuestionResponses: {
       q1: {
-        answer: { value: 'A deterministic answer' },
+        // Stored as the response writer stores a public answer.
+        answer: {
+          value: 'A deterministic answer',
+          encrypted: false,
+          encryptionAudience: 'self',
+          encryptionGateId: null,
+          audienceMode: 'explicit',
+          hash: '',
+          encryptedPortion: '',
+        },
         conviction: 4,
       },
     },
@@ -201,6 +211,96 @@ describe('UserPage analysis cache and routing', () => {
         sessionConfig: expect.objectContaining({ slug: 'open-slug' }),
       }),
     );
+  });
+
+  it('sends public answers but never an Only me answer this browser decrypted', async () => {
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
+    const lockedResponse = {
+      questionID: 'q2',
+      answer: {
+        value: '*',
+        encrypted: true,
+        encryptionAudience: 'self',
+        encryptionGateId: null,
+        audienceMode: 'explicit',
+        hash: `0x${'ab'.repeat(32)}`,
+        encryptedPortion: '{"v":1}',
+      },
+      additional: { value: '', encrypted: false, encryptionAudience: 'self', encryptedPortion: '' },
+    };
+    instance.state = {
+      ...instance.state,
+      questionResponseInfo: [
+        ...instance.state.questionResponseInfo,
+        { id: 'q2', type: 'freeform', prompt: 'Private question' },
+      ],
+      detailedQuestionResponses: { ...instance.state.detailedQuestionResponses, q2: lockedResponse },
+    };
+    cryptoUtils.decryptSingleField.mockResolvedValue({
+      answers: { q2: { value: 'private plaintext' } },
+      additionalComments: {},
+      importance: {},
+    });
+
+    await expect(instance.handleDecryptQuestionAnswer('q2', 'answer', lockedResponse)).resolves.toBe(true);
+    expect(instance.state.detailedQuestionResponses.q2.answer.value).toBe('private plaintext');
+    await instance.analyzeUser();
+
+    expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+    const [userData] = analyzeUserOpinions.mock.calls[0];
+    expect(userData.questions).toEqual([expect.objectContaining({ id: 'q1', answer: 'A deterministic answer' })]);
+    expect(JSON.stringify(userData)).not.toContain('private plaintext');
+    const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+    expect(entry).toBeTruthy();
+    expect(JSON.stringify(entry)).not.toContain('private plaintext');
+  });
+
+  it('sends public comments but never a comment this browser decrypted', async () => {
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
+    const writerField = (value, overrides = {}) => ({
+      value,
+      encrypted: false,
+      encryptionAudience: 'self',
+      encryptionGateId: null,
+      audienceMode: 'explicit',
+      hash: '',
+      encryptedPortion: '',
+      ...overrides,
+    });
+    const lockedComment = {
+      questionID: 'q2',
+      answer: writerField('A second public answer'),
+      additional: writerField('*', { encrypted: true, hash: `0x${'cd'.repeat(32)}`, encryptedPortion: '{"v":1}' }),
+    };
+    instance.state = {
+      ...instance.state,
+      questionResponseInfo: [
+        ...instance.state.questionResponseInfo,
+        { id: 'q2', type: 'freeform', prompt: 'Question with a locked comment' },
+      ],
+      detailedQuestionResponses: {
+        q1: { ...instance.state.detailedQuestionResponses.q1, additional: writerField('Public context') },
+        q2: lockedComment,
+      },
+    };
+    cryptoUtils.decryptSingleField.mockResolvedValue({
+      answers: {},
+      additionalComments: { q2: { value: 'only-me remark' } },
+      importance: {},
+    });
+
+    await expect(instance.handleDecryptQuestionAnswer('q2', 'additional', lockedComment)).resolves.toBe(true);
+    expect(instance.state.detailedQuestionResponses.q2.additional.value).toBe('only-me remark');
+    await instance.analyzeUser();
+
+    const [userData] = analyzeUserOpinions.mock.calls[0];
+    expect(userData.questions).toEqual([
+      expect.objectContaining({ id: 'q1', additionalComment: 'Public context' }),
+      expect.objectContaining({ id: 'q2', answer: 'A second public answer', additionalComment: undefined }),
+    ]);
+    expect(JSON.stringify(userData)).not.toContain('only-me remark');
+    const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+    expect(JSON.stringify(entry)).not.toContain('only-me remark');
   });
 
   it('writes analysisCache after a cache miss calls AI', async () => {

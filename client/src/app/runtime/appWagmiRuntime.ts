@@ -1,5 +1,4 @@
 import { configureChains, createClient, createStorage } from 'wagmi';
-import { noopStorage } from '@wagmi/core';
 import { goerli, localhost } from 'wagmi/chains';
 import {
   mainnet,
@@ -61,6 +60,9 @@ export const { chains, provider, webSocketProvider } = configuredChains;
 const connectors = buildWalletConnectors(chains);
 
 const userExplicitlyDisconnected = wasUserExplicitlyDisconnected();
+// wagmi 0.9 does not re-export @wagmi/core's noopStorage, and @wagmi/core is
+// not a declared dependency.
+const noopStorage = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
 const safeStorage = (() => {
   try {
     return window.localStorage;

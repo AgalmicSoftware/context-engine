@@ -13,12 +13,13 @@ import {
   resolveDeployHelperAllowList,
   resolveDeployHelperFallbackAllowList,
 } from '../shared/deployHelperOrigins.mjs';
+import { timingSafeSecretEqual } from '../sessionCorsWorker/tokenSigning.js';
 export { SessionWriteCoordinator } from '../sessionCorsWorker/sessionWriteCoordinator.js';
-const isAdminAuthorized = (request, env) => {
+const isAdminAuthorized = async (request, env) => {
   const adminSecret = toStr(env?.ADMIN_SECRET).trim();
   const authHeader = toStr(request.headers.get('Authorization')).trim();
   if (!adminSecret || !authHeader.startsWith('Bearer ')) return false;
-  return authHeader.slice(7).trim() === adminSecret;
+  return timingSafeSecretEqual(authHeader.slice(7).trim(), adminSecret);
 };
 
 const originAllowed = (origin, allowList) => {
@@ -55,7 +56,7 @@ const handleResolvedRequest = async ({ request, env, origin, url, allowListInfo,
   }
 
   if (url.pathname === '/admin/origins') {
-    if (!isAdminAuthorized(request, env)) {
+    if (!(await isAdminAuthorized(request, env))) {
       return json({ error: 'Admin authorization failed.' }, 401, headers);
     }
     if (request.method === 'GET') {

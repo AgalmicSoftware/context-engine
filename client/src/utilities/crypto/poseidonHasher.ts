@@ -38,3 +38,18 @@ export const loadPoseidonHasher = async ({
     poseidon3: poseidon3Module.poseidon3 as PoseidonFunction,
   });
 };
+
+// Loads poseidon-lite on the first commitment instead of on page load. A failed
+// load is retried on the next call; callers then skip the Poseidon commitment.
+export const createLazyPoseidonHasher = (loaders: PoseidonLoaders = {}): ((inputs: bigint[]) => Promise<bigint>) => {
+  let loading: Promise<PoseidonHasher> | null = null;
+  return async (inputs) => {
+    if (!loading) {
+      loading = loadPoseidonHasher(loaders).catch((error: unknown) => {
+        loading = null;
+        throw error;
+      });
+    }
+    return (await loading)(inputs);
+  };
+};

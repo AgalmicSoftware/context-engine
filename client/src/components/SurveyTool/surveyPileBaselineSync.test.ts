@@ -2,7 +2,6 @@ import { mergeQuestionResponses } from './surveyToolCacheState.js';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
-  buildPilePrefillReadPlan,
   readPileScopedQuestionResponses,
 } from './surveyPileBaselineSync';
 
@@ -63,82 +62,6 @@ describe('surveyPileBaselineSync', () => {
       shouldSkip: false,
       reason: 'check',
       renderedIds: ['q1', 'q2'],
-    });
-  });
-
-  it('builds pile prefill read plans for anon, dirty, missing-network, empty, and ready cases', () => {
-    expect(
-      buildPilePrefillReadPlan({
-        account: '',
-        networkIdStr: '84532',
-        pileQuestions: [{ id: 'q1' }],
-      }),
-    ).toEqual({
-      shouldSkip: true,
-      shouldBumpNoop: false,
-      reason: 'anon',
-    });
-
-    expect(
-      buildPilePrefillReadPlan({
-        account: '0xabc',
-        isDirty: true,
-        networkIdStr: '84532',
-        pileQuestions: [{ id: 'q1' }],
-      }),
-    ).toEqual({
-      shouldSkip: true,
-      shouldBumpNoop: true,
-      reason: 'dirty',
-    });
-
-    expect(
-      buildPilePrefillReadPlan({
-        account: '0xabc',
-        modifiedCount: 2,
-        networkIdStr: '84532',
-        pileQuestions: [{ id: 'q1' }],
-      }),
-    ).toEqual({
-      shouldSkip: true,
-      shouldBumpNoop: true,
-      reason: 'dirty',
-    });
-
-    expect(
-      buildPilePrefillReadPlan({
-        account: '0xabc',
-        networkIdStr: '',
-        pileQuestions: [{ id: 'q1' }],
-      }),
-    ).toEqual({
-      shouldSkip: true,
-      shouldBumpNoop: false,
-      reason: 'missing-network',
-    });
-
-    expect(
-      buildPilePrefillReadPlan({
-        account: '0xabc',
-        networkIdStr: '84532',
-        pileQuestions: [],
-      }),
-    ).toEqual({
-      shouldSkip: true,
-      shouldBumpNoop: false,
-      reason: 'empty-pile',
-    });
-
-    expect(
-      buildPilePrefillReadPlan({
-        account: '0xabc',
-        networkIdStr: '84532',
-        pileQuestions: [{ id: 'q1' }],
-      }),
-    ).toEqual({
-      shouldSkip: false,
-      shouldBumpNoop: false,
-      reason: 'prefill',
     });
   });
 

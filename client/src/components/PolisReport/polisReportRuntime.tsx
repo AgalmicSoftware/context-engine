@@ -7,6 +7,7 @@ import {
 import * as d3 from 'd3';
 
 import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import demoData from '../../variables/demo/demo_polis_data.json';
 import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';
@@ -304,6 +305,11 @@ const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
   ),
 );
 
+// Only the fixtures that ship with the app have simulated-user profile pages.
+export function isBuiltInPolisDemoDataset(dataset: unknown): boolean {
+  return !!dataset && Object.values(BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG).includes(dataset);
+}
+
 export function buildPolisDemoDatasetsBySlug(demoDataBySlug: unknown = null) {
   const out: Record<string, unknown> = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
   if (!demoDataBySlug || typeof demoDataBySlug !== 'object' || Array.isArray(demoDataBySlug)) {
@@ -409,13 +415,15 @@ export function shouldAutoEnablePolisDemoData(
   return POLIS_DEMO_AUTOLOAD_SLUG_SET.has(slug) && hasPolisDemoDatasetForSlug(slug, input);
 }
 
+// AI cluster summaries are keyed on what they were written from: the prompts,
+// who is in each cluster, and the votes. A refresh that changes none of these
+// keeps its summaries; any changed vote, prompt or membership replaces them.
 export function buildClusterAnalysisDataKey({
   activeClusterAssignments = [],
   activeClusterCount = 0,
   activeRepQuestions = {},
   embeddingChoice = '',
-  useDemoData = false,
-  questionResponsesNonce = 0,
+  ratingMatrix = [],
   questionPrompts = {},
   allQuestions = [],
   allResponders = [],
@@ -424,8 +432,7 @@ export function buildClusterAnalysisDataKey({
   activeClusterCount?: number;
   activeRepQuestions?: PolisRepQuestionsMap;
   embeddingChoice?: string;
-  useDemoData?: boolean;
-  questionResponsesNonce?: number;
+  ratingMatrix?: RatingMatrix | null;
   questionPrompts?: StringMap;
   allQuestions?: string[];
   allResponders?: string[];
@@ -440,17 +447,36 @@ export function buildClusterAnalysisDataKey({
   let promptsHash = 0;
   promptEntries.forEach(([key, value]) => {
     const text = `${key}:${value || ''}`;
-    for (let i = 0; i < text.length; i += 31) {
+    for (let i = 0; i < text.length; i += 1) {
       promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
     }
   });
   const questionCount = allQuestions?.length || 0;
   const repCount = Object.keys(activeRepQuestions || {}).length;
-  // Demo-mode analysis derives from the fixed fixture, so upstream response
-  // nonce churn should not invalidate the visible cluster-analysis cache.
-  const nonce = useDemoData ? 0 : (questionResponsesNonce ?? 0);
+  // The votes decide each cluster's statements and counts. Two independent
+  // hashes keep an accidental match between different vote sets negligible.
+  let votesHash = 0;
+  let votesCheck = 0;
+  (Array.isArray(ratingMatrix) ? ratingMatrix : []).forEach((row) => {
+    [...(Array.isArray(row) ? row : []), 'end'].forEach((vote) => {
+      const code = vote === 1 ? 1 : vote === -1 ? 2 : vote === 0 ? 3 : vote === 'end' ? 5 : 4;
+      votesHash = (votesHash * 7 + code) % 1000000007;
+      votesCheck = (votesCheck * 11 + code) % 998244353;
+    });
+  });
 
-  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}-${JSON.stringify(allResponders)}`;
+  return `${embeddingChoice}-${activeClusterCount}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}-${votesHash}.${votesCheck}-${JSON.stringify(allResponders)}`;
+}
+
+// AI cluster summaries are kept for the few most recent views, so switching
+// back to one does not repeat paid analysis, but the cache cannot grow forever.
+export const POLIS_ANALYSIS_CACHE_KEY_LIMIT = 6;
+
+export function rememberClusterAnalysis<T>(cache: Record<string, T>, key: string, entry: T): Record<string, T> {
+  const recentKeys = Object.keys(cache)
+    .filter((cachedKey) => cachedKey !== key)
+    .slice(1 - POLIS_ANALYSIS_CACHE_KEY_LIMIT);
+  return { ...Object.fromEntries(recentKeys.map((cachedKey) => [cachedKey, cache[cachedKey]])), [key]: entry };
 }
 
 /**************************************************************
@@ -774,9 +800,7 @@ export function applyFilterStateToAggregator(
             score += 1;
           }
         } else {
-          const rawImportance = parsed?.importance ?? parsed?.conviction ?? 0;
-          const imp = Number(asRecord(rawImportance).value ?? rawImportance);
-          if (!Number.isNaN(imp)) score += imp;
+          score += readStoredRating(parsed.importance) ?? readStoredRating(parsed.conviction) ?? 0;
         }
       }
       return { qId, score };
@@ -821,7 +845,7 @@ function isPolisRealRowAllowedForSession(
 
 export function buildRatingMatrixFromRealData(
   realQR: PolisQuestionResponses | UnknownRecord,
-  options: { sessionSlug?: unknown; allowDemo?: boolean } = {},
+  options: { sessionSlug?: unknown; allowDemo?: boolean; metadata?: Record<string, unknown> } = {},
 ): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
     return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
@@ -833,42 +857,49 @@ export function buildRatingMatrixFromRealData(
   const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
   const promptsMap: StringMap = {};
   const displayNamesMap: StringMap = {};
+  const votesByQuestion = new Map<string, Map<string, ConcretePolisVote>>();
 
   Object.entries(realQR).forEach(([qId, arr]) => {
     if (!Array.isArray(arr) || arr.length === 0) return;
 
-    // Find the first parsed response with a declared type to decide if it's binary
-    let firstType: unknown = null;
-    let firstPrompt: unknown = null;
+    // Question metadata decides the type and prompt. A participant payload only
+    // fills gaps, as in the answer sections and the summary statistics.
+    const firstPayload = (arr as PolisResponseRow[])
+      .map((r) => ({ r, parsed: safeJsonParse(r?.response) }))
+      .find(
+        ({ r, parsed }) =>
+          (options.allowDemo || !isPolisDemoFixturePayload(parsed)) &&
+          isPolisRealRowAllowedForSession(r, parsed, sessionSlug),
+      )?.parsed;
+    const question = reportQuestionMetadata(options.metadata?.[qId.toLowerCase()], firstPayload || {});
+    if ((question.type || question.questionType) !== 'binary') return; // we only include binary questions
+    const prompt = String(question.prompt || '').trim() || '(No prompt)';
+
+    binaryQuestions.push({ qId, prompt });
+    promptsMap[qId] = prompt;
+
+    // Only a readable Agree/Unsure/Disagree vote makes someone a participant.
+    // Comment-only, rating-only, cleared and encrypted rows would otherwise be
+    // plotted and clustered as participants who voted on nothing.
+    const votes = new Map<string, ConcretePolisVote>();
+    votesByQuestion.set(qId, votes);
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
+      // Skip a row whose payload claims another question type.
+      if (!parsed || (parsed.type && parsed.type !== 'binary')) continue;
       if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (parsed && typeof parsed === 'object' && parsed.type) {
-        firstType = parsed.type;
-        firstPrompt = parsed.prompt || '(No prompt)';
-        break;
-      }
-    }
-    if (firstType !== 'binary') return; // we only include binary questions
-
-    binaryQuestions.push({ qId, prompt: String(firstPrompt || '(No prompt)') });
-    promptsMap[qId] = String(firstPrompt || '(No prompt)');
-
-    // Gather participants who answered this (binary) question
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (r?.responder) {
-        const responder = String(r.responder).toLowerCase();
-        participantsSet.add(responder);
-        const responderName = String(parsed?.responderName || '')
-          .trim()
-          .replace(/\s+/g, ' ')
-          .slice(0, 160);
-        if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
-      }
+      const answer = asRecord(parsed.answer);
+      const vote = answer.encrypted ? null : normalizePolisBinaryVote(answer.value);
+      const responder = String(r?.responder || '').toLowerCase();
+      if (!responder || vote === null) continue;
+      votes.set(responder, vote);
+      participantsSet.add(responder);
+      const responderName = String(parsed.responderName || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, 160);
+      if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
     }
   });
 
@@ -901,22 +932,9 @@ export function buildRatingMatrixFromRealData(
   // Fill matrix with -1 / 0 / 1 for Disagree / Unsure / Agree
   questionsSorted.forEach((qId) => {
     const rowIndex = questionIndexMap[qId];
-    const arr = Array.isArray(realQR[qId]) ? (realQR[qId] as PolisResponseRow[]) : [];
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (!parsed || parsed.type !== 'binary') continue;
-      if (!options.allowDemo && isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      const answer = asRecord(parsed.answer);
-      if (answer.encrypted) continue;
-
-      const val: PolisVote = normalizePolisBinaryVote(answer.value);
-
-      const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
-      if (pIdx !== undefined) {
-        matrix[rowIndex][pIdx] = val;
-      }
-    }
+    votesByQuestion.get(qId)?.forEach((vote, responder) => {
+      matrix[rowIndex][participantIndexMap[responder]] = vote;
+    });
   });
 
   return {
@@ -926,6 +944,22 @@ export function buildRatingMatrixFromRealData(
     promptsMap,
     displayNamesMap,
   };
+}
+
+/**
+ * UMAP input: one row per participant. A skipped question takes that
+ * question's mean vote, as in the PCA projection; reading a skip as Unsure (0)
+ * would pull participants who skipped the same questions together.
+ */
+export function buildUmapParticipantData(ratingMatrix: RatingMatrix): number[][] {
+  const nParticipants = ratingMatrix[0]?.length || 0;
+  const means = ratingMatrix.map((votes) => {
+    const answered = votes.filter((vote): vote is ConcretePolisVote => vote !== null && vote !== undefined);
+    return answered.length ? answered.reduce<number>((sum, vote) => sum + vote, 0) / answered.length : 0;
+  });
+  return Array.from({ length: nParticipants }, (_, participantIndex) =>
+    ratingMatrix.map((votes, questionIndex) => votes[participantIndex] ?? means[questionIndex]),
+  );
 }
 
 export function buildRatingMatrixFromDemo(demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA): RatingMatrixBuildResult {

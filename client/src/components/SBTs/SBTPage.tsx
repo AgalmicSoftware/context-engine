@@ -27,6 +27,7 @@ import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { isInertRasterImageMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -178,6 +179,9 @@ import {
   shouldRunSbtPagePropPasswordAutoMint,
   SBT_ADMIN_INVITE_FAILURE_MESSAGE,
   SBT_CLAIM_FAILURE_MESSAGE,
+  isKnownOpenSbt,
+  readKnownSbtMintMode,
+  resolveSbtGroupPasswordFailureMessage,
 } from './sbtPageHelpers';
 import type {
   ReconcileSbtPageHolderRefreshStateArgs,
@@ -385,6 +389,9 @@ type SbtPageState = Record<string, unknown> & {
   filteredMintedUsers: unknown[];
   groupPasswordHash: unknown;
   groupPasswordHashLoaded: boolean;
+  // The last hash read failed and the mint mode is unknown: the card offers Retry instead of a join.
+  groupPasswordCheckUnreadable?: boolean;
+  groupPasswordChecking: boolean;
   groupPasswordInput: string;
   hasGroupPasswordMint: boolean;
   hasInviteMint: boolean;
@@ -914,7 +921,8 @@ class SBTPage extends Component<any, any> {
 
     const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', currentSbtAddressString, slug);
     if (!isUrlAutoMintTargetCurrent()) return false;
-    if (onchainGph && onchainGph !== ethers.constants.HashZero) {
+    // A failed read (null) may still be a password group: that path reads the hash again and says if it can't.
+    if (onchainGph !== ethers.constants.HashZero) {
       const minted = await this.mintUnlimitedWithGroupPassword({
         accountLowerOverride: targetAccountLower,
         chainIdOverride: targetChainId,
@@ -1267,6 +1275,26 @@ class SBTPage extends Component<any, any> {
     if (sbtInfoRecord.hasPasswordMint) {
       if (this._isMounted)
         this.setState(buildSbtPageMintFailurePatch({ error: `Password required for this ${t('sbt')}.` }));
+      return false;
+    }
+    // A failed read (null) may hide a group password, so only metadata that says the group is open lets it claim.
+    // Otherwise record the check as a page load would, so the card offers Retry rather than a failed status.
+    if (!onchainGph && !isKnownOpenSbt(sbtInfoRecord)) {
+      if (this._isMounted) {
+        const { groupPasswordCheckUnreadable, hasGroupPasswordMint, hasInviteMint } =
+          resolveSbtPageGroupPasswordMintState({
+            groupPasswordHash: null,
+            hashZero: ethers.constants.HashZero,
+            hasPasswordMint: sbtInfoRecord.hasPasswordMint,
+            mintMode: readKnownSbtMintMode(sbtInfoRecord),
+          });
+        this.setState({
+          groupPasswordCheckUnreadable,
+          groupPasswordHashLoaded: false,
+          hasGroupPasswordMint,
+          hasInviteMint,
+        });
+      }
       return false;
     }
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
@@ -1713,7 +1741,9 @@ class SBTPage extends Component<any, any> {
       if (!text) {
         const blob = litStorage.decodeLitPayloadToBlob(payload);
         if (blob && typeof URL !== 'undefined') {
-          blobUrl = URL.createObjectURL(blob);
+          // A blob: URL runs as the app if opened in a tab, so a type that could act
+          // as a page (SVG, HTML, XML) is offered only as a plain download.
+          blobUrl = URL.createObjectURL(toViewerBlob(blob, blob.type).blob);
         }
       }
 
@@ -2391,8 +2421,11 @@ class SBTPage extends Component<any, any> {
                 });
                 if (!isCurrentLoad()) return;
                 const blob = litStorage.decodeLitPayloadToBlob(payload);
-                if (blob && typeof URL !== 'undefined') {
-                  const blobUrl = URL.createObjectURL(blob);
+                // Only raster images display: "Open image in new tab" on an SVG
+                // blob would run its script as the app.
+                const image = blob ? toViewerBlob(blob, blob.type) : null;
+                if (image && isInertRasterImageMime(image.mime) && typeof URL !== 'undefined') {
+                  const blobUrl = URL.createObjectURL(image.blob);
                   this.releaseDecryptedImageBlobUrl();
                   this._decryptedImageBlobUrl = blobUrl;
                   sbtInfo.image = blobUrl;
@@ -2434,11 +2467,13 @@ class SBTPage extends Component<any, any> {
         ? cachedGroupPasswordHash
         : await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
       if (!isCurrentLoad()) return;
-      const { hasGroupHash, hasInviteMint, hasGroupPasswordMint } = resolveSbtPageGroupPasswordMintState({
-        groupPasswordHash,
-        hashZero: ethers.constants.HashZero,
-        hasPasswordMint: sbtInfo?.hasPasswordMint,
-      });
+      const { groupPasswordCheckUnreadable, hasInviteMint, hasGroupPasswordMint } =
+        resolveSbtPageGroupPasswordMintState({
+          groupPasswordHash,
+          hashZero: ethers.constants.HashZero,
+          hasPasswordMint: sbtInfo?.hasPasswordMint,
+          mintMode: readKnownSbtMintMode(sbtInfo),
+        });
 
       let historySummary = normalizeSbtPageHistorySummary(entry?.historySummary);
       let mintedAddresses = expandSbtPageAddressListFromCountMap(entry?.mintedCountByAddress, entry?.mintedAddresses);
@@ -2645,7 +2680,9 @@ class SBTPage extends Component<any, any> {
               userHasSBT: holderState.userHasSBT,
               userIsSbtAdmin,
               groupPasswordHash: groupPasswordHash || null,
-              groupPasswordHashLoaded: true,
+              // A failed read is not kept, so the next load (or Retry) reads the hash again.
+              groupPasswordHashLoaded: !!groupPasswordHash,
+              groupPasswordCheckUnreadable,
               hasInviteMint,
               hasGroupPasswordMint,
               filteredMintedUsers: holderState.filteredMintedUsers,
@@ -2866,6 +2903,14 @@ class SBTPage extends Component<any, any> {
     }
   };
 
+  // Reads the group's password check again after a failed read, so the card can offer the right join.
+  retryGroupPasswordCheck = (): Promise<void> => this.loadSBTInfo({ preferCountsOnly: true });
+
+  handleMiniRetryGroupPasswordCheck = (event: React.MouseEvent<HTMLButtonElement>): void => {
+    event.preventDefault();
+    void this.retryGroupPasswordCheck();
+  };
+
   async mintUnlimitedWithGroupPassword(options: SbtPageManualMintOptions = {}): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
     let sbt: string | null = null;
@@ -2927,7 +2972,7 @@ class SBTPage extends Component<any, any> {
       ) {
         return false;
       }
-      if (!onchain || onchain === ethers.constants.HashZero) {
+      if (onchain === ethers.constants.HashZero) {
         this.setState(
           buildSbtPageErrorPatch({
             error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.`,
@@ -2936,19 +2981,23 @@ class SBTPage extends Component<any, any> {
         return false;
       }
 
-      const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-        password,
-        sbtAddress: sbt,
-        groupPasswordHash: onchain,
-      });
-      const local =
-        walletScopeSbtAddress === null
-          ? null
-          : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-              password,
-              sbtAddress: walletScopeSbtAddress,
-            });
-      if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
+      // The slow password check and the signature share one derivation. A failed read (null) stops
+      // signing with "Could not read this group's password check…", and the join can be tried again.
+      sbtLog.log('[MANUAL-MINT] Checking password and signing authorization...');
+      this.setState({ groupPasswordChecking: true });
+      let sig = '';
+      try {
+        sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
+          password,
+          sbtAddress: sbt,
+          userAddress: String(mintAccount || ''),
+          chainId: mintChainId,
+          groupPasswordHash: onchain ?? '',
+        });
+      } catch (error) {
+        // A wrong password, or a check that cannot run here (no WebCrypto), gets its own message.
+        const groupPasswordFailure = resolveSbtGroupPasswordFailureMessage(error);
+        if (!groupPasswordFailure) throw error;
         sbtLog.error('[MANUAL-MINT] Credential check failed.');
         if (
           !this.isMintTargetContextCurrent({
@@ -2960,8 +3009,12 @@ class SBTPage extends Component<any, any> {
         ) {
           return false;
         }
-        this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
+        this.setState(buildSbtPageMintFailurePatch({ error: groupPasswordFailure }));
+        // The mini card shows only "failed", so surface the reason as a toast there.
+        if (this.props.miniaturized) notify.error(groupPasswordFailure);
         return false;
+      } finally {
+        if (this._isMounted) this.setState({ groupPasswordChecking: false });
       }
 
       if (
@@ -2981,25 +3034,6 @@ class SBTPage extends Component<any, any> {
         sessionSlug: slug,
       });
 
-      sbtLog.log('[MANUAL-MINT] Signing authorization...');
-      const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
-        password,
-        sbtAddress: sbt,
-        userAddress: String(mintAccount || ''),
-        chainId: mintChainId,
-        walletScopeSbtAddress,
-      });
-
-      if (
-        !this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        return false;
-      }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
       const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbt, String(sig || ''));
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
@@ -3715,6 +3749,8 @@ class SBTPage extends Component<any, any> {
       burnButtonClassName: styles.burnButton,
       burnLabel: t('burn'),
       claimCountdown,
+      groupPasswordCheckUnreadable: this.state.groupPasswordCheckUnreadable === true,
+      groupPasswordChecking: this.state.groupPasswordChecking,
       groupPasswordInput,
       hasGroupPasswordMint: this.state.hasGroupPasswordMint,
       hasInviteMint: this.state.hasInviteMint,
@@ -3749,6 +3785,7 @@ class SBTPage extends Component<any, any> {
         onManualPasswordInputChange: this.handleManualPasswordInputChange,
         onMint: this.handleMint,
         onMintUnlimitedWithGroupPassword: this.mintUnlimitedWithGroupPassword,
+        onRetryGroupPasswordCheck: this.retryGroupPasswordCheck,
         onOpenMintTransaction: () => window.open(this.getExplorerLink(lastMintTxHash), '_blank', 'noopener,noreferrer'),
       },
     });
@@ -4058,6 +4095,8 @@ class SBTPage extends Component<any, any> {
         burnLabel: t('burn'),
         burningStatus,
         claimCountdown,
+        groupPasswordCheckUnreadable: this.state.groupPasswordCheckUnreadable === true,
+        groupPasswordChecking: this.state.groupPasswordChecking,
         groupPasswordInput: this.state.groupPasswordInput,
         hasGroupPasswordMint: this.state.hasGroupPasswordMint,
         hasInviteMint: this.state.hasInviteMint,
@@ -4139,6 +4178,7 @@ class SBTPage extends Component<any, any> {
           onMiniBurn={miniCardActionHandlers.onMiniBurn}
           onMiniMint={miniCardActionHandlers.onMiniMint}
           onMintUnlimitedWithGroupPassword={miniCardActionHandlers.onMintUnlimitedWithGroupPassword}
+          onRetryGroupPasswordCheck={this.handleMiniRetryGroupPasswordCheck}
           onShowMiniPasswordInput={miniCardActionHandlers.onShowMiniPasswordInput}
           sbtAddress={sbtAddressForDisplay}
           sbtName={sbtNameText}

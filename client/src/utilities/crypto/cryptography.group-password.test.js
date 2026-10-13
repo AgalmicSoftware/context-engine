@@ -1,141 +1,303 @@
+import { pbkdf2Sync } from 'crypto';
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
 import groupPasswordDerivation from './groupPasswordDerivation.cjs';
+import { isGroupPasswordUnverifiableError } from './sbtAuthorization';
+import { useFastGroupPasswordKdf as useFastKdf } from './groupPasswordKdf.testUtils';
 
 const PASSWORD = 'shared-secret';
 const SBT_A = '0x00000000000000000000000000000000000000a1';
 const SBT_B = '0x00000000000000000000000000000000000000b2';
 const USER = '0x00000000000000000000000000000000000000c3';
+const CHAIN_ID = 11155420;
 
-describe('cryptoUtils group password derivation', () => {
-  it('matches the shared script derivation for zero and address scopes', () => {
-    const sharedDerivation = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+// Known answer for the real 600,000-iteration PBKDF2-SHA256 derivation.
+const KAT_PASSWORD = 'orbit-maple-signal-tunnel-quartz';
+const KAT_SIGNER = '0xf49eCc54682aa8B38c45D571922fF284170e1AeB';
+const KAT_HASH = ethers.utils.solidityKeccak256(['address'], [KAT_SIGNER]);
 
-    for (const sbtAddress of ['', SBT_A]) {
-      expect(sharedDerivation.computeGroupPasswordHash({ password: PASSWORD, sbtAddress })).toBe(
-        cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress }),
-      );
-    }
+const signerHashOf = (messageHash, signature) =>
+  ethers.utils.solidityKeccak256(
+    ['address'],
+    [ethers.utils.verifyMessage(ethers.utils.arrayify(messageHash), signature)],
+  );
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('group password derivation v4 (real KDF)', () => {
+  it('derives the pinned signer, matching an independent PBKDF2 computation', async () => {
+    const salt = ethers.utils.arrayify(
+      ethers.utils.solidityKeccak256(['string', 'address'], ['sbt-group-password-v4', ethers.utils.getAddress(SBT_A)]),
+    );
+    const bits = pbkdf2Sync(Buffer.from(KAT_PASSWORD, 'utf8'), Buffer.from(salt), 600000, 32, 'sha256');
+    expect(new ethers.Wallet(ethers.utils.keccak256(bits)).address).toBe(KAT_SIGNER);
+
+    await expect(cryptoUtils.computeGroupPasswordHash({ password: KAT_PASSWORD, sbtAddress: SBT_A })).resolves.toBe(
+      KAT_HASH,
+    );
   });
 
-  it('scopes the same password hash by SBT address and falls back to AddressZero when missing', () => {
-    const zeroScopedHash = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD });
-    const explicitZeroScopedHash = cryptoUtils.computeGroupPasswordHash({
-      password: PASSWORD,
-      sbtAddress: ethers.constants.AddressZero,
-    });
-    const hashA = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
-    const hashB = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_B });
-
-    expect(explicitZeroScopedHash).toBe(zeroScopedHash);
-    expect(hashA).not.toBe(zeroScopedHash);
-    expect(hashA).not.toBe(hashB);
-  });
-
-  it('resolves the wallet scope against the on-chain group password hash', () => {
-    const hashA = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
-    const hashB = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_B });
-    const zeroScopedHash = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: '' });
-
-    expect(
-      cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-        password: PASSWORD,
-        sbtAddress: SBT_A,
-        groupPasswordHash: hashA,
-      }),
-    ).toBe(ethers.utils.getAddress(SBT_A));
-
-    expect(
-      cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-        password: PASSWORD,
-        sbtAddress: SBT_A,
-        groupPasswordHash: zeroScopedHash,
-      }),
-    ).toBe('');
-
-    expect(
-      cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-        password: PASSWORD,
-        sbtAddress: SBT_A,
-        groupPasswordHash: hashB,
-      }),
-    ).toBeNull();
-  });
-
-  it('uses the SBT-scoped wallet by default for group mint signatures', async () => {
-    const scopedHash = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
-    const signature = await cryptoUtils.signGroupMintAuthorization({
-      password: PASSWORD,
+  it('signs group mints and invites with the v4 signer', async () => {
+    const mintSignature = await cryptoUtils.signGroupMintAuthorization({
+      password: KAT_PASSWORD,
       sbtAddress: SBT_A,
       userAddress: USER,
-      chainId: 11155420,
+      chainId: CHAIN_ID,
+      groupPasswordHash: KAT_HASH,
     });
-    const messageHash = cryptoUtils.computeGroupMintMessageHash(SBT_A, USER, 11155420);
-    const signer = ethers.utils.verifyMessage(ethers.utils.arrayify(messageHash), signature);
-
-    expect(ethers.utils.solidityKeccak256(['address'], [signer])).toBe(scopedHash);
-  });
-
-  it('supports zero-scoped invite signing when the on-chain hash was created predeploy', async () => {
-    const zeroScopedHash = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: '' });
-    const scopedHash = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
-    const signature = await cryptoUtils.signInvite({
-      password: PASSWORD,
+    const [inviteSignature] = await cryptoUtils.signInvites({
+      password: KAT_PASSWORD,
       sbtAddress: SBT_A,
-      nonce: '1',
-      chainId: 11155420,
-      walletScopeSbtAddress: '',
+      nonces: ['1'],
+      chainId: CHAIN_ID,
+      groupPasswordHash: KAT_HASH,
     });
 
+    expect(signerHashOf(cryptoUtils.computeGroupMintMessageHash(SBT_A, USER, CHAIN_ID), mintSignature)).toBe(KAT_HASH);
     expect(
       cryptoUtils.verifyInviteSignature({
         sbtAddress: SBT_A,
         nonce: '1',
-        chainId: 11155420,
-        signature,
-        groupPasswordHash: zeroScopedHash,
+        chainId: CHAIN_ID,
+        signature: inviteSignature,
+        groupPasswordHash: KAT_HASH,
       }),
-    ).toEqual(expect.objectContaining({ ok: true }));
-
-    expect(
-      cryptoUtils.verifyInviteSignature({
-        sbtAddress: SBT_A,
-        nonce: '1',
-        chainId: 11155420,
-        signature,
-        groupPasswordHash: scopedHash,
-      }),
-    ).toEqual(expect.objectContaining({ ok: false }));
+    ).toEqual({ ok: true, signer: KAT_SIGNER });
   });
 });
 
-describe('SBT authorization domains', () => {
-  const chainId = 11155420;
-  const input = { password: PASSWORD, sbtAddress: SBT_A, chainId, nonce: '2' };
+describe('group password derivation v4 inputs', () => {
+  it.each([
+    '',
+    undefined,
+    null,
+    ethers.constants.AddressZero,
+    'not-an-address',
+    '0xF49eCc54682aa8B38c45D571922fF284170e1AeB',
+  ])('requires a valid non-zero SBT address scope (%s)', async (sbtAddress) => {
+    const { importKey } = useFastKdf();
+    await expect(cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress })).rejects.toThrow(
+      'needs the SBT contract address',
+    );
+    expect(importKey).not.toHaveBeenCalled();
+  });
+
+  it.each(['', undefined, 42])('rejects an empty or non-text password (%s)', async (password) => {
+    const { importKey } = useFastKdf();
+    await expect(cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: SBT_A })).rejects.toThrow(
+      'A group password is required.',
+    );
+    expect(importKey).not.toHaveBeenCalled();
+  });
+
+  it('treats NFKC-equivalent passwords as the same password', async () => {
+    useFastKdf();
+    const hash = (password) => cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: SBT_A });
+
+    expect(await hash('café-pass')).toBe(await hash('café-pass'));
+    expect(await hash('ｐａｓｓｗｏｒｄ')).toBe(await hash('password'));
+    expect(await hash('password')).not.toBe(await hash('passw0rd'));
+  });
+
+  it('scopes the same password to each SBT and accepts any address casing', async () => {
+    useFastKdf();
+    const hashA = await cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
+
+    expect(await cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_B })).not.toBe(hashA);
+    expect(
+      await cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: ethers.utils.getAddress(SBT_A) }),
+    ).toBe(hashA);
+  });
+
+  it('derives again on every call instead of caching keys', async () => {
+    const { deriveBits } = useFastKdf();
+    await cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
+    await cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A });
+
+    expect(deriveBits).toHaveBeenCalledTimes(2);
+    expect(deriveBits.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ name: 'PBKDF2', hash: 'SHA-256', iterations: 600000 }),
+    );
+  });
+
+  it('fails clearly when WebCrypto is unavailable', async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+    Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });
+    try {
+      await expect(cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress: SBT_A })).rejects.toThrow(
+        'WebCrypto',
+      );
+    } finally {
+      Object.defineProperty(globalThis.crypto, 'subtle', original);
+    }
+  });
+
+  it('exposes only the v4 derivation from the shared CommonJS module', () => {
+    const derivation = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+
+    expect(derivation.derivation).toBe('sbt-group-password-v4');
+    expect(Object.keys(derivation).sort()).toEqual([
+      'computeGroupPasswordHash',
+      'derivation',
+      'deriveGroupPasswordWallet',
+    ]);
+  });
+});
+
+describe('SBT authorization signing', () => {
+  const input = { password: PASSWORD, sbtAddress: SBT_A, chainId: CHAIN_ID };
+
+  it('stops before signing when the password does not derive the on-chain hash', async () => {
+    useFastKdf();
+    const otherHash = await cryptoUtils.computeGroupPasswordHash({ password: 'another-secret', sbtAddress: SBT_A });
+
+    const mintError = await cryptoUtils
+      .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash: otherHash })
+      .catch((error) => error);
+    const inviteError = await cryptoUtils
+      .signInvites({ ...input, nonces: ['1'], groupPasswordHash: otherHash })
+      .catch((error) => error);
+
+    expect(cryptoUtils.isGroupPasswordMismatchError(mintError)).toBe(true);
+    expect(cryptoUtils.isGroupPasswordMismatchError(inviteError)).toBe(true);
+    expect(cryptoUtils.isGroupPasswordMismatchError(new Error('other'))).toBe(false);
+  });
+
+  it('signs every invite slot from a single derivation', async () => {
+    const { deriveBits } = useFastKdf();
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    deriveBits.mockClear();
+
+    const signatures = await cryptoUtils.signInvites({ ...input, nonces: ['1', 2, '3'], groupPasswordHash });
+
+    expect(deriveBits).toHaveBeenCalledTimes(1);
+    expect(signatures).toHaveLength(3);
+    signatures.forEach((signature, index) => {
+      expect(
+        cryptoUtils.verifyInviteSignature({ ...input, nonce: String(index + 1), signature, groupPasswordHash }).ok,
+      ).toBe(true);
+    });
+  });
 
   it('binds invite signatures to their chain, collection and independent slot', async () => {
-    const signature = await cryptoUtils.signInvite(input);
-    const groupPasswordHash = cryptoUtils.computeGroupPasswordHash(input);
-    expect(cryptoUtils.verifyInviteSignature({ ...input, signature, groupPasswordHash }).ok).toBe(true);
-    for (const change of [{ chainId: chainId + 1 }, { sbtAddress: SBT_B }, { nonce: '1' }]) {
-      expect(cryptoUtils.verifyInviteSignature({ ...input, ...change, signature, groupPasswordHash }).ok).toBe(false);
+    useFastKdf();
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    const [signature] = await cryptoUtils.signInvites({ ...input, nonces: ['2'], groupPasswordHash });
+    const signed = { ...input, nonce: '2', signature, groupPasswordHash };
+    expect(cryptoUtils.verifyInviteSignature(signed).ok).toBe(true);
+    for (const change of [{ chainId: CHAIN_ID + 1 }, { sbtAddress: SBT_B }, { nonce: '1' }]) {
+      expect(cryptoUtils.verifyInviteSignature({ ...signed, ...change }).ok).toBe(false);
     }
   });
 
   it('binds group signatures to chain and claimant with an explicit protocol domain', async () => {
-    const signature = await cryptoUtils.signGroupMintAuthorization({ ...input, userAddress: USER });
+    useFastKdf();
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    const signature = await cryptoUtils.signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash });
     const expected = ethers.utils.keccak256(
       ethers.utils.defaultAbiCoder.encode(
         ['bytes32', 'uint256', 'address', 'address'],
-        [ethers.utils.id('ContextEngine.SBT.GroupMint:1'), chainId, SBT_A, USER],
+        [ethers.utils.id('ContextEngine.SBT.GroupMint:1'), CHAIN_ID, SBT_A, USER],
       ),
     );
-    const signer = ethers.utils.verifyMessage(ethers.utils.arrayify(expected), signature);
-    expect(ethers.utils.solidityKeccak256(['address'], [signer])).toBe(cryptoUtils.computeGroupPasswordHash(input));
+    expect(signerHashOf(expected, signature)).toBe(groupPasswordHash);
+  });
+
+  it.each([undefined, null, '', '0x1234', 'not-a-hash'])(
+    'requires a readable on-chain hash before deriving (%s)',
+    async (groupPasswordHash) => {
+      const { importKey } = useFastKdf();
+      const error = await cryptoUtils
+        .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash })
+        .catch((caught) => caught);
+
+      expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+      expect(error.message).toMatch(/password check from the chain/);
+      expect(importKey).not.toHaveBeenCalled();
+    },
+  );
+
+  it('says a group with a zero on-chain hash has no group password, before deriving', async () => {
+    const { importKey } = useFastKdf();
+    const errors = await Promise.all([
+      cryptoUtils
+        .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash: ethers.constants.HashZero })
+        .catch((caught) => caught),
+      cryptoUtils
+        .signInvites({ ...input, nonces: ['1'], groupPasswordHash: ethers.constants.HashZero })
+        .catch((caught) => caught),
+    ]);
+
+    for (const error of errors) {
+      expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+      expect(cryptoUtils.isGroupPasswordMismatchError(error)).toBe(false);
+      expect(error.message).toBe("This group has no group password, so it can't be joined with one.");
+    }
+    expect(importKey).not.toHaveBeenCalled();
+  });
+
+  it('keeps a WebCrypto failure classified, with a plain message and the original error as its cause', async () => {
+    // A DOMException's `code` is read-only, so the classification must travel on a new error.
+    const failure = new DOMException('The operation failed for an operation-specific reason', 'OperationError');
+    jest.spyOn(globalThis.crypto.subtle, 'deriveBits').mockRejectedValue(failure);
+
+    const error = await cryptoUtils
+      .signGroupMintAuthorization({ ...input, userAddress: USER, groupPasswordHash: `0x${'11'.repeat(32)}` })
+      .catch((caught) => caught);
+
+    expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+    expect(error.message).toBe('This browser could not check the group password. Try again, or use another browser.');
+    expect(error.cause).toBe(failure);
+  });
+
+  it('names an unencodable password character instead of showing the encoder error', async () => {
+    const { importKey } = useFastKdf();
+    const emojiPassword = 'pass\u{1F511}word';
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash({
+      password: emojiPassword,
+      sbtAddress: SBT_A,
+    });
+    importKey.mockClear();
+
+    const error = await cryptoUtils
+      .signGroupMintAuthorization({ ...input, password: 'pass\uD83Dword', userAddress: USER, groupPasswordHash })
+      .catch((caught) => caught);
+
+    expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+    expect(error.message).toBe('The group password contains an invalid character. Retype it and try again.');
+    expect(importKey).not.toHaveBeenCalled();
+    // A complete surrogate pair, such as this emoji, is an ordinary character.
+    await expect(
+      cryptoUtils.signGroupMintAuthorization({
+        ...input,
+        password: emojiPassword,
+        userAddress: USER,
+        groupPasswordHash,
+      }),
+    ).resolves.toMatch(/^0x/);
+  });
+
+  it('reports missing WebCrypto as a clear error, not a wrong password, when signing', async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+    Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true, writable: true });
+    try {
+      const error = await cryptoUtils
+        .signInvites({ ...input, nonces: ['1'], groupPasswordHash: `0x${'11'.repeat(32)}` })
+        .catch((caught) => caught);
+
+      expect(isGroupPasswordUnverifiableError(error)).toBe(true);
+      expect(cryptoUtils.isGroupPasswordMismatchError(error)).toBe(false);
+      expect(error.message).toMatch(/WebCrypto/);
+    } finally {
+      Object.defineProperty(globalThis.crypto, 'subtle', original);
+    }
   });
 
   it('rejects old unscoped invite signatures and separates claim kinds', async () => {
-    const wallet = groupPasswordDerivation
+    useFastKdf();
+    const wallet = await groupPasswordDerivation
       .createGroupPasswordDerivation(ethers)
       .deriveGroupPasswordWallet({ password: PASSWORD, sbtAddress: SBT_A });
     const unscoped = ethers.utils.solidityKeccak256(['address', 'uint256'], [SBT_A, '2']);
@@ -143,24 +305,34 @@ describe('SBT authorization domains', () => {
     expect(
       cryptoUtils.verifyInviteSignature({
         ...input,
+        nonce: '2',
         signature,
-        groupPasswordHash: cryptoUtils.computeGroupPasswordHash(input),
+        groupPasswordHash: await cryptoUtils.computeGroupPasswordHash(input),
       }).ok,
     ).toBe(false);
     expect(
-      cryptoUtils.computeGroupMintMessageHash(SBT_A, '0x0000000000000000000000000000000000000002', chainId),
-    ).not.toBe(cryptoUtils.buildInviteMessageHash(input));
+      cryptoUtils.computeGroupMintMessageHash(SBT_A, '0x0000000000000000000000000000000000000002', CHAIN_ID),
+    ).not.toBe(cryptoUtils.buildInviteMessageHash({ ...input, nonce: '2' }));
   });
 
-  it.each([undefined, 0, -1, 1.5, 'invalid'])('rejects invalid signing chain %s', async (invalidChain) => {
-    await expect(cryptoUtils.signInvite({ ...input, chainId: invalidChain })).rejects.toThrow();
+  it.each([undefined, 0, -1, 1.5, 'invalid'])('rejects invalid signing chain %s before deriving', async (chainId) => {
+    const { importKey } = useFastKdf();
+    await expect(cryptoUtils.signInvites({ ...input, nonces: ['2'], chainId })).rejects.toThrow();
+    expect(importKey).not.toHaveBeenCalled();
+  });
+
+  it('requires at least one invite slot', async () => {
+    useFastKdf();
+    await expect(cryptoUtils.signInvites({ ...input, nonces: [] })).rejects.toThrow('at least one slot');
   });
 
   it('decodes only scoped signed invite payloads and rejects reusable secrets', async () => {
-    const signature = await cryptoUtils.signInvite(input);
-    const payload = { c: String(chainId), a: SBT_A, n: '2', s: signature };
+    useFastKdf();
+    const groupPasswordHash = await cryptoUtils.computeGroupPasswordHash(input);
+    const [signature] = await cryptoUtils.signInvites({ ...input, nonces: ['2'], groupPasswordHash });
+    const payload = { c: String(CHAIN_ID), a: SBT_A, n: '2', s: signature };
     expect(cryptoUtils.decodeInvite(cryptoUtils.encodeInvite(payload))).toEqual({
-      chainId: String(chainId),
+      chainId: String(CHAIN_ID),
       sbtAddress: ethers.utils.getAddress(SBT_A),
       nonce: '2',
       signature,

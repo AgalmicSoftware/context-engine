@@ -3,19 +3,23 @@ import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './con
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
+type GroupPasswordHashInput = {
+  password?: unknown;
+  sbtAddress?: unknown;
+};
 type SignGroupMintAuthorizationInput = {
   chainId: string | number;
   password?: unknown;
   sbtAddress?: string | null;
   userAddress?: string | null;
-  walletScopeSbtAddress?: string | null;
+  groupPasswordHash: string;
 };
 type GenerateInvitePayloadsInput = {
   chainId: string | number;
   password?: unknown;
   sbtAddress?: string | null;
   nonces?: Array<string | number>;
-  walletScopeSbtAddress?: string | null;
+  groupPasswordHash: string;
 };
 type InvitePayloadResult = {
   chainId: string;
@@ -54,7 +58,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
     memoizedResolveSession,
     normalizeAddress,
     normalizeSbtHistorySummary,
-    resolveGroupPasswordWalletScopeSbtAddress,
     resolveReadProvider,
     resolveTxGasOverrides,
     rpcLog,
@@ -214,19 +217,11 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
     },
 
     /**
-     * Deterministic group password hash scoped to an SBT address.
-     * Predeploy callers fall back to AddressZero by passing an empty sbtAddress.
+     * Group password hash (slow v4 KDF) scoped to the address the SBT has or will have.
+     * Deploy callers pass the predicted CREATE2 address; there is no unscoped form.
      */
-    computeGroupPasswordHash({ password, sbtAddress, adminAddress, chainId, name, symbol, tokenURI }: any) {
-      return cryptoUtils.computeGroupPasswordHash({
-        password,
-        sbtAddress,
-        adminAddress,
-        chainId,
-        name,
-        symbol,
-        tokenURI,
-      } as any);
+    computeGroupPasswordHash({ password, sbtAddress }: GroupPasswordHashInput): Promise<string> {
+      return cryptoUtils.computeGroupPasswordHash({ password, sbtAddress });
     },
 
     async signGroupMintAuthorization({
@@ -234,14 +229,8 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       sbtAddress,
       userAddress,
       chainId,
-      walletScopeSbtAddress,
+      groupPasswordHash,
     }: SignGroupMintAuthorizationInput) {
-      const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
-        password,
-        sbtAddress,
-        walletScopeSbtAddress,
-        getGroupPasswordHashFn: this.getGroupPasswordHash.bind(this),
-      });
       rpcLog('Local Sign (SBT-scoped group signature):', {
         function: 'signGroupMintAuthorization',
         params: { sbtAddress, userAddress },
@@ -251,7 +240,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         sbtAddress,
         userAddress,
         chainId,
-        walletScopeSbtAddress: resolvedWalletScopeSbtAddress,
+        groupPasswordHash,
       });
     },
 
@@ -260,7 +249,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       sbtAddress,
       nonces,
       chainId,
-      walletScopeSbtAddress,
+      groupPasswordHash,
     }: GenerateInvitePayloadsInput) {
       if (!Array.isArray(nonces) || nonces.length === 0) {
         throw new Error('generateInvitePayloads requires a non-empty nonces array.');
@@ -269,41 +258,34 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       if (!normalizedPassword) {
         throw new Error('generateInvitePayloads requires a non-empty group password.');
       }
-      const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
-        password: normalizedPassword,
-        sbtAddress,
-        walletScopeSbtAddress,
-        getGroupPasswordHashFn: this.getGroupPasswordHash.bind(this),
-      });
       inviteLog.log('[INVITE_DEBUG v4] generateInvitePayloads (SBT-scoped derivation)', {
         sbtAddress,
         nonceCount: nonces.length,
       });
-      const out: InvitePayloadResult[] = [];
-      for (const nonce of nonces) {
-        const signature = await cryptoUtils.signInvite({
-          password: normalizedPassword,
-          sbtAddress,
-          nonce,
-          chainId,
-          walletScopeSbtAddress: resolvedWalletScopeSbtAddress,
-        });
+      // One slow derivation signs every slot.
+      const signatures = await cryptoUtils.signInvites({
+        password: normalizedPassword,
+        sbtAddress,
+        nonces,
+        chainId,
+        groupPasswordHash,
+      });
+      return nonces.map((nonce, index): InvitePayloadResult => {
+        const signature = signatures[index];
         const payload: EncodedInvitePayload = {
           c: String(chainId),
           a: String(sbtAddress),
           n: String(nonce),
           s: signature,
         };
-        const inviteCode = cryptoUtils.encodeInvite(payload);
-        out.push({
+        return {
           chainId: String(chainId),
           sbtAddress: String(sbtAddress),
           nonce: String(nonce),
           signature,
-          inviteCode,
-        });
-      }
-      return out;
+          inviteCode: cryptoUtils.encodeInvite(payload),
+        };
+      });
     },
 
     // "Group" here refers to SBT token group/collection, not session group

@@ -1,16 +1,21 @@
-# Lit Protocol - Primitives + SDK + Payments (agent-ready)
+# Lit Protocol in Context Engine
 
-This file contains legacy background plus current and planned app wiring. The
-runtime section below describes the code currently in this repo; it does not
-imply the corresponding hosted Lit network still exists.
+Context Engine installs no Lit SDK packages. When a session selects Lit
+encryption, the browser encrypts content locally with a fresh content key, and
+the session Worker calls Lit's Chipotle REST API to wrap and release that key
+behind an SBT gate. Lit-gated content is not end-to-end encrypted: the Worker
+sees the content key in plaintext, and Lit account administrators remain trusted.
+New authorities require Worker-signed authorization, so a scoped usage API key
+alone cannot impersonate an SBT holder. See
+[`lit-v3-design.md`](lit-v3-design.md) for the trust boundary.
+
+This file records the current wiring plus platform background from the move
+off the former Naga-era browser SDK. It does not imply that any older hosted
+Lit network still exists.
 
 Primary docs:
 - What is Lit: https://developer.litprotocol.com/what-is-lit
-- v7→v8 migration guide: https://developer.litprotocol.com/sdk/migration-guide
-- Lit Client setup (v8): https://developer.litprotocol.com/sdk/getting-started/lit-client
-- AuthManager / authContext (v8): https://developer.litprotocol.com/sdk/getting-started/auth-manager
-- Encryption & access control (v8): https://developer.litprotocol.com/sdk/access-control/encryption
-- Payment Manager / Ledger model (v8): https://developer.litprotocol.com/sdk/getting-started/payment-manager-setup
+- Chipotle API (OpenAPI): https://api.chipotle.litprotocol.com/core/v1/openapi.json
 
 ---
 
@@ -23,8 +28,8 @@ Primary docs:
   - the worker can still fall back to a deployment-level server env key for sponsored/shared-account setups
 - Current worker/runtime split:
   - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
-  - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`
-  - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }`
+  - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`, and the Worker-generated `litAuthorizationPrivateKey`
+  - per-session Worker-private config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }`; the public `/session-config` response strips this entire descriptor
 - Runtime security contract:
   - `op: "encrypt"` wraps a CEK for the configured audience but does not require the author to hold the target SBT
   - `op: "check"` and `op: "decrypt"` still require the requester to satisfy the SBT gate
@@ -35,6 +40,8 @@ Primary docs:
   - `litUsageApiKey` is a secret
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
   - the real security boundary is still API-key scope + group membership + Lit Action code; hiding IDs alone is not a sufficient protection model
+  - the Action verifies a 60-second Worker signature over the requester, policy, approved HTTPS RPC, operation, and reply key before any gate or key operation; decrypt replies are encrypted to the original Worker request. Account management credentials remain trusted because they can alter permissions. See [authorization and cutover](lit-worker-authorization.md).
+  - all permission paths available to untrusted execution keys must restrict the relevant PKP to its Worker-authorized Action: no wildcard Action/PKP grants or another unsigned Action attached to that PKP. CE creates its narrow group but does not audit or repair account-wide permissions; broad account management authority remains trusted
 - Current Chipotle endpoints/source-of-truth:
   - prod API: `https://api.chipotle.litprotocol.com`
   - prod dashboard: `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
@@ -50,11 +57,17 @@ Primary docs:
     - `lit-chipotle-status`
     - `lit-chipotle-provision`
     - `lit-chipotle-bootstrap-session`
-- Re-provisioning note: any edit to the default CE Lit Action source changes the
-  derived `litActionCid`. Chipotle-enabled sessions must re-run
-  `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` before live
-  v2 wrapped-key encrypt/decrypt is expected to work. CE intentionally does not
-  fall back to older insecure action CIDs.
+- Re-provisioning note: unsigned or incomplete authorities fail closed.
+  Preserve required plaintext with the old working runtime **before updating
+  the Worker**; the updated Worker cannot decrypt legacy unsigned ciphertext.
+  In `/admin`, open **Worker secrets → Lit**, save the account key, refresh
+  status, acknowledge the warning, and select **Create fresh Lit authority**.
+  This sends the existing signed provision request with `freshAuthority: true`
+  to create a new PKP, group, scoped key, and specialized Action. Refresh status
+  and verify new content before retiring old permissions separately. Replacing
+  any authority cuts off its old ciphertext in this application; no automatic
+  content migration is provided. See
+  [the upgrade runbook](lit-worker-authorization.md#upgrade-and-cutover).
 - Current default CE architecture direction:
   - create one new Lit account per session
   - create one default group inside that account
@@ -85,31 +98,32 @@ Primary docs:
 - Current public docs do not document a Naga-to-Chipotle import path for accounts, usage keys, PKPs, groups, permissions, or balances; plan to recreate those resources during migration.
 - Current public docs are also internally inconsistent about IPFS action execution. CE should therefore treat inline `code` execution as the most certain worker-mediated path until Lit documents the `ipfs_id` / cached-action model more cleanly.
 
-The rest of this document contains legacy background plus repo context that is
-still useful for understanding the older Naga-era implementation.
+The sections below cover the current runtime, the Lit platform state, brief
+Lit background with the concepts Context Engine uses, and the repo wiring.
 
 ---
 
 ## Context Engine runtime status (Chipotle cutover)
 
 - Worker-mediated Chipotle execution is now the active CE Lit runtime for supported sessions.
-- The frontend still keeps the generic Lit SDK helpers for legacy envelope compatibility and tests, but `MainSite` and `/session/new` no longer invent a default hosted Lit network when no Chipotle runtime is configured.
-- `window.__litHooks` are now published only when the active session or wizard has a real Chipotle runtime:
-  - worker URL
-  - `litApiBase`
-  - `litGroupId`
-  - `litPkpId`
-  - `litActionCid`
+- The frontend has no Lit SDK client. `MainSite` and `/session/new` do not invent a default hosted Lit network when no Chipotle runtime is configured.
+- `window.__litHooks` are published only when the active session or wizard has a Chipotle runtime: a session Worker URL plus complete `litCredentials`, a `chipotle` network hint, configured SBT gate addresses, or a validated worker-canonical Lit profile.
 - `/session/new` now presents the Lit setup as one manual field:
   - bootstrap authority: `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`
   - the worker uses the default Chipotle API base unless worker config/env overrides it, then derives and persists `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, and `litUsageApiKey`
   - scoped-runtime identifiers remain supported as worker-side/admin/sponsored-bundle config, but they are no longer hand-entered in the `/new` Lit card
 - `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
+- `/admin` Lit status preserves `needsFreshAuthority` even when no execution
+  API key is configured, so operators can distinguish authority replacement
+  from an ordinary ready runtime. The fresh-authority control requires signed
+  status from an updated Worker, saved secret changes, and explicit
+  acknowledgement on every attempt. A missing account key produces guidance
+  to save one; failures do not automatically retry provisioning.
 - When passkey EOA soft-session mode is enabled and the current page has an
   unlocked in-memory signer, typed-data signatures are auto-signed, so worker
-  auth and any remaining direct Lit SDK auth flows can run without extra
-  passkey prompts. Passive wallet restores only hydrate account metadata; they
-  do not make automatic decrypt paths interactive.
+  auth can run without extra passkey prompts. Passive wallet restores only
+  hydrate account metadata; they do not make automatic decrypt paths
+  interactive.
 - For non-creator gated metadata decrypts, CE prefers Lit SBT recipients before
   trying the self EIP-712 unwrap path, avoiding a needless self-sign attempt
   when the viewer should use the SBT gate.
@@ -118,7 +132,7 @@ still useful for understanding the older Naga-era implementation.
 
 ## External Lit platform state (research baseline: 2026-04-28)
 
-- Naga is no longer a future migration concern; it is sunset. The repo still contains Naga-era wiring, but the hosted Naga path should be treated as legacy.
+- Naga is sunset. The only Naga-era code left normalizes old network labels (such as `naga-dev` or `datil`) to `chipotle` when old session metadata is read or rewritten.
 - Chipotle production is live at:
   - `https://api.chipotle.litprotocol.com`
   - `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
@@ -163,444 +177,56 @@ Source: https://developer.litprotocol.com/what-is-lit
 
 ---
 
-## 2) Primitives (definitions + identifiers + where used)
+## 2) Lit concepts used here
 
-### 2.1 LitNodeClient (network client)
-- **What it is**: JS client that connects your app to Lit nodes.
-- **Where used**: required for most operations (encryption/decryption, actions, signing, payments).
-- **Historical note**: CE no longer uses this client directly in the browser runtime after the Chipotle cutover.
-- **Lifecycle**: `connect()` establishes connection; `disconnect()` stops listeners.
-
-Docs:
-- Connect: https://developer.litprotocol.com/connecting-to-a-lit-network/connecting
-- Install: https://developer.litprotocol.com/sdk/installation
+### 2.1 Access Control Conditions (ACCs)
+- **What it is**: a policy describing who can decrypt or sign.
+- **How CE uses it**: the client still builds SBT `balanceOf` conditions, then sends only their SBT addresses, gate mode, and chain ID to the session Worker; the Lit Action evaluates that gate.
 
 ---
 
-### 2.2 Access Control Conditions (ACCs)
-- **What it is**: a policy describing who can decrypt/sign.
-- **Where used**: encryption/decryption, policy-gated operations.
-- **Inputs**: EVM calls like `eth_getBalance`, ERC721 `balanceOf`, etc. (depends on condition type).
-
-Docs:
-- Encryption + ACCs: https://developer.litprotocol.com/sdk/access-control/encryption
-
----
-
-### 2.3 Unified Access Control Conditions (Unified ACCs)
-- **What it is**: a normalized structure used by some SDK methods (commonly for Lit Actions / decrypt in-actions).
-- **Where used**: action-side decrypt flows often reference Unified ACCs.
-
-Docs entry point:
-- Encryption page references unified conditions & serialization helper: https://developer.litprotocol.com/sdk/access-control/encryption
+### 2.2 What CE stores
+Lit does **not** store content. The content itself is AES-GCM ciphertext kept
+on Arweave or in Cloudflare storage, as the session profile decides. Each
+`lit-sbt-v1` recipient in a CE envelope stores:
+- `ciphertext`: the content key wrapped by the Chipotle action
+- `dataToEncryptHash`: a policy-bound sentinel, not a Lit SDK hash
+- `chipotle`: version-2 policy metadata (`litActionCid`, `litPkpId`, `sbtAddresses`, `gateMode`, `chainId`, `policyFingerprint`, `policy`)
+- the access control conditions and chain used to build that policy
 
 ---
 
-### 2.4 Ciphertext + Metadata (what you store)
-Lit does **not** store your content. You store:
-- `ciphertext` (base64)
-- `dataToEncryptHash` (base64)
-- conditions (`accessControlConditions` / `unifiedAccessControlConditions` / etc)
-- `chain`
-...in any datastore you choose (IPFS/Arweave/DB/etc).
-
-Docs:
-- Encryption walkthrough: https://developer.litprotocol.com/sdk/access-control/encryption
+### 2.3 Lit Actions
+- **What it is**: JS code that Lit runs for you; on Chipotle it runs inside a single TEE.
+- **How CE uses it**: the session Worker calls `POST /core/v1/lit_action` with the session's registered action CID (`litActionCid`). The action wraps a content key for the configured gate, which does not require the author to hold the SBT, and releases a wrapped key only after the requester passes the SBT gate.
 
 ---
 
-### 2.5 AuthSig + SessionSigs (authentication)
-- **AuthSig**: signature over a SIWE-style message (often with capability "recaps").
-- **SessionSigs**: scoped, time-bounded session signatures used to authenticate requests to Lit nodes.
-- **Rule**: do not cache SessionSigs; generate on-demand.
-- **Nonce**: often uses `litNodeClient.getLatestBlockhash()` as nonce in examples.
-
-Docs:
-- Lit Actions quick start (SessionSigs example): https://developer.litprotocol.com/sdk/serverless-signing/quick-start
-- Delegated payment SessionSigs example: https://developer.litprotocol.com/paying-for-lit/using-delegated-auth-sig
-- Resources & abilities model: https://developer.litprotocol.com/sdk/authentication/session-sigs/resources-and-abilities
-
----
-
-### 2.6 Lit Resources + Lit Abilities (capability model)
-Lit identifies resources and abilities so SessionSigs can be restricted.
-- **Resources** include:
-  - access control condition
-  - PKP NFT
-  - Capacity Credit NFT
-  - Lit Action (by IPFS CID)
-- **Abilities** include:
-  - threshold decrypt from an ACC
-  - threshold signing (ACC / PKP)
-  - Lit Action execution
-  - capacity credit auth for higher rate limits
-  - signing of Lit Action code
-
-Docs:
-- Resources & Abilities: https://developer.litprotocol.com/sdk/authentication/session-sigs/resources-and-abilities
-
----
-
-### 2.7 Lit Actions (decentralized compute)
-- **What it is**: JS code executed on Lit nodes.
-- **How stored**: inline string or IPFS CID.
-- **How executed**: `litNodeClient.executeJs({ sessionSigs, code|ipfsId, jsParams })`
-- **Notes**:
-  - Naga-dev is positioned as "payment not required"; Naga-test recommended for production-ready dev; Naga for production.
-
-Docs:
-- Lit Actions quick start: https://developer.litprotocol.com/sdk/serverless-signing/quick-start
-
----
-
-### 2.8 PKPs (Programmable Key Pairs)
-- **What it is**: programmable keypairs used for signing (often with Lit Actions).
-- **Where used**: threshold signing, programmable accounts, etc.
-- **Payment**: signing with a PKP requires Capacity Credits (network usage).
-
-Docs (overview + payment table):
-- Payments overview: https://developer.litprotocol.com/paying-for-lit/overview
-
----
-
-### 2.9 Wrapped Keys (encrypted external keys used via Lit)
-- **What it is**: encrypted key material usable under Lit policy constraints.
-- **Payment**: several wrapped-key operations require Capacity Credits and/or on-chain gas (see payment table).
-
-Docs:
-- Payments overview (wrapped keys table): https://developer.litprotocol.com/paying-for-lit/overview
-
----
-
-## 3) SDK installation (JS)
-
-### 3.1 Browser or general JS
-```bash
-yarn add @lit-protocol/lit-node-client
-# or
-npm i @lit-protocol/lit-node-client
-```
-
-Optional/commonly used packages in guides:
-
-```bash
-yarn add @lit-protocol/constants @lit-protocol/auth-helpers @lit-protocol/contracts-sdk
-# or
-npm i @lit-protocol/constants @lit-protocol/auth-helpers @lit-protocol/contracts-sdk
-```
-
-Docs:
-- Install: https://developer.litprotocol.com/sdk/installation
-- Encryption guide package list: https://developer.litprotocol.com/sdk/access-control/encryption
-- Lit Actions quick start package list: https://developer.litprotocol.com/sdk/serverless-signing/quick-start
-
----
-
-### 3.2 Node.js server usage
-
-Use the Node-only client:
-
-```bash
-yarn add @lit-protocol/lit-node-client-nodejs
-# or
-npm i @lit-protocol/lit-node-client-nodejs
-```
-
-Notes:
-- Server-side client class is `LitNodeClientNodeJs` (different from browser class).
-
-Docs:
-- Install + node notes: https://developer.litprotocol.com/sdk/installation
-- Encryption guide node notes: https://developer.litprotocol.com/sdk/access-control/encryption
-
----
-
-## 4) Historical SDK example
-
-```ts
-import { LitNodeClient } from "@lit-protocol/lit-node-client";
-import { LIT_NETWORK } from "@lit-protocol/constants";
-
-const litNodeClient = new LitNodeClient({
-  litNetwork: LIT_NETWORK.DatilDev, // historical SDK example
-});
-await litNodeClient.connect();
-
-// later, to stop listeners:
-await litNodeClient.disconnect();
-```
-
-Network notes:
-- Docs list Datil networks and warn older Chronicle-based networks (habanero/manzano/cayenne) are deprecated.
-
-Docs:
-- Connect: https://developer.litprotocol.com/connecting-to-a-lit-network/connecting
-
----
-
-## 5) Encryption & decryption primitives
-
-### 5.1 Encryption (client-side)
-
-Encryption can be fully client-side and outputs:
-- `ciphertext` (base64)
-- `dataToEncryptHash` (base64)
-
-Common helpers:
-- `encryptString()`
-- `encryptFile()`
-- `encryptUint8Array()`
-- `encryptToJson()` (serialize metadata + ciphertext into JSON)
-
-Docs:
-- Encryption page: https://developer.litprotocol.com/sdk/access-control/encryption
-
-Example (string):
-
-```ts
-import * as LitJsSdk from "@lit-protocol/lit-node-client";
-
-const { ciphertext, dataToEncryptHash } = await LitJsSdk.encryptString(
-  { accessControlConditions, dataToEncrypt: "hello" },
-  litNodeClient
-);
-
-// store ciphertext + dataToEncryptHash + accessControlConditions + chain
-```
-
-### 5.2 Decryption (requires network)
-
-Decryption typically calls a helper like `decryptToString()` and requires:
-- conditions
-- `ciphertext`
-- `dataToEncryptHash`
-
-Docs:
-- Encryption page: https://developer.litprotocol.com/sdk/access-control/encryption
-
----
-
-## 6) SessionSigs (auth) primitive pattern
-
-SessionSigs are required for:
-- Lit Action execution
-- Decrypt requests
-- Signing requests
-...depending on the operation.
-
-Minimal pattern (Lit Actions quick start style):
-
-```ts
-import { LIT_ABILITY } from "@lit-protocol/constants";
-import { LitActionResource, createSiweMessage, generateAuthSig } from "@lit-protocol/auth-helpers";
-
-const sessionSigs = await litNodeClient.getSessionSigs({
-  chain: "ethereum",
-  expiration: new Date(Date.now() + 1000 * 60 * 10).toISOString(),
-  resourceAbilityRequests: [
-    { resource: new LitActionResource("*"), ability: LIT_ABILITY.LitActionExecution },
-  ],
-  authNeededCallback: async ({ uri, expiration, resourceAbilityRequests }) => {
-    const toSign = await createSiweMessage({
-      uri,
-      expiration,
-      resources: resourceAbilityRequests,
-      walletAddress: await signer.getAddress(),
-      nonce: await litNodeClient.getLatestBlockhash(),
-      litNodeClient,
-    });
-    return generateAuthSig({ signer, toSign });
-  },
-});
-```
-
-Docs:
-- Lit Actions quick start: https://developer.litprotocol.com/sdk/serverless-signing/quick-start
-- Delegated payment SessionSigs example (capabilityAuthSigs): https://developer.litprotocol.com/paying-for-lit/using-delegated-auth-sig
-
----
-
-## 7) Lit Actions primitive pattern
-
-### 7.1 Store code (inline or IPFS CID)
-
-Docs show inline code turned into a string:
-
-```ts
-const _litActionCode = async () => {
-  // use LitActions.* inside
-  LitActions.setResponse({ response: "ok" });
-};
-const code = `(${_litActionCode.toString()})();`;
-```
-
-### 7.2 Execute
-
-```ts
-const res = await litNodeClient.executeJs({
-  sessionSigs,
-  code,              // or ipfsId: "<CID>"
-  jsParams: { ... }, // optional
-});
-```
-
-Docs:
-- Lit Actions quick start (executeJs): https://developer.litprotocol.com/sdk/serverless-signing/quick-start
-
----
-
-## 8) Paying for Lit (how payment works)
-
-### 8.1 Payment types (two layers)
-
-Lit separates:
-1. **Capacity Credits** (for *network operations* like decrypting, executing Lit Actions, signing)
-2. **Lit test tokens** (for *on-chain transactions* on the Chronicle Yellowstone rollup, like minting Capacity Credits and PKPs)
-
-Docs:
-- Capacity Credits concept: https://developer.litprotocol.com/paying-for-lit/capacity-credits
-- Paying overview + tables: https://developer.litprotocol.com/paying-for-lit/overview
-
----
-
-### 8.2 What requires payment (summary)
-
-From Lit's payment overview tables (high level):
-- No payment: connect to network, generate SessionSigs, read from Lit contracts, encrypt data
-- Requires Capacity Credits: Lit Action execution, decrypting data, signing with PKPs, many wrapped-key operations
-- Requires on-chain gas (Lit test token): minting credits, minting PKPs, some wrapped-key lifecycle ops, payment delegation setup, etc.
-
-Docs:
-- Full matrix: https://developer.litprotocol.com/paying-for-lit/overview
-
----
-
-### 8.3 Quick path payment flow (direct capacity credits)
-
-#### Step 1 - get test tokens for the rollup (if needed)
-
-Lit docs say the `tstLPX` test token is used on the Chronicle Yellowstone rollup for gas + minting PKPs/Credits, obtainable via a faucet.
-
-Docs:
-- Paying overview (tstLPX + faucet): https://developer.litprotocol.com/paying-for-lit/overview
-
-#### Step 2 - mint a Capacity Credit NFT (reserve capacity)
-
-You mint Capacity Credits (NFTs) and then reference their Token ID in paid requests.
-Mint options:
-- via Lit Explorer
-- via NFT contract / contracts SDK
-
-Example (contracts-sdk):
-
-```ts
-import { LitContracts } from "@lit-protocol/contracts-sdk";
-import { LIT_NETWORK } from "@lit-protocol/constants";
-
-const contractClient = new LitContracts({
-  signer: dAppOwnerWallet,      // wallet that will own the credit
-  network: LIT_NETWORK.Datil,
-});
-await contractClient.connect();
-
-const { capacityTokenIdStr } = await contractClient.mintCapacityCreditsNFT({
-  requestsPerKilosecond: 80,
-  daysUntilUTCMidnightExpiration: 2,
-});
-```
-
-Docs:
-- Capacity credits: https://developer.litprotocol.com/paying-for-lit/capacity-credits
-- Minting via SDK example: https://developer.litprotocol.com/sdk/access-control/encryption
-
-#### Step 3 - create a Capacity Delegation Auth Sig (delegate use of the credit)
-
-To use a Capacity Credit for network requests, you create a **Capacity Delegation Auth Sig** that:
-- proves authorization to use a specific Capacity Credit
-- is scoped to `delegateeAddresses`
-- can be limited by `uses` and `expiration`
-
-Example:
-
-```ts
-const { capacityDelegationAuthSig } =
-  await litNodeClient.createCapacityDelegationAuthSig({
-    dAppOwnerWallet: ownerSigner,     // MUST own the capacity credit NFT
-    capacityTokenId,                  // token id of the Capacity Credit NFT
-    delegateeAddresses: [userAddr],   // authorized callers
-    uses: "1",
-    expiration: new Date(Date.now() + 1000 * 60 * 10).toISOString(),
-  });
-```
-
-Docs:
-- Delegating a credit: https://developer.litprotocol.com/paying-for-lit/delegating-credit
-
-#### Step 4 - attach the delegation auth sig to SessionSigs
-
-For paid network requests, include the delegation auth sig inside SessionSigs:
-
-```ts
-const sessionSigs = await litNodeClient.getSessionSigs({
-  chain: "ethereum",
-  expiration: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-  capabilityAuthSigs: [capacityDelegationAuthSig],
-  resourceAbilityRequests: [
-    { resource: new LitActionResource("*"), ability: LIT_ABILITY.LitActionExecution },
-  ],
-  authNeededCallback: async (...) => { ... },
-});
-```
-
-Docs:
-- Using a Delegation Auth Sig: https://developer.litprotocol.com/paying-for-lit/using-delegated-auth-sig
-
-#### Step 5 - use SessionSigs for paid operations
-
-Use those `sessionSigs` in:
-- `executeJs` (Lit Actions)
-- decrypt calls
-- signing calls
-...depending on the operation.
-
----
-
-### 8.4 Payment tooling options (to reduce friction)
-
-Lit documents two tools to simplify payment integration:
-- **Lit Relayer**: open-source service hosted by Lit to facilitate onboarding; may subsidize some interactions like minting PKPs; availability not guaranteed.
-- **Payment Delegation Database**: service (from Relayer) for managing payers/payees and capacity delegation at scale.
-
-Docs:
-- Paying overview (tools): https://developer.litprotocol.com/paying-for-lit/overview
-
----
-
-## 9) Operational notes / common pitfalls
-
-- **Do not cache SessionSigs**; generate on demand.
-- **Nonce** in examples uses `litNodeClient.getLatestBlockhash()`.
-- **Disconnect** when done (`litNodeClient.disconnect()`) to stop listeners.
-- Docs mention stale `authSig` / `sessionSigs` can cause errors; clearing local storage / disconnect patterns are referenced in guides.
-
-Docs:
-- Lit Actions quick start: https://developer.litprotocol.com/sdk/serverless-signing/quick-start
-- Encryption guide notes: https://developer.litprotocol.com/sdk/access-control/encryption
-
-Key official pages used for traceability: see [Lit Protocol Developer Docs](https://developer.litprotocol.com/) — topics referenced include: What is Lit, SDK installation, connecting to a Lit network, encryption and access control, Lit Actions and SessionSigs, payments overview, capacity credits, delegation auth sigs, and resources/abilities.
+### 2.4 PKPs (Programmable Key Pairs)
+- **What it is**: programmable keypairs used for signing, often from Lit Actions.
+- **How CE uses it**: each Chipotle-enabled session uses a PKP (`litPkpId`) scoped to its group and usage key.
+- **Billing**: Chipotle meters action execution and mutating management calls against the Lit account's credits.
 
 ---
 
 ## Repo wiring (contextEngine)
 
 - Global hooks: `window.__litHooks` (saveKey/getKey) are set from `MainSite` only when the active session has worker-mediated Chipotle runtime credentials.
-- Dev helper: `window.__litTools.encryptForSbt({ value, sbtAddresses, contextLabel })` returns a v1 envelope string.
-- Dev helper: `window.__litTools.decryptEnvelope(envelopeJson)` decrypts a v1 envelope (if you hold the gate SBT).
+- Dev helpers (development builds only; production builds never publish `window.__litTools`):
+  - `window.__litTools.encryptForSbt({ value, sbtAddresses, contextLabel })` returns a v1 envelope string.
+  - `window.__litTools.decryptEnvelope(envelopeJson)` decrypts a v1 envelope (if you hold the gate SBT).
 - `/admin` now uses worker-mediated Lit status/bootstrap/provision checks; there is no supported generic admin execute helper.
 - `/new` Session Wizard no longer shows a Lit quick-test panel or scoped runtime fields; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
 - Demo session secrets live in `client/src/variables/demo/demo_sessions.json` under the `test` session.
 
-- CE should default to one reusable group per environment or trust boundary, not one group per session. The SBT gate itself belongs in Lit Action code and request params. Session-specific groups remain an optional isolation choice, not the default migration target.
+- Each session authority uses its own PKP and group containing only its Worker-authorized Action. Never add an older unsigned Action to that PKP/group. The SBT gate remains in the signed policy and Action logic.
+- Reused Action CIDs are checked against the canonical source specialized for
+  the pinned Worker signer, session, and PKP before bootstrap accepts a
+  completed setup or changes permissions. Changing that source changes the
+  CID and requires another fresh-authority cutover, with preservation before
+  deployment. Ordinary Worker updates that leave Action source unchanged do
+  not themselves require replacement. Fresh authority preserves the Worker
+  signing key; this release provides no signer-rotation procedure.
 - Session Wizard can now automate both Chipotle setup modes from canonical CE action source:
-  - existing-account mode: use `lit-chipotle-provision` to register the default CE action into a configured group/PKP, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`
+  - existing-account mode: `lit-chipotle-provision` uses the same fresh-authority bootstrap path, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`; legacy authority replacement requires `freshAuthority: true`
   - bootstrap mode: use `lit-chipotle-bootstrap-session` with a stored/session/deployment `litAccountApiKey` to derive the missing default group, PKP, usage key, and CE action before persisting the returned `litCredentials`; if no account key is available, the worker can still create a brand-new session account

@@ -58,6 +58,8 @@ describe('sessionWizardChipotleLitSupport', () => {
         litGroupId: ' stale-group ',
         litPkpId: ' stale-pkp ',
         litActionCid: ' stale-cid ',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litAccountApiKey: ' account-secret ',
         litUsageApiKey: ' stale-usage ',
       },
@@ -121,6 +123,8 @@ describe('sessionWizardChipotleLitSupport', () => {
         litGroupId: 'ce-session-content-prod',
         litPkpId: '0xpkp123',
         litActionCid: 'QmExistingCid',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
       }),
     ).toBeNull();
   });
@@ -133,6 +137,8 @@ describe('sessionWizardChipotleLitSupport', () => {
       .mockResolvedValueOnce({
         ok: true,
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litGroupId: '7',
       });
     const ensureSessionConfig = jest.fn(async () => ({}));
@@ -158,6 +164,8 @@ describe('sessionWizardChipotleLitSupport', () => {
       expect.objectContaining({
         synced: true,
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litGroupId: '7',
         note: 'Lit action auto-provisioned.',
       }),
@@ -166,6 +174,8 @@ describe('sessionWizardChipotleLitSupport', () => {
     expect(applyProvisionedConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litGroupId: '7',
       }),
     );
@@ -185,6 +195,8 @@ describe('sessionWizardChipotleLitSupport', () => {
         ok: true,
         apiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litGroupId: '7',
         litPkpId: '0xpkp123',
       });
@@ -210,6 +222,8 @@ describe('sessionWizardChipotleLitSupport', () => {
         synced: true,
         apiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litGroupId: '7',
         litPkpId: '0xpkp123',
         note: 'Lit session account auto-created.',
@@ -220,6 +234,8 @@ describe('sessionWizardChipotleLitSupport', () => {
       expect.objectContaining({
         apiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litGroupId: '7',
         litPkpId: '0xpkp123',
       }),
@@ -244,6 +260,8 @@ describe('sessionWizardChipotleLitSupport', () => {
       ok: true,
       apiBase: 'https://api.chipotle.litprotocol.com',
       litActionCid: 'QmAction123',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
       litGroupId: '7',
       litPkpId: '0xpkp123',
     });
@@ -267,6 +285,8 @@ describe('sessionWizardChipotleLitSupport', () => {
       expect.objectContaining({
         synced: true,
         litActionCid: 'QmAction123',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         note: 'Lit session account auto-created.',
       }),
     );

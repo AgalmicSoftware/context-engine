@@ -290,6 +290,59 @@ describe('SessionWizard worker resource rendering', () => {
     });
   });
 
+  it.each([
+    ['Cloudflare', selectFastCheapPreset],
+    ['Cloudflare with Lit', selectCloudflareLitProfile],
+  ])('hides user-paid usage for centralized %s sessions in advanced mode', async (_name, selectProfile) => {
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectProfile();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
+    expect(screen.queryByText('Require users to pay for usage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-wizard-worker-tooltip-gw-worker-kv-tip')).not.toBeInTheDocument();
+  });
+
+  it('turns Worker secrets back on when a profile change hides user-paid usage', async () => {
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY));
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
+
+    await selectFastCheapPreset();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
+  });
+
+  it('keeps Worker secrets on in normal mode and the custom pay-for-usage choice for later', async () => {
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
+    enableAdvancedMode();
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY));
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
+
+    // Normal mode hides the toggle, so its custom choice does not apply there.
+    selectNormalModeCard('Worker');
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
+
+    enableAdvancedMode();
+    // The Worker panel stays open from the first visit.
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).toBeChecked();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
+  });
+
   it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 

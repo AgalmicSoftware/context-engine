@@ -40,7 +40,6 @@ import {
   buildQuestionsJsonToggleState,
   buildQuestionPoolResponseMergeState,
   buildRenderedQuestionPayloadPoolsState,
-  buildResponseEditCompleteState,
   buildResponseHydrationInvalidatedState,
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
@@ -92,8 +91,8 @@ import {
   resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
-  toggleShowJsonState,
 } from './surveyQuestionsTypes.js';
+import { buildEncryptionTogglePlan } from './surveyToolFieldEncryptionController';
 
 describe('surveyQuestionsTypes', () => {
   it('builds the default SurveyQuestions state for non-standalone flows', () => {
@@ -1218,11 +1217,6 @@ describe('surveyQuestionsTypes', () => {
       isDecrypting: false,
       submissionError: 'Decryption failed.',
     });
-    expect(buildResponseEditCompleteState()).toEqual({
-      isEditing: false,
-      userHasResponse: true,
-      userResponseEncrypted: true,
-    });
     expect(buildParsedViewAddressAnswersState()).toEqual({
       parsedViewAddressAnswers: null,
     });
@@ -1280,6 +1274,7 @@ describe('surveyQuestionsTypes', () => {
     });
     expect(buildStandaloneAuthResetState(false)).toEqual({
       isEditing: false,
+      startFresh: false,
       submissionError: '',
       submissionComplete: false,
       submittedSinceLastEdit: false,
@@ -1369,12 +1364,6 @@ describe('surveyQuestionsTypes', () => {
       showJson: true,
     });
     expect(buildShowJsonState('')).toEqual({
-      showJson: false,
-    });
-    expect(toggleShowJsonState({ showJson: false })).toEqual({
-      showJson: true,
-    });
-    expect(toggleShowJsonState({ showJson: true })).toEqual({
       showJson: false,
     });
     expect(buildAutoDecryptToggleState({ autoDecryptEnabled: false })).toEqual({
@@ -2015,4 +2004,46 @@ describe('surveyQuestionsTypes', () => {
       },
     ]);
   });
+});
+
+it('explains instead of publishing a masked comment when the answer lock is removed', () => {
+  const lockedField = (value: string, audienceMode = 'explicit') => ({
+    value,
+    encrypted: true,
+    encryptionAudience: 'self_admin',
+    encryptionGateId: null,
+    audienceMode,
+  });
+  const deps = {
+    isQuestionLockedForResponse: () => false,
+    buildEmptyResponseFieldState: () => ({ value: '', encrypted: false, audienceMode: 'explicit' }),
+    resolveFieldEncryptionAudience: () => 'self_admin',
+    resolveFieldEncryptionGateId: () => null,
+    normalizeFieldAudienceMode: (value: unknown) => String(value || 'explicit'),
+    buildInheritedAdditionalFieldState: (additional: Record<string, unknown>, answer: Record<string, unknown>) => ({
+      ...additional,
+      encrypted: answer.encrypted,
+    }),
+    normalizeResponseEncryptionAudience: (audience: unknown) => String(audience || ''),
+  };
+  const slice = {
+    answers: { q1: lockedField('Decrypted answer') },
+    additionalComments: { q1: lockedField('*', 'inherit') },
+  };
+
+  expect(
+    buildAnswerEncryptionToggleResponseState(
+      { surveysResponseState: [slice] },
+      {
+        // The state builder takes the plan through the runtime's loose record types.
+        buildEncryptionTogglePlan: buildEncryptionTogglePlan as unknown as Parameters<
+          typeof buildAnswerEncryptionToggleResponseState
+        >[1]['buildEncryptionTogglePlan'],
+        deps,
+        newEncryptedState: false,
+        questionId: 'q1',
+        surveyIndex: 0,
+      },
+    ),
+  ).toEqual({ submissionError: 'Decrypt the locked answer and comment before making them public.' });
 });

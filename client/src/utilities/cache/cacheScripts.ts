@@ -359,13 +359,6 @@ const updateMirrorFromStorageKey = (storageKey: string, value: CacheValue): void
   setMirrorValue(parsed.namespace, parsed.slug, value);
 };
 
-const removeMirrorFromStorageKey = (storageKey: string): void => {
-  const parsed = parseStorageKey(storageKey);
-  if (!parsed) return;
-  if (!isManagedNamespace(parsed.namespace)) return;
-  removeMirrorValue(parsed.namespace, parsed.slug);
-};
-
 const attachStorageListenerOnce = (): void => {
   if (storageListenerAttached) return;
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
@@ -799,31 +792,6 @@ export const initCacheManager = async (): Promise<void> => {
     } else hydrateMirrorFromLocalStorage();
   })();
   return initPromise;
-};
-
-export const migrateLocalStorageToIDB = async (): Promise<{
-  migrated: boolean;
-  idb: boolean;
-  moved: number;
-  removed: number;
-  failed: number;
-}> => {
-  await ensureBackendReady();
-  const managed = await migrateManagedKeysFromLocalStorage({ useIdb: !!idbAvailable });
-  const report = {
-    migrated: Number(managed.moved || 0) > 0 || Number(managed.removed || 0) > 0,
-    idb: !!idbAvailable,
-    moved: Number(managed.moved || 0),
-    removed: Number(managed.removed || 0),
-    failed: Number(managed.failed || 0),
-  };
-  if (!didHydrateMirror) {
-    if (idbAvailable) {
-      await hydrateMirrorFromIdb();
-      hydrateMissingMirrorFromLocalStorage();
-    } else hydrateMirrorFromLocalStorage();
-  }
-  return report;
 };
 
 export const readCache = async <TValue = CacheLegacyNode>(

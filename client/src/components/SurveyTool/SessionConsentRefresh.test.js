@@ -5,10 +5,10 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import {
   createPileViewRuntimeStrategy,
-  loadSessionInterviewOwnAnswers,
   recordInterviewProvenance,
   submitSessionInterviewResponses,
 } from './SurveyPileViewMode';
+import { loadSessionInterviewOwnAnswers } from './surveySavedAnswerGate';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
@@ -236,7 +236,7 @@ describe('E2 consent change then undo then reload', () => {
     expect(await run(() => submitSessionInterviewResponses(engine2, ['q1']))).toEqual({ status: 'already-saved' });
   }, 40000);
 
-  it('E2b Clear changes after a withdrawal leaves nothing pending, before and after reload', async () => {
+  it('E2b Clear changes keeps a withdrawal pending, before and after reload', async () => {
     setCache({ q1: { [A]: withConsent } });
     mockCaches();
     ownAnswers({ [A]: [withConsent] });
@@ -248,19 +248,21 @@ describe('E2 consent change then undo then reload', () => {
       recordInterviewProvenance(engine, [{ questionId: 'q1', answer: 'Agree' }], SOURCE, PACKET, false, false, ''),
     );
     expect(engine.getSubmitCount()).toBe(1);
+    // Clear changes discards edits but never makes the response more disclosing again.
     await run(async () => engine.handleRevertPendingChanges());
     await settle();
-    expect(engine.getSubmitCount()).toBe(0);
+    expect(engine.getSubmitCount()).toBe(1);
     first.view.unmount();
     const engine2 = await waitForPile(mountPile());
-    expect(engine2.getSubmitCount()).toBe(0);
+    expect(engine2.getSubmitCount()).toBe(1);
     const submitResponses = contractScriptsModule.default.submitResponses;
     await run(() => new Promise((resolve) => engine2.handleAnswerPile('q1', 'Disagree', { afterUpdate: resolve })));
     await run(() => engine2.handlePileSubmitClick());
     await settle();
     const [uploaded] = submitResponses.mock.calls[0][2];
-    expect(uploaded.responderName).toBe('Participant A');
-    expect(uploaded.interviewProvenance.source.platform).toBe('claude');
+    expect(uploaded.answer.value).toBe('Disagree');
+    expect(uploaded).not.toHaveProperty('responderName');
+    expect(uploaded).not.toHaveProperty('interviewProvenance');
   }, 40000);
 });
 

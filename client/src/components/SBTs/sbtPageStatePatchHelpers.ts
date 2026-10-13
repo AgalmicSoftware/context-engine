@@ -242,6 +242,7 @@ export const buildSbtPageInitialState = ({ network = null }: BuildSbtPageInitial
   hasInviteMint: false,
   groupPasswordHash: null,
   groupPasswordHashLoaded: false,
+  groupPasswordChecking: false,
   docModalOpen: false,
   docModalLoading: false,
   docModalError: '',

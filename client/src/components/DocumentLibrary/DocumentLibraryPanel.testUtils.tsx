@@ -5,7 +5,6 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockBuildSbtAccessControlConditions = jest.fn();
 const mockGetGlobalLitHooks = jest.fn();
-const mockGetUnsupportedLitContractAccessControlError = jest.fn();
 const mockListArweaveTransactionsByTags = jest.fn();
 const mockResolveDocLibraryProvider = jest.fn();
 const mockResolveArweaveGraphqlUrl = jest.fn();
@@ -53,8 +52,6 @@ jest.mock('../../utilities/docLibrary/config.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
-  getUnsupportedLitContractAccessControlError: (...args: any[]) =>
-    mockGetUnsupportedLitContractAccessControlError(...args),
   getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
   litStorage: {
     buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
@@ -152,7 +149,6 @@ export const setupDocumentLibraryPanelTestLifecycle = () => {
     });
     mockBuildSbtAccessControlConditions.mockReturnValue([{ contractAddress: '0xgate' }]);
     mockGetGlobalLitHooks.mockReturnValue(null);
-    mockGetUnsupportedLitContractAccessControlError.mockReturnValue('');
     mockUploadDocLibraryFile.mockResolvedValue({
       txId: 'Z'.repeat(43),
       tagMap: {},
@@ -195,7 +191,6 @@ export {
   E2E_TESTIDS,
   mockBuildSbtAccessControlConditions,
   mockGetGlobalLitHooks,
-  mockGetUnsupportedLitContractAccessControlError,
   mockListArweaveTransactionsByTags,
   mockResolveDocLibraryProvider,
   mockResolveArweaveGraphqlUrl,

@@ -17,7 +17,13 @@ type RatingResponseObject = UnknownRecord & {
 type RatingSliceForSubmit = {
   answers?: Record<string, ResponseFieldState>;
   additionalComments?: Record<string, ResponseFieldState>;
+  importance?: Record<string, unknown>;
+  conviction?: Record<string, unknown>;
 };
+
+// A lock on a comment that has no text protects nothing new, so it does not encrypt fresh ratings.
+const hasCommentText = (field: ResponseFieldState | undefined): boolean =>
+  typeof field?.value === 'string' ? field.value.trim().length > 0 : field?.value != null;
 
 type RatingEncryptionBaseOptions = {
   sessionSlug?: string;
@@ -130,6 +136,15 @@ export function buildRatingBaseline(
   return ratingBaselineByQid;
 }
 
+// Research snapshots must not repeat a rating that is still sent encrypted.
+function redactEnvelopedRatingResearch(respObj: RatingResponseObject, qid: string): void {
+  if (!respObj.interviewProvenance) return;
+  const protectedFields = RATING_FIELD_SPECS.filter(({ envelopeKey }) => !!respObj[envelopeKey]).map(
+    ({ fieldKey }) => fieldKey,
+  );
+  respObj.interviewProvenance = redactInterviewEncryptedRatings(respObj.interviewProvenance, qid, protectedFields);
+}
+
 export function pickAudienceForRatingEncryption(
   qid: string,
   sliceForSubmit: RatingEnvelopeContext['sliceForSubmit'],
@@ -195,17 +210,23 @@ export function shouldEncryptRatingForQid(
   respObj: RatingResponseObject,
   sliceForSubmit: RatingEnvelopeContext['sliceForSubmit'],
   deps: RatingEnvelopeDeps,
+  changedFields: Record<string, unknown> = {},
 ): boolean {
   const qLower = String(qid || '')
     .trim()
     .toLowerCase();
-  const locked = deps.isQuestionLockedForResponse(qLower);
   const answerState = sliceForSubmit?.answers?.[qLower];
   const additionalState = sliceForSubmit?.additionalComments?.[qLower];
-  const encryptedState = !!locked || !!answerState?.encrypted || !!additionalState?.encrypted;
-  const encryptedPayload = !!respObj?.answer?.encrypted || !!respObj?.additional?.encrypted;
-
-  return encryptedState || encryptedPayload;
+  if (deps.isQuestionLockedForResponse(qLower) || answerState?.encrypted || respObj?.answer?.encrypted) return true;
+  // Ratings saved encrypted stay encrypted unless the user turned a lock on this question off in
+  // this edit, whatever the answer and comment now hold (a cleared field, for example, has no lock).
+  const storedEncrypted = RATING_FIELD_SPECS.some(({ envelopeKey }) => !!respObj?.[envelopeKey]);
+  const lockTurnedOff =
+    (!!changedFields.encryptedAnswer && !answerState?.encrypted) ||
+    (!!changedFields.encryptedAdditional && !additionalState?.encrypted);
+  if (storedEncrypted && !lockTurnedOff) return true;
+  if (!additionalState?.encrypted && !respObj?.additional?.encrypted) return false;
+  return storedEncrypted || hasCommentText(additionalState) || hasCommentText(respObj?.additional);
 }
 
 export async function processRatingEnvelopesForSubmit(
@@ -248,16 +269,19 @@ export async function processRatingEnvelopesForSubmit(
       }
     });
 
-    const hasAnyExistingEnvelope = RATING_FIELD_SPECS.some(({ envelopeKey }) => {
-      const envelope = typeof respObj[envelopeKey] === 'string' ? respObj[envelopeKey] : '';
-      return !!envelope;
-    });
-
-    const shouldEncryptRating = hasAnyExistingEnvelope || shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps);
-    if (!shouldEncryptRating) {
+    // Ratings follow the answer and comment locks; with every lock off, known ratings go public.
+    if (!shouldEncryptRatingForQid(qid, respObj, sliceForSubmit, deps, changedFields)) {
       RATING_FIELD_SPECS.forEach(({ fieldKey, envelopeKey }) => {
-        if (changedByField[fieldKey]) respObj[envelopeKey] = '';
+        if (!respObj[envelopeKey]) return;
+        const known =
+          changedByField[fieldKey] ||
+          sliceForSubmit?.[fieldKey]?.[qidRaw] != null ||
+          sliceForSubmit?.[fieldKey]?.[qid] != null;
+        // A known rating becomes public; one this browser never decrypted keeps its envelope.
+        if (known) respObj[envelopeKey] = '';
+        else respObj[fieldKey] = null;
       });
+      redactEnvelopedRatingResearch(respObj, qid);
       continue;
     }
 
@@ -321,12 +345,7 @@ export async function processRatingEnvelopesForSubmit(
     RATING_FIELD_SPECS.forEach(({ fieldKey }) => {
       respObj[fieldKey] = null;
     });
-    if (respObj.interviewProvenance) {
-      const protectedFields = RATING_FIELD_SPECS.filter(({ envelopeKey }) => !!respObj[envelopeKey]).map(
-        ({ fieldKey }) => fieldKey,
-      );
-      respObj.interviewProvenance = redactInterviewEncryptedRatings(respObj.interviewProvenance, qid, protectedFields);
-    }
+    redactEnvelopedRatingResearch(respObj, qid);
   }
 
   return {

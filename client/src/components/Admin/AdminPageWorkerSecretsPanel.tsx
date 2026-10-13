@@ -61,6 +61,7 @@ type AdminPageWorkerSecretsPanelProps = {
   faucetResource: AdminResourceDisplayState;
   litResource: AdminResourceDisplayState;
   litResourceLabel: string;
+  litAuthorityControls?: React.ReactNode;
   refreshArweaveResource: () => void;
   refreshFaucetResource: () => void;
   refreshLitResource: (options?: { includeSignedStatus?: boolean }) => void;
@@ -126,6 +127,7 @@ const AdminPageWorkerSecretsPanel = ({
   faucetResource,
   litResource,
   litResourceLabel,
+  litAuthorityControls,
   refreshArweaveResource,
   refreshFaucetResource,
   refreshLitResource,
@@ -283,12 +285,15 @@ const AdminPageWorkerSecretsPanel = ({
                       />
                     )}
                     {card.key === 'lit' && (
-                      <InlineResourceSummary
-                        label={litResourceLabel}
-                        resource={litResource}
-                        onRefresh={() => refreshLitResource({ includeSignedStatus: true })}
-                        refreshLabel="Refresh Lit status"
-                      />
+                      <>
+                        <InlineResourceSummary
+                          label={litResourceLabel}
+                          resource={litResource}
+                          onRefresh={() => refreshLitResource({ includeSignedStatus: true })}
+                          refreshLabel="Refresh Lit status"
+                        />
+                        {litAuthorityControls}
+                      </>
                     )}
                   </div>
                 )}

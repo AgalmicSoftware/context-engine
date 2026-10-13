@@ -951,3 +951,11 @@
     font-size: 0.8rem;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .docsSectionToggle:hover,
+  .docsSectionToggle:focus-visible {
+    background: color-mix(in srgb, var(--ce-action-submit) 12%, var(--ce-surface));
+    color: var(--ce-document-text);
+  }
+}

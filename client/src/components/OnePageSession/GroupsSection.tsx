@@ -61,7 +61,7 @@ export type GroupsSectionProps = {
 const renderSectionHeading = (title: React.ReactNode, subtitle: React.ReactNode) => (
   <span className={styles.sectionHeaderText}>
     <span className={styles.sectionHeaderTitle}>{title}</span>
-    <span className={styles.sectionHeaderSubtitle}>{subtitle}</span>
+    {subtitle ? <span className={styles.sectionHeaderSubtitle}>{subtitle}</span> : null}
   </span>
 );
 
@@ -181,7 +181,7 @@ const OnePageSessionGroupsSection = ({
           ) : (
             <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
           )}
-          {renderSectionHeading(usesRegistryGroups ? t('sbts') : 'Groups', 'Join or Create')}
+          {renderSectionHeading(usesRegistryGroups ? t('sbts') : 'Groups', showGroups ? null : 'Join or Create')}
           {showGroups ? (
             <div
               className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}

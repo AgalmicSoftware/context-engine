@@ -88,7 +88,7 @@ describe('SessionWizard new-session requirements banner', () => {
     enableAdvancedMode();
     fireEvent.click(screen.getByRole('button', { name: 'Worker deployment & secrets' }));
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Agent Session Wrapped' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Agents (HTTP API)' }));
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).toBeInTheDocument();

@@ -53,6 +53,20 @@ export const timingSafeEqual = (a, b) => {
   return res === 0;
 };
 
+// Compare SHA-256 digests so the check always runs over 32 equal-length bytes
+// and leaks neither the secret's contents nor its length through timing.
+export const timingSafeSecretEqual = async (supplied, expected, deps) => {
+  const subtle = getCryptoSubtle(deps);
+  const [left, right] = await Promise.all([supplied, expected].map(async (value) => (
+    new Uint8Array(await subtle.digest('SHA-256', encoder.encode(toStr(value))))
+  )));
+  let res = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    res |= left[i] ^ right[i];
+  }
+  return res === 0;
+};
+
 export const getHmacKey = async (secret, deps) => {
   const keyText = toStr(secret);
   if (!keyText) return null;

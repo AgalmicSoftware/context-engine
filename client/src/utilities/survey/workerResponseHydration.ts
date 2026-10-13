@@ -39,7 +39,9 @@ const WORKER_RESPONSE_CACHE_VERSION = 1;
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const readString = (value: unknown): string => String(value || '').trim();
+// Response payloads are any participant's JSON, and converting an object with a
+// broken toString throws, so only strings count as text here.
+const readString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 export const isWorkerCanonicalSessionConfig = (value: unknown): boolean => {
   const projection = resolveSessionCapabilityProjection(value);

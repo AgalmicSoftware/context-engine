@@ -287,6 +287,26 @@ const addCount = (target: Record<string, number>, key: string, amount = 1) => {
   target[key] = Number(target[key] || 0) + amount;
 };
 
+// Written and allocation answers are not categories, so the Breakdown does not
+// chart them; the report and the AI analysis still use them.
+const UNCHARTED_BREAKDOWN_TYPES = new Set(['freeform', 'text', 'quadratic']);
+
+// The Worker joins a multiple-choice answer's option labels with '; '. Known
+// labels are matched first so an option that contains '; ' stays whole.
+const splitMultichoiceAnswer = (answer: string, options: string[]): string[] => {
+  const picks: string[] = [];
+  let rest = answer;
+  while (rest) {
+    const option = options
+      .filter((label) => rest === label || rest.startsWith(`${label}; `))
+      .sort((a, b) => b.length - a.length)[0];
+    if (!option) return uniqueTexts(answer.split('; '));
+    picks.push(option);
+    rest = rest.slice(option.length + 2);
+  }
+  return uniqueTexts(picks);
+};
+
 export const buildGeneratedBreakdownAnalysisData = ({
   questions = [],
   responses = [],
@@ -295,7 +315,10 @@ export const buildGeneratedBreakdownAnalysisData = ({
   questions?: GeneratedSessionResultsSubmittedQuestion[];
   responses?: GeneratedSessionResultsSubmittedResponse[];
 } = {}): GeneratedBreakdownAdapterResult => {
-  const normalizedQuestions = (Array.isArray(questions) ? questions : []).map(normalizeQuestion);
+  const submittedQuestions = (Array.isArray(questions) ? questions : []).map(normalizeQuestion);
+  const normalizedQuestions = submittedQuestions.filter(
+    (question) => !UNCHARTED_BREAKDOWN_TYPES.has(question.sourcePromptType.toLowerCase()),
+  );
   const questionMap = new Map(normalizedQuestions.map((question) => [question.id, question]));
   const answerCounts = new Map<string, Record<string, number>>();
   const segmentTotalsByQuestion: Record<string, Record<string, number>> = {};
@@ -306,7 +329,13 @@ export const buildGeneratedBreakdownAnalysisData = ({
     const questionId = toText(response.questionId);
     const answer = toText(response.answer ?? response.additional);
     if (!questionId || !answer) return;
-    if (!questionMap.has(questionId)) return;
+    const question = questionMap.get(questionId);
+    if (!question) return;
+    // A multiple-choice responder counts once for each option they picked.
+    const picks =
+      question.sourcePromptType.toLowerCase() === 'multichoice'
+        ? splitMultichoiceAnswer(answer, question.options)
+        : [answer];
 
     const participantKey = toText(response.participantId) || `response_${index + 1}`;
     const responseKey = `${questionId}::${participantKey}`;
@@ -317,7 +346,7 @@ export const buildGeneratedBreakdownAnalysisData = ({
     segmentKeys.forEach((segmentKey) => {
       const mapKey = `${questionId}::${segmentKey}`;
       const counts = answerCounts.get(mapKey) || {};
-      addCount(counts, answer);
+      picks.forEach((pick) => addCount(counts, pick));
       answerCounts.set(mapKey, counts);
       segmentTotalsByQuestion[questionId] = segmentTotalsByQuestion[questionId] || {};
       addCount(segmentTotalsByQuestion[questionId], segmentKey);
@@ -368,7 +397,9 @@ export const buildGeneratedBreakdownAnalysisData = ({
     return {
       analysisData: null,
       unavailableReason:
-        'Submitted responses are required before Breakdown can render generated session distributions.',
+        submittedQuestions.length > 0 && normalizedQuestions.length === 0
+          ? 'Breakdown charts binary, rating, and multiple-choice questions only.'
+          : 'Submitted responses are required before Breakdown can render generated session distributions.',
     };
   }
 

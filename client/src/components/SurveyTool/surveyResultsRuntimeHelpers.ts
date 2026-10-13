@@ -91,12 +91,13 @@ export const areValuesEquivalentBySignature = (currentValue: unknown, nextValue:
 export const getResponseQuestionId = (obj: SurveyResultsResponseRecord | null | undefined): string =>
   String(obj?.questionID || obj?.questionId || '').trim();
 
+// Question metadata wins; a participant's payload only fills gaps.
 export const getResponseQuestionPrompt = (
   obj: SurveyResultsResponseRecord | null | undefined,
   questionData: SurveyResultsRuntimeRecord | null = null,
-): unknown => obj?.prompt || questionData?.prompt || '';
+): unknown => questionData?.prompt || obj?.prompt || '';
 
 export const getResponseQuestionType = (
   obj: SurveyResultsResponseRecord | null | undefined,
   questionData: SurveyResultsRuntimeRecord | null = null,
-): unknown => obj?.type || questionData?.type || '';
+): unknown => questionData?.type || obj?.type || '';

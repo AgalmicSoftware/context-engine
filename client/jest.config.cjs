@@ -49,8 +49,6 @@ module.exports = {
     '^.+\\.sol\\?raw$': '<rootDir>/scripts/jest/fileMock.js',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^(utilities/.+)\\.js$': '$1',
-    '^node:os$': '<rootDir>/src/shims/node-os.ts',
-    '^node:events$': '<rootDir>/src/shims/node-events.ts',
     '^viem$': '<rootDir>/node_modules/viem/_cjs/index.js',
     '^viem\\/(.*)$': '<rootDir>/node_modules/viem/_cjs/$1',
     '^ox$': `${oxCjsBase}/index.js`,
@@ -60,15 +58,5 @@ module.exports = {
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
   },
   watchPathIgnorePatterns: ['<rootDir>/build', '<rootDir>/coverage'],
-  // Coverage floors are banked from full-client coverage runs. Move them only
-  // upward after large lanes, rounding down to avoid CI flakes.
-  coverageThreshold: {
-    global: {
-      statements: 75.7,
-      branches: 61.0,
-      functions: 77.0,
-      lines: 79.1,
-    },
-  },
   resetMocks: false,
 };

@@ -308,6 +308,22 @@ describe('SponsorPage', () => {
     expect(screen.getByDisplayValue('https://edited.example.test')).toBeInTheDocument();
   });
 
+  it('tells sponsors that grant deploys use the release recorded on their session Worker', async () => {
+    await renderSponsorPage();
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+
+    const deployCard = getFieldInputByLabel('Cloudflare API token').closest('.secretOptionCard') as HTMLElement;
+    const guideLink = within(deployCard).getByRole('link', { name: 'sponsored deploy release guide' });
+    expect(guideLink).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#sponsored-deploy-release',
+    );
+    expect(guideLink).toHaveAttribute('target', '_blank');
+    expect(guideLink.parentElement).toHaveTextContent(
+      'Grant deploys install the release recorded on your session Worker, but only Worker code from 0.6.8 or later enforces this: an older Worker still deploys whatever code the redeemer sends, so update it first. On 0.6.8 or later, every deploy grant needs WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on that Worker. A grant for a session that turns on Agents HTTP also needs AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL; without that pair, only those deploys are refused. See the sponsored deploy release guide.',
+    );
+  });
+
   it('preselects the requested session using sessionId and chainId props', async () => {
     sessionEntries = [
       [
@@ -884,6 +900,48 @@ describe('SponsorPage', () => {
     expect(
       await screen.findByText('Deploy grants require embedded deploy-helper to be enabled on the sponsoring worker.'),
     ).toBeInTheDocument();
+    expect(mockUploadDataToArweave).not.toHaveBeenCalled();
+  });
+
+  it('explains a deploy grant refused for a missing Worker release and uploads nothing', async () => {
+    global.fetch = jest.fn((url: any): Promise<any> =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : String(url).endsWith('/admin/issue-sponsored-grants')
+            ? {
+                ok: false,
+                status: 409,
+                json: async () => ({
+                  error: 'Deploy grants need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on this Worker.',
+                  reason: 'sponsored_release_missing',
+                }),
+              }
+            : { ok: true, json: async () => ({ ok: true }) },
+      ),
+    ) as any;
+
+    await renderSponsorPage();
+
+    fireEvent.change(getFieldInputByLabel('Label'), {
+      target: { value: 'Grant blocked by a missing release' },
+    });
+    fireEvent.change(getFieldInputByLabel('Cloudflare API token'), {
+      target: { value: 'cf-live-token' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
+
+    const status = await screen.findByTestId(E2E_TESTIDS.SPONSOR_STATUS);
+    await waitFor(() => {
+      expect(status).toHaveTextContent(
+        'No grant was issued: your session Worker has no recorded release for deploy grants to install. Set WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on it, then create the URL again. See the sponsored deploy release guide.',
+      );
+    });
+    expect(within(status).getByRole('link', { name: 'sponsored deploy release guide' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('docs/session-cors-worker.md#sponsored-deploy-release'),
+    );
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
   });
 

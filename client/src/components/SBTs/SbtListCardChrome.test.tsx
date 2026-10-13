@@ -47,6 +47,23 @@ describe('SbtListCardChrome', () => {
     expect(screen.queryByRole('link', { name: 'Alpha doc' })).not.toBeInTheDocument();
   });
 
+  it('renders a document without a safe href as text instead of a link', () => {
+    render(
+      <SbtListDetailsPanel
+        details={{
+          documentUrls: [{ href: '', label: 'javascript:alert(1)' }],
+          hasDetails: true,
+          tags: [],
+        }}
+        detailsId="sbt-details-unsafe"
+        styles={styles}
+      />,
+    );
+
+    expect(screen.getByText('javascript:alert(1)').closest('a')).toBeNull();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('renders tag chips and details toggle wiring from the meta row model', () => {
     const onTagClick = jest.fn((event: React.MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();

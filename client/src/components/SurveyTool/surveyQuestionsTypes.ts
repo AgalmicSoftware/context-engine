@@ -231,12 +231,6 @@ export type SurveyDecryptEditFailureStatePatch = {
   submissionError: string;
 };
 
-export type SurveyResponseEditCompleteStatePatch = {
-  isEditing: boolean;
-  userHasResponse: boolean;
-  userResponseEncrypted: boolean;
-};
-
 export type SurveyParsedViewAddressAnswersStatePatch = {
   parsedViewAddressAnswers: unknown;
 };
@@ -291,6 +285,7 @@ export type SurveyAccountViewResetStatePatch = {
 
 export type SurveyStandaloneAuthResetStatePatch = {
   isEditing: boolean;
+  startFresh: boolean;
   submissionError: string;
   submissionComplete: boolean;
   submittedSinceLastEdit: unknown;
@@ -461,12 +456,15 @@ export type SurveyFetchedQuestionPoolStatePatch = {
   questionPoolPendingIds: string[];
 };
 
-export type SurveyEncryptionResponseStatePatch = {
-  surveysResponseState: unknown[];
-  lockAudienceMenuByQuestion: unknown;
-  lockAudienceGateDetailsByQuestion: unknown;
-  submittedSinceLastEdit: unknown;
-};
+export type SurveyEncryptionResponseStatePatch =
+  | {
+      surveysResponseState: unknown[];
+      lockAudienceMenuByQuestion: unknown;
+      lockAudienceGateDetailsByQuestion: unknown;
+      submittedSinceLastEdit: unknown;
+    }
+  // A lock change that would publish a masked value only explains why it did nothing.
+  | { submissionError: string };
 
 export type SurveyResponseFetchLoadingStatePatch = {
   isLoadingResponse: boolean;
@@ -772,10 +770,6 @@ export const buildJsonPreviewState = (jsonPreview: unknown): SurveyJsonPreviewSt
 
 export const buildShowJsonState = (showJson: unknown): SurveyShowJsonStatePatch => ({
   showJson: !!showJson,
-});
-
-export const toggleShowJsonState = (prevState: { showJson?: unknown } = {}): SurveyShowJsonStatePatch => ({
-  showJson: !prevState.showJson,
 });
 
 export const buildAutoDecryptToggleState = (
@@ -1225,6 +1219,7 @@ export const buildAnswerEncryptionToggleResponseState = (
   const slice = { ...((arr[surveyIndex] as UnknownRecord | undefined) || createEmptyResponseSlice()) };
 
   const plan = buildEncryptionTogglePlan(questionId, 'answer', newEncryptedState, slice, deps);
+  if (plan.blockedReason) return { submissionError: String(plan.blockedReason) };
 
   slice.answers = { ...((slice.answers as UnknownRecord | undefined) || {}), [questionId]: plan.nextFieldState };
   if (plan.nextAdditionalState) {
@@ -1275,6 +1270,7 @@ export const buildAdditionalEncryptionToggleResponseState = (
   const slice = { ...((arr[surveyIndex] as UnknownRecord | undefined) || createEmptyResponseSlice()) };
 
   const plan = buildEncryptionTogglePlan(questionId, 'additional', newEncryptedState, slice, deps);
+  if (plan.blockedReason) return { submissionError: String(plan.blockedReason) };
 
   slice.additionalComments = {
     ...((slice.additionalComments as UnknownRecord | undefined) || {}),
@@ -1371,7 +1367,14 @@ export const buildAdditionalEncryptionAudienceState = (
   });
   const slice = { ...((arr[surveyIndex] as UnknownRecord | undefined) || createEmptyResponseSlice()) };
 
-  const { nextAdditionalState } = buildAdditionalAudienceSelectionPlan(questionId, audience, gateId, slice, deps);
+  const { nextAdditionalState, blockedReason } = buildAdditionalAudienceSelectionPlan(
+    questionId,
+    audience,
+    gateId,
+    slice,
+    deps,
+  );
+  if (blockedReason) return { submissionError: String(blockedReason) };
 
   slice.additionalComments = {
     ...((slice.additionalComments as UnknownRecord | undefined) || {}),
@@ -1504,12 +1507,6 @@ export const buildDecryptEditFailureState = (
   submissionError: String(submissionError || 'Decryption failed.'),
 });
 
-export const buildResponseEditCompleteState = (): SurveyResponseEditCompleteStatePatch => ({
-  isEditing: false,
-  userHasResponse: true,
-  userResponseEncrypted: true,
-});
-
 export const buildParsedViewAddressAnswersState = (
   parsedViewAddressAnswers: unknown = null,
 ): SurveyParsedViewAddressAnswersStatePatch => ({
@@ -1583,6 +1580,7 @@ export const buildStandaloneAuthResetState = (
   submittedSinceLastEdit: unknown,
 ): SurveyStandaloneAuthResetStatePatch => ({
   isEditing: false,
+  startFresh: false,
   submissionError: '',
   submissionComplete: false,
   submittedSinceLastEdit,

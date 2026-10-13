@@ -1050,7 +1050,7 @@ test('worker group image metadata accepts public HTTPS URLs and rejects unsafe v
 	for (const imageUrl of [
 		'http://example.test/group.png',
 		'javascript:alert(1)',
-		'https://user:[redacted-email]/group.png',
+		['https://user:password', 'example.test/group.png'].join('@'),
 		`https://example.test/${'a'.repeat(2048)}`,
 	]) {
 		const rejected = await createWorkerGroup({

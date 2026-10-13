@@ -171,11 +171,6 @@ export type UploadFilenameInput = {
   fallbackExtension?: unknown;
 };
 
-export type ManualLibraryTextFileInput = {
-  title?: unknown;
-  text?: unknown;
-};
-
 export type LibraryContentInput = {
   pastedText?: unknown;
   additionalUrlInput?: unknown;
@@ -461,30 +456,6 @@ export const renameFileForLibraryUpload = (file: unknown, title: unknown) => {
   });
 };
 
-export const buildManualLibraryTextFile = ({ title, text }: ManualLibraryTextFileInput = {}) => {
-  const body = toStr(text);
-  const looksLikeMarkdown = /(^|\n)\s*(#|\* |- |\d+\.)/.test(body);
-  const extension = looksLikeMarkdown ? 'md' : 'txt';
-  const filename = buildUploadFilename({
-    title,
-    originalName: '',
-    fallbackBase: 'context-note',
-    fallbackExtension: extension,
-  });
-  return new File([body], filename, {
-    type: looksLikeMarkdown ? 'text/markdown' : 'text/plain',
-  });
-};
-
-export const isManualLibraryUploadableContent = ({
-  pastedText = '',
-  additionalUrlInput = '',
-  additionalSources = [],
-}: LibraryContentInput = {}) =>
-  Boolean(toStr(pastedText).trim()) ||
-  Boolean(toStr(additionalUrlInput).trim()) ||
-  (Array.isArray(additionalSources) && additionalSources.length > 0);
-
 export const hasDatabaseToolInputContent = ({
   pastedText = '',
   additionalUrlInput = '',
@@ -522,6 +493,20 @@ export const normalizeTags = (dTags?: string | Array<string | null | undefined |
 export const getSelectedQuestionTypes = (questionTypes: QuestionTypeSelection = {}) =>
   Object.keys(questionTypes).filter((type) => questionTypes[type]);
 
+// AI output is untrusted JSON: keep only text prompts, and option questions
+// whose options are strings with at least two usable labels.
+const isUsableGeneratedQuestion = (question: unknown): question is GeneratedAiQuestion => {
+  const record = (question && typeof question === 'object' ? question : {}) as Record<string, unknown>;
+  if (typeof record.prompt !== 'string' || !record.prompt.trim()) return false;
+  if (record.questionType !== 'multichoice' && record.questionType !== 'quadratic') return true;
+  const options = record.options;
+  return (
+    Array.isArray(options) &&
+    options.every((option) => typeof option === 'string') &&
+    options.filter((option) => option.trim()).length >= 2
+  );
+};
+
 export const buildGeneratedSurveyStatements = ({
   aiData,
   questionTypes,
@@ -530,7 +515,10 @@ export const buildGeneratedSurveyStatements = ({
   generateQuestionId = generateSharedQuestionId,
 }: GeneratedSurveyStatementsInput): GeneratedSurveyStatementsResult => {
   const wantedTypes = getSelectedQuestionTypes(questionTypes);
-  const questions = aiData.questions.filter((question) => wantedTypes.includes(question.questionType)).slice(0, count);
+  const questions = (Array.isArray(aiData?.questions) ? aiData.questions : [])
+    .filter(isUsableGeneratedQuestion)
+    .filter((question) => wantedTypes.includes(question.questionType))
+    .slice(0, count);
 
   questions.forEach((question) => {
     question.tags = question.tags || [];

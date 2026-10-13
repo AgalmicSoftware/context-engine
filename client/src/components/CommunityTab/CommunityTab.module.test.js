@@ -5,9 +5,11 @@ describe('CommunityTab module styles', () => {
   it('stacks mobile sections as statistics, beeswarm, then leaderboard', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.rightSection\s*{[\s\S]*?order:\s*1;[\s\S]*?}/);
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.sessionContent\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?}/,
+    );
     expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.statsSection\s*{[\s\S]*?order:\s*1;[\s\S]*?}/);
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.beeswarmSection\s*{[\s\S]*?order:\s*2;[\s\S]*?}/);
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.beeswarmSection\s*{[\s\S]*?order:\s*1;[\s\S]*?}/);
     expect(scss).toMatch(
       /@media \(max-width: 768px\)\s*{[\s\S]*?\.leaderboardSection\s*{[\s\S]*?order:\s*2;[\s\S]*?border-top:\s*1px solid var\(--ce-color-border-light\);[\s\S]*?border-bottom:\s*none;[\s\S]*?}/,
     );
@@ -42,13 +44,13 @@ describe('CommunityTab module styles', () => {
     expect(scss).not.toMatch(/:global\(\.modal-header\)\s*{[\s\S]*?:global\(\.close\)/);
   });
 
-  it('uses the classic split-pane statistics window without changing the default layout', () => {
+  it('uses the classic split-pane participant and chart area', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
 
     expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(scss).not.toContain('data-ce-theme');
     expect(scss).toMatch(/\.communityTab \.leaderboardSection\s*{[\s\S]*?flex:\s*0 0 28%;/);
-    expect(scss).toMatch(/\.communityTab \.statsGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
+    expect(scss).toMatch(/\.communityTab \.statsGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(5,/);
     expect(scss).toMatch(/\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/);
     expect(scss).toMatch(
       /\.communityTab \.beeswarmPlot\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?justify-content:\s*center;/,
@@ -78,5 +80,14 @@ describe('CommunityTab module styles', () => {
     expect(scss).toMatch(/^ {2}\.leaderboardSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
     expect(scss).toMatch(/^ {2}\.statsSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
     expect(scss).toMatch(/^ {2}\.leaderboardItem \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
+  });
+
+  it('marks active session filters with a data attribute instead of a toggle-button state', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.sessionFilterToggle\[data-active='true'\]\s*{[\s\S]*?background:\s*var\(--ce-selection-bg\);/,
+    );
+    expect(scss).not.toContain('aria-pressed');
   });
 });

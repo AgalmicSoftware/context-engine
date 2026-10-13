@@ -85,3 +85,31 @@
     outline-offset: 2px;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .toggle,
+  .toggle:hover,
+  .toggle:focus-visible,
+  .toggle[aria-expanded='true'] {
+    color: var(--ce-control-text) !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .menu {
+    background: var(--ce-overlay-surface);
+    border-color: var(--ce-document-border-strong);
+    box-shadow: var(--ce-card-shadow);
+    color: var(--ce-overlay-text);
+  }
+
+  .item {
+    color: var(--ce-overlay-text) !important;
+
+    &:hover,
+    &:focus {
+      background: var(--ce-surface-alt) !important;
+      color: var(--ce-link) !important;
+    }
+  }
+}

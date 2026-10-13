@@ -2,6 +2,10 @@
 import React, { Component } from 'react';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
+import {
+  createGroupPasswordHashUnreadableError,
+  isGroupPasswordUnverifiableError,
+} from '../../utilities/crypto/sbtAuthorization';
 import { ethers } from 'ethers';
 
 import {
@@ -11,12 +15,20 @@ import {
 } from '../../domains/sessions/sessionBalanceReaders.js';
 import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
+import { isKnownOpenSbt, resolveSbtGroupPasswordFailureMessage } from '../SBTs/sbtClaimUrlSafety';
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
 import { captureSessionRecruitmentSource } from '../SurveyTool/sessionRecruitmentSource';
-import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
+import {
+  getLoadedDemoSessionFixtures,
+  loadDemoSessionFixtures,
+  resolveLoadedPolisDemoQuestionPool,
+  showDemoFixtureLoadError,
+  shouldUseBuiltInPolisDemoQuestionPool,
+} from '../SurveyTool/demoSessionFixtureLoader';
+import { usesDemoSessionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
@@ -222,6 +234,8 @@ class OnePageSession extends Component<any, any> {
     }
 
     this.state = {
+      // Demo sessions render from fixtures that load on demand.
+      demoFixturesLoaded: !!getLoadedDemoSessionFixtures(),
       // Core UI sections
       showQuestions: routeUiState.showQuestions,
       showGroups: false,
@@ -327,7 +341,6 @@ class OnePageSession extends Component<any, any> {
     this.parseAutoMintFragment = this.parseAutoMintFragment.bind(this);
     this.kickoffAutoMintIfNeeded = this.kickoffAutoMintIfNeeded.bind(this);
     this.runAutoMintQueue = this.runAutoMintQueue.bind(this);
-    this.verifyGroupPasswordBinding = this.verifyGroupPasswordBinding.bind(this);
     this.prefetchTargetNames = this.prefetchTargetNames.bind(this);
     this.normalizeInviteCode = this.normalizeInviteCode.bind(this);
     this.decodeInviteInput = this.decodeInviteInput.bind(this);
@@ -424,9 +437,36 @@ class OnePageSession extends Component<any, any> {
     this.scheduleGeneratedResultsViewerRefresh();
 
     this.bootstrapTelegramSession();
+    this.ensureDemoSessionFixtures();
+  }
+
+  // Loads the demo fixtures only for a demo session; the state flip rebuilds
+  // the results and re-renders the demo question pool.
+  ensureDemoSessionFixtures(propsIn: any = this.props) {
+    if (this.state.demoFixturesLoaded) return;
+    const displaySlug = resolveEffectiveSlug(propsIn);
+    const sourceSlug = resolveOnePageSessionSurveySlug(propsIn);
+    const pathname = typeof window !== 'undefined' ? window.location?.pathname : '';
+    if (
+      !usesDemoSessionFixtures(displaySlug, sourceSlug) &&
+      !shouldUseBuiltInPolisDemoQuestionPool({ displaySlug, sourceSlug, pathname })
+    ) {
+      return;
+    }
+    loadDemoSessionFixtures().then(
+      () => {
+        if (!this._demoFixturesDisposed) this.setState({ demoFixturesLoaded: true });
+      },
+      (error: unknown) => {
+        demoLog.warn('OnePageSession: demo fixtures failed to load', error);
+        // Without the fixtures the demo has no questions or results, so never wait silently.
+        if (!this._demoFixturesDisposed) showDemoFixtureLoadError((update) => this.setState(update), error);
+      },
+    );
   }
 
   componentWillUnmount() {
+    this._demoFixturesDisposed = true;
     this.disposeTelegramActions();
     this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
@@ -467,6 +507,7 @@ class OnePageSession extends Component<any, any> {
       props.isQuestionCacheReady ? 1 : 0,
       props.isResponsesCacheReady ? 1 : 0,
       Number(props.questionResponsesNonce || 0),
+      state.demoFixturesLoaded ? 1 : 0,
     ].join('|');
   }
 
@@ -645,6 +686,7 @@ class OnePageSession extends Component<any, any> {
     const slugChanged = prevSlug !== nextSlug;
     if (slugChanged) {
       captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
+      this.ensureDemoSessionFixtures();
     }
     const telegramTargetChanged =
       getAgentClientLoginEnvelopeMemoryKey(
@@ -979,7 +1021,7 @@ class OnePageSession extends Component<any, any> {
           questionSourceSlug,
           readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug),
           resolveQuestionPool: (candidateDisplaySlug, candidateSourceSlug) =>
-            resolvePolisDemoQuestionPool({ displaySlug: candidateDisplaySlug, sourceSlug: candidateSourceSlug }),
+            resolveLoadedPolisDemoQuestionPool({ displaySlug: candidateDisplaySlug, sourceSlug: candidateSourceSlug }),
           workerCacheIdentity,
           writeQuestionsCache: (candidateSlug, cache) => void writeCache('questionsCache', candidateSlug, cache),
         });
@@ -1346,33 +1388,6 @@ class OnePageSession extends Component<any, any> {
     }
   }
 
-  /* =======================
-   * Verify password ↔ SBT binding (unlimited path)
-   * ======================= */
-  async verifyGroupPasswordBinding(sbtAddress: any, password: any) {
-    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return false;
-    const slug = resolveEffectiveSlug(this.props);
-    try {
-      // Read-only provider internally
-      const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddress, slug);
-      const pw = cryptoUtils.normalizeGroupPasswordInput(password);
-      if (!pw) return false;
-
-      if (!onchainGph || onchainGph === ethers.constants.HashZero) {
-        return false;
-      }
-      return (
-        cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-          password: pw,
-          sbtAddress,
-          groupPasswordHash: onchainGph,
-        }) !== null
-      );
-    } catch (err) {
-      return false;
-    }
-  }
-
   kickoffAutoMintIfNeeded() {
     if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
       this.clearUnsupportedAutoMintState();
@@ -1717,7 +1732,11 @@ class OnePageSession extends Component<any, any> {
           path = 'invite';
         } else {
           const gph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
-          const hasGroupPassword = !!gph && gph !== ethers.constants.HashZero;
+          // null means the read failed: the group may still have a password, so it is only treated as open
+          // when the metadata says so.
+          const gphUnreadable = gph == null;
+          const hasGroupPassword = !gphUnreadable && gph !== ethers.constants.HashZero;
+          const mayHaveGroupPassword = gphUnreadable && !isKnownOpenSbt(sbtInfo);
 
           let isPublic = false;
           if (sbtInfo && typeof sbtInfo.hasPasswordMint === 'boolean') {
@@ -1726,13 +1745,17 @@ class OnePageSession extends Component<any, any> {
             // Fallback: Use password presence as heuristic if metadata flag missing
             if (!t.gp) isPublic = true;
           }
-          if (hasGroupPassword) isPublic = false;
+          if (hasGroupPassword || mayHaveGroupPassword) isPublic = false;
 
           if (isPublic) {
             path = 'public';
           } else {
             // Password required paths
-            if (!t.gp) throw new Error('Password required for this group');
+            if (!t.gp) {
+              throw mayHaveGroupPassword
+                ? createGroupPasswordHashUnreadableError()
+                : new Error('Password required for this group');
+            }
 
             let maxTokensLimit: any = null;
             try {
@@ -1761,17 +1784,23 @@ class OnePageSession extends Component<any, any> {
               invitePayload = this.decodeInviteInput(t.gp);
               if (!invitePayload) throw new Error('Invite code required for this group');
             } else if (hasGroupPassword) {
+              // The tx phase checks the password with the same slow derivation that signs.
               path = 'unlimited';
-              // Optional: verify binding pre-tx (kept); tx phase will re-check
-              await this.verifyGroupPasswordBinding(sbtAddr, t.gp);
+            } else if (gphUnreadable) {
+              throw createGroupPasswordHashUnreadableError();
             } else {
               throw new Error('Invite code required for this group');
             }
           }
         }
       } catch (e: any) {
-        // Preflight/read-only error: log diagnostic but do NOT mark as "failed" in UI
-        updateStatus(sbtKey, { status: 'info', name: `Skipped (read error)`, error: getErrorMessage(e, 'Read error') });
+        // Preflight/read-only error: log diagnostic but do NOT mark as "failed" in UI. A password check that could
+        // not be read is the exception: marked failed, its banner offers Retry (the target was not consumed).
+        updateStatus(sbtKey, {
+          status: isGroupPasswordUnverifiableError(e) ? 'failed' : 'info',
+          name: `Skipped (read error)`,
+          error: getErrorMessage(e, 'Read error'),
+        });
         continue;
       }
 
@@ -1826,7 +1855,10 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
         } else if (path === 'unlimited') {
-          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp, userAddr, autoMintProvider);
+          updateStatus(sbtKey, { status: 'pending', name: `Checking password: ${sbtName}` });
+          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp, userAddr, autoMintProvider, () =>
+            updateStatus(sbtKey, { status: 'pending', name: `Joining Group: ${sbtName}` }),
+          );
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1835,9 +1867,13 @@ class OnePageSession extends Component<any, any> {
         }
       } catch (e: any) {
         const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
+        // A wrong password, or a check that cannot run here (no WebCrypto), gets its own message.
+        const groupPasswordFailure = resolveSbtGroupPasswordFailureMessage(e);
 
         if (msg.includes('wallet changed during auto-join')) {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+        } else if (groupPasswordFailure) {
+          updateStatus(sbtKey, { status: 'failed', name: 'Join Failed', error: groupPasswordFailure });
         } else if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
           // Graceful handling of "already owned" revert
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
@@ -1874,6 +1910,7 @@ class OnePageSession extends Component<any, any> {
     groupPassword: any,
     expectedAccount: any = this.props.account,
     provider: any = this.props.provider,
+    onPasswordAccepted: () => void = () => {},
   ) {
     if (!this.props.loginComplete) {
       this.props.toggleLoginModal(true);
@@ -1902,36 +1939,21 @@ class OnePageSession extends Component<any, any> {
       sbtAddress,
       resolveEffectiveSlug(this.props),
     );
-    if (!onchain || onchain === ethers.constants.HashZero) throw new Error('No group password set on-chain');
 
-    const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-      password: pw,
-      sbtAddress,
-      groupPasswordHash: onchain,
-    });
-    const local =
-      walletScopeSbtAddress === null
-        ? null
-        : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-            password: pw,
-            sbtAddress: walletScopeSbtAddress,
-          });
-    if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
-      throw new Error('Password mismatch');
-    }
-    assertExpectedAccountCurrent();
-
-    this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
-
+    // One slow derivation checks the password against the on-chain hash and signs the claim;
+    // a wrong password throws a group-password mismatch error before anything is sent. A failed
+    // read (null) and a group without a password (zero hash) stop signing with their own messages.
     const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
       userAddress: normalizedExpectedAccount,
       chainId: mintChainId,
-      walletScopeSbtAddress,
+      groupPasswordHash: onchain ?? '',
     });
-
+    onPasswordAccepted();
     assertExpectedAccountCurrent();
+
+    this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
     const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''));
 
     this.setState({
@@ -2287,7 +2309,7 @@ class OnePageSession extends Component<any, any> {
     // Only show demo-specific result surfaces on configured public demo sessions.
     const isDemoSlug = isDemoSessionSlug(effectiveSlug);
     const displaySessionSlug = normalizeOnePageSessionSlug(effectiveSlug || slug);
-    const demoQuestionPool = resolvePolisDemoQuestionPool({
+    const demoQuestionPool = resolveLoadedPolisDemoQuestionPool({
       displaySlug: displaySessionSlug,
       sourceSlug: surveySessionSlug,
     });
@@ -2378,6 +2400,7 @@ class OnePageSession extends Component<any, any> {
         autoOpenResults={this.state.autoOpenResults}
         blockLimits={blockLimits}
         cacheHasLoaded={this.props.cacheHasLoaded}
+        cacheInitializationError={this.props.cacheInitializationError}
         contracts={contracts}
         corpusViewerLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
         corpusViewerLoadState={corpusViewerLoadState}

@@ -9,7 +9,9 @@ import {
   writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import contractScripts from '../../utilities/web3/chainGateway.js';
+import contractScripts, * as chainGateway from '../../utilities/web3/chainGateway.js';
+import * as sessionSources from '../../utilities/session/sessionSourceResolver';
+import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import * as workerGroupPorts from '../../domains/worker/workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth';
 import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
@@ -174,6 +176,252 @@ describe('CommunityTab helpers', () => {
   it('prefers activeSessionSlug over URL parsing', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     expect(instance._currentSlug()).toBe('edge');
+  });
+
+  it('opens a session directory with authority totals and links independently of the selected stats scope', () => {
+    jest.spyOn(chainGateway, 'getAllSessionEntries').mockReturnValue([
+      [
+        'cloud',
+        { slug: 'cloud', sessionName: 'Cloud forum', sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+      ],
+      [
+        'chain',
+        {
+          slug: 'chain',
+          sessionName: 'Chain forum',
+          sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+        },
+      ],
+    ]);
+    jest.spyOn(sessionSources, 'getAllDemoSessionConfigs').mockReturnValue([]);
+    const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: 'cloud' }));
+    instance._refreshSessionCatalog();
+    const [stat] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-stat-sessions',
+    );
+    expect(stat.type).toBe('button');
+    expect(stat.props['data-ce-count']).toBe('2');
+    stat.props.onClick();
+    expect(instance.state).toMatchObject({ showModal: true, modalType: 'sessions', modalTitle: 'Sessions Details' });
+    const content = instance.renderModalContent();
+    expect(collectNodeText(content)).toContain('1Centralized1Decentralized');
+    const links = collectTreeNodes(content, (node) => node.type === 'a');
+    expect(links.map((node) => node.props.href)).toEqual(['/session/chain', '/session/cloud']);
+    expect(collectTreeNodes(content, (node) => node.props?.['aria-label'] === 'Session list')[0].props.tabIndex).toBe(
+      0,
+    );
+  });
+
+  it('refreshes the session count when registry discovery changes and removes its listener on unmount', () => {
+    const entries = jest.spyOn(chainGateway, 'getAllSessionEntries').mockReturnValue([]);
+    jest.spyOn(sessionSources, 'getAllDemoSessionConfigs').mockReturnValue([]);
+    const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: '' }));
+    instance._scheduleNextStatsPoll = jest.fn();
+    instance.componentDidMount();
+    expect(instance.state.sessions).toHaveLength(0);
+    entries.mockReturnValue([['new-session', { slug: 'new-session', sessionName: 'New session' }]]);
+    window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
+    expect(instance.state.sessions).toHaveLength(1);
+    instance.componentWillUnmount();
+    entries.mockClear();
+    window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
+    expect(entries).not.toHaveBeenCalled();
+  });
+
+  it('shows a useful empty state in the session directory', () => {
+    const instance = new CommunityTab({});
+    instance.state.modalType = 'sessions';
+    expect(collectNodeText(instance.renderModalContent())).toContain('No sessions discovered yet.');
+  });
+
+  it('toggles session filters from the modal header, filters rows and counts, and clears them', () => {
+    const instance = attachMutableSetState(new CommunityTab({}));
+    instance.state.modalType = 'sessions';
+    instance.state.modalTitle = 'Sessions Details';
+    instance.state.sessions = [
+      {
+        slug: 'cloud',
+        name: 'Cloud',
+        kind: 'centralized',
+        href: '/session/cloud',
+        createdAt: new Date(2026, 1, 1).getTime(),
+        lastActivityAt: new Date(2026, 1, 3).getTime(),
+        adminAddresses: ['0x1111111111111111111111111111111111111111'],
+      },
+      {
+        slug: 'chain',
+        name: 'Chain',
+        kind: 'decentralized',
+        href: '/session/chain',
+        createdAt: null,
+        lastActivityAt: null,
+        adminAddresses: [],
+      },
+    ];
+    const toggle = () =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['aria-label'] === 'Session filters')[0];
+    expect(toggle().props['aria-expanded']).toBe(false);
+    expect(collectNodeText(instance.renderModalContent())).not.toContain('Sessions discovered by this app.');
+    toggle().props.onClick();
+    expect(toggle().props['aria-expanded']).toBe(true);
+    const controls = () =>
+      collectTreeNodes(instance.renderModalContent(), (node) => ['select', 'input'].includes(node.type));
+    controls()
+      .find((node) => node.type === 'select')
+      .props.onChange({ target: { value: 'centralized' } });
+    controls()
+      .find((node) => node.props.type === 'search')
+      .props.onChange({ target: { value: '0x1111' } });
+    controls()
+      .find((node) => node.props['aria-label'] === 'Date created from')
+      .props.onChange({ target: { value: '2026-02-01' } });
+    controls()
+      .find((node) => node.props['aria-label'] === 'Last activity through')
+      .props.onChange({ target: { value: '2026-02-03' } });
+    expect(
+      collectTreeNodes(instance.renderModalContent(), (node) => node.type === 'a').map((node) => node.props.href),
+    ).toEqual(['/session/cloud']);
+    expect(collectNodeText(instance.renderModalContent())).toContain('1 of 2 sessions1Centralized0Decentralized');
+    // A disclosure button: no toggle-button state; the filtered summary describes it.
+    const [summary] = collectTreeNodes(instance.renderModalContent(), (node) => node.props?.role === 'status');
+    expect(toggle().props).not.toHaveProperty('aria-pressed');
+    expect(toggle().props['aria-describedby']).toBe(summary.props.id);
+    expect(collectNodeText(summary)).toBe('Filtered: 1 of 2 sessions');
+    toggle().props.onClick();
+    expect(toggle().props['aria-expanded']).toBe(false);
+    // Collapsed filters stay mounted (hidden) so aria-controls always resolves.
+    const panels = () =>
+      collectTreeNodes(instance.renderModalContent(), (node) => node.props?.id === toggle().props['aria-controls']);
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].props.hidden).toBe(true);
+    expect(collectTreeNodes(instance.renderModalContent(), (node) => node.type === 'a')).toHaveLength(1);
+    toggle().props.onClick();
+    controls()
+      .find((node) => node.props.type === 'search')
+      .props.onChange({ target: { value: 'unmatched' } });
+    expect(collectNodeText(instance.renderModalContent())).toContain('No sessions match these filters.');
+    collectTreeNodes(
+      instance.renderModalContent(),
+      (node) => node.type === 'button' && collectNodeText(node) === 'Clear filters',
+    )[0].props.onClick();
+    expect(collectTreeNodes(instance.renderModalContent(), (node) => node.type === 'a')).toHaveLength(2);
+    expect(toggle().props['aria-describedby']).toBeUndefined();
+    expect(panels()[0].props.hidden).toBe(false);
+  });
+
+  it('keeps undated sessions under a date filter and marks them date unavailable', () => {
+    const instance = attachMutableSetState(new CommunityTab({}));
+    instance.state.modalType = 'sessions';
+    instance.state.sessions = [
+      {
+        slug: 'cloud',
+        name: 'Cloud',
+        kind: 'centralized',
+        href: '/session/cloud',
+        createdAt: null,
+        lastActivityAt: null,
+        adminAddresses: [],
+      },
+      {
+        slug: 'chain',
+        name: 'Chain',
+        kind: 'decentralized',
+        href: '/session/chain',
+        createdAt: new Date(2026, 1, 1).getTime(),
+        lastActivityAt: new Date(2026, 1, 1).getTime(),
+        adminAddresses: [],
+      },
+    ];
+    instance.state.sessionFilters = { ...instance.state.sessionFilters, createdFrom: '2026-03-01' };
+
+    const content = instance.renderModalContent();
+    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
+      '/session/cloud',
+    ]);
+    expect(collectNodeText(content)).toContain('cloud · date unavailable');
+    expect(collectNodeText(content)).toContain('1 of 2 sessions1Centralized0Decentralized');
+  });
+
+  it('groups the chart and leaderboard under one selected-session label', () => {
+    const instance = new CommunityTab({
+      activeSessionSlug: 'cloud',
+      sessionConfig: { slug: 'cloud', sessionName: 'Cloud forum' },
+    });
+    instance._getSelectedSessionSlugs = jest.fn(() => ['cloud']);
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
+    instance._beeswarmPoints = [{ questionId: 'q1', total: 1 }];
+    const [section] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-session-section',
+    );
+    const labels = collectTreeNodes(section, (node) => node.props?.id === section.props['aria-labelledby']);
+    expect(labels.map(collectNodeText)).toEqual(['Session: Cloud forum (cloud)']);
+    for (const id of ['ce-community-beeswarm-section', 'ce-community-leaderboard-section']) {
+      expect(collectTreeNodes(section, (node) => node.props?.['data-testid'] === id)).toHaveLength(1);
+    }
+    expect(
+      collectTreeNodes(section, (node) => node.props?.['data-testid'] === 'ce-community-beeswarm-session'),
+    ).toHaveLength(0);
+
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => true);
+    instance._iterScopeCaches = jest.fn(() => [{ slug: 'cloud' }]);
+    instance._buildDemoBeeswarmPoints = jest.fn(() => []);
+    const [demoLabel] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === 'ce-community-session-scope',
+    );
+    expect(collectNodeText(demoLabel)).toBe('Demo session: Cloud forum (cloud)');
+  });
+
+  it('names selected sessions and uses an all-session label for combined scope', () => {
+    jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'alpha',
+      sessionConfig: { slug: 'unrelated', sessionName: 'Wrong name' },
+    });
+    instance._getSelectedSessionSlugs = jest.fn(() => ['alpha', 'beta']);
+    expect(instance._communityScopeLabel()).toBe('Sessions: alpha, beta');
+    instance._isUniverseEnabled = jest.fn(() => true);
+    expect(instance._communityScopeLabel()).toBe('All sessions');
+  });
+
+  it('reuses the scope label until its session inputs change', () => {
+    const configLookup = jest.spyOn(chainGateway, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(chainGateway, 'getDemoSessionConfigBySlug').mockReturnValue(null);
+    const instance = new CommunityTab({ activeSessionSlug: 'alpha' });
+    instance._getSelectedSessionSlugs = jest.fn(() => ['alpha']);
+
+    expect(instance._communityScopeLabel()).toBe('Session: alpha');
+    expect(instance._communityScopeLabel()).toBe('Session: alpha');
+    expect(instance._getSelectedSessionSlugs).toHaveBeenCalledTimes(1);
+    expect(configLookup).toHaveBeenCalledTimes(1);
+
+    // A refreshed session catalog (registry or Worker records changed) recomputes it.
+    instance.state.sessions = [...instance.state.sessions];
+    configLookup.mockReturnValue({ slug: 'alpha', sessionName: 'Alpha forum' });
+    expect(instance._communityScopeLabel()).toBe('Session: Alpha forum (alpha)');
+    expect(instance._getSelectedSessionSlugs).toHaveBeenCalledTimes(2);
+  });
+
+  it('labels bundled demo fallback separately from the selected live session', () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'cloud' });
+    instance._shouldUseDemoBeeswarmData = jest.fn(() => false);
+    instance._beeswarmPoints = [{ questionId: 'demo-question', total: 0 }];
+    instance._isZeroResponseBundledDemoPointSet = jest.fn(() => true);
+    instance._buildDemoBeeswarmPoints = jest.fn(() => [{ questionId: 'demo-question', total: 10 }]);
+    instance._sessionDisplayName = jest.fn((slug) => slug);
+    expect(instance._getQuestionSwarmView()).toEqual({
+      points: [{ questionId: 'demo-question', total: 10 }],
+      scopeLabel: 'Demo session: demo',
+      isDemoFallback: true,
+    });
+    instance._communityScopeLabel = jest.fn(() => 'Session: cloud');
+    const labels = collectTreeNodes(instance.render(), (node) =>
+      ['ce-community-session-scope', 'ce-community-beeswarm-session'].includes(node.props?.['data-testid']),
+    );
+    expect(labels.map(collectNodeText)).toEqual(['Session: cloud', 'Demo session: demo']);
   });
 
   it('keeps /session/debate as its explicit slug', () => {

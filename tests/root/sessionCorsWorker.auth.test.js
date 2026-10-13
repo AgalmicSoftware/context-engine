@@ -21,10 +21,12 @@ describe('sessionCorsWorker auth routes', () => {
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
   const loginOrigin = 'https://contextengine.sh';
   const loginDomain = 'contextengine.sh';
-  const readActiveNonce = (env) => {
+  // Issuing a signed nonce stores nothing per nonce; using one records it.
+  const isNonceUsed = (env, nonce) => {
     const identity = `auth-nonce:${sessionSlug}:${wallet.address.toLowerCase()}`;
     const digest = ethers.utils.sha256(ethers.utils.toUtf8Bytes(identity)).slice(2);
-    return env.__coordinatorInstances.get(`coordinator:${digest}`)?.store.get('auth-nonce-active')?.nonce;
+    const entries = env.__coordinatorInstances.get(`coordinator:${digest}`)?.store.get('auth-nonce-used')?.entries || [];
+    return entries.some((entry) => entry.nonce === nonce);
   };
 
 
@@ -44,6 +46,7 @@ describe('sessionCorsWorker auth routes', () => {
   const buildLoginSiweMessage = (params = {}, origin = loginOrigin) => buildSiweMessage({
     domain: new URL(origin).host || loginDomain,
     uri: origin,
+    sessionSlug,
     ...params,
   });
 
@@ -103,8 +106,8 @@ describe('sessionCorsWorker auth routes', () => {
     const payload = await response.json();
     expect(response.status).toBe(200);
     expect(typeof payload?.nonce).toBe('string');
-    expect(payload.nonce.length).toBeGreaterThan(10);
-    expect(readActiveNonce(env)).toBe(payload.nonce);
+    expect(payload.nonce).toMatch(/^n1[0-9a-f]{32}\d{13}[0-9a-f]{32}$/);
+    expect(isNonceUsed(env, payload.nonce)).toBe(false);
     expect(kv.put).not.toHaveBeenCalled();
   });
 
@@ -387,7 +390,7 @@ describe('sessionCorsWorker auth routes', () => {
       lit: true,
       groups: true,
     });
-    expect(readActiveNonce(env)).toBeUndefined();
+    expect(isNonceUsed(env, nonce)).toBe(true);
     expect(kv.delete).not.toHaveBeenCalled();
   });
 
@@ -433,7 +436,7 @@ describe('sessionCorsWorker auth routes', () => {
       sessionId: workerSessionId,
     });
     const { nonce } = noncePayload;
-    const message = buildLoginSiweMessage({ address: wallet.address, nonce });
+    const message = buildLoginSiweMessage({ address: wallet.address, nonce, sessionId: workerSessionId });
     const signature = await wallet.signMessage(message);
     const loginResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/login', {
@@ -537,7 +540,7 @@ describe('sessionCorsWorker auth routes', () => {
       lit: false,
       groups: true,
     });
-    expect(readActiveNonce(env)).toBeUndefined();
+    expect(isNonceUsed(env, nonce)).toBe(true);
     expect(kv.delete).not.toHaveBeenCalled();
   });
 
@@ -608,7 +611,8 @@ describe('sessionCorsWorker auth routes', () => {
   });
 
   it('does not treat eventually consistent KV nonce markers as the consume authority', async () => {
-    const nonce = 'reused-auth-nonce';
+    // EIP-4361 nonces are letters and digits only.
+    const nonce = 'reusedAuthNonce1';
     const fetchMock = buildRpcFetchMock({
       rpcUrl,
       registryAddress,
@@ -699,7 +703,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('SIWE domain does not match URI host.');
     expect(kv.delete).not.toHaveBeenCalled();
-    expect(readActiveNonce(env)).toBe(nonce);
+    expect(isNonceUsed(env, nonce)).toBe(false);
   });
 
   it('rejects login when the SIWE message address does not match the request address and preserves the nonce', async () => {
@@ -746,7 +750,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('SIWE address mismatch.');
     expect(kv.delete).not.toHaveBeenCalled();
-    expect(readActiveNonce(env)).toBe(nonce);
+    expect(isNonceUsed(env, nonce)).toBe(false);
   });
 
   it('rejects login when the siwe message is expired and preserves the nonce', async () => {
@@ -787,7 +791,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('SIWE message expired.');
     expect(kv.delete).not.toHaveBeenCalled();
-    expect(readActiveNonce(env)).toBe(nonce);
+    expect(isNonceUsed(env, nonce)).toBe(false);
   });
 
   it('rejects login when session config is missing without consuming the nonce', async () => {
@@ -827,7 +831,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(loginResponse.status).toBe(404);
     expect(payload?.error).toBe('Session config not found.');
     expect(kv.delete).not.toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
-    expect(readActiveNonce(env)).toBe(nonce);
+    expect(isNonceUsed(env, nonce)).toBe(false);
   });
 
   it('returns a stable 403 error when the default on-chain gate denies login access', async () => {
@@ -886,7 +890,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(response.status).toBe(403);
     expect(payload?.error).toBe('Access denied: default gate failed.');
     expect(payload?.token).toBeUndefined();
-    expect(readActiveNonce(env)).toBeUndefined();
+    expect(isNonceUsed(env, nonce)).toBe(true);
     expect(kv.delete).not.toHaveBeenCalled();
   });
 
@@ -938,6 +942,6 @@ describe('sessionCorsWorker auth routes', () => {
     expect(payload?.error).toBe('Origin not allowed.');
     expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
     expect(kv.delete).not.toHaveBeenCalledWith(nonceKey);
-    expect(readActiveNonce(env)).toBe(nonce);
+    expect(isNonceUsed(env, nonce)).toBe(false);
   });
 });

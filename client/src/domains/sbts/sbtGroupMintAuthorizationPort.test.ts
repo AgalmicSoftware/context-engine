@@ -7,25 +7,21 @@ const buildGroupMintArtifacts = async (
   password: string,
   sbtAddress: string,
   userAddress: string,
-  walletScopeSbtAddress: string | null,
 ) => {
-  const groupPasswordHash = port.computeGroupPasswordHash({
-    password,
-    sbtAddress: walletScopeSbtAddress,
-  });
+  const groupPasswordHash = await port.computeGroupPasswordHash({ password, sbtAddress });
   const signature = await port.signGroupMintAuthorization({
     password,
     sbtAddress,
     chainId: 11155420,
     userAddress,
-    walletScopeSbtAddress,
+    groupPasswordHash,
   });
   const invites = await port.generateInvitePayloads({
     password,
     sbtAddress,
     chainId: 11155420,
     nonces: ['1', 2],
-    walletScopeSbtAddress,
+    groupPasswordHash,
   });
 
   return {
@@ -40,9 +36,9 @@ describe('SbtGroupMintAuthorizationPort', () => {
     jest.restoreAllMocks();
   });
 
-  it('supports a fake authorization port with scoped group mint inputs', async () => {
+  it('supports a fake authorization port with SBT-scoped group mint inputs', async () => {
     const fakePort: SbtGroupMintAuthorizationPort = {
-      computeGroupPasswordHash: jest.fn(() => '0xhash'),
+      computeGroupPasswordHash: jest.fn(async () => '0xhash'),
       signGroupMintAuthorization: jest.fn(async () => '0xsignature'),
       generateInvitePayloads: jest.fn(async () => [
         {
@@ -64,9 +60,7 @@ describe('SbtGroupMintAuthorizationPort', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000001';
     const userAddress = '0x0000000000000000000000000000000000000002';
 
-    await expect(
-      buildGroupMintArtifacts(fakePort, 'group password', sbtAddress, userAddress, sbtAddress),
-    ).resolves.toEqual({
+    await expect(buildGroupMintArtifacts(fakePort, 'group password', sbtAddress, userAddress)).resolves.toEqual({
       groupPasswordHash: '0xhash',
       signature: '0xsignature',
       invites: [
@@ -96,21 +90,21 @@ describe('SbtGroupMintAuthorizationPort', () => {
       sbtAddress,
       userAddress,
       chainId: 11155420,
-      walletScopeSbtAddress: sbtAddress,
+      groupPasswordHash: '0xhash',
     });
     expect(fakePort.generateInvitePayloads).toHaveBeenCalledWith({
       password: 'group password',
       sbtAddress,
       chainId: 11155420,
       nonces: ['1', 2],
-      walletScopeSbtAddress: sbtAddress,
+      groupPasswordHash: '0xhash',
     });
   });
 
   it('delegates group mint authorization through call-time chainGateway property lookup', async () => {
     const computeGroupPasswordHash = jest
       .spyOn(chainGateway, 'computeGroupPasswordHash')
-      .mockReturnValue('0xfirstHash');
+      .mockResolvedValue('0xfirstHash');
     const signGroupMintAuthorization = jest
       .spyOn(chainGateway, 'signGroupMintAuthorization')
       .mockResolvedValue('0xsecondSignature');
@@ -122,21 +116,21 @@ describe('SbtGroupMintAuthorizationPort', () => {
       sbtAddress: '0x0000000000000000000000000000000000000001',
     };
 
-    expect(sbtGroupMintAuthorizationPort.computeGroupPasswordHash(firstInput)).toBe('0xfirstHash');
+    await expect(sbtGroupMintAuthorizationPort.computeGroupPasswordHash(firstInput)).resolves.toBe('0xfirstHash');
 
     const signInput = {
       password: 'second password',
       chainId: 11155420,
       sbtAddress: '0x0000000000000000000000000000000000000002',
       userAddress: '0x0000000000000000000000000000000000000003',
-      walletScopeSbtAddress: '0x0000000000000000000000000000000000000002',
+      groupPasswordHash: `0x${'22'.repeat(32)}`,
     };
     const inviteInput = {
       password: 'second password',
       chainId: 11155420,
       sbtAddress: '0x0000000000000000000000000000000000000002',
       nonces: ['2'],
-      walletScopeSbtAddress: '0x0000000000000000000000000000000000000002',
+      groupPasswordHash: `0x${'22'.repeat(32)}`,
     };
 
     await expect(sbtGroupMintAuthorizationPort.signGroupMintAuthorization(signInput)).resolves.toBe(

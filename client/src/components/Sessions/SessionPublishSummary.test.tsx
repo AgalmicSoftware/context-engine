@@ -1,4 +1,4 @@
-import React, { createRef } from 'react';
+import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import SessionPublishSummary from './SessionPublishSummary';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -83,17 +83,6 @@ const buildProps = (
   normalModePublishSummary: [],
   onPublish: jest.fn(),
   onTogglePublishAdvanced: jest.fn(),
-  showSponsoredBundleFallbackInput: false,
-  normalModeBundleUrlOverride: '',
-  onNormalModeBundleUrlOverrideChange: jest.fn(),
-  normalModeBundleUrlOverrideValidationError: '',
-  manualBundleUrlOverrideHelp: '',
-  bundleFileInputRef: createRef<HTMLInputElement>(),
-  onBundleFileChange: jest.fn(),
-  onClearBundleFile: jest.fn(),
-  bundleFile: null,
-  localWorkerBundleFallbackFilePath: '',
-  sponsoredManualBundleRetryMessage: '',
   publishUiPlan: buildPublishUiPlan(),
   publishSettingsCapabilities: resolvePresetPublishSettings(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
   renderInfoTooltip: () => null,
@@ -138,6 +127,8 @@ describe('SessionPublishSummary', () => {
       />,
     );
 
+    expect(screen.getByRole('term')).toHaveTextContent('Session');
+    expect(screen.getByRole('definition')).toHaveTextContent('Ready');
     fireEvent.click(screen.getByRole('button', { name: /Deploy Session/i }));
     expect(onPublish).toHaveBeenCalledTimes(1);
 

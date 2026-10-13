@@ -22,8 +22,7 @@ import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath, resolveQuestionPayloadDisplayState } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
+import { surveyResponseStoragePort } from '../../domains/storage/surveyResponseStoragePort';
 import GateTooltip from '../Gates/GateTooltip';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import {
@@ -33,6 +32,7 @@ import {
   RATING_MAX,
   RATING_MIN,
 } from '../../utilities/survey/ratingValue.js';
+import { readStoredRating } from '../../utilities/survey/storedRating';
 import {
   buildAggregatorResponseSignature,
   buildBinaryAggregatorSummary,
@@ -63,6 +63,7 @@ import {
 } from './singleQuestionResponseDisplay';
 
 const questionLog = createLogger('questions');
+const ARWEAVE_LINK_OPTIONS = { contextLabel: 'single_question_response_link' };
 
 type SingleQuestionRecord = Record<string, unknown>;
 type SingleQuestionNetworkLike = SingleQuestionRecord & {
@@ -571,7 +572,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       allOptions = this.getMultichoiceOptions(aggregatorQuestion);
     }
 
-    const multichoiceSummary = buildMultichoiceAggregatorSummary(parsedResponses, allOptions);
+    const multichoiceSummary = buildMultichoiceAggregatorSummary(parsedResponses, allOptions, aggregatorQuestion);
 
     if (!multichoiceSummary.options.length) {
       return (
@@ -848,10 +849,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     // Stable id + URL
     const qid = this.getQuestionId(questionRecord);
     const url = qid ? buildQuestionRoutePath(qid, { sessionSlug: this.resolveGroupSlug() }) : '/questions';
-    const questionArweaveTxId = getLegacyArweaveTxId(questionRecord);
-    const arweaveUrl = questionArweaveTxId
-      ? normalizeArweaveUrl(questionArweaveTxId, { contextLabel: 'single_question_response_link' })
-      : '';
+    // Question and response records carry uploader data, so only real Arweave ids link.
+    const arweaveUrl = surveyResponseStoragePort.buildQuestionArweaveHref(questionRecord, ARWEAVE_LINK_OPTIONS);
     const hasCardActions = Boolean(qid || arweaveUrl);
     const isFullscreen = mode === 'fullscreen';
     const containerClassName = joinClassNames(
@@ -1043,11 +1042,13 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     }
 
     const { prompt, type, id } = question;
-    const finalArweaveTxId = getLegacyArweaveTxId(response) || getLegacyArweaveTxId(question);
+    const finalArweaveHref =
+      surveyResponseStoragePort.buildQuestionArweaveHref(response, ARWEAVE_LINK_OPTIONS) ||
+      surveyResponseStoragePort.buildQuestionArweaveHref(question, ARWEAVE_LINK_OPTIONS);
     const answer = response.answer || {};
     const additional = response.additional || {};
     const conviction = response.conviction !== undefined ? response.conviction : (response.importance ?? null);
-    const normalizedConviction = normalizeRatingValue(conviction, null);
+    const normalizedConviction = readStoredRating(conviction);
 
     const isAnswerEncrypted = answer.encrypted && answer.value === '*';
     const isAdditionalEncrypted = additional.encrypted && additional.value === '*';
@@ -1162,7 +1163,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       );
     };
 
-    const hasCardActions = Boolean(id || finalArweaveTxId);
+    const hasCardActions = Boolean(id || finalArweaveHref);
     const containerClass =
       mode === 'fullscreen'
         ? joinClassNames(styles.fullscreenQuestionContainer, this.props.containerClassName)
@@ -1213,9 +1214,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
               )}
 
               {/* External/Expand are gated in mini mode until expanded */}
-              {showMiniExtras && Boolean(finalArweaveTxId) && (
+              {showMiniExtras && Boolean(finalArweaveHref) && (
                 <a
-                  href={normalizeArweaveUrl(finalArweaveTxId, { contextLabel: 'single_question_response_link' })}
+                  href={finalArweaveHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cardLinkButtonClassName}
@@ -1374,9 +1375,12 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     if (aggregatorResponseMode) {
       const aggregatorQuestion = question || {};
       const aggregatorQuestionId = aggregatorQuestion.id;
-      const aggregatorQuestionArweaveTxId = getLegacyArweaveTxId(aggregatorQuestion);
+      const aggregatorQuestionArweaveHref = surveyResponseStoragePort.buildQuestionArweaveHref(
+        aggregatorQuestion,
+        ARWEAVE_LINK_OPTIONS,
+      );
       const containerClassName = joinClassNames(styles.fullscreenQuestionContainer, this.props.containerClassName);
-      const hasCardActions = Boolean(aggregatorQuestionId || aggregatorQuestionArweaveTxId);
+      const hasCardActions = Boolean(aggregatorQuestionId || aggregatorQuestionArweaveHref);
       const questionBodyClassName = joinClassNames(
         styles.questionTitleBody,
         !hasCardActions && styles.questionTitleBodyNoLinks,
@@ -1408,11 +1412,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                     />
                   </button>
                 )}
-                {Boolean(aggregatorQuestionArweaveTxId) && (
+                {Boolean(aggregatorQuestionArweaveHref) && (
                   <a
-                    href={normalizeArweaveUrl(aggregatorQuestionArweaveTxId, {
-                      contextLabel: 'single_question_response_link',
-                    })}
+                    href={aggregatorQuestionArweaveHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cardLinkButtonClassName}

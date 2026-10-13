@@ -406,6 +406,104 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
   });
 
+  const prepareSponsoredAgentsHttpRedeem = (redeemResponse: { status: number; body: Record<string, unknown> }) => {
+    const options = buildDeployHookOptions();
+    const runtime = options.refs.runtimeRef.current as SessionWizardWorkerDeployRuntime;
+    runtime.wizardMode = 'normal';
+    // A manual retry source stays out of grants: only the configured release goes.
+    runtime.forceManualBundleFile = true;
+    runtime.bundleFile = { name: 'sessionCorsWorker.bundle.js', text: async () => 'unused' } as unknown as File;
+    runtime.normalModeBundleUrlOverride = 'https://manual.example.test/sessionCorsWorker.bundle.js';
+    runtime.draft = {
+      ...runtime.draft,
+      sessionModeProfile: (() => {
+        const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+        profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+        profile.surfaces.agentHttp = true;
+        return profile;
+      })(),
+    };
+    (options.refs.sponsoredBundleAppliedBundleRef as { current: Record<string, unknown> | null }).current = {
+      deployGrantToken: 'sponsored-deploy-grant',
+      bootstrapWorkerUrl: 'https://sponsor-worker.example.test',
+    };
+    const fetchMock = jest.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
+      String(url).endsWith('/sponsored/redeem-deploy')
+        ? ({
+            ok: redeemResponse.status === 200,
+            status: redeemResponse.status,
+            json: async () => redeemResponse.body,
+          } as Response)
+        : ({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response),
+    );
+    global.fetch = fetchMock;
+    const readRedeemPayload = () => {
+      const redeemCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/sponsored/redeem-deploy'));
+      return JSON.parse(String(redeemCall?.[1]?.body || '{}')).deployPayload;
+    };
+    return { options, readRedeemPayload };
+  };
+
+  const redeemSponsoredDeploy = async (options: ReturnType<typeof buildDeployHookOptions>) => {
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
+    });
+    return deployResult;
+  };
+
+  it('redeems a deploy grant with only the configured release and explains an unconfigured sponsor', async () => {
+    const workerError =
+      'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.';
+    const { options, readRedeemPayload } = prepareSponsoredAgentsHttpRedeem({
+      status: 400,
+      body: { error: workerError },
+    });
+    const {
+      AGENT_BRIDGE_WORKER_BUNDLE_URL,
+      WORKER_BUNDLE_URL,
+      WORKER_RELEASE_MANIFEST_URL,
+    } = require('../../../variables/publicDeploymentConfig.js');
+
+    const deployResult = await redeemSponsoredDeploy(options);
+
+    const deployPayload = readRedeemPayload();
+    // Sponsors running code older than 0.6.8 deploy this release; newer ones ignore it.
+    expect(WORKER_BUNDLE_URL).toMatch(/^https:\/\//);
+    expect(deployPayload).toEqual(
+      expect.objectContaining({
+        bundleUrl: WORKER_BUNDLE_URL,
+        bundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
+        agentBridgeBundleUrl: AGENT_BRIDGE_WORKER_BUNDLE_URL,
+        agentBridgeBundleManifestUrl: WORKER_RELEASE_MANIFEST_URL,
+        agentSessionWrappedDeploymentIdentity: expect.any(String),
+      }),
+    );
+    expect(deployPayload).not.toHaveProperty('bundleText');
+    expect(deployPayload).not.toHaveProperty('bundleSha256');
+    expect(deployResult).toEqual({
+      ok: false,
+      error: `${workerError} Your deploy grant was not used. It will work once the sponsor sets these on their Worker.`,
+    });
+    expect(options.updateDeploymentState).not.toHaveBeenCalledWith({ forceManualBundleFile: true });
+  });
+
+  it('tells the redeemer how to retry when a sponsor running older code has no bundle', async () => {
+    const { options } = prepareSponsoredAgentsHttpRedeem({
+      status: 400,
+      body: { error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).' },
+    });
+
+    await expect(redeemSponsoredDeploy(options)).resolves.toEqual({
+      ok: false,
+      error:
+        'The sponsoring Worker has no Worker release to deploy, so nothing was deployed. The grant now only works ' +
+        'for this exact request: retry this same draft here once the sponsor sets WORKER_BUNDLE_URL on that ' +
+        'Worker. If the sponsor updates its Worker code instead, ask for a new deploy grant.',
+    });
+  });
+
   it('reports infrastructure-only completion when public config readback is not verified', async () => {
     const options = buildDeployHookOptions();
     mockSuccessfulWorkerDeployFetch();
@@ -1699,6 +1797,8 @@ describe('useSessionWizardWorkerDeploy', () => {
       litGroupId: 'stale-group',
       litPkpId: 'stale-pkp',
       litActionCid: 'stale-cid',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
     });
     options.resolveWorkerRpcUrl.mockReturnValue('');
     options.resolveWorkerRpcUrlMap.mockReturnValue({});
@@ -1753,6 +1853,8 @@ describe('useSessionWizardWorkerDeploy', () => {
       litGroupId: 'group_123',
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
       litUsageApiKey: 'lit-secret',
     });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
@@ -1778,6 +1880,8 @@ describe('useSessionWizardWorkerDeploy', () => {
       litGroupId: 'group_123',
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
+      litAuthorizationVersion: 'worker-signed-v1',
+      litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
     });
     expect(deployResult).toEqual(
       expect.objectContaining({
@@ -1876,6 +1980,8 @@ describe('useSessionWizardWorkerDeploy', () => {
             litGroupId: 'group-1',
             litPkpId: 'pkp-1',
             litActionCid: 'bafy-action',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
           }),
         } as Response;
       }
@@ -1947,6 +2053,8 @@ describe('useSessionWizardWorkerDeploy', () => {
             litGroupId: 'group-1',
             litPkpId: 'pkp-1',
             litActionCid: 'bafy-action',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
           }),
         } as Response;
       }
@@ -2003,6 +2111,8 @@ describe('useSessionWizardWorkerDeploy', () => {
         litGroupId: 'group-1',
         litPkpId: 'pkp-1',
         litActionCid: 'bafy-action',
+        litAuthorizationVersion: 'worker-signed-v1',
+        litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
         litRuntimeRecovered: 'bootstrap',
       }),
     );
@@ -2036,6 +2146,8 @@ describe('useSessionWizardWorkerDeploy', () => {
             litGroupId: 'group-1',
             litPkpId: 'pkp-1',
             litActionCid: 'bafy-action',
+            litAuthorizationVersion: 'worker-signed-v1',
+            litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
           },
         }),
       ]),

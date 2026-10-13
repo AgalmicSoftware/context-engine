@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'fs';
+import path from 'path';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { renderSbtPageFullView } from './SbtPageFullView';
@@ -203,6 +205,46 @@ describe('renderSbtPageFullView', () => {
 
     expect(screen.getByText('Loading SBT Details')).toBeInTheDocument();
     expect(screen.queryByText('SBT list')).toBeNull();
+  });
+
+  it('keeps the loading title readable on the Minimal white page', () => {
+    const stylesheet = fs.readFileSync(path.join(__dirname, 'SBTPage.module.scss'), 'utf8');
+
+    expect(stylesheet).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*minimal-app\)\s*{[\s\S]*?\.loadingTitle,[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
+  });
+
+  it('keeps the group page, mini cards, and modals readable on Minimal light surfaces', () => {
+    const stylesheet = fs.readFileSync(path.join(__dirname, 'SBTPage.module.scss'), 'utf8');
+    const minimalStart = stylesheet.indexOf('@container ce-theme style(--ce-layout-profile: minimal-app)');
+    const minimal = stylesheet.slice(minimalStart);
+    const colorAfter = (selector: string) => {
+      const index = minimal.indexOf(selector);
+      expect(index).toBeGreaterThan(-1);
+      return minimal.slice(index).match(/(?:^|[\s;{])color:\s*([^;]+);/)?.[1];
+    };
+
+    expect(minimalStart).toBeGreaterThan(-1);
+    // White text meant for dark cards becomes theme document or overlay text.
+    for (const selector of [
+      '.sbtPage .sbtInfo .rightColumn .sectionHeader',
+      '.sbtPage .sbtInfo .rightColumn .stats p,',
+      '.sbtPage .adminContainer .adminActions .autoMintUrlText',
+      '.relevantInfo,',
+    ]) {
+      expect(colorAfter(selector)).toBe('var(--ce-document-text)');
+    }
+    expect(colorAfter('.sbtPage .sbtInfo .leftColumn .description p')).toBe('var(--ce-document-text-muted)');
+    expect(colorAfter('.backButton,')).toBe('var(--ce-control-text)');
+    expect(colorAfter('.modalHeader .modalTitle,')).toBe('var(--ce-overlay-text)');
+    expect(colorAfter('.modalBody button:not(.userItemActions button)')).toBe('var(--ce-action-accent-text)');
+    expect(minimal).toMatch(
+      /\.sbtPage \.sbtInfo \.leftColumn,\s*\.sbtPage \.adminContainer\s*{\s*background:\s*var\(--ce-surface-alt\);/,
+    );
+    // Only theme tokens: no inverse text and no color literals in the Minimal block.
+    expect(minimal).not.toContain('--ce-text-inverse');
+    expect(minimal).not.toMatch(/#[0-9a-f]{3,8}\b|\brgba?\(/i);
   });
 
   it('wires full-view section handlers without owning side effects', () => {

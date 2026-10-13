@@ -583,8 +583,8 @@ $input-border: var(--ce-input-border);
       border-radius: var(--ce-radius-round);
     }
     .liveIndicator {
-      background: var(--ce-action-accent);
-      color: var(--ce-action-accent);
+      background: var(--ce-status-success);
+      color: var(--ce-status-success);
     }
     .endedIndicator {
       background: var(--ce-status-error);
@@ -978,8 +978,19 @@ $input-border: var(--ce-input-border);
   width: 120px;
   height: 120px;
   object-fit: contain;
-  filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--ce-compat-dark) 35%, transparent));
-  animation: none;
+  filter: var(--ce-brand-logo-filter);
+  animation: loadingLogoPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes loadingLogoPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
 }
 
 .loadingTitle {
@@ -1293,5 +1304,107 @@ $input-border: var(--ce-input-border);
   .modalBody button:not(.userItemActions button),
   .modalBody .userItem {
     transition-duration: 0.01ms !important;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .sbtItem .miniSbtName {
+    color: var(--ce-document-text);
+  }
+
+  // The loading screen sits on the white page, not on a dark card.
+  .loadingPage,
+  .loading,
+  .loadingTitle,
+  .loadingSubtitle {
+    color: var(--ce-document-text);
+  }
+
+  // The rest of the group page, its cards, and its modals also sit on light
+  // surfaces here, so the inverse (white) text meant for dark cards becomes
+  // document text, and the dark-tinted panels become the light alternate surface.
+  .sbtPage .sbtInfo .leftColumn,
+  .sbtPage .adminContainer {
+    background: var(--ce-surface-alt);
+  }
+
+  .sbtPage .sbtInfo .leftColumn .bookmarkIcon .bookmarkButton,
+  .sbtPage .sbtInfo .leftColumn .bookmarkIcon .copyButton,
+  .sbtPage .sbtInfo .leftColumn .description p,
+  .sbtPage .sbtInfo .rightColumn .stats p button,
+  .sbtPage .sbtInfo .rightColumn .scanProgress,
+  .sbtPage .adminContainer .adminActions .autoMintUrlHelp,
+  .scanProgress,
+  .sbtItem .miniSbtAddress,
+  .sbtItem .iconOverlay .lockIcon {
+    color: var(--ce-document-text-muted);
+  }
+
+  .sbtPage .sbtInfo .rightColumn .sectionHeader,
+  .sbtPage .sbtInfo .rightColumn .stats p,
+  .sbtPage .sbtInfo .rightColumn .moreDetails p,
+  .sbtPage .adminContainer .adminActions .autoMintUrlText,
+  .relevantInfo,
+  .passwordAlert {
+    color: var(--ce-document-text);
+  }
+
+  .relevantInfo :global(.alert-info) {
+    background: var(--ce-surface-alt);
+    border-color: var(--ce-document-border);
+    color: var(--ce-document-text);
+  }
+
+  .relevantInfo a {
+    color: var(--ce-link);
+  }
+
+  .sbtPage .sbtInfo .rightColumn .actions .input,
+  .sbtPage .adminContainer .adminActions .input,
+  .sbtItem .miniMintPasswordArea .miniPasswordInput {
+    background: var(--ce-input-bg);
+    border-color: var(--ce-input-border);
+    color: var(--ce-control-text);
+  }
+
+  .backButton,
+  .backButton:hover,
+  .sbtPage .adminContainer .adminActions .actionButton,
+  .sbtPage .adminContainer .adminActions .actionButton:hover {
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+    color: var(--ce-control-text);
+  }
+
+  .modalHeader {
+    border-bottom: 1px solid var(--ce-document-border) !important;
+  }
+
+  .modalHeader .modalTitle,
+  .modalHeader .modalTitleCount,
+  .modalBody .userItem .userItemLeft .userAddressLink {
+    color: var(--ce-overlay-text);
+  }
+
+  .modalCloseButton,
+  .modalCloseButton:hover {
+    border-color: var(--ce-document-border-strong);
+    color: var(--ce-overlay-text);
+  }
+
+  .emptyState,
+  .modalBody .filteringStatus,
+  .modalBody .userItem .userItemActions button,
+  .modalBody .userItem .userItemActions a {
+    color: var(--ce-overlay-text-muted);
+  }
+
+  .modalBody .userItem {
+    border-color: var(--ce-document-border);
+  }
+
+  // Minimal's accent is dark, so text on accent buttons uses the accent's own text color.
+  .modalBody button:not(.userItemActions button) {
+    color: var(--ce-action-accent-text);
   }
 }

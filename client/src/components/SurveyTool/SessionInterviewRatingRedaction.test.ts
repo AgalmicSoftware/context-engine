@@ -38,14 +38,18 @@ const ratingDeps = {
   getConvictionFromResponse: (r: { conviction?: unknown }) => (typeof r.conviction === 'number' ? r.conviction : null),
 };
 
-const submit = async (slice: Record<string, unknown>, userAnswersSource: unknown = null) => {
+const submit = async (
+  slice: Record<string, unknown>,
+  userAnswersSource: unknown = null,
+  changed: Record<string, boolean> = { answer: true, importance: true, conviction: true },
+) => {
   const response = buildResponsePayload(opts(slice as never)).responses![0] as Record<string, unknown>;
   await processRatingEnvelopesForSubmit(
     {
       sliceForSubmit: slice as never,
       userAnswersSource,
       questionResponses: [response as never],
-      changedMapForSubmit: { q1: { answer: true, importance: true, conviction: true } },
+      changedMapForSubmit: { q1: changed },
       encryptionBaseOpts: {
         provider: {},
         account: '0xUser',
@@ -147,18 +151,17 @@ it('R2-D5: unselected drafts for a locked question redact ratings in original/re
   expect(research).not.toMatch(/"conviction":(2|1|6|3)/);
 });
 
-it('R2-D2: ratings that stay encrypted through an existing envelope are not repeated in research', async () => {
-  // The answer was saved as "Only me" earlier, so the saved response carries rating envelopes.
+const savedRatingEnvelopes = {
+  questionID: 'q1',
+  importance: null,
+  conviction: null,
+  importanceEncrypted: '{"v":1,"recipients":[{"type":"self-eip712-v1"}]}',
+  convictionEncrypted: '{"v":1,"recipients":[{"type":"self-eip712-v1"}]}',
+};
+
+it('R2-D2: unlocking a decrypted answer publishes its ratings with it', async () => {
+  // The answer was saved as "Only me", so the saved response carries rating envelopes.
   // The user decrypts, makes the answer public, and re-submits with research consent.
-  // processRatingEnvelopesForSubmit keeps the ratings encrypted (hasAnyExistingEnvelope),
-  // but the research snapshot only looks at the answer/comment locks.
-  const saved = {
-    questionID: 'q1',
-    importance: null,
-    conviction: null,
-    importanceEncrypted: '{"v":1,"recipients":[{"type":"self-eip712-v1"}]}',
-    convictionEncrypted: '{"v":1,"recipients":[{"type":"self-eip712-v1"}]}',
-  };
   const response = await submit(
     {
       answers: { q1: { value: 'Agree', encrypted: false } },
@@ -167,11 +170,32 @@ it('R2-D2: ratings that stay encrypted through an existing envelope are not repe
       conviction: { q1: 2 },
       interviewProvenance: provenance(),
     },
-    { responses: [saved] },
+    { responses: [savedRatingEnvelopes] },
+    // Making the answer public is a lock change, which is what lets saved encrypted ratings go public.
+    { answer: true, encryptedAnswer: true, importance: true, conviction: true },
   );
-  expect(response.importance).toBeNull();
-  expect(response.importanceEncrypted).toEqual(expect.any(String));
+  expect(response).toMatchObject({ importance: 9, conviction: 2, importanceEncrypted: '', convictionEncrypted: '' });
+  expect(response.interviewProvenance).toMatchObject({ finalSubmitted: { importance: 9, conviction: 2 } });
+});
+
+it('ratings that keep a saved envelope after an unlock are not repeated in research', async () => {
+  // This browser never decrypted the ratings, so their envelopes are re-sent as they are.
+  const response = await submit(
+    {
+      answers: { q1: { value: 'Agree', encrypted: false } },
+      additionalComments: {},
+      interviewProvenance: provenance(),
+    },
+    { responses: [savedRatingEnvelopes] },
+    { answer: true },
+  );
+  expect(response).toMatchObject({
+    importance: null,
+    conviction: null,
+    importanceEncrypted: savedRatingEnvelopes.importanceEncrypted,
+    convictionEncrypted: savedRatingEnvelopes.convictionEncrypted,
+  });
   const research = JSON.stringify(response.interviewProvenance);
-  expect(research).not.toMatch(/"importance":9/);
-  expect(research).not.toMatch(/"conviction":2/);
+  expect(research).not.toMatch(/"importance":7/);
+  expect(research).not.toMatch(/"conviction":3/);
 });

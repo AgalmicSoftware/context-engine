@@ -71,6 +71,30 @@ const buildDeployExecutionFailure = (error) => ({
   },
 });
 
+// A deploy grant lends the sponsor's Cloudflare token, not a code upload. The
+// redeemer's bundle fields (and a different deployment kind) are dropped and
+// only the release this Worker is configured with is deployed; the manifest
+// pins its digest.
+const resolveSponsoredReleaseBundles = (env, deployPayload) => {
+  const bundleUrl = toTrimmedString(env?.WORKER_BUNDLE_URL);
+  const bundleManifestUrl = toTrimmedString(env?.WORKER_BUNDLE_MANIFEST_URL);
+  if (!bundleUrl || !bundleManifestUrl) {
+    return { ok: false, error: 'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.' };
+  }
+  if (deployPayload?.sessionModeProfile?.surfaces?.agentHttp !== true) {
+    return { ok: true, fields: { bundleUrl, bundleManifestUrl } };
+  }
+  const agentBridgeBundleUrl = toTrimmedString(env?.AGENT_BRIDGE_BUNDLE_URL);
+  const agentBridgeBundleManifestUrl = toTrimmedString(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+  if (!agentBridgeBundleUrl || !agentBridgeBundleManifestUrl) {
+    return {
+      ok: false,
+      error: 'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker.',
+    };
+  }
+  return { ok: true, fields: { bundleUrl, bundleManifestUrl, agentBridgeBundleUrl, agentBridgeBundleManifestUrl } };
+};
+
 const buildSponsoredRequestDigest = async (action, payload, requestOrigin = '') => sha256Hex(
   stableCanonicalSerialize({ action, payload, requestOrigin: normalizeOrigin(requestOrigin) }),
 );
@@ -211,12 +235,25 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       );
     }
 
+    const releaseBundles = resolveSponsoredReleaseBundles(env, deployPayload);
+    if (!releaseBundles.ok) {
+      return buildGrantErrorResponse(deps, headers, 400, releaseBundles.error);
+    }
+
     // A grant chooses credentials, not an account. The deploy helper must
     // derive the sponsor token's one visible account itself.
     const {
       accountId: _discardedAccountId,
       deploymentRequestId: _discardedDeploymentRequestId,
       configRevision: _discardedConfigRevision,
+      deploymentKind: _discardedDeploymentKind,
+      bundleText: _discardedBundleText,
+      bundleUrl: _discardedBundleUrl,
+      bundleSha256: _discardedBundleSha256,
+      bundleManifestUrl: _discardedBundleManifestUrl,
+      agentBridgeBundleUrl: _discardedAgentBridgeBundleUrl,
+      agentBridgeBundleManifestUrl: _discardedAgentBridgeBundleManifestUrl,
+      agentBridgeBundleSha256: _discardedAgentBridgeBundleSha256,
       ...accountIndependentDeployPayload
     } = deployPayload;
     // Regression guard: the one-shot grant, not a page-lifetime hook ref,
@@ -225,6 +262,7 @@ export const dispatchSponsoredBootstrapRedeem = async ({
     const configRevision = await buildSponsoredConfigRevision(grantToken);
     const effectiveDeployPayload = {
       ...accountIndependentDeployPayload,
+      ...releaseBundles.fields,
       deploymentRequestId,
       configRevision,
     };

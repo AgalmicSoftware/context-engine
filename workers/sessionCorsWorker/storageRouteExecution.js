@@ -15,10 +15,13 @@ import {
   normalizePayloadAccessControl,
 } from './payloadAccessControl.js';
 import {
+  base64urlToBytes,
+  bytesToBase64url,
   decryptPayloadWithStorageEnvelope,
   encryptPayloadWithStorageEnvelope,
   toUint8Array,
   writeStorageEnvelopeKeyReleaseAudit,
+  writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
 import {
   isWorkerGroupMember,
@@ -41,6 +44,21 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+import {
+  isStorageResourceId,
+  readStoragePayloadResourceId,
+  validateStorageUploadPayload,
+} from './storageUploadValidation.js';
+import {
+  isOwnedStorageResource,
+  isStorageResourceHidden,
+  LEGACY_STORAGE_OWNER,
+  listHiddenStorageResourceIds,
+  readStorageResourceOwner,
+  writeStorageResourceHidden,
+  writeStorageResourceOwner,
+} from './storageResourceOwnership.js';
+import { checkCoordinatedLegacyStorageOwner } from './sessionWriteCoordinator.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -54,6 +72,22 @@ const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(
 const isJsonContentType = (contentType) => {
   const mediaType = trim(contentType).split(';', 1)[0].trim().toLowerCase();
   return mediaType === 'application/json' || mediaType.endsWith('+json');
+};
+const MEDIA_TYPE_RE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
+const INLINE_MEDIA_TYPE_RE = /^(?:application\/(?:pdf|json|[a-z0-9.-]+\+json)|text\/plain|(?:image|audio|video)\/[a-z0-9.+-]+)$/;
+// Keeps the declared type (fetch-based readers such as the document library
+// rely on it) but serves only JSON, plain text, raster images, audio, video,
+// and PDF inline. SVG, HTML, XML, scripts, and unknown types download.
+const resolveStorageReadContentType = (storedContentType) => {
+  const declared = trim(storedContentType);
+  const mediaType = declared.split(';', 1)[0].trim().toLowerCase();
+  if (!MEDIA_TYPE_RE.test(mediaType) || !/^[ -~]*$/.test(declared) || declared.includes(',')) {
+    return { contentType: 'application/octet-stream', inline: false };
+  }
+  return {
+    contentType: declared,
+    inline: INLINE_MEDIA_TYPE_RE.test(mediaType) && !/svg|xml/.test(mediaType),
+  };
 };
 
 export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
@@ -72,14 +106,6 @@ const DEFAULT_RESOURCE_GATES = Object.freeze({
 
 const isStorageResource = (resource) => Object.hasOwn(DEFAULT_RESOURCE_GATES, trim(resource) || 'docsContext');
 
-const bytesToBase64url = (bytes) => {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  }
-  let binary = '';
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-};
 const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValuesDep } = {}) => {
   const bytes = new Uint8Array(32);
   const suppliedBytes = typeof randomBytes === 'function' ? randomBytes(32) : null;
@@ -115,24 +141,24 @@ const normalizeGroupIdList = (value) => {
   const source = Array.isArray(raw) ? raw : [raw];
   return Array.from(new Set(source.map(safeGroupId).filter(Boolean)));
 };
-const readKvPayloadEnvelope = async ({ index, slug, id }) => {
+// A storage error reads as a missing payload unless strict, which lets it
+// propagate so a caller can retry instead of treating the payload as gone.
+const readKvPayloadEnvelope = async ({ index, slug, id, strict = false }) => {
   if (!index || typeof index.get !== 'function') return null;
+  let raw;
   try {
-    const envelope = JSON.parse(await index.get(buildPayloadKey({ slug, id })) || 'null');
+    raw = await index.get(buildPayloadKey({ slug, id }));
+  } catch (error) {
+    if (strict) throw error;
+    return null;
+  }
+  try {
+    const envelope = JSON.parse(raw || 'null');
     return envelope && isObj(envelope?.metadata) ? envelope : null;
   } catch {
     return null;
   }
 };
-export const base64urlToBytes = (value) => {
-  const text = trim(value);
-  if (!text) return new Uint8Array();
-  const base64 = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
-  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(base64, 'base64'));
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-};
-
 const normalizeTagsForMetadata = (tagsInput) => {
   let tags = tagsInput;
   if (typeof tagsInput === 'string' && tagsInput.trim()) {
@@ -549,6 +575,8 @@ const resolveRoleAddressSet = ({ config = {}, role }) => {
   });
   return addresses;
 };
+
+export const resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet({ config, role: 'admin' });
 
 const listDelimitedAddresses = (value) => {
   if (typeof value === 'string') {
@@ -1332,7 +1360,7 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
   }, 200, baseHeaders);
 };
 
-const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps }) => {
+const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, resourceId = '', baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
   const canWriteR2 = !!r2 && typeof r2.put === 'function';
@@ -1372,6 +1400,46 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT && payload.payloadEncrypted !== true) {
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
   }
+  const resource = trim(payload.resource) || 'docsContext';
+  const uploader = normalizeAddress(uploaderAddress);
+  const owned = isOwnedStorageResource(resource);
+  let owner = null;
+  let hidden = false;
+  if (owned) {
+    if (!isStorageResourceId(resourceId)) {
+      return responseJson(deps, { error: `Invalid ${resource} payload: missing id.` }, 400, baseHeaders);
+    }
+    if (typeof index?.get !== 'function') {
+      return responseJson(deps, { error: 'Cloudflare storage index binding not configured.' }, 501, baseHeaders);
+    }
+    // Only the id's first author or a session admin may upload it again;
+    // anyone else would be rewriting a question or survey people answered.
+    const uploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
+    owner = await readStorageResourceOwner({ index, slug, resource, resourceId });
+    if (!owner && !uploaderIsAdmin) {
+      const legacy = await resolveLegacyStorageOwner({ env, config, slug, resource, resourceId, deps });
+      if (!legacy.ok) return responseJson(deps, { error: legacy.error }, legacy.status || 503, baseHeaders);
+      owner = legacy.owner;
+    }
+    if (owner && normalizeAddress(owner.uploader) !== uploader && !uploaderIsAdmin) {
+      const noun = resource === 'questions' ? 'question' : 'survey';
+      return responseJson(deps, {
+        error: owner.uploader === LEGACY_STORAGE_OWNER
+          ? `This ${noun} id was stored before authors were recorded, so only a session admin can upload it again.`
+          : `This ${noun} id already belongs to another author. Only its first author or a session admin can upload it again.`,
+        reason: 'storage_resource_id_owned',
+      }, 409, baseHeaders);
+    }
+    hidden = await isStorageResourceHidden({ index, slug, resource, resourceId });
+    // A hidden id stays hidden: only an admin can upload it again, and that
+    // upload starts hidden too.
+    if (hidden && !resolveSessionAdminAddresses(config).has(uploader)) {
+      return responseJson(deps, {
+        error: `A session admin hid this ${resource === 'questions' ? 'question' : 'survey'} id, so it cannot be uploaded again.`,
+        reason: 'storage_resource_id_hidden',
+      }, 409, baseHeaders);
+    }
+  }
 
   let id = '';
   try {
@@ -1387,7 +1455,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
   const createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
   const objectKey = buildObjectKey({ slug, id });
-  const resource = trim(payload.resource) || 'docsContext';
   const storageLayer = canWriteR2 ? 'r2' : 'kv';
   let bytesToStore = payload.bytes || new Uint8Array();
   let envelope = null;
@@ -1436,6 +1503,8 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     ...(resource === 'responses' && trim(uploaderAddress)
       ? { responder: trim(uploaderAddress).toLowerCase() }
       : {}),
+    // Trusted authorship for questions and surveys, like responder above.
+    ...(owned ? { resourceId, ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
     payloadAccessMode: payloadAccess.mode,
     payloadAccessControl: {
       gate: payloadAccess.gate,
@@ -1490,6 +1559,9 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
 
   if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
+  }
+  if (owned && !owner && uploader) {
+    await writeStorageResourceOwner({ index, slug, resource, resourceId, uploader, storageRefId: id, createdAt });
   }
 
   const storageRef = normalizeStorageRef(metadata);
@@ -1699,9 +1771,15 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
       return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope decrypt failed.' }, 403, baseHeaders);
     }
   }
-  const contentType = trim(metadata?.contentType) || 'application/octet-stream';
+  const { contentType, inline } = resolveStorageReadContentType(metadata?.contentType);
   const responseHeaders = new Headers(baseHeaders || {});
   responseHeaders.set('Content-Type', contentType);
+  // Uploaders choose the content type, so a read must never run as a page on
+  // the Worker origin: no sniffing, an opaque script-free sandbox, and a
+  // download instead of a render for anything outside the safe inline list.
+  responseHeaders.set('X-Content-Type-Options', 'nosniff');
+  responseHeaders.set('Content-Security-Policy', "sandbox; default-src 'none'");
+  if (!inline) responseHeaders.set('Content-Disposition', 'attachment');
   responseHeaders.set('X-CE-Storage-Backend', STORAGE_BACKENDS.CLOUDFLARE);
   responseHeaders.set('X-CE-Storage-Ref', id);
   responseHeaders.set('X-CE-Payload-Access-Mode', deriveLegacyPayloadAccessMode(resolvedAccess));
@@ -1757,7 +1835,11 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   }
   const keys = Array.isArray(listed?.keys) ? listed.keys : [];
   const rows = [];
+  let hiddenIds = null;
   try {
+    // Hidden markers also cover a version whose own flag a hide has not
+    // written yet, such as one uploaded in another region during the hide.
+    if (isOwnedStorageResource(resource)) hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource });
     for (let offset = 0; offset < keys.length; offset += 8) {
       rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
         const name = trim(keyEntry?.name || keyEntry);
@@ -1768,6 +1850,9 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);
   }
   const items = [];
+  // Clients cannot see every Worker role, so lists say whether each question
+  // or survey uploader is a session admin under the current role set.
+  const admins = isOwnedStorageResource(resource) ? resolveSessionAdminAddresses(config) : null;
   for (const { name, raw } of rows) {
     if (!name) continue;
     let metadata;
@@ -1803,6 +1888,14 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       if (mine) return itemAccess.response;
       continue;
     }
+    const owned = isOwnedStorageResource(storageRef.resource);
+    const resourceId = owned ? normalizeAddress(metadata?.resourceId) : '';
+    if (owned && (metadata?.hidden === true || hiddenIds?.has(resourceId))) {
+      // An admin hid this id. List no reference to the stored record, only a
+      // marker so clients can drop a copy they cached before the hide.
+      if (resourceId) items.push({ hidden: true, metadata: { resource: storageRef.resource, resourceId, hidden: true } });
+      continue;
+    }
     const metadataAccess = normalizePayloadAccessControl(
       metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config),
     );
@@ -1818,6 +1911,9 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
         ...(storageRef.resource === 'responses' && trim(metadata?.responder)
           ? { responder: trim(metadata.responder).toLowerCase() }
           : {}),
+        ...(resourceId ? { resourceId } : {}),
+        ...(owned && trim(metadata?.uploader) ? { uploader: normalizeAddress(metadata.uploader) } : {}),
+        ...(owned ? { uploaderIsAdmin: !!admins?.has(normalizeAddress(metadata?.uploader)) } : {}),
         payloadAccessControl: {
           gate: metadataAccess.gate,
           encryption: metadataAccess.encryption,
@@ -1864,7 +1960,7 @@ export const listCloudflareMetadataRows = async ({ index, slug, resource = '' })
   return rows;
 };
 
-export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
+export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false }) => {
   const id = trim(metadata?.id);
   if (!id) return null;
   const r2 = getStorageR2Binding(env);
@@ -1872,9 +1968,204 @@ export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metad
     const object = await r2.get(buildObjectKey({ slug, id }));
     if (object) return toUint8Array(object);
   }
-  const envelope = await readKvPayloadEnvelope({ index, slug, id });
-  if (envelope?.payloadBase64url) return base64urlToBytes(envelope.payloadBase64url);
-  return null;
+  const envelope = await readKvPayloadEnvelope({ index, slug, id, strict });
+  if (!envelope?.payloadBase64url) return null;
+  if (!strict) return base64urlToBytes(envelope.payloadBase64url);
+  // Strict reads fail only on storage errors; a malformed payload is no payload.
+  try {
+    return base64urlToBytes(envelope.payloadBase64url);
+  } catch {
+    return null;
+  }
+};
+
+const readStoredPayloadJson = async ({ env, index, slug, config, metadata, deps }) => {
+  try {
+    let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
+    if (!bytes) return null;
+    if (isObj(metadata?.envelope)) {
+      bytes = await decryptPayloadWithStorageEnvelope({
+        env, config, slug, payloadId: trim(metadata.id), ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+      });
+    }
+    const payload = JSON.parse(decoder.decode(await toUint8Array(bytes)));
+    return isObj(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+// The questions or surveys id of an index row: its recorded resourceId, else
+// the id in the payload of a row stored before resourceId was recorded.
+// Returns null when that payload cannot be read and '' when it has no valid id.
+const readIndexRowResourceId = async ({ env, index, slug, config, resource, row, deps }) => {
+  const recorded = normalizeAddress(row.metadata?.resourceId);
+  if (recorded) return recorded;
+  const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
+  if (!payload) return null;
+  const resourceId = readStoragePayloadResourceId(resource, payload);
+  return isStorageResourceId(resourceId) ? resourceId : '';
+};
+
+// The id of a row the legacy-owner scan reads. A storage error propagates, so
+// the step fails and is retried from the same place rather than skipping an
+// id for good. A payload that is gone, or that the Worker cannot read by
+// design (client-encrypted, undecryptable, or not JSON), has no id to find.
+const readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
+  const recorded = normalizeAddress(metadata.resourceId);
+  if (recorded) return recorded;
+  if (metadata.encrypted === true && !isObj(metadata.envelope)) return '';
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
+  if (!bytes) return '';
+  try {
+    if (isObj(metadata.envelope)) {
+      bytes = await decryptPayloadWithStorageEnvelope({
+        env, config, slug, payloadId: trim(metadata.id), ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+      });
+    }
+    const payload = JSON.parse(decoder.decode(await toUint8Array(bytes)));
+    const resourceId = isObj(payload) ? readStoragePayloadResourceId(resource, payload) : '';
+    return isStorageResourceId(resourceId) ? resourceId : '';
+  } catch {
+    return '';
+  }
+};
+
+// Questions and surveys stored before first-writer records existed have no
+// owner, so the first upload of such an id after an update would claim it.
+// The ids of rows without a recorded uploader are admin-only instead. This is
+// one bounded step of that scan: it reads up to maxRows index rows after
+// (cursor, lastKey), and the payloads of those stored before resourceId was
+// recorded, so callers can spread a large session over several invocations.
+// It writes nothing.
+export const scanLegacyStorageOwnerIds = async ({
+  env, config, slug, resource, cursor = '', lastKey = '', maxRows = Infinity, deps,
+} = {}) => {
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
+    throw new Error('Cloudflare storage index binding not configured.');
+  }
+  const prefix = buildIndexPrefix({ slug, resource });
+  const ids = new Set();
+  let rows = 0;
+  let skippedRows = 0;
+  let pageCursor = trim(cursor);
+  let after = trim(lastKey);
+  for (;;) {
+    const listed = await index.list({ prefix, ...(pageCursor ? { cursor: pageCursor } : {}) });
+    const nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && !nextCursor) throw new Error('Cloudflare storage list cursor is unavailable.');
+    // KV lists keys in order, so (page cursor, last key read) resumes a page.
+    const names = (Array.isArray(listed?.keys) ? listed.keys : [])
+      .map((entry) => trim(entry?.name || entry))
+      .filter((name) => name && (!after || name > after))
+      .sort();
+    for (const name of names) {
+      if (rows >= maxRows) return { ids: [...ids], skippedRows, cursor: pageCursor, lastKey: after, done: false };
+      rows += 1;
+      after = name;
+      const raw = await index.get(name);
+      let metadata = null;
+      try {
+        metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch {
+        continue;
+      }
+      if (!isObj(metadata) || !trim(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+      const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
+      if (resourceId) ids.add(resourceId);
+      else skippedRows += 1;
+    }
+    if (!nextCursor) return { ids: [...ids], skippedRows, cursor: '', lastKey: '', done: true };
+    pageCursor = nextCursor;
+    after = '';
+  }
+};
+
+// Whether an id without an owner record was stored before first-writer
+// records existed. The session coordinator scans in bounded steps, keeps its
+// progress and the ids found, and answers from its own storage, so racing
+// uploads agree. Without a coordinator binding (local tools and tests) the
+// whole scan runs inline for each such upload.
+const LEGACY_OWNER = Object.freeze({ uploader: LEGACY_STORAGE_OWNER });
+
+const resolveLegacyStorageOwner = async ({ env, config, slug, resource, resourceId, deps }) => {
+  const coordinated = await checkCoordinatedLegacyStorageOwner({ env, config, slug, resource, resourceId });
+  if (coordinated) return coordinated.ok ? { ok: true, owner: coordinated.adminOnly ? LEGACY_OWNER : null } : coordinated;
+  try {
+    const { ids } = await scanLegacyStorageOwnerIds({ env, config, slug, resource, deps });
+    return { ok: true, owner: ids.includes(resourceId) ? LEGACY_OWNER : null };
+  } catch {
+    return { ok: false, status: 503, error: 'Recording the owners of existing questions and surveys failed; retry.' };
+  }
+};
+
+// Admin soft hide: every stored version stays readable by its storage id, but
+// lists, the interview catalog, and results analysis skip the question or
+// survey id, and later uploads of the id start hidden.
+export const setCloudflareStorageResourceHidden = async ({ env, config, slug, body, actor = '', deps = {} } = {}) => {
+  const resource = trim(body?.resource);
+  const resourceId = normalizeAddress(body?.id);
+  if (!isOwnedStorageResource(resource)) {
+    return { ok: false, status: 400, error: 'Only questions and surveys can be hidden.' };
+  }
+  if (!isStorageResourceId(resourceId)) return { ok: false, status: 400, error: `Invalid ${resource} id.` };
+  if (typeof body?.hidden !== 'boolean') return { ok: false, status: 400, error: 'hidden must be true or false.' };
+  const index = getStorageIndexBinding(env);
+  if (!index || ['get', 'put', 'list', 'delete'].some((method) => typeof index[method] !== 'function')) {
+    return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
+  }
+  const { hidden } = body;
+  try {
+    await writeStorageVisibilityAudit({ env, slug, resource, resourceId, hidden, principal: actor, deps });
+  } catch (error) {
+    return { ok: false, status: 503, error: error?.message || 'Storage audit store is unavailable.' };
+  }
+  // Mark every stored version so lists can skip them from index metadata.
+  // Uploads from before this release lack resourceId; read those once here and
+  // record it, so later scans read only the index. KV takes one write per key
+  // per second, so each row gets a single put carrying both changes.
+  let matchedRows = 0;
+  let unreadableRows = 0;
+  try {
+    await writeStorageResourceHidden({
+      index, slug, resource, resourceId, hidden, actor, updatedAt: new Date(deps?.now?.() || Date.now()).toISOString(),
+    });
+    for (const row of await listCloudflareMetadataRows({ index, slug, resource })) {
+      if (!row.metadata) {
+        unreadableRows += 1;
+        continue;
+      }
+      const rowResourceId = await readIndexRowResourceId({ env, index, slug, config, resource, row, deps });
+      if (rowResourceId === null) {
+        unreadableRows += 1;
+        continue;
+      }
+      const matched = rowResourceId === resourceId;
+      const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
+      if (!matched && !recordsId) continue;
+      const next = { ...row.metadata, resourceId: rowResourceId };
+      if (matched) {
+        matchedRows += 1;
+        if (hidden) next.hidden = true;
+        else delete next.hidden;
+      }
+      await index.put(row.key, JSON.stringify(next));
+    }
+  } catch (error) {
+    // A change within a second of the last one hits KV's per-key write limit.
+    // Its audit entry is already written; the retry completes the change.
+    if (/\b429\b|too many requests/i.test(toStr(error?.message))) {
+      return { ok: false, status: 429, error: 'This id changed less than a second ago. Try again in a moment.' };
+    }
+    throw error;
+  }
+  const hiddenIds = [...await listHiddenStorageResourceIds({ index, slug, resource })].sort();
+  return {
+    ok: true,
+    status: 200,
+    body: { ok: true, resource, id: resourceId, hidden, matchedRows, unreadableRows, hiddenIds },
+  };
 };
 
 const resolveEnvelopeExportKeyProvider = ({ metadataAccess, metadata, config }) => {
@@ -2033,6 +2324,12 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     if (!uploadPayload?.ok) return responseJson(deps, { error: uploadPayload?.error || 'Invalid storage upload payload.' }, uploadPayload?.status || 400, baseHeaders);
     const payload = uploadPayload.payload || {};
     if (!isStorageResource(payload.resource)) return responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders);
+    const checked = validateStorageUploadPayload({
+      resource: trim(payload.resource),
+      bytes: payload.bytes,
+      payloadEncrypted: payload.payloadEncrypted === true,
+    });
+    if (!checked.ok) return responseJson(deps, { error: checked.error }, checked.status, baseHeaders);
     const backend = resolveConfiguredStorageBackend({
       config,
       requestedBackend: payload.backend,
@@ -2042,7 +2339,9 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
       return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
-    return handleCloudflareUpload({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps: routeDeps });
+    return handleCloudflareUpload({
+      env, config, slug, uploaderAddress, authScopes, payload, resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
+    });
   }
 
   const configuredBackend = resolveConfiguredStorageBackend({ config });

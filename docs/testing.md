@@ -76,9 +76,8 @@ yet zero-diagnostic, so the ratchet command—not a claim of clean standalone
 `client/jest.full-universe.config.cjs`. Every tracked executable JS, JSX, TS,
 and TSX production file under `client/src` enters the denominator, including
 never-imported files. `npm run coverage-floor:check` reuses that run's
-`coverage-final.json` to enforce both the fixed legacy imported-file metric and
-the separately banked whole-production metric. The two percentages are not
-directly comparable.
+`coverage-final.json` to enforce the whole-production floor banked in
+`scripts/client-coverage-full-baseline.json`.
 
 ### Targeted Root Commands
 

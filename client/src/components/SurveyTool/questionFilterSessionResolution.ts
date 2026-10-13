@@ -16,6 +16,7 @@ type QuestionFilterSessionInput = {
 
 type ResolveQuestionFilterSessionContextInput = QuestionFilterSessionInput & {
   resolveBySlug?: ResolveSessionConfigBySlug;
+  sessionConfig?: unknown;
 };
 
 const readPrioritizedPropSlug = (rawSlug: unknown): string => {
@@ -57,9 +58,22 @@ export const resolveQuestionFilterEffectiveSlug = (input: QuestionFilterSessionI
 
 export const resolveQuestionFilterSessionContext = ({
   resolveBySlug,
+  sessionConfig,
   ...input
-}: ResolveQuestionFilterSessionContextInput = {}): SessionResolutionResult =>
-  resolveCanonicalSessionConfig({
-    source: buildQuestionFilterSessionSource(input),
+}: ResolveQuestionFilterSessionContextInput = {}): SessionResolutionResult => {
+  const source = buildQuestionFilterSessionSource(input);
+  const requestedSlug = resolveCanonicalSessionConfig({ source }).sessionSlug;
+  const config =
+    sessionConfig && typeof sessionConfig === 'object' && !Array.isArray(sessionConfig)
+      ? (sessionConfig as Record<string, unknown>)
+      : null;
+  const configSlug = resolveCanonicalSessionConfig({
+    source: { sessionSlug: config?.slug ?? config?.sessionSlug ?? '' },
+  }).sessionSlug;
+  // Worker bootstrap configs arrive through props, outside the registry cache.
+  // Only reuse them for the selected route; stale props must not route AI elsewhere.
+  return resolveCanonicalSessionConfig({
+    source: { ...source, ...(config && configSlug === requestedSlug ? { sessionConfig: config } : {}) },
     resolveBySlug,
   }) as SessionResolutionResult;
+};

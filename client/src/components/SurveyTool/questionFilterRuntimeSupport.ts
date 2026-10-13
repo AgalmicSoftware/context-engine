@@ -159,6 +159,10 @@ export type QuestionFilterAiAccessState = {
   sponsoredAvailable: boolean;
   localKeyAvailable: boolean;
   sponsoredStatus: string;
+  // The Worker grants AI to signed-out visitors, so a run needs no sign-in.
+  workerAnonymousAvailable?: boolean;
+  // The Worker grants AI to participants only and the visitor is signed out.
+  needsSignIn?: boolean;
 };
 export type QuestionFilterGateTooltipProps = {
   gateId: string | null;
@@ -211,6 +215,7 @@ export function resolveEffectiveSessionContext(props: QuestionFilterSessionProps
     pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
     activeSessionSlug: props.activeSessionSlug,
     sessionSlug: props.sessionSlug,
+    sessionConfig: props.sessionConfig,
     resolveBySlug: getSessionConfigBySlug,
   });
 }

@@ -74,6 +74,7 @@ import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionD
 import { chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
+import { loadWorkerCanonicalQuestionMatcher } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
 import {
   workerCanonicalCacheIdentityMatches,
   withWorkerCanonicalCacheIdentity,
@@ -1073,6 +1074,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
     if (shouldAppendPreformedQuestions && prevProps.preformedQuestions !== this.props.preformedQuestions) {
       const previousIds = new Set(
@@ -1632,15 +1634,22 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.setState(buildCreateSurveyBookmarkedSurveysSetPatch(set));
   };
 
-  updateSurveyHash: () => void = () => {
+  computeSurveyHash = (): string => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
-    const newHash = buildCreateSurveyHashValue({
+    const projection = resolveSessionCapabilityProjection(this.getResolvedSessionConfig());
+    return buildCreateSurveyHashValue({
+      // Session Workers let only an id's first author reuse it, so new Worker
+      // survey ids include the author. Registry ids stay content hashes.
+      author: projection.profileValid && projection.isWorkerCanonical ? this.props.account : '',
       digest: createSurveySha256,
       documentURLs,
       isStandaloneQuestion,
       title,
     });
-    this.setState(buildCreateSurveyHashPatch(newHash));
+  };
+
+  updateSurveyHash: () => void = () => {
+    this.setState(buildCreateSurveyHashPatch(this.computeSurveyHash()));
   };
 
   toggleStandaloneQuestion: () => void = () => {
@@ -1732,7 +1741,19 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           return compatible as CreateQuestionsSeededQuestionRow;
         })
         .filter((row): row is CreateQuestionsSeededQuestionRow => !!row);
-      if (!normalizedRows.length) return false;
+      // Another author already published these exact questions. Never seed this
+      // author's lock, tags, or creator onto them; hydration reads theirs.
+      const alreadyPublishedIds = new Set(
+        uploadedRows
+          .filter((row) => row?.alreadyPublished === true)
+          .map((row) =>
+            String(row?.questionId || row?.id || '')
+              .trim()
+              .toLowerCase(),
+          ),
+      );
+      const seededRows = normalizedRows.filter((row) => !alreadyPublishedIds.has(row.id));
+      if (!seededRows.length) return false;
 
       const sourceRows: CreateQuestionsCacheQuestionRow[] = Array.isArray(sourceQuestions)
         ? (sourceQuestions as CreateQuestionsCacheQuestionRow[])
@@ -1779,6 +1800,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           });
 
           recentRows.forEach((row) => {
+            if (alreadyPublishedIds.has(row.id)) return;
             nextRecent[row.id] = {
               ...row,
               id: row.id,
@@ -1812,12 +1834,21 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         canReuseNetBucket && isObjectLikeRecord(existingNetBucket) ? { ...(existingNetBucket as UnknownRecord) } : {};
       const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions) ? { ...netBucket.questions } : {};
 
-      normalizedRows.forEach((row) => {
+      seededRows.forEach((row) => {
         questions[row.id] = { ...((questions[row.id] as UnknownRecord) || {}), ...row };
+      });
+      // A seeded row is a local copy. Drop its Worker version ref so the next
+      // hydration rereads the canonical blob instead of skipping it as cached.
+      const workerQuestionMetadataRefs = isObjectLikeRecord(netBucket.workerQuestionMetadataRefs)
+        ? { ...(netBucket.workerQuestionMetadataRefs as UnknownRecord) }
+        : null;
+      seededRows.forEach((row) => {
+        if (workerQuestionMetadataRefs) delete workerQuestionMetadataRefs[row.id];
       });
 
       const nextNetBucket: ManagedCacheBucket = {
         ...netBucket,
+        ...(workerQuestionMetadataRefs ? { workerQuestionMetadataRefs } : {}),
         questionsLatestBlock: Number(netBucket.questionsLatestBlock || 0) || 0,
         questions,
         questionResponses:
@@ -2429,13 +2460,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         const questionIdsForContract = uniqueQuestions.map((q) => q.id);
         let submittedQuestions: unknown[] = [];
         if (isWorkerCanonicalAuthoring) {
-          const workerResult = await workerCanonicalAuthoringPort.publishQuestions({
-            account: this.props.account,
-            providerLike: this.props.provider,
-            questions: questionDataArray,
-            sessionConfig,
-            sessionSlug,
-          });
+          const workerResult = await workerCanonicalAuthoringPort.publishQuestions(
+            {
+              account: this.props.account,
+              providerLike: this.props.provider,
+              questions: questionDataArray,
+              sessionConfig,
+              sessionSlug,
+            },
+            { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
+          );
           submittedQuestions = workerResult.uploadedQuestions;
         } else {
           const surveyIdsForContract = uniqueQuestions.map((q) => q.associatedSurveyId || ethers.constants.HashZero);
@@ -2497,7 +2531,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           this.setState(buildCreateSurveySubmitResetPatch());
           return;
         }
-        const surveyIDForUpload = this.state.surveyHash;
+        // Worker ids carry the uploading account, so recompute them at submit.
+        const surveyIDForUpload = isWorkerCanonicalAuthoring ? this.computeSurveyHash() : this.state.surveyHash;
         if (!surveyIDForUpload) {
           this.setState(buildCreateSurveySubmitBlockingErrorPatch('Internal error: Survey ID could not be generated.'));
           return;
@@ -2718,14 +2753,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         this.setState(buildCreateSurveySubmitProgressPatch({ progress: 60, submitStep: 2 }));
         let addSurveyResult: UnknownRecord;
         if (isWorkerCanonicalAuthoring) {
-          addSurveyResult = await workerCanonicalAuthoringPort.publishSurvey({
-            account: this.props.account,
-            providerLike: this.props.provider,
-            questions: questionDataArray,
-            sessionConfig,
-            sessionSlug,
-            survey: completeSurveyData,
-          });
+          addSurveyResult = await workerCanonicalAuthoringPort.publishSurvey(
+            {
+              account: this.props.account,
+              providerLike: this.props.provider,
+              questions: questionDataArray,
+              sessionConfig,
+              sessionSlug,
+              survey: completeSurveyData,
+            },
+            { loadPublishedQuestionMatcher: loadWorkerCanonicalQuestionMatcher },
+          );
         } else {
           addSurveyResult = await contractScriptsForSubmit.addSurveyWithQuestions(
             this.props.provider,
@@ -2779,12 +2817,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           this.setState(
             buildCreateSurveySurveySubmitSuccessPatch({
               surveyArweaveTxId: submittedSurveyArweaveTxId,
-              surveyId: this.state.surveyHash,
+              surveyId: surveyIDForUpload,
             }),
             () => {
               this.startCacheWatch();
               if (this.props.miniaturized && this.props.onUploadComplete) {
-                this.props.onUploadComplete(this.state.surveyHash);
+                this.props.onUploadComplete(surveyIDForUpload);
               }
             },
           );
@@ -2895,15 +2933,25 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         isGeneratingTags: false,
       };
     });
-    const firstKey = built.length > 0 ? built[0].uiKey : null;
+    // Never discard a manual draft: add the generated questions after it and keep
+    // its title and Survey/Questions mode. An empty draft takes the AI result as is.
+    const draftQuestions = this.state.questions || [];
+    const draftTitle = String(this.state.title || '').trim();
+    const hasDraft = draftQuestions.length > 0 || draftTitle !== '';
+    const draftIds = new Set(draftQuestions.map((question) => question.id));
+    const added = hasDraft ? built.filter((question) => !draftIds.has(question.id)) : built;
+    const firstKey = added.length > 0 ? added[0].uiKey : null;
+    const generatedDraftPatch = buildCreateSurveyAutoGeneratedDraftPatch({
+      documentURLs: sanitizeDocumentUrls([...(hasDraft ? this.state.documentURLs || [] : []), ...(docURLs || [])]),
+      focusTargetUiKey: firstKey,
+      questions: [...(hasDraft ? draftQuestions : []), ...added],
+      title: draftTitle ? this.state.title : aiTitle || '',
+    });
 
     this.setState(
-      buildCreateSurveyAutoGeneratedDraftPatch({
-        documentURLs: sanitizeDocumentUrls(docURLs || []),
-        focusTargetUiKey: firstKey,
-        questions: built,
-        title: aiTitle || '',
-      }),
+      hasDraft
+        ? { ...generatedDraftPatch, isStandaloneQuestion: this.state.isStandaloneQuestion }
+        : generatedDraftPatch,
       () => {
         this.updateSurveyHash();
         this.saveToLocalStorage();
@@ -3396,7 +3444,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   target="cs-survey-gate-tip"
                   className={styles.tooltipBubble}
                 >
-                  {`Only holders of selected ${t('sbtsLower')} can access locked content.`}
+                  {`Holders of the selected ${t('sbtsLower')} can unlock locked content; the session worker operator can read it too.`}
                 </CETooltip>
               </div>
             ) : null}

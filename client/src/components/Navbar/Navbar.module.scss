@@ -556,3 +556,10 @@
   transform: scale(0.96);
   cursor: pointer;
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  #navbarContainer,
+  #navbarContainerLoggedIn {
+    align-items: center;
+  }
+}

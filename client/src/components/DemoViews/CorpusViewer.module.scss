@@ -1525,3 +1525,47 @@ $text: var(--ce-panel-text);
     margin-left: 54px;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .card {
+    background: var(--ce-document-surface);
+    color: var(--ce-document-text);
+    border-color: var(--ce-document-border);
+  }
+
+  .insiderName {
+    color: var(--ce-document-text);
+  }
+
+  .tweetCard .debateMapLink,
+  .tweetCard .externalLink {
+    background: var(--ce-control-face);
+    color: var(--ce-link);
+    border-color: transparent;
+  }
+
+  .tweetCard .sentimentNeutral {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+  }
+
+  .tweetCard .sentimentSkeptical {
+    background: var(--ce-response-unsure-bg);
+    color: var(--ce-response-unsure-text);
+  }
+
+  .tweetCard .sentimentOptimistic {
+    background: var(--ce-response-agree-bg);
+    color: var(--ce-response-agree-text);
+  }
+
+  .tabButton,
+  .tabButton:hover {
+    color: var(--ce-document-text);
+    opacity: 1;
+  }
+
+  .tabButtonActive {
+    color: var(--ce-action-primary);
+  }
+}

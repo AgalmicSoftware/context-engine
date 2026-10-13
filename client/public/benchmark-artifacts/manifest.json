@@ -12,10 +12,10 @@
       "participantCount": 5,
       "artifact": "model-opinions-bench-development-preview.html.gz",
       "compression": "gzip",
-      "bytes": 760247,
-      "sha256": "3e383aaf577549b799fe8663e91d5a562f8837f660a160e3ee7ee69ac426cc12",
-      "contentBytes": 19381417,
-      "contentSha256": "064618da745fa280beaa6a341d1ba65604379b5bde22772c3cc5559e5f16cce9",
+      "bytes": 760395,
+      "sha256": "4a017b0a1ed97b312bd1df31717f494bed9a706bf07b2d0fba59d01563237646",
+      "contentBytes": 19387509,
+      "contentSha256": "f776692a9a1e5c09e4b85fbf477546a4e3ef9d6c5155a3ec1eef37686f959d15",
       "releaseReportContentHash": null
     }
   ]

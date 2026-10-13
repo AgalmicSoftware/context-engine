@@ -1,6 +1,5 @@
 import {
   resolveSurveyResultsExplicitSessionSlug,
-  resolveSurveyResultsEffectiveSlug,
   resolveSurveyResultsQuestionReadScope,
   resolveSurveyResultsSessionContext,
   scanSurveyResultsSessionSlugFromCache,
@@ -51,7 +50,7 @@ describe('surveyResultsSessionResolution', () => {
 
   it('does not replace an explicit unknown non-general slug from cache hits', () => {
     expect(
-      resolveSurveyResultsEffectiveSlug({
+      resolveSurveyResultsSessionContext({
         sessionSlug: 'missing-session-slug',
         surveyId: 'survey-1',
         surveyCacheEntries: [
@@ -67,7 +66,7 @@ describe('surveyResultsSessionResolution', () => {
           },
         ],
       }),
-    ).toBe('missing-session-slug');
+    ).toEqual(expect.objectContaining({ sessionSlug: 'missing-session-slug' }));
   });
 
   it('preserves cache-entry session slugs when scanning survey caches by survey id', () => {
@@ -92,7 +91,7 @@ describe('surveyResultsSessionResolution', () => {
 
   it('returns the canonical general slug when an explicit general alias is provided', () => {
     expect(
-      resolveSurveyResultsEffectiveSlug({
+      resolveSurveyResultsSessionContext({
         sessionSlug: 'General',
         surveyId: 'survey-1',
         surveyCacheEntries: [
@@ -108,7 +107,7 @@ describe('surveyResultsSessionResolution', () => {
           },
         ],
       }),
-    ).toBe('');
+    ).toEqual(expect.objectContaining({ sessionSlug: '' }));
   });
 
   it('fails closed for unresolved explicit session aliases', () => {

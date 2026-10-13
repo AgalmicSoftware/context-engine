@@ -64,6 +64,31 @@ describe('SurveyResultsModalHeader', () => {
     expect(onToggleSurveyBookmark).toHaveBeenCalledWith(surveyId);
   });
 
+  it('renders unsafe survey document URLs as text instead of links', () => {
+    const unsafeUrl = 'javascript:alert(document.domain)';
+    const protocolRelativeUrl = '//evil.example/phish';
+    const docUrl = 'https://docs.example.test/survey';
+    const { container } = render(
+      <SurveyResultsModalHeader
+        currentSurveyId="0xsurvey"
+        onClose={jest.fn()}
+        onDemoResultsViewSelect={jest.fn()}
+        onToggleSurveyBookmark={jest.fn()}
+        styleMap={styleMap}
+        surveyDocumentURLs={[unsafeUrl, protocolRelativeUrl, docUrl]}
+        surveyTitle="Survey"
+        viewMode="survey"
+      />,
+    );
+
+    const hrefs = Array.from(container.querySelectorAll('a')).map((anchor) => anchor.getAttribute('href'));
+    expect(hrefs).not.toContain(unsafeUrl);
+    expect(hrefs).not.toContain(protocolRelativeUrl);
+    expect(screen.getByText(unsafeUrl).closest('a')).toBeNull();
+    expect(screen.getByText(protocolRelativeUrl).closest('a')).toBeNull();
+    expect(screen.getByRole('link', { name: docUrl })).toHaveAttribute('href', docUrl);
+  });
+
   it('renders question mode demo view navigation without survey metadata', () => {
     const onDemoResultsViewSelect = jest.fn();
     render(

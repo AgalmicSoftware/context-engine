@@ -218,7 +218,7 @@ export async function runSmoke() {
   try {
     for (const viewport of [{ width: 1280, height: 900 }, { width: 551, height: 803 }, { width: 390, height: 844 }, { width: 280, height: 844 }]) {
       const page = await browser.newPage({ viewport });
-      for (const theme of ['context-engine', 'classic-95']) {
+      for (const theme of ['context-engine', 'classic-95', 'civic']) {
         await page.goto(`${process.env.BASE_URL || 'http://127.0.0.1:3000'}/tests/fixtures/quadratic-allocation.html`);
         await page.getByRole('combobox', { name: 'Theme' }).selectOption(theme);
         console.log(JSON.stringify({ viewport, theme, ...await probeQuadraticAllocation(page) }));

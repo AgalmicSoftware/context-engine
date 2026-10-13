@@ -16,7 +16,17 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeSessionSlugToken as normalizeSlug } from '../../utilities/session/sessionSlug';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 import { SponsorHandoffResult } from './SponsorHandoffResult';
+
+const SPONSORED_DEPLOY_RELEASE_GUIDE_URL = buildPublicRepoBlobUrl(
+  'docs/session-cors-worker.md#sponsored-deploy-release',
+);
+// The Worker refuses a deploy grant it could not honor: redeeming one deploys
+// the release recorded on it, and it has none.
+const SPONSORED_RELEASE_MISSING_REASON = 'sponsored_release_missing';
+const SPONSORED_RELEASE_MISSING_MESSAGE =
+  'No grant was issued: your session Worker has no recorded release for deploy grants to install. Set WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on it, then create the URL again.';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -951,6 +961,9 @@ const SponsorPage = ({
         const grantData: UnknownRecord = await grantResponse.json().catch(() => ({}));
         if (!isCurrentCreateRequest()) return;
         if (!grantResponse.ok) {
+          if (grantData?.reason === SPONSORED_RELEASE_MISSING_REASON) {
+            throw new Error(SPONSORED_RELEASE_MISSING_MESSAGE);
+          }
           throw new Error(
             normalizeSponsorGrantErrorMessage({
               error: grantData?.error || `Failed to issue sponsored bootstrap grants (${grantResponse.status}).`,
@@ -1219,10 +1232,24 @@ const SponsorPage = ({
                       );
                     })}
                     {group.key === 'deploy' ? (
-                      <div className={styles.statusNote}>
-                        Uses sponsoring worker:{' '}
-                        {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
-                      </div>
+                      <>
+                        <div className={styles.statusNote}>
+                          Uses sponsoring worker:{' '}
+                          {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
+                        </div>
+                        <div className={styles.statusNote}>
+                          Grant deploys install the release recorded on your session Worker, but only Worker code from
+                          0.6.8 or later enforces this: an older Worker still deploys whatever code the redeemer sends,
+                          so update it first. On 0.6.8 or later, every deploy grant needs WORKER_BUNDLE_URL and
+                          WORKER_BUNDLE_MANIFEST_URL on that Worker. A grant for a session that turns on Agents HTTP
+                          also needs AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL; without that pair,
+                          only those deploys are refused. See the{' '}
+                          <a href={SPONSORED_DEPLOY_RELEASE_GUIDE_URL} target="_blank" rel="noreferrer">
+                            sponsored deploy release guide
+                          </a>
+                          .
+                        </div>
+                      </>
                     ) : null}
                     {group.notice ? <div className={styles.warningNote}>{group.notice}</div> : null}
                   </div>
@@ -1343,6 +1370,16 @@ const SponsorPage = ({
           {createStatus ? (
             <div className={styles.statusNote} data-testid={E2E_TESTIDS.SPONSOR_STATUS}>
               {createStatus}
+              {createStatus === SPONSORED_RELEASE_MISSING_MESSAGE ? (
+                <>
+                  {' '}
+                  See the{' '}
+                  <a href={SPONSORED_DEPLOY_RELEASE_GUIDE_URL} target="_blank" rel="noreferrer">
+                    sponsored deploy release guide
+                  </a>
+                  .
+                </>
+              ) : null}
             </div>
           ) : null}
 

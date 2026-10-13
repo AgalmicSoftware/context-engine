@@ -4,7 +4,6 @@ const { JEST_COLLECT_COVERAGE_FROM } = require('../scripts/clientCoverageUnivers
 module.exports = {
   ...baseConfig,
   collectCoverageFrom: [...JEST_COLLECT_COVERAGE_FROM],
-  // The fixed legacy and new whole-production floors are both enforced from
-  // this run's coverage-final.json by the repository-level dual checker.
-  coverageThreshold: undefined,
+  // scripts/check-client-coverage-floors.mjs enforces the whole-production
+  // floor from this run's coverage-final.json.
 };

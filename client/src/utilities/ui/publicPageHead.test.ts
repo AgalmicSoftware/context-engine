@@ -6,12 +6,7 @@ import {
   buildCanonicalPublicUrl,
   syncPublicPageHead,
 } from './publicPageHead.js';
-import {
-  PUBLIC_DISCOVERABILITY_URL,
-  PUBLIC_LLMS_URL,
-  PUBLIC_REPO_SOURCE_URL,
-  PUBLIC_REPO_URL,
-} from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_SOURCE_URL, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 
 type StructuredDataNode = {
   '@type'?: unknown;
@@ -47,11 +42,7 @@ describe('publicPageHead', () => {
 
   it('uses contextengine.sh for deployment-independent public metadata defaults', () => {
     expect(DEFAULT_PUBLIC_SITE_URL).toBe('https://contextengine.sh/');
-    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe(
-      'https://contextengine.sh/assets/img/context-engine-social-preview-square.png',
-    );
-    expect(PUBLIC_DISCOVERABILITY_URL).toBe('https://contextengine.sh/discoverability.html');
-    expect(PUBLIC_LLMS_URL).toBe('https://contextengine.sh/llms.txt');
+    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe('https://contextengine.sh/context-engine-social-preview-square.png');
   });
 
   it('falls back to the live browser origin for router-style locations', () => {
@@ -291,7 +282,12 @@ describe('publicPageHead', () => {
         url: 'https://contextengine.sh/about',
         name: DEFAULT_PUBLIC_PAGE_TITLE,
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
-        significantLink: [PUBLIC_REPO_URL, PUBLIC_REPO_SOURCE_URL, PUBLIC_DISCOVERABILITY_URL, PUBLIC_LLMS_URL],
+        significantLink: [
+          PUBLIC_REPO_URL,
+          PUBLIC_REPO_SOURCE_URL,
+          'https://contextengine.sh/discoverability.html',
+          'https://contextengine.sh/llms.txt',
+        ],
       }),
     );
   });

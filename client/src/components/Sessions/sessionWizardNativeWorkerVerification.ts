@@ -27,6 +27,8 @@ type NativeWorkerVerificationArgs = {
   runtimeRef?: MutableRefObject<SessionWizardWorkerDeployRuntime | null>;
   sessionSlug: string;
   workerQueryValue: unknown;
+  // True when this tab generated the template setup values for this Worker.
+  deployedFromTemplate?: boolean;
   getCurrentWorkerSecrets: () => WorkerSecretsLike;
   getMissingWorkerSecretsForDeploy: (secretsSnapshot?: WorkerSecretsLike) => string[];
   parseAllowOriginsInput: () => string[];
@@ -58,10 +60,21 @@ const readRuntime = (
   return current && typeof current === 'object' ? current : {};
 };
 
+// The Cloudflare template sets DEPLOY_HELPER_ENABLED to "0", so a Worker
+// deployed from it cannot run sponsored deploys. Say so in its config;
+// otherwise the sponsor page offers deploy grants that this Worker rejects.
+// No route reports the binding, so an attached existing Worker keeps the
+// draft's value.
+const withoutEmbeddedDeployHelper = (runtime: SessionWizardWorkerDeployRuntime): SessionWizardWorkerDeployRuntime => ({
+  ...runtime,
+  embeddedDeployHelperEnabled: false,
+});
+
 export const verifyNativeSessionWorker = async ({
   runtimeRef,
   sessionSlug,
   workerQueryValue,
+  deployedFromTemplate = false,
   getCurrentWorkerSecrets,
   getMissingWorkerSecretsForDeploy,
   parseAllowOriginsInput,
@@ -70,6 +83,8 @@ export const verifyNativeSessionWorker = async ({
   updateDeploymentState,
   updateDraftValue,
 }: NativeWorkerVerificationArgs): Promise<SessionWizardVerifiedWorkerConnection> => {
+  const withTemplateHelperFlag = (runtime: SessionWizardWorkerDeployRuntime): SessionWizardWorkerDeployRuntime =>
+    deployedFromTemplate ? withoutEmbeddedDeployHelper(runtime) : runtime;
   const runtime = readRuntime(runtimeRef);
   const currentDraft = runtime.draft && typeof runtime.draft === 'object' ? runtime.draft : {};
   const slug = normalizeSlug(toStr(sessionSlug || currentDraft.slug).trim());
@@ -138,7 +153,7 @@ export const verifyNativeSessionWorker = async ({
         ? parseAllowOriginsInput()
         : parseSessionWizardAllowOriginsInput(runtime.workerAllowOrigins);
     const workerConfig = buildSessionWizardWorkerVerificationConfig({
-      runtime,
+      runtime: withTemplateHelperFlag(runtime),
       draft: currentDraft,
       adminAddress: resolvedAdmin,
       workerUrl,
@@ -225,7 +240,7 @@ export const verifyNativeSessionWorker = async ({
         : parseSessionWizardAllowOriginsInput(liveRuntime.workerAllowOrigins);
     const liveWorkerSecrets = getCurrentWorkerSecrets();
     const liveWorkerConfig = buildSessionWizardWorkerVerificationConfig({
-      runtime: liveRuntime,
+      runtime: withTemplateHelperFlag(liveRuntime),
       draft: liveDraft,
       adminAddress: liveAdminAddress,
       workerUrl,
@@ -254,7 +269,21 @@ export const verifyNativeSessionWorker = async ({
     }
 
     updateDraftValue(['corsWorkerUrl'], bootstrap.workerOrigin);
-    publishVerifiedRuntime(runtimeRef, currentDraft, bootstrap.workerOrigin, bootstrap.workerOrigin, true, proof);
+    if (deployedFromTemplate) {
+      // Publication rebuilds this config from the draft; keep it matching the
+      // verified one.
+      updateDraftValue(['embeddedDeployHelperEnabled'], false);
+    }
+    publishVerifiedRuntime(
+      runtimeRef,
+      currentDraft,
+      bootstrap.workerOrigin,
+      bootstrap.workerOrigin,
+      true,
+      proof,
+      deployedFromTemplate ? { embeddedDeployHelperEnabled: false } : {},
+    );
+    if (runtimeRef?.current) runtimeRef.current = withTemplateHelperFlag(runtimeRef.current);
     updateDeploymentState({
       deployStatus: bootstrap.configRevision
         ? `Session Worker verified at canonical config revision ${bootstrap.configRevision}.`

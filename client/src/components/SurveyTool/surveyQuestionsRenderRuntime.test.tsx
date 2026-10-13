@@ -104,7 +104,8 @@ describe('surveyQuestionsRenderRuntime', () => {
     const runtime = createSurveyQuestionsRenderRuntime(context);
     const responseSlice = { answers: { q1: { value: 'answer' } } };
 
-    expect(runtime.renderQuestion({ id: 'q1', type: 'text' }, 3, responseSlice)).toBe('full-card');
+    const question = { id: 'q1', type: 'text' };
+    expect(runtime.renderQuestion(question, 3, responseSlice)).toBe('full-card');
 
     expect(context.shouldShowSingleQuestionResponseLookupSpinner).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -112,7 +113,9 @@ describe('surveyQuestionsRenderRuntime', () => {
         singleQuestionMode: false,
       }),
     );
+    // The card's question sizes its answer against the stored-entry cap.
     expect(context.getQuestionRenderDisplayState).toHaveBeenCalledWith({
+      question,
       questionId: 'q1',
       responseSlice,
     });

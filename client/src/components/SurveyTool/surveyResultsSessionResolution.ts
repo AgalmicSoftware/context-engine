@@ -236,27 +236,6 @@ export const scanSurveyResultsSessionSlugFromCache = ({
   return '';
 };
 
-export const resolveSurveyResultsEffectiveSlug = ({
-  sessionSlug,
-  activeSessionSlug,
-  surveyId,
-  surveyCacheEntries,
-}: {
-  sessionSlug?: unknown;
-  activeSessionSlug?: unknown;
-  surveyId?: unknown;
-  surveyCacheEntries?: unknown;
-} = {}): string => {
-  return (
-    resolveSurveyResultsSessionContext({
-      surveyId,
-      surveyCacheEntries,
-      sessionSlug,
-      activeSessionSlug,
-    }).sessionSlug || ''
-  );
-};
-
 export const resolveSurveyResultsSessionContext = ({
   resolveBySlug,
   ...input

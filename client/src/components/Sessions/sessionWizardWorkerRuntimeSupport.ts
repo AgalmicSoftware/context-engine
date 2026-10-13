@@ -224,6 +224,9 @@ export const validateSessionWizardWorkerLimits = ({
   return '';
 };
 
+// Always the full object: a blank limit is sent as null, which every Worker
+// reads like an absent one. Older Workers merge limit keys on set-config, so
+// leaving a cleared limit out would keep its old value there.
 export const buildSessionWizardWorkerLimits = ({
   perWalletPerDay,
   perAnonymousIpPerDay,
@@ -233,12 +236,10 @@ export const buildSessionWizardWorkerLimits = ({
 } = {}): AnyRecord => {
   const validationError = validateSessionWizardWorkerLimits({ perWalletPerDay, perAnonymousIpPerDay });
   if (validationError) throw new Error(validationError);
-  const limits: AnyRecord = {};
-  const walletLimit = normalizeSessionWizardWorkerLimitInput(perWalletPerDay);
-  if (walletLimit !== null) limits.perWalletPerDay = walletLimit;
-  const anonymousIpLimit = normalizeSessionWizardWorkerLimitInput(perAnonymousIpPerDay);
-  if (anonymousIpLimit !== null) limits.perAnonymousIpPerDay = anonymousIpLimit;
-  return limits;
+  return {
+    perWalletPerDay: normalizeSessionWizardWorkerLimitInput(perWalletPerDay),
+    perAnonymousIpPerDay: normalizeSessionWizardWorkerLimitInput(perAnonymousIpPerDay),
+  };
 };
 
 export const parseSessionWizardAllowOriginsInput = (value: unknown): string[] => {

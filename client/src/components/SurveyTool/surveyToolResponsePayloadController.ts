@@ -2,9 +2,29 @@ import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 import { buildSelectedInterviewResearch, buildUnselectedInterviewResearch } from './sessionInterviewResearch';
 import { resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
+import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+
+/**
+ * Every question a responder can have edited. The pile filter narrows only what is
+ * shown, so payloads and lookups must also see questions hidden by the filter.
+ */
+export const resolveEditableQuestionList = (state: {
+  pileQuestions?: unknown;
+  allQuestionsForFilter?: unknown;
+}): UnknownRecord[] => {
+  const seen = new Set<string>();
+  return [state?.pileQuestions, state?.allQuestionsForFilter].flatMap((list) =>
+    (Array.isArray(list) ? list : []).filter((question) => {
+      const id = normalizeQuestionIdKey(asRecord(question).id);
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }),
+  );
+};
 
 const hasOwn = (value: UnknownRecord, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
 
@@ -185,13 +205,11 @@ export interface BuildResponsePayloadOptions {
   getImportanceFromSlice: (state: ResponseSlice, qid: string) => number | null;
   sanitizeQuestionPromptForResponsePayload: (q: ResponseQuestionSource, opts: { isLocked: boolean }) => string;
   recruitmentSource?: unknown;
+  // Edited questions to include even when blank: a cleared answer is an explicit upload.
+  includeQuestionIds?: Iterable<string> | null;
 }
 
 export const buildResponsePayload = (opts: BuildResponsePayloadOptions): ResponsePayload => {
-  let surveyIndex = opts.surveyIndex;
-  surveyIndex = opts.isStandalone || opts.singleQuestionMode ? 0 : surveyIndex;
-  void surveyIndex;
-
   const surveyHash = opts.isStandalone || opts.singleQuestionMode ? undefined : opts.surveyId;
 
   const surveyResponseState = opts.surveyResponseState as SurveyResponsePayloadState | null;
@@ -231,12 +249,18 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
   const hasConviction = (qid: string) => opts.getConvictionFromSlice(surveyResponseState, qid) !== null;
 
   const shouldFilterByAnswered = opts.isStandalone || opts.singleQuestionMode || poolFromState.length === 0;
+  const includedQuestionIds = new Set(Array.from(opts.includeQuestionIds || [], (id) => normalizeQuestionIdKey(id)));
 
   const answeredQuestions = shouldFilterByAnswered
     ? candidateQuestions.filter((q) => {
         const a = surveyResponseState.answers?.[q.id]?.value;
         const add = surveyResponseState.additionalComments?.[q.id]?.value;
-        return hasMainAnswer(a) || hasAdditional(add) || hasConviction(q.id);
+        return (
+          hasMainAnswer(a) ||
+          hasAdditional(add) ||
+          hasConviction(q.id) ||
+          includedQuestionIds.has(normalizeQuestionIdKey(q.id))
+        );
       })
     : candidateQuestions;
 
@@ -247,6 +271,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const additionalAudience = opts.resolveFieldEncryptionAudience(additional, q.id, 'additional');
     const additionalHasContent = hasAdditional(additional.value);
     const additionalEncrypted = additionalHasContent && !!additional.encrypted;
+    // A blank answer has nothing encrypted, so it is sent as cleared, never with an envelope it once had.
+    const answerEncrypted = !!answer.encrypted && hasMainAnswer(answer.value);
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
@@ -382,12 +408,12 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       importance: importanceForPayload !== null ? importanceForPayload : null,
       answer: {
         value: answer.value !== undefined ? answer.value : '',
-        encrypted: !!answer.encrypted,
+        encrypted: answerEncrypted,
         encryptionAudience: answerAudience,
-        encryptionGateId: answer.encrypted ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
+        encryptionGateId: answerEncrypted ? opts.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
         audienceMode: 'explicit',
         hash: answer.hash || '',
-        encryptedPortion: answer.encrypted ? answer.encryptedPortion || '' : '',
+        encryptedPortion: answerEncrypted ? answer.encryptedPortion || '' : '',
       },
       additional: {
         value: additional.value !== undefined ? additional.value : '',

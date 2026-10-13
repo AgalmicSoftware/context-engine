@@ -38,7 +38,7 @@ const ARWEAVE_STORAGE_TOOLTIP =
 const NO_ENCRYPTION_TOOLTIP =
   'This setting adds no encryption layer: payload bytes are stored as provided. Access and visibility controls do not turn unencrypted payloads into encrypted data.';
 const LIT_ENCRYPTION_TOOLTIP =
-  'Lit encrypts data before upload and uses on-chain access conditions to control decryption. It requires a registry network, an RPC connection, and Lit credentials.';
+  'Lit encrypts data before upload, and a Lit Action releases the key only after on-chain access conditions (SBT ownership) pass. The key passes through the session worker, so the worker operator and Lit account administrators remain trusted. A scoped Lit usage key alone cannot authorize decryption; this is not end-to-end encryption. It requires a registry network, an RPC connection, and Lit credentials.';
 const CLOUDFLARE_ENCRYPTION_TOOLTIP =
   'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
 const DEFAULT_CLOUDFLARE_ACCESS_RULES_TOOLTIP =
@@ -71,11 +71,41 @@ const EXPORT_SCOPE_OPTIONS: Array<{ value: SessionModeExportScope; label: string
   { value: 'encrypted_envelopes_only', label: 'Admins can export encrypted records only' },
 ];
 
-const SURFACE_LABELS: Array<{ value: SessionModeSurface; label: string; fixed?: boolean }> = [
-  { value: 'web', label: 'Website', fixed: true },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'miniApp', label: 'Telegram Mini App' },
-  { value: 'agentHttp', label: 'Agent Session Wrapped' },
+const SURFACE_LABELS: Array<{
+  value: SessionModeSurface;
+  label: string;
+  fixed?: boolean;
+  tooltip: string;
+  tooltipId: string;
+}> = [
+  {
+    value: 'web',
+    label: 'Website',
+    fixed: true,
+    tooltip: 'Use the session in a web browser, subject to its access rules. This channel is always enabled.',
+    tooltipId: E2E_TESTIDS.WIZARD_SURFACE_WEB_INFO,
+  },
+  {
+    value: 'telegram',
+    label: 'Telegram',
+    tooltip:
+      'Let participants use the session through a Telegram bot. Selecting Telegram also enables its Mini App; turning Telegram off disables the Mini App. Direct agent access is configured separately.',
+    tooltipId: E2E_TESTIDS.WIZARD_SURFACE_TELEGRAM_INFO,
+  },
+  {
+    value: 'miniApp',
+    label: 'Telegram Mini App',
+    tooltip:
+      'Open the session interface inside Telegram. This requires Telegram, so selecting the Mini App also enables Telegram. It does not enable direct agent access.',
+    tooltipId: E2E_TESTIDS.WIZARD_SURFACE_MINI_APP_INFO,
+  },
+  {
+    value: 'agentHttp',
+    label: 'Agents (HTTP API)',
+    tooltip:
+      'Let authorized agents use this session’s HTTP API without Telegram. This option uses Agent Session Wrapped and deploys an additional per-session service. Session access rules and agent permissions still apply.',
+    tooltipId: E2E_TESTIDS.WIZARD_SURFACE_AGENT_HTTP_INFO,
+  },
 ];
 
 const DEFAULT_CUSTOM_ACCESS_CONDITIONS: SessionModeAccessConditionDocument = {
@@ -190,27 +220,42 @@ const SessionModeProfileSections = ({
         </div>
         <div className={styles.modeCheckboxRow} role="group" aria-label="Session participation channels">
           {SURFACE_LABELS.map((surface) => (
-            <Label key={surface.value} check className={styles.modeCheckboxLabel}>
-              <Input
-                type="checkbox"
-                checked={profile.surfaces[surface.value]}
-                disabled={surface.fixed}
-                onChange={(event) =>
-                  updateProfile((draft) => {
-                    draft.surfaces[surface.value] = surface.fixed ? true : event.target.checked;
-                    if (surface.value === 'telegram' && event.target.checked) draft.surfaces.miniApp = true;
-                    if (surface.value === 'telegram' && !event.target.checked) draft.surfaces.miniApp = false;
-                    if (surface.value === 'miniApp' && event.target.checked) draft.surfaces.telegram = true;
+            <div key={surface.value} className={`${styles.modeCheckboxWithTooltip} ${styles.modeChannelOption}`}>
+              <Label check className={styles.modeCheckboxLabel}>
+                <Input
+                  type="checkbox"
+                  checked={profile.surfaces[surface.value]}
+                  disabled={surface.fixed}
+                  aria-describedby={surface.value === 'agentHttp' ? 'ce-wizard-agent-access-status' : undefined}
+                  onChange={(event) =>
+                    updateProfile((draft) => {
+                      draft.surfaces[surface.value] = surface.fixed ? true : event.target.checked;
+                      if (surface.value === 'telegram' && event.target.checked) draft.surfaces.miniApp = true;
+                      if (surface.value === 'telegram' && !event.target.checked) draft.surfaces.miniApp = false;
+                      if (surface.value === 'miniApp' && event.target.checked) draft.surfaces.telegram = true;
+                    })
+                  }
+                />
+                <span className={styles.modeCheckboxText}>{surface.label}</span>
+              </Label>
+              {renderInfoTooltip
+                ? renderInfoTooltip({
+                    id: surface.tooltipId,
+                    testId: surface.tooltipId,
+                    content: surface.tooltip,
+                    ariaLabel: `About ${surface.label}`,
+                    placement: 'top',
                   })
-                }
-              />
-              <span className={styles.modeCheckboxText}>{surface.label}</span>
-            </Label>
+                : null}
+            </div>
           ))}
         </div>
-        <p className={styles.helperText}>
-          Agent Session Wrapped deploys an additional per-session Worker/Bridge. Telegram stays optional and is off by
-          default.
+        <p id="ce-wizard-agent-access-status" role="status" className={styles.helperText}>
+          <strong>Agent API access: {profile.surfaces.agentHttp ? 'On after deployment' : 'Off'}.</strong>{' '}
+          {profile.surfaces.agentHttp
+            ? 'Authorized agents can use this session through its HTTP API once the agent service is deployed and verified.'
+            : 'Enable Agents (HTTP API) for direct access by authorized agents.'}{' '}
+          Telegram is not required.
         </p>
         <ValidationIssues issues={sectionValidationIssues} />
       </section>

@@ -34,14 +34,23 @@ type WorkerCanonicalSurveyAuthoringInput = WorkerCanonicalAuthoringInput & {
 
 type UploadData = typeof uploadDataToSessionStorage;
 
+// Returns a check for whether readers already see a question under its id
+// with the same content (the metadata hydration port provides it).
+type LoadPublishedQuestionMatcher = (
+  input: WorkerCanonicalAuthoringInput,
+) => Promise<(question: UnknownRecord) => boolean>;
+
 type WorkerCanonicalAuthoringDeps = {
+  loadPublishedQuestionMatcher?: LoadPublishedQuestionMatcher;
   uploadData?: UploadData;
 };
 
 type UploadedWorkerQuestion = {
   questionId: string;
   resource: typeof STORAGE_RESOURCE_KEYS.QUESTIONS;
-  storageRef: StorageRef;
+  // Absent when another author already published this exact question.
+  storageRef?: StorageRef;
+  alreadyPublished?: true;
 };
 
 export type WorkerCanonicalQuestionsAuthoringResult = WorkerCanonicalAuthoringTarget & {
@@ -59,6 +68,20 @@ type WorkerCanonicalStorageTargetOptions = {
 
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+
+// Session Workers let only an id's first author or a session admin upload it
+// again, and refuse ids a session admin hid.
+const STORAGE_ID_OWNED = 'storage_resource_id_owned';
+const STORAGE_ID_HIDDEN = 'storage_resource_id_hidden';
+
+const readUploadRejectionReason = (error: unknown): string =>
+  isRecord(error) && typeof error.reason === 'string' ? error.reason : '';
+
+const describeQuestionPrompt = (question: UnknownRecord): string => {
+  const prompt = typeof question.prompt === 'string' ? question.prompt.trim() : '';
+  if (!prompt || prompt === '[encrypted]') return '';
+  return `: "${prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt}"`;
+};
 
 const requireRecord = (value: unknown, error: string): UnknownRecord => {
   if (!isRecord(value)) throw new Error(error);
@@ -155,6 +178,20 @@ const uploadQuestions = async ({
   if (!rows.length) throw new Error('worker_authoring_questions_missing');
   const uploadData = deps.uploadData || uploadDataToSessionStorage;
   const uploadedQuestions: UploadedWorkerQuestion[] = [];
+  // Read the session's questions at most once, on the first id another author owns.
+  let publishedQuestionMatcher: Promise<((question: UnknownRecord) => boolean) | null> | null = null;
+  const isAlreadyPublished = async (payload: UnknownRecord): Promise<boolean> => {
+    const loadMatcher = deps.loadPublishedQuestionMatcher;
+    if (!loadMatcher) return false;
+    publishedQuestionMatcher ??= loadMatcher({
+      account,
+      providerLike,
+      sessionConfig: target.sessionConfig,
+      sessionSlug: target.sessionSlug,
+    }).catch(() => null);
+    const matches = await publishedQuestionMatcher;
+    return !!matches && matches(payload);
+  };
   for (const value of rows) {
     const question = requireRecord(value, 'worker_authoring_question_invalid');
     const questionId = String(question.id || question.questionId || '').trim();
@@ -165,23 +202,41 @@ const uploadQuestions = async ({
       sessionId: target.sessionId,
       sessionSlug: target.sessionSlug,
     };
-    const uploaded = await uploadData(payload, 'json', {
-      sessionSlug: target.sessionSlug,
-      sessionConfig: target.sessionConfig,
-      context: {
-        account,
-        providerLike,
-      },
-      workerUrl: target.workerUrl,
-      tags: buildStorageTags({
-        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-        resourceId: questionId,
-        sessionId: target.sessionId,
+    let uploaded: unknown;
+    try {
+      uploaded = await uploadData(payload, 'json', {
         sessionSlug: target.sessionSlug,
-      }),
-      contentType: 'application/json',
-      resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-    });
+        sessionConfig: target.sessionConfig,
+        context: {
+          account,
+          providerLike,
+        },
+        workerUrl: target.workerUrl,
+        tags: buildStorageTags({
+          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+          resourceId: questionId,
+          sessionId: target.sessionId,
+          sessionSlug: target.sessionSlug,
+        }),
+        contentType: 'application/json',
+        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+      });
+    } catch (error) {
+      const reason = readUploadRejectionReason(error);
+      // Another author owns this id. It counts as already published only when
+      // the stored question readers see has this same content; otherwise the
+      // Worker's refusal stands.
+      if (reason === STORAGE_ID_OWNED && (await isAlreadyPublished(payload))) {
+        uploadedQuestions.push({ questionId, resource: STORAGE_RESOURCE_KEYS.QUESTIONS, alreadyPublished: true });
+        continue;
+      }
+      if (reason === STORAGE_ID_HIDDEN) {
+        throw new Error(
+          `This question was hidden by the session admin and can't be published again${describeQuestionPrompt(question)}.`,
+        );
+      }
+      throw error;
+    }
     uploadedQuestions.push({
       questionId,
       resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
@@ -251,7 +306,12 @@ export const publishWorkerCanonicalSurvey = async (
       contentType: 'application/json',
       resource: STORAGE_RESOURCE_KEYS.SURVEYS,
     },
-  );
+  ).catch((error: unknown) => {
+    if (readUploadRejectionReason(error) === STORAGE_ID_HIDDEN) {
+      throw new Error("This survey was hidden by the session admin and can't be published again.");
+    }
+    throw error;
+  });
   return {
     ...target,
     uploadedQuestions,

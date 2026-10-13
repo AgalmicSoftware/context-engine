@@ -275,7 +275,6 @@ describe('surveyToolHydrationController', () => {
         getPendingEditStats: () => ({ total: 0 }),
         getHydrationQuestionIds: () => ['q1'],
         applyDraftHydrationEntryToSlice: jest.fn(),
-        cloneBaseline: <T>(value: T): T => value,
         setState,
         updateJsonPreview,
         skipDraftHydrationRun: () => false,
@@ -550,5 +549,58 @@ describe('surveyToolHydrationController', () => {
     expect(recalculateEditStats).toHaveBeenCalledTimes(1);
     expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads a question it lacks during a decrypt without undoing the decrypt', async () => {
+    type Field = { value: string; encrypted?: boolean; encryptedPortion?: string };
+    type Slice = { answers: Record<string, Field>; importance: object; conviction: object; additionalComments: object };
+    const slice = (answers: Record<string, Field>): Slice => ({
+      answers,
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    });
+    const masked = { value: '*', encrypted: true, encryptedPortion: 'envelope' };
+    // The run reads the form while q1 is still masked; q1's decrypt lands before the run applies.
+    const readState = {
+      suppressPrefill: true,
+      surveysResponseState: [slice({ q1: masked, q2: { value: '' } })],
+      editBaseline: slice({ q1: masked, q2: { value: '' } }),
+    };
+    const stateRef: { current: Record<string, unknown> } = {
+      current: { ...readState, surveysResponseState: [slice({ q1: { value: 'Decrypted' }, q2: { value: '' } })] },
+    };
+    type Update = Record<string, unknown> | null | ((prev: Record<string, unknown>) => Record<string, unknown> | null);
+    const setState = jest.fn((update: Update, callback?: () => void) => {
+      const patch = typeof update === 'function' ? update(stateRef.current) : update;
+      stateRef.current = { ...stateRef.current, ...(patch || {}) };
+      callback?.();
+    });
+
+    await executeSurveyLocalCacheRehydrate({
+      props: { isStandalone: true },
+      state: readState,
+      getHydrationQuestionIds: () => ['q1', 'q2'],
+      isQuestionLoaded: (questionId) => questionId === 'q1',
+      buildHydrationSignature: (_index, ids) => ids.join('|'),
+      buildSliceFromLocalCache: async () => slice({ q1: masked, q2: { value: 'Saved q2' } }),
+      cloneBaseline: (value) => JSON.parse(JSON.stringify(value)),
+      buildDraftAwareCacheHydrationState: ({ cachedAnswer, cachedAdditional }) => ({
+        effectiveAnswerState: cachedAnswer,
+        effectiveAdditionalState: cachedAdditional,
+      }),
+      applyLocalCacheHydrationEntryToSlice: ({ targetSlice, questionId, cachedAnswer }) => {
+        const answers = (targetSlice as Slice).answers;
+        const id = String(questionId);
+        if (!cachedAnswer || answers[id]?.value) return false;
+        answers[id] = { ...(cachedAnswer as Field) };
+        return true;
+      },
+      setState,
+    });
+
+    const answers = (stateRef.current.surveysResponseState as Slice[])[0].answers;
+    expect(answers.q1.value).toBe('Decrypted');
+    expect(answers.q2.value).toBe('Saved q2');
   });
 });

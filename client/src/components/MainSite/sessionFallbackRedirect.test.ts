@@ -2,7 +2,6 @@ import {
   FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY,
   consumeOneTimeFirstVisitRootRedirect,
   consumeSessionFallbackRedirect,
-  getFirstVisitRootRedirectTarget,
   getSessionFallbackPreferredTarget,
   getSessionFallbackRedirectStorageKey,
   getSessionFallbackScopeSlugs,
@@ -145,26 +144,6 @@ describe('sessionFallbackRedirect', () => {
         }),
       ).toBe(true);
       expect(readBoolishRuntimeFlag).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('getFirstVisitRootRedirectTarget', () => {
-    it('uses the public about route when enabled', () => {
-      expect(
-        getFirstVisitRootRedirectTarget({
-          isFirstVisitRootRedirectEnabled: () => true,
-        }),
-      ).toEqual({
-        path: '/about',
-      });
-    });
-
-    it('returns null when disabled', () => {
-      expect(
-        getFirstVisitRootRedirectTarget({
-          isFirstVisitRootRedirectEnabled: () => false,
-        }),
-      ).toBeNull();
     });
   });
 

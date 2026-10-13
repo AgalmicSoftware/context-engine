@@ -23,6 +23,8 @@ import PolisReport, {
   resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
+import { buildReportResponseStats } from './polisReportAnswers';
+import { buildUmapParticipantData, rememberClusterAnalysis } from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { doUMAP } from '../../utilities/survey/consensusMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
@@ -160,6 +162,14 @@ describe('PolisReport session description', () => {
   });
 });
 
+describe('PolisReport retired settings', () => {
+  it('no longer writes the removed address-label toggle to local storage', () => {
+    localStorage.removeItem('ceReport_showAddresses');
+    render(<PolisReport {...baseReportProps} slug="edge" questionResponses={seededQuestionResponses} />);
+    expect(localStorage.getItem('ceReport_showAddresses')).toBeNull();
+  });
+});
+
 describe('PolisReport report palette', () => {
   it('shares runtime categorical colors with other report charts', () => {
     expect(POLIS_CLUSTER_COLORS).toBe(CHART_SERIES_COLORS);
@@ -179,8 +189,59 @@ describe('PolisReport participant profile links', () => {
       buildPolisParticipantProfileHref({
         displayName: 'Ada Lovelace',
         sessionSlug: 'demo-interview',
+        simulated: true,
       }),
     ).toBe('/su/Ada%20Lovelace?session=demo-interview');
+  });
+
+  it('links named real participants to their own profile, not a simulated user', () => {
+    expect(
+      buildPolisParticipantProfileHref({
+        address: '0x1111111111111111111111111111111111111111',
+        displayName: 'Franklin',
+        sessionSlug: 'rxc-ra-test',
+      }),
+    ).toBe('/u/0x1111111111111111111111111111111111111111?session=rxc-ra-test');
+    expect(buildPolisParticipantProfileHref({ displayName: 'Sam Participant', sessionSlug: 'rxc-ra-test' })).toBe('');
+  });
+
+  it('shows named real participants with their address blockie and profile link', async () => {
+    const addresses = ['1', '2', '3'].map((digit) => `0x${digit.repeat(40)}`);
+    const responses = {
+      q1: addresses.map((responder, index) => ({
+        responder,
+        questionId: 'q1',
+        response: JSON.stringify({
+          type: 'binary',
+          prompt: 'Agree?',
+          responderName: index === 0 ? 'Franklin' : '',
+          answer: { value: index ? 'Disagree' : 'Agree' },
+        }),
+      })),
+    };
+
+    render(<PolisReport {...baseReportProps} slug="rxc-ra-test" questionResponses={responses} />);
+
+    const link = await screen.findByRole('link', { name: /Franklin/ });
+    expect(link).toHaveAttribute('href', `/u/${addresses[0]}?session=rxc-ra-test`);
+    expect(link.parentElement.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,mock-blockie');
+    expect(screen.queryByTestId('ce-polis-participant-avatar-Franklin')).not.toBeInTheDocument();
+  });
+
+  it('keeps simulated-user links and portraits for the built-in demo participants', async () => {
+    const participant = getPolisDemoDatasetForSlug('demo').participantsVotes.find((entry) => entry?.xid);
+
+    render(<PolisReport {...baseReportProps} slug="demo" />);
+
+    const item = await screen.findByTitle(participant.xid);
+    expect(within(item).getByRole('link')).toHaveAttribute(
+      'href',
+      `/su/${encodeURIComponent(participant.xid)}?session=demo`,
+    );
+    expect(within(item).getByTestId(`ce-polis-participant-avatar-${participant.xid}`)).toHaveAttribute(
+      'src',
+      'data:image/png;base64,mock-avatar',
+    );
   });
 });
 
@@ -226,6 +287,56 @@ describe('PolisReport cache read options', () => {
     render(<PolisReport {...baseReportProps} slug="small-cohort" questionResponses={questionResponses} />);
     expect(doUMAP).not.toHaveBeenCalled();
     expect(screen.queryByText('(Not enough participant data to plot.)')).not.toBeInTheDocument();
+  });
+
+  const buildBinaryResponses = (flip = false) =>
+    Object.fromEntries(
+      ['q1', 'q2', 'q3'].map((qid) => [
+        qid,
+        ['0x1', '0x2', '0x3', '0x4', '0x5'].map((responder, index) => ({
+          responder,
+          questionId: qid,
+          response: JSON.stringify({
+            type: 'binary',
+            prompt: `Prompt ${qid}`,
+            answer: { value: (index % 2 === 0) !== flip ? 'Agree' : 'Disagree' },
+          }),
+        })),
+      ]),
+    );
+
+  it('runs PCA and UMAP once per data load and skips refreshes that change nothing', async () => {
+    const responses = buildBinaryResponses();
+    const props = { ...baseReportProps, slug: 'umap-refresh', questionResponses: responses };
+    const view = render(<PolisReport {...props} questionResponsesNonce={1} />);
+    await waitFor(() => expect(doUMAP).toHaveBeenCalled());
+    expect(doUMAP).toHaveBeenCalledTimes(1);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(1);
+
+    // A Worker refresh with no new rows: readiness flips and the nonce bumps.
+    view.rerender(<PolisReport {...props} isResponsesCacheReady={false} questionResponsesNonce={1} />);
+    view.rerender(<PolisReport {...props} questionResponses={{ ...responses }} questionResponsesNonce={2} />);
+
+    expect(doUMAP).toHaveBeenCalledTimes(1);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(1);
+  });
+
+  it('computes UMAP only while the UMAP view is shown', async () => {
+    const props = { ...baseReportProps, slug: 'umap-view' };
+    const view = render(<PolisReport {...props} questionResponses={buildBinaryResponses()} />);
+    await waitFor(() => expect(doUMAP).toHaveBeenCalledTimes(1));
+    const select = screen.getByDisplayValue('UMAP');
+
+    fireEvent.change(select, { target: { value: 'POLIS' } });
+    view.rerender(<PolisReport {...props} questionResponses={buildBinaryResponses(true)} />);
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(2);
+    expect(doUMAP).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(select, { target: { value: 'UMAP' } });
+    await waitFor(() => expect(doUMAP).toHaveBeenCalledTimes(2));
+    fireEvent.change(select, { target: { value: 'SVD' } });
+    fireEvent.change(select, { target: { value: 'UMAP' } });
+    expect(doUMAP).toHaveBeenCalledTimes(2);
   });
 
   it('keeps an opened cluster expanded when response data refreshes', () => {
@@ -451,6 +562,136 @@ describe('PolisReport cache read options', () => {
     expect(JSON.stringify(result)).not.toContain('test-2');
   });
 
+  it('counts only readable binary votes as report participants', () => {
+    const row = (responder, answer, extra = {}) => ({
+      responder,
+      questionId: 'q1',
+      response: JSON.stringify({ type: 'binary', prompt: 'Q', answer, ...extra }),
+    });
+    const responses = {
+      q1: [
+        row('0xa', { value: 'Agree' }),
+        row('0xb', { value: 'Disagree' }),
+        row('0xcomment', { value: '' }, { additional: { value: 'Only a comment' } }),
+        row('0xrating', { value: '' }, { importance: 7, conviction: 7 }),
+        row('0xlocked', { value: '*', encrypted: true }),
+      ],
+    };
+
+    const result = buildRatingMatrixFromRealData(responses);
+
+    expect(result.responders).toEqual(['0xa', '0xb']);
+    expect(result.matrix).toEqual([[1, -1]]);
+    expect(buildReportResponseStats(responses).binary.participants).toBe(result.responders.length);
+  });
+
+  it('fills skipped votes with the question mean for UMAP instead of reading them as Unsure', () => {
+    expect(
+      buildUmapParticipantData([
+        [1, -1, 1],
+        [1, null, 1],
+        [null, null, -1],
+      ]),
+    ).toEqual([
+      [1, 1, -1],
+      [-1, 1, -1],
+      [1, 1, -1],
+    ]);
+  });
+
+  it('runs UMAP on voters only, with skipped votes mean-filled', async () => {
+    const row = (responder, qid, value, extra = {}) => ({
+      responder,
+      questionId: qid,
+      response: JSON.stringify({ type: 'binary', prompt: `Prompt ${qid}`, answer: { value }, ...extra }),
+    });
+    const responses = {
+      q1: [
+        row('0xa', 'q1', 'Agree'),
+        row('0xb', 'q1', 'Disagree'),
+        row('0xc', 'q1', 'Agree'),
+        row('0xd', 'q1', '', { additional: { value: 'Only a comment' } }),
+      ],
+      q2: [row('0xa', 'q2', 'Agree'), row('0xc', 'q2', 'Agree')],
+    };
+
+    render(<PolisReport {...baseReportProps} slug="umap-voters" questionResponses={responses} />);
+
+    await waitFor(() => {
+      expect(doUMAP).toHaveBeenCalledWith(
+        [
+          [1, 1],
+          [-1, 1],
+          [1, 1],
+        ],
+        2,
+        42,
+      );
+    });
+  });
+
+  it('takes binary question prompts and types from metadata before participant payloads', () => {
+    const row = (responder, payload) => ({ responder, questionId: 'q1', response: JSON.stringify(payload) });
+    const honest = (value) => ({ type: 'binary', prompt: 'Canonical prompt', answer: { value, encrypted: false } });
+    const metadata = { q1: { type: 'binary', prompt: 'Canonical prompt' } };
+
+    const spoofedPrompt = buildRatingMatrixFromRealData(
+      {
+        q1: [
+          row('0xa', { type: 'binary', prompt: 'Attacker headline', answer: { value: 'Agree' } }),
+          row('0xb', honest('Disagree')),
+        ],
+      },
+      { metadata },
+    );
+    expect(spoofedPrompt.promptsMap).toEqual({ q1: 'Canonical prompt' });
+
+    const spoofedType = buildRatingMatrixFromRealData(
+      {
+        q1: [
+          row('0xa', { type: 'freeform', prompt: 'Canonical prompt', answer: { value: 'whatever' } }),
+          row('0xb', honest('Agree')),
+          row('0xc', honest('Disagree')),
+        ],
+      },
+      { metadata },
+    );
+    expect(spoofedType.questions).toEqual(['q1']);
+    expect(spoofedType.matrix[0].filter((vote) => vote !== null)).toEqual([1, -1]);
+  });
+
+  it('passes cached question metadata into the binary report', async () => {
+    cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+      namespace === 'questionsCache'
+        ? { 84532: { questions: { q1: { type: 'binary', prompt: 'Canonical prompt' } } } }
+        : {},
+    );
+    const responses = {
+      q1: ['Agree', 'Disagree'].map((value, index) => ({
+        responder: `0x${String(index + 1).repeat(40)}`,
+        response: JSON.stringify({
+          type: 'binary',
+          prompt: index ? 'Canonical prompt' : 'Attacker headline',
+          answer: { value },
+        }),
+      })),
+    };
+    try {
+      render(<PolisReport {...baseReportProps} slug="metadata-report" questionResponses={responses} />);
+      await waitFor(() => {
+        expect(computePolisConversationMath).toHaveBeenCalledWith(
+          expect.any(Array),
+          { q1: 'Canonical prompt' },
+          ['q1'],
+          expect.objectContaining({ randomSeed: 42 }),
+        );
+      });
+      expect(screen.queryByText(/Attacker headline/)).not.toBeInTheDocument();
+    } finally {
+      cacheScripts.peekCacheSync.mockImplementation(() => ({}));
+    }
+  });
+
   it('reads question and sbt caches with clone disabled during filter application', () => {
     const out = applyFilterStateToAggregator({ q1: [] }, { id: 84532 }, {}, 'edge');
 
@@ -580,6 +821,26 @@ describe('PolisReport cache read options', () => {
     });
     expect(screen.getByLabelText('Refreshing report')).toBeInTheDocument();
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+  });
+
+  it('offers a retry instead of loading forever when the session load failed', async () => {
+    const onRetryLoad = jest.fn(async () => {});
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="edge"
+        isResponsesCacheReady={false}
+        cacheInitializationError
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Responses could not be loaded, so the report can't be shown yet.",
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
   });
 
   it('shows block-count loading progress under the Polis spinner when scoped question scan progress is available', () => {
@@ -910,6 +1171,27 @@ describe('PolisReport demo data defaults', () => {
     expect(ratings.querySelectorAll('article')).toHaveLength(3);
   });
 
+  it('counts only respondents in each binary question total', () => {
+    const vote = (responder, value) => ({
+      responder,
+      response: { type: 'binary', prompt: value ? 'Everyone voted' : 'One voted', answer: { value: value || 'Agree' } },
+    });
+    const responses = {
+      q1: [vote('person-a', 'Agree'), vote('person-b', 'Agree'), vote('person-c', 'Disagree')],
+      q2: [vote('person-a', '')],
+    };
+
+    render(<PolisReport {...baseReportProps} questionResponses={responses} />);
+
+    const lines = [...screen.getByTestId('ce-polis-answers-binary').querySelectorAll('[data-pdf-keep-together]')].map(
+      (line) => line.textContent,
+    );
+    expect(lines.find((line) => line.includes('Everyone voted'))).toContain('Disagree: 1 / Responses: 3');
+    expect(lines.find((line) => line.includes('Everyone voted'))).not.toContain('No response');
+    expect(lines.find((line) => line.includes('One voted'))).toContain('Responses: 1 / No response: 2');
+    expect(lines.join(' ')).not.toContain('Total');
+  });
+
   it('previews the five most divisive binary questions and expands the remaining questions in score order', () => {
     const scores = [0.1, 0.9, 0.5, 0.8, 0.4, 0.7, 0.3];
     computePolisConversationMath.mockReturnValue({
@@ -1095,39 +1377,65 @@ describe('PolisReport demo data defaults', () => {
     expect(first).toBe(buildClusterAnalysisDataKey({ ...common, allResponders: ['0x111', '0x222'] }));
   });
 
-  it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
+  it('keeps cluster summaries only for the most recent views', () => {
+    let cache = {};
+    ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].forEach((key) => {
+      cache = rememberClusterAnalysis(cache, key, { 0: { short: key, long: '' } });
+    });
+    expect(Object.keys(cache)).toEqual(['c', 'd', 'e', 'f', 'g', 'h']);
+
+    cache = rememberClusterAnalysis(cache, 'd', { ...cache.d, 1: { short: 'd1', long: '' } });
+    cache = rememberClusterAnalysis(cache, 'i', {});
+    expect(Object.keys(cache)).toEqual(['e', 'f', 'g', 'h', 'd', 'i']);
+    expect(cache.d[1].short).toBe('d1');
+  });
+
+  it('keys cluster summaries on every character of the question prompts', () => {
+    const common = { activeClusterAssignments: [0, 1], allQuestions: ['q1'], allResponders: ['0x1', '0x2'] };
+    expect(buildClusterAnalysisDataKey({ ...common, questionPrompts: { q1: 'Raise taxes' } })).not.toBe(
+      buildClusterAnalysisDataKey({ ...common, questionPrompts: { q1: 'Lower taxes' } }),
+    );
+  });
+
+  it('keeps cluster summaries across refreshes with the same votes and drops them when a vote changes', () => {
     const sharedArgs = {
       activeClusterAssignments: [0, 1, 1, 0],
       activeClusterCount: 2,
       activeRepQuestions: { 0: [{ questionIndex: 0 }], 1: [{ questionIndex: 1 }] },
       embeddingChoice: 'UMAP',
       questionPrompts: { 0: 'Prompt A', 1: 'Prompt B' },
-      allQuestions: [{}, {}],
+      allQuestions: ['q0', 'q1'],
+      allResponders: ['0x1', '0x2', '0x3', '0x4'],
     };
+    const votes = () => [
+      [1, -1, 0, null],
+      [-1, 1, 1, 0],
+    ];
+    const before = buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: votes() });
 
-    const demoKeyA = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: true,
-      questionResponsesNonce: 0,
-    });
-    const demoKeyB = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: true,
-      questionResponsesNonce: 7,
-    });
-    const liveKeyA = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: false,
-      questionResponsesNonce: 0,
-    });
-    const liveKeyB = buildClusterAnalysisDataKey({
-      ...sharedArgs,
-      useDemoData: false,
-      questionResponsesNonce: 7,
-    });
+    // A live refresh rebuilds equal data in new arrays and bumps the response
+    // nonce; the key, and so the cached summaries, must survive it.
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: votes() })).toBe(before);
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: votes(), questionResponsesNonce: 7 })).toBe(
+      before,
+    );
 
-    expect(demoKeyA).toBe(demoKeyB);
-    expect(liveKeyA).not.toBe(liveKeyB);
+    const changed = votes();
+    changed[1][3] = -1;
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: changed })).not.toBe(before);
+    const answered = votes();
+    answered[0][3] = 0;
+    expect(buildClusterAnalysisDataKey({ ...sharedArgs, ratingMatrix: answered })).not.toBe(before);
+    // Moving a vote between questions changes the content too.
+    expect(
+      buildClusterAnalysisDataKey({
+        ...sharedArgs,
+        ratingMatrix: [
+          [1, -1, 0],
+          [null, -1, 1, 1, 0],
+        ],
+      }),
+    ).not.toBe(before);
   });
 
   it('defaults custom demo datasets to UMAP with 3 groups and clears manual K in Polis Auto mode', () => {

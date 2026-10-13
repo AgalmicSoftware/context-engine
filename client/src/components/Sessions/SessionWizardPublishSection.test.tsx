@@ -1,4 +1,4 @@
-import React, { createRef } from 'react';
+import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -87,29 +87,20 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => ({
 const buildProps = (overrides: Partial<SessionWizardPublishSectionProps> = {}): SessionWizardPublishSectionProps => ({
   adminUrl: '',
   adminUrlStatus: '',
-  bundleFile: null,
-  bundleFileInputRef: createRef<HTMLInputElement>(),
   isCollapsed: false,
   isNormalMode: false,
-  localWorkerBundleFallbackFilePath: '',
-  manualBundleUrlOverrideHelp: '',
   manualGasLimit: '',
   manualGasPriceGwei: '',
   manualMaxFeePerGasGwei: '',
   manualMaxPriorityFeePerGasGwei: '',
   manualMetadataUrl: '',
-  normalModeBundleUrlOverride: '',
-  normalModeBundleUrlOverrideValidationError: '',
   normalModePublishSummary: [],
-  onBundleFileChange: jest.fn(),
-  onClearBundleFile: jest.fn(),
   onCopyAdminUrl: jest.fn(),
   onManualGasLimitChange: jest.fn(),
   onManualGasPriceGweiChange: jest.fn(),
   onManualMaxFeePerGasGweiChange: jest.fn(),
   onManualMaxPriorityFeePerGasGweiChange: jest.fn(),
   onManualMetadataUrlChange: jest.fn(),
-  onNormalModeBundleUrlOverrideChange: jest.fn(),
   onPublish: jest.fn(),
   onToggleCollapsed: jest.fn(),
   onTogglePublishAdvanced: jest.fn(),
@@ -124,8 +115,6 @@ const buildProps = (overrides: Partial<SessionWizardPublishSectionProps> = {}): 
   renderInfoTooltip: jest.fn(() => null),
   resolvedWorkerBaseUrl: '',
   sessionUrl: '',
-  showSponsoredBundleFallbackInput: false,
-  sponsoredManualBundleRetryMessage: '',
   status: '',
   workerUrlSource: 'custom worker URL',
   ...overrides,

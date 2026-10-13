@@ -3,6 +3,7 @@ import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } f
 import {
   extractUserPageAnalysisAdditionalComment,
   extractUserPageAnalysisImportance,
+  readUserPageAnalysisPublicValue,
 } from './userPageAnalysisStateHelpers';
 
 type UserPageSbtDisplayNameReader = (sbtInfo: unknown) => unknown;
@@ -199,8 +200,8 @@ export const buildUserPageAnalysisQuestions = ({
     .map((q: UserPageAnalysisQuestionRecord) => {
       const resp =
         (detailedQuestionResponses as Record<string, UserPageUnknownRecord> | null | undefined)?.[q.id as string] || {};
-      const ans = toAnalysisRecord(resp.answer).value;
-      if (ans === '*' || ans === '' || ans == null) return null;
+      const ans = readUserPageAnalysisPublicValue(resp.answer);
+      if (ans == null) return null;
       if (q.type === 'quadratic' && validateQuadraticAllocation(ans, q)) return null;
       return {
         id: q.id,
@@ -222,16 +223,16 @@ export const buildUserPageAnalysisSurveys = ({
     const arr = (detailedSurveyResponses as Record<string, unknown> | null | undefined)?.[s.id as string] || [];
     const answered = (Array.isArray(arr) ? (arr as UserPageAnalysisSurveyResponseItem[]) : []).filter((it) => {
       const responseData = toAnalysisRecord(it?.responseData);
-      const v = toAnalysisRecord(responseData.answer).value;
+      const v = readUserPageAnalysisPublicValue(responseData.answer);
       const questionData = toAnalysisRecord(it?.questionData);
       if (questionData.type === 'quadratic' && validateQuadraticAllocation(v, questionData)) return false;
-      return v && v !== '*';
+      return !!v;
     });
 
     const sample = answered.slice(0, 3).map((it) => {
       const questionData = toAnalysisRecord(it?.questionData);
       const responseData = toAnalysisRecord(it?.responseData);
-      const v = toAnalysisRecord(responseData.answer).value;
+      const v = readUserPageAnalysisPublicValue(responseData.answer);
       return {
         prompt: questionData.prompt,
         type: questionData.type || responseData.type || 'unknown',

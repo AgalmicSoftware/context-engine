@@ -3,18 +3,13 @@
  * @description Session scan window configuration — controls which session slugs are in scope for
  *              SBT scanning, block range resolution, and deep profile discovery.
  *
- * Key exports: readSessionScanScope, readSessionScanSlugs, writeSessionScanScope, isSessionSlugAllowedByScope, getAllowedSessionSlugs
+ * Key exports: readSessionScanScope, readSessionScanSlugs, isSessionSlugAllowedByScope, getAllowedSessionSlugs
  */
 import { CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES } from '../../variables/appConfig.js';
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
 import { canonicalizeSessionSlug, resolveSessionSlugAliasFromDemoSessions } from './canonicalSessionContext.js';
-import {
-  dispatchGlobalSessionSelectionUpdatedEvent,
-  normalizeGlobalSessionSelection,
-  persistGlobalSessionSelection,
-  readStoredGlobalSessionSelection,
-} from './globalSessionState.js';
+import { readStoredGlobalSessionSelection } from './globalSessionState.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 
 type DemoSessionMap = Record<string, Record<string, unknown>>;
@@ -445,66 +440,4 @@ export const readSessionScanSlugs = (): string[] => {
   }
 
   return [];
-};
-
-export const writeSessionScanScope = (scopeIn: unknown): SessionScanScope => {
-  const scope = normalizeSessionScanScope(scopeIn);
-
-  try {
-    if (typeof globalThis !== 'undefined') {
-      (globalThis as Record<string, unknown>)[GLOBAL_KEY] = scope;
-    }
-  } catch (e) {
-    log.warn('sessionScanScope: fallback', e);
-  }
-
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEY, scope);
-  } catch (e) {
-    log.warn('sessionScanScope: fallback', e);
-  }
-
-  try {
-    const selection = normalizeGlobalSessionSelection({
-      ...(readStoredGlobalSessionSelection() as GlobalSessionSelection | null),
-      selectedSessionScope: scope,
-    });
-    persistGlobalSessionSelection(selection);
-    dispatchGlobalSessionSelectionUpdatedEvent(selection);
-  } catch (e) {
-    log.warn('sessionScanScope: fallback', e);
-  }
-
-  return scope;
-};
-
-export const writeSessionScanSlugs = (slugsIn: unknown): string[] => {
-  const slugs = normalizeSessionScanSlugs(slugsIn);
-
-  try {
-    if (typeof globalThis !== 'undefined') {
-      (globalThis as Record<string, unknown>)[GLOBAL_SLUGS_KEY] = slugs;
-    }
-  } catch (e) {
-    log.warn('sessionScanScope: fallback', e);
-  }
-
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(LOCAL_STORAGE_SLUGS_KEY, JSON.stringify(slugs));
-  } catch (e) {
-    log.warn('sessionScanScope: fallback', e);
-  }
-
-  try {
-    const selection = normalizeGlobalSessionSelection({
-      ...(readStoredGlobalSessionSelection() as GlobalSessionSelection | null),
-      selectedSessionSlugs: slugs,
-    });
-    persistGlobalSessionSelection(selection);
-    dispatchGlobalSessionSelectionUpdatedEvent(selection);
-  } catch (e) {
-    log.warn('sessionScanScope: fallback', e);
-  }
-
-  return slugs;
 };

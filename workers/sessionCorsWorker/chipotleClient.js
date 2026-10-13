@@ -1,3 +1,5 @@
+import { buildWorkerAuthorizedLitAction, DEFAULT_CHIPOTLE_ACTION_CODE, LIT_AUTHORIZATION_VERSION } from '../../shared/litChipotleAction.mjs';
+import { resolveLitAuthorization, isLitAuthorizationReady, prepareLitAuthorization, authorizeLitRequest, openLitReply, LIT_AUTHORIZATION_REPROVISION_ERROR } from './litWorkerAuthorization.js';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { ethers } from 'ethers';
 import {
@@ -39,7 +41,7 @@ const normalizeChipotleRpcCandidateList = (value = []) => {
   (Array.isArray(value) ? value : [value]).forEach((entry) => {
     const trimmed = toTrimmedString(entry);
     if (!trimmed) return;
-    const key = trimmed.toLowerCase();
+    const key = trimmed;
     if (seen.has(key)) return;
     seen.add(key);
     out.push(trimmed);
@@ -312,6 +314,7 @@ export const resolveLitChipotleRuntime = ({
     allowLocalApiBase,
     litUsageApiKey,
     apiKeySource,
+    authorizationReady: isLitAuthorizationReady({ config, secrets }),
     litGroupId: toTrimmedString(requestBody.litGroupId || litCredentials.litGroupId),
     litPkpId: toTrimmedString(requestBody.litPkpId || litCredentials.litPkpId),
     litActionCid: toTrimmedString(requestBody.litActionCid || litCredentials.litActionCid),
@@ -478,9 +481,26 @@ export const readLitChipotleStatus = async ({
   runtime = {},
   fetchImpl = globalThis.fetch,
 } = {}) => {
-  ensureChipotleApiKey(runtime);
-
   const warnings = [];
+  const status = {
+    ok: true,
+    apiBase: runtime.litApiBase,
+    apiKeySource: runtime.apiKeySource,
+    litGroupId: runtime.litGroupId,
+    litPkpId: runtime.litPkpId,
+    litActionCid: runtime.litActionCid,
+    balance: null,
+    clientConfig: null,
+    warnings,
+    groupSummary: { walletCount: null, actionCount: null, hasConfiguredPkp: null, hasConfiguredAction: null },
+    needsFreshAuthority: runtime.authorizationReady !== true,
+    ready: false,
+  };
+  // Legacy setup must remain diagnosable even after its execution key is removed.
+  if (!toTrimmedString(runtime.litUsageApiKey)) {
+    warnings.push(createStatusWarning('api-key', 'Lit API key not configured. Save an account API key to provision Lit.'));
+    return status;
+  }
 
   const balance = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
@@ -530,12 +550,7 @@ export const readLitChipotleStatus = async ({
   });
 
   return {
-    ok: true,
-    apiBase: runtime.litApiBase,
-    apiKeySource: runtime.apiKeySource,
-    litGroupId: runtime.litGroupId,
-    litPkpId: runtime.litPkpId,
-    litActionCid: runtime.litActionCid,
+    ...status,
     balance,
     clientConfig,
     warnings,
@@ -546,6 +561,7 @@ export const readLitChipotleStatus = async ({
       hasConfiguredAction: groupHasConfiguredAction,
     },
     ready: (
+      runtime.authorizationReady === true &&
       !!toTrimmedString(runtime.litUsageApiKey) &&
       (groupHasConfiguredPkp !== false) &&
       (groupHasConfiguredAction !== false)
@@ -590,8 +606,8 @@ const validateChipotleRpcUrl = (value = '') => {
   } catch {
     throw new Error('Lit Chipotle RPC URL is invalid.');
   }
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('Lit Chipotle RPC URL must be http(s).');
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Lit Chipotle RPC URL must be HTTPS.');
   }
   if (isPrivateHostname(parsed.hostname)) {
     throw new Error('Lit Chipotle RPC URL must be public.');
@@ -647,7 +663,7 @@ const resolveSessionChipotleRpcUrl = ({
   for (const candidate of candidates) {
     try {
       const normalized = validateChipotleRpcUrl(candidate);
-      const key = normalized.toLowerCase();
+      const key = normalized;
       if (seen.has(key)) continue;
       seen.add(key);
       approvedUrls.push(normalized);
@@ -658,8 +674,10 @@ const resolveSessionChipotleRpcUrl = ({
 
   if (requestRpcUrl) {
     const normalizedRequestRpcUrl = validateChipotleRpcUrl(requestRpcUrl);
+    // URL() normalizes scheme/host; paths and query credentials remain
+    // case-sensitive and must match the approved endpoint exactly.
     const approved = approvedUrls.some((candidate) => (
-      candidate.toLowerCase() === normalizedRequestRpcUrl.toLowerCase()
+      candidate === normalizedRequestRpcUrl
     ));
     if (!approved) {
       throw new Error('Lit Chipotle request RPC URL is not approved for this gate chain.');
@@ -840,21 +858,6 @@ const readChipotleBillingBalance = async ({
   fetchImpl,
 }).catch(() => null);
 
-const resolveProvisioningGroupId = async ({ runtime = {}, fetchImpl = globalThis.fetch } = {}) => {
-  const rawGroupId = toTrimmedString(runtime?.litGroupId);
-  if (!rawGroupId) throw new Error('Lit group ID not configured.');
-  if (/^\d+$/.test(rawGroupId)) return rawGroupId;
-  const groups = await listGroups({ runtime, fetchImpl });
-  const match = groups.find((group) => {
-    const candidateId = toTrimmedString(group?.id);
-    const candidateName = toTrimmedString(group?.name);
-    return candidateId === rawGroupId || candidateName === rawGroupId;
-  });
-  const resolvedId = toTrimmedString(match?.id);
-  if (!resolvedId) throw new Error(`Lit group not found: ${rawGroupId}`);
-  return resolvedId;
-};
-
 const ensureActionMetadata = async ({ runtime = {}, litActionCid = '', actionName = '', actionDescription = '', fetchImpl = globalThis.fetch } = {}) => {
   const actions = await listActions({ runtime, fetchImpl, groupId: null });
   const hasAction = await resolveActionCidMembership({
@@ -954,65 +957,59 @@ const ensurePkpInGroup = async ({ runtime = {}, groupId = '', fetchImpl = global
   };
 };
 
-export const provisionLitChipotleAction = async ({
-  runtime = {},
-  request = {},
-  fetchImpl = globalThis.fetch,
-} = {}) => {
+export const provisionLitChipotleAction = async ({ runtime = {}, config = {}, secrets = {}, request = {}, sessionSlug = '', persistAuthorizationSecret, fetchImpl = globalThis.fetch } = {}) => {
   ensureChipotleManagementApiKey(runtime);
-  if (!toTrimmedString(runtime?.litPkpId)) {
-    throw new Error('Lit PKP ID not configured.');
+  return bootstrapLitChipotleSession({
+    env: { LIT_API_BASE: runtime.litApiBase, LIT_ACCOUNT_API_KEY: runtime.litManagementApiKey,
+      LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: runtime.allowLocalApiBase ? 'true' : '' },
+    config, secrets, request, sessionSlug, persistAuthorizationSecret, fetchImpl,
+  });
+};
+
+export const bootstrapLitChipotleSession = async (options = {}) => {
+  const config = options.config || {};
+  const secrets = options.secrets || {};
+  const credentials = config.litCredentials || {};
+  const freshAuthority = options.request?.freshAuthority === true;
+  const hasAuthority = !!(credentials.litActionCid || credentials.litPkpId || credentials.litGroupId);
+  if (hasAuthority && credentials.litAuthorizationVersion !== LIT_AUTHORIZATION_VERSION && !freshAuthority) {
+    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
   }
-
-  const actionRequest = isObj(request) ? request : {};
-  const actionCode = toTrimmedString(actionRequest.actionCode || actionRequest.code);
-  if (!actionCode) {
-    throw new Error('Lit Action code is required.');
+  const authorization = await prepareLitAuthorization({
+    secrets,
+    // Reprovision Lit authority without rotating the independent session signer.
+    persistAuthorizationSecret: options.persistAuthorizationSecret,
+  });
+  if (!freshAuthority && credentials.litAuthorizationSigner &&
+      credentials.litAuthorizationSigner.toLowerCase() !== authorization.litAuthorizationSigner.toLowerCase()) {
+    throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
   }
-
-  const resolvedGroupId = await resolveProvisioningGroupId({ runtime, fetchImpl });
-  const litActionCid = await deriveLitActionCid({ runtime, actionCode, fetchImpl });
-  const metadata = await ensureActionMetadata({
-    runtime,
-    litActionCid,
-    actionName: actionRequest.actionName || actionRequest.name,
-    actionDescription: actionRequest.actionDescription || actionRequest.description,
-    fetchImpl,
+  const result = await bootstrapLitChipotleSessionCore({
+    ...options,
+    config: freshAuthority ? { ...config, litCredentials: { litApiBase: credentials.litApiBase } } : config,
+    secrets: freshAuthority ? { ...secrets, litUsageApiKey: '' } : secrets,
+    request: { ...options.request, actionCode: DEFAULT_CHIPOTLE_ACTION_CODE },
+    buildActionCode: (pkpId) => buildWorkerAuthorizedLitAction({
+      signer: authorization.litAuthorizationSigner, sessionSlug: options.sessionSlug || '', pkpId,
+    }),
   });
-  const groupAction = await ensureActionInGroup({
-    runtime,
-    groupId: resolvedGroupId,
-    litActionCid,
-    fetchImpl,
-  });
-  const groupPkp = await ensurePkpInGroup({
-    runtime,
-    groupId: resolvedGroupId,
-    fetchImpl,
-  });
-
   return {
-    ok: true,
-    apiBase: runtime.litApiBase,
-    apiKeySource: runtime.apiKeySource,
-    litActionCid,
-    litGroupId: resolvedGroupId,
-    litPkpId: toTrimmedString(runtime.litPkpId),
-    steps: {
-      derivedCid: true,
-      registeredAction: metadata.created,
-      addedActionToGroup: groupAction.added,
-      addedPkpToGroup: groupPkp.added,
-    },
+    ...result,
+    litAuthorizationVersion: authorization.litAuthorizationVersion,
+    litAuthorizationSigner: authorization.litAuthorizationSigner,
+    litCredentials: { ...result.litCredentials, litAuthorizationVersion: authorization.litAuthorizationVersion,
+      litAuthorizationSigner: authorization.litAuthorizationSigner },
+    secretOutputs: { ...result.secretOutputs, litAuthorizationPrivateKey: authorization.litAuthorizationPrivateKey },
   };
 };
 
-export const bootstrapLitChipotleSession = async ({
+const bootstrapLitChipotleSessionCore = async ({
   env = {},
   config = {},
   secrets = {},
   request = {},
   sessionSlug = '',
+  buildActionCode,
   fetchImpl = globalThis.fetch,
 } = {}) => {
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
@@ -1028,6 +1025,9 @@ export const bootstrapLitChipotleSession = async ({
       : envAccountApiKey
       ? 'worker-env'
       : 'missing';
+  // A complete intended secret snapshot must explicitly clear an old session
+  // account when switching to the Worker account, including durable retries.
+  const accountSecretOutput = existingAccountApiKeySource === 'worker-env' ? '' : existingAccountApiKey;
   const existingUsageApiKey = toTrimmedString(secrets?.litUsageApiKey);
   const existingGroupId = toTrimmedString(litCredentials?.litGroupId);
   const existingPkpId = toTrimmedString(litCredentials?.litPkpId);
@@ -1040,6 +1040,20 @@ export const bootstrapLitChipotleSession = async ({
     DEFAULT_LIT_API_BASE,
     { allowLocalApiBase }
   );
+
+  if (existingActionCid) {
+    if (!existingPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+    // Validate before the completed-setup return or any permission mutation:
+    // attaching a stale unsigned Action would bypass Worker authorization.
+    const expectedCid = await deriveLitActionCid({
+      runtime: { litApiBase, allowLocalApiBase },
+      actionCode: buildActionCode(existingPkpId),
+      fetchImpl,
+    });
+    if (expectedCid !== existingActionCid) {
+      throw new Error('Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.');
+    }
+  }
 
   if (
     existingAccountApiKey &&
@@ -1063,7 +1077,7 @@ export const bootstrapLitChipotleSession = async ({
         litPkpId: existingPkpId,
       },
       secretOutputs: {
-        litAccountApiKey: existingAccountApiKey,
+        litAccountApiKey: accountSecretOutput,
         litUsageApiKey: existingUsageApiKey,
       },
       steps: {
@@ -1129,7 +1143,7 @@ export const bootstrapLitChipotleSession = async ({
     };
     const litActionCid = existingActionCid || await deriveLitActionCid({
       runtime: runtimeWithGroup,
-      actionCode,
+      actionCode: buildActionCode(litPkpId),
       fetchImpl,
     });
     const metadata = await ensureActionMetadata({
@@ -1190,9 +1204,7 @@ export const bootstrapLitChipotleSession = async ({
         litPkpId,
       },
       secretOutputs: {
-        ...(secretAccountApiKey || requestAccountApiKey
-          ? { litAccountApiKey: existingAccountApiKey }
-          : {}),
+        litAccountApiKey: accountSecretOutput,
         ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
       },
       steps: {
@@ -1252,7 +1264,7 @@ export const bootstrapLitChipotleSession = async ({
   };
   const litActionCid = await deriveLitActionCid({
     runtime: runtimeWithGroup,
-    actionCode,
+    actionCode: buildActionCode(litPkpId),
     fetchImpl,
   });
   const metadata = await ensureActionMetadata({
@@ -1369,7 +1381,6 @@ export const executeLitChipotleAction = async ({
     ok: true,
     apiBase: runtime.litApiBase,
     apiKeySource: runtime.apiKeySource,
-    request: payload,
     response,
   };
 };
@@ -1380,6 +1391,7 @@ export const executeSessionLitChipotleAction = async ({
   secrets = {},
   request = {},
   requesterAddress = '',
+  sessionSlug = '',
   fetchImpl = globalThis.fetch,
 } = {}) => {
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
@@ -1402,10 +1414,8 @@ export const executeSessionLitChipotleAction = async ({
     throw new Error('Lit Action CID not configured.');
   }
 
-  const actionCode = toTrimmedString(requestBody.actionCode || requestBody.code);
-  if (!actionCode) {
-    throw new Error('Lit Action code is required.');
-  }
+  // Only server-owned source can anchor the signer. Client source is a catalog hint, never executable authority.
+  const { wallet, actionCode } = resolveLitAuthorization({ secrets, config, sessionSlug });
   const derivedActionCid = await deriveLitActionCid({ runtime, actionCode, fetchImpl });
   if (derivedActionCid !== litActionCid) {
     throw new Error('Lit Action code does not match the configured Lit Action CID.');
@@ -1493,17 +1503,18 @@ export const executeSessionLitChipotleAction = async ({
     }
   }
 
+  const replyContext = await authorizeLitRequest({ wallet, jsParams, sessionSlug });
   const actionRuntime = {
     ...runtime,
     litActionCid,
     litPkpId,
   };
+  let result;
   try {
-    return await executeLitChipotleAction({
+    result = await executeLitChipotleAction({
       runtime: actionRuntime,
       request: {
-        // Verify submitted source first, then execute the provisioned action CID
-        // that the session usage key/group is permitted to run.
+        // Execute only the Worker-owned source whose CID matches this authority.
         ipfsId: litActionCid,
         jsParams,
       },
@@ -1512,15 +1523,39 @@ export const executeSessionLitChipotleAction = async ({
   } catch (error) {
     const message = toTrimmedString(error?.message || error).toLowerCase();
     if (!message.includes('no cached code found') && !message.includes('cache miss for ipfs id')) {
-      throw error;
+      // Upstream diagnostics may echo jsParams. Never return a signed ticket or CEK in an error.
+      throw new Error('Lit Action execution failed. Ask the session admin to verify Lit provisioning and account access.');
     }
-    return executeLitChipotleAction({
+    try {
+      result = await executeLitChipotleAction({
       runtime: actionRuntime,
       request: {
         code: actionCode,
         jsParams,
       },
       fetchImpl,
-    });
+      });
+    } catch {
+      throw new Error('Lit Action execution failed. Ask the session admin to verify Lit provisioning and account access.');
+    }
   }
+  if (result.response?.has_error) throw new Error('Lit Action authorization failed.');
+  const rawResponse = result.response?.response ?? result.response;
+  let response;
+  try { response = typeof rawResponse === 'string' ? JSON.parse(rawResponse) : rawResponse; }
+  catch { throw new Error('Invalid Lit Action response.'); }
+  if (!response || typeof response !== 'object') throw new Error('Invalid Lit Action response.');
+  if (op === 'decrypt' && response.ok === true && response.allowed === true) {
+    // Never fall back to a plaintext response from an old Action, even if the upstream request succeeds.
+    const plaintext = normalizeChipotleCekHex(await openLitReply(response.encryptedReply, replyContext));
+    return { ok: true, response: { ok: true, allowed: true, op, plaintext, policyFingerprint: expectedPolicyFingerprint } };
+  }
+  // Keep signed tickets, upstream logs, and encrypted reply internals out of participant responses.
+  return { ok: true, response: {
+    ok: response.ok === true, allowed: response.allowed === true, op,
+    ...(response.allowed === false ? { reason: 'Requester does not satisfy the SBT gate.' } : {}),
+    ...(op === 'encrypt' && typeof response.ciphertext === 'string' ? { ciphertext: response.ciphertext } : {}),
+    policyFingerprint: expectedPolicyFingerprint,
+    policy,
+  } };
 };

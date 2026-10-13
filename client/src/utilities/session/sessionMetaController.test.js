@@ -5,6 +5,7 @@ import {
 } from './sessionMetaController.js';
 
 const ACCOUNT = '0x00000000000000000000000000000000000000aa';
+const OTHER_ACCOUNT = '0x00000000000000000000000000000000000000bb';
 const GROUP_CFG = {
   networkChainId: 84532,
   slug: 'edge',
@@ -238,5 +239,94 @@ describe('sessionMetaController', () => {
     expect(host.warn).toHaveBeenCalledTimes(1);
     expect(host.warn.mock.calls[0][0]).toBe('MainSite: fallback');
     expect(host.warn.mock.calls[0][1]).toBeInstanceOf(Error);
+  });
+});
+
+describe('sessionMetaController account changes', () => {
+  const ENCRYPTED_CFG = {
+    ...GROUP_CFG,
+    sessionInfoEncrypted: 'session-info-env',
+    encryptedFields: { sessionName: 'name-env', sessionHeader: 'header-env' },
+  };
+  const DECRYPTED = {
+    'session-info-env': 'Private session info',
+    'name-env': 'Private Session Name',
+    'header-env': 'ar://private-header',
+  };
+
+  const createHarness = ({ decryptEnvelopeValue = jest.fn(async (encrypted) => DECRYPTED[encrypted]) } = {}) => {
+    const harness = {
+      account: ACCOUNT,
+      state: { sessionInfoOverrides: {}, sessionNameOverrides: {}, sessionHeaderOverrides: {} },
+      decryptEnvelopeValue,
+    };
+    harness.controller = createSessionMetaRefreshController({
+      getActiveSessionSlug: () => 'edge',
+      getSessionConfigBySlugOrDefault: () => ENCRYPTED_CFG,
+      getGlobalLitHooks: () => ({ getKey: jest.fn() }),
+      getAccount: () => harness.account,
+      getProviderLike: () => 'passkey_eoa',
+      decryptEnvelopeValue,
+      setState: (updater) => {
+        harness.state = { ...harness.state, ...(updater(harness.state) || {}) };
+      },
+      warn: jest.fn(),
+    });
+    harness.refresh = async () => {
+      await harness.controller.refreshSessionInfo();
+      await harness.controller.refreshSessionMetaFields();
+    };
+    return harness;
+  };
+
+  it('clears decrypted session name, info, and header after logout', async () => {
+    const harness = createHarness();
+    await harness.refresh();
+    expect(harness.state).toEqual({
+      sessionInfoOverrides: { edge: 'Private session info' },
+      sessionNameOverrides: { edge: 'Private Session Name' },
+      sessionHeaderOverrides: { edge: 'ar://private-header' },
+    });
+
+    harness.account = '';
+    await harness.refresh();
+
+    expect(harness.state).toEqual({ sessionInfoOverrides: {}, sessionNameOverrides: {}, sessionHeaderOverrides: {} });
+  });
+
+  it('decrypts again for the next account instead of showing the previous one', async () => {
+    const harness = createHarness();
+    await harness.refresh();
+    harness.decryptEnvelopeValue.mockRejectedValue(new Error('not authorized'));
+
+    harness.account = OTHER_ACCOUNT;
+    await harness.refresh();
+
+    expect(harness.state).toEqual({ sessionInfoOverrides: {}, sessionNameOverrides: {}, sessionHeaderOverrides: {} });
+    expect(harness.decryptEnvelopeValue).toHaveBeenCalledTimes(6);
+
+    harness.decryptEnvelopeValue.mockImplementation(async (encrypted) => DECRYPTED[encrypted]);
+    harness.account = ACCOUNT;
+    await harness.refresh();
+
+    expect(harness.state.sessionNameOverrides).toEqual({ edge: 'Private Session Name' });
+  });
+
+  it('drops a decrypt that finishes after the account changed', async () => {
+    let finishDecrypt = () => undefined;
+    const decryptEnvelopeValue = jest.fn(
+      (encrypted) =>
+        new Promise((resolve) => {
+          finishDecrypt = () => resolve(DECRYPTED[encrypted]);
+        }),
+    );
+    const harness = createHarness({ decryptEnvelopeValue });
+
+    const pending = harness.controller.refreshSessionInfo();
+    harness.account = '';
+    finishDecrypt();
+    await pending;
+
+    expect(harness.state.sessionInfoOverrides).toEqual({});
   });
 });

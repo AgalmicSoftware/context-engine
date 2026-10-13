@@ -811,3 +811,89 @@
     }
   }
 }
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .legendText,
+  .headerSessionSelectorHint {
+    color: var(--ce-document-text-muted);
+    opacity: 1;
+  }
+
+  .squareText,
+  .squareSubtext {
+    color: var(--ce-document-text);
+    background: var(--ce-document-surface);
+  }
+
+  // Dim the illustration, not the caption, on unavailable tool cards.
+  .disabled {
+    opacity: 1;
+
+    .backgroundImage {
+      opacity: 0.5;
+    }
+
+    .squareText,
+    .squareSubtext {
+      color: var(--ce-control-disabled-text);
+      background: var(--ce-control-disabled-bg);
+    }
+  }
+
+  .headerActionButton {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    border-color: transparent;
+    box-shadow: none;
+
+    &:hover,
+    &:focus-visible,
+    &:active {
+      background: var(--ce-surface-alt);
+      color: var(--ce-control-text);
+      border-color: transparent;
+      box-shadow: none;
+      transform: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  .headerActionButtonActive {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
+
+    &:hover,
+    &:focus-visible,
+    &:active {
+      background: var(--ce-action-primary-hover);
+      color: var(--ce-selection-text);
+    }
+  }
+
+  .headerSessionSelectorPanel {
+    background: var(--ce-overlay-surface);
+    color: var(--ce-overlay-text);
+    border-color: var(--ce-document-border-strong);
+    box-shadow: var(--ce-card-shadow);
+  }
+
+  .title {
+    color: var(--ce-document-text);
+  }
+
+  .secureAddressDisplay {
+    background: var(--ce-response-agree-bg);
+    color: var(--ce-response-agree-text);
+    border-color: var(--ce-response-agree-border);
+    box-shadow: none;
+  }
+
+  .secureAddress,
+  #aboutText {
+    opacity: 1;
+  }
+}

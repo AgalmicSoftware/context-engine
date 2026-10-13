@@ -858,6 +858,47 @@ describe('error paths', () => {
     expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['a plain deploy', '', {}],
+    ['a salted deploy that is not configured', 'predictable-salt', {}],
+  ])('refuses a group password hash on %s before broadcasting', async (_label, salt, createOptions) => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+    const mockFactory = {
+      estimateGas: { createSBT: jest.fn(), createSBTDeterministic: jest.fn() },
+      createSBT: jest.fn(),
+      createSBTDeterministic: jest.fn(),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockFactory;
+    });
+
+    await expect(
+      createSBT(
+        'wagmi',
+        'Error Path Group',
+        'EPG',
+        0,
+        TEST_ADDRESS,
+        0,
+        false,
+        0,
+        [],
+        'ipfs://token-uri',
+        `0x${'11'.repeat(32)}`,
+        GROUP_CFG,
+        salt,
+        createOptions,
+      ),
+    ).rejects.toThrow("This group can't be created with a password. Remove the group password and try again.");
+
+    expect(mockFactory.estimateGas.createSBT).not.toHaveBeenCalled();
+    expect(mockFactory.estimateGas.createSBTDeterministic).not.toHaveBeenCalled();
+    expect(
+      rpcProvider.request.mock.calls.filter(([payload]) => payload?.method === 'eth_sendTransaction'),
+    ).toHaveLength(0);
+  });
+
   it('fails before broadcasting configured deterministic deploys from a non-admin signer', async () => {
     window.ethereum = makeRpcProvider();
 

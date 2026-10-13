@@ -17,18 +17,15 @@ type DemoAvatarInfo = {
 };
 
 type DemoFigureLike = {
-  id?: unknown;
   name?: unknown;
   displayName?: unknown;
   username?: unknown;
   aliases?: unknown;
-  polisParticipant?: unknown;
   avatar?: unknown;
 };
 
 type AvatarRegistrationInput = {
   names?: unknown[];
-  addresses?: unknown[];
   usernames?: unknown[];
   url?: unknown;
 };
@@ -82,11 +79,6 @@ const normalizeLookupKey = (value = ''): string =>
     .replace(/[^a-zA-Z0-9]+/g, '')
     .toLowerCase();
 
-const normalizeAddress = (value: unknown = '') =>
-  String(value || '')
-    .trim()
-    .toLowerCase();
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -131,7 +123,6 @@ const buildAvatarInfo = (name = '', url = ''): DemoAvatarInfo | null => {
   };
 };
 
-const avatarByAddress = new Map<string, DemoAvatarInfo>();
 const avatarByName = new Map<string, DemoAvatarInfo>();
 
 const resolveLocalAvatarUrl = ({ names = [], usernames = [] }: AvatarRegistrationInput = {}): string => {
@@ -149,12 +140,7 @@ const resolveLocalAvatarUrl = ({ names = [], usernames = [] }: AvatarRegistratio
   return getHistoricalFigureAvatarByName(matchingName) || '';
 };
 
-const registerAvatarInfo = ({
-  names = [],
-  addresses = [],
-  usernames = [],
-  url = '',
-}: AvatarRegistrationInput = {}): void => {
+const registerAvatarInfo = ({ names = [], usernames = [], url = '' }: AvatarRegistrationInput = {}): void => {
   const normalizedNames = names.map((name) => String(name || '').trim()).filter(Boolean);
 
   const resolvedUrl = String(
@@ -177,13 +163,6 @@ const registerAvatarInfo = ({
   normalizedNames.forEach((name) => {
     avatarByName.set(normalizeLookupKey(name), avatarInfo);
   });
-
-  addresses
-    .map((address) => normalizeAddress(address))
-    .filter(Boolean)
-    .forEach((address) => {
-      avatarByAddress.set(address, avatarInfo);
-    });
 };
 
 const mergedManifest = historicalFiguresMerged as HistoricalFiguresManifest;
@@ -201,7 +180,6 @@ mergedFigures.forEach((figure) => {
       figure?.username,
       ...(Array.isArray(figure?.aliases) ? figure.aliases : []),
     ],
-    addresses: [figure?.polisParticipant],
     usernames: [figure?.username, figure?.name],
     url: figure?.avatar,
   });
@@ -235,19 +213,12 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
 (Array.isArray(policyAtlasCouncil) ? (policyAtlasCouncil as DemoFigureLike[]) : []).forEach((entry) => {
   registerAvatarInfo({
     names: [entry?.name],
-    addresses: [entry?.id],
     url: entry?.avatar,
   });
 });
 
 const cloneAvatarInfo = (avatarInfo: DemoAvatarInfo | null): DemoAvatarInfo | null =>
   avatarInfo ? { ...avatarInfo } : null;
-
-export const getDemoAvatar = (address = ''): DemoAvatarInfo | null => {
-  const normalizedAddress = normalizeAddress(address);
-  if (!normalizedAddress) return null;
-  return cloneAvatarInfo(avatarByAddress.get(normalizedAddress) || null);
-};
 
 export const getDemoAvatarByName = (name = ''): DemoAvatarInfo | null => {
   const normalizedName = normalizeLookupKey(name);

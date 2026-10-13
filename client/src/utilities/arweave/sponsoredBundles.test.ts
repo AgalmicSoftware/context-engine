@@ -3,7 +3,7 @@ import {
   buildSponsoredSessionUrl,
   generateSponsoredBundleSecret,
   hasSponsoredBundleFields,
-  normalizeSponsoredBundlePayload,
+  normalizeSparseSponsoredBundlePayload,
   readSponsoredBundleFromArweave,
   SPONSORED_BUNDLE_CIPHER,
   SPONSORED_BUNDLE_TYPE,
@@ -92,7 +92,7 @@ describe('sponsoredBundles', () => {
 
   it('normalizes supported bundle fields and ignores unsupported customRpcKey', () => {
     expect(
-      normalizeSponsoredBundlePayload({
+      normalizeSparseSponsoredBundlePayload({
         openaiKey: ' sk-openai ',
         customRpcUrl: ' https://rpc.example ',
         litApiBase: ' https://api.chipotle.litprotocol.com ',
@@ -101,20 +101,8 @@ describe('sponsoredBundles', () => {
       }),
     ).toEqual({
       openaiKey: 'sk-openai',
-      anthropicKey: '',
-      openrouterKey: '',
-      arweaveJwk: '',
-      faucetPrivateKey: '',
       customRpcUrl: 'https://rpc.example',
       litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: '',
-      litPkpId: '',
-      litActionCid: '',
-      litAccountApiKey: '',
-      litUsageApiKey: '',
-      bootstrapWorkerUrl: '',
-      deployGrantToken: '',
-      faucetGrantToken: '',
       meta: {
         label: 'Test label',
         createdAt: '',

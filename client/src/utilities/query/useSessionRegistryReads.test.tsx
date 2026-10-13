@@ -140,9 +140,7 @@ describe('useSessionRegistryReads', () => {
       expect(screen.getByTestId('registry-snapshot-slugs')).toHaveTextContent('|edge|alpha');
     });
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
-    expect(invalidateQueries).toHaveBeenLastCalledWith({
-      queryKey: [appScope, 'sessions', 'registry'],
-    });
+    expect(invalidateQueries.mock.lastCall).toEqual([{ queryKey: [appScope, 'sessions', 'registry'] }]);
     expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
     expect(mockSubscribeToCacheUpdates).toHaveBeenCalledTimes(1);
 

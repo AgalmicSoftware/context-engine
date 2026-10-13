@@ -4,6 +4,31 @@ import {
 } from './questionFilterSessionResolution.js';
 
 describe('questionFilterSessionResolution', () => {
+  it('uses the active Worker bootstrap config for the matching route without a registry lookup', () => {
+    const sessionConfig = { slug: 'worker-ai', corsWorkerUrl: 'https://worker-ai.example.test' };
+    const resolveBySlug = jest.fn<null, [string]>(() => null);
+    expect(
+      resolveQuestionFilterSessionContext({
+        pathname: '/session/worker-ai',
+        sessionConfig,
+        resolveBySlug,
+      }),
+    ).toMatchObject({ sessionSlug: 'worker-ai', sessionConfig });
+    expect(resolveBySlug).not.toHaveBeenCalled();
+  });
+
+  it.each(['/session/other', '/session/general'])('does not use stale Worker config on route %s', (pathname) => {
+    const resolveBySlug = jest.fn<null, [string]>(() => null);
+    const result = resolveQuestionFilterSessionContext({
+      pathname,
+      activeSessionSlug: 'worker-ai',
+      sessionConfig: { slug: 'worker-ai', corsWorkerUrl: 'https://worker-ai.example.test' },
+      resolveBySlug,
+    });
+    expect(result.sessionConfig).toBeNull();
+    expect(resolveBySlug).toHaveBeenCalledWith(pathname.endsWith('general') ? '' : 'other');
+  });
+
   it('canonicalizes the general alias from explicit route slugs', () => {
     expect(
       resolveQuestionFilterEffectiveSlug({

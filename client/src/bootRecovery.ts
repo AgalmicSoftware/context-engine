@@ -1,6 +1,16 @@
 const BOOT_RELOAD_PARAM = 'ceBootReload';
 const STALE_CHUNK_RELOAD_PARAM = 'ceChunkReload';
+// Set by an automatic reload and cleared once a primary route commits.
 export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v20260618b';
+// Time of the last automatic reload. Route commits keep it, so a chunk that fails on
+// every load reloads at most once per window instead of looping.
+export const STALE_CHUNK_RELOAD_AT_STORAGE_KEY = 'ce:staleChunkReloadAt:v20261011';
+export const STALE_CHUNK_RELOAD_WINDOW_MS = 60_000;
+// Failures that already caused an automatic reload in this tab, for the build that was
+// running. One that comes back in that build, for example a chunk a content blocker
+// always blocks, shows the error panel instead; a new deploy starts a new list.
+const STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY = 'ce:staleChunkReloadedFailures:v20261011';
+const MAX_REMEMBERED_RELOAD_FAILURES = 20;
 
 type BootStorage = {
   clear?: () => void;
@@ -27,9 +37,11 @@ type BootHistory = {
 
 type BootWindow = {
   caches?: BootCacheApi;
+  document?: Pick<Document, 'querySelector'>;
   history?: BootHistory;
   localStorage?: BootStorage;
   location?: BootLocation;
+  navigator?: { onLine?: boolean };
   sessionStorage?: BootStorage;
   setTimeout?: (handler: TimerHandler, timeout?: number, ...args: unknown[]) => unknown;
 };
@@ -66,7 +78,9 @@ export const isStaleChunkLoadError = (error: unknown): boolean => {
   return (
     message.includes('not a valid javascript mime type') ||
     message.includes('failed to fetch dynamically imported module') ||
+    message.includes('error loading dynamically imported module') ||
     message.includes('importing a module script failed') ||
+    message.includes('unable to preload css') ||
     message.includes('chunkloaderror') ||
     (message.includes('loading chunk') && message.includes('failed'))
   );
@@ -122,6 +136,15 @@ const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
   }
 };
 
+// Reading window.sessionStorage itself throws when site data is blocked.
+const readSessionStorage = (win: BootWindow | undefined): BootStorage | undefined => {
+  try {
+    return win?.sessionStorage;
+  } catch {
+    return undefined;
+  }
+};
+
 export const clearBootReloadMarker = (
   win: BootWindow = globalThis.window,
   reloadParam = BOOT_RELOAD_PARAM,
@@ -140,16 +163,67 @@ export const clearBootReloadMarker = (
 };
 
 export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window): boolean => {
-  // Regression guard: this loop sentinel must survive until a primary route commits;
-  // clearing it at entry-module load lets a still-stale lazy chunk reload forever.
+  // A primary route committed, so drop the boot-loop flag. The reload time is the loop
+  // guard from here on; keep the URL marker unless that time reads back from storage.
+  const storage = readSessionStorage(win);
+  let reloadTimeStored = false;
   try {
-    win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+    storage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+    if (!storage?.getItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY)) {
+      const markerTime = win?.location ? new URL(win.location.href).searchParams.get(STALE_CHUNK_RELOAD_PARAM) : null;
+      if (Number(markerTime) > 0) storage?.setItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY, String(markerTime));
+    }
+    reloadTimeStored = Number(storage?.getItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY)) > 0;
   } catch {
-    // Successful route cleanup is best-effort when storage is unavailable.
+    reloadTimeStored = false;
   }
 
-  return clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM);
+  return reloadTimeStored ? clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM) : false;
 };
+
+const describeReloadFailure = (error: unknown): string =>
+  (readErrorField(error, 'message') || String(error || '')).trim().slice(0, 500);
+
+// The entry script's hashed URL changes when any chunk or stylesheet changes, so it
+// names the running build. WebKit's import error names no chunk, so the build is what
+// tells two deploys apart.
+const readRunningBuild = (win: BootWindow | undefined): string => {
+  try {
+    return win?.document?.querySelector('script[type="module"][src]')?.getAttribute('src') || '';
+  } catch {
+    return '';
+  }
+};
+
+type ReloadedFailures = { build?: unknown; failures?: unknown };
+
+const readReloadedFailures = (storage: BootStorage | undefined, build: string): string[] => {
+  try {
+    const stored = JSON.parse(
+      storage?.getItem?.(STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY) || 'null',
+    ) as ReloadedFailures | null;
+    // A list from another build never blocks this one; the next write replaces it.
+    if (stored?.build !== build || !Array.isArray(stored.failures)) return [];
+    return stored.failures.filter((failure): failure is string => typeof failure === 'string');
+  } catch {
+    return [];
+  }
+};
+
+const wasRecentlyAutoReloaded = (storage: BootStorage | undefined, storageKey: string, now: number): boolean => {
+  try {
+    if (storage?.getItem?.(storageKey) === 'true') return true;
+    const elapsedMs = now - Number(storage?.getItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY) || 0);
+    return elapsedMs >= 0 && elapsedMs < STALE_CHUNK_RELOAD_WINDOW_MS;
+  } catch {
+    // The URL marker still guards reload loops when storage is unavailable.
+    return false;
+  }
+};
+
+// Only false is reliable: onLine can be true on a network that reaches nothing.
+export const isBrowserOffline = (win: BootWindow | undefined = globalThis.window): boolean =>
+  win?.navigator?.onLine === false;
 
 export const recoverFromStaleChunkLoadError = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
   if (!isStaleChunkLoadError(error)) {
@@ -157,29 +231,46 @@ export const recoverFromStaleChunkLoadError = (error: unknown, options: BootReco
   }
 
   const win = options.window || globalThis.window;
-  const storage = options.storage || win?.sessionStorage;
+  // Offline failures are transient; a reload would only reach the browser's offline page.
+  if (isBrowserOffline(win)) return false;
+
+  const storage = options.storage || readSessionStorage(win);
   const storageKey = options.storageKey || STALE_CHUNK_RELOAD_STORAGE_KEY;
   const reloadParam = options.reloadParam || STALE_CHUNK_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
+  const now = Date.now();
 
-  let alreadyAttempted = hasReloadParam(win, reloadParam);
-  try {
-    alreadyAttempted = alreadyAttempted || storage?.getItem?.(storageKey) === 'true';
-  } catch {
-    // URL param guard above still prevents reload loops when storage is unavailable.
-  }
-  if (alreadyAttempted) {
+  // Regression guard: at most one automatic reload per window, and never twice in a tab
+  // for the same failure in the same build; otherwise the error boundary stays up and
+  // reloads on request.
+  const build = readRunningBuild(win);
+  const failure = describeReloadFailure(error);
+  const reloadedFailures = readReloadedFailures(storage, build);
+  if (
+    hasReloadParam(win, reloadParam) ||
+    wasRecentlyAutoReloaded(storage, storageKey, now) ||
+    reloadedFailures.includes(failure)
+  ) {
     return false;
   }
 
   try {
     storage?.setItem?.(storageKey, 'true');
+    storage?.setItem?.(STALE_CHUNK_RELOAD_AT_STORAGE_KEY, String(now));
+    storage?.setItem?.(
+      STALE_CHUNK_RELOADED_FAILURES_STORAGE_KEY,
+      JSON.stringify({ build, failures: [...reloadedFailures, failure].slice(-MAX_REMEMBERED_RELOAD_FAILURES) }),
+    );
   } catch {
     // Best-effort loop guard; reloadWithCacheBuster also marks the URL.
   }
   reload();
   return true;
 };
+
+// React.lazy caches a rejected chunk import, so only a fresh page load can pick up a newer deploy.
+export const reloadForStaleChunk = (win: BootWindow = globalThis.window): void =>
+  reloadWithCacheBuster(win, STALE_CHUNK_RELOAD_PARAM);
 
 const appendTextNode = (
   doc: Document,
@@ -228,6 +319,8 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   }
 
   const staleChunk = isStaleChunkLoadError(error);
+  // Offline, an automatic reload would only reach the browser's offline page.
+  const offline = staleChunk && isBrowserOffline(win);
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
   const reload =
     options.reload ||
@@ -238,7 +331,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
   const requestedAutoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   const automaticReloadPaused = hasReloadParam(win, reloadParam);
-  const autoReloadDelayMs = !staleChunk || automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
+  const autoReloadDelayMs = !staleChunk || offline || automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
   let refreshStarted = false;
   const refresh = async (button: HTMLButtonElement | null) => {
     if (refreshStarted) return;
@@ -293,23 +386,29 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     doc,
     panel,
     'h1',
-    staleChunk ? 'A new version of Context Engine is available' : 'Context Engine could not start',
+    offline
+      ? 'You appear to be offline'
+      : staleChunk
+        ? 'A new version of Context Engine is available'
+        : 'Context Engine could not start',
     'margin:0 0 14px;color:var(--ce-panel-text,CanvasText);font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
     panel,
     'p',
-    staleChunk
-      ? 'Reloading clears cached app data and loads the latest version.'
-      : 'Reload to try again. Your drafts and settings will be preserved.',
+    offline
+      ? 'Reconnect, then reload Context Engine.'
+      : staleChunk
+        ? 'Reloading clears cached app data and loads the latest version.'
+        : 'Reload to try again. Your drafts and settings will be preserved.',
     'margin:0 0 20px;color:var(--ce-panel-text-muted,CanvasText);font-size:17px;line-height:1.45',
   );
   const countdownNode = appendTextNode(
     doc,
     panel,
     'p',
-    automaticReloadPaused
+    automaticReloadPaused && !offline
       ? 'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.'
       : '',
     'margin:0 0 20px;color:var(--ce-panel-text,CanvasText);font-size:15px;font-weight:700;line-height:1.35',

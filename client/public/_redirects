@@ -1,2 +1,4 @@
 /demo/dacc /about 301
+/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301
+/assets/* /404.html 404
 /* /index.html 200

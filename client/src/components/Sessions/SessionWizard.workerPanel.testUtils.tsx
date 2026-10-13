@@ -535,12 +535,12 @@ const openAdvancedMoreOptions = async () => {
   enableAdvancedMode();
   fireEvent.click(screen.getByRole('button', { name: /more options/i }));
 };
-const getFeaturedCreateButton = async () =>
+const getFeaturedCreateButton = async (): Promise<HTMLElement> =>
   await waitFor(() => {
     const button = screen
       .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
       .find((node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs');
-    expect(button).toBeTruthy();
+    if (!button) throw new Error('Featured SBT create button not found.');
     return button;
   });
 const ensureGateASelectorVisible = async () => {

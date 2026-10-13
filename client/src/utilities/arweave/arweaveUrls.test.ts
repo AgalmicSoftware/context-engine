@@ -5,6 +5,8 @@ import {
   isArweaveTxId,
   normalizeArweaveUrl,
   parseArweaveTxId,
+  toSafeArweaveLinkHref,
+  toSafeLinkHref,
 } from './arweaveUrls';
 
 jest.mock('./arweaveClient.js', () => ({
@@ -65,6 +67,66 @@ describe('arweaveUrls helpers', () => {
     expect(normalizeArweaveUrl(`${subdomainArweaveGateway}/${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
     expect(normalizeArweaveUrl('assets/img/ce_header.webp')).toBe('assets/img/ce_header.webp');
     expect(normalizeArweaveUrl('https://example.example.test/foo.png')).toBe('https://example.example.test/foo.png');
+  });
+
+  it('allows only http, https, ar://, and same-site path values as link hrefs', () => {
+    expect(toSafeLinkHref(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeLinkHref(`ar://${txId}`, { gateway: testArweaveGateway })).toBe(`${testArweaveGateway}/${txId}`);
+    expect(toSafeLinkHref(' https://example.test/doc ')).toBe('https://example.test/doc');
+    expect(toSafeLinkHref('http://example.test/doc?x=1')).toBe('http://example.test/doc?x=1');
+    // Same-site paths, such as saved doc-library viewer links, resolve against this origin.
+    expect(toSafeLinkHref('/session/demo/docs?__ceDocTx=abc')).toBe(
+      `${window.location.origin}/session/demo/docs?__ceDocTx=abc`,
+    );
+    expect(toSafeLinkHref('/.//evil.example/phish')).toBe(`${window.location.origin}//evil.example/phish`);
+    // Unlike normalizeArweaveUrl, unsafe values never pass through.
+    expect(normalizeArweaveUrl('javascript:alert(1)')).toBe('javascript:alert(1)');
+    for (const unsafe of [
+      'javascript:alert(1)',
+      ' JavaScript:alert(1)',
+      'data:text/html,<b>x</b>',
+      'vbscript:msgbox(1)',
+      'ar://not-a-tx-id',
+      'ftp://example.test/doc',
+      '//evil.example/phish',
+      '/\\evil.example/phish',
+      '/\t/evil.example/phish',
+      // A user name or password in the link hides its real host.
+      ['https://site.example', 'evil.example/'].join('@'),
+      ['https://user:pass', 'example.test/doc'].join('@'),
+      'relative/doc',
+      'example.test/doc',
+      txId,
+      '',
+      null,
+      { href: 'https://example.test' },
+      // Uploaded JSON can carry an object whose text conversion throws.
+      JSON.parse('{"toString":1}'),
+    ]) {
+      expect(toSafeLinkHref(unsafe)).toBe('');
+    }
+  });
+
+  it('links stored Arweave references only through safe gateway hrefs', () => {
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = false;
+    expect(toSafeArweaveLinkHref(txId)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeArweaveLinkHref(`ar://${txId}`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeArweaveLinkHref(`${canonicalArweaveGateway}/tx/${txId}/data`)).toBe(`${defaultArIoGateway}/${txId}`);
+    expect(toSafeArweaveLinkHref(txId, { gateway: testArweaveGateway })).toBe(`${testArweaveGateway}/${txId}`);
+    for (const unsafe of [
+      'javascript:alert(document.domain)',
+      '//evil.example/phish',
+      'data:text/html,x',
+      // Other web links and same-site paths are not Arweave references.
+      'https://arweave-net.example/login?next=wallet',
+      'https://example.test/doc',
+      '/session/demo?worker=https://worker.attacker.example',
+      '',
+      null,
+      JSON.parse('{"toString":1}'),
+    ]) {
+      expect(toSafeArweaveLinkHref(unsafe)).toBe('');
+    }
   });
 
   it('defaults to direct AR.IO-only gateway routing', () => {

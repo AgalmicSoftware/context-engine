@@ -1,4 +1,4 @@
-import { getEffectiveFaucetConfig, getLocalResourceKeys, saveLocalResourceKeys } from './resourceKeys.js';
+import { getEffectiveArweaveKey, getLocalResourceKeys, saveLocalResourceKeys } from './resourceKeys.js';
 
 describe('resourceKeys session fallback policy', () => {
   beforeEach(() => {
@@ -6,32 +6,21 @@ describe('resourceKeys session fallback policy', () => {
     sessionStorage.clear();
   });
 
-  it('does not inherit the general session faucet config for unknown non-general slugs', async () => {
-    const resolved = await getEffectiveFaucetConfig({
+  it('does not inherit the general session config for unknown non-general slugs', async () => {
+    const resolved = await getEffectiveArweaveKey({
       sessionSlug: 'missing-session-slug',
     });
 
-    expect(resolved.rpcUrl).toBe('');
-    expect(resolved.amountEth).toBe('');
-    expect(resolved.balanceThresholdEth).toBe('');
-  });
-
-  it('keeps the general session faucet config empty in the oss demo seed', async () => {
-    const resolved = await getEffectiveFaucetConfig({
-      sessionSlug: '',
-    });
-
-    expect(resolved.amountEth).toBe('');
-    expect(resolved.balanceThresholdEth).toBe('');
+    expect(resolved.sessionConfigSource).toBe('missing');
+    expect(resolved.arweaveJwk).toBe('');
   });
 
   it('treats canonicalized general aliases as the default session', async () => {
-    const resolved = await getEffectiveFaucetConfig({
-      sessionSlug: ' GeNeRal!!! ',
-    });
+    const general = await getEffectiveArweaveKey({ sessionSlug: '' });
+    const alias = await getEffectiveArweaveKey({ sessionSlug: ' GeNeRal!!! ' });
 
-    expect(resolved.amountEth).toBe('');
-    expect(resolved.balanceThresholdEth).toBe('');
+    expect(general.sessionConfigSource).not.toBe('missing');
+    expect(alias.sessionConfigSource).toBe(general.sessionConfigSource);
   });
 
   it('preserves exact non-alias session slugs in in-memory resource-key state', () => {

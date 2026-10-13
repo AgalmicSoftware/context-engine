@@ -137,3 +137,79 @@ test('strict admin snapshots redact auxiliary locks and still reject answer or r
 		assert.equal(rejected.status, 400);
 	}
 });
+
+// How clients up to 0.6.7 uploaded a cleared answer or comment that had been locked.
+const clearedWithLockFlag = (extra = {}) => ({
+	value: '',
+	encrypted: true,
+	encryptionAudience: 'self_admin',
+	encryptionGateId: 'gate-1',
+	audienceMode: 'explicit',
+	hash: '',
+	encryptedPortion: '',
+	...extra,
+});
+
+test('a cleared field that kept its lock flag reads as cleared and withdraws the older answer', async () => {
+	const kv = createKv();
+	await putPayload({
+		kv,
+		resource: 'questions',
+		id: 'qmeta1',
+		payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Say something', type: 'freeform' },
+	});
+	const blank = { value: '', encrypted: false, hash: '', encryptedPortion: '' };
+	const putRow = (id, responder, createdAt, answer, additional) => putPayload({
+		kv,
+		resource: 'responses',
+		id,
+		metadata: { responder, createdAt },
+		payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer, additional },
+	});
+	const [A, B, C] = ['1', '2', '3'].map((digit) => `0x${digit.repeat(40)}`);
+	// A answers in public, then clears the locked answer.
+	await putRow('a0', A, '2026-09-17T00:00:00.000Z', { value: 'older public answer', encrypted: false }, blank);
+	await putRow('a1', A, '2026-09-18T00:00:00.000Z', clearedWithLockFlag(), blank);
+	// B keeps a public answer and clears a locked comment.
+	await putRow('b0', B, '2026-09-17T00:00:00.000Z', { value: 'kept answer', encrypted: false }, clearedWithLockFlag({ hash: '0xstale' }));
+	// C clears both.
+	await putRow('c0', C, '2026-09-17T00:00:00.000Z', blank, clearedWithLockFlag());
+	const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: kv }, slug: 'session-a', config });
+	assert.equal(source.ok, true);
+	assert.deepEqual(source.snapshot.responses.map(({ answer, additional }) => ({ answer, additional })), [
+		{ answer: 'kept answer', additional: undefined },
+	]);
+	assert.deepEqual([source.counts.lockedCount, source.counts.excludedCount], [0, 2]);
+});
+
+test('an admin snapshot reads a cleared field that kept its lock flag as cleared', async () => {
+	const load = (responses) => loadAdminSnapshotResultsAnalysisSource({
+		slug: 'session-a',
+		config,
+		body: {
+			source: {
+				kind: 'admin-snapshot',
+				snapshot: { sessionSlug: 'session-a', sessionId, questions: [{ id: 'q1', prompt: 'Say something', type: 'text' }], responses },
+			},
+		},
+	});
+	const older = { questionId: 'q1', participantId: 'p1', answer: { value: 'older public answer' }, submittedAt: '2026-09-17T00:00:00.000Z' };
+	const source = await load([
+		older,
+		{ questionId: 'q1', participantId: 'p1', answer: clearedWithLockFlag(), submittedAt: '2026-09-18T00:00:00.000Z' },
+		{ questionId: 'q1', participantId: 'p2', answer: { value: 'kept answer' }, additional: clearedWithLockFlag() },
+	]);
+	assert.equal(source.ok, true, JSON.stringify(source));
+	assert.deepEqual(source.snapshot.responses.map(({ answer }) => answer), ['kept answer']);
+	assert.equal(source.counts.lockedCount, 0);
+	// A field that still holds a mask or an envelope stays locked.
+	for (const answer of [
+		clearedWithLockFlag({ encryptedPortion: 'ciphertext' }),
+		clearedWithLockFlag({ envelope: { ciphertext: 'AAAA' } }),
+		clearedWithLockFlag({ value: '*' }),
+		clearedWithLockFlag({ locked: true }),
+	]) {
+		const rejected = await load([{ ...older, answer }]);
+		assert.equal(rejected.status, 400, JSON.stringify(answer));
+	}
+});

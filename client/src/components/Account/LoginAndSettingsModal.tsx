@@ -117,7 +117,7 @@ import {
   createLoginAgentActions,
   resolveValidatedWorkerCanonicalLoginConfig,
 } from './loginAndSettingsAgentTokenActions';
-import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
+import { createLoginPasskeyActions, restorePasskeyLoginPassively } from './loginAndSettingsPasskeyActions';
 import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 const LoginSettingsAiConfigContent = React.lazy(() => import('./LoginSettingsAiConfigContent'));
@@ -549,32 +549,22 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this.applyLoginModalFocus(this.props.loginModalFocus);
     this.checkAndSendTestFundsIfNeeded();
 
-    // Passkey wallet session rehydration
-    const passkeyNetwork = this.getPasskeyWalletNetwork();
+    // Passkey wallet session rehydration; AccountSection also runs this at app start.
     const passkeyRestoreReqId = this._passkeyWalletRestoreReqId + 1;
     this._passkeyWalletRestoreReqId = passkeyRestoreReqId;
     const passkeyActionIdAtRestoreStart = this._passkeyWalletActionId;
-    const restoredAddress = await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false });
+    const restoredAddress = await restorePasskeyLoginPassively({
+      changeAccount: (payload) => this.props.changeAccount(payload),
+      getNetwork: () => this.getPasskeyWalletNetwork(),
+      isCurrent: () =>
+        this._isMounted &&
+        passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
+        passkeyActionIdAtRestoreStart === this._passkeyWalletActionId,
+      restoreSession: (options) => passkeyWallet.restorePasskeyWalletSession(options),
+      updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
+    });
     if (!this._isMounted) return;
-
-    const restoreStillCurrent =
-      passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
-      passkeyActionIdAtRestoreStart === this._passkeyWalletActionId;
-    if (restoredAddress && restoreStillCurrent) {
-      accountLog.log('Restored passkey wallet session:', restoredAddress);
-      const web3info = {
-        account: restoredAddress,
-        provider: 'passkey_eoa',
-        network: passkeyNetwork,
-        userImageURL: undefined,
-      };
-      this.props.changeAccount(web3info);
-      this.props.updateLoginInfo({
-        loginInProgress: false,
-        loginComplete: true,
-        provider: 'passkey_eoa',
-      });
-    }
+    if (restoredAddress) accountLog.log('Restored passkey wallet session:', restoredAddress);
 
     if (this.props.wagmiAddress && this.props.provider !== 'wagmi') {
       this.updateStateUponWagmiLogin();
@@ -832,8 +822,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   handleLogout = async () => {
     this._passkeyWalletActionId += 1;
     this._purposefulPasskeyActionId = null;
-    if (this.props.provider === 'passkey_eoa') {
+    // Disconnect a saved passkey wallet on every logout, not only a passkey one,
+    // so the start-up restore cannot sign the visitor back in as that account.
+    try {
       await passkeyWallet.logoutPasskeyWallet();
+    } catch (error) {
+      if (this.props.provider === 'passkey_eoa') throw error;
+      accountLog.warn('Saved passkey wallet disconnect failed during logout:', error);
     }
 
     if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {

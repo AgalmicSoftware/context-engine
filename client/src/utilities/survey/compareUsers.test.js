@@ -1,6 +1,5 @@
 import {
   buildUsersFromCaches,
-  computeOverlapMatrix,
   encodeStancesForUser,
   fallbackBullets,
   getCompareSbtKey,
@@ -9,8 +8,6 @@ import {
   normalizeRatingSignedValue,
   pcaLiteCompass,
   sanitizeCompass,
-  sbtNameSets,
-  selectTopOpinionTokens,
   shortenPlain,
 } from './compareUsers';
 
@@ -222,7 +219,7 @@ describe('buildUsersFromCaches', () => {
       [],
     );
 
-    expect(sbtNameSets(users).map((set) => Array.from(set))).toEqual([
+    expect(users.map((user) => user.sbts.map((sbt) => getCompareSbtKey(sbt)))).toEqual([
       ['sbt_onchain:general:84532:0xsbt1'],
       ['sbt_onchain:general:84532:0xsbt2'],
     ]);
@@ -381,7 +378,7 @@ describe('buildUsersFromCaches', () => {
       { sessionSlug: 'alpha' },
     );
 
-    const keys = users.map((user) => Array.from(sbtNameSets([user])[0]));
+    const keys = users.map((user) => user.sbts.map((sbt) => getCompareSbtKey(sbt)));
     expect(keys[0][0]).toContain(':11155420:');
     expect(keys[1][0]).toContain(':84532:');
     expect(fallbackBullets(users).agreements).toEqual([]);
@@ -503,37 +500,6 @@ describe('compare user pure helpers', () => {
       expect(tokens.has('rating')).toBe(false);
     },
   );
-
-  it('selects top opinion tokens and builds opinion overlap rows', () => {
-    const topTokens = selectTopOpinionTokens(opinionUsers, 4);
-    const matrix = computeOverlapMatrix(opinionUsers, 4);
-
-    expect(topTokens).toEqual(['q1', 'q2', 'q4::cli', 'q3']);
-    expect(matrix.mode).toBe('opinion');
-    expect(matrix.columns.map((column) => column.key)).toEqual(topTokens);
-    expect(matrix.rows).toEqual([
-      [1, -1, 1, 0],
-      [1, 1, 1, -1],
-      [-1, 1, 0, -1],
-    ]);
-  });
-
-  it('falls back to an SBT presence matrix when opinion signal is sparse', () => {
-    const matrix = computeOverlapMatrix(
-      [
-        { address: ADDRESS_A, sbts: [{ name: 'Alpha' }], questions: [{ id: 'q1', type: 'binary', answer: 'yes' }] },
-        { address: ADDRESS_B, sbts: [{ name: 'Alpha' }, { name: 'Beta' }], questions: [] },
-      ],
-      3,
-    );
-
-    expect(matrix.mode).toBe('sbt');
-    expect(matrix.columns.map((column) => column.label)).toEqual(['Alpha', 'Beta']);
-    expect(matrix.rows).toEqual([
-      [{ has: true }, { has: false }],
-      [{ has: true }, { has: true }],
-    ]);
-  });
 
   it('creates and sanitizes deterministic compass points', () => {
     const compass = pcaLiteCompass(opinionUsers);

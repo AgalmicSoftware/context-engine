@@ -8,7 +8,7 @@
  */
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
-import { cryptoUtils } from './cryptography.js';
+import { cryptoUtils, getDecryptCacheGeneration } from './cryptography.js';
 import { DEFAULT_CHIPOTLE_ACTION_CODE } from './litChipotleCatalog.js';
 import {
   buildLitChipotlePolicy,
@@ -132,19 +132,6 @@ type LitGetKeyCacheEntry = {
   value?: unknown;
   errMsg?: string;
 };
-type BufferBigUIntWriter = {
-  writeBigUInt64BE?(value: string | number | bigint, offset?: number): unknown;
-  writeBigUint64BE?(value: string | number | bigint, offset?: number): unknown;
-};
-
-type BufferCtorLike = {
-  prototype?: BufferBigUIntWriter;
-  alloc?: (size: number) => Uint8Array & BufferBigUIntWriter;
-};
-type RuntimeBufferScope = {
-  Buffer?: BufferCtorLike;
-};
-
 declare global {
   interface Window {
     __litHooks?: LitHooksApi | null;
@@ -331,90 +318,6 @@ const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
 
-const asRuntimeBufferScope = (scope: object): RuntimeBufferScope => scope;
-
-const getGlobalScope = (): RuntimeBufferScope | null => {
-  if (typeof globalThis !== 'undefined') return asRuntimeBufferScope(globalThis);
-  if (typeof window !== 'undefined') return asRuntimeBufferScope(window);
-  return null;
-};
-
-const bufferHasBigUIntWrite = (BufferCtor: BufferCtorLike | null | undefined) => {
-  try {
-    if (!BufferCtor || typeof BufferCtor.alloc !== 'function') return false;
-    const probe = BufferCtor.alloc(8);
-    return typeof probe?.writeBigUInt64BE === 'function' || typeof probe?.writeBigUint64BE === 'function';
-  } catch (_) {
-    return false;
-  }
-};
-
-const installBufferBigUIntWriteShim = (BufferCtor: BufferCtorLike | null | undefined) => {
-  if (!BufferCtor || !BufferCtor.prototype) return false;
-
-  const writeCompat = function writeBigUInt64BECompat(this: Uint8Array, value: string | number | bigint, offset = 0) {
-    const bigIntCtor =
-      typeof globalThis !== 'undefined' && typeof globalThis.BigInt === 'function' ? globalThis.BigInt : null;
-    if (!bigIntCtor) {
-      throw new TypeError('BigInt is not supported in this runtime.');
-    }
-    const start = Number(offset);
-    if (!Number.isInteger(start) || start < 0 || start + 8 > this.length) {
-      throw new RangeError('Index out of range');
-    }
-
-    let x = typeof value === 'bigint' ? value : bigIntCtor(value);
-    if (x < 0n || x > 0xffffffffffffffffn) {
-      throw new RangeError('value out of range');
-    }
-
-    for (let i = 7; i >= 0; i -= 1) {
-      this[start + i] = Number(x & 0xffn);
-      x >>= 8n;
-    }
-    return start + 8;
-  };
-
-  const prototype = BufferCtor.prototype;
-  if (typeof prototype.writeBigUInt64BE !== 'function') {
-    prototype.writeBigUInt64BE = writeCompat;
-  }
-  if (typeof prototype.writeBigUint64BE !== 'function') {
-    prototype.writeBigUint64BE = prototype.writeBigUInt64BE;
-  }
-  return bufferHasBigUIntWrite(BufferCtor);
-};
-
-/**
- * Ensures the active runtime exposes a Buffer implementation compatible with Lit's bigint writes.
- *
- * @returns {BufferConstructorLike | null}
- */
-export const ensureLitBufferCompatibility = () => {
-  const scope = getGlobalScope();
-  if (!scope) return null;
-
-  const runtimeBuffer = scope.Buffer;
-  const bundledBuffer = Buffer as BufferCtorLike;
-  if (bufferHasBigUIntWrite(runtimeBuffer)) return runtimeBuffer;
-
-  if (bufferHasBigUIntWrite(bundledBuffer)) {
-    scope.Buffer = bundledBuffer;
-    return scope.Buffer;
-  }
-
-  if (installBufferBigUIntWriteShim(runtimeBuffer)) {
-    return runtimeBuffer;
-  }
-  if (installBufferBigUIntWriteShim(bundledBuffer)) {
-    scope.Buffer = bundledBuffer;
-    return scope.Buffer;
-  }
-  return null;
-};
-
-ensureLitBufferCompatibility();
-
 const logLit = (level: string, message: string, meta?: unknown) => {
   const logger = log as Record<string, (...args: unknown[]) => void>;
   const fn = logger[level] || logger.log;
@@ -431,15 +334,18 @@ const normalizeConnectTimeout = (value: unknown) => {
   return Math.floor(num);
 };
 
+const isProductionBuild = () => {
+  try {
+    return typeof process !== 'undefined' && !!process.env && process.env.NODE_ENV === 'production';
+  } catch (e) {
+    void e; /* fallback: build mode detection. */
+    return false;
+  }
+};
+
 const isE2eLitMockEnabled = () => {
   // Dev/e2e only: never enable in production builds.
-  try {
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production') {
-      return false;
-    }
-  } catch (e) {
-    void e; /* fallback: lit mock detection. */
-  }
+  if (isProductionBuild()) return false;
 
   if (typeof window === 'undefined') return false;
 
@@ -476,16 +382,12 @@ const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
   11155420: 'optimismSepolia',
 });
 
-const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({});
-
 const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
   Object.entries(LIT_CHAIN_BY_ID).reduce((acc: Record<string, number>, [id, chain]) => {
     acc[chain] = Number(id);
     return acc;
   }, {}),
 );
-
-const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({});
 
 const LIT_NETWORK_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   chipotle: 'chipotle',
@@ -888,6 +790,7 @@ const wrapLitGetKeyWithCache = (
   const inflight = new Map<string, Promise<unknown>>(); // key -> Promise
 
   let opCount = 0;
+  let cacheGeneration = getDecryptCacheGeneration();
 
   const clearCache = () => {
     successCache.clear();
@@ -898,6 +801,12 @@ const wrapLitGetKeyWithCache = (
 
   const getKey = async (opts: LitHookOptions = {}) => {
     perfDebugLitGetKey('attempt');
+    // clearDecryptCaches (sign-out, account change) drops every cached key.
+    const generation = getDecryptCacheGeneration();
+    if (generation !== cacheGeneration) {
+      clearCache();
+      cacheGeneration = generation;
+    }
 
     const requester = toStr(opts.requesterAddress || opts.account || context.account || '').trim();
 
@@ -982,6 +891,7 @@ const wrapLitGetKeyWithCache = (
 
     try {
       const value = await run;
+      if (generation !== getDecryptCacheGeneration()) return value;
       const settledAt = Date.now();
       cacheLruSet(
         successCache,
@@ -997,7 +907,7 @@ const wrapLitGetKeyWithCache = (
       const accFail = isAccFailure(err);
       const transient = isTransientLitError(err);
       const ttl = transient ? LIT_GETKEY_NEG_TTL_MS : accFail ? LIT_GETKEY_ACC_NEG_TTL_MS : 0;
-      if (ttl > 0) {
+      if (ttl > 0 && generation === getDecryptCacheGeneration()) {
         cacheLruSet(
           negativeCache,
           key,
@@ -1061,32 +971,6 @@ export const resolveLitChain = ({
   return DEFAULT_LIT_CHAIN;
 };
 
-export const resolveLitWalletAddressChain = ({
-  chainId,
-  litChain,
-  chain,
-}: {
-  chainId?: ChainInput;
-  litChain?: ChainInput;
-  chain?: ChainInput;
-} = {}) => {
-  const resolvedChain = resolveLitChain({ chainId, litChain, chain });
-  return LIT_WALLET_CHAIN_FALLBACKS[resolvedChain] || resolvedChain;
-};
-
-export const getUnsupportedLitContractAccessControlError = ({
-  chainId,
-  litChain,
-  chain,
-}: {
-  chainId?: ChainInput;
-  litChain?: ChainInput;
-  chain?: ChainInput;
-} = {}) => {
-  const resolvedChain = resolveLitChain({ chainId, litChain, chain });
-  return LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS[resolvedChain] || '';
-};
-
 const ensureArray = (val: unknown): unknown[] => (Array.isArray(val) ? val : val ? [val] : []);
 
 /**
@@ -1148,43 +1032,6 @@ export const buildSbtAccessControlConditions = ({
   return out;
 };
 
-/**
- * Builds Lit access control conditions that match a specific wallet address.
- *
- * @param {{
- *   walletAddress?: string,
- *   chain?: string | number | null,
- *   litChain?: string | number | null,
- *   chainId?: number | string | null
- * }} [options={}]
- * @returns {LitAccessControlCondition[] | null}
- */
-export const buildWalletAddressAccessControlConditions = ({
-  walletAddress,
-  chain,
-  litChain,
-  chainId,
-}: {
-  walletAddress?: unknown;
-  chain?: ChainInput;
-  litChain?: ChainInput;
-  chainId?: ChainInput;
-} = {}): LitAccessControlCondition[] | null => {
-  const address = toStr(walletAddress).trim().toLowerCase();
-  if (!ethers.utils.isAddress(address)) return null;
-  const resolvedChain = resolveLitWalletAddressChain({ chainId, litChain, chain });
-  return [
-    {
-      contractAddress: '',
-      standardContractType: '',
-      chain: resolvedChain,
-      method: '',
-      parameters: [':userAddress'],
-      returnValueTest: { comparator: '=', value: address.toLowerCase() },
-    },
-  ];
-};
-
 const normalizeUserMaxPrice = (value: unknown) => {
   if (typeof value === 'bigint') return value;
   const raw = toStr(value).trim();
@@ -1198,10 +1045,6 @@ const normalizeUserMaxPrice = (value: unknown) => {
   } catch {
     return undefined;
   }
-};
-
-const sanitizePublicLitHooks = (hooks: unknown = {}): LitHooksApi => {
-  return hooks as LitHooksApi;
 };
 
 let e2eLitMockMasterKeyPromise: Promise<CryptoKey> | null = null;
@@ -1354,14 +1197,12 @@ const createE2eLitMockHooks = ({
   connectTimeout,
   litConnectTimeout,
 }: LitHookOptions = {}): LitHooksApi => {
-  ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
   const resolvedNetwork = resolveLitNetwork(litNetwork);
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
 
   const saveKey = async (symmetricKey: unknown, opts: LitHookOptions = {}) => {
-    ensureLitBufferCompatibility();
     const conditions = Array.isArray(opts.accessControlConditions) ? opts.accessControlConditions : baseConditions;
     if (!conditions || !conditions.length) {
       throw new Error('Lit mock saveKey requires access control conditions.');
@@ -1372,7 +1213,6 @@ const createE2eLitMockHooks = ({
   };
 
   const getKeyUncached = async (opts: LitHookOptions = {}) => {
-    ensureLitBufferCompatibility();
     const effectiveProviderLike = opts.providerLike || providerLike;
     const requester = toStr(opts.requesterAddress || opts.account || account || '').trim();
     const rawConditions = Array.isArray(opts.accessControlConditions) ? opts.accessControlConditions : baseConditions;
@@ -1409,7 +1249,7 @@ const createE2eLitMockHooks = ({
     accessControlConditions: baseConditions,
   });
 
-  return sanitizePublicLitHooks({
+  return {
     saveKey,
     getKey,
     clearCache,
@@ -1422,7 +1262,7 @@ const createE2eLitMockHooks = ({
     resourceAbilityRequests,
     userMaxPrice: normalizeUserMaxPrice(userMaxPrice),
     __e2eMock: true,
-  });
+  } as LitHooksApi;
 };
 
 const createLitChipotleHooks = ({
@@ -1595,7 +1435,7 @@ const createLitChipotleHooks = ({
     accessControlConditions: baseConditions,
   });
 
-  return sanitizePublicLitHooks({
+  return {
     saveKey,
     getKey,
     clearCache,
@@ -1616,7 +1456,7 @@ const createLitChipotleHooks = ({
         litPkpId: toStr(litCredentials.litPkpId).trim(),
       },
     },
-  });
+  } as LitHooksApi;
 };
 
 /**
@@ -1650,7 +1490,6 @@ export const createLitHooks = ({
   litConnectTimeout,
   chipotle,
 }: LitHookOptions = {}): LitHooksApi | null => {
-  ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
   const resolvedUserMaxPrice = normalizeUserMaxPrice(userMaxPrice);
@@ -1691,7 +1530,7 @@ export const createLitHooks = ({
 };
 
 /**
- * Publishes a sanitized Lit hook set on `window.__litHooks`.
+ * Publishes a Lit hook set on `window.__litHooks`.
  *
  * @param {LitHooksApi | Record<string, unknown> | null | undefined} hooks
  * @returns {LitHooksApi | null}
@@ -1699,9 +1538,8 @@ export const createLitHooks = ({
 export const setGlobalLitHooks = (hooks: LitHooksApi | UnknownRecord | null | undefined): LitHooksApi | null => {
   if (typeof window === 'undefined') return null;
   if (hooks && typeof hooks === 'object') {
-    const publicHooks = sanitizePublicLitHooks(hooks) as LitHooksApi;
-    window.__litHooks = publicHooks;
-    return publicHooks;
+    window.__litHooks = hooks;
+    return hooks;
   }
   delete window.__litHooks;
   return null;
@@ -1719,6 +1557,7 @@ export const getGlobalLitHooks = () => {
 
 /**
  * Attaches lightweight Lit encryption helpers to `window.__litTools` for debugging flows in-browser.
+ * Development builds only; production builds never publish them.
  *
  * @param {{
  *   providerLike?: LitProviderLike,
@@ -1739,7 +1578,7 @@ export const attachLitDevTools = ({
   chainId?: ChainInput;
   litChain?: ChainInput;
 } = {}): LitDevToolsApi | null => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined' || isProductionBuild()) return null;
   const tools = {
     encryptForSbt: async ({ value, sbtAddresses, contextLabel, chain }: UnknownRecord = {}) => {
       const hooks = getGlobalLitHooks();

@@ -15,6 +15,7 @@ type RenderInfoTooltip = (props: {
 
 export type WorkerSecretsSectionProps = {
   isNormalMode: boolean;
+  showUserPaidUsage?: boolean;
   translate?: (key: string) => string;
   renderInfoTooltip?: RenderInfoTooltip;
   workerSecretsEnabled: boolean;
@@ -33,6 +34,7 @@ export type WorkerSecretsSectionProps = {
 
 const WorkerSecretsSection = ({
   isNormalMode,
+  showUserPaidUsage = false,
   translate,
   renderInfoTooltip,
   workerSecretsEnabled,
@@ -57,29 +59,31 @@ const WorkerSecretsSection = ({
       {!isNormalMode && (
         <div className={styles.workerSecretsHeader}>
           <div className={styles.workerSecretsTitle}>Worker secrets</div>
-          <div className={styles.workerSecretsToggles}>
-            <Label className={styles.workerToggle}>
-              <Input
-                type="checkbox"
-                checked={!workerSecretsEnabled}
-                data-testid={E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY}
-                onChange={(e) => {
-                  const requirePay = !!e.target.checked;
-                  setWorkerSecretsEnabled(!requirePay);
-                  if (!requirePay) clearWorkerSecretFields();
-                }}
-              />
-              <span>Require users to pay for usage</span>
-              {renderTooltip({
-                id: 'gw-worker-kv-tip',
-                content:
-                  'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
-                placement: 'right',
-                testId: 'ce-wizard-worker-tooltip-gw-worker-kv-tip',
-                ariaLabel: 'Worker secrets mode info',
-              })}
-            </Label>
-          </div>
+          {showUserPaidUsage && (
+            <div className={styles.workerSecretsToggles}>
+              <Label className={styles.workerToggle}>
+                <Input
+                  type="checkbox"
+                  checked={!workerSecretsEnabled}
+                  data-testid={E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY}
+                  onChange={(e) => {
+                    const requirePay = !!e.target.checked;
+                    setWorkerSecretsEnabled(!requirePay);
+                    if (!requirePay) clearWorkerSecretFields();
+                  }}
+                />
+                <span>Require users to pay for usage</span>
+                {renderTooltip({
+                  id: 'gw-worker-kv-tip',
+                  content:
+                    'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
+                  placement: 'right',
+                  testId: 'ce-wizard-worker-tooltip-gw-worker-kv-tip',
+                  ariaLabel: 'Worker secrets mode info',
+                })}
+              </Label>
+            </div>
+          )}
         </div>
       )}
       <div className={styles.resourceSection}>

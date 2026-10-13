@@ -1,4 +1,3 @@
-import { shouldSeedPileBaselineFromPrefill } from './surveyPileCacheSync';
 import { buildPileQuestionSetHydrationPlan } from './surveyPileHydrationPlan';
 import {
   buildEnsureVisiblePileResponseStatePlan,
@@ -10,23 +9,6 @@ import {
 } from './surveyPileResponseWindow';
 
 type CloneValue = <T>(value: T) => T;
-
-type PileQuestionLike =
-  | {
-      id?: unknown;
-    }
-  | null
-  | undefined;
-
-type ApplyCachedResponseEntryToSlice = ({
-  targetSlice,
-  questionId,
-  response,
-}: {
-  targetSlice: PileResponseSlice;
-  questionId: string;
-  response: Record<string, unknown>;
-}) => boolean;
 
 type PileResponseValueShape = {
   answers?: Record<string, unknown> | null;
@@ -90,95 +72,6 @@ export const shouldInitializePileResponses = ({
   submissionComplete?: boolean;
   currentSlice?: PileResponseValueShape | null;
 } = {}): boolean => !submissionComplete && !hasPileResponseSliceValues(currentSlice);
-
-export type PileCachePrefillStatePlan = {
-  shouldSkip: boolean;
-  reason: 'seed-baseline' | 'patch-live';
-  nextSlice: PileResponseSlice;
-  nextState: Record<string, unknown>;
-};
-
-export const buildPileCachePrefillStatePlan = ({
-  pileQuestions = [],
-  questionResponsesByQuestionId = {},
-  account = '',
-  currentSlice = null,
-  editBaseline = null,
-  pendingTotal = 0,
-  applyCachedResponseEntryToSlice = () => false,
-  cloneValue = defaultCloneValue,
-}: {
-  pileQuestions?: PileQuestionLike[];
-  questionResponsesByQuestionId?: Record<string, Record<string, unknown>>;
-  account?: string | null;
-  currentSlice?: Partial<PileResponseSlice> | null;
-  editBaseline?: unknown;
-  pendingTotal?: number | null;
-  applyCachedResponseEntryToSlice?: ApplyCachedResponseEntryToSlice;
-  cloneValue?: CloneValue;
-} = {}): PileCachePrefillStatePlan => {
-  const nextSlice = normalizeResponseSlice(currentSlice, cloneValue);
-  const accountLower = String(account || '').toLowerCase();
-  const questionList = Array.isArray(pileQuestions) ? pileQuestions : [];
-  const responseLookup =
-    questionResponsesByQuestionId && typeof questionResponsesByQuestionId === 'object'
-      ? questionResponsesByQuestionId
-      : {};
-
-  questionList.forEach((question) => {
-    const questionId = String(question?.id || '');
-    if (!questionId) return;
-
-    const rawResponse = responseLookup[questionId.toLowerCase()]?.[accountLower];
-    if (!rawResponse) return;
-
-    let parsedResponse: Record<string, unknown> | null = null;
-    try {
-      parsedResponse =
-        typeof rawResponse === 'string' ? JSON.parse(rawResponse) : (rawResponse as Record<string, unknown>);
-    } catch {
-      parsedResponse = null;
-    }
-    if (!parsedResponse) return;
-
-    applyCachedResponseEntryToSlice({
-      targetSlice: nextSlice,
-      questionId,
-      response: parsedResponse,
-    });
-  });
-
-  const shouldSeedBaseline = shouldSeedPileBaselineFromPrefill({
-    editBaseline,
-    currentSlice,
-    pendingTotal,
-  });
-
-  if (!shouldSeedBaseline) {
-    return {
-      shouldSkip: false,
-      reason: 'patch-live',
-      nextSlice,
-      nextState: {
-        surveysResponseState: [nextSlice],
-      },
-    };
-  }
-
-  const baselineSlice = normalizeResponseSlice(nextSlice, cloneValue);
-  return {
-    shouldSkip: false,
-    reason: 'seed-baseline',
-    nextSlice,
-    nextState: {
-      surveysResponseState: [nextSlice],
-      baselineResponses: normalizeResponseSlice(baselineSlice, cloneValue),
-      editBaseline: baselineSlice,
-      modifiedCount: 0,
-      isDirty: false,
-    },
-  };
-};
 
 export const buildPileInitializeResponseStatePatch = ({
   cloneValue = defaultCloneValue,

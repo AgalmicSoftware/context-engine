@@ -153,6 +153,34 @@ describe('PasskeyEoaWalletClient', () => {
     expect(credentials.get).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['encrypted private-key', config, true],
+    ['passkey-derived', derivedConfig, false],
+  ])('creates a second %s wallet with the saved passkey excluded: %s', async (_label, walletConfig, excluded) => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const createClient = () =>
+      new PasskeyEoaWalletClient({
+        config: walletConfig,
+        storage,
+        credentials,
+        sessionClient: makeSessionClient(),
+        privateKeyFactory: () => PRIVATE_KEY,
+      });
+    await createClient().createWallet();
+    const saved = await storage.read();
+    await createClient().createWallet();
+
+    const [firstOptions, secondOptions] = (credentials.create as jest.Mock).mock.calls.map(
+      ([options]) => (options as CredentialCreationOptions).publicKey,
+    );
+    expect(firstOptions).not.toHaveProperty('excludeCredentials');
+    const secondExclusions = secondOptions?.excludeCredentials || [];
+    expect(secondExclusions.map(({ id }) => bufferToBase64URL(id as ArrayBuffer))).toEqual(
+      excluded ? [saved?.credentialId] : [],
+    );
+  });
+
   it('falls back to one assertion when registration reports PRF support without returning output', async () => {
     const credentials = makeCredentials({ createPrfOutput: null });
     const client = new PasskeyEoaWalletClient({
@@ -387,16 +415,16 @@ describe('PasskeyEoaWalletClient', () => {
     }
   });
 
-  it('re-unlocks and retries a transaction once when the soft-session worker has locked', async () => {
+  it('re-unlocks and retries a signature once when the soft-session worker has locked', async () => {
     const storage = createMemoryWalletStorage();
     const credentials = makeCredentials();
     const sessionClient = makeSessionClient();
     const requestSpy = jest.spyOn(sessionClient, 'request');
     requestSpy.mockImplementation(async ({ method }) => {
-      if (method === 'eth_sendTransaction' && requestSpy.mock.calls.length === 1) {
+      if (method === 'personal_sign' && requestSpy.mock.calls.length === 1) {
         throw new Error('Passkey wallet is locked.');
       }
-      if (method === 'eth_sendTransaction') return '0x' + '33'.repeat(32);
+      if (method === 'personal_sign') return '0x' + '11'.repeat(65);
       return null;
     });
     const client = new PasskeyEoaWalletClient({
@@ -413,7 +441,7 @@ describe('PasskeyEoaWalletClient', () => {
     const address = await client.createWallet();
     expect(client.isUnlocked()).toBe(true);
 
-    await expect(client.sendTransaction({ to: address, value: '0x0' })).resolves.toMatch(/^0x33/);
+    await expect(client.signMessage('hello', address)).resolves.toMatch(/^0x11/);
 
     expect(credentials.get).toHaveBeenCalledTimes(1);
     expect(sessionClient.calls).toHaveLength(2);
@@ -594,6 +622,284 @@ describe('PasskeyEoaWalletClient', () => {
     await expect(returning.signMessage('unlock me')).resolves.toMatch(/^0x11/);
     expect(credentials.get).toHaveBeenCalledTimes(1);
     expect(returning.isUnlocked()).toBe(true);
+  });
+});
+
+describe('PasskeyEoaWalletClient account binding', () => {
+  const OTHER_ACCOUNT = '0x00000000000000000000000000000000000000Bb';
+  const TYPED_DATA = {
+    domain: { name: 'Context Engine' },
+    types: { Message: [{ name: 'contents', type: 'string' }] },
+    primaryType: 'Message',
+    message: { contents: 'hello' },
+  };
+
+  beforeEach(() => {
+    (globalThis as any).PublicKeyCredential = function PublicKeyCredential() {};
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).PublicKeyCredential;
+  });
+
+  it('rejects EIP-1193 signing for an account other than the unlocked wallet', async () => {
+    const sessionClient = makeSessionClient();
+    const requestSpy = jest.spyOn(sessionClient, 'request');
+    const client = new PasskeyEoaWalletClient({
+      config,
+      storage: createMemoryWalletStorage(),
+      credentials: makeCredentials(),
+      sessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    const address = await client.createWallet();
+    const provider = client.createProvider();
+
+    for (const request of [
+      { method: 'personal_sign', params: ['0x68656c6c6f', OTHER_ACCOUNT] },
+      { method: 'eth_signTypedData_v4', params: [OTHER_ACCOUNT, JSON.stringify(TYPED_DATA)] },
+      { method: 'eth_sendTransaction', params: [{ from: OTHER_ACCOUNT, to: address, value: '0x0' }] },
+      { method: 'eth_signTransaction', params: [{ from: OTHER_ACCOUNT, to: address, value: '0x0' }] },
+    ]) {
+      await expect(provider.request(request)).rejects.toMatchObject({ code: 4100 });
+    }
+    expect(requestSpy).not.toHaveBeenCalled();
+
+    await expect(
+      provider.request({ method: 'personal_sign', params: ['0x68656c6c6f', address.toLowerCase()] }),
+    ).resolves.toMatch(/^0x11/);
+    await expect(
+      provider.request({ method: 'eth_signTypedData_v4', params: [address, JSON.stringify(TYPED_DATA)] }),
+    ).resolves.toMatch(/^0x22/);
+    await client.lock();
+  });
+
+  it.each([
+    ['encrypted private-key', config],
+    ['passkey-derived', derivedConfig],
+  ])('keeps the %s account when another tab saves a different wallet', async (_label, walletConfig) => {
+    const storage = createMemoryWalletStorage();
+    let now = Date.now();
+    const firstCredentials = makeCredentials();
+    const first = new PasskeyEoaWalletClient({
+      config: walletConfig,
+      storage,
+      credentials: firstCredentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: makeSessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+      now: () => now,
+    });
+    const firstAddress = await first.createWallet();
+    const second = new PasskeyEoaWalletClient({
+      config: walletConfig,
+      storage,
+      credentials: makeCredentials({ createPrfOutput: ALT_PRF_OUTPUT, getPrfOutput: ALT_PRF_OUTPUT }),
+      sessionClient: makeSessionClient(),
+      privateKeyFactory: () => `0x${'42'.repeat(32)}` as `0x${string}`,
+    });
+    const secondAddress = await second.createWallet();
+    await second.lock();
+    expect(secondAddress).not.toBe(firstAddress);
+
+    now += walletConfig.unlockTtlSeconds * 1000 + 1;
+    await expect(first.signTypedData(TYPED_DATA)).rejects.toMatchObject({ code: 4100 });
+    await expect(
+      first.createProvider().request({ method: 'eth_signTypedData_v4', params: [firstAddress, TYPED_DATA] }),
+    ).rejects.toMatchObject({ code: 4100 });
+
+    expect(firstCredentials.get).not.toHaveBeenCalled();
+    expect(first.getAddress()).toBe(firstAddress);
+    expect((await storage.read())?.evmAddress).toBe(secondAddress);
+    await first.lock();
+  });
+
+  it('locks the signer when the app switches chains and re-unlocks on the new chain', async () => {
+    const credentials = makeCredentials();
+    const firstSession = makeSessionClient();
+    const nextSession = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: firstSession,
+      sessionClientFactory: () => nextSession,
+    });
+    const address = await client.createWallet();
+    expect(firstSession.calls[0].chainId).toBe(11155420);
+
+    client.setChain(11155420);
+    expect(client.isUnlocked()).toBe(true);
+    expect(firstSession.locked).toBe(false);
+
+    client.setChain(84532);
+    expect(client.isUnlocked()).toBe(false);
+    expect(firstSession.locked).toBe(true);
+    await expect(client.request({ method: 'eth_chainId' })).resolves.toBe('0x14a34');
+
+    await expect(client.signMessage('hello', address)).resolves.toMatch(/^0x11/);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(nextSession.calls.map((call) => call.chainId)).toEqual([84532]);
+    expect(client.isUnlocked()).toBe(true);
+    await client.lock();
+  });
+
+  it('unlocks only the requested account when the app has no active wallet yet', async () => {
+    const storage = createMemoryWalletStorage();
+    const creator = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+    });
+    const address = await creator.createWallet();
+    await creator.lock();
+    const credentials = makeCredentials();
+    const returning = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+    });
+
+    await expect(returning.signMessage('hello', OTHER_ACCOUNT)).rejects.toMatchObject({ code: 4100 });
+    expect(credentials.get).not.toHaveBeenCalled();
+    await expect(returning.signMessage('hello', address)).resolves.toMatch(/^0x11/);
+    expect(returning.getAddress()).toBe(address);
+    await returning.lock();
+  });
+});
+
+// Like the worker session client: requests stay in flight until released, and
+// lock() rejects whatever is still in flight. A transaction is broadcast as
+// soon as the session receives it.
+type FakeSession = {
+  chainId: number;
+  locked: boolean;
+  pendingCount: () => number;
+  release: () => void;
+};
+
+const makeFakeSessions = (broadcasts: number[]) => {
+  const sessions: FakeSession[] = [];
+  const create = (): SoftSessionClient => {
+    const pending: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
+    const session: FakeSession = {
+      chainId: 0,
+      locked: false,
+      pendingCount: () => pending.length,
+      release: () => pending.splice(0).forEach(({ resolve }) => resolve()),
+    };
+    sessions.push(session);
+    return {
+      async init(options) {
+        session.chainId = options.chainId;
+        return ADDRESS;
+      },
+      request({ method }) {
+        const chainId = session.chainId;
+        if (method === 'eth_sendTransaction') broadcasts.push(chainId);
+        return new Promise((resolve, reject) =>
+          pending.push({ resolve: () => resolve(`${method}-on-${chainId}`), reject }),
+        );
+      },
+      async lock() {
+        session.locked = true;
+        pending.splice(0).forEach(({ reject }) => reject(new Error('Passkey wallet is locked.')));
+      },
+    };
+  };
+  return { sessions, create };
+};
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+const flushUntil = async (condition: () => boolean) => {
+  for (let attempt = 0; attempt < 50 && !condition(); attempt += 1) await flush();
+};
+
+describe('PasskeyEoaWalletClient requests in flight', () => {
+  beforeEach(() => {
+    (globalThis as any).PublicKeyCredential = function PublicKeyCredential() {};
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).PublicKeyCredential;
+  });
+
+  const setup = async () => {
+    const broadcasts: number[] = [];
+    const { sessions, create } = makeFakeSessions(broadcasts);
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: create(),
+      sessionClientFactory: create,
+    });
+    const address = await client.createWallet();
+    return { address, broadcasts, client, credentials, sessions };
+  };
+
+  it('lets a transaction in flight finish on its own chain when the app switches chains', async () => {
+    const { address, broadcasts, client, credentials, sessions } = await setup();
+    const tx = client.sendTransaction({ from: address, to: address, value: '0x0' });
+    await flush();
+
+    client.setChain(84532);
+    expect(sessions[0].locked).toBe(false);
+    sessions[0].release();
+
+    await expect(tx).resolves.toBe('eth_sendTransaction-on-11155420');
+    await flush();
+    expect(sessions[0].locked).toBe(true);
+    expect(broadcasts).toEqual([11155420]);
+    expect(credentials.get).not.toHaveBeenCalled();
+
+    const signature = client.signMessage('hello', address);
+    await flushUntil(() => sessions.some((session) => session.pendingCount() > 0));
+    sessions.forEach((session) => session.release());
+    await expect(signature).resolves.toBe('personal_sign-on-84532');
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    await client.lock();
+  });
+
+  it('never resends a transaction that a lock cut off', async () => {
+    const { address, broadcasts, client, credentials } = await setup();
+    const tx = client.sendTransaction({ from: address, to: address, value: '0x0' });
+    await flush();
+
+    await client.lock(); // e.g. the unlock TTL ends while the transaction is in flight
+
+    await expect(tx).rejects.toThrow(/may already have been sent/);
+    expect(broadcasts).toEqual([11155420]);
+    expect(credentials.get).not.toHaveBeenCalled();
+  });
+
+  it('says a transaction may have been sent when a lock cuts it off after a chain switch', async () => {
+    const { address, broadcasts, client } = await setup();
+    const tx = client.sendTransaction({ from: address, to: address, value: '0x0' });
+    await flush();
+
+    client.setChain(84532);
+    await client.lock(); // e.g. sign-out while the transaction finishes on 11155420
+
+    await expect(tx).rejects.toThrow(/may already have been sent/);
+    expect(broadcasts).toEqual([11155420]);
+  });
+
+  it('reports a network change when a lock interrupts a retry sent before the switch', async () => {
+    const { address, client, sessions } = await setup();
+    const signature = client.signMessage('hello', address);
+    await flush();
+
+    await client.lock();
+    await flushUntil(() => sessions.slice(1).some((session) => session.pendingCount() > 0));
+    client.setChain(84532);
+    await client.lock();
+
+    await expect(signature).rejects.toMatchObject({ code: 4901 });
   });
 });
 

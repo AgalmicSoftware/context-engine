@@ -185,15 +185,21 @@ const login = async ({ env, wallet }) => {
 
 	const issuedAt = new Date(Date.now() - 60_000).toISOString();
 	const expirationTime = new Date(Date.now() + 3_600_000).toISOString();
+	// The exact message shape the current client signs (workerAuth.ts).
 	const message = `${new URL(ORIGIN).host} wants you to sign in with your Ethereum account:
 ${wallet.address}
+
+Sign in to Context Engine.
 
 URI: ${ORIGIN}
 Version: 1
 Chain ID: 1
 Nonce: ${noncePayload.nonce}
 Issued At: ${issuedAt}
-Expiration Time: ${expirationTime}`;
+Expiration Time: ${expirationTime}
+Resources:
+- https://worker.example
+- urn:context-engine:session:id:${SESSION_ID}`;
 	const signature = await wallet.signMessage(message);
 	const response = await fetchWorker(
 		makeRequest('/auth/login', {
@@ -278,13 +284,15 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 	assert.equal(duplicatePolicy.status, 400, await duplicatePolicy.clone().text());
 	assert.equal(storageKv.dump().size, 0);
 	const marker = 'credential-free bundle runtime plaintext marker';
+	// Responses must be answer-shaped JSON, as the client uploads them.
+	const answer = { questionID: 'bundle-runtime-question', answer: marker };
 	const uploadResponse = await fetchWorker(
 		makeRequest('/storage/upload', {
 			method: 'POST',
 			token: participantToken,
 			body: {
-				data: marker,
-				contentType: 'text/plain',
+				data: answer,
+				contentType: 'application/json',
 				resource: 'responses',
 			},
 		}),
@@ -303,7 +311,7 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 		env,
 	);
 	assert.equal(participantRead.status, 200, await participantRead.clone().text());
-	assert.equal(await participantRead.text(), marker);
+	assert.deepEqual(await participantRead.json(), answer);
 
 	const anonymousRead = await fetchWorker(makeRequest(readPath), env);
 	assert.equal(anonymousRead.status, 403);

@@ -1,13 +1,17 @@
 import {
   getChangedInterviewConsentQids,
+  keepConsentWithdrawals,
   resolveConsentFlags,
   type InterviewConsentOverrides,
 } from './sessionInterviewConsent';
 import {
-  loadSessionInterviewSavedAnswers,
-  mergeInterviewSavedAnswerBaseline,
-  type InterviewSavedSlice,
-} from './sessionInterviewSavedAnswers';
+  buildSessionInterviewActiveSubmitContextToken,
+  buildSessionInterviewSubmitContextToken,
+  collectSubmitQuestionIds,
+  ensureSessionInterviewCachedAnswers,
+  loadSessionInterviewOwnAnswers,
+  readOwnAnswersBeforeUpload,
+} from './surveySavedAnswerGate';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
@@ -20,6 +24,7 @@ import QuestionFilter from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import AnswerTooLongNotice from './AnswerTooLongNotice';
 import { extractSingleQuestionOptionsFromCandidate } from './singleQuestionResponseHelpers.js';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -54,7 +59,6 @@ import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
-  buildPilePrefillReadPlan,
   readPileScopedQuestionResponses,
 } from './surveyPileBaselineSync';
 import {
@@ -88,19 +92,19 @@ import {
   buildPileFilterResultPlan,
   buildPileLoadResultPlan,
   buildPileQuestionPipelineState,
+  keepReachedPileCards,
 } from './surveyPileQuestionFlow';
 import { arePileQuestionListsEquivalent } from './surveyPileQuestionListEquivalence';
 import { buildPileVisibleResponseSignature as buildPileVisibleResponseSignatureHelper } from './surveyPileResponseSignature';
 import { buildPileVisibleQuestionIds } from './surveyPileVisibleQuestionIds';
 import {
-  buildPileCachePrefillStatePlan,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
   shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
-import type { PileResponseSlice } from './surveyPileResponseWindow';
+import { clearSurveyDraftsForAccount } from './surveyToolDraftState';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -122,11 +126,6 @@ import {
   type SessionVoiceMode,
 } from './sessionInterview';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
-import {
-  getUsableSessionWorkerUrl,
-  resolveConfiguredSessionWorkerUrlFromConfig,
-} from '../../utilities/session/sessionWorkerAvailability';
-import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 
 // Crypto and contract utilities
 import { utils } from 'ethers';
@@ -143,7 +142,6 @@ import {
   resolveSponsoredGateStateForResource,
 } from '../../utilities/web3/sponsoredAccess.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
-import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 import { resolvePayloadStorageRef } from '../../utilities/storage/storageRefs.js';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue.js';
 
@@ -153,7 +151,6 @@ import {
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionScanProgressDisplay,
   resolveRevertPendingAnswerValue,
-  buildRatingEnvelopeQidSetFromUserAnswers,
   buildSliderPersistOptions,
   buildSliceToken,
   computeSubmitLabel,
@@ -449,7 +446,6 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     toggleConviction: bindPileEngineMethod(engine, toggleConviction),
     openConvictionSlider: bindPileEngineMethod(engine, openConvictionSlider),
     checkCacheAgainstBaseline: bindPileEngineMethod(engine, checkCacheAgainstBaseline),
-    prefillUserAnswersFromCache: bindPileEngineMethod(engine, prefillUserAnswersFromCache),
     buildSessionInterviewSubmitContextToken,
     getSessionInterviewResponseReadinessToken: bindPileEngineMethod(engine, getSessionInterviewResponseReadinessToken),
     loadAndSortQuestions: bindPileEngineMethod(engine, loadAndSortQuestions),
@@ -1116,6 +1112,7 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
 
 const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, prevState: any) => {
   consumeInterviewPrefillHashIfPresent(engine);
+  if (engine.props.isResponsesCacheReady) engine._savedAnswersSeenReady = true;
   const diffInputsChanged = engine.didEditDiffInputsChange(prevProps, prevState);
   if (diffInputsChanged) {
     engine.invalidateDiffCaches();
@@ -1220,12 +1217,17 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     if (engine._jsonPreviewTimer) clearTimeout(engine._jsonPreviewTimer);
     engine._jsonPreviewTimer = null;
     engine._draftDirtyQids?.clear();
+    engine._userAnswersSliceCache = { source: null, value: null };
+    engine.invalidateDiffCaches();
     engine._lastLoadAndSortResultSignature = '';
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;
     engine._sessionInterviewResponseReadyToken = '';
+    engine._savedAnswersSeenReady = !!engine.props.isResponsesCacheReady;
     engine._pileOwnAnswersSubmitController?.abort();
     engine._pileOwnAnswersSubmitController = null;
+    // Unsaved edits belong to the signed-in account; never leave them for the next person.
+    if (accountChanged && prevProps.account) clearSurveyDraftsForAccount(prevProps.account);
 
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
@@ -1543,6 +1545,13 @@ export const recordInterviewProvenance = (
             ? { ...currentProvenance }
             : {};
         const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
+        const savedConsentFor = (questionId: string) => {
+          const consent = provenance[questionId] ?? prev.editBaseline?.interviewProvenance?.[questionId];
+          return consent && typeof consent === 'object' ? (consent as Record<string, unknown>) : null;
+        };
+        // Without an imported name, a ticked box shows the saved name and every submitted response gets one.
+        const shownSavedName =
+          drafts.map((draft) => String(savedConsentFor(draft.questionId)?.responderName || '')).find(Boolean) || '';
         drafts.forEach((draft) => {
           const reviewed =
             reviewedByQuestionId.get(draft.questionId) ||
@@ -1556,10 +1565,7 @@ export const recordInterviewProvenance = (
               ? originalDraft.revisions[0]
               : originalDraft;
           // An untouched control preserves consent, including withdrawals; this draft supplies its own source.
-          const savedConsent =
-            provenance[draft.questionId] ?? prev.editBaseline?.interviewProvenance?.[draft.questionId];
-          const saved =
-            savedConsent && typeof savedConsent === 'object' ? (savedConsent as Record<string, unknown>) : null;
+          const saved = savedConsentFor(draft.questionId);
           const flags = resolveConsentFlags(saved);
           const ai =
             consentOverrides?.includeAiProvenance ?? (consentOverrides && saved ? flags.includeAiProvenance : included);
@@ -1572,7 +1578,7 @@ export const recordInterviewProvenance = (
               : consentOverrides?.includeResponderName === false
                 ? ''
                 : normalizedResponderName ||
-                  (consentOverrides?.includeResponderName ? String(saved?.responderName || '') : '');
+                  (consentOverrides?.includeResponderName ? String(saved?.responderName || shownSavedName) : '');
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: ai,
@@ -1726,66 +1732,6 @@ const checkCacheAgainstBaseline = (engine: PileViewModeEngine) => {
   } else {
     surveyLog.log('PileViewMode: Ignoring stale cache. Maintaining optimistic state.');
   }
-};
-
-const prefillUserAnswersFromCache = (engine: PileViewModeEngine) => {
-  const slug = resolveEffectiveSlug(engine.props);
-  const pileResponseReadContext = resolvePileResponseReadContext(engine.props, slug);
-  const effectiveSlug = pileResponseReadContext.sessionSlug || slug;
-  const networkID = pileResponseReadContext.networkIdStr;
-  const prefillReadPlan = buildPilePrefillReadPlan({
-    account: engine.props.account,
-    isDirty: engine.state.isDirty,
-    modifiedCount: engine.state.modifiedCount,
-    networkIdStr: networkID,
-    pileQuestions: engine.state.pileQuestions,
-  });
-  if (prefillReadPlan.shouldSkip) {
-    if (prefillReadPlan.shouldBumpNoop) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      surveyLog.debug('baseline-guard: skipped rebuild');
-    }
-    return;
-  }
-
-  const acctLower = (engine.props.account || '').toLowerCase();
-  const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(engine.props, effectiveSlug)];
-  const qRespMap = readPileScopedQuestionResponses({
-    scopeSlugs,
-    networkIdStr: networkID,
-    readQuestionsCache,
-    mergeQuestionResponses: mergeQuestionResponsesForPile,
-  });
-
-  const pendingStats = (typeof engine.getPendingEditStats === 'function' && engine.getPendingEditStats()) || {
-    total: engine.state.modifiedCount || 0,
-  };
-  const prefillPlan = buildPileCachePrefillStatePlan({
-    pileQuestions: engine.state.pileQuestions,
-    questionResponsesByQuestionId: qRespMap,
-    account: acctLower,
-    currentSlice: engine.state.surveysResponseState?.[0] as Partial<PileResponseSlice> | null | undefined,
-    editBaseline: engine.state.editBaseline,
-    pendingTotal: pendingStats.total,
-    cloneValue: engine.deepClone,
-    applyCachedResponseEntryToSlice: ({
-      targetSlice,
-      questionId,
-      response,
-    }: {
-      targetSlice: PileResponseSlice;
-      questionId: string;
-      response: Record<string, unknown>;
-    }) =>
-      engine._applyCachedResponseEntryToSlice({
-        targetSlice,
-        questionId,
-        response,
-        parseValue: engine.parseAnswerValue,
-      }),
-  });
-
-  engine.setState(prefillPlan.nextState, () => engine.updateJsonPreview());
 };
 
 const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
@@ -1960,7 +1906,9 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
       previousHasHiddenGatedQuestions: engine.state.hasHiddenGatedQuestions,
       previousLoading: engine.state.loading,
       sortedQuestions: sorted,
-      sortedVisibleQuestions: sortedVisible,
+      sortedVisibleQuestions: isFilterActive
+        ? sortedVisible
+        : keepReachedPileCards(sortedVisible, engine.state.pileQuestions, engine.state.activePileIndex),
       hiddenQuestions: hiddenGated,
       hasHiddenGatedQuestions: nextHidden,
       isFilterActive,
@@ -2124,6 +2072,8 @@ const initializeResponseState = (engine: PileViewModeEngine, cb: any) => {
     buildEmptyResponseFieldState: engine.buildEmptyResponseFieldState,
     setLastInitializeResponseSig: (nextInitializeResponseSig: string) => {
       engine._lastInitializeResponseSig = nextInitializeResponseSig;
+      // The form is rebuilt empty for the new window, so every card loads its saved answers again.
+      engine._savedAnswersLoadedQids?.clear();
     },
     cloneValue: engine.deepClone,
     setState: engine.setState.bind(engine),
@@ -2171,8 +2121,13 @@ const readPlainRecord = (value: unknown): Record<string, unknown> =>
 
 // Interview drafts set answers; they never toggle them. Re-applying the value a
 // binary question already holds would clear it through the pile's toggle.
-export const applySessionInterviewAnswer = (engine: PileViewModeEngine, questionId: string, answer: unknown) =>
-  new Promise<void>((resolve) => {
+export const applySessionInterviewAnswer = async (engine: PileViewModeEngine, questionId: string, answer: unknown) => {
+  const readContext = () =>
+    buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const context = readContext();
+  await ensureSessionInterviewCachedAnswers(engine, [questionId]);
+  if (readContext() !== context) throw new Error('The signed-in account or session changed.');
+  return new Promise<void>((resolve) => {
     const current = readPlainRecord(
       engine.state.surveysResponseState?.[0]?.answers?.[normalizeQuestionIdKey(questionId)],
     ).value;
@@ -2182,58 +2137,79 @@ export const applySessionInterviewAnswer = (engine: PileViewModeEngine, question
     }
     engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
   });
-
-export const buildSessionInterviewSubmitContextToken = (props: Record<string, unknown> = {}) => {
-  const sessionConfig = readPlainRecord(props.sessionConfig);
-  const sessionModeProfile = readPlainRecord(sessionConfig.sessionModeProfile);
-  const sessionAuthority = readPlainRecord(sessionModeProfile.authority);
-  const sessionStorage = readPlainRecord(sessionModeProfile.storage);
-  const storageProfile = readPlainRecord(sessionConfig.storageProfile);
-  const storageResources = readPlainRecord(storageProfile.resources);
-  const slug = String(resolveEffectiveSlug(props) || sessionConfig.slug || '').trim();
-  const network = readPlainRecord(props.network);
-  const networkId = String(network.id || network.chainId || sessionConfig.networkChainId || '').trim();
-  const workerUrl =
-    getUsableSessionWorkerUrl({
-      slug,
-      sessionConfig,
-      allowSharedFallback: false,
-      requireExactWorkerSession: true,
-    }) ||
-    getUsableSessionWorkerUrl({
-      slug,
-      sessionConfig,
-      allowSharedFallback: false,
-    }) ||
-    resolveConfiguredSessionWorkerUrlFromConfig(sessionConfig);
-  const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
-  const responseContract = resolveSessionContractRef({ sessionConfig, contractKey: 'surveys' });
-  const identityParts = [
-    slug,
-    networkId,
-    sessionId,
-    workerUrl,
-    String(sessionConfig.metadataURI || ''),
-    String(sessionModeProfile.preset || ''),
-    String(sessionAuthority.mode || ''),
-    String(sessionStorage.backend || storageProfile.backend || ''),
-    String(storageResources.questions || ''),
-    String(storageResources.surveys || ''),
-    String(storageResources.responses || ''),
-    String(responseContract.address || '').toLowerCase(),
-    String(responseContract.chainId || ''),
-  ];
-  return identityParts.join('|');
 };
 
-const buildSessionInterviewActiveSubmitContextToken = (engine: PileViewModeEngine, baseToken: string) =>
-  [
-    baseToken,
-    String(engine.props.account || '')
-      .trim()
-      .toLowerCase(),
-    String(Boolean(engine.props.loginComplete)),
-  ].join('|');
+// Each draft field with the pending-edit flags that mark it as an unsaved change.
+const INTERVIEW_DRAFT_FIELDS: Record<string, string[]> = {
+  answers: ['answer', 'encryptedAnswer'],
+  additionalComments: ['additional', 'encryptedAdditional'],
+  importance: ['importance'],
+  conviction: ['conviction'],
+  interviewProvenance: [],
+};
+// Interview drafts enter the pile only to be uploaded. The returned restore undoes the
+// applied drafts, so one removed or discarded after a failed upload is not sent later.
+export const captureSessionInterviewResponses = (engine: PileViewModeEngine, questionIds: string[]) => {
+  const readContext = () =>
+    buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
+  const context = readContext();
+  const ids = [...new Set(questionIds.flatMap((id) => [String(id), normalizeQuestionIdKey(id)]))].filter(Boolean);
+  const slice = readPlainRecord(engine.state.surveysResponseState?.[0]);
+  const pendingFlags = readPlainRecord(engine.getChangedQidsAndFields?.(0)?.changedMap);
+  const before = Object.entries(INTERVIEW_DRAFT_FIELDS).map(([field, flags]) => {
+    const entries = readPlainRecord(slice[field]);
+    return {
+      field,
+      entries: ids.map((id) => ({
+        id,
+        had: Object.hasOwn(entries, id),
+        value: entries[id],
+        pending: flags.some((flag) => !!readPlainRecord(pendingFlags[normalizeQuestionIdKey(id)])[flag]),
+      })),
+    };
+  });
+  return () =>
+    new Promise<void>((resolve) => {
+      // A reset for another account or session already discarded the applied drafts.
+      if (!engine._isMounted || readContext() !== context) return resolve();
+      engine.invalidateDiffCaches();
+      // A question that was uploaded after all is saved; only unsaved drafts are undone.
+      const unsaved = new Set<string>(engine.getChangedQidsAndFields?.(0)?.changedQids || []);
+      engine.setState(
+        (prev: SurveyQuestionsState) => {
+          const states = [...(prev.surveysResponseState || [])];
+          const current: Record<string, unknown> = { ...states[0] };
+          before.forEach(({ field, entries }) => {
+            const next = { ...readPlainRecord(current[field]) };
+            const saved = readPlainRecord(readPlainRecord(prev.editBaseline)[field]);
+            entries.forEach(({ id, had, value, pending }) => {
+              if (!unsaved.has(normalizeQuestionIdKey(id))) return;
+              const restored =
+                field === 'interviewProvenance'
+                  ? keepConsentWithdrawals(had ? value : saved[id], next[id]) || (had ? value : undefined)
+                  : // An unedited field takes the saved value, which may have loaded during the upload.
+                    !pending && Object.hasOwn(saved, id)
+                    ? engine.deepClone(saved[id])
+                    : had
+                      ? value
+                      : undefined;
+              if (restored === undefined) delete next[id];
+              else next[id] = restored;
+            });
+            if (current[field] !== undefined || Object.keys(next).length) current[field] = next;
+          });
+          states[0] = current as (typeof states)[number];
+          return { surveysResponseState: states };
+        },
+        () => {
+          // Undo the applied drafts in storage too, so a reload cannot bring them back.
+          ids.forEach((id) => engine._draftDirtyQids?.add(normalizeQuestionIdKey(id)));
+          engine.persistDraft?.();
+          resolve();
+        },
+      );
+    });
+};
 
 const markSessionInterviewResponsesReady = (engine: PileViewModeEngine, baseToken: string) => {
   engine._sessionInterviewResponseReadyToken = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
@@ -2252,6 +2228,27 @@ const getSessionInterviewResponseReadinessToken = (engine: PileViewModeEngine, b
     engine._sessionInterviewResponseReadyToken = activeToken;
   }
   return engine._sessionInterviewResponseReadyToken === activeToken ? activeToken : '';
+};
+
+// A failed session load leaves saved answers unknown; Submit stays gated by the
+// own-answer read, and this notice lets the responder reload them before editing.
+const buildSavedAnswersNotice = (engine: PileViewModeEngine, hasQuestions: boolean) => {
+  const { props } = engine;
+  if (!props.cacheInitializationError || !props.loginComplete || !props.account || !hasQuestions) return null;
+  if (props.isResponsesCacheReady || engine._savedAnswersSeenReady) return null;
+  return { retrying: !!engine.state.savedAnswersRetrying, onRetry: () => void retrySavedAnswersLoad(engine) };
+};
+
+const retrySavedAnswersLoad = async (engine: PileViewModeEngine) => {
+  if (engine.state.savedAnswersRetrying || typeof engine.props.refreshQuestionResponses !== 'function') return;
+  engine.setState({ savedAnswersRetrying: true });
+  try {
+    await engine.props.refreshQuestionResponses(null, { slug: resolveEffectiveSlug(engine.props) });
+  } catch (e) {
+    surveyLog.warn('PileViewMode: saved answers are still unavailable', e);
+  } finally {
+    if (engine._isMounted) engine.setState({ savedAnswersRetrying: false });
+  }
 };
 
 const getSubmitCount = (engine: PileViewModeEngine) => {
@@ -2333,47 +2330,23 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
   ) {
     return engine.handlePileSubmitClick();
   }
-  const token = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
   const controller = new AbortController();
   engine._pileOwnAnswersSubmitController = controller;
-  const isCurrent = () =>
-    engine._isMounted &&
-    !controller.signal.aborted &&
-    token ===
-      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
-  const answerIds = () => {
-    const slice = engine.state.surveysResponseState?.[0] || {};
-    return [
-      ...new Set([
-        // Navigation can initialize another card while the read is in flight.
-        ...engine.state.pileQuestions
-          .map((question: { id: string }) => normalizeQuestionIdKey(question.id))
-          .filter(Boolean),
-        ...['answers', 'additionalComments', 'importance', 'conviction', 'interviewProvenance'].flatMap((key) =>
-          Object.keys(slice[key] || {}),
-        ),
-      ]),
-    ];
-  };
-  const questionIds = answerIds();
   engine.setState({ pileSubmitTempText: 'Loading your saved answers…', submissionError: null });
   try {
-    // A capped public listing cannot prove that a blank answer is new. The
-    // existing strict own read covers all submitted fields and preserves edits.
-    const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, controller.signal);
-    if (!isCurrent()) return { status: 'stale' as const };
-    if (saved === null || answerIds().some((id) => !questionIds.includes(id))) {
-      const message = 'Your saved answers are still loading. Try Submit again when the sync completes.';
-      engine.setState({ pileSubmitTempText: '', submissionError: message });
-      return { status: 'pending' as const, message };
+    const outcome = await readOwnAnswersBeforeUpload(
+      engine,
+      // Navigation can initialize another card while the read is in flight.
+      () => collectSubmitQuestionIds(engine.state.pileQuestions, engine.state.surveysResponseState?.[0]),
+      controller.signal,
+    );
+    if (outcome.status === 'stale') return outcome;
+    if (outcome.status !== 'ready') {
+      engine.setState({ pileSubmitTempText: '', submissionError: outcome.message });
+      return outcome;
     }
     engine.setState({ pileSubmitTempText: '' });
     return await engine.encryptAndUpload();
-  } catch {
-    if (!isCurrent()) return { status: 'stale' as const };
-    const message = 'Could not load your saved answers. Try Submit again to retry.';
-    engine.setState({ pileSubmitTempText: '', submissionError: message });
-    return { status: 'failed' as const, message };
   } finally {
     if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
     // A context reset may have cleared this controller; a later request still
@@ -2387,68 +2360,15 @@ const handlePileSubmitWithOwnAnswers = async (engine: PileViewModeEngine) => {
   }
 };
 
-export const loadSessionInterviewOwnAnswers = async (
-  engine: PileViewModeEngine,
-  questionIds: string[],
-  signal: AbortSignal,
-): Promise<InterviewSavedSlice | null> => {
-  const props = engine.props;
-  const token = buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(props));
-  const isCurrent = () =>
-    !signal.aborted &&
-    token ===
-      buildSessionInterviewActiveSubmitContextToken(engine, buildSessionInterviewSubmitContextToken(engine.props));
-  const responses = await loadSessionInterviewSavedAnswers({
-    questionIds,
-    account: String(props.account || '')
-      .trim()
-      .toLowerCase(),
-    provider: props.provider,
-    sessionSlug: resolveEffectiveSlug(props),
-    sessionConfig: props.sessionConfig || {},
-    signal,
-  });
-  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
-  if (responses === null) return null;
-  const userAnswers = { responses };
-  const saved = engine.buildSliceFromUserAnswers(userAnswers);
-  await new Promise<void>((resolve) =>
-    engine.setState((previous: PileViewModeEngine['state']) => {
-      if (!isCurrent()) return null;
-      const merged = mergeInterviewSavedAnswerBaseline(
-        previous.surveysResponseState?.[0],
-        previous.editBaseline,
-        saved,
-        questionIds,
-        {
-          normalizeQuestionIdKey,
-          valuesEqual: engine.valuesEqual,
-          ratingEnvelopeQids: buildRatingEnvelopeQidSetFromUserAnswers(previous.userAnswers),
-          getDefaultResponseEncryptionAudience: engine.getDefaultResponseEncryptionAudience,
-          normalizeResponseEncryptionAudience: engine.normalizeResponseEncryptionAudience,
-          getDefaultResponseEncryptionAudienceForQid: engine.getDefaultResponseEncryptionAudienceForQid,
-          resolveFieldEncryptionGateId: engine.resolveFieldEncryptionGateId,
-          normalizeFieldAudienceMode: engine.normalizeFieldAudienceMode,
-        },
-      );
-      return {
-        userAnswers,
-        editBaseline: merged.baseline,
-        surveysResponseState: [merged.slice, ...(previous.surveysResponseState || []).slice(1)],
-      };
-    }, resolve),
-  );
-  if (!isCurrent()) throw new Error('The signed-in account or session changed.');
-  return saved || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
-};
-
 export const submitSessionInterviewResponses = async (engine: PileViewModeEngine, questionIds: string[] = []) => {
   // A zero edit count alone cannot prove that drafts were saved. Check the
   // persisted responses for every selected question before accepting a no-op.
   if (engine.props.loginComplete && !engine.state.isSubmitting && engine.getSubmitCount() === 0 && questionIds.length) {
-    const saved = engine.state.userAnswers
-      ? engine.buildSliceFromUserAnswers(engine.state.userAnswers)
-      : engine.state.editBaseline;
+    // Saved rows cover only what the last upload or saved-answer read touched;
+    // any other question is checked against the saved answers loaded into the form.
+    const savedRows = engine.state.userAnswers ? engine.buildSliceFromUserAnswers(engine.state.userAnswers) : null;
+    const savedFor = (id: string) =>
+      savedRows && Object.hasOwn(savedRows.answers || {}, id) ? savedRows : engine.state.editBaseline;
     const current = engine.state.surveysResponseState?.[0];
     const fieldValue = (entry: unknown) => {
       return entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
@@ -2460,13 +2380,15 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
     );
     if (
       !questionIds.some((id) => consentChanges.has(normalizeQuestionIdKey(id))) &&
-      questionIds.every(
-        (id) =>
+      questionIds.every((id) => {
+        const saved = savedFor(id);
+        return (
           Object.hasOwn(saved?.answers || {}, id) &&
           (['answers', 'additionalComments', 'importance', 'conviction'] as const).every((field) =>
             engine.valuesEqual(fieldValue(saved?.[field]?.[id]), fieldValue(current?.[field]?.[id])),
-          ),
-      )
+          )
+        );
+      })
     ) {
       return { status: 'already-saved' as const };
     }
@@ -2474,6 +2396,19 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   // Use the same complete own-answer baseline as manual Submit while the
   // public listing is pending or capped; never bypass the saved-answer read.
   const result = await handlePileSubmitWithOwnAnswers(engine);
+  // An interview answer held back from the upload is reported, so its draft can be removed.
+  const heldBack = new Set<string>(Array.isArray(engine._heldBackSubmitQids) ? engine._heldBackSubmitQids : []);
+  if (
+    result &&
+    typeof result === 'object' &&
+    result.status === 'submitted' &&
+    questionIds.some((id) => heldBack.has(normalizeQuestionIdKey(id)))
+  ) {
+    return {
+      status: 'failed' as const,
+      message: String(engine._heldBackSubmitMessage || 'Some answers were not submitted.'),
+    };
+  }
   if (result && typeof result === 'object' && 'status' in result) return result;
   if (!engine.props.loginComplete) return { status: 'login-required' as const };
   return { status: 'failed' as const, message: 'Submission did not complete.' };
@@ -2581,6 +2516,8 @@ const handleFilter = (engine: PileViewModeEngine, filteredQsOrCombined: any, new
   const nextFilterState = normalizeSurveyToolFilterState(newFilterState || engine.state.filterState);
   const filterResultPlan = buildPileFilterResultPlan({
     currentVisibleSignature: engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions || []),
+    currentPileQuestions: engine.state.pileQuestions,
+    currentActivePileIndex: engine.state.activePileIndex,
     nextVisibleQuestions: sortedFilteredVisible,
     currentFilterState: engine.state.filterState,
     nextFilterState,
@@ -2737,7 +2674,7 @@ const renderPileResponseInput = (
             max={ratingScale.max}
             step={1}
             value={ratingValue}
-            onChange={(val: any, event: any) => {
+            onChange={(val: number, event: Event) => {
               changedDuringInteraction = true;
               if (onAnswerChange) onAnswerChange(val);
               else engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event));
@@ -3017,12 +2954,13 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
     allowDecryptAdditional,
     isAnswerDecrypting,
     isAdditionalDecrypting,
+    answerTooLongMessage,
   } = engine.getQuestionRenderDisplayState({
     questionId: question.id,
     responseSlice: slice,
   });
 
-  const questionComponent = engine.renderPileResponseInput({
+  const responseInput = engine.renderPileResponseInput({
     question,
     answer,
     glowAnswer,
@@ -3031,6 +2969,14 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
     decryptTooltip,
     isAnswerDecrypting,
   });
+  const questionComponent = answerTooLongMessage ? (
+    <>
+      {responseInput}
+      <AnswerTooLongNotice message={answerTooLongMessage} />
+    </>
+  ) : (
+    responseInput
+  );
 
   const questionContainerClass = styles[`${question.type}QuestionContainer`] || '';
   const promptMasked = engine.isQuestionPromptMasked(question);
@@ -3082,6 +3028,8 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     interviewPrefillPacket,
     interviewPrefillError,
   } = engine.state;
+  // The voice modal and its large chunk load on first open, then stay mounted so closing animates.
+  const voiceModeModalMounted = (engine._voiceModeModalMounted ||= !!showVoiceModeModal);
   const fallbackQuestionPool: EarlyVisiblePileQuestion[] =
     Array.isArray(engine.state.questionPool) && engine.state.questionPool.length > 0
       ? (engine.state.questionPool as EarlyVisiblePileQuestion[])
@@ -3231,6 +3179,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({
             submissionError: String(engine.state.submissionError || ''),
+            savedAnswersNotice: buildSavedAnswersNotice(engine, pileQuestions.length > 0),
             showHologramAssistant,
             toggleHologramAssistant: engine.toggleHologramAssistant,
             showMiniBackgroundSpinner,
@@ -3295,7 +3244,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         )}
       </div>
 
-      {isInterviewFeatureEnabled(engine.props?.sessionConfig) ? (
+      {isInterviewFeatureEnabled(engine.props?.sessionConfig) && voiceModeModalMounted ? (
         <React.Suspense fallback={null}>
           {(() => {
             const submitContextToken = engine.buildSessionInterviewSubmitContextToken(engine.props);
@@ -3348,6 +3297,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   })
                 }
                 onRecordProvenance={engine.recordInterviewProvenance}
+                onCaptureResponses={(questionIds: string[]) => captureSessionInterviewResponses(engine, questionIds)}
                 onLoadSavedResponses={(questionIds, signal) =>
                   loadSessionInterviewOwnAnswers(engine, questionIds, signal)
                 }

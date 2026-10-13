@@ -1,12 +1,8 @@
-import { normalizeBaseUrl } from '../urlUtils.js';
-import { canonicalizeSessionSlug, resolveSessionSlugAliasFromDemoSessions } from './canonicalSessionContext.js';
+import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { normalizeSessionNaming } from './sessionMetadata.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 import { getPrimaryDemoSessionSlug } from './demoSessionSlugs.js';
-import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability.js';
 import type { SessionConfigLike } from './sessionTypes.js';
-
-type ResolveSessionSlugAliasOptions = NonNullable<Parameters<typeof resolveSessionSlugAliasFromDemoSessions>[0]>;
 
 const DEMO_SESSION_MAP = getDemoSessionMap() as Record<string, SessionConfigLike>;
 
@@ -39,13 +35,6 @@ const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | 
   return isObj(bySlug) ? bySlug : null;
 };
 
-export const resolveSessionSlugAlias = (sessionSlug: unknown, opts: Partial<ResolveSessionSlugAliasOptions> = {}) =>
-  resolveSessionSlugAliasFromDemoSessions({
-    sessionSlug,
-    demoSessions: DEMO_SESSION_MAP,
-    ...(opts || {}),
-  });
-
 export const getDemoSessionConfigForDisplay = (slug: unknown): SessionConfigLike | null => {
   const normalized = normalizeSessionNaming(findDemoSessionConfigBySlug(slug));
   return isObj(normalized) ? normalized : null;
@@ -58,19 +47,3 @@ export const getAllDemoSessionConfigs = (): Array<[string, SessionConfigLike]> =
     const normalized = normalizeSessionNaming(cfg);
     return [key, isObj(normalized) ? normalized : {}];
   });
-
-export const findDemoSessionByWorkerUrl = (url: unknown = '') => {
-  const normalizedTargetUrl = normalizeBaseUrl(url);
-  for (const [, cfg] of getAllDemoSessionConfigs()) {
-    const normalizedWorkerUrl = normalizeBaseUrl(
-      getUsableSessionWorkerUrl({
-        slug: cfg.slug || '',
-        sessionConfig: cfg,
-        allowSharedFallback: true,
-      }),
-    );
-    if (!normalizedWorkerUrl) continue;
-    if (!normalizedTargetUrl || normalizedWorkerUrl === normalizedTargetUrl) return cfg;
-  }
-  return null;
-};

@@ -69,6 +69,11 @@ describe('surveyPileLifecycle', () => {
       submittedSinceLastEdit: false,
       editBaseline: null,
       surveysResponseState: [{ ...EMPTY_PILE_RESPONSE_SLICE }],
+      userAnswers: null,
+      userHasResponse: false,
+      isDirty: false,
+      modifiedCount: 0,
+      hasEncryptedChanges: false,
     });
   });
 

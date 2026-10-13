@@ -9,6 +9,7 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardSponsoredReleaseBundlePayload,
   resolveSessionWizardPublishProgressDisplayState,
   resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
@@ -249,7 +250,6 @@ describe('sessionWizardPublishFlow', () => {
   it('evaluates sponsored auto-deploy readiness from bundle, deploy form, and secret requirements', () => {
     expect(
       resolveSponsoredBundleDeployReadiness({
-        wizardMode: 'normal',
         sponsoredBundle: {
           deployGrantToken: 'grant',
           bootstrapWorkerUrl: 'https://worker.example',
@@ -258,8 +258,6 @@ describe('sessionWizardPublishFlow', () => {
         deployForm: { workerName: 'launch-week-worker' },
         workerSecretsEnabled: true,
         missingWorkerSecrets: [],
-        hasBundleFile: false,
-        normalModeDefaultBundleUrl: 'https://default.example/bundle.js',
       }),
     ).toEqual(
       expect.objectContaining({
@@ -271,7 +269,6 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(
       resolveSessionWizardSponsoredAutoDeployReadiness({
-        wizardMode: 'normal',
         sponsoredBundle: {
           deployGrantToken: 'grant',
           bootstrapWorkerUrl: 'https://worker.example',
@@ -280,8 +277,6 @@ describe('sessionWizardPublishFlow', () => {
         workerSecretsEnabled: true,
         currentWorkerSecrets: {},
         getMissingWorkerSecretsForDeploy: () => ['OpenAI key'],
-        hasBundleFile: false,
-        normalModeDefaultBundleUrl: 'https://default.example/bundle.js',
       }),
     ).toEqual(
       expect.objectContaining({
@@ -357,61 +352,28 @@ describe('sessionWizardPublishFlow', () => {
     );
   });
 
-  it('keeps sponsored auto-deploy readiness override-aware when the hosted bundle URL is blank', () => {
-    const baseArgs = {
-      wizardMode: 'normal',
-      sponsoredBundle: {
-        deployGrantToken: 'deploy-grant-token',
-        bootstrapWorkerUrl: 'https://source-worker.example.test',
-        openaiKey: 'sponsored-openai',
-        arweaveJwk: '{"kty":"RSA"}',
-      },
-      deployForm: {
-        workerName: 'launch-week-worker',
-        bundleUrl: '',
-      },
-      workerSecretsEnabled: true,
-      currentWorkerSecrets: {
-        openaiKey: 'sponsored-openai',
-        arweaveJwk: '{"kty":"RSA"}',
-      },
-      getMissingWorkerSecretsForDeploy: () => [],
-      normalModeDefaultBundleUrl: '',
-    };
-
+  it('readies a sponsored deploy without any bundle source', () => {
+    // The grant deploys the release recorded on the sponsoring Worker.
     expect(
       resolveSessionWizardSponsoredAutoDeployReadiness({
-        ...baseArgs,
-        normalModeBundleUrlOverride: 'https://assets.example.test/sessionCorsWorker.bundle.js',
+        sponsoredBundle: {
+          deployGrantToken: 'deploy-grant-token',
+          bootstrapWorkerUrl: 'https://source-worker.example.test',
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        deployForm: {
+          workerName: 'launch-week-worker',
+          bundleUrl: '',
+        },
+        workerSecretsEnabled: true,
+        currentWorkerSecrets: {
+          openaiKey: 'sponsored-openai',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        getMissingWorkerSecretsForDeploy: () => [],
       }),
-    ).toEqual(
-      expect.objectContaining({
-        active: true,
-        ready: true,
-        missing: [],
-      }),
-    );
-
-    expect(resolveSessionWizardSponsoredAutoDeployReadiness(baseArgs)).toEqual(
-      expect.objectContaining({
-        active: true,
-        ready: false,
-        missing: ['Worker bundle URL'],
-      }),
-    );
-
-    expect(
-      resolveSessionWizardSponsoredAutoDeployReadiness({
-        ...baseArgs,
-        hasBundleFile: true,
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        active: true,
-        ready: true,
-        missing: [],
-      }),
-    );
+    ).toEqual({ active: true, ready: true, missing: [] });
   });
 
   it('resolves deploy bundle mode from normal-mode overrides and manual fallback choices', () => {
@@ -468,7 +430,6 @@ describe('sessionWizardPublishFlow', () => {
     expect(
       resolveSessionWizardSponsoredPublishSurfaceState({
         isNormalMode: true,
-        wizardMode: 'normal',
         workerMode: 'custom',
         sponsoredAutoDeployState: {
           active: true,
@@ -476,7 +437,6 @@ describe('sessionWizardPublishFlow', () => {
           missing: [],
         },
         forceManualBundleFile: false,
-        hasBundleFile: false,
         normalModeDefaultBundleUrl: 'https://assets.example.test/sessionCorsWorker.bundle.js',
         manualBundleRetryMessage: 'Retry with a local bundle.',
         missingHostedBundleMessage: 'Bundle URL missing.',
@@ -490,64 +450,50 @@ describe('sessionWizardPublishFlow', () => {
       shouldUseSponsoredAutoDeployFlow: true,
       showNormalModeManualBundleControls: false,
       showNormalModeWorkerStep: false,
-      showSponsoredBundleFallbackInput: false,
-      sponsoredAutoDeployBundleMode: 'url',
-      sponsoredAutoDeployMissingBundleUrl: false,
-      sponsoredLocalBundledAssetAvailable: true,
     });
   });
 
-  it('plans hosted-bundle fallback visibility for sponsored normal-mode deploys', () => {
+  it('lets a ready sponsored deploy publish when no hosted bundle URL is configured', () => {
     expect(
       resolveSessionWizardSponsoredPublishSurfaceState({
         isNormalMode: true,
-        wizardMode: 'normal',
         workerMode: 'custom',
-        deployForm: { bundleUrl: 'https://stale-advanced.example.test/sessionCorsWorker.bundle.js' },
-        sponsoredAutoDeployState: {
-          active: true,
-          ready: false,
-          missing: ['Worker bundle URL'],
-        },
-        forceManualBundleFile: false,
-        hasBundleFile: false,
+        sponsoredAutoDeployState: { active: true, ready: true, missing: [] },
+        forceManualBundleFile: true,
         normalModeDefaultBundleUrl: '',
         manualBundleRetryMessage: 'Retry with a local bundle.',
         missingHostedBundleMessage: 'Bundle URL missing.',
       }),
     ).toEqual(
       expect.objectContaining({
-        canUseSponsoredAutoDeployNow: false,
+        canUseSponsoredAutoDeployNow: true,
         normalModeBundleHelpText: 'Bundle URL missing.',
         normalModeHostedBundleConfigured: false,
-        normalModeManualBundleHelpText: 'Bundle URL missing.',
-        shouldUseSponsoredAutoDeployFlow: false,
+        shouldUseSponsoredAutoDeployFlow: true,
         showNormalModeManualBundleControls: true,
         showNormalModeWorkerStep: false,
-        showSponsoredBundleFallbackInput: true,
-        sponsoredAutoDeployBundleMode: 'upload',
-        sponsoredAutoDeployMissingBundleUrl: true,
-        sponsoredLocalBundledAssetAvailable: false,
       }),
     );
+  });
 
+  it('gives deploy grants only the complete configured release', () => {
     expect(
-      resolveSessionWizardSponsoredPublishSurfaceState({
-        isNormalMode: false,
-        workerMode: 'custom',
-        sponsoredAutoDeployState: {
-          active: true,
-          ready: false,
-          missing: ['Worker bundle URL'],
-        },
-        normalModeDefaultBundleUrl: '',
+      resolveSessionWizardSponsoredReleaseBundlePayload({
+        releaseBundleUrl: ' https://releases.example.test/sessionCorsWorker.bundle.js ',
+        releaseManifestUrl: 'https://releases.example.test/worker-release-manifest.json',
       }),
-    ).toEqual(
-      expect.objectContaining({
-        showNormalModeManualBundleControls: false,
-        showSponsoredBundleFallbackInput: false,
+    ).toEqual({
+      bundleText: '',
+      bundleUrl: 'https://releases.example.test/sessionCorsWorker.bundle.js',
+      bundleManifestUrl: 'https://releases.example.test/worker-release-manifest.json',
+      bundleSha256: undefined,
+    });
+    expect(
+      resolveSessionWizardSponsoredReleaseBundlePayload({
+        releaseBundleUrl: 'https://releases.example.test/sessionCorsWorker.bundle.js',
+        releaseManifestUrl: '',
       }),
-    );
+    ).toEqual({ bundleText: '', bundleUrl: undefined, bundleManifestUrl: undefined, bundleSha256: undefined });
   });
 
   it('resolves deploy bundle payloads for URL and validated upload modes', async () => {
