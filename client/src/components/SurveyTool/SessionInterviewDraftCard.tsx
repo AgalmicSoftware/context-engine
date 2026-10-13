@@ -6,6 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faRobot, faTimes } from '@fortawesome/free-solid-svg-icons';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
+import quadraticStyles from './QuadraticAllocationInput.module.scss';
+import { QuadraticScrollControlsProvider, QuadraticScrollControlsSlot } from './QuadraticScrollControls';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
@@ -217,7 +219,7 @@ const isNativeAnswerType = (question?: InterviewQuestion): boolean => {
   );
 };
 
-export default function SessionInterviewDraftCard({
+function SessionInterviewDraftCardContent({
   draft,
   edited,
   question,
@@ -265,7 +267,7 @@ export default function SessionInterviewDraftCard({
   };
   return (
     <article
-      className={`${styles.draftCard} ${selected ? '' : styles.draftCardRemoved}`}
+      className={`${styles.draftCard} ${question?.type === 'quadratic' ? styles.quadraticDraftCard : ''} ${selected ? '' : styles.draftCardRemoved}`}
       data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT}
       data-ce-question-id={draft.questionId}
     >
@@ -329,7 +331,7 @@ export default function SessionInterviewDraftCard({
           />
         )}
         <div className={styles.footerShell}>
-          <div className={styles.controlsRow}>
+          <div className={`${styles.controlsRow} ${quadraticStyles.footerRow}`}>
             <SurveyQuestionsFullQuestionSliderSection
               questionId={`interview-${draft.questionId}`}
               importanceToggleEnabled
@@ -347,6 +349,7 @@ export default function SessionInterviewDraftCard({
               }}
               onChange={(value) => onEdit(markEdit(sliderMode, value))}
             />
+            <QuadraticScrollControlsSlot />
             <div className={styles.footerIconCluster}>
               {!hasHumanEditedDraft ? (
                 <span className={styles.agentCommentMarker} aria-label="AI-proposed response">
@@ -444,5 +447,13 @@ export default function SessionInterviewDraftCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+export default function SessionInterviewDraftCard(props: Props) {
+  return (
+    <QuadraticScrollControlsProvider>
+      <SessionInterviewDraftCardContent {...props} />
+    </QuadraticScrollControlsProvider>
   );
 }

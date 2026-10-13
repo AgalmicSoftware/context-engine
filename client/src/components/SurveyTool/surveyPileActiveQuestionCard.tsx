@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardBody } from 'reactstrap';
 
 import styles from './SurveyTool.module.scss';
+import { QuadraticScrollControlsProvider } from './QuadraticScrollControls';
 
 export type PileActiveQuestionLike = {
   [key: string]: unknown;
@@ -38,17 +39,19 @@ export const renderPileCardShell = ({
   footerSection,
   questionType,
 }: PileCardShellProps): React.ReactElement => (
-  <Card className={`${styles.pileCardInner} ${questionType === 'quadratic' ? styles.pileQuadraticCard : ''}`}>
-    <CardBody className={styles.pileCardBody}>
-      <div className={styles.pileCardHeader}>{promptHeader}</div>
+  <QuadraticScrollControlsProvider>
+    <Card className={`${styles.pileCardInner} ${questionType === 'quadratic' ? styles.pileQuadraticCard : ''}`}>
+      <CardBody className={styles.pileCardBody}>
+        <div className={styles.pileCardHeader}>{promptHeader}</div>
 
-      <div className={styles.pileCardMainContent}>
-        <div className={questionContainerClass}>{questionComponent}</div>
-      </div>
+        <div className={styles.pileCardMainContent}>
+          <div className={questionContainerClass}>{questionComponent}</div>
+        </div>
 
-      {footerSection}
-    </CardBody>
-  </Card>
+        {footerSection}
+      </CardBody>
+    </Card>
+  </QuadraticScrollControlsProvider>
 );
 
 export const renderPileGatedPromptCard = ({

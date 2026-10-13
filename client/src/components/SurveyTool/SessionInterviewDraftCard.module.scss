@@ -326,6 +326,14 @@
     padding: 12px 44px 12px 12px;
   }
 
+  .quadraticDraftCard {
+    padding-right: 12px;
+
+    .questionText {
+      padding-right: 32px;
+    }
+  }
+
   .controlsRow {
     align-items: center;
     flex-wrap: wrap;

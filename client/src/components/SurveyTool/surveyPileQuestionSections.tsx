@@ -4,6 +4,8 @@ import { faComment } from '@fortawesome/free-solid-svg-icons';
 
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import styles from './SurveyTool.module.scss';
+import quadraticStyles from './QuadraticAllocationInput.module.scss';
+import { QuadraticScrollControlsSlot } from './QuadraticScrollControls';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 export type PileAdditionalEditorRowProps = {
@@ -119,8 +121,9 @@ export const renderPileFooterSection = ({
   commentsSection,
 }: PileFooterSectionProps): React.ReactElement => (
   <div className={styles.pileCardFooter}>
-    <div className={styles.pileControlsRow}>
+    <div className={`${styles.pileControlsRow} ${quadraticStyles.footerRow}`}>
       {sliderSection}
+      <QuadraticScrollControlsSlot />
       {questionIcons}
     </div>
 
