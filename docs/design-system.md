@@ -20,7 +20,8 @@ Session controls share one bordered unit containing the label, selected session,
 and open-session action. The native selector sizes to the selected label and
 shrinks within narrow viewports. Stats centers the unit; expanded tools align it
 right. In Questions, Back and Session occupy the top header row, with question
-actions on a separate row directly above the list. JSON debug controls are hidden
+actions in a full-width bordered panel directly above the list. The controls
+spread across the panel and center when wrapping on phones. JSON debug controls are hidden
 in this embedded Questions view; the underlying JSON UI remains available to other
 surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
 server to check short and long selections at mobile, compact, and desktop widths.
@@ -186,9 +187,9 @@ editing behind Config.
 Expanded tool headers keep Back, help, and the Session chooser together for
 Groups and Context, wrapping the chooser only when the controls cannot fit.
 Groups actions follow this primary group on wide screens and move below it on
-narrow screens; Context actions stay below. Questions places its actions beside
-Back and help on one row when space permits, then gives the chooser its own row
-on narrow screens without shrinking touch targets. Questions keeps one toolbar
+narrow screens; Context actions stay below. Questions keeps Back, help, and
+Session above a bordered toolbar spanning the question column, with its controls
+distributed across the panel and centered when wrapping on phones. Questions keeps one toolbar
 with its existing state and handlers in the Explorer header; standalone and
 session views retain their own toolbar placement. Explorer help buttons open on
 click, Enter, or Space even when automatic Explainers are off, and close on a

@@ -1824,15 +1824,22 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 #surveysRow.explorerToolbar {
   position: static;
+  box-sizing: border-box;
+  width: 100%;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 8px;
   max-width: 100%;
   margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 10px 12px;
+  border: var(--ce-border-control-width) solid var(--ce-authoring-control-border);
+  background: var(--ce-authoring-section-bg);
   backdrop-filter: none;
+
+  @media (max-width: 466px) {
+    justify-content: center;
+    padding: 8px;
+  }
 
   #dropdownToggle,
   #filterButton,

@@ -43,15 +43,29 @@ export async function inspectQuestionsHeader(page) {
     const row = element.closest('[class*="expandedHeaderRow_"]');
     const primary = row.querySelector('[class*="expandedHeaderPrimaryControls_"]');
     const primaryRect = primary.getBoundingClientRect();
+    const toolbarRect = element.getBoundingClientRect();
+    const toolbarStyle = getComputedStyle(element);
+    const controls = Array.from(element.children, (child) => child.getBoundingClientRect());
     const back = primary.querySelector('button').getBoundingClientRect();
     const session = primary.querySelector('select').getBoundingClientRect();
     return {
       width: innerWidth,
       actionsBelow: element.getBoundingClientRect().top >= primaryRect.bottom - 1,
       primaryCenters: [back.top + back.height / 2, session.top + session.height / 2],
+      toolbarEdges: [toolbarRect.left, toolbarRect.right],
+      headerEdges: [primaryRect.left, primaryRect.right],
+      border: parseFloat(toolbarStyle.borderLeftWidth),
+      background: toolbarStyle.backgroundColor,
+      controlsInside: controls.every((control) => control.left >= toolbarRect.left && control.right <= toolbarRect.right),
+      overflow: document.documentElement.scrollWidth > innerWidth + 1,
     };
   });
   assert(layout.actionsBelow, 'Question actions sit below Back and Session');
+  assert(layout.toolbarEdges.every((edge, index) => Math.abs(edge - layout.headerEdges[index]) < 2),
+    'Question toolbar spans the available question column');
+  assert(layout.border > 0 && layout.background !== 'rgba(0, 0, 0, 0)' && layout.background !== 'transparent',
+    'Question controls share a visible bordered panel');
+  assert(layout.controlsInside && !layout.overflow, 'Question controls fit without horizontal overflow');
   if (layout.width >= 560) {
     assert(Math.abs(layout.primaryCenters[0] - layout.primaryCenters[1]) < 2, 'Back and Session share the top row');
   }
