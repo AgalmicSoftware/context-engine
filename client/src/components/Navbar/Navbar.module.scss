@@ -558,6 +558,10 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
+  #addressDisplay .addressButton:not(:active) {
+    border-color: var(--ce-document-border);
+  }
+
   #navbarContainer,
   #navbarContainerLoggedIn {
     align-items: center;
