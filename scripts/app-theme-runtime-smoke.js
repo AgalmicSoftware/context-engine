@@ -2037,6 +2037,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
               window.localStorage.setItem('ce_onboarding_complete', 'true');
               window.localStorage.setItem('firstVisit', 'false');
+              window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
               window.localStorage.setItem('ce:theme', 'context-engine');
               window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
               window.localStorage.setItem('ce:selectedSessionScope', 'active');
@@ -2134,6 +2135,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
               window.localStorage.setItem('ce_onboarding_complete', 'true');
               window.localStorage.setItem('firstVisit', 'false');
+              window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
               window.localStorage.setItem('ce:theme', 'classic-95');
               window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
               window.localStorage.setItem('ce:selectedSessionScope', 'active');
@@ -3635,6 +3637,7 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
       window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
       window.localStorage.setItem('ce_onboarding_complete', 'true');
       window.localStorage.setItem('firstVisit', 'false');
+      window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
       window.localStorage.setItem('ce:theme', selectedThemeId);
       window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
       window.localStorage.setItem('ce:selectedSessionScope', 'active');
@@ -3942,6 +3945,7 @@ async function main() {
           window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
           window.localStorage.setItem('ce_onboarding_complete', 'true');
           window.localStorage.setItem('firstVisit', 'false');
+          window.localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
           window.localStorage.setItem('ce:theme', 'classic-95');
           window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
           window.localStorage.setItem('ce:selectedSessionScope', 'active');

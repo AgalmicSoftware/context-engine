@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import registry from '../../scss/themes/registry.json';
+import { initializeThemeRuntime, setStoredThemePreference } from './themeRuntime';
 
 const clientRoot = path.resolve(__dirname, '..', '..', '..');
 
@@ -28,6 +29,90 @@ describe('pre-paint theme bootstrap', () => {
     window.localStorage.clear();
     window.eval(source);
     expect(themeColor()).toBe('#008080');
+  });
+
+  test.each([
+    ['', 'context-engine'],
+    ['civic', 'context-engine'],
+    ['', 'classic-95'],
+    ['civic', 'classic-95'],
+  ])('migrates returning visitors to Minimal once on deployment %s from %s', (deployment, priorTheme) => {
+    document.documentElement.dataset.ceDeploymentTheme = deployment;
+    window.localStorage.setItem('ce:theme', priorTheme);
+    const preserved = {
+      'ce:color-vision': 'color-blind',
+      appCacheVersion: '2026-06-19-demo-session-and-sbt-cache-sync-v1',
+      'fixture:auth': 'keep-auth',
+      'fixture:wallet': 'keep-wallet',
+      'fixture:authored-draft': 'keep-draft',
+    };
+    Object.entries(preserved).forEach(([key, value]) => window.localStorage.setItem(key, value));
+
+    window.eval(source);
+    expect(document.documentElement.dataset.ceTheme).toBe('civic');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute('content', '#ffffff');
+    expect(window.localStorage.getItem('ce:theme')).toBeNull();
+    expect(window.localStorage.getItem('ce:theme-default-version')).toBe('2026-10-13-civic-v1');
+    expect(initializeThemeRuntime().id).toBe('civic');
+    expect(document.documentElement.dataset.ceColorVision).toBe('color-blind');
+    Object.entries(preserved).forEach(([key, value]) => expect(window.localStorage.getItem(key)).toBe(value));
+
+    setStoredThemePreference('classic-95');
+    window.localStorage.setItem('appCacheVersion', 'later-data-cache-refresh');
+    window.eval(source);
+    expect(document.documentElement.dataset.ceTheme).toBe('classic-95');
+    expect(initializeThemeRuntime()).toEqual({ id: 'classic-95', source: 'user' });
+  });
+
+  test('marks fresh Minimal visits without resetting later explicit themes', () => {
+    document.documentElement.dataset.ceDeploymentTheme = 'civic';
+    window.eval(source);
+    expect(window.localStorage.getItem('ce:theme-default-version')).toBe('2026-10-13-civic-v1');
+    setStoredThemePreference('context-engine');
+    window.eval(source);
+    expect(initializeThemeRuntime()).toEqual({ id: 'context-engine', source: 'user' });
+  });
+
+  test.each(['context-engine', 'classic-95'])('keeps explicit non-Minimal deployment %s preferences', (deployment) => {
+    document.documentElement.dataset.ceDeploymentTheme = deployment;
+    window.localStorage.setItem('ce:theme', 'classic-95');
+    window.eval(source);
+    expect(document.documentElement.dataset.ceTheme).toBe('classic-95');
+    expect(window.localStorage.getItem('ce:theme')).toBe('classic-95');
+    expect(window.localStorage.getItem('ce:theme-default-version')).toBeNull();
+  });
+
+  test('preserves a readable saved preference and accessibility when migration writes are blocked', () => {
+    document.documentElement.dataset.ceDeploymentTheme = 'civic';
+    window.localStorage.setItem('ce:theme', 'context-engine');
+    window.localStorage.setItem('ce:color-vision', 'color-blind');
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Storage is read only');
+    });
+    try {
+      expect(() => window.eval(source)).not.toThrow();
+      expect(document.documentElement.dataset.ceTheme).toBe('context-engine');
+      expect(initializeThemeRuntime()).toEqual({ id: 'context-engine', source: 'user' });
+      expect(document.documentElement.dataset.ceColorVision).toBe('color-blind');
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  test('retains consistent theme resolution when an old preference cannot be removed', () => {
+    document.documentElement.dataset.ceDeploymentTheme = 'civic';
+    window.localStorage.setItem('ce:theme', 'classic-95');
+    const removeItem = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('Storage removal is blocked');
+    });
+    try {
+      expect(() => window.eval(source)).not.toThrow();
+      expect(document.documentElement.dataset.ceTheme).toBe('classic-95');
+      expect(initializeThemeRuntime()).toEqual({ id: 'classic-95', source: 'user' });
+    } finally {
+      removeItem.mockRestore();
+    }
   });
 
   test('keeps each theme-color equal to the theme canvas, with Minimal as the static default', () => {

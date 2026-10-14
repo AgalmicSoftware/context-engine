@@ -41,7 +41,14 @@ order is:
 3. built-in Minimal (`civic`).
 
 `client/public/theme-bootstrap.js` applies user/deployment state before the app
-bundle runs. `client/src/utilities/ui/themeRuntime.ts` validates and persists
+bundle runs. The October 2026 Minimal rollout clears a previously saved app
+theme once on default/Minimal deployments, recording `ce:theme-default-version`
+before paint. Later user choices are preserved, including across routine data
+cache refreshes. Explicit non-Minimal deployment defaults retain their existing
+preferences. The migration leaves color-vision, authentication, wallet, and
+authored content storage untouched; blocked storage falls back to the retained
+preference without interrupting startup.
+`client/src/utilities/ui/themeRuntime.ts` validates and persists
 only a bundled app-theme ID and emits `ce:theme-change` for SVG, canvas, and
 chart consumers. Both set `<meta name="theme-color">` to the theme's
 `themeColor` from `registry.json`, so the browser bar matches the page. Session metadata is not an app-theme resolution layer. Those

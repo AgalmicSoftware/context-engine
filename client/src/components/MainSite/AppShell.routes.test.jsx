@@ -1697,6 +1697,7 @@ describe('AppShell route render smoke', () => {
   });
 
   it('preserves cached direct session loads and later refreshes', async () => {
+    localStorage.setItem('appCacheVersion', '2026-06-19-demo-session-and-sbt-cache-sync-v1');
     const subject = stubMainSiteMountSideEffects(
       createSubject({
         path: '/session/demo-1',
@@ -1714,6 +1715,8 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
     expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem('appCacheVersion')).toBe('2026-10-13-civic-client-refresh-v1');
+    expect(subject.reloadWindowLocation).toHaveBeenCalledTimes(1);
     subject.componentWillUnmount();
 
     window.history.replaceState({}, '', '/session/demo-1');
@@ -1725,6 +1728,7 @@ describe('AppShell route render smoke', () => {
       }),
     );
     refreshedSubject.hasPersistedManagedCacheData = jest.fn(async () => true);
+    refreshedSubject.reloadWindowLocation = jest.fn();
 
     await act(async () => {
       await refreshedSubject.componentDidMount();
@@ -1732,6 +1736,7 @@ describe('AppShell route render smoke', () => {
 
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
+    expect(refreshedSubject.reloadWindowLocation).not.toHaveBeenCalled();
     refreshedSubject.componentWillUnmount();
   });
 
