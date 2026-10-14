@@ -1,6 +1,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
+import * as sass from 'sass';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -8,6 +9,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Navbar } from './Navbar';
 
 const navbarStylesheet = fs.readFileSync(path.join(__dirname, 'Navbar.module.scss'), 'utf8');
+const compiledNavbarStylesheet = sass.compile(path.join(__dirname, 'Navbar.module.scss')).css;
 const mockLoginAndSettingsModal = jest.fn((_props: unknown) => <div data-testid="web3-modal" />);
 
 jest.mock('./AccountDisplay', () => ({
@@ -202,6 +204,50 @@ describe('Navbar logo navigation', () => {
       /#mainLogoLoggedIn\s*{[\s\S]*?opacity:\s*var\(--ce-brand-logo-opacity\);[\s\S]*?mix-blend-mode:\s*var\(--ce-brand-logo-blend-mode\);[\s\S]*?filter:\s*var\(--ce-brand-logo-filter\);/,
     );
     expect(navbarStylesheet).not.toContain('data-ce-theme');
+  });
+
+  it('keeps both logo states at the signed-out size without enlarging the account button', () => {
+    const sharedLogo = compiledNavbarStylesheet.match(/#mainLogo,\s*#mainLogoLoggedIn\s*\{([^}]+)\}/)?.[1];
+    expect(sharedLogo).toContain('width: var(--ce-navbar-logo-size);');
+    expect(sharedLogo).toContain('max-width: var(--ce-navbar-logo-size);');
+    expect(sharedLogo).toContain('height: var(--ce-navbar-logo-size);');
+    expect(sharedLogo).toContain('transform: scale(calc(var(--ce-navbar-logo-scale) * 1.343));');
+    expect(compiledNavbarStylesheet).toMatch(
+      /#navbarContainer,\s*#navbarContainerLoggedIn\s*\{[^}]*--ce-navbar-logo-size: 100px;[^}]*--ce-navbar-logo-scale: 1;/,
+    );
+    expect(compiledNavbarStylesheet).toMatch(/#navbarContainerLoggedIn\s*\{\s*--ce-navbar-control-size: 49px;/);
+    expect(compiledNavbarStylesheet).toMatch(/\.addressButton\s*\{\s*height: var\(--ce-navbar-control-size, auto\);/);
+  });
+
+  it('reserves balanced vertical whitespace around the logo in both account states', () => {
+    expect(compiledNavbarStylesheet).toMatch(
+      /#navbarContainer,\s*#navbarContainerLoggedIn\s*\{[^}]*--ce-navbar-logo-size: 100px;[^}]*padding-top: 16px;[^}]*padding-bottom: 16px;/,
+    );
+  });
+
+  it('anchors the scaled phone account control to the right so it clears the full-size logo', () => {
+    expect(compiledNavbarStylesheet).toMatch(
+      /@media \(min-width: 320px\) and \(max-width: 465px\)\s*\{\s*#AccountSectionLoggedIn\s*\{[^}]*transform: scale\(var\(--ce-navbar-control-scale, 0.8\)\);[^}]*transform-origin: right center;/,
+    );
+    expect(compiledNavbarStylesheet).toMatch(
+      /@media \(min-width: 320px\) and \(max-width: 465px\)\s*\{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*\{\s*#navbarContainerLoggedIn\s*\{[^}]*flex-wrap: wrap;[^}]*row-gap: 8px;/,
+    );
+  });
+
+  it.each([
+    [768, 80, null],
+    [465, 70, 0.9],
+  ])('shares the signed-out logo geometry across both states below %spx', (breakpoint, size, scale) => {
+    const responsiveLogo = [
+      ...compiledNavbarStylesheet.matchAll(
+        new RegExp(
+          `@media \\(max-width: ${breakpoint}px\\)\\s*\\{\\s*#navbarContainer,\\s*#navbarContainerLoggedIn\\s*\\{([^}]+)\\}`,
+          'g',
+        ),
+      ),
+    ].at(-1)?.[1];
+    expect(responsiveLogo).toContain(`--ce-navbar-logo-size: ${size}px;`);
+    if (scale !== null) expect(responsiveLogo).toContain(`--ce-navbar-logo-scale: ${scale};`);
   });
 
   it('keeps classic logo geometry on the shared responsive breakpoints', () => {
