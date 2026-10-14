@@ -102,27 +102,29 @@ const ToolExplorerSessionControl = ({
       className={`${accountStyles.globalSessionSelector} ${accountStyles.settingsSessionRoute} ${styles.activeSessionControl}`}
     >
       <span className={accountStyles.settingsSessionLabel}>SESSION</span>
-      <select
-        className={`${accountStyles.settingsSessionName} ${styles.activeSessionSelect}`}
-        aria-label="Active session"
-        data-testid={E2E_TESTIDS.TOOL_EXPLORER_ACTIVE_SESSION}
-        value={activeSessionSlug}
-        title={activeDescription}
-        onFocus={refresh}
-        onChange={(event) => {
-          if (onUseInheritedSession && event.target.value === inheritedOptionValue) onUseInheritedSession();
-          else onChange(event.target.value);
-        }}
-      >
-        {onUseInheritedSession && (
-          <option value={inheritedOptionValue}>Use global default: {inheritedSessionDescription}</option>
-        )}
-        {options.map((option) => (
-          <option key={option.slug || 'general'} value={option.slug}>
-            {option.description}
-          </option>
-        ))}
-      </select>
+      <span className={accountStyles.globalSessionSelectField} data-selected-label={activeDescription}>
+        <select
+          className={`${accountStyles.settingsSessionName} ${styles.activeSessionSelect}`}
+          aria-label="Active session"
+          data-testid={E2E_TESTIDS.TOOL_EXPLORER_ACTIVE_SESSION}
+          value={activeSessionSlug}
+          title={activeDescription}
+          onFocus={refresh}
+          onChange={(event) => {
+            if (onUseInheritedSession && event.target.value === inheritedOptionValue) onUseInheritedSession();
+            else onChange(event.target.value);
+          }}
+        >
+          {onUseInheritedSession && (
+            <option value={inheritedOptionValue}>Use global default: {inheritedSessionDescription}</option>
+          )}
+          {options.map((option) => (
+            <option key={option.slug || 'general'} value={option.slug}>
+              {option.description}
+            </option>
+          ))}
+        </select>
+      </span>
       <a
         href={sessionHref}
         className={accountStyles.globalSessionLink}

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 
 // Exercise the light surfaces that palette-only contrast tests cannot cover.
@@ -11,6 +12,7 @@ export async function inspectCivicExplorerContent(page) {
     await back.waitFor({ state: 'visible' });
     const control = page.getByTestId('ce-tool-explorer-active-session');
     await control.waitFor({ state: 'visible' });
+    await inspectSessionSelectorLayout(control, 'right');
     const help = page.getByRole('button', { name: `About ${name}`, exact: true });
     await help.press('Enter');
     const helpId = await help.getAttribute('aria-describedby');

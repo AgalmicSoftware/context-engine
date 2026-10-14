@@ -16,6 +16,12 @@ global compatibility styles, and browser-rendered visualizations.
 - `client/src/scss/_variables.scss` remains for structural/build-time Sass
   values. Do not add theme-dependent component values there.
 
+Session controls share one bordered unit containing the label, selected session,
+and open-session action. The native selector sizes to the selected label and
+shrinks within narrow viewports. Stats centers the unit; expanded tools align it
+right. Run `node scripts/session-selector-layout-smoke.mjs` against the local
+server to check short and long selections at mobile, compact, and desktop widths.
+
 ## Runtime Resolution
 
 Session section headers show their action subtitles only while collapsed:

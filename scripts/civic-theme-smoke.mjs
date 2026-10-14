@@ -1,6 +1,7 @@
 // Run against a local server with demo surfaces enabled. Answers stay in the
 // isolated browser context and are cleared; this smoke never submits responses.
 import assert from 'node:assert/strict';
+import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable, auditPanelContrast, clickQuestionAction, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
 import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
 import { inspectCivicWizard } from './civic-theme-wizard-smoke.mjs';
@@ -171,6 +172,7 @@ export async function inspectStatsCounters(page) {
   const selector = page.getByTestId('ce-community-session-select');
   await selector.waitFor({ state: 'visible' });
   await selector.selectOption({ label: 'General' });
+  await inspectSessionSelectorLayout(selector, 'center');
   const sessionLink = page.getByTestId('ce-community-session-select-link');
   assert.equal(await sessionLink.getAttribute('target'), '_blank', 'A concrete session opens in a new tab');
   assert(new URL(await sessionLink.getAttribute('href'), page.url()).pathname.endsWith('/session'), 'General links to its session page');

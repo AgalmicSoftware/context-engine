@@ -2523,20 +2523,62 @@ h1 {
   --ce-settings-text: var(--ce-control-text);
   --ce-settings-field-bg: var(--ce-control-face);
 
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
   min-width: 0;
-
-  > select {
-    flex: 1;
-    min-width: 0;
-    width: 100%;
-    min-height: 44px;
-  }
+  padding: 4px 8px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-control-face);
 
   > span {
     color: var(--ce-control-text);
+  }
+}
+
+.globalSessionSelectField {
+  display: inline-grid;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+  font-family: var(--ce-font-body);
+  font-size: 0.95rem;
+
+  // Measure only the selected label, rather than the longest option in the menu.
+  &::after {
+    content: attr(data-selected-label);
+    grid-area: 1 / 1;
+    visibility: hidden;
+    white-space: pre;
+    padding: 0 28px 0 6px;
+  }
+}
+
+.globalSessionSelector .globalSessionSelectField > select {
+  grid-area: 1 / 1;
+  width: 0;
+  min-width: 100%;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: var(--ce-control-text);
+  box-shadow: none;
+  font: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 0;
+  }
+
+  option {
+    background: var(--ce-document-surface);
+    color: var(--ce-document-text);
   }
 }
 

@@ -105,6 +105,12 @@ const GlobalSessionSelector = ({
           : selection.selectedSessionScope === 'list'
             ? selection.selectedSessionSlugs[0]
             : selection.primarySessionSlug;
+  const selectedLabel =
+    value === allValue
+      ? 'ALL'
+      : isListSummary
+        ? `Selected sessions (${selection.selectedSessionSlugs.length})`
+        : options.find((option) => option.slug === value)?.label || 'General';
   const hasConcreteSelection = selection.selectedSessionScope !== 'all' && !isListSummary;
   const exactConfigEntry =
     sessionConfig &&
@@ -134,36 +140,38 @@ const GlobalSessionSelector = ({
   return (
     <div className={`${styles.globalSessionSelector} ${className}`}>
       <span className={labelClassName}>Session</span>
-      <select
-        aria-label="Session"
-        className={selectClassName}
-        data-testid={testId}
-        value={value}
-        onFocus={refresh}
-        onChange={(event) => {
-          const nextValue = event.target.value;
-          if (nextValue === listValue) return;
-          if (nextValue === allValue) {
-            onChange({
-              primarySessionSlug: selection.primarySessionSlug,
-              primarySessionExplicit: selection.primarySessionExplicit,
-              selectedSessionScope: 'all',
-            });
-          } else {
-            onChange({ primarySessionSlug: nextValue, selectedSessionScope: nextValue ? 'active' : 'general' });
-          }
-        }}
-      >
-        <option value={allValue}>ALL</option>
-        {isListSummary && (
-          <option value={listValue}>Selected sessions ({selection.selectedSessionSlugs.length})</option>
-        )}
-        {options.map(({ slug, label }) => (
-          <option key={slug} value={slug}>
-            {label}
-          </option>
-        ))}
-      </select>
+      <span className={styles.globalSessionSelectField} data-selected-label={selectedLabel}>
+        <select
+          aria-label="Session"
+          className={selectClassName}
+          data-testid={testId}
+          value={value}
+          onFocus={refresh}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            if (nextValue === listValue) return;
+            if (nextValue === allValue) {
+              onChange({
+                primarySessionSlug: selection.primarySessionSlug,
+                primarySessionExplicit: selection.primarySessionExplicit,
+                selectedSessionScope: 'all',
+              });
+            } else {
+              onChange({ primarySessionSlug: nextValue, selectedSessionScope: nextValue ? 'active' : 'general' });
+            }
+          }}
+        >
+          <option value={allValue}>ALL</option>
+          {isListSummary && (
+            <option value={listValue}>Selected sessions ({selection.selectedSessionSlugs.length})</option>
+          )}
+          {options.map(({ slug, label }) => (
+            <option key={slug} value={slug}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </span>
       {sessionHref ? (
         <a
           href={sessionHref}
