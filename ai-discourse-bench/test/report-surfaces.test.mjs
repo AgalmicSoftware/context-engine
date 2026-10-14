@@ -1525,6 +1525,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="sectionHeaderActions resultsModeActions"/);
   assert.match(html, /\.sectionHeaderActionsScroller \{ box-sizing: border-box; display: flex; flex: 1 1 320px; justify-content: flex-end; max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; \}/);
   assert.match(html, /class="tooltip sectionHeaderTooltip"/);
+  assert.match(html, /\.sectionsGrid \{ gap: 8px; margin-top: 28px; \}/);
+  assert.match(html, /\.sectionsGrid \.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \{ min-height: 44px; padding: 0; align-items: center; \}/);
   assert.match(html, /data-icon="question-circle" class="svg-inline--fa fa-question-circle"/);
   assert.doesNotMatch(html, /data-icon="question-circle" class="svg-inline--fa fa-question-circle resultsTooltipIcon"/);
   assert.doesNotMatch(html, /class="resultsTooltipIcon" aria-hidden="true">\?<\/span>/);
@@ -1533,8 +1535,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.tooltip \.tooltiptext/);
   assert.match(html, /\.tooltip > svg \{ color: rgba\(255, 255, 255, 0\.75\); opacity: 0\.1; transition: opacity 0\.25s ease; \}/);
   assert.match(html, /\.tooltip:hover > svg,\s*\.tooltip:focus-within > svg,\s*\.tooltip:focus > svg \{ opacity: 0\.55; \}/);
-  assert.match(html, /@media only screen and \(max-width: 600px\) \{\s*\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \.tooltiptext \{ left: auto; right: -10px; transform: none; text-align: left; \}/);
-  assert.match(html, /\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \.tooltiptext::after \{ left: auto; right: 15px; margin-left: 0; \}/);
+  assert.match(html, /@media only screen and \(max-width: 600px\) \{\s*\.ce-session-results-section > \.sectionHeaderRow \{ position: relative; \}\s*\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \{ position: static; \}\s*\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \.tooltiptext \{ left: 0; right: 0; margin-inline: auto; transform: none; text-align: left; width: min\(250px, calc\(100% - 16px\)\); max-width: calc\(100% - 16px\); \}/);
+  assert.match(html, /\.ce-session-results-section > \.sectionHeaderRow > \.sectionHeader \.tooltip \.tooltiptext::after \{ display: none; \}/);
   assert.match(html, /\.sectionHeaderTooltip \{ display: inline-flex; align-items: center; font-size: 1em; line-height: 1; margin-left: 6px; align-self: center; flex: 0 0 auto; \}/);
   assert.match(html, /@media only screen and \(max-width: 1024px\)[\s\S]*\.resultsModeActionsScroller/);
   assert.doesNotMatch(html, /@media \(max-width: 1024px\) \{\s*main\.onePageDemoContainer/);
