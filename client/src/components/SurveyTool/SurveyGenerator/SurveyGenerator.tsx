@@ -2062,8 +2062,13 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                       onClick={() => toggleQuestionType('quadratic')}
                       aria-pressed={!!questionTypes.quadratic}
                     >
-                      <div className={styles.typeTitle}>Quadratic allocation</div>
-                      <div className={styles.typePreviewRow}>99 voice credits · ± votes</div>
+                      <div className={styles.typeTitle}>Quadratic</div>
+                      <div className={styles.quadraticPreview} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                      </div>
                     </button>
                     <div
                       className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}

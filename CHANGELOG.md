@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Show the Quadratic question type with a compact four-square graphic.
+
 - Keep the Users Details session selector and Filter on one row, with long session
   titles contained beside the external-link icon.
 
