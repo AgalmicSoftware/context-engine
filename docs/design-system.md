@@ -160,6 +160,13 @@ General opens the general session, while ALL and multi-session selections leave
 the icon disabled. Worker links retain their validated discovery origin. Settings
 shows this same control in its quick summary and keeps only advanced scope
 editing behind Config.
+
+Expanded tool headers place the primary Session chooser and session-page link
+at the right edge, opposite Back and help. Groups and Context actions stay on a
+separate row below; narrow phones give the chooser its own full-width row.
+Selected and unselected options show `Name (slug)` to distinguish repeated
+names. Context retains its local session override and explicit return to the
+global default; its link follows the currently selected local session.
 The Sessions dialog's header filter button opens type, creation-date range,
 last-activity range, and admin-address filters. These combine immediately and
 update the visible totals. Date ranges include both local calendar dates;

@@ -334,6 +334,9 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                     {...(expandedComponent.props || {})}
                   />
                 </div>
+              </div>
+
+              <div className={styles.expandedHeaderSession}>
                 <ToolExplorerSessionControl
                   activeSessionSlug={showDataHeaderActions ? selectedDataSessionSlug : activeSessionSlug}
                   sessionConfig={

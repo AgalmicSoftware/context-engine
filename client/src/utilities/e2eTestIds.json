@@ -75,6 +75,7 @@
   "TOOL_EXPLORER_DATA_ADD": "ce-tool-explorer-data-add",
   "TOOL_EXPLORER_DATA_VIEW": "ce-tool-explorer-data-view",
   "TOOL_EXPLORER_ACTIVE_SESSION": "ce-tool-explorer-active-session",
+  "TOOL_EXPLORER_ACTIVE_SESSION_LINK": "ce-tool-explorer-active-session-link",
   "DATABASE_VIEW_DEMO_TOGGLE": "ce-database-view-demo-toggle",
   "DATABASE_VIEW_PANEL": "ce-database-view-panel",
   "DATABASE_PHOTO_SOURCE_CARD": "ce-database-photo-source-card",

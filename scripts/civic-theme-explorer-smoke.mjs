@@ -9,6 +9,28 @@ export async function inspectCivicExplorerContent(page) {
   const open = async (name) => {
     await page.getByText(name, { exact: true }).click();
     await back.waitFor({ state: 'visible' });
+    const control = page.getByTestId('ce-tool-explorer-active-session');
+    await control.waitFor({ state: 'visible' });
+    const header = await control.evaluate((element) => {
+      const wrapper = element.closest('[class*="expandedHeaderSession_"]');
+      const row = wrapper?.closest('[class*="expandedHeaderRow_"]');
+      return {
+        value: element.value,
+        label: element.selectedOptions[0]?.textContent.trim(),
+        width: element.getBoundingClientRect().width,
+        right: wrapper?.getBoundingClientRect().right,
+        rowRight: row?.getBoundingClientRect().right,
+      };
+    });
+    assert(header.width >= 100, `${name}: session dropdown has readable width`);
+    assert(header.right && header.rowRight && Math.abs(header.rowRight - header.right) < 10, `${name}: session control is at the header's right edge`);
+    if (header.value) assert(header.label.endsWith(`(${header.value})`), `${name}: selected option includes its slug`);
+    else assert.equal(header.label, 'General');
+    const link = page.getByTestId('ce-tool-explorer-active-session-link');
+    assert.equal(await link.getAttribute('target'), '_blank');
+    assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
+    const destination = new URL(await link.getAttribute('href'), page.url());
+    assert(destination.pathname.endsWith(header.value ? `/session/${encodeURIComponent(header.value)}` : '/session'), `${name}: external icon links to the selected session`);
   };
   await assertReadable(body);
 

@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { act } from 'react';
+import path from 'path';
+import * as sass from 'sass';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider, useSelector } from 'react-redux';
 import { applyMiddleware, combineReducers, createStore } from 'redux';
 import thunk from 'redux-thunk';
 import ConnectedToolExplorer, { ToolExplorer } from './ToolExplorer';
+import ToolExplorerSessionControl from './ToolExplorerSessionControl';
+import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import sessionStateReducer from '../../reducers/sessionStateReducer';
 import { UPDATE_GLOBAL_SESSION_SELECTION } from '../../actions/types';
 import styles from './ToolExplorer.module.scss';
@@ -12,6 +16,9 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
+const mockReadWorkerCache = jest.fn(() => ({ bySession: {} }));
+const mockGetDemoConfigs = jest.fn(() => []);
+const compiledToolStyles = sass.compile(path.join(__dirname, 'ToolExplorer.module.scss')).css;
 const mockSurveyTool = jest.fn();
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
@@ -23,6 +30,15 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
+  getAllSessionEntries: () => mockGetAllSessionSlugs().map((slug: string) => [slug, mockGetSessionConfigBySlug(slug)]),
+}));
+
+jest.mock('../../utilities/session/sessionSourceResolver', () => ({
+  getAllDemoSessionConfigs: () => mockGetDemoConfigs(),
+}));
+jest.mock('../../utilities/session/sessionWorkerConfigCache', () => ({
+  SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT: 'ce:session-worker-config-cache-updated',
+  readSessionWorkerConfigCache: () => mockReadWorkerCache(),
 }));
 
 jest.mock('../SurveyTool/SurveyTool', () => ({
@@ -123,6 +139,8 @@ describe('ToolExplorer session propagation', () => {
 
   beforeEach(() => {
     localStorage.setItem('ce:selectedSessionScope', 'active');
+    mockReadWorkerCache.mockReturnValue({ bySession: {} });
+    mockGetDemoConfigs.mockReturnValue([]);
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
     mockGetSessionConfigBySlug.mockImplementation((slug: unknown) => {
       const normalized = String(slug || '');
@@ -130,6 +148,109 @@ describe('ToolExplorer session propagation', () => {
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
       return {};
     });
+  });
+
+  it.each(['Questions', 'Groups', 'Context', 'Debate Map', 'Risks'])(
+    'keeps the %s session control outside Back/help and disambiguates the selected name and link',
+    async (tool) => {
+      mockGetSessionConfigBySlug.mockImplementation((slug: string) => ({ slug, sessionName: 'Shared name' }));
+      const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
+      fireEvent.click(screen.getByText(tool, { exact: true }));
+      const selector = await screen.findByRole('combobox', { name: 'Active session' });
+      expect(screen.getByRole('option', { name: 'Shared name (edge)' })).toHaveProperty('selected', true);
+      expect(screen.getByRole('option', { name: 'Shared name (rxc)' })).toBeInTheDocument();
+      expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeNull();
+      expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
+      const lead = container.querySelector(`.${styles.expandedHeaderLead}`);
+      expect(lead).toContainElement(screen.getByRole('button', { name: '← Back' }));
+      expect(lead).toContainElement(screen.getByTestId('mock-explainer'));
+      const link = screen.getByRole('link', { name: 'Open session Shared name (edge)' });
+      expect(link).toHaveAttribute('href', '/session/edge');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link.closest('label')).toBeNull();
+    },
+  );
+
+  it('preserves exact Worker destinations, refreshes cache-only discovery, and keeps General and stale props safe', () => {
+    mutableEnv.PUBLIC_URL = '/ce';
+    mockGetAllSessionSlugs.mockReturnValue([]);
+    mockGetSessionConfigBySlug.mockReturnValue(null);
+    const worker = {
+      slug: 'worker-link',
+      sessionName: 'Shared Worker',
+      corsWorkerUrl: 'https://cached-worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const cache = (origin: string) => ({
+      bySession: {
+        cached: {
+          slug: worker.slug,
+          authorityMode: 'worker_canonical',
+          canonicalConfig: { ...worker, corsWorkerUrl: origin },
+          workerOrigin: origin,
+        },
+      },
+    });
+    mockReadWorkerCache.mockReturnValue(cache(worker.corsWorkerUrl));
+    const onChange = jest.fn();
+    const view = render(
+      <ToolExplorerSessionControl
+        activeSessionSlug={worker.slug}
+        sessionConfig={{ ...worker, corsWorkerUrl: 'https://route-worker.example' }}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/ce/session/worker-link?worker=https%3A%2F%2Froute-worker.example',
+    );
+    view.rerender(
+      <ToolExplorerSessionControl
+        activeSessionSlug={worker.slug}
+        sessionConfig={{ slug: worker.slug }}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/ce/session/worker-link?worker=https%3A%2F%2Fcached-worker.example',
+    );
+    mockReadWorkerCache.mockReturnValue(cache('https://refreshed-worker.example'));
+    act(() => window.dispatchEvent(new Event(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT)));
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/ce/session/worker-link?worker=https%3A%2F%2Frefreshed-worker.example',
+    );
+    view.rerender(
+      <ToolExplorerSessionControl activeSessionSlug="other session" sessionConfig={worker} onChange={onChange} />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/ce/session/other%20session');
+    expect(screen.getByRole('option', { name: 'Shared Worker (worker-link)' })).toBeInTheDocument();
+    view.rerender(<ToolExplorerSessionControl activeSessionSlug="" sessionConfig={worker} onChange={onChange} />);
+    expect(screen.getByRole('link', { name: 'Open session General' })).toHaveAttribute('href', '/ce/session');
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^General$/);
+    view.rerender(
+      <ToolExplorerSessionControl
+        activeSessionSlug={worker.slug}
+        sessionConfig={{ ...worker, corsWorkerUrl: 'javascript:alert(1)' }}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/ce/session/worker-link?worker=https%3A%2F%2Frefreshed-worker.example',
+    );
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('places session selection at the right edge with tool actions on a separate row and readable narrow controls', () => {
+    expect(compiledToolStyles).toMatch(/\.expandedHeaderSession\s*\{[^}]*justify-self:\s*end;/);
+    expect(compiledToolStyles).toMatch(/\.expandedHeaderActions\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/);
+    expect(compiledToolStyles).toMatch(
+      /@media \(max-width: 640px\)\s*\{[\s\S]*?\.expandedHeaderRow\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/,
+    );
+    expect(compiledToolStyles).not.toMatch(/\.expandedHeaderLead \.activeSessionControl/);
   });
 
   it('switches Groups globally, including General from list scope, without closing the tool', async () => {
@@ -156,7 +277,7 @@ describe('ToolExplorer session propagation', () => {
     const previousGroup = await screen.findByTestId('mock-sbts-page');
     const selector = screen.getByRole('combobox', { name: 'Active session' });
     expect(selector).toHaveValue('edge');
-    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session$/);
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session \(edge\)$/);
     expect(screen.getByRole('option', { name: 'Debate Session (rxc)' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -164,7 +285,7 @@ describe('ToolExplorer session propagation', () => {
 
     expect(store.getState().sessionState.primarySessionSlug).toBe('rxc');
     expect(localStorage.getItem('ce:primarySessionSlug')).toBe('rxc');
-    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session$/);
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session \(rxc\)$/);
     expect(screen.getByTestId('mock-sbts-page')).not.toBe(previousGroup);
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-create-open', 'false');
     expect(screen.getByRole('button', { name: '← Back' })).toBeInTheDocument();
@@ -201,14 +322,14 @@ describe('ToolExplorer session propagation', () => {
     fireEvent.click(screen.getByText('Questions'));
     await screen.findByTestId('mock-survey-tool');
     const selector = screen.getByRole('combobox', { name: 'Active session' });
-    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Current Session$/);
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Current Session \(edge\)$/);
     expect(screen.queryByRole('option', { name: /^Use global default/ })).not.toBeInTheDocument();
     fireEvent.change(selector, { target: { value: 'edge' } });
     expect(updateGlobalSessionSelection).not.toHaveBeenCalled();
 
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc', 'new-session']);
     fireEvent.focus(selector);
-    expect(screen.getByRole('option', { name: 'new-session' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'new-session (new-session)' })).toBeInTheDocument();
     fireEvent.change(selector, { target: { value: 'new-session' } });
     expect(updateGlobalSessionSelection).toHaveBeenCalledWith({ primarySessionSlug: 'new-session' });
     expect(screen.getByTestId('mock-survey-tool')).toBeInTheDocument();
@@ -415,8 +536,9 @@ describe('ToolExplorer session propagation', () => {
     fireEvent.change(draft, { target: { value: 'Keep this draft' } });
     const selector = screen.getByRole('combobox', { name: 'Active session' });
     expect(selector).toHaveValue('edge');
-    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session$/);
-    expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeInTheDocument();
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session \(edge\)$/);
+    expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeNull();
+    expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
     const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
     if (!headerGroup) throw new Error('Expected header mode toggle group');
     expect(Array.from(headerGroup.querySelectorAll('button')).map((node) => node.textContent?.trim())).toEqual([
@@ -427,7 +549,11 @@ describe('ToolExplorer session propagation', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.TOOL_EXPLORER_DATA_VIEW));
     fireEvent.change(selector, { target: { value: 'rxc' } });
-    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session$/);
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session \(rxc\)$/);
+    expect(screen.getByRole('link', { name: 'Open session Debate Session (rxc)' })).toHaveAttribute(
+      'href',
+      '/session/rxc',
+    );
     expect(screen.getByTestId('mock-audio-survey-generator')).toBe(context);
     expect(context).toHaveAttribute('data-explorer-mode', 'view');
     expect(draft).toHaveValue('Keep this draft');
@@ -466,6 +592,7 @@ describe('ToolExplorer session propagation', () => {
     rerender(<ToolExplorer activeSessionSlug="edge" updateGlobalSessionSelection={updateGlobalSessionSelection} />);
     expect(selector).toHaveValue('');
     expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^General$/);
+    expect(screen.getByRole('link', { name: 'Open session General' })).toHaveAttribute('href', '/session');
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
       expect.objectContaining({ activeSessionSlug: 'edge', sessionOverrideSlug: '', sessionOverrideTouched: true }),
     );
@@ -493,12 +620,12 @@ describe('ToolExplorer session propagation', () => {
     );
 
     const inheritOption = screen.getByRole('option', {
-      name: 'Use global default (Debate Session)',
+      name: 'Use global default: Debate Session (rxc)',
     }) as HTMLOptionElement;
     expect(mockGetAllSessionSlugs()).not.toContain(inheritOption.value);
     fireEvent.change(selector, { target: { value: inheritOption.value } });
     expect(selector).toHaveValue('rxc');
-    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session$/);
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session \(rxc\)$/);
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
       expect.objectContaining({ sessionOverrideSlug: null, sessionOverrideTouched: false }),
     );
@@ -515,7 +642,9 @@ describe('ToolExplorer session propagation', () => {
       await screen.findByTestId('mock-audio-survey-generator');
       const selector = screen.getByRole('combobox', { name: 'Active session' });
       fireEvent.change(selector, { target: { value: 'rxc' } });
-      expect(screen.getByRole('option', { name: inherited || 'General' })).toHaveValue(inherited);
+      expect(screen.getByRole('option', { name: inherited ? `${inherited} (${inherited})` : 'General' })).toHaveValue(
+        inherited,
+      );
       fireEvent.change(selector, { target: { value: inherited } });
       expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
         expect.objectContaining({ sessionOverrideSlug: null, sessionOverrideTouched: false }),
