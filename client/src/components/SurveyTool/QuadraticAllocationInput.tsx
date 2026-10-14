@@ -17,6 +17,7 @@ import {
   validateQuadraticQuestion,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import styles from './QuadraticAllocationInput.module.scss';
+import { QuadraticScrollControls } from './QuadraticScrollControls';
 
 type Props = {
   questionId: string;
@@ -265,9 +266,14 @@ export default function QuadraticAllocationInput({
                 key={index}
                 data-direction={vote > 0 ? 'positive' : vote < 0 ? 'negative' : 'neutral'}
               >
-                <label htmlFor={inputId} className={styles.optionLabel} data-quadratic-option-label>
-                  {String(option)}
-                </label>
+                <div className={styles.optionDescription}>
+                  <label htmlFor={inputId} className={styles.optionLabel} data-quadratic-option-label>
+                    {String(option)}
+                  </label>
+                  <span className={styles.cost} data-testid={`ce-quadratic-cost-${index}`}>
+                    {vote === 0 ? '' : credits(vote ** 2)}
+                  </span>
+                </div>
                 <div className={styles.stepper}>
                   {/* Pointer shortcuts; the range input below is the keyboard and assistive control. */}
                   <button
@@ -345,46 +351,45 @@ export default function QuadraticAllocationInput({
                       <i className={styles.solidSquare} />
                     ))}
                 </span>
-                <span className={styles.cost} data-testid={`ce-quadratic-cost-${index}`}>
-                  {vote === 0 ? '' : credits(vote ** 2)}
-                </span>
               </div>
             );
           })}
         </div>
       </div>
       {scrollState.overflow && (
-        <div className={styles.scrollControls}>
-          {scrollState.canScrollUp && (
-            <button
-              type="button"
-              className={`${styles.moreOptions} ${styles.scrollPrevious}`}
-              aria-label="Scroll to previous options"
-              aria-controls={optionsId}
-              onClick={() =>
-                optionsRef.current?.scrollBy({
-                  top: -optionsRef.current.clientHeight * 0.8,
-                  behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-                })
-              }
-            >
-              <FontAwesomeIcon icon={faChevronUp} />
-            </button>
-          )}
-          {scrollState.canScrollDown && (
-            <button
-              type="button"
-              className={`${styles.moreOptions} ${styles.scrollNext}`}
-              onClick={scrollToMoreOptions}
-              aria-label="Scroll to more options"
-              aria-controls={optionsId}
-              title="More options below"
-              data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
-            >
-              <FontAwesomeIcon icon={faChevronDown} />
-            </button>
-          )}
-        </div>
+        <QuadraticScrollControls>
+          <div className={styles.scrollControls}>
+            {scrollState.canScrollUp && (
+              <button
+                type="button"
+                className={`${styles.moreOptions} ${styles.scrollPrevious}`}
+                aria-label="Scroll to previous options"
+                aria-controls={optionsId}
+                onClick={() =>
+                  optionsRef.current?.scrollBy({
+                    top: -optionsRef.current.clientHeight * 0.8,
+                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                  })
+                }
+              >
+                <FontAwesomeIcon icon={faChevronUp} />
+              </button>
+            )}
+            {scrollState.canScrollDown && (
+              <button
+                type="button"
+                className={`${styles.moreOptions} ${styles.scrollNext}`}
+                onClick={scrollToMoreOptions}
+                aria-label="Scroll to more options"
+                aria-controls={optionsId}
+                title="More options below"
+                data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
+              >
+                <FontAwesomeIcon icon={faChevronDown} />
+              </button>
+            )}
+          </div>
+        </QuadraticScrollControls>
       )}
       {valueError && (
         <p className={styles.error} role="alert">

@@ -81,6 +81,13 @@
     padding: 16px 18px 0;
   }
 
+  .sessionScope {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .sessionContent {
     flex: 1;
     display: flex;
@@ -574,10 +581,6 @@
     border: 0;
     color: var(--ce-panel-text);
     transition: none;
-  }
-
-  .communityTab .statItem + .statItem {
-    border-left: 1px solid var(--ce-edge-shadow);
   }
 
   .communityTab .statItem:hover {

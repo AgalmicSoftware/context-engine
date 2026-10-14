@@ -173,7 +173,13 @@
   }
 }
 
+.optionDescription {
+  display: contents;
+}
+
 .optionLabel {
+  grid-column: 1;
+  grid-row: 1;
   margin: 0;
   overflow-wrap: anywhere;
   font-size: 1.1rem;
@@ -182,6 +188,8 @@
 }
 
 .stepper {
+  grid-column: 2;
+  grid-row: 1;
   position: relative;
   display: inline-grid;
   // Every row reserves the same count width, including existing larger budgets.
@@ -257,6 +265,8 @@
 
 // n votes cost n² credits: draw them as an n×n block of unit squares.
 .squares {
+  grid-column: 3;
+  grid-row: 1;
   display: inline-grid;
   justify-self: center;
   grid-template-columns: repeat(var(--votes), calc(var(--unit) - 1px));
@@ -284,6 +294,8 @@
 }
 
 .cost {
+  grid-column: 4;
+  grid-row: 1;
   text-align: right;
   font-size: 1rem;
   font-weight: 600;
@@ -294,12 +306,26 @@
 
 @container (max-width: 700px) {
   .option {
-    grid-template-columns: auto 36px minmax(0, 1fr);
-    column-gap: 0.35rem;
-    row-gap: 0.15rem;
+    grid-template-columns: minmax(0, 1fr) 36px auto;
+    column-gap: 0.5rem;
+  }
+  .optionDescription {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
   }
   .optionLabel {
-    grid-column: 1 / -1;
+    font-size: 1rem;
+  }
+  .cost {
+    display: none;
+  }
+  .squares {
+    grid-column: 2;
+  }
+  .stepper {
+    grid-column: 3;
   }
 }
 
@@ -360,4 +386,57 @@
 .scrollNext {
   grid-column: 2;
   grid-row: 1;
+}
+
+.scrollSlot {
+  display: contents;
+}
+
+// Only a quadratic footer with visible navigation needs the compact row.
+.footerRow:has(.scrollControls) {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  > :global([class*='importanceSlider']) {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    margin-bottom: 0;
+
+    &:has(input[type='range']) {
+      flex-basis: 100%;
+      width: 100%;
+    }
+  }
+
+  :global([class*='convictionToggleStack']) {
+    min-width: 0;
+  }
+
+  :global(button[class*='iconButton']) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 1.25rem;
+
+    svg {
+      width: 1em;
+      height: 1em;
+    }
+  }
+
+  .scrollControls {
+    grid-template-columns: 32px 32px;
+    gap: 4px;
+  }
+
+  .moreOptions {
+    width: 32px;
+    height: 32px;
+    margin-top: 0;
+  }
 }
