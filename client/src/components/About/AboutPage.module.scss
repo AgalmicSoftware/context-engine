@@ -709,6 +709,13 @@ $modal-cta-text: var(--ce-action-submit-text);
   background: $logo-dark-bg;
 }
 
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .practiceWordmarkDark img {
+    background: transparent;
+    filter: invert(1);
+  }
+}
+
 .recognitionSubheading {
   margin: 0 0 16px;
   font-family: var(--ce-font-body);
