@@ -472,7 +472,7 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   }
 
   .workerRouteSessionHero {
-    flex: 1 1 max-content;
+    flex: 1 1 320px;
     max-width: 100%;
   }
 
@@ -550,39 +550,66 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 }
 
 .workerRouteSessionName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   margin: 0;
   font-size: clamp(0.92rem, 3vw, 1.15rem);
-  line-height: 1.08;
+  line-height: 1.2;
 
   a {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
-    max-width: 100%;
+    justify-content: center;
+    flex: 0 0 32px;
+    min-height: 36px;
     color: var(--ce-panel-text);
-    text-decoration: none;
 
     &:hover,
     &:focus-visible {
       color: $clickable-color;
-      outline: none;
-      text-decoration: underline;
-      text-decoration-thickness: 2px;
-      text-underline-offset: 6px;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-panel-text);
+      outline-offset: 2px;
     }
   }
 }
 
-.workerRouteSessionNameText {
+.workerRouteSessionSelect {
+  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
-  overflow-wrap: anywhere;
+  min-height: 36px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--ce-card-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-panel-text);
+    outline-offset: 2px;
+  }
+
+  option {
+    color: var(--ce-panel-text);
+    background: var(--ce-card-bg);
+  }
 }
 
 .workerRouteSessionExternalIcon {
-  flex: 0 0 auto;
   color: $clickable-color;
-  font-size: 0.72em;
+  font-size: 0.8em;
 }
 
 /* Base styles for the standard full-page list layout */

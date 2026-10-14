@@ -2,9 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
-import AppThemeSelector from './AppThemeSelector';
-import ColorBlindModeControl from './ColorBlindModeControl';
-import { CE_THEME_SELECTOR_ENABLED } from '../../variables/appConfig.js';
+import LoginThemeQuickControl from './LoginThemeQuickControl';
 
 type LoginSettingsOverview = {
   activeSession: {
@@ -97,16 +95,7 @@ const LoginPreLoginSettingsDisplay = ({
                       children: renderPreLoginConfigPanel(),
                     })
                   : null}
-                {renderStaticSettingsSection({
-                  title: 'Appearance & colors',
-                  summary: '',
-                  children: (
-                    <>
-                      {CE_THEME_SELECTOR_ENABLED && <AppThemeSelector />}
-                      <ColorBlindModeControl />
-                    </>
-                  ),
-                })}
+                <LoginThemeQuickControl />
               </>
             ),
           })}

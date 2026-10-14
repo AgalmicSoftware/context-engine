@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faPlus, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 
 import WorkerSessionGroupsPanel from '../OnePageSession/WorkerSessionGroupsPanel';
+import WorkerGroupsSessionSelector from './WorkerGroupsSessionSelector';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -14,7 +15,7 @@ import {
   claimsWorkerCanonicalAuthority,
   resolveSessionCapabilityProjection,
 } from '../../utilities/session/sessionCapabilityProjection.js';
-import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { buildSbtListRootClassName } from './sbtListHelpers';
 import { isRecord } from './sbtListRuntimeValues';
 import type { SBTsListProps, UnknownRecord } from './sbtListTypes';
@@ -63,7 +64,6 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
   const sessionSlug = normalizeSessionSlug(props.sessionSlug || workerSessionConfig.slug || '');
   const configuredSessionName = String(workerSessionConfig.sessionName || '').trim();
   const sessionName = configuredSessionName || sessionSlug;
-  const sessionHref = buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`);
   const selectedGroupId =
     String(props.selectedGroupId || '').trim() ||
     (typeof window !== 'undefined'
@@ -121,19 +121,11 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
     >
       {!props.embeddedMode && !selectedGroupId ? (
         <div className={styles.workerRouteToolbar}>
-          <section className={styles.workerRouteSessionHero} data-testid="ce-worker-groups-session-hero">
-            <span className={styles.workerRouteSessionEyebrow}>Active session</span>
-            <h1 className={styles.workerRouteSessionName}>
-              <a href={sessionHref} aria-label={`Open session ${sessionName}`}>
-                <span className={styles.workerRouteSessionNameText}>{sessionName}</span>
-                <FontAwesomeIcon
-                  aria-hidden="true"
-                  className={styles.workerRouteSessionExternalIcon}
-                  icon={faExternalLinkAlt}
-                />
-              </a>
-            </h1>
-          </section>
+          <WorkerGroupsSessionSelector
+            sessionSlug={sessionSlug}
+            sessionName={sessionName}
+            sessionConfig={workerSessionConfig}
+          />
           <div className={styles.header}>
             <Button
               className={styles.createGroupButton}

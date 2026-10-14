@@ -457,6 +457,24 @@ describe('App wagmi auto-connect persistence', () => {
     expect(getLatestAppShellElement().props.path).toBe('/session/demo');
   });
 
+  it('passes search-only navigation to AppShell, including Back and cleared queries', () => {
+    const { default: App } = loadAppModule();
+    render(<App params={{}} location={{ pathname: '/groups', search: '?sessionSlug=old' }} navigate={jest.fn()} />);
+    act(() => {
+      window.history.pushState({}, '', '/groups?sessionSlug=next');
+    });
+    expect(getLatestAppShellElement().props.search).toBe('?sessionSlug=next');
+    act(() => {
+      window.history.replaceState({}, '', '/groups?sessionSlug=old');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(getLatestAppShellElement().props.search).toBe('?sessionSlug=old');
+    act(() => {
+      window.history.replaceState({}, '', '/groups');
+    });
+    expect(getLatestAppShellElement().props.search).toBe('');
+  });
+
   it('reuses the cold-load onboarding snapshot on mount', () => {
     window.history.replaceState({}, '', '/session/demo');
     mockReadColdLoadOnboardingState.mockReturnValue({

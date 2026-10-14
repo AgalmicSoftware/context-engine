@@ -2249,7 +2249,7 @@ h1 {
 
 .settingsThemeQuickControl {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   min-height: 56px;
@@ -2294,9 +2294,9 @@ h1 {
   min-width: 0;
 
   > div {
-    flex: 1 1 160px;
-    min-width: 0;
-    max-width: 220px;
+    flex: 0 1 170px;
+    min-width: 110px;
+    max-width: 170px;
   }
 
   > label {
@@ -2726,9 +2726,21 @@ h1 {
   }
 
   .settingsThemeQuickControl {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 8px;
     padding-left: 10px;
+  }
+
+  .settingsThemeQuickSelect {
+    display: contents;
+
+    > div {
+      min-width: 0;
+    }
+
+    > label {
+      grid-column: 1 / -1;
+    }
   }
 }
 

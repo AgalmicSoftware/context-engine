@@ -173,6 +173,7 @@ export const buildPolisParticipantProfileHref = ({
 export default function PolisReport({
   account,
   provider,
+  loginComplete,
   questionResponses, // Aggregator object { questionId -> [ { responder, questionId, response }, ... ] }
   network, // blockchain network object
   sbtFilterString, // (Optional) String describing SBT filters applied by parent
@@ -757,7 +758,7 @@ export default function PolisReport({
     }
   };
 
-  const reportData = useMemo(() => {
+  const pendingReportData = useMemo(() => {
     const metadata = effectiveUseDemoData
       ? buildPolisDemoSurveyResultsNetworkData(activeDemoData, { sessionSlug: activeReportSlug }).questions
       : readPolisReportCacheContext(network, activeReportSlug, sessionConfig).qMap;
@@ -804,6 +805,39 @@ export default function PolisReport({
     isQuestionCacheReady,
     isResponsesCacheReady,
   ]);
+
+  // Hydration can temporarily replace the aggregator with an empty or partial
+  // map. Keep one consistent report until the replacement is ready, scoped to
+  // this session, viewer and filters so prior results cannot bleed over.
+  const reportSessionConfig = (sessionConfig || {}) as UnknownRecord;
+  const reportScope = JSON.stringify([
+    activeReportSlug,
+    reportSessionConfig.sessionId,
+    reportSessionConfig.corsWorkerUrl,
+    networkChainId || network?.id || network?.chainId,
+    account,
+    loginComplete,
+    effectiveUseDemoData,
+    filterState,
+  ]);
+  const retainedReport = useRef<{ scope: string; data: typeof pendingReportData } | null>(null);
+  const cacheRefreshPending = !effectiveUseDemoData && (!isQuestionCacheReady || !isResponsesCacheReady);
+  const reportData =
+    cacheRefreshPending &&
+    retainedReport.current?.scope === reportScope &&
+    Object.keys(retainedReport.current.data.filtered || {}).length > 0
+      ? retainedReport.current.data
+      : pendingReportData;
+  useEffect(() => {
+    if (retainedReport.current?.scope !== reportScope) retainedReport.current = null;
+    if (
+      !cacheRefreshPending ||
+      (!Object.keys(retainedReport.current?.data.filtered || {}).length &&
+        Object.keys(pendingReportData.filtered || {}).length > 0)
+    ) {
+      retainedReport.current = { scope: reportScope, data: pendingReportData };
+    }
+  }, [cacheRefreshPending, pendingReportData, reportScope]);
 
   /***************************************************************
    * Build rating matrix from real or demo

@@ -823,6 +823,85 @@ describe('PolisReport cache read options', () => {
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
   });
 
+  it('retains the report through a transient empty refresh, then accepts a confirmed empty result', async () => {
+    const props = { ...baseReportProps, slug: 'edge', questionResponses: seededQuestionResponses };
+    const { rerender } = render(<PolisReport {...props} />);
+    await screen.findByText('Summary and Statistics');
+    const calls = computePolisConversationMath.mock.calls.length;
+    rerender(
+      <PolisReport
+        {...props}
+        questionResponses={{}}
+        isQuestionCacheReady={false}
+        isResponsesCacheReady={false}
+        questionResponsesNonce={1}
+      />,
+    );
+    expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+    expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+    expect(screen.getByLabelText('Refreshing report')).toBeInTheDocument();
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(calls);
+    rerender(<PolisReport {...props} questionResponses={{}} questionResponsesNonce={2} />);
+    await waitFor(() => expect(screen.queryByText('Summary and Statistics')).not.toBeInTheDocument());
+  });
+
+  it('keeps current report math during a partial refresh and applies new responses when ready', async () => {
+    const props = { ...baseReportProps, slug: 'edge', questionResponses: seededQuestionResponses };
+    const { rerender } = render(<PolisReport {...props} />);
+    await screen.findByText('Summary and Statistics');
+    const calls = computePolisConversationMath.mock.calls.length;
+    const nextResponses = {
+      ...seededQuestionResponses,
+      secondQuestion: [
+        {
+          ...seededQuestionResponses.seedQuestion[0],
+          questionId: 'secondQuestion',
+          response: JSON.stringify({ type: 'binary', prompt: 'Second prompt', answer: { value: 'Disagree' } }),
+        },
+      ],
+    };
+    rerender(
+      <PolisReport
+        {...props}
+        questionResponses={nextResponses}
+        isResponsesCacheReady={false}
+        questionResponsesNonce={1}
+      />,
+    );
+    expect(computePolisConversationMath).toHaveBeenCalledTimes(calls);
+    rerender(<PolisReport {...props} questionResponses={nextResponses} questionResponsesNonce={2} />);
+    await waitFor(() => expect(computePolisConversationMath).toHaveBeenCalledTimes(calls + 1));
+    expect(screen.queryByLabelText('Refreshing report')).not.toBeInTheDocument();
+  });
+
+  it.each(['session', 'filter', 'viewer', 'worker'])(
+    'does not retain report data across a %s change during refresh',
+    async (change) => {
+      const props = { ...baseReportProps, slug: 'edge', questionResponses: seededQuestionResponses };
+      const { rerender } = render(<PolisReport {...props} />);
+      await screen.findByText('Summary and Statistics');
+      const changed =
+        change === 'session'
+          ? { slug: 'other' }
+          : change === 'filter'
+            ? { filterState: { selectedTags: ['missing'] } }
+            : change === 'viewer'
+              ? { account: '0x' + '2'.repeat(40) }
+              : { sessionConfig: { corsWorkerUrl: 'https://other.example.test' } };
+      rerender(
+        <PolisReport
+          {...props}
+          {...changed}
+          questionResponses={{}}
+          isQuestionCacheReady={false}
+          isResponsesCacheReady={false}
+        />,
+      );
+      await screen.findByLabelText('Loading report');
+      expect(screen.queryByText('Summary and Statistics')).not.toBeInTheDocument();
+    },
+  );
+
   it('offers a retry instead of loading forever when the session load failed', async () => {
     const onRetryLoad = jest.fn(async () => {});
     render(

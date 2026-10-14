@@ -4515,6 +4515,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .pileInteractionUnit {
   --pile-desktop-submit-rail-offset: 42px;
   --pile-desktop-rail-gap: 24px;
+  --pile-desktop-rail-width: 72px;
   --pile-card-width: min(550px, 90vw);
   display: flex;
   flex-direction: column;
@@ -4622,7 +4623,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .pileControls > .pileNav {
   position: absolute;
   left: calc(100% + var(--pile-desktop-rail-gap));
-  width: max-content;
+  width: var(--pile-desktop-rail-width);
+  box-sizing: border-box;
 }
 
 .pileControls > .pileActions {
@@ -5516,6 +5518,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileInteractionUnit {
     --pile-card-width: min(760px, calc(100vw - 190px));
     --pile-desktop-rail-gap: 28px;
+    --pile-desktop-rail-width: 52px;
     width: var(--pile-card-width);
     max-width: calc(100vw - 190px);
   }

@@ -34,6 +34,7 @@ export type MainSiteProps = {
   wagmiBlocknumber?: number;
   path?: string;
   urlPath?: string;
+  search?: string;
   firstVisit?: boolean;
   [key: string]: unknown;
 };

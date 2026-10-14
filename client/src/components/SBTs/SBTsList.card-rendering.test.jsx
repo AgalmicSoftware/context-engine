@@ -450,7 +450,8 @@ describe('SBTsList card rendering and navigation', () => {
     expect(sessionHero).not.toHaveTextContent('/alpha');
     expect(sessionHero).not.toHaveTextContent('Open session');
     const activeSessionLink = screen.getByRole('link', { name: 'Open session Alpha' });
-    expect(activeSessionLink).toHaveAttribute('href', '/session/alpha');
+    expect(activeSessionLink).toHaveAttribute('href', '/session/alpha?worker=https%3A%2F%2Fworker.example');
+    expect(screen.getByRole('combobox', { name: 'Active session' })).toHaveValue('alpha');
     expect(activeSessionLink.querySelector('svg')).toBeInTheDocument();
     const refreshGroupsButton = screen.getByRole('button', { name: 'Refresh groups' });
     const createGroupButton = (await screen.findAllByRole('button', { name: /create group/i }))[0];
@@ -488,6 +489,11 @@ describe('SBTsList card rendering and navigation', () => {
     );
     expect(mockGetRelevantBlockWindowForFilter).not.toHaveBeenCalled();
     expect(screen.queryByText(/Loading latest block|Blocks left/i)).not.toBeInTheDocument();
+    workerRender.rerender(<SBTsList {...sharedProps} sessionSlug="custom-universe-session" />);
+    expect(screen.getByRole('combobox', { name: 'Active session' })).toHaveValue('custom-universe-session');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionSlug: 'custom-universe-session', showCreate: false, refreshNonce: 0 }),
+    );
     workerRender.unmount();
 
     window.history.replaceState({}, '', '/groups/beta');

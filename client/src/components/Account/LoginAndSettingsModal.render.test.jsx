@@ -632,7 +632,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(4);
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
-    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.getByText('Appearance')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Appearance & colors/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
     expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
@@ -769,7 +769,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await openPreLoginSettingsDrawer();
 
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
-    expect(screen.getByText('Appearance & colors')).toBeInTheDocument();
+    expect(screen.getByText('Appearance')).toBeInTheDocument();
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();

@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Fit Appearance controls into a compact row, align question navigation with
+  the action buttons, and retain loaded results during background refreshes.
+
+- Switch the active session directly from the Groups page, with session-scoped
+  navigation and the selected session’s Worker discovery address.
+
 - Load Questions in Tools from the selected session’s verified Worker, keeping
   unresolved counts in a loading state and failed reads distinct from confirmed zero.
 
