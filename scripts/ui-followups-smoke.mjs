@@ -20,7 +20,7 @@ try {
         const controls = nav.parentElement;
         const actions = [...controls.children].find(child => child.className.includes('pileActions'));
         const center = element => { const rect = element.getBoundingClientRect(); return rect.left + rect.width / 2; };
-        return { desktop: getComputedStyle(nav).position === 'absolute', nav: center(button), actions: center([...actions.querySelectorAll('button')].find(element => element.getBoundingClientRect().width > 0)), overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+        return { desktop: getComputedStyle(controls).position === 'absolute', nav: center(button), actions: center([...actions.querySelectorAll('button')].find(element => element.getBoundingClientRect().width > 0)), overflow: document.documentElement.scrollWidth > innerWidth + 1 };
       });
       if (rail.desktop) assert(Math.abs(rail.nav - rail.actions) < 1, JSON.stringify({ theme, width, rail }));
       assert(!rail.overflow, JSON.stringify({ theme, width, rail }));

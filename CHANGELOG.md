@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Align desktop question navigation with the top of the card and keep its counter
+  on one line when moving between questions. Keep mobile Submit controls clear
+  of the navigation arrows.
+
 - Show the Quadratic question type with a compact four-square graphic.
 
 - Keep the Users Details session selector and Filter on one row, with long session
