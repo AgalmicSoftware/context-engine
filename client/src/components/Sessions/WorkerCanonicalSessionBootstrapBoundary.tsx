@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import LazyFallback from '../Shared/LazyFallback';
 import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import {
   fetchWorkerCanonicalSessionBootstrap,
@@ -222,7 +223,13 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
       style={{ color: 'var(--ce-loading-text)' }}
     >
       {viewState.kind === 'loading' ? (
-        <ElapsedLoadingLabel key={`${sessionSlug}:${retryNonce}`} label={viewState.message} />
+        <LazyFallback
+          label={
+            <span style={{ fontSize: '1.5rem' }}>
+              <ElapsedLoadingLabel key={`${sessionSlug}:${retryNonce}`} label={viewState.message} />
+            </span>
+          }
+        />
       ) : (
         viewState.message
       )}

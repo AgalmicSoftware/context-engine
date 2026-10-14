@@ -107,7 +107,7 @@ jest.mock('../UserPage/UserPage', () => {
     },
   };
 });
-jest.mock('../Shared/LazyFallback', () => () => null);
+jest.mock('../Shared/LazyFallback', () => ({ label }) => <>{label}</>);
 jest.mock('../E2E/DevE2eNav', () => () => null);
 jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
   __esModule: true,

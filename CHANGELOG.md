@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Center the session loading message with larger text and a spinner while keeping
+  the elapsed-seconds counter visible across themes.
+
 - Resolve Worker session sponsorship in Settings from verified session config and
   live resource presence. Distinguish unavailable checks from missing sponsorship,
   and retain selected-session model defaults for text AI and transcription.
