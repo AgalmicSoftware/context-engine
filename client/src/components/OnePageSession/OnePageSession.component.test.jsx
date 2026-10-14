@@ -1883,7 +1883,9 @@ describe('OnePageSession view gating', () => {
     expect(await screen.findByTestId('worker-session-groups-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('sbts-page')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^View All$/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/without deploying a contract/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('Use groups to organize people and manage access to shared content and tools.'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     await waitFor(() =>
