@@ -402,6 +402,18 @@ Omitting the field inherits that default. This is session configuration; there
 is no user Settings toggle, and the retired browser preference is ignored.
 Manual navigation remains available and submission remains explicit.
 
+## Worker session AI defaults and sponsorship
+
+Settings resolves directory selections through the session Worker's verified
+configuration before checking `/resource-presence`. A confirmed AI key appears
+as Sponsored; failed or malformed checks appear as Check unavailable and can be
+retried by reopening Settings. Sponsorship describes key availability; the
+Worker still enforces the session's access permissions on requests.
+
+Text AI and transcription retain the selected Worker's configured model defaults.
+Explicit browser-local AI overrides still take precedence. Provider secrets stay
+on the Worker and are not returned by these configuration or presence reads.
+
 ## Current Migration Toggle
 
 - `REACT_APP_TERMINOLOGY_MODE=plain`

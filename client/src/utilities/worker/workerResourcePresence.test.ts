@@ -53,6 +53,16 @@ describe('workerResourcePresence', () => {
     await expect(readWorkerResourcePresence({ sessionSlug: 'demo-1', fetchImpl })).resolves.toBeNull();
   });
 
+  it.each([{}, { ai: 'true', arweave: false, rpc: false, txGas: false }])(
+    'does not treat malformed presence as absent sponsorship',
+    async (resources) => {
+      const fetchImpl = jest.fn(
+        async () => new Response(JSON.stringify({ resources }), { status: 200 }),
+      ) as unknown as typeof fetch;
+      await expect(readWorkerResourcePresence({ sessionSlug: 'session-a', fetchImpl })).resolves.toBeNull();
+    },
+  );
+
   it('uses the explicit general alias for the default session header', async () => {
     const fetchImpl = jest.fn(
       async () =>
@@ -69,4 +79,18 @@ describe('workerResourcePresence', () => {
       expect.objectContaining({ headers: { 'X-Session-Slug': 'general' } }),
     );
   });
+});
+
+it('retries an unavailable check instead of caching a temporary failure', async () => {
+  const fetchImpl = jest
+    .fn()
+    .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ resources: { ai: true, arweave: false, rpc: false, txGas: false } })),
+    );
+  await expect(readWorkerResourcePresence({ sessionSlug: 'retry-session', fetchImpl })).resolves.toBeNull();
+  await expect(readWorkerResourcePresence({ sessionSlug: 'retry-session', fetchImpl })).resolves.toMatchObject({
+    ai: true,
+  });
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
 });

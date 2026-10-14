@@ -14,7 +14,10 @@ type SponsorSessionsRecord = Record<string, unknown> & {
   byResource?: Record<string, readonly SponsorSessionDisplayEntry[]>;
 };
 
+export type SponsorshipCheckStatus = 'checking' | 'unavailable' | '';
+
 type SponsorshipCardArgs = {
+  checkStatus?: SponsorshipCheckStatus;
   activeSession?: unknown;
   key: string;
   sponsoredAccess?: SponsoredAccessRecord;
@@ -62,10 +65,25 @@ export const formatSponsoredStatusMeta = (
   entry: SponsoredStatusEntry | null = null,
   hasActiveSponsor: boolean = false,
   gateKind: 'sbt' | 'session' = 'session',
+  checkStatus: SponsorshipCheckStatus = '',
 ) => {
+  if (checkStatus === 'checking') return { label: 'Checking', tone: 'muted', detail: 'Checking session sponsorship…' };
+  if (checkStatus === 'unavailable')
+    return {
+      label: 'Check unavailable',
+      tone: 'muted',
+      detail: 'Could not confirm sponsorship. Reopen Settings to try again.',
+    };
   const status = entry?.status === 'unresolved' ? 'error' : entry?.status || 'no-gate';
   if (!hasActiveSponsor) {
     return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
+  }
+  if (status === 'worker-managed') {
+    return {
+      label: 'Sponsored',
+      tone: 'ok',
+      detail: 'A sponsor key is configured. Access follows the session permissions.',
+    };
   }
   if (status === 'granted') {
     return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
@@ -117,6 +135,7 @@ export const buildLoginSettingsSponsorshipCard = ({
   sponsorSessions = {},
   title,
   gateKind = 'session',
+  checkStatus = '',
 }: SponsorshipCardArgs) => {
   const sessions = sponsorSessions.byResource?.[key] || [];
   const activeSponsorSession = sessions.find((entry) => entry?.isActive) || null;
@@ -125,7 +144,7 @@ export const buildLoginSettingsSponsorshipCard = ({
   return {
     key,
     title,
-    status: formatSponsoredStatusMeta(access, !!activeSponsorSession, gateKind),
+    status: formatSponsoredStatusMeta(access, !!activeSponsorSession, gateKind, checkStatus),
     access,
     activeSession,
     activeSponsorSession,
@@ -140,7 +159,9 @@ export const buildLoginSettingsSponsorshipCards = ({
   sponsorSessions = {},
   resourceKeys = SETTINGS_SPONSORSHIP_RESOURCES.map(({ key }) => key),
   gateKind = 'session',
+  checkStatus = '',
 }: {
+  checkStatus?: SponsorshipCheckStatus;
   activeSession?: unknown;
   sponsoredAccess?: SponsoredAccessRecord;
   sponsorSessions?: SponsorSessionsRecord;
@@ -155,6 +176,7 @@ export const buildLoginSettingsSponsorshipCards = ({
       sponsorSessions,
       title,
       gateKind,
+      checkStatus,
     }),
   );
 

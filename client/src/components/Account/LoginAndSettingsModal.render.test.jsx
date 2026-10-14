@@ -114,6 +114,7 @@ jest.mock('../../utilities/worker/workerAuth.js', () => ({
 }));
 
 jest.mock('../../utilities/session/sessionNaming.js', () => ({
+  ...jest.requireActual('../../utilities/session/sessionNaming.js'),
   normalizeSessionSlug: jest.fn((value = '') => {
     const normalized = String(value || '')
       .trim()
@@ -885,6 +886,64 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
       expect(screen.queryByText('configured here')).not.toBeInTheDocument();
     });
+  });
+
+  it.each([false, true])('loads Worker sponsorship from a directory selection (signed in: %s)', async (signedIn) => {
+    const slug = 'sponsored-session';
+    const origin = `https://sponsored-${signedIn}.example.test`;
+    const sessionId = '0x00112233445566778899aabbccddeeff';
+    const hint = {
+      slug,
+      sessionId,
+      sessionName: 'Sponsored session',
+      corsWorkerUrl: origin,
+      workerCanonicalCleanRoute: true,
+    };
+    const config = buildPureWorkerSessionConfig({ ...hint, workerCanonicalCleanRoute: false, configRevision: 'v1' });
+    getSessionConfigBySlugOrDefault.mockImplementation((selected) => (selected === slug ? hint : {}));
+    const previousFetch = global.fetch;
+    global.fetch = jest.fn(
+      async (url) =>
+        new Response(
+          JSON.stringify(
+            String(url).includes('/session-config')
+              ? { ok: true, sessionSlug: slug, config }
+              : { ok: true, sessionSlug: slug, resources: { ai: true, arweave: false, rpc: false, txGas: false } },
+          ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    try {
+      const ref = React.createRef();
+      render(
+        <LoginAndSettingsModal
+          ref={ref}
+          {...buildProps({
+            activeSessionSlug: slug,
+            ...(signedIn ? { account: WAGMI_ADDRESS, loginComplete: true, provider: 'passkey_eoa' } : {}),
+          })}
+        />,
+      );
+      if (!signedIn) await openPreLoginSettingsDrawer();
+      else await clickAndSettle(screen.getByRole('button', { name: 'Config' }));
+      await waitFor(
+        () =>
+          expect(ref.current.state).toMatchObject({ sponsoredAccessLoading: false, sponsoredSessionConfig: config }),
+        { timeout: 1000 },
+      );
+      expect(await screen.findByText('Sponsored')).toBeInTheDocument();
+      expect(screen.queryByText('Not sponsored')).not.toBeInTheDocument();
+      expect(screen.getByText(/Access follows the session permissions/)).toBeInTheDocument();
+      expect(ref.current.getDisplaySessionConfig(slug).sessionModeProfile).toEqual(config.sessionModeProfile);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${origin}/resource-presence`,
+        expect.objectContaining({
+          headers: { 'X-Session-Slug': slug },
+        }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+    }
   });
 
   it('keeps advanced scope and local AI controls behind Config with a visible shared session selector', async () => {

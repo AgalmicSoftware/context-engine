@@ -121,6 +121,7 @@ import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import {
   createLoginAgentActions,
   resolveValidatedWorkerCanonicalLoginConfig,
+  type LoginDisplaySessionConfig,
 } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions, restorePasskeyLoginPassively } from './loginAndSettingsPasskeyActions';
 import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
@@ -192,6 +193,7 @@ interface LoginAndSettingsModalState {
   sponsoredAccess: any;
   sponsoredAccessLoading: boolean;
   workerResourcePresence: WorkerResourcePresence | null;
+  sponsoredSessionConfig: LoginDisplaySessionConfig | null;
   sessionScanScope: string;
   sessionScanSlugs: string[];
   sessionScanSlugsInput: string;
@@ -367,6 +369,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sponsoredAccess: null,
       sponsoredAccessLoading: false,
       workerResourcePresence: null,
+      sponsoredSessionConfig: null,
       sessionScanScope: normalizeSessionScanScope(this.props.selectedSessionScope || readSessionScanScope()),
       sessionScanSlugs: Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [],
       sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
@@ -449,7 +452,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
     windowTarget: typeof window !== 'undefined' ? window : null,
   });
-  getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig;
+  getDisplaySessionConfig = (slugIn: unknown = '', cfgIn: unknown = null) => {
+    const slug = normalizeSettingsSessionSlug(slugIn);
+    const resolved = this.state.sponsoredSessionConfig;
+    if (!cfgIn && resolved && normalizeSettingsSessionSlug(resolved.slug) === slug) return resolved;
+    return this._agentTokenActions.getDisplaySessionConfig(slugIn, cfgIn);
+  };
   getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
   shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin;
   toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
@@ -868,7 +876,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (this.props.loginModalToggled && (settingsOpened || focusChanged)) {
       this.applyLoginModalFocus(this.props.loginModalFocus);
     }
-    const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
+    const needsSponsoredAccessRefresh =
+      accountChanged || activeSessionChanged || settingsOpened || this.props.sessionConfig !== prevProps.sessionConfig;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
     if (accountChanged) {
       needsBalanceCheck = true;
@@ -1154,7 +1163,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   loadAiSettings = () => {
     const sessionSlug = this.getActiveSessionSlug();
     const aiSettings = getLocalAiSettings();
-    const aiGroupSettings = getSessionAiSettings(sessionSlug);
+    const aiGroupSettings = getSessionAiSettings(sessionSlug, this.getDisplaySessionConfig(sessionSlug));
     this.setStateIfMounted({
       aiSettings,
       aiGroupSettings,
@@ -1222,10 +1231,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       normalizeSessionSlug: normalizeSettingsSessionSlug,
     });
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
-    this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
+    this.setStateIfMounted({
+      sponsoredAccessLoading: true,
+      workerResourcePresence: null,
+      sponsoredAccess: null,
+      sponsoredSessionConfig: null,
+    });
     try {
       const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
-      const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
+      const { accessMap, workerResourcePresence, sessionConfig } = await loadLoginSettingsSponsoredAccess({
         slug,
         sessionConfig: verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {},
         account: this.props.account || '',
@@ -1239,6 +1253,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         sponsoredAccess: accessMap,
         sponsoredAccessLoading: false,
         workerResourcePresence,
+        sponsoredSessionConfig: sessionConfig,
+        aiGroupSettings: getSessionAiSettings(slug, sessionConfig),
       });
     } catch (_) {
       if (reqId !== this._sponsoredReqId) return;
@@ -2129,7 +2145,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const sessionSlug = this.getActiveSessionSlug();
     const aiGroup = this.state.aiGroupSettings || getSessionAiSettings(sessionSlug) || {};
     const sessionConfig = this.getDisplaySessionConfig(sessionSlug);
-    const sponsoredKeys = sessionConfig?.sponsoredKeys || {};
+    const sponsoredKeys = mergeWorkerResourcePresenceIntoSponsoredKeys(
+      sessionConfig?.sponsoredKeys || {},
+      this.state.workerResourcePresence,
+    );
     const useLocalAi = !!aiLocal.useLocal;
     const aiDisplay = useLocalAi ? aiLocal : aiGroup;
     const resourceKeys = this.state.resourceKeys || getLocalSessionResourceKeys(sessionSlug) || {};
@@ -2361,6 +2380,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       JSON.stringify(nextProps.selectedSessionSlugs || []) !== JSON.stringify(this.props.selectedSessionSlugs || []) ||
       nextProps.demoSurfaceMode !== this.props.demoSurfaceMode ||
       nextProps.tooltipsEnabled !== this.props.tooltipsEnabled ||
+      nextProps.sessionConfig !== this.props.sessionConfig ||
       nextProps.network?.id !== this.props.network?.id ||
       this.state !== nextState ||
       nextProps.wagmiNetwork?.id !== this.props.wagmiNetwork?.id ||

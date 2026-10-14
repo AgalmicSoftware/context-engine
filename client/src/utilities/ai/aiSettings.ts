@@ -12,7 +12,8 @@ import store from '../../store.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { toStr } from '../shared/primitives.js';
 import { sessionRegistryStore } from '../web3/sessionRegistry.js';
-import { resolveSessionConfigFromSources } from '../session/canonicalSessionContext.js';
+import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
+import { canonicalizeSessionSlug, resolveSessionConfigFromSources } from '../session/canonicalSessionContext.js';
 import { resolveActiveSessionSlug } from '../session/sessionNaming.js';
 import { getDemoSessionConfigForDisplay } from '../session/sessionSourceResolver.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -685,7 +686,15 @@ export const writeLocalAiSettingsEnvelope = (nextSettings: unknown = {}, { stora
   }
 };
 
-const resolveSessionConfigEntry = (slugIn = '') => {
+const resolveSessionConfigEntry = (slugIn = '', suppliedConfig?: unknown) => {
+  const supplied = asRecord(suppliedConfig);
+  const projection = resolveSessionCapabilityProjection(supplied);
+  const slug = canonicalizeSessionSlug(slugIn);
+  // Worker-backed tools already hold a validated config. Keep its model choices
+  // with its endpoint instead of looking up an unrelated registry/default record.
+  if (projection.profileValid && projection.isWorkerCanonical && canonicalizeSessionSlug(supplied.slug) === slug) {
+    return { sessionSlug: slug, sessionConfig: supplied, sessionConfigSource: 'worker', warnings: [] };
+  }
   const resolved = resolveSessionConfigFromSources({
     sessionSlug: slugIn,
     getRegistrySessionConfig: (slug) => sessionRegistryStore.getSessionConfig(slug),
@@ -714,15 +723,15 @@ const getActiveSessionSlugFromStore = (): string => {
 
 // Legacy alias removed — function is now getActiveSessionSlugFromStore directly.
 
-export const getSessionAiSettings = (slugIn = ''): NormalizedAiSettings => {
-  const resolved = resolveSessionConfigEntry(slugIn);
+export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): NormalizedAiSettings => {
+  const resolved = resolveSessionConfigEntry(slugIn, sessionConfig);
   const session = resolved.sessionConfig;
   const normalized = normalizeAiSettings(session?.ai || {}, { includeUseLocal: false });
   const sanitized = stripProviderKeys(normalized);
   return {
     ...sanitized,
-    _sessionSlug: resolved.sessionSlug || session?.slug || '',
-    _sessionName: session?.sessionName || '',
+    _sessionSlug: toStr(resolved.sessionSlug || session?.slug || ''),
+    _sessionName: toStr(session?.sessionName || ''),
     _sessionConfigSource: resolved.sessionConfigSource || 'missing',
   };
 };
@@ -811,15 +820,17 @@ export const clearLocalAiSettings = () => {
 
 export const resolveAiSettings = ({
   sessionSlug,
+  sessionConfig,
   preferLocal,
 }: {
   sessionSlug?: unknown;
+  sessionConfig?: unknown;
   preferLocal?: unknown;
 } = {}) => {
   const effectiveSlug =
     typeof sessionSlug === 'string' && sessionSlug.length >= 0 ? sessionSlug : getActiveSessionSlugFromStore();
   const local = getLocalAiSettings();
-  const session = getSessionAiSettings(effectiveSlug || '');
+  const session = getSessionAiSettings(effectiveSlug || '', sessionConfig);
   const useLocal = typeof preferLocal === 'boolean' ? preferLocal : !!local.useLocal;
   const settings = useLocal ? local : session;
   return {
@@ -928,6 +939,7 @@ async function resolveApiKey(
 
 export const getEffectiveAiConfig = async ({
   sessionSlug,
+  sessionConfig,
   preferLocal,
   provider,
   model,
@@ -936,6 +948,7 @@ export const getEffectiveAiConfig = async ({
   resolveSecrets = true,
 }: {
   sessionSlug?: unknown;
+  sessionConfig?: unknown;
   preferLocal?: unknown;
   provider?: unknown;
   model?: unknown;
@@ -943,7 +956,7 @@ export const getEffectiveAiConfig = async ({
   context?: AiWalletContext;
   resolveSecrets?: boolean;
 } = {}) => {
-  const { source, settings, local, session } = resolveAiSettings({ sessionSlug, preferLocal });
+  const { source, settings, local, session } = resolveAiSettings({ sessionSlug, sessionConfig, preferLocal });
   const preferLocalResolved = typeof preferLocal === 'boolean' ? preferLocal : !!local.useLocal;
   const modelType = thinking ? AI_MODEL_TYPES.THINKING : AI_MODEL_TYPES.FAST;
   const sessionProvider =
@@ -1010,6 +1023,7 @@ export const getEffectiveAiConfig = async ({
 
 export const getEffectiveTranscriptionConfig = async ({
   sessionSlug,
+  sessionConfig,
   preferLocal,
   provider,
   model,
@@ -1018,6 +1032,7 @@ export const getEffectiveTranscriptionConfig = async ({
   context,
 }: {
   sessionSlug?: unknown;
+  sessionConfig?: unknown;
   preferLocal?: unknown;
   provider?: unknown;
   model?: unknown;
@@ -1025,7 +1040,7 @@ export const getEffectiveTranscriptionConfig = async ({
   rpcUrl?: unknown;
   context?: AiWalletContext;
 } = {}) => {
-  const { local, session } = resolveAiSettings({ sessionSlug, preferLocal });
+  const { local, session } = resolveAiSettings({ sessionSlug, sessionConfig, preferLocal });
   const preferLocalResolved = typeof preferLocal === 'boolean' ? preferLocal : !!local.useLocal;
   const hasExplicitKey = !!toStr(apiKey).trim();
   const sessionTranscription = isRecord(session.models?.transcription)

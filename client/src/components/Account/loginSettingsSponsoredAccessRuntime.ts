@@ -1,3 +1,4 @@
+import { resolveLoginSettingsSessionConfig } from './loginSettingsSessionConfig';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { refreshSessionRegistryFieldsCache } from '../../utilities/web3/sessionRegistry.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
@@ -21,6 +22,7 @@ const isSponsoredAccessSessionConfig = (value: unknown): value is SponsoredAcces
 export type LoginSettingsSponsoredAccessResult = {
   accessMap: Record<'ai' | 'arweave' | 'rpc' | 'txGas', unknown>;
   workerResourcePresence: WorkerResourcePresence | null;
+  sessionConfig: SponsoredAccessSessionConfig;
 };
 
 const SPONSORED_RESOURCE_KEYS = ['ai', 'arweave', 'rpc', 'txGas'] as const;
@@ -43,7 +45,9 @@ export const loadLoginSettingsSponsoredAccess = async ({
   fallbackChainId?: unknown;
   includeWorkerResourcePresence?: boolean;
 }): Promise<LoginSettingsSponsoredAccessResult> => {
-  let cfg = sessionConfig || {};
+  let cfg: SponsoredAccessSessionConfig = includeWorkerResourcePresence
+    ? await resolveLoginSettingsSessionConfig(slug, sessionConfig || {})
+    : sessionConfig || {};
   let capabilities = resolveSessionCapabilityProjection(cfg);
   const chainId = Number(capabilities.chainId || 0);
   if (slug && chainId && capabilities.isRegistryCanonical) {
@@ -70,7 +74,9 @@ export const loadLoginSettingsSponsoredAccess = async ({
   const [results, workerResourcePresence] = await Promise.all([
     Promise.all(
       resourceKeys.map((resourceKey) =>
-        checkSponsoredAccess({ sessionConfig: cfg, sessionSlug: slug, account, resourceKey }),
+        capabilities.isWorkerCanonical
+          ? Promise.resolve({ resourceKey, status: 'worker-managed' })
+          : checkSponsoredAccess({ sessionConfig: cfg, sessionSlug: slug, account, resourceKey }),
       ),
     ),
     canReadWorkerPresence
@@ -94,5 +100,6 @@ export const loadLoginSettingsSponsoredAccess = async ({
   return {
     accessMap,
     workerResourcePresence,
+    sessionConfig: cfg,
   };
 };

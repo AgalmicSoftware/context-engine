@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Resolve Worker session sponsorship in Settings from verified session config and
+  live resource presence. Distinguish unavailable checks from missing sponsorship,
+  and retain selected-session model defaults for text AI and transcription.
+
 - Route Context dictation and AI rewrite through the selected session's Worker,
   including local session changes and returning to the global default.
 - Keep Back and Session above one Groups action row containing View All, Create,
