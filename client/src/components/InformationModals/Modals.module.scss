@@ -772,6 +772,13 @@ input[type='radio']:checked:after {
     mix-blend-mode: normal !important;
   }
 
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageMotivation,
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageAudience {
+    opacity: 0.82;
+    filter: saturate(0.55) brightness(1.05) contrast(0.9);
+    mix-blend-mode: multiply !important;
+  }
+
   .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageIntro,
   .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageGoals,
   .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImageCollaborators {

@@ -109,7 +109,10 @@ Minimal is the default white theme. Its stable configuration and storage ID rema
 for a deployment default. It uses dark slate text, blue actions, subtle borders,
 modest corner radii, sans-serif typography with system fallbacks, and flat surfaces.
 Login and Submit share the brighter blue submit palette, including hover states.
-Minimal Welcome slides use a white canvas, opaque artwork, dark copy, and blue navigation. White line-art illustrations are inverted only within this profile; color illustrations retain their original colors.
+Minimal Welcome slides use a white canvas, dark copy, and blue navigation.
+White line-art illustrations are inverted only within this profile. The Because
+helmet and Built to Help robot use reduced opacity, muted colors, and multiply
+blending to sit softly on the canvas; other artwork retains its existing treatment.
 Article chart labels, totals, tooltips, code blocks, and expanded methodology use
 explicit light-surface text pairs. Participant colors appear as swatches beside
 readable quote labels.
