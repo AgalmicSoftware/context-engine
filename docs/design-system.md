@@ -156,15 +156,17 @@ Bookmarks controls. Inline fields retain light backgrounds, dark text, and
 visible validation and focus indicators. Disconnect stays red with white text.
 This treatment is scoped to the Account card.
 
-The Stats tab includes a Sessions count across the app's discovered registry
-sessions, configured Worker sessions, and previously visited Worker sessions.
+When ALL is selected, the Stats tab includes a Sessions count across the app's
+discovered registry sessions, configured Worker sessions, and previously visited
+Worker sessions.
 Opening it shows centralized and decentralized totals and a scrollable list of
 session links. Classification follows canonical authority: Worker authority is
 centralized and EVM registry authority is decentralized, even when a session also
 uses the other backend for supporting services. Missing authority metadata is
 shown as "Type unavailable." This directory is independent of the selected
-session scope used by the other Stats counts. Its five summary buttons wrap to
-three columns on narrow phones.
+session scope used by the other Stats counts. The four or five visible summary
+buttons share the available width evenly. On narrow phones, four buttons form
+two balanced rows of two, while five buttons wrap to three columns.
 Stats, Users Details, and Settings share one Session dropdown with an adjacent
 external-link icon. A concrete selection opens its session page in a new tab;
 General opens the general session, while ALL and multi-session selections leave
