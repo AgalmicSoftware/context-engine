@@ -16,8 +16,9 @@ All notable changes to this project will be documented in this file.
 - Show the owning session name and slug for session-wide group member visibility.
   Keep shared group links scoped with an explicit `sessionSlug`, including when
   a different session is active, while supporting older links.
-- Advance the question pile after binary and single-choice answers, with a saved
-  Auto-advance setting that defaults to On. Keep manual navigation available.
+- Advance the question pile after binary and single-choice answers by default.
+  Configure the deployment default in the client environment and override it
+  per session with `pileAutoAdvanceEnabled`. Keep manual navigation available.
 - Keep the active session selection consistent across Stats, account settings,
   Questions, Groups, and Context. Add a session filter to user details and link
   question rows directly to their session report.

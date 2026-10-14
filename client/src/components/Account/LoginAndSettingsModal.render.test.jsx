@@ -748,23 +748,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(toggleTooltips.mock.calls[0]).toEqual([]);
   });
 
-  it.each([false, true])('updates auto-advance in settings (signed in: %s)', async (signedIn) => {
-    const stableProps = buildProps(signedIn ? { account: WAGMI_ADDRESS, loginComplete: true, provider: 'wagmi' } : {});
-    function AutoAdvanceHarness() {
-      const [enabled, setEnabled] = React.useState(true);
-      return (
-        <LoginAndSettingsModal
-          {...stableProps}
-          pileAutoAdvanceEnabled={enabled}
-          togglePileAutoAdvance={() => setEnabled((value) => !value)}
-        />
-      );
-    }
-    render(<AutoAdvanceHarness />);
+  it.each([false, true])('keeps session auto-advance out of user settings (signed in: %s)', async (signedIn) => {
+    const props = buildProps(signedIn ? { account: WAGMI_ADDRESS, loginComplete: true, provider: 'wagmi' } : {});
+    render(<LoginAndSettingsModal {...props} />);
     if (!signedIn) await openPreLoginSettingsDrawer();
-    expect(screen.getByRole('button', { name: 'Auto-advance On' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Auto-advance On' }));
-    expect(screen.getByRole('button', { name: 'Auto-advance Off' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('ce-settings-auto-advance')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auto-advance/i })).not.toBeInTheDocument();
   });
 
   it('exposes pre-login settings so tooltip preference and custom AI endpoint can be updated before sign-in', async () => {

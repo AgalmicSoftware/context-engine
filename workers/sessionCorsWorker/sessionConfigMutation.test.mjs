@@ -330,6 +330,40 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
   assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
 });
 
+test('set-config accepts boolean pile navigation overrides and preserves them in later patches', () => {
+  for (const pileAutoAdvanceEnabled of [false, true]) {
+    const result = applySessionConfigMutation({
+      existingConfig: cloneJson(profileBearingConfig),
+      mutation: { kind: 'set-config', incomingConfig: { pileAutoAdvanceEnabled } },
+      slug: 'session-a',
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.pileAutoAdvanceEnabled, pileAutoAdvanceEnabled);
+    const patched = applySessionConfigMutation({
+      existingConfig: result.config,
+      mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Renamed' } },
+      slug: 'session-a',
+    });
+    assert.equal(patched.ok, true);
+    assert.equal(patched.config.pileAutoAdvanceEnabled, pileAutoAdvanceEnabled);
+  }
+});
+
+test('session config rejects malformed pile navigation values before persistence', () => {
+  for (const pileAutoAdvanceEnabled of ['false', 0, null, {}, []]) {
+    for (const authorityConfig of [profileBearingConfig, baseConfig]) {
+      const existingConfig = cloneJson(authorityConfig);
+      const result = applySessionConfigMutation({
+        existingConfig,
+        mutation: { kind: 'set-config', incomingConfig: { pileAutoAdvanceEnabled } },
+        slug: 'session-a',
+      });
+      assert.deepEqual(result, { ok: false, status: 400, error: 'Invalid pile auto-advance config.' });
+      assert.deepEqual(existingConfig, authorityConfig);
+    }
+  }
+});
+
 test('set-config sets optional field encryption and linked groups on Worker sessions', () => {
   const linkedWorkerGroups = [{
     sessionSlug: 'source-session',

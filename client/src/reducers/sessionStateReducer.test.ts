@@ -7,7 +7,6 @@ import {
   LOGIN_IN_PROGRESS,
   SET_DEMO_SURFACE_MODE,
   TOGGLE_DEMO_MODE,
-  TOGGLE_PILE_AUTO_ADVANCE,
   TOGGLE_LOGIN_MODAL,
   UPDATE_GLOBAL_SESSION_SELECTION,
 } from '../actions/types';
@@ -73,7 +72,6 @@ describe('sessionStateReducer', () => {
       selectedSessionSlugs: initialSelection.selectedSessionSlugs,
       onboardingStep: null,
       tooltipsEnabled: true,
-      pileAutoAdvanceEnabled: true,
     });
   });
 
@@ -359,14 +357,10 @@ describe('sessionStateReducer', () => {
   });
 });
 
-it('keeps the default-on pile navigation preference across reloads and session refreshes', () => {
-  localStorage.clear();
+it('ignores the retired browser auto-advance preference during initialization and refresh', () => {
+  localStorage.setItem('ce:pileAutoAdvanceEnabled', 'false');
   const initial = reducer(undefined, { type: '@@INIT' });
-  expect(initial.pileAutoAdvanceEnabled).toBe(true);
-  const disabled = reducer(initial, { type: TOGGLE_PILE_AUTO_ADVANCE });
-  expect(disabled.pileAutoAdvanceEnabled).toBe(false);
-  expect(reducer(undefined, { type: '@@INIT' }).pileAutoAdvanceEnabled).toBe(false);
-  expect(reducer(disabled, { type: FETCH_SESSION_STATE, payload: {} }).pileAutoAdvanceEnabled).toBe(false);
-  expect(reducer(disabled, { type: TOGGLE_PILE_AUTO_ADVANCE }).pileAutoAdvanceEnabled).toBe(true);
+  expect(initial).not.toHaveProperty('pileAutoAdvanceEnabled');
+  expect(reducer(initial, { type: FETCH_SESSION_STATE, payload: {} })).not.toHaveProperty('pileAutoAdvanceEnabled');
   localStorage.clear();
 });

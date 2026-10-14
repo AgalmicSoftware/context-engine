@@ -1,4 +1,4 @@
-// A card the responder can see must not change under them when response counts arrive.
+// Auto-advance follows session configuration and only direct, committed choices.
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -14,9 +14,6 @@ const SESSION_CONFIG = {
   networkChainId: 84532,
   __registry: { registryChainId: 84532, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
-import { createStore } from 'redux';
-import sessionStateReducer from '../../reducers/sessionStateReducer';
-import { TOGGLE_PILE_AUTO_ADVANCE } from '../../actions/types';
 
 const questions = [
   { id: 'q1', type: 'binary', prompt: 'First binary' },
@@ -27,7 +24,7 @@ const questions = [
   { id: 'q6', type: 'binary', prompt: 'Last binary' },
 ];
 
-const mountPile = async () => {
+const mountPile = async (sessionConfig = SESSION_CONFIG) => {
   jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(SESSION_CONFIG);
   const cache = {
     84532: {
@@ -38,11 +35,6 @@ const mountPile = async () => {
   };
   jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (ns) => (ns === 'questionsCache' ? cache : {}));
   jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((ns) => (ns === 'questionsCache' ? cache : null));
-  const store = createStore((state = {}, action) => ({
-    ...state,
-    profile: {},
-    sessionState: sessionStateReducer(state.sessionState, action),
-  }));
   let engine;
   const strategy = createPileViewRuntimeStrategy();
   const renderPile = strategy.render;
@@ -50,30 +42,27 @@ const mountPile = async () => {
     engine = current;
     return renderPile(current);
   };
-  renderSurveyPileViewMode(
-    {
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      loginComplete: false,
-      cacheHasLoaded: true,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionsCacheNonce: 1,
-      questionResponsesNonce: 1,
-      onFilterChange: jest.fn(),
-      runtimeStrategy: strategy,
-      sessionConfig: SESSION_CONFIG,
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-    },
-    { store },
-  );
+  const harness = renderSurveyPileViewMode({
+    minifiedMode: 'pile',
+    network: { id: 84532 },
+    networkChainId: 84532,
+    account: '',
+    loginComplete: false,
+    cacheHasLoaded: true,
+    isQuestionCacheReady: true,
+    isResponsesCacheReady: true,
+    questionsCacheNonce: 1,
+    questionResponsesNonce: 1,
+    onFilterChange: jest.fn(),
+    runtimeStrategy: strategy,
+    sessionConfig,
+    sessionSlug: 'edge',
+    activeSessionSlug: 'edge',
+  });
   await waitFor(() => expect(engine?.state?.pileQuestions?.length).toBe(6), { timeout: 8000 });
   await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
   await act(async () => engine.setState({ pileQuestions: questions, activePileIndex: 0 }));
-  return { engine: () => engine, store };
+  return { engine: () => engine, ...harness };
 };
 const card = () => screen.getByTestId('ce-pile-active-question');
 const choose = (role, name) => fireEvent.click(within(card()).getByRole(role, { name }));
@@ -89,6 +78,7 @@ afterEach(() => {
 });
 
 it('saves binary and single-choice answers, advances exactly once, focuses the next card, and keeps answers on Back', async () => {
+  localStorage.setItem('ce:pileAutoAdvanceEnabled', 'false');
   const pile = await mountPile();
   choose('radio', 'Agree');
   await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
@@ -108,13 +98,13 @@ it('saves binary and single-choice answers, advances exactly once, focuses the n
   expect(card()).toHaveAccessibleName('Question 1 of 6');
 });
 
-it('responds immediately to the saved setting and leaves multi-select and final questions in place', async () => {
-  const pile = await mountPile();
-  await act(async () => pile.store.dispatch({ type: TOGGLE_PILE_AUTO_ADVANCE }));
+it('uses updated session config and leaves multi-select and final questions in place', async () => {
+  localStorage.setItem('ce:pileAutoAdvanceEnabled', 'true');
+  const pile = await mountPile({ ...SESSION_CONFIG, pileAutoAdvanceEnabled: false });
   choose('radio', 'Unsure');
   expect(answer(pile, 'q1')).toBe('Unsure');
   expect(card()).toHaveAccessibleName('Question 1 of 6');
-  await act(async () => pile.store.dispatch({ type: TOGGLE_PILE_AUTO_ADVANCE }));
+  pile.rerenderSurveyQuestions({ sessionConfig: { ...SESSION_CONFIG, pileAutoAdvanceEnabled: true } });
   choose('radio', 'Disagree');
   await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
   await act(async () => pile.engine().handleNext());

@@ -6,6 +6,7 @@ const runtimeGlobals = globalThis as Record<string, unknown>;
 const ENV_KEYS = [
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
+  'REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED',
   'REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK',
   'REACT_APP_CE_SESSION_SCAN_SCOPE',
   'REACT_APP_CE_SESSION_SCAN_SLUGS',
@@ -195,6 +196,19 @@ describe('appConfig env-backed config', () => {
     jest.isolateModules(() => {
       const config = require('./appConfig.js');
       expect(config.DEFAULT_DEMO_SURFACE_MODE).toBe(expected);
+    });
+  });
+
+  it.each([
+    [undefined, true],
+    ['false', false],
+    ['true', true],
+    ['wat', true],
+  ])('reads REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED=%p as %p', (value, expected) => {
+    if (value === undefined) delete process.env.REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED;
+    else process.env.REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED = value;
+    jest.isolateModules(() => {
+      expect(require('./appConfig.js').DEFAULT_PILE_AUTO_ADVANCE_ENABLED).toBe(expected);
     });
   });
 

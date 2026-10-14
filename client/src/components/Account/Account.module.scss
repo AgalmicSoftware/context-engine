@@ -2243,24 +2243,6 @@ h1 {
   opacity: 0.78;
 }
 
-.autoAdvanceSetting {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  width: 100%;
-  color: var(--ce-settings-control-text);
-
-  > button {
-    flex: 0 0 auto;
-  }
-  > span {
-    flex: 1 1 180px;
-    font-size: 13px;
-    line-height: 1.4;
-  }
-}
-
 .settingsThemeQuickSlot {
   width: 100%;
 }

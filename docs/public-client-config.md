@@ -386,6 +386,22 @@ writes (about 240), so set up caching there separately.
   Keep them in uncommitted `client/.env` for local diagnostics, not in a shared
   production client config if you need a true secret boundary.
 
+## Question pile navigation
+
+`REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED=true` controls the deployment default for
+advancing after a binary or single-select answer. It defaults to `true`; set it
+in `client/.env` and restart the dev server or rebuild the deployed client.
+Each session can override it with a top-level boolean in its session config:
+
+```json
+{ "pileAutoAdvanceEnabled": false }
+```
+
+An explicit session boolean takes precedence over the environment default.
+Omitting the field inherits that default. This is session configuration; there
+is no user Settings toggle, and the retired browser preference is ignored.
+Manual navigation remains available and submission remains explicit.
+
 ## Current Migration Toggle
 
 - `REACT_APP_TERMINOLOGY_MODE=plain`

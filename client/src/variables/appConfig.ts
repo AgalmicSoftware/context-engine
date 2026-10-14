@@ -56,6 +56,8 @@ export const MAX_SBT_INSTANCE_LISTENERS = readPublicIntEnv('REACT_APP_MAX_SBT_IN
 export const SBT_INSTANCE_LISTENER_GROUPS = readPublicListEnv('REACT_APP_SBT_INSTANCE_LISTENER_GROUPS', ['general']);
 // When false, skip mint/burn history scans during SBT cache initialization.
 export const ENABLE_SBT_HISTORY_SCAN = readPublicBoolEnv('REACT_APP_ENABLE_SBT_HISTORY_SCAN', false);
+// Sessions may override this deployment default with pileAutoAdvanceEnabled.
+export const DEFAULT_PILE_AUTO_ADVANCE_ENABLED = readPublicBoolEnv('REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED', true);
 // Toggle the Conviction/Importance slider swap UI (SurveyTool)
 export const ENABLE_IMPORTANCE_SLIDER_TOGGLE = readPublicBoolEnv('REACT_APP_ENABLE_IMPORTANCE_SLIDER_TOGGLE', true);
 // When true, unresolved SBT labels can trigger targeted metadata lookups (cache-first fallback path).

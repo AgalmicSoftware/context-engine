@@ -2063,6 +2063,13 @@ Never return secrets in responses.
 
 `/admin/set-config` notes:
 
+- `pileAutoAdvanceEnabled` is an optional boolean controlling question pile
+  navigation. Both `true` and `false` survive deployment, config patches, and
+  the public `/session-config` response; non-boolean writes return `400`.
+  Omitting it from a patch preserves the existing value. Sessions without this
+  field inherit the client's `REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED` default
+  (`true`).
+
 - Security-sensitive `sessionModeProfile` and `storageProfile` enum values are
   validated before merge and again on the complete record before persistence.
   Read compatibility for legacy values is not a write-time fallback. A

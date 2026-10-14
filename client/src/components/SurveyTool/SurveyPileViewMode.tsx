@@ -16,8 +16,7 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../reducers/index.js';
+import { resolvePileAutoAdvanceEnabled } from './surveyPileNavigation';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
@@ -2611,7 +2610,7 @@ const renderPileResponseInput = (
         (inputType === 'multichoice' && (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
       engine.handleAnswerPile(question.id, value, {
         afterUpdate: () => {
-          if (!canAdvance || engine.props.pileAutoAdvanceEnabled === false) return;
+          if (!canAdvance || !resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())) return;
           // Inspect the committed answer: clicking a selected binary option clears it.
           // Only direct card edits reach this callback; interview drafts and hydration do not.
           const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
@@ -3450,16 +3449,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
 };
 
 export function PileViewMode(props: any): React.ReactElement {
-  const pileAutoAdvanceEnabled = useSelector(
-    (state: RootState) => state.sessionState?.pileAutoAdvanceEnabled !== false,
-  );
-  return (
-    <SurveyQuestions
-      {...props}
-      pileAutoAdvanceEnabled={pileAutoAdvanceEnabled}
-      runtimeStrategy={props?.runtimeStrategy || createPileViewRuntimeStrategy()}
-    />
-  );
+  return <SurveyQuestions {...props} runtimeStrategy={props?.runtimeStrategy || createPileViewRuntimeStrategy()} />;
 }
 
 export default PileViewMode;

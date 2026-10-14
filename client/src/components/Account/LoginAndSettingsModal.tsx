@@ -12,7 +12,6 @@ import {
   toggleDemoMode,
   setDemoSurfaceMode,
   toggleTooltips,
-  togglePileAutoAdvance,
   changeActiveSessionSlug,
   updateGlobalSessionSelection,
 } from '../../actions/sessionStateActions.js';
@@ -38,7 +37,6 @@ import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './Log
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
-import LoginAutoAdvanceToggleControl from './LoginAutoAdvanceToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
 import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
@@ -155,8 +153,6 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   selectedSessionScope: string;
   selectedSessionSlugs: string[];
   tooltipsEnabled: boolean;
-  pileAutoAdvanceEnabled?: boolean;
-  togglePileAutoAdvance?: () => void;
   changeAccount: (payload?: unknown) => void;
   toggleLoginModal: (payload?: unknown) => void;
   updateLoginInfo: (payload?: unknown) => void;
@@ -1623,12 +1619,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         tooltipPlacement,
         tooltipsEnabled: this.props.tooltipsEnabled !== false,
       }),
-      autoAdvanceControl: (
-        <LoginAutoAdvanceToggleControl
-          enabled={this.props.pileAutoAdvanceEnabled !== false}
-          onToggle={() => this.props.togglePileAutoAdvance?.()}
-        />
-      ),
       demoControl: LoginDemoSurfaceToggleControl({
         demoSurfaceEnabled: this.props.demoSurfaceMode !== false,
         onToggle: () => this.props.setDemoSurfaceMode?.(this.props.demoSurfaceMode === false),
@@ -2371,7 +2361,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       JSON.stringify(nextProps.selectedSessionSlugs || []) !== JSON.stringify(this.props.selectedSessionSlugs || []) ||
       nextProps.demoSurfaceMode !== this.props.demoSurfaceMode ||
       nextProps.tooltipsEnabled !== this.props.tooltipsEnabled ||
-      nextProps.pileAutoAdvanceEnabled !== this.props.pileAutoAdvanceEnabled ||
       nextProps.network?.id !== this.props.network?.id ||
       this.state !== nextState ||
       nextProps.wagmiNetwork?.id !== this.props.wagmiNetwork?.id ||
@@ -2588,7 +2577,6 @@ const mapStateToProps = (state: RootState) => ({
   selectedSessionScope: state.sessionState.selectedSessionScope,
   selectedSessionSlugs: state.sessionState.selectedSessionSlugs,
   tooltipsEnabled: state.sessionState.tooltipsEnabled,
-  pileAutoAdvanceEnabled: state.sessionState.pileAutoAdvanceEnabled,
 });
 
 const LoginAndSettingsModalWithWagmiHooks = Object.assign(WagmiHooksHOC(LoginAndSettingsModal), {
@@ -2602,7 +2590,6 @@ export default connect(mapStateToProps, {
   toggleDemoMode,
   setDemoSurfaceMode,
   toggleTooltips,
-  togglePileAutoAdvance,
   changeFocusedTab,
   changeActiveSessionSlug,
   updateGlobalSessionSelection,

@@ -38,6 +38,7 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'questionsGenPrompt',
   'interviewMode',
   'interviewModeEnabled',
+  'pileAutoAdvanceEnabled',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -90,6 +91,9 @@ const validResultsAnalysisSettingsConfig = (config) => {
   if (!hasOwn(config, 'resultsAnalysis')) return true;
   return validResultsAnalysisSettings(config.resultsAnalysis);
 };
+
+const validPileAutoAdvanceConfig = (config) =>
+  !hasOwn(config, 'pileAutoAdvanceEnabled') || typeof config.pileAutoAdvanceEnabled === 'boolean';
 
 const validInterviewModeConfig = (config) => {
   if (hasOwn(config, 'interviewModeEnabled') && typeof config.interviewModeEnabled !== 'boolean') return false;
@@ -332,6 +336,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validAppearanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid session appearance config.' };
     }
+    if (!validPileAutoAdvanceConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid pile auto-advance config.' };
+    }
     if (!validInterviewModeConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid interview mode config.' };
     }
@@ -394,6 +401,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validAppearanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid session appearance config.' };
+  }
+  if (!validPileAutoAdvanceConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid pile auto-advance config.' };
   }
   if (!validInterviewModeConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid interview mode config.' };
