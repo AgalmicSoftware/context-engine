@@ -12,12 +12,12 @@ import {
 jest.mock('../../utilities/session/sessionSourceResolver', () => ({ getAllDemoSessionConfigs: jest.fn(() => []) }));
 jest.mock('../../utilities/session/sessionWorkerConfigCache', () => ({
   SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT: 'ce:session-worker-config-cache-updated',
-  readSessionWorkerConfigCache: jest.fn(() => ({ bySession: {} })),
+  readSessionWorkerConfigCache: jest.fn(() => ({ v: 1, bySession: {}, slugIndex: {} })),
 }));
 
 jest.mock('../../utilities/web3/chainGateway', () => {
   const slugs = jest.fn(() => ['alpha', 'beta']);
-  const config = jest.fn((slug: string) => ({ slug, sessionName: `${slug} discussion` }));
+  const config = jest.fn((slug: unknown) => ({ slug, sessionName: `${slug} discussion` }));
   return {
     getAllSessionSlugs: slugs,
     getSessionConfigBySlug: config,
@@ -32,14 +32,16 @@ describe('GlobalSessionSelector', () => {
     selectedSessionScope: 'all' as const,
     selectedSessionSlugs: ['alpha', 'beta'],
   };
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
   beforeEach(() => {
     jest.mocked(getAllSessionSlugs).mockReturnValue(['alpha', 'beta']);
     jest
       .mocked(getSessionConfigBySlug)
-      .mockImplementation((slug: string) => ({ slug, sessionName: `${slug} discussion` }));
+      .mockImplementation((slug: unknown) => ({ slug, sessionName: `${slug} discussion` }));
     jest.mocked(getAllDemoSessionConfigs).mockReturnValue([]);
-    jest.mocked(readSessionWorkerConfigCache).mockReturnValue({ bySession: {} });
+    jest.mocked(readSessionWorkerConfigCache).mockReturnValue({ v: 1, bySession: {}, slugIndex: {} });
   });
 
   it('links the selected concrete scope with base-path encoding and disables aggregate destinations', () => {
@@ -226,7 +228,7 @@ describe('GlobalSessionSelector', () => {
 
   it('refreshes the shared catalog and preserves real sessions whose slugs resemble scope sentinels', () => {
     jest.mocked(getAllSessionSlugs).mockReturnValue(['alpha', '__ce_all_sessions__', '__ce_selected_sessions__']);
-    jest.mocked(getSessionConfigBySlug).mockImplementation((slug: string) => ({ slug, sessionName: slug }));
+    jest.mocked(getSessionConfigBySlug).mockImplementation((slug: unknown) => ({ slug, sessionName: slug }));
     const onChange = jest.fn();
     render(<GlobalSessionSelector selection={selection} onChange={onChange} testId="selector" />);
     const allOption = screen.getByRole('option', { name: 'ALL' });
@@ -244,7 +246,7 @@ describe('GlobalSessionSelector', () => {
   it('allows registry hydration to notify other mounted views without updating them during render', () => {
     let hydrate = false;
     jest.mocked(getAllSessionSlugs).mockReturnValue(['alpha', 'beta']);
-    jest.mocked(getSessionConfigBySlug).mockImplementation((slug: string) => {
+    jest.mocked(getSessionConfigBySlug).mockImplementation((slug: unknown) => {
       if (hydrate) {
         hydrate = false;
         window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));

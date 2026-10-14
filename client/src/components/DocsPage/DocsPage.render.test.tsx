@@ -142,8 +142,8 @@ describe('DocsPage contract deep links', () => {
   it('opens and closes the header Graphic independently of Quickstart', () => {
     render(<DocsPage />);
     const header = screen.getByRole('heading', { level: 1, name: 'Docs' }).closest('header')!;
-    const graphicToggle = within(header).getByRole('button', { name: 'Graphic', exact: true });
-    const quickstartToggle = screen.getByRole('button', { name: 'Quickstart', exact: true });
+    const graphicToggle = within(header).getByRole('button', { name: 'Graphic' });
+    const quickstartToggle = screen.getByRole('button', { name: 'Quickstart' });
 
     expect(graphicToggle).toHaveAttribute('data-testid', 'ce-docs-graphic-toggle');
     expect(graphicToggle).toHaveAttribute('aria-expanded', 'false');
