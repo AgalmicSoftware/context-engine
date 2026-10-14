@@ -177,7 +177,9 @@ at the right edge. Questions and Groups place their actions beside Back and help
 on one row when space permits, then wrap without shrinking touch targets.
 Questions keeps one toolbar with its existing state and handlers in the Explorer
 header; standalone and session views retain their own toolbar placement. Context
-actions stay on a separate row below. Narrow phones give the chooser its own full-width row.
+actions stay on a separate row below. Context groups help beside its Session
+chooser and wraps them only when they cannot fit together. Narrow phones give
+the Questions and Groups chooser its own full-width row.
 Selected and unselected options show `Name (slug)` to distinguish repeated
 names. Context retains its local session override and explicit return to the
 global default; its link follows the currently selected local session.

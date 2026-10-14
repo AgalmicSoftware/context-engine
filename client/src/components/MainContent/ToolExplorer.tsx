@@ -305,6 +305,15 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       }
     : null;
 
+  const expandedHeaderHelp = expandedComponent && (
+    <div className={styles.expandedHeaderMeta}>
+      <ToolExplorerPluginExplainer
+        explainText={expandedComponent.data.explainText}
+        {...(expandedComponent.props || {})}
+      />
+    </div>
+  );
+
   const expandedHeaderSession = (
     <div className={styles.expandedHeaderSession}>
       <ToolExplorerSessionControl
@@ -350,15 +359,17 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                   ← Back
                 </button>
 
-                <div className={styles.expandedHeaderMeta}>
-                  <ToolExplorerPluginExplainer
-                    explainText={expandedComponent.data.explainText}
-                    {...(expandedComponent.props || {})}
-                  />
-                </div>
+                {!showDataHeaderActions && expandedHeaderHelp}
               </div>
 
-              {!useCompactExpandedHeader && expandedHeaderSession}
+              {showDataHeaderActions ? (
+                <div className={styles.expandedHeaderContextControls}>
+                  {expandedHeaderHelp}
+                  {expandedHeaderSession}
+                </div>
+              ) : (
+                !useCompactExpandedHeader && expandedHeaderSession
+              )}
 
               <div
                 className={styles.expandedHeaderActions}

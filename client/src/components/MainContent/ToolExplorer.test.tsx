@@ -151,7 +151,7 @@ describe('ToolExplorer session propagation', () => {
   });
 
   it.each(['Questions', 'Groups', 'Context', 'Debate Map', 'Risks'])(
-    'keeps the %s session control outside Back/help and disambiguates the selected name and link',
+    'keeps the %s session control outside Back and disambiguates the selected name and link',
     async (tool) => {
       mockGetSessionConfigBySlug.mockImplementation((slug: string) => ({ slug, sessionName: 'Shared name' }));
       const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
@@ -163,7 +163,8 @@ describe('ToolExplorer session propagation', () => {
       expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
       const lead = container.querySelector(`.${styles.expandedHeaderLead}`);
       expect(lead).toContainElement(screen.getByRole('button', { name: '← Back' }));
-      expect(lead).toContainElement(screen.getByTestId('mock-explainer'));
+      const helpRegion = tool === 'Context' ? selector.closest(`.${styles.expandedHeaderContextControls}`) : lead;
+      expect(helpRegion).toContainElement(screen.getByTestId('mock-explainer'));
       const link = screen.getByRole('link', { name: 'Open session Shared name (edge)' });
       expect(link).toHaveAttribute('href', '/session/edge');
       expect(link).toHaveAttribute('target', '_blank');
@@ -543,6 +544,10 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session \(edge\)$/);
     expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeNull();
     expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
+    const contextControls = selector.closest(`.${styles.expandedHeaderContextControls}`);
+    expect(contextControls).toContainElement(screen.getByTestId('mock-explainer'));
+    expect(contextControls).not.toContainElement(screen.getByRole('button', { name: '← Back' }));
+    expect(contextControls).not.toContainElement(screen.getByTestId(E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD));
     const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
     if (!headerGroup) throw new Error('Expected header mode toggle group');
     expect(Array.from(headerGroup.querySelectorAll('button')).map((node) => node.textContent?.trim())).toEqual([

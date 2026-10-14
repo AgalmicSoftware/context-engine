@@ -468,6 +468,26 @@
   }
 }
 
+.expandedHeaderContextControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+
+  .expandedHeaderMeta {
+    flex: 0 0 auto;
+  }
+
+  .expandedHeaderSession {
+    flex: 1 1 240px;
+    width: auto;
+    max-width: 440px;
+    margin-left: auto;
+  }
+}
+
 .expandedHeaderCompact {
   display: flex;
   flex-wrap: wrap;
