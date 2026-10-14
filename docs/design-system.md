@@ -172,14 +172,16 @@ the icon disabled. Worker links retain their validated discovery origin. Setting
 shows this same control in its quick summary and keeps only advanced scope
 editing behind Config.
 
-Expanded tool headers place the primary Session chooser and session-page link
-at the right edge. Questions and Groups place their actions beside Back and help
-on one row when space permits, then wrap without shrinking touch targets.
-Questions keeps one toolbar with its existing state and handlers in the Explorer
-header; standalone and session views retain their own toolbar placement. Context
-actions stay on a separate row below. Context groups help beside its Session
-chooser and wraps them only when they cannot fit together. Narrow phones give
-the Questions and Groups chooser its own full-width row.
+Expanded tool headers keep Back, help, and the Session chooser together for
+Groups and Context, wrapping the chooser only when the controls cannot fit.
+Groups actions follow this primary group on wide screens and move below it on
+narrow screens; Context actions stay below. Questions places its actions beside
+Back and help on one row when space permits, then gives the chooser its own row
+on narrow screens without shrinking touch targets. Questions keeps one toolbar
+with its existing state and handlers in the Explorer header; standalone and
+session views retain their own toolbar placement. Explorer help buttons open on
+click, Enter, or Space even when automatic Explainers are off, and close on a
+second activation, Escape, or a click outside.
 Selected and unselected options show `Name (slug)` to distinguish repeated
 names. Context retains its local session override and explicit return to the
 global default; its link follows the currently selected local session.

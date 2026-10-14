@@ -11,6 +11,33 @@ export async function inspectCivicExplorerContent(page) {
     await back.waitFor({ state: 'visible' });
     const control = page.getByTestId('ce-tool-explorer-active-session');
     await control.waitFor({ state: 'visible' });
+    const help = page.getByRole('button', { name: `About ${name}`, exact: true });
+    await help.press('Enter');
+    const helpId = await help.getAttribute('aria-describedby');
+    assert(helpId, `${name}: explicit help describes its button`);
+    await page.locator(`[id="${helpId}"]`).waitFor({ state: 'visible' });
+    assert.equal(await help.getAttribute('aria-expanded'), 'true');
+    await help.press('Escape');
+    assert.equal(await help.getAttribute('aria-expanded'), 'false');
+    await page.locator(`[id="${helpId}"]`).waitFor({ state: 'hidden' });
+    if (name === 'Groups' || name === 'Context') {
+      const primary = await control.evaluate((element) => {
+        const group = element.closest('[class*="expandedHeaderPrimaryControls_"]');
+        const back = group?.querySelector('button');
+        const help = group?.querySelector('button[aria-expanded]');
+        const rects = [back, help, element].map((control) => control?.getBoundingClientRect());
+        return {
+          viewport: innerWidth,
+          grouped: rects.every(Boolean),
+          fits: rects.every((rect) => rect && rect.left >= 0 && rect.right <= innerWidth),
+          centers: rects.map((rect) => rect ? rect.top + rect.height / 2 : 0),
+        };
+      });
+      assert(primary.grouped && primary.fits, `${name}: Back, help, and Session stay in their primary group`);
+      if (primary.viewport >= 560) {
+        assert(Math.max(...primary.centers) - Math.min(...primary.centers) < 2, `${name}: primary controls share a row when space permits`);
+      }
+    }
     if (name === 'Questions' || name === 'Groups') {
       const action = page.getByTestId(name === 'Questions' ? 'ce-survey-toolbar' : 'ce-sbts-create-toggle');
       await action.waitFor({ state: 'visible' });
@@ -40,7 +67,7 @@ export async function inspectCivicExplorerContent(page) {
     }
     const header = await control.evaluate((element) => {
       const wrapper = element.closest('[class*="expandedHeaderSession_"]');
-      const row = wrapper?.closest('[class*="expandedHeaderRow_"]');
+      const row = wrapper?.closest('[class*="expandedHeaderPrimaryControls_"]') || wrapper?.closest('[class*="expandedHeaderRow_"]');
       return {
         value: element.value,
         label: element.selectedOptions[0]?.textContent.trim(),

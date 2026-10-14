@@ -171,6 +171,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const showQuestionsHeaderActions = expandedToolName === 'Questions';
   const useCompactExpandedHeader = showGroupsHeaderActions || showQuestionsHeaderActions;
   const showDataHeaderActions = expandedToolName === 'Context';
+  const usePrimaryHeaderControls = showGroupsHeaderActions || showDataHeaderActions;
   const expandedDemoCard = expandedComponent?.data?.status === 'future';
   const selectedDataSessionSlug = useMemo(
     () =>
@@ -309,8 +310,22 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
     <div className={styles.expandedHeaderMeta}>
       <ToolExplorerPluginExplainer
         explainText={expandedComponent.data.explainText}
+        label={`About ${expandedToolName}`}
         {...(expandedComponent.props || {})}
       />
+    </div>
+  );
+
+  const expandedHeaderLead = (
+    <div className={styles.expandedHeaderLead}>
+      <button
+        type="button"
+        className={`${styles.headerActionButton} ${styles.headerActionButtonPrimary}`}
+        onClick={resetExpandedComponent}
+      >
+        ← Back
+      </button>
+      {expandedHeaderHelp}
     </div>
   );
 
@@ -350,25 +365,16 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
             <div
               className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''}`}
             >
-              <div className={styles.expandedHeaderLead}>
-                <button
-                  type="button"
-                  className={`${styles.headerActionButton} ${styles.headerActionButtonPrimary}`}
-                  onClick={resetExpandedComponent}
-                >
-                  ← Back
-                </button>
-
-                {!showDataHeaderActions && expandedHeaderHelp}
-              </div>
-
-              {showDataHeaderActions ? (
-                <div className={styles.expandedHeaderContextControls}>
-                  {expandedHeaderHelp}
+              {usePrimaryHeaderControls ? (
+                <div className={styles.expandedHeaderPrimaryControls}>
+                  {expandedHeaderLead}
                   {expandedHeaderSession}
                 </div>
               ) : (
-                !useCompactExpandedHeader && expandedHeaderSession
+                <>
+                  {expandedHeaderLead}
+                  {!useCompactExpandedHeader && expandedHeaderSession}
+                </>
               )}
 
               <div
@@ -430,7 +436,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                   </a>
                 )}
               </div>
-              {useCompactExpandedHeader && expandedHeaderSession}
+              {showQuestionsHeaderActions && expandedHeaderSession}
             </div>
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>

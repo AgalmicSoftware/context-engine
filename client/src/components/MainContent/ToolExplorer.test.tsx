@@ -163,7 +163,7 @@ describe('ToolExplorer session propagation', () => {
       expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
       const lead = container.querySelector(`.${styles.expandedHeaderLead}`);
       expect(lead).toContainElement(screen.getByRole('button', { name: '← Back' }));
-      const helpRegion = tool === 'Context' ? selector.closest(`.${styles.expandedHeaderContextControls}`) : lead;
+      const helpRegion = lead;
       expect(helpRegion).toContainElement(screen.getByTestId('mock-explainer'));
       const link = screen.getByRole('link', { name: 'Open session Shared name (edge)' });
       expect(link).toHaveAttribute('href', '/session/edge');
@@ -410,8 +410,10 @@ describe('ToolExplorer session propagation', () => {
     expect(headerLead).toContainElement(screen.getByTestId('mock-explainer'));
     expect(headerActions).toContainElement(screen.getByRole('link', { name: /^View All$/i }));
     expect(headerActions).toContainElement(screen.getByRole('button', { name: /^Create$/i }));
-    expect(headerLead.parentElement).toHaveClass(styles.expandedHeaderCompact);
-    expect(headerActions.nextElementSibling).toContainElement(screen.getByLabelText('Active session'));
+    const primary = headerLead.closest(`.${styles.expandedHeaderPrimaryControls}`);
+    expect(primary).toContainElement(screen.getByLabelText('Active session'));
+    expect(primary?.nextElementSibling).toBe(headerActions);
+    expect(primary?.parentElement).toHaveClass(styles.expandedHeaderCompact);
 
     expect(mockSBTsPage).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -544,9 +546,9 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session \(edge\)$/);
     expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeNull();
     expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
-    const contextControls = selector.closest(`.${styles.expandedHeaderContextControls}`);
+    const contextControls = selector.closest(`.${styles.expandedHeaderPrimaryControls}`);
     expect(contextControls).toContainElement(screen.getByTestId('mock-explainer'));
-    expect(contextControls).not.toContainElement(screen.getByRole('button', { name: '← Back' }));
+    expect(contextControls).toContainElement(screen.getByRole('button', { name: '← Back' }));
     expect(contextControls).not.toContainElement(screen.getByTestId(E2E_TESTIDS.TOOL_EXPLORER_DATA_ADD));
     const headerGroup = container.querySelector(`.${styles.headerModeToggleGroup}`) as HTMLElement | null;
     if (!headerGroup) throw new Error('Expected header mode toggle group');
