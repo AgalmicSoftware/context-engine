@@ -636,6 +636,14 @@
   transform: scale(var(--ce-navbar-control-scale));
 }
 
+@media (min-width: 769px) {
+  #mainLogo,
+  #mainLogoLoggedIn {
+    // The SVG artwork fills 74.5% of its viewBox height; keep the layout box fixed.
+    transform: scale(calc(var(--ce-navbar-control-scale) * 1.343));
+  }
+}
+
 .logoHomeLink {
   min-width: 44px;
   min-height: 44px;
