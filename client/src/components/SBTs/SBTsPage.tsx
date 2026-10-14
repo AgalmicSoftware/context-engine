@@ -422,7 +422,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     let referrerSlug = '';
     try {
       const ref = (typeof document !== 'undefined' ? document.referrer : '') || '';
-      referrerSlug = resolveReferrerSessionSlug(ref);
+      const hasEmbeddedSession = this.props.embeddedWorkerGroups && typeof this.props.sessionSlug === 'string';
+      referrerSlug = hasEmbeddedSession ? '' : resolveReferrerSessionSlug(ref);
     } catch (e) {
       sbtLog.warn('SBTsPage: fallback', e);
     }

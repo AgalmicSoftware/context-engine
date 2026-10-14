@@ -191,6 +191,37 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.expandedHeaderLead .activeSessionControl {
+  width: 280px;
+  max-width: 100%;
+  margin: 0;
+  cursor: pointer;
+
+  select.activeSessionSelect {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ce-settings-text);
+    font-family: var(--ce-font-mono);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+
+    option {
+      background: var(--ce-document-surface);
+      color: var(--ce-document-text);
+    }
+  }
 }
 
 .expandedHeaderActions {

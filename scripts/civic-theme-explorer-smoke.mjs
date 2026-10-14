@@ -23,6 +23,19 @@ export async function inspectCivicExplorerContent(page) {
   await back.click();
 
   await open('Groups');
+  const sessionSelector = page.getByTestId('ce-tool-explorer-active-session');
+  await sessionSelector.waitFor({ state: 'visible' });
+  assert.equal(await sessionSelector.getAttribute('aria-label'), 'Active session');
+  const sessionSelection = await sessionSelector.evaluate((element) => ({
+    value: element.value,
+    selected: element.selectedOptions[0]?.value,
+    name: element.selectedOptions[0]?.textContent.trim(),
+    hasGeneral: Array.from(element.options).some((option) => option.value === ''),
+  }));
+  assert.equal(sessionSelection.value, sessionSelection.selected);
+  assert(sessionSelection.name, 'The active session name is visible');
+  assert(sessionSelection.hasGeneral, 'General is available in the session chooser');
+  await sessionSelector.press('Tab');
   await page.getByText('e/acc', { exact: true }).waitFor({ state: 'visible', timeoutMs: 30000 });
   await assertReadable(body);
   await back.click();

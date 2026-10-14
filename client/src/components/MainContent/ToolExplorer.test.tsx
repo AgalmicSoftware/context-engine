@@ -1,6 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ToolExplorer from './ToolExplorer';
+import { Provider, useSelector } from 'react-redux';
+import { applyMiddleware, combineReducers, createStore } from 'redux';
+import thunk from 'redux-thunk';
+import ConnectedToolExplorer, { ToolExplorer } from './ToolExplorer';
+import sessionStateReducer from '../../reducers/sessionStateReducer';
+import { UPDATE_GLOBAL_SESSION_SELECTION } from '../../actions/types';
 import styles from './ToolExplorer.module.scss';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -42,7 +47,14 @@ jest.mock('../SBTs/SBTsPage', () => ({
   __esModule: true,
   default: (props: any) => {
     mockSBTsPage(props);
-    return <div data-testid="mock-sbts-page" data-create-open={props.showCreateGroupExternal ? 'true' : 'false'} />;
+    return (
+      <div
+        data-testid="mock-sbts-page"
+        data-create-open={props.showCreateGroupExternal ? 'true' : 'false'}
+        data-active-session-slug={props.activeSessionSlug || ''}
+        data-session-slug={props.sessionSlug || ''}
+      />
+    );
   },
 }));
 
@@ -102,11 +114,13 @@ describe('ToolExplorer session propagation', () => {
   afterEach(() => {
     jest.clearAllMocks();
     sessionStorage.clear();
+    localStorage.clear();
     if (originalPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
     else mutableEnv.PUBLIC_URL = originalPublicUrl;
   });
 
   beforeEach(() => {
+    localStorage.setItem('ce:selectedSessionScope', 'active');
     mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc']);
     mockGetSessionConfigBySlug.mockImplementation((slug: unknown) => {
       const normalized = String(slug || '');
@@ -114,6 +128,100 @@ describe('ToolExplorer session propagation', () => {
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
       return {};
     });
+  });
+
+  it('switches Groups globally, including General from list scope, without closing the tool', async () => {
+    const store = createStore(combineReducers({ sessionState: sessionStateReducer }), applyMiddleware(thunk));
+    store.dispatch({ type: UPDATE_GLOBAL_SESSION_SELECTION, payload: { primarySessionSlug: 'edge' } });
+    const AppSessionHost = () => {
+      const activeSessionSlug = useSelector(
+        (state: { sessionState: { activeSessionSlug: string } }) => state.sessionState.activeSessionSlug,
+      );
+      return (
+        <ConnectedToolExplorer
+          activeSessionSlug={activeSessionSlug}
+          sessionConfig={mockGetSessionConfigBySlug(activeSessionSlug)}
+          demoSurfaceMode={false}
+        />
+      );
+    };
+    render(
+      <Provider store={store}>
+        <AppSessionHost />
+      </Provider>,
+    );
+    fireEvent.click(screen.getByText('Groups'));
+    const previousGroup = await screen.findByTestId('mock-sbts-page');
+    const selector = screen.getByRole('combobox', { name: 'Active session' });
+    expect(selector).toHaveValue('edge');
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Edge Session$/);
+    expect(screen.getByRole('option', { name: 'Debate Session (rxc)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    fireEvent.change(selector, { target: { value: 'rxc' } });
+
+    expect(store.getState().sessionState.primarySessionSlug).toBe('rxc');
+    expect(localStorage.getItem('ce:primarySessionSlug')).toBe('rxc');
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Debate Session$/);
+    expect(screen.getByTestId('mock-sbts-page')).not.toBe(previousGroup);
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-create-open', 'false');
+    expect(screen.getByRole('button', { name: '← Back' })).toBeInTheDocument();
+    expect(mockSBTsPage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'rxc',
+        sessionSlug: 'rxc',
+        sessionConfig: { slug: 'rxc', sessionName: 'Debate Session' },
+      }),
+    );
+    expect(
+      mockSBTsPage.mock.calls
+        .filter(([props]) => props.sessionSlug === 'rxc')
+        .every(([props]) => !props.showCreateGroupExternal),
+    ).toBe(true);
+
+    localStorage.setItem('ce:selectedSessionScope', 'list');
+    localStorage.setItem('ce:selectedSessionSlugs', JSON.stringify(['rxc', 'edge']));
+    fireEvent.change(selector, { target: { value: '' } });
+    expect(store.getState().sessionState.primarySessionSlug).toBe('');
+    expect(store.getState().sessionState.selectedSessionScope).toBe('list');
+    expect(store.getState().sessionState.selectedSessionSlugs).toEqual(['rxc', 'edge', '']);
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^General$/);
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', '');
+  });
+
+  it('ignores selecting the current session and refreshes known options when focused', async () => {
+    const updateGlobalSessionSelection = jest.fn();
+    renderToolExplorer({
+      activeSessionSlug: 'edge',
+      sessionConfig: { slug: 'edge', sessionName: 'Current Session' },
+      updateGlobalSessionSelection,
+    });
+    fireEvent.click(screen.getByText('Questions'));
+    await screen.findByTestId('mock-survey-tool');
+    const selector = screen.getByRole('combobox', { name: 'Active session' });
+    expect(screen.getByRole('option', { selected: true })).toHaveTextContent(/^Current Session$/);
+    fireEvent.change(selector, { target: { value: 'edge' } });
+    expect(updateGlobalSessionSelection).not.toHaveBeenCalled();
+
+    mockGetAllSessionSlugs.mockReturnValue(['edge', 'rxc', 'new-session']);
+    fireEvent.focus(selector);
+    expect(screen.getByRole('option', { name: 'new-session' })).toBeInTheDocument();
+    fireEvent.change(selector, { target: { value: 'new-session' } });
+    expect(updateGlobalSessionSelection).toHaveBeenCalledWith({ primarySessionSlug: 'new-session' });
+    expect(screen.getByTestId('mock-survey-tool')).toBeInTheDocument();
+  });
+
+  it('drops a stale session config when parent session props change without closing the tool', async () => {
+    const staleConfig = { slug: 'edge', sessionName: 'Old Session' };
+    const { rerender } = renderToolExplorer({ activeSessionSlug: 'edge', sessionConfig: staleConfig });
+    fireEvent.click(screen.getByText('Groups'));
+    await screen.findByTestId('mock-sbts-page');
+    rerender(<ToolExplorer activeSessionSlug="rxc" sessionConfig={staleConfig} />);
+    expect(screen.getByRole('combobox', { name: 'Active session' })).toHaveValue('rxc');
+    expect(mockSBTsPage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionConfig: { slug: 'rxc', sessionName: 'Debate Session' } }),
+    );
+    expect(screen.getByRole('button', { name: '← Back' })).toBeInTheDocument();
   });
 
   it('keeps the expanded Debate Map mounted when its detail modal closes', async () => {
@@ -308,6 +416,7 @@ describe('ToolExplorer session propagation', () => {
     );
 
     expect(headerButtons).toEqual(['Add', 'View', 'Context session selector']);
+    expect(screen.queryByRole('combobox', { name: 'Active session' })).not.toBeInTheDocument();
     expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
       expect.objectContaining({
         sessionOverrideSlug: null,

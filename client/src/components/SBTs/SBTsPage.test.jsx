@@ -126,6 +126,27 @@ describe('SBTsPage auto-feature flag', () => {
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
+  it.each([
+    [true, '', ''],
+    [false, '', 'edge'],
+    [true, undefined, 'edge'],
+  ])(
+    'honors an explicit embedded General session without changing referrer fallback (%s, %p)',
+    (embeddedWorkerGroups, sessionSlug, expectedSlug) => {
+      const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+      contractScripts.getSessionConfigBySlug.mockImplementation((slug) => ({ slug: String(slug || '') }));
+      const referrer = jest.spyOn(document, 'referrer', 'get').mockReturnValue('https://example.test/session/edge');
+      try {
+        const subject = createSubject({ embeddedWorkerGroups, sessionSlug, activeSessionSlug: '' });
+        const resolved = subject.getResolvedRouting();
+        expect(resolved.canonicalSlug).toBe(expectedSlug);
+        expect(resolved.activeGroup.slug).toBe(expectedSlug);
+      } finally {
+        referrer.mockRestore();
+      }
+    },
+  );
+
   it('keeps an explicit demo alias as the cache slug when display config falls back to general', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const demoAutoAddress = '0x0000000000000000000000000000000000000d0a';

@@ -1,6 +1,8 @@
 /** @file ToolExplorer.tsx */
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
+import { connect } from 'react-redux';
+import { updateGlobalSessionSelection } from '../../actions/sessionStateActions.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
@@ -21,11 +23,13 @@ import { sbtsListPath } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { readStoredGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
 import { Container, Row, Col } from 'reactstrap';
 
 import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
+import ToolExplorerSessionControl, { resolveToolSessionConfig } from './ToolExplorerSessionControl';
 import LazyFallback from '../Shared/LazyFallback';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 
@@ -69,18 +73,22 @@ type ExpandedComponentState = {
 type ToolExplorerProps = {
   activeSessionSlug?: unknown;
   demoSurfaceMode?: unknown;
+  updateGlobalSessionSelection?: (selection: { primarySessionSlug: string; selectedSessionSlugs?: string[] }) => void;
   [key: string]: unknown;
 };
 
-const ToolExplorer = (props: ToolExplorerProps) => {
+export const ToolExplorer = (props: ToolExplorerProps) => {
   const [expandedComponent, setExpandedComponent] = useState<ExpandedComponentState>(null);
-  const [showEmbeddedCreateGroup, setShowEmbeddedCreateGroup] = useState(false);
+  const [createGroupSessionSlug, setCreateGroupSessionSlug] = useState<string | null>(null);
   const [dataToolMode, setDataToolMode] = useState('add');
   const [showDataSessionSelector, setShowDataSessionSelector] = useState(false);
   const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
   const showDemoCards = demoSurfaceEnabled;
+  const activeSessionSlug = normalizeSessionSlug(props.activeSessionSlug || '');
+  const activeSessionConfig = resolveToolSessionConfig(activeSessionSlug, props.sessionConfig);
+  const showEmbeddedCreateGroup = createGroupSessionSlug === activeSessionSlug;
 
   const exampleData: ToolData[] = [
     {
@@ -214,9 +222,9 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       setDataToolMode('add');
       setShowDataSessionSelector(false);
       if (data.name === 'Groups') {
-        setShowEmbeddedCreateGroup(readInitialGroupsCreateState());
+        setCreateGroupSessionSlug(readInitialGroupsCreateState() ? activeSessionSlug : null);
       } else {
-        setShowEmbeddedCreateGroup(false);
+        setCreateGroupSessionSlug(null);
       }
       setExpandedComponent(() => ({
         component: Component,
@@ -226,7 +234,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   };
 
   const resetExpandedComponent = () => {
-    setShowEmbeddedCreateGroup(false);
+    setCreateGroupSessionSlug(null);
     setDataToolMode('add');
     setShowDataSessionSelector(false);
     setDataSessionOverrideSlug(null);
@@ -235,7 +243,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   };
 
   const toggleEmbeddedCreateGroup = () => {
-    setShowEmbeddedCreateGroup((prevState) => !prevState);
+    setCreateGroupSessionSlug((previousSlug) => (previousSlug === activeSessionSlug ? null : activeSessionSlug));
   };
 
   const handleDataSessionSelect = (slugIn: unknown) => {
@@ -248,9 +256,27 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     setDataSessionOverrideTouched(false);
   };
 
+  const handleActiveSessionChange = (slugIn: string) => {
+    const nextSlug = normalizeSessionSlug(slugIn);
+    if (nextSlug === activeSessionSlug) return;
+    const selection = readStoredGlobalSessionSelection();
+    props.updateGlobalSessionSelection?.({
+      primarySessionSlug: nextSlug,
+      // A list that excludes General would coerce its blank primary back to
+      // the first named session. Retain that list and include General explicitly.
+      ...(nextSlug === '' && selection.selectedSessionScope === 'list' && !selection.selectedSessionSlugs.includes('')
+        ? { selectedSessionSlugs: [...selection.selectedSessionSlugs, ''] }
+        : {}),
+    });
+  };
+
+  useEffect(() => {
+    setCreateGroupSessionSlug(null);
+  }, [activeSessionSlug]);
+
   useEffect(() => {
     if (props.demoSurfaceMode === false && expandedDemoCard) {
-      setShowEmbeddedCreateGroup(false);
+      setCreateGroupSessionSlug(null);
       setExpandedComponent(null);
     }
   }, [expandedDemoCard, props.demoSurfaceMode]);
@@ -262,7 +288,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         provider: props.provider,
         litHooks: props.litHooks,
         activeSessionSlug: props.activeSessionSlug,
-        sessionConfig: props.sessionConfig || getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+        sessionConfig: activeSessionConfig,
         ensureLightSbtUniverse: props.ensureLightSbtUniverse,
         loginComplete: props.loginComplete,
         toggleLoginModal: props.toggleLoginModal,
@@ -342,6 +368,13 @@ const ToolExplorer = (props: ToolExplorerProps) => {
                     {...(expandedComponent.props || {})}
                   />
                 </div>
+                {!showDataHeaderActions && (
+                  <ToolExplorerSessionControl
+                    activeSessionSlug={activeSessionSlug}
+                    sessionConfig={activeSessionConfig}
+                    onChange={handleActiveSessionChange}
+                  />
+                )}
               </div>
 
               <div className={styles.expandedHeaderActions}>
@@ -441,7 +474,10 @@ const ToolExplorer = (props: ToolExplorerProps) => {
             </div>
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>
-              {React.createElement(expandedComponent.component, expandedChildProps)}
+              {React.createElement(expandedComponent.component, {
+                ...expandedChildProps,
+                ...(showGroupsHeaderActions ? { key: activeSessionSlug } : {}),
+              })}
             </Suspense>
           </div>
         ) : (
@@ -475,4 +511,4 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   );
 };
 
-export default ToolExplorer;
+export default connect(null, { updateGlobalSessionSelection })(ToolExplorer);
