@@ -1132,6 +1132,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('renders the active Worker session groups when embedded in the home explorer', () => {
+    const refreshControlTarget = document.createElement('div');
     const workerSessionConfig = {
       slug: 'demo-sh',
       groupCreationPolicy: 'participants',
@@ -1155,6 +1156,7 @@ describe('SBTsPage auto-feature flag', () => {
         sessionInfo="Demo session"
         hideMiniActionRow={true}
         embeddedWorkerGroups={true}
+        refreshControlTarget={refreshControlTarget}
         showCreateGroupExternal={false}
       />,
     );
@@ -1164,6 +1166,7 @@ describe('SBTsPage auto-feature flag', () => {
     expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
         createOnly: false,
+        refreshControlTarget,
         sessionConfig: workerSessionConfig,
         sessionSlug: 'demo-sh',
         showCreate: false,

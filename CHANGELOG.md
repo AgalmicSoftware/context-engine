@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Keep Back and Session above one Groups action row containing View All, Create,
+  and Refresh.
 - Restore the Questions toolbar as a full-width bordered panel with evenly
   distributed controls and centered wrapping on phones across all themes. Keep
   it pinned near the viewport top while scrolling, including pending Submit controls.

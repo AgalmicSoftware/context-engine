@@ -401,7 +401,7 @@ describe('ToolExplorer session propagation', () => {
     expect(primary?.parentElement).toHaveClass(styles.expandedHeaderQuestions);
   });
 
-  it('keeps Groups controls in the compact header and retains its create toggle', async () => {
+  it('keeps Groups actions below the navigation row and retains its create toggle', async () => {
     const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
 
     fireEvent.click(screen.getByText('Groups'));
@@ -421,7 +421,7 @@ describe('ToolExplorer session propagation', () => {
     const primary = headerLead.closest(`.${styles.expandedHeaderPrimaryControls}`);
     expect(primary).toContainElement(screen.getByLabelText('Active session'));
     expect(primary?.nextElementSibling).toBe(headerActions);
-    expect(primary?.parentElement).toHaveClass(styles.expandedHeaderCompact);
+    expect(primary?.parentElement).toHaveClass(styles.expandedHeaderCompact, styles.expandedHeaderGroups);
 
     expect(mockSBTsPage).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -432,6 +432,7 @@ describe('ToolExplorer session propagation', () => {
         activeSessionSlug: 'edge',
         sessionSlug: 'edge',
         embeddedWorkerGroups: true,
+        refreshControlTarget: headerActions,
       }),
     );
 

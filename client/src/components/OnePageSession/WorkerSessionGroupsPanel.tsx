@@ -31,6 +31,7 @@ export type WorkerSessionGroupsPanelProps = {
   showCreate: boolean;
   createOnly?: boolean;
   refreshNonce?: number;
+  refreshControlTarget?: HTMLElement | null;
   selectedGroupId?: string;
   groupIdFilter?: string;
   inlineDetails?: boolean;
@@ -71,6 +72,7 @@ const WorkerSessionGroupsPanel = ({
   createOnly = false,
   authenticateOnRender = true,
   refreshNonce = 0,
+  refreshControlTarget,
   selectedGroupId = '',
   groupIdFilter = '',
   inlineDetails = false,
@@ -456,6 +458,7 @@ const WorkerSessionGroupsPanel = ({
           sessionSlug={canonicalSessionSlug}
           sessionName={activeSessionName}
           refreshNonce={groupsRevision + refreshNonce}
+          refreshControlTarget={refreshControlTarget}
           selectedGroupId={selectedGroupId}
           groupIdFilter={groupIdFilter}
           inlineDetails={inlineDetails}

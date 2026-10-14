@@ -199,6 +199,7 @@ describe('WorkerSessionGroupsPanel', () => {
   });
 
   it('forwards the session header refresh state to the membership list', async () => {
+    const refreshControlTarget = document.createElement('div');
     const publicSessionConfig = {
       ...sessionConfig,
       sessionModeProfile: publicSessionModeProfile,
@@ -212,6 +213,7 @@ describe('WorkerSessionGroupsPanel', () => {
         sessionSlug="demo-sh"
         showCreate={false}
         refreshNonce={4}
+        refreshControlTarget={refreshControlTarget}
         groupIdFilter="community"
         inlineDetails
         showEmptyState={false}
@@ -225,6 +227,7 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(mockMembershipPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         refreshNonce: 4,
+        refreshControlTarget,
         groupIdFilter: 'community',
         inlineDetails: true,
         showEmptyState: false,

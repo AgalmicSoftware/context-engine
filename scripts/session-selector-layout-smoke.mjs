@@ -105,6 +105,46 @@ async function inspectQuestionsStickyToolbar(page, theme) {
   await toolbar.getByTestId('ce-survey-submit').waitFor({ state: 'hidden' });
 }
 
+
+async function inspectGroupsHeader(page, theme) {
+  const refresh = page.getByRole('button', { name: 'Refresh groups', exact: true });
+  await refresh.waitFor({ state: 'visible' });
+  const layout = await refresh.evaluate((button) => {
+    const row = button.closest('[class*="expandedHeaderRow_"]');
+    const primary = row.querySelector('[class*="expandedHeaderPrimaryControls_"]');
+    const primaryRect = primary.getBoundingClientRect();
+    const back = primary.querySelector('button').getBoundingClientRect();
+    const session = primary.querySelector('select').getBoundingClientRect();
+    const actions = button.parentElement;
+    const bounds = actions.getBoundingClientRect();
+    const controls = Array.from(actions.children, (control) => control.getBoundingClientRect());
+    return {
+      width: innerWidth,
+      actionsBelow: bounds.top >= primaryRect.bottom - 1,
+      primaryCenters: [back.top + back.height / 2, session.top + session.height / 2],
+      controlCenters: controls.map((rect) => rect.top + rect.height / 2),
+      controlWidths: controls.map((rect) => rect.width),
+      actionsWidth: bounds.width,
+      controlsFit: controls.every((rect) => rect.left >= bounds.left && rect.right <= bounds.right && rect.height >= 44),
+      labelsFit: Array.from(actions.children).every((control) => control.scrollWidth <= control.clientWidth + 1),
+    };
+  });
+  assert.equal(layout.controlCenters.length, 3, 'View All, Create, and Refresh share one action row');
+  assert(layout.actionsBelow, 'Groups actions sit below Back and Session');
+  assert(layout.controlCenters.every((center) => Math.abs(center - layout.controlCenters[0]) < 2), `All group actions align on one row: ${JSON.stringify(layout)}`);
+  assert(layout.controlsFit && layout.labelsFit, `Group actions fit without shrinking touch targets or clipping labels: ${JSON.stringify(layout)}`);
+  if (layout.width >= 560) {
+    assert(Math.abs(layout.primaryCenters[0] - layout.primaryCenters[1]) < 2, 'Back and Session share the Groups top row');
+  }
+  if (layout.width === 320) {
+    await page.screenshot({ path: `/tmp/groups-header-${theme}-320.png` });
+  }
+  if (theme === 'civic' && layout.width === 705) {
+    await page.getByRole('article').first().waitFor({ state: 'visible' });
+    await page.screenshot({ path: '/tmp/groups-header-705.png' });
+  }
+}
+
 export async function runSmoke() {
   const { chromium } = await import('playwright');
   const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
@@ -140,6 +180,7 @@ export async function runSmoke() {
             await inspectQuestionsHeader(page);
             await inspectQuestionsStickyToolbar(page, theme);
           }
+          if (tool === 'Groups') await inspectGroupsHeader(page, theme);
           await inspectSessionSelectorLayout(selector, 'right');
           await selector.selectOption({ label: 'General' });
           await inspectSessionSelectorLayout(selector, 'right');

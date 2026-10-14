@@ -630,6 +630,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         selectedGroupId={routeWorkerGroupId}
         showCreate={showCreate}
         createOnly={createOnly}
+        refreshControlTarget={createOnly ? undefined : this.props.refreshControlTarget}
         toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
       />
     );

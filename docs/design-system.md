@@ -188,8 +188,8 @@ editing behind Config.
 
 Expanded tool headers keep Back, help, and the Session chooser together for
 Groups and Context, wrapping the chooser only when the controls cannot fit.
-Groups actions follow this primary group on wide screens and move below it on
-narrow screens; Context actions stay below. Questions keeps Back, help, and
+Groups keeps View All, Create, and Refresh together on a separate row below
+Back and Session at every width; Context actions also stay below. Questions keeps Back, help, and
 Session above a bordered toolbar spanning the question column, with its controls
 distributed across the panel and centered when wrapping on phones. Questions keeps one toolbar
 with its existing state and handlers in the Explorer header; standalone and

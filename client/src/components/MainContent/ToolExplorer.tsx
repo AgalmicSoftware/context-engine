@@ -79,6 +79,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const [createGroupSessionSlug, setCreateGroupSessionSlug] = useState<string | null>(null);
   const [dataToolMode, setDataToolMode] = useState('add');
   const [questionsToolbarTarget, setQuestionsToolbarTarget] = useState<HTMLDivElement | null>(null);
+  const [groupsActionsTarget, setGroupsActionsTarget] = useState<HTMLDivElement | null>(null);
   const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
@@ -289,6 +290,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
           ? {
               sessionSlug: props.activeSessionSlug,
               embeddedWorkerGroups: true,
+              refreshControlTarget: groupsActionsTarget,
               hideMiniActionRow: true,
               showCreateGroupAboveFeatured: true,
               showCreateGroupExternal: showEmbeddedCreateGroup,
@@ -364,7 +366,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         {expandedComponent ? (
           <div className={styles.breadcrumbContainer}>
             <div
-              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''}`}
+              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''} ${showGroupsHeaderActions ? styles.expandedHeaderGroups : ''}`}
             >
               {usePrimaryHeaderControls ? (
                 <div className={styles.expandedHeaderPrimaryControls}>
@@ -379,7 +381,10 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
               )}
 
               {!showQuestionsHeaderActions && (
-                <div className={styles.expandedHeaderActions}>
+                <div
+                  className={styles.expandedHeaderActions}
+                  ref={showGroupsHeaderActions ? setGroupsActionsTarget : undefined}
+                >
                   {showGroupsHeaderActions && (
                     <>
                       <a

@@ -87,6 +87,46 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText('No visible Groups are configured.')).not.toBeInTheDocument();
   });
 
+  it('places one working refresh control in an external actions row and restores the local fallback', async () => {
+    const refreshControlTarget = document.createElement('div');
+    document.body.appendChild(refreshControlTarget);
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groups: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    const props = {
+      allowAnonymousGroupDiscovery: true,
+      canReadGroups: true,
+      workerUrl: envelope.workerUrl,
+      sessionId: SESSION_ID,
+      sessionSlug: 'alpha',
+      fetchImpl: fetchImpl as typeof fetch,
+    };
+    const view = render(<WorkerGroupMembershipPanel {...props} refreshControlTarget={refreshControlTarget} />);
+    try {
+      await screen.findByText('No visible Groups are configured.');
+      expect(screen.getAllByRole('button', { name: 'Refresh groups' })).toHaveLength(1);
+      expect(refreshControlTarget).toContainElement(screen.getByRole('button', { name: 'Refresh groups' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh groups' }));
+      await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+      await screen.findByText('No visible Groups are configured.');
+      view.rerender(<WorkerGroupMembershipPanel {...props} />);
+      expect(refreshControlTarget).toBeEmptyDOMElement();
+      expect(view.container).toContainElement(screen.getByRole('button', { name: 'Refresh groups' }));
+    } finally {
+      view.unmount();
+      refreshControlTarget.remove();
+    }
+  });
+
   it('can suppress a duplicate loading notice while still loading local groups and showing errors', async () => {
     const response = createResponseDeferred();
     const fetchImpl = jest.fn(() => response.promise);

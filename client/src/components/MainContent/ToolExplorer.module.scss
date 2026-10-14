@@ -520,6 +520,32 @@
   width: 100%;
 }
 
+.expandedHeaderGroups .expandedHeaderPrimaryControls,
+.expandedHeaderGroups .expandedHeaderActions {
+  flex-basis: 100%;
+  width: 100%;
+}
+
+.expandedHeaderGroups .expandedHeaderActions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+
+  > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  @media (max-width: 466px) {
+    gap: 6px;
+
+    .headerActionButton {
+      gap: 6px;
+      padding: 10px 8px;
+      font-size: 0.875rem;
+    }
+  }
+}
+
 // Keep the sticky slot beside the question body so the short navigation header
 // cannot constrain it as the page scrolls.
 .expandedQuestionsToolbar {
