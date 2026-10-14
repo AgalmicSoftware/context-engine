@@ -387,10 +387,16 @@ describe('ToolExplorer session propagation', () => {
         questionResponsesNonce: 7,
         questionScanProgress,
         preventUrlChange: true,
+        hideEmbeddedDebugUi: true,
         toolbarTarget: container.querySelector(`.${styles.expandedHeaderActions}`),
       }),
     );
     expect(container.querySelector(`.${styles.expandedHeaderRow}`)).toHaveClass(styles.expandedHeaderCompact);
+    const primary = container.querySelector(`.${styles.expandedHeaderPrimaryControls}`);
+    expect(primary).toContainElement(screen.getByRole('button', { name: '← Back' }));
+    expect(primary).toContainElement(screen.getByRole('combobox', { name: 'Active session' }));
+    expect(primary?.nextElementSibling).toBe(container.querySelector(`.${styles.expandedHeaderActions}`));
+    expect(primary?.parentElement).toHaveClass(styles.expandedHeaderQuestions);
   });
 
   it('keeps Groups controls in the compact header and retains its create toggle', async () => {

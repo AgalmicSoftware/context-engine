@@ -19,7 +19,10 @@ global compatibility styles, and browser-rendered visualizations.
 Session controls share one bordered unit containing the label, selected session,
 and open-session action. The native selector sizes to the selected label and
 shrinks within narrow viewports. Stats centers the unit; expanded tools align it
-right. Run `node scripts/session-selector-layout-smoke.mjs` against the local
+right. In Questions, Back and Session occupy the top header row, with question
+actions on a separate row directly above the list. JSON debug controls are hidden
+in this embedded Questions view; the underlying JSON UI remains available to other
+surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
 server to check short and long selections at mobile, compact, and desktop widths.
 
 ## Runtime Resolution

@@ -171,7 +171,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const showQuestionsHeaderActions = expandedToolName === 'Questions';
   const useCompactExpandedHeader = showGroupsHeaderActions || showQuestionsHeaderActions;
   const showDataHeaderActions = expandedToolName === 'Context';
-  const usePrimaryHeaderControls = showGroupsHeaderActions || showDataHeaderActions;
+  const usePrimaryHeaderControls = showGroupsHeaderActions || showDataHeaderActions || showQuestionsHeaderActions;
   const expandedDemoCard = expandedComponent?.data?.status === 'future';
   const selectedDataSessionSlug = useMemo(
     () =>
@@ -273,6 +273,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         ...(expandedToolName === 'Questions'
           ? {
               preventUrlChange: true,
+              hideEmbeddedDebugUi: true,
               toolbarTarget: questionsToolbarTarget,
             }
           : {}),
@@ -363,7 +364,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         {expandedComponent ? (
           <div className={styles.breadcrumbContainer}>
             <div
-              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''}`}
+              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''}`}
             >
               {usePrimaryHeaderControls ? (
                 <div className={styles.expandedHeaderPrimaryControls}>
@@ -436,7 +437,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                   </a>
                 )}
               </div>
-              {showQuestionsHeaderActions && expandedHeaderSession}
             </div>
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>

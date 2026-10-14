@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
+import { inspectQuestionsHeader, inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 
 // Exercise the light surfaces that palette-only contrast tests cannot cover.
@@ -13,6 +13,7 @@ export async function inspectCivicExplorerContent(page) {
     const control = page.getByTestId('ce-tool-explorer-active-session');
     await control.waitFor({ state: 'visible' });
     await inspectSessionSelectorLayout(control, 'right');
+    if (name === 'Questions') await inspectQuestionsHeader(page);
     const help = page.getByRole('button', { name: `About ${name}`, exact: true });
     await help.press('Enter');
     const helpId = await help.getAttribute('aria-describedby');
@@ -63,7 +64,7 @@ export async function inspectCivicExplorerContent(page) {
       });
       assert(layout.inHeader, `${name}: actions share the Explorer header`);
       assert(layout.fits, `${name}: wrapped header regions stay within the available width`);
-      if (layout.viewport >= 1100) {
+      if (name !== 'Questions' && layout.viewport >= 1100) {
         assert(Math.max(...layout.centers) - Math.min(...layout.centers) < 2, `${name}: roomy desktop controls share one row`);
       }
     }

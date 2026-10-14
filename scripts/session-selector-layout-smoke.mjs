@@ -36,6 +36,30 @@ export async function inspectSessionSelectorLayout(selector, alignment) {
   return layout;
 }
 
+export async function inspectQuestionsHeader(page) {
+  const toolbar = page.getByTestId('ce-survey-toolbar');
+  await toolbar.waitFor({ state: 'visible' });
+  const layout = await toolbar.evaluate((element) => {
+    const row = element.closest('[class*="expandedHeaderRow_"]');
+    const primary = row.querySelector('[class*="expandedHeaderPrimaryControls_"]');
+    const primaryRect = primary.getBoundingClientRect();
+    const back = primary.querySelector('button').getBoundingClientRect();
+    const session = primary.querySelector('select').getBoundingClientRect();
+    return {
+      width: innerWidth,
+      actionsBelow: element.getBoundingClientRect().top >= primaryRect.bottom - 1,
+      primaryCenters: [back.top + back.height / 2, session.top + session.height / 2],
+    };
+  });
+  assert(layout.actionsBelow, 'Question actions sit below Back and Session');
+  if (layout.width >= 560) {
+    assert(Math.abs(layout.primaryCenters[0] - layout.primaryCenters[1]) < 2, 'Back and Session share the top row');
+  }
+  for (const name of ['View JSON', 'question .json', 'response .json']) {
+    assert.equal(await page.getByRole('button', { name, exact: true }).count(), 0, `${name} is hidden in Questions`);
+  }
+}
+
 export async function runSmoke() {
   const { chromium } = await import('playwright');
   const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000';
@@ -66,6 +90,7 @@ export async function runSmoke() {
           await page.getByText(tool, { exact: true }).filter({ visible: true }).click();
           const selector = page.getByTestId('ce-tool-explorer-active-session');
           await selector.waitFor({ state: 'visible' });
+          if (tool === 'Questions') await inspectQuestionsHeader(page);
           await inspectSessionSelectorLayout(selector, 'right');
           await selector.selectOption({ label: 'General' });
           await inspectSessionSelectorLayout(selector, 'right');

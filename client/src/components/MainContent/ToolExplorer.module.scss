@@ -511,6 +511,12 @@
   }
 }
 
+.expandedHeaderQuestions .expandedHeaderPrimaryControls,
+.expandedHeaderQuestions .expandedHeaderActions {
+  flex-basis: 100%;
+  width: 100%;
+}
+
 @media (max-width: 640px) {
   .expandedHeaderCompact > .expandedHeaderSession {
     flex-basis: auto;
