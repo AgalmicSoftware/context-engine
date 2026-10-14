@@ -447,8 +447,9 @@ writes (about 240), so set up caching there separately.
 
 ## Profile Scan Fanout Toggles
 
-- `REACT_APP_CE_SESSION_SCAN_SCOPE=list`
+- `REACT_APP_CE_SESSION_SCAN_SCOPE=all`
   - Controls the default session scan mode (`active|general|list|all`).
+  - Fresh selections start at ALL; stored selections and explicit environment overrides take precedence. The public demo remains the default primary session for Tools and session links while ALL is selected.
 
 - `REACT_APP_CE_SESSION_SCAN_SLUGS=slug-a,slug-b`
   - Sets the default list-scope session slugs.

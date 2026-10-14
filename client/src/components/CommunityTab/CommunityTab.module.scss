@@ -110,6 +110,21 @@
     margin-left: auto;
   }
 
+  .sessionSelector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: min(100%, 420px);
+    min-width: 0;
+    margin: 0 0 18px;
+
+    select {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+    }
+  }
+
   .statsHeaderSpinner {
     margin-top: 6px;
     color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);

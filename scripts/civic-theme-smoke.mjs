@@ -161,6 +161,11 @@ export async function inspectCivicStats(page) {
 }
 
 export async function inspectStatsCounters(page) {
+  const selector = page.getByTestId('ce-community-session-select');
+  await selector.waitFor({ state: 'visible' });
+  await selector.selectOption({ label: 'General' });
+  assert.equal(await page.getByTestId('ce-community-stat-sessions').count(), 0, 'Specific session scope hides the Sessions total');
+  await selector.selectOption({ label: 'ALL' });
   for (const name of ['users', 'questions', 'surveys', 'groups', 'sessions']) {
     await page.getByTestId(`ce-community-stat-${name}`).waitFor({ state: 'visible' });
   }

@@ -41,16 +41,21 @@ jest.mock('../Shared/CETooltip', () => ({
   ),
 }));
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
-  __esModule: true,
-  default: {
-    sendTestnetFunds: jest.fn(),
-  },
-  getDemoSessionConfigBySlug: jest.fn(() => null),
-  getSessionNetwork: jest.fn(() => ({ id: 84532, chainId: 84532, name: 'Base Sepolia' })),
-  getSessionConfigBySlugOrDefault: jest.fn(() => ({})),
-  getAllSessionSlugs: jest.fn(() => []),
-}));
+jest.mock('../../utilities/web3/chainGateway.js', () => {
+  const getSlugs = jest.fn(() => []);
+  return {
+    __esModule: true,
+    default: {
+      sendTestnetFunds: jest.fn(),
+    },
+    getDemoSessionConfigBySlug: jest.fn(() => null),
+    getSessionNetwork: jest.fn(() => ({ id: 84532, chainId: 84532, name: 'Base Sepolia' })),
+    getSessionConfigBySlugOrDefault: jest.fn(() => ({})),
+    getSessionConfigBySlug: jest.fn(() => null),
+    getAllSessionSlugs: getSlugs,
+    getAllSessionEntries: jest.fn(() => getSlugs().map((slug) => [slug, { slug }])),
+  };
+});
 
 jest.mock('../../wallet/passkeyWallet.js', () => ({
   createPasskeyWallet: jest.fn(),
@@ -1059,13 +1064,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Active session'), {
+    fireEvent.change(screen.getByLabelText('Session'), {
       target: { value: 'edge' },
     });
 
     expect(props.updateGlobalSessionSelection).toHaveBeenCalledTimes(1);
     expect(props.updateGlobalSessionSelection).toHaveBeenCalledWith({
       primarySessionSlug: 'edge',
+      selectedSessionScope: 'active',
     });
   });
 
@@ -1097,7 +1103,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getPreLoginSettingsDisplay());
 
-    expect(screen.getByTestId('ce-prelogin-session-select')).toHaveValue('edge');
+    expect(screen.getByTestId('ce-prelogin-session-select').selectedOptions[0]).toHaveTextContent(
+      'Selected sessions (2)',
+    );
     expect(screen.getByTestId('ce-prelogin-session-scope-chip-edge')).toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-scope-chip-rxc')).toBeInTheDocument();
   });

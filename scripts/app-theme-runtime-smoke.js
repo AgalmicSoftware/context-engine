@@ -794,6 +794,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (routeCase.requiresReadableStats) {
     await page.getByTestId('ce-main-stats-tab').click();
     assert.equal(await page.getByTestId('ce-community-session-section').count(), 0);
+    await page.getByTestId('ce-community-session-select').selectOption({ label: 'ALL' });
+    await page.getByTestId('ce-community-stat-sessions').waitFor({ state: 'visible' });
     await page.getByTestId('ce-community-stat-questions').click();
     await page.getByRole('dialog').waitFor({ state: 'visible' });
     const table = page.getByTestId('ce-community-questions-table');

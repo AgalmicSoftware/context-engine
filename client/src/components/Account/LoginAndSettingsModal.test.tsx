@@ -1381,7 +1381,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       },
     };
 
-    expect(treeHasPropValue(subject.getSettingsDisplay(), 'data-testid', 'ce-web3modal-session-select')).toBe(true);
+    expect(treeHasPropValue(subject.getSettingsDisplay(), 'testId', 'ce-web3modal-session-select')).toBe(true);
   });
 
   it('persists the selected-session scope and list from the settings panel', () => {

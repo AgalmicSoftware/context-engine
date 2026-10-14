@@ -30,6 +30,7 @@ import { faWindowClose } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, CardHeader, CardFooter, Modal } from 'reactstrap';
 
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
 import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
@@ -79,7 +80,12 @@ import {
 } from '../../utilities/session/sessionScanScope.js';
 import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../utilities/cache/cacheScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
+import {
+  derivePrimarySessionSlugFromList,
+  normalizeGlobalSessionSelection,
+  readStoredGlobalSessionSelection,
+  type GlobalSessionSelection,
+} from '../../utilities/session/globalSessionState.js';
 import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
@@ -143,6 +149,7 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   demoSurfaceMode: RootState['sessionState']['demoSurfaceMode'];
   focusedTab: number;
   activeSessionSlug: string;
+  primarySessionSlug?: string;
   primarySessionExplicit: boolean | undefined;
   selectedSessionScope: string;
   selectedSessionSlugs: string[];
@@ -933,7 +940,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const nextScope = normalizeSessionScanScope(this.props.selectedSessionScope || '');
     const prevScopeSlugs = normalizeSessionScanSlugs(prevProps.selectedSessionSlugs || []);
     const nextScopeSlugs = normalizeSessionScanSlugs(this.props.selectedSessionSlugs || []);
-    if (prevScope !== nextScope || JSON.stringify(prevScopeSlugs) !== JSON.stringify(nextScopeSlugs)) {
+    if (
+      prevScope !== nextScope ||
+      JSON.stringify(prevScopeSlugs) !== JSON.stringify(nextScopeSlugs) ||
+      prevProps.primarySessionSlug !== this.props.primarySessionSlug
+    ) {
       this.loadSessionScanSettings();
     }
   }
@@ -1631,6 +1642,29 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
+  getGlobalSessionSelection = (): GlobalSessionSelection => {
+    const stored = readStoredGlobalSessionSelection();
+    return normalizeGlobalSessionSelection({
+      ...stored,
+      primarySessionSlug: this.props.primarySessionSlug ?? this.props.activeSessionSlug ?? stored.primarySessionSlug,
+      primarySessionExplicit: this.props.primarySessionExplicit ?? stored.primarySessionExplicit,
+      selectedSessionScope: this.props.selectedSessionScope ?? stored.selectedSessionScope,
+      selectedSessionSlugs: this.props.selectedSessionSlugs ?? stored.selectedSessionSlugs,
+    });
+  };
+
+  handleGlobalSessionSelectionChange = (selection: Partial<GlobalSessionSelection>) => {
+    this.props.updateGlobalSessionSelection?.(selection);
+    // The immediate selector supersedes unsaved advanced-scope drafts, including same-scope choices.
+    const next = { ...this.getGlobalSessionSelection(), ...selection };
+    this.setState({
+      sessionScanScope: next.selectedSessionScope,
+      sessionScanSlugs: next.selectedSessionSlugs,
+      sessionScanSlugsInput: this.formatSessionScanSlugsInput(next.selectedSessionSlugs),
+      sessionScanStatus: '',
+    });
+  };
+
   getScanScopeSessionSlugs = ({
     activeSlug = this.getActiveSessionSlug(),
     sessionScanScope = this.getSessionScanScopeValue(),
@@ -1898,8 +1932,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     sessionSelectTestId = 'ce-web3modal-session-select',
     scopePrefix = 'ce-web3modal-session-scope',
   }: any = {}) => {
-    const sessionOptions = this.getSettingsSessionOptions();
-    const activeSessionSlug = this.getActiveSessionSlug();
     const sessionScanScope = this.getSessionScanScopeValue();
     const selectedSessionSlugs = this.getConfiguredSessionScanSlugs();
     const selectedSessionLabels = this.buildSessionScopeChipOptions({
@@ -1912,22 +1944,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
     return (
       <>
-        <label className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}>
-          <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>Primary session</span>
-          <select
-            aria-label="Active session"
-            className={compact ? styles.preLoginSettingsInput : styles.aiSettingsSelect}
-            value={activeSessionSlug}
-            onChange={this.handleActiveSessionChange}
-            data-testid={sessionSelectTestId}
-          >
-            {sessionOptions.map((descriptor: any) => (
-              <option key={descriptor.slug || 'general'} value={descriptor.slug}>
-                {this.formatSettingsSessionOptionLabel(descriptor)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <GlobalSessionSelector
+          selection={this.getGlobalSessionSelection()}
+          sessionConfig={this.props.sessionConfig}
+          onChange={this.handleGlobalSessionSelectionChange}
+          testId={sessionSelectTestId}
+          className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}
+          labelClassName={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}
+          selectClassName={compact ? styles.preLoginSettingsInput : styles.aiSettingsSelect}
+        />
 
         <label className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}>
           <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>
@@ -2341,6 +2366,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       nextProps.provider !== this.props.provider ||
       nextProps.account !== this.props.account ||
       nextProps.activeSessionSlug !== this.props.activeSessionSlug ||
+      nextProps.primarySessionSlug !== this.props.primarySessionSlug ||
       nextProps.selectedSessionScope !== this.props.selectedSessionScope ||
       JSON.stringify(nextProps.selectedSessionSlugs || []) !== JSON.stringify(this.props.selectedSessionSlugs || []) ||
       nextProps.demoSurfaceMode !== this.props.demoSurfaceMode ||
@@ -2555,6 +2581,7 @@ const mapStateToProps = (state: RootState) => ({
   demoSurfaceMode: state.sessionState.demoSurfaceMode,
   focusedTab: state.sessionState.focusedTab,
   activeSessionSlug: state.sessionState.activeSessionSlug,
+  primarySessionSlug: state.sessionState.primarySessionSlug,
   primarySessionExplicit: state.sessionState.primarySessionExplicit,
   selectedSessionScope: state.sessionState.selectedSessionScope,
   selectedSessionSlugs: state.sessionState.selectedSessionSlugs,

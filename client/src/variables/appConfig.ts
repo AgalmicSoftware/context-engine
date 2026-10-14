@@ -9,12 +9,12 @@ import {
   WORKER_RELEASE_MANIFEST_URL,
 } from './publicDeploymentConfig.js';
 
-const DEFAULT_SESSION_SCAN_SCOPE = 'list';
+const DEFAULT_SESSION_SCAN_SCOPE = 'all';
 // Demo-like sessions that should receive public demo UI affordances. The first
 // entry is the About-page CTA target; keep older slugs in the list while links migrate.
 const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
-// Default cross-session scans follow the active public demo while legacy slugs
-// remain demo-like for direct links during migration.
+// Retain the public demo as the fresh primary and initial saved-list choice;
+// the default scan scope includes all sessions.
 const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
 
 // ****************************************** BOOLEAN OPTIONS ******************************************* //

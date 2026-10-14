@@ -1,5 +1,8 @@
 /** @file CommunityTab.tsx */
 import { Component } from 'react';
+import { connect } from 'react-redux';
+import type { RootState } from '../../reducers';
+import { updateGlobalSessionSelection } from '../../actions/sessionStateActions';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faUsers,
@@ -22,7 +25,6 @@ import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts, {
   getAllSessionSlugs,
-  getAllSessionEntries,
   getSessionConfigBySlug,
   getDemoSessionConfigBySlug,
   getSessionChainId,
@@ -32,6 +34,7 @@ import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import CETooltip from '../Shared/CETooltip';
+import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -73,11 +76,9 @@ import {
 } from './communityWorkerGroupStats';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
-import { getAllDemoSessionConfigs } from '../../utilities/session/sessionSourceResolver';
-import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
-import { readSessionWorkerConfigCache } from '../../utilities/session/sessionWorkerConfigCache';
+import { readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
+import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import {
-  buildCommunitySessionCatalog,
   countCommunitySessions,
   createCommunitySessionFilters,
   filterCommunitySessions,
@@ -175,7 +176,7 @@ const getDisplaySessionChainId = (slugIn = '') => {
   return Number.isFinite(demoChainId) && demoChainId > 0 ? demoChainId : null;
 };
 
-class CommunityTab extends Component<any, any> {
+export class CommunityTab extends Component<any, any> {
   [key: string]: any;
 
   constructor(props: any) {
@@ -251,17 +252,17 @@ class CommunityTab extends Component<any, any> {
   // === Universe helpers (encapsulated) ===
   _refreshSessionCatalog = () => {
     if (this._isUnmounted) return;
-    const sessions = buildCommunitySessionCatalog({
-      entries: [
-        ...getAllSessionEntries(),
-        ...getAllDemoSessionConfigs().filter(([, config]) => claimsWorkerCanonicalAuthority(config)),
-      ],
-      workerRecords: Object.values(readSessionWorkerConfigCache().bySession),
-    });
+    const sessions = readKnownSessionCatalog();
+    this._knownSessionCatalog = sessions;
     if (JSON.stringify(sessions) !== JSON.stringify(this.state.sessions)) this.setState({ sessions });
   };
 
-  _readGlobalSelection = () => readStoredGlobalSessionSelection();
+  _handleWorkerSessionCatalogUpdate = () => {
+    this._refreshSessionCatalog();
+    this._queueCacheDrivenRefresh({ force: true });
+  };
+
+  _readGlobalSelection = () => this.props.globalSessionSelection || readStoredGlobalSessionSelection();
 
   _isUniverseEnabled = () => this._readGlobalSelection().selectedSessionScope === 'all';
 
@@ -383,19 +384,13 @@ class CommunityTab extends Component<any, any> {
     const availableSlugs = this._getSessionSelectorOptions().map((option: SessionSelectorOption) => option.value);
     const availableSet = new Set<string>(availableSlugs);
     const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
-    if (this._hasPinnedRouteSession() && availableSet.has(routeSlug)) {
-      return [routeSlug];
-    }
     const selection = this._readGlobalSelection();
-    const fallbackPrimarySlug = normalizeSessionSlug(
-      typeof this.props.activeSessionSlug === 'string' ? this.props.activeSessionSlug : selection.primarySessionSlug,
-    );
     const scopedDefaults =
       selection.selectedSessionScope === 'all'
         ? availableSlugs
         : resolveScopedSessionSlugsFromSelection({
             ...selection,
-            primarySessionSlug: fallbackPrimarySlug,
+            primarySessionSlug: selection.primarySessionSlug,
           });
     const filteredDefaults = this._dedupeNormalizedSlugs(scopedDefaults).filter((slug: string) =>
       availableSet.has(slug),
@@ -432,13 +427,20 @@ class CommunityTab extends Component<any, any> {
   };
 
   listAllSlugs = () => {
-    if (readSessionScanScope() === 'list') {
-      const scopedSlugs = this._dedupeNormalizedSlugs(readSessionScanSlugs());
+    const selection = this._readGlobalSelection();
+    if (selection.selectedSessionScope === 'list') {
+      const scopedSlugs = this._dedupeNormalizedSlugs(selection.selectedSessionSlugs);
       if (scopedSlugs.length > 0) return scopedSlugs;
       const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
       return routeSlug ? [routeSlug] : [''];
     }
-    return this._dedupeNormalizedSlugs([this._resolveRouteSlug(), '', ...getAllSessionSlugs()]);
+    return this._dedupeNormalizedSlugs([
+      this._resolveRouteSlug(),
+      selection.primarySessionSlug,
+      '',
+      ...getAllSessionSlugs(),
+      ...(this._knownSessionCatalog || this.state.sessions).map(({ slug }: CommunitySessionEntry) => slug),
+    ]);
   };
 
   _resolveNetKeyForSlug = (slug: string) => {
@@ -1352,8 +1354,22 @@ class CommunityTab extends Component<any, any> {
     }, safeDelay);
   };
 
-  _runStatsRefreshCycle = async ({ force = false, markLoading = false }: any = {}) => {
+  _statsSelectionKey = () => {
+    const selection = this._readGlobalSelection();
+    return JSON.stringify([
+      selection.primarySessionSlug,
+      selection.selectedSessionScope,
+      selection.selectedSessionSlugs,
+    ]);
+  };
+
+  _runStatsRefreshCycle = async ({ force = false, markLoading = false, request = null }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
+    const selectionKey = this._statsSelectionKey();
+    const isCurrent = () =>
+      !this._isUnmounted &&
+      selectionKey === this._statsSelectionKey() &&
+      (!request || this._activeStatsRefresh === request);
     this._refreshSessionCatalog();
 
     if (markLoading && (!this.state.loadingSbtsCreated || !this.state.loadingSurveyData)) {
@@ -1365,6 +1381,7 @@ class CommunityTab extends Component<any, any> {
 
     const scopeEntries = this._iterScopeCaches({ clone: false });
     await this._hydrateWorkerGroupCounts(scopeEntries);
+    if (!isCurrent()) return { changed: false };
     const coarseSignature = this._buildCoarseCacheSignature(scopeEntries);
     let signature = this._latestCacheSignature;
     if (force || coarseSignature !== this._latestCoarseCacheSignature) {
@@ -1384,18 +1401,8 @@ class CommunityTab extends Component<any, any> {
       this._statsUnchangedStreak += 1;
     }
 
-    let nextInitialLoadDone = this.state.initialLoadDone;
-    if (!nextInitialLoadDone) {
-      const now = Date.now();
-      const checkIntervalMs = force ? 0 : this._statsUnchangedStreak >= 3 ? 5000 : 2000;
-      if (now - this._lastInitialLoadCheckMs >= checkIntervalMs) {
-        this._lastInitialLoadCheckMs = now;
-        const loadDone = await this.checkIfInitialLoadDone();
-        if (loadDone) nextInitialLoadDone = true;
-      }
-    }
-
     this.setState((prevState: Readonly<CommunityTab['state']>) => {
+      if (!isCurrent()) return null;
       const next: Record<string, any> = {};
       if (prevState.showModal && prevState.modalType === 'questions') {
         // Prompt hydration does not change counter signatures, but the open table must still refresh.
@@ -1429,58 +1436,72 @@ class CommunityTab extends Component<any, any> {
       }
       if (prevState.loadingSbtsCreated) next.loadingSbtsCreated = false;
       if (prevState.loadingSurveyData) next.loadingSurveyData = false;
-      if (nextInitialLoadDone !== prevState.initialLoadDone) {
-        next.initialLoadDone = nextInitialLoadDone;
-      }
       return Object.keys(next).length ? next : null;
     });
+
+    // Cached counts are useful before a slow chain readiness check settles.
+    // A newer selection also owns readiness; old asynchronous work cannot publish it.
+    if (!this.state.initialLoadDone && isCurrent()) {
+      const now = Date.now();
+      const checkIntervalMs = force ? 0 : this._statsUnchangedStreak >= 3 ? 5000 : 2000;
+      if (now - this._lastInitialLoadCheckMs >= checkIntervalMs) {
+        this._lastInitialLoadCheckMs = now;
+        const loadDone = await this.checkIfInitialLoadDone();
+        if (loadDone && isCurrent()) {
+          this.setState(() => (isCurrent() ? { initialLoadDone: true } : null));
+        }
+      }
+    }
 
     return { changed };
   };
 
   _refreshCommunityStats = async ({ force = false, markLoading = false }: any = {}) => {
     if (this._isUnmounted) return { changed: false };
-    if (this._statsRefreshInFlight) {
+    const selectionKey = this._statsSelectionKey();
+    if (this._statsRefreshInFlight && this._statsRefreshSelectionKey === selectionKey) {
       this._statsRefreshQueued = true;
       this._statsRefreshQueuedForce = this._statsRefreshQueuedForce || force;
       this._statsRefreshQueuedLoading = this._statsRefreshQueuedLoading || markLoading;
       return { changed: false, queued: true };
     }
 
+    // Switching scopes supersedes pending I/O. Its eventual finally block must
+    // not unlock or drain the refresh that belongs to the newer selection.
+    const request = {};
+    this._activeStatsRefresh = request;
+    this._statsRefreshSelectionKey = selectionKey;
+    this._statsRefreshQueued = false;
+    this._statsRefreshQueuedForce = false;
+    this._statsRefreshQueuedLoading = false;
     this._statsRefreshInFlight = true;
     let result = { changed: false };
     try {
-      result = await this._runStatsRefreshCycle({ force, markLoading });
+      result = await this._runStatsRefreshCycle({ force, markLoading, request });
     } catch (error) {
       uiLog.error('CommunityTab refresh failed:', error);
-      this.setState({ loadingSbtsCreated: false, loadingSurveyData: false });
+      if (this._activeStatsRefresh === request) {
+        this.setState({ loadingSbtsCreated: false, loadingSurveyData: false });
+      }
     } finally {
-      this._statsRefreshInFlight = false;
-      if (this._statsRefreshQueued && !this._isUnmounted) {
-        const queuedForce = this._statsRefreshQueuedForce;
-        const queuedLoading = this._statsRefreshQueuedLoading;
-        this._statsRefreshQueued = false;
-        this._statsRefreshQueuedForce = false;
-        this._statsRefreshQueuedLoading = false;
-        setTimeout(() => {
-          this._refreshCommunityStats({ force: queuedForce, markLoading: queuedLoading });
-        }, 0);
+      if (this._activeStatsRefresh === request) {
+        this._statsRefreshInFlight = false;
+        if (this._statsRefreshQueued && !this._isUnmounted) {
+          const queuedForce = this._statsRefreshQueuedForce;
+          const queuedLoading = this._statsRefreshQueuedLoading;
+          this._statsRefreshQueued = false;
+          this._statsRefreshQueuedForce = false;
+          this._statsRefreshQueuedLoading = false;
+          setTimeout(() => {
+            this._refreshCommunityStats({ force: queuedForce, markLoading: queuedLoading });
+          }, 0);
+        }
       }
     }
     return result;
   };
 
-  componentDidMount() {
-    uiLog.log('CommunityTab mounted. Fetching initial data...');
-    this._isUnmounted = false;
-    this._refreshSessionCatalog();
-    this._statsPollStartedAtMs = Date.now();
-    this._statsUnchangedStreak = 0;
-    this._latestCacheSignature = '';
-    this._latestCoarseCacheSignature = '';
-    this.setState({ initialLoadDone: false, loadingSbtsCreated: true, loadingSurveyData: true });
-
-    if (this._universeKickoffDone == null) this._universeKickoffDone = false;
+  _ensureUniverseWarmup = () => {
     if (
       this._isUniverseEnabled() &&
       typeof this.props.ensureLightSbtUniverse === 'function' &&
@@ -1493,6 +1514,18 @@ class CommunityTab extends Component<any, any> {
         uiLog.warn('CommunityTab: callback', e);
       }
     }
+  };
+
+  componentDidMount() {
+    uiLog.log('CommunityTab mounted. Fetching initial data...');
+    this._isUnmounted = false;
+    this._refreshSessionCatalog();
+    this._statsPollStartedAtMs = Date.now();
+    this._statsUnchangedStreak = 0;
+    this._latestCacheSignature = '';
+    this._latestCoarseCacheSignature = '';
+    this.setState({ initialLoadDone: false, loadingSbtsCreated: true, loadingSurveyData: true });
+    this._ensureUniverseWarmup();
 
     this._statsCacheRefreshCoalescer = createCacheUpdateCoalescer(
       () => {
@@ -1523,10 +1556,12 @@ class CommunityTab extends Component<any, any> {
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       this._globalSessionSelectionListener = () => {
         if (this._isUnmounted) return;
+        this._ensureUniverseWarmup();
         this._queueCacheDrivenRefresh({ force: true });
       };
       window.addEventListener(GLOBAL_SESSION_SELECTION_UPDATED_EVENT, this._globalSessionSelectionListener);
       window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
+      window.addEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, this._handleWorkerSessionCatalogUpdate);
     }
 
     // Eagerly start SBT holder hydration so uniqueUsers is complete before modal opens
@@ -1541,6 +1576,7 @@ class CommunityTab extends Component<any, any> {
     this._isUnmounted = true;
     if (typeof window !== 'undefined') {
       window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
+      window.removeEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, this._handleWorkerSessionCatalogUpdate);
     }
     this._holdersHydrationAbort = true;
     if (this._eagerHydrationTimer) {
@@ -1591,6 +1627,12 @@ class CommunityTab extends Component<any, any> {
   };
 
   componentDidUpdate(prevProps: any, prevState: any) {
+    const globalSelectionChanged =
+      prevProps.globalSessionSelection?.primarySessionSlug !== this.props.globalSessionSelection?.primarySessionSlug ||
+      prevProps.globalSessionSelection?.selectedSessionScope !==
+        this.props.globalSessionSelection?.selectedSessionScope ||
+      JSON.stringify(prevProps.globalSessionSelection?.selectedSessionSlugs) !==
+        JSON.stringify(this.props.globalSessionSelection?.selectedSessionSlugs);
     const cacheInputsChanged =
       prevProps.network?.id !== this.props.network?.id ||
       prevProps.provider !== this.props.provider ||
@@ -1602,9 +1644,11 @@ class CommunityTab extends Component<any, any> {
       prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady ||
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
       prevProps.activeSessionSlug !== this.props.activeSessionSlug ||
-      prevProps.sessionConfig !== this.props.sessionConfig;
+      prevProps.sessionConfig !== this.props.sessionConfig ||
+      globalSelectionChanged;
 
     if (cacheInputsChanged) {
+      this._ensureUniverseWarmup();
       this._queueCacheDrivenRefresh({ force: true });
       this._scheduleNextStatsPoll(this._computeFallbackPollDelayMs());
     }
@@ -2516,12 +2560,21 @@ class CommunityTab extends Component<any, any> {
 
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
-    const displayStats = [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }];
+    const displayStats = this._isUniverseEnabled()
+      ? [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }]
+      : stats;
     const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
     return (
       <div className={styles.communityTab}>
         <div className={styles.statsSection}>
           <div className={styles.statsHeader}>
+            <GlobalSessionSelector
+              selection={this._readGlobalSelection()}
+              sessionConfig={this.props.sessionConfig}
+              onChange={this.props.updateGlobalSessionSelection}
+              testId={E2E_TESTIDS.COMMUNITY_SESSION_SELECT}
+              className={styles.sessionSelector}
+            />
             <div className={styles.headerActionsRight}>
               {!initialLoadDone && (
                 <FontAwesomeIcon
@@ -2610,4 +2663,6 @@ class CommunityTab extends Component<any, any> {
   }
 }
 
-export default CommunityTab;
+export default connect((state: RootState) => ({ globalSessionSelection: state.sessionState }), {
+  updateGlobalSessionSelection,
+})(CommunityTab);

@@ -8,6 +8,7 @@ import {
   readSessionWorkerConfigCache,
   upsertCachedSessionWorkerConfig,
   upsertWorkerCanonicalSessionBootstrap,
+  SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT,
 } from './sessionWorkerConfigCache.js';
 
 describe('sessionWorkerConfigCache', () => {
@@ -53,6 +54,40 @@ describe('sessionWorkerConfigCache', () => {
       canonicalConfig: config,
     });
     expect(localStorage.getItem('dg:sessionRegistryCache:v1')).toBe(registrySentinel);
+  });
+
+  it('notifies mounted catalogs only after a successful Worker cache write', () => {
+    const readDuringNotification = jest.fn(() => readSessionWorkerConfigCache());
+    window.addEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, readDuringNotification);
+    const config = {
+      slug: 'cloud',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const write = () =>
+      upsertWorkerCanonicalSessionBootstrap({
+        slug: config.slug,
+        sessionIdHex: config.sessionId,
+        workerOrigin: config.corsWorkerUrl,
+        config,
+      });
+    let storageFailure;
+    try {
+      write();
+      expect(readDuringNotification).toHaveBeenCalledTimes(1);
+      expect(Object.values(readDuringNotification.mock.results[0].value.bySession)).toEqual([
+        expect.objectContaining({ slug: 'cloud' }),
+      ]);
+      storageFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('Storage unavailable');
+      });
+      write();
+      expect(readDuringNotification).toHaveBeenCalledTimes(1);
+    } finally {
+      storageFailure?.mockRestore();
+      window.removeEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, readDuringNotification);
+    }
   });
 
   it('reloads a worker-canonical chain-zero entry and requires the pinned origin', () => {

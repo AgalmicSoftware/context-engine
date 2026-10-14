@@ -178,6 +178,20 @@ describe('globalSessionState helpers', () => {
     );
   });
 
+  it('starts at ALL while retaining the public demo primary, and preserves an explicit saved General choice', () => {
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      selectedSessionScope: 'all',
+      primarySessionSlug: 'demo-sh',
+      primarySessionExplicit: false,
+    });
+    writeGlobalSessionSelection({ primarySessionSlug: '', selectedSessionScope: 'general' });
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      selectedSessionScope: 'general',
+      primarySessionSlug: '',
+      primarySessionExplicit: true,
+    });
+  });
+
   it('resolves scope slugs without collapsing list mode into a single session', () => {
     expect(
       resolveScopedSessionSlugsFromSelection({

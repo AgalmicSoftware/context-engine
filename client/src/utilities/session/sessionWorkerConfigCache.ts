@@ -68,6 +68,7 @@ type UpsertCachedSessionWorkerConfigArgs = {
 };
 
 const WORKER_CONFIG_CACHE_KEY = 'ce:sessionWorkerConfigCache:v1';
+export const SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT = 'ce:session-worker-config-cache-updated';
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 const WORKER_CONFIG_CACHE_VERSION = 3;
 const WORKER_CONFIG_REPLICA_META = '__workerConfigReplicaMeta';
@@ -421,6 +422,7 @@ const writeStore = (payload: WorkerConfigStore): void => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(WORKER_CONFIG_CACHE_KEY, JSON.stringify(payload));
+    window.dispatchEvent(new Event(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT));
   } catch (_) {}
 };
 

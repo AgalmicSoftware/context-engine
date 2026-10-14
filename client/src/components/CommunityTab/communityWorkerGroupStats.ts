@@ -1,8 +1,19 @@
 import { getDemoSessionConfigBySlug, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import {
+  claimsWorkerCanonicalAuthority,
+  resolveSessionCapabilityProjection,
+} from '../../utilities/session/sessionCapabilityProjection';
 import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
-import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
+import {
+  normalizeWorkerCanonicalSessionIdHex,
+  parseSessionWorkerDiscoveryOrigin,
+  resolveWorkerCanonicalSessionIdHex,
+} from '../../utilities/session/sessionWorkerDiscovery';
+import {
+  getWorkerCanonicalSessionBootstrap,
+  readSessionWorkerConfigCache,
+} from '../../utilities/session/sessionWorkerConfigCache';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
@@ -62,15 +73,58 @@ export const resolveCommunityScopeAuthority = ({
     const candidateSlug = normalizeSessionSlug(config.slug || config.sessionSlug || '');
     return candidateSlug === slug ? config : null;
   };
-  const sessionConfig =
+  let sessionConfig =
     exactCandidate(propSessionConfig) ||
     exactCandidate(getSessionConfigBySlug(slug)) ||
     exactCandidate(getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })) ||
     {};
+  const records = Object.values(readSessionWorkerConfigCache().bySession).filter(
+    (record) => record.authorityMode === 'worker_canonical' && normalizeSessionSlug(record.slug) === slug,
+  );
+  const hasDeclaredConfig = Object.keys(sessionConfig).length > 0;
+  const claimsWorker = claimsWorkerCanonicalAuthority(sessionConfig);
+  if (claimsWorker || !hasDeclaredConfig) {
+    const origin = (value: unknown) => {
+      try {
+        return parseSessionWorkerDiscoveryOrigin(value) || '';
+      } catch (_) {
+        return '';
+      }
+    };
+    const declaredOrigin = origin(sessionConfig.corsWorkerUrl);
+    const expectedOrigin =
+      declaredOrigin || (!hasDeclaredConfig && records.length === 1 ? origin(records[0].workerOrigin) : '');
+    const matches = expectedOrigin ? records.filter((record) => origin(record.workerOrigin) === expectedOrigin) : [];
+    if (matches.length === 1) {
+      const record = matches[0];
+      const cached = exactCandidate(getWorkerCanonicalSessionBootstrap({ slug, workerOrigin: expectedOrigin }));
+      const cachedProjection = resolveSessionCapabilityProjection(cached);
+      const declaredId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
+      const hasDeclaredId = !!(sessionConfig.sessionId || sessionConfig.sessionIdHex);
+      try {
+        const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: cached, sessionSlug: slug });
+        // Cache metadata is not authority on its own: the canonical config must
+        // agree with its record and any configured Worker origin/session ID.
+        if (
+          cached &&
+          cachedProjection.profileValid &&
+          cachedProjection.isWorkerCanonical &&
+          identity.workerOrigin === expectedOrigin &&
+          identity.sessionSlug === slug &&
+          identity.sessionId === normalizeWorkerCanonicalSessionIdHex(record.sessionIdHex) &&
+          (!hasDeclaredId || (!!declaredId && identity.sessionId === declaredId))
+        ) {
+          sessionConfig = cached;
+        }
+      } catch (_) {}
+    }
+  }
   const projection = resolveSessionCapabilityProjection(sessionConfig);
-  const isWorkerCanonical = projection.source === 'profile' && projection.profileValid && projection.isWorkerCanonical;
+  // Partial Worker hints and ambiguous cached-only routes must never fall back
+  // to numeric or single-node caches while their canonical identity is unknown.
+  const isWorkerCanonical = claimsWorkerCanonicalAuthority(sessionConfig) || (!hasDeclaredConfig && records.length > 0);
   let workerCanonicalIdentity: WorkerCanonicalCacheIdentity | null = null;
-  if (isWorkerCanonical) {
+  if (isWorkerCanonical && projection.profileValid && projection.isWorkerCanonical) {
     try {
       workerCanonicalIdentity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: slug });
     } catch (_) {

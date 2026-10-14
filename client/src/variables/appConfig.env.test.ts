@@ -203,7 +203,7 @@ describe('appConfig env-backed config', () => {
       const config = require('./appConfig.js');
 
       expect(config.DEFAULT_CHAIN_ID).toBe(11155420);
-      expect(config.CE_SESSION_SCAN_SCOPE).toBe('list');
+      expect(config.CE_SESSION_SCAN_SCOPE).toBe('all');
       expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo-sh']);
       expect(config.CE_DEMO_SESSION_SLUGS).toEqual(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
       expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
