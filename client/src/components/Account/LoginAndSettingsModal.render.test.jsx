@@ -43,6 +43,11 @@ jest.mock('../Shared/CETooltip', () => ({
 
 jest.mock('../../utilities/web3/chainGateway.js', () => {
   const getSlugs = jest.fn(() => []);
+  const getConfig = jest.fn(() => ({}));
+  const getExactConfig = jest.fn((slug) => {
+    const config = getConfig(slug);
+    return config?.slug === slug ? config : null;
+  });
   return {
     __esModule: true,
     default: {
@@ -50,10 +55,10 @@ jest.mock('../../utilities/web3/chainGateway.js', () => {
     },
     getDemoSessionConfigBySlug: jest.fn(() => null),
     getSessionNetwork: jest.fn(() => ({ id: 84532, chainId: 84532, name: 'Base Sepolia' })),
-    getSessionConfigBySlugOrDefault: jest.fn(() => ({})),
-    getSessionConfigBySlug: jest.fn(() => null),
+    getSessionConfigBySlugOrDefault: getConfig,
+    getSessionConfigBySlug: getExactConfig,
     getAllSessionSlugs: getSlugs,
-    getAllSessionEntries: jest.fn(() => getSlugs().map((slug) => [slug, { slug }])),
+    getAllSessionEntries: jest.fn(() => getSlugs().map((slug) => [slug, getExactConfig(slug) || { slug }])),
   };
 });
 
@@ -561,16 +566,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('shows the old network-style active session row up top and keeps network details out of the collapsed row in plain mode', () => {
+  it('shows the shared session dropdown above Config and keeps network details out of the collapsed row in plain mode', () => {
     const subject = buildWrongNetworkSubject();
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('SESSION')).toBeInTheDocument();
-    expect(screen.getAllByText('Edge Session').length).toBeGreaterThan(0);
+    expect(screen.getByRole('combobox', { name: 'Session' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Edge Session (edge)' })).toHaveProperty('selected', true);
     const sessionLink = screen.getByRole('link', { name: 'Open session Edge Session' });
     expect(sessionLink).toHaveAttribute('href', '/session/edge');
-    expect(sessionLink).not.toHaveAttribute('target');
+    expect(sessionLink).toHaveAttribute('target', '_blank');
     expect(screen.queryByText('session:')).not.toBeInTheDocument();
     expect(screen.queryByText('network:')).not.toBeInTheDocument();
     expect(screen.queryByText('wallet:')).not.toBeInTheDocument();
@@ -652,7 +657,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByRole('link', { name: 'Open session general' })).toHaveAttribute('href', '/session');
+    expect(screen.getByRole('link', { name: 'Open session General' })).toHaveAttribute('href', '/session');
   });
 
   it('renders the list-derived primary session in the summary when list scope excludes general', () => {
@@ -692,7 +697,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByText('Edge Session')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Edge Session (edge)' })).toHaveProperty('selected', true);
     expect(screen.queryByText('session:')).not.toBeInTheDocument();
     expect(screen.getByText('network:')).toBeInTheDocument();
     expect(screen.getByText('Base Sepolia')).toBeInTheDocument();
@@ -799,9 +804,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getPreLoginSettingsDisplay());
 
-    expect(screen.getByText('SESSION')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Session' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/session/edge');
-    expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
   });
 
   it('shows the shared network summary and sponsored-resource cards in the logged-out drawer before login', async () => {
@@ -855,7 +860,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getPreLoginSettingsDisplay());
 
-    expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -874,7 +879,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('keeps pre-login session and local AI controls behind Config with a capability-driven overview', async () => {
+  it('keeps advanced scope and local AI controls behind Config with a visible shared session selector', async () => {
     getAllSessionSlugs.mockReturnValue(['demo']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
       String(slug || '')
@@ -897,7 +902,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(await screen.findByText('AI')).toBeInTheDocument();
     expect(screen.queryByText('Network')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
     expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
@@ -905,6 +910,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.queryByText('Network')).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox', { name: 'Session', exact: true })).toHaveLength(1);
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
     expect(screen.getByLabelText('AI endpoint')).toBeInTheDocument();
   });
@@ -917,7 +923,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
-    const sessionSummary = screen.getByLabelText(/^Active session:/);
+    const sessionSummary = screen.getByTestId('ce-prelogin-session-select');
     expect(screen.queryByRole('button', { name: 'Demo Mode On' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-prelogin-settings-panel')).not.toBeInTheDocument();
     expect(sessionSummary).toBeInTheDocument();

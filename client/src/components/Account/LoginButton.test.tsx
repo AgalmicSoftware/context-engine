@@ -3,9 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import fs from 'fs';
 import path from 'path';
+import * as sass from 'sass';
 import LoginButton from './LoginButton';
 
 const accountStylesheet = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+const compiledAccountStylesheet = sass.compile(path.join(__dirname, 'Account.module.scss')).css;
 
 const createStore = (loginInProgress = false) => ({
   getState: () => ({
@@ -18,6 +20,47 @@ const createStore = (loginInProgress = false) => ({
 });
 
 describe('LoginButton', () => {
+  it('pairs Civic account text and inline editor fields with the blue account surface', () => {
+    const civicStyles = accountStylesheet.slice(
+      accountStylesheet.indexOf('@container ce-theme style(--ce-layout-profile: minimal-app)'),
+    );
+    const accountPanel = civicStyles.slice(
+      civicStyles.indexOf('#accountModalPanel {'),
+      civicStyles.indexOf('.navConnectContainer {'),
+    );
+    expect(accountPanel).toContain('--ce-panel-text: var(--ce-action-primary-text);');
+    expect(accountPanel).toContain('--ce-input-bg: var(--ce-action-primary-hover);');
+    expect(accountPanel).toContain(
+      '--ce-input-border: color-mix(in srgb, var(--ce-action-primary-text) 35%, transparent);',
+    );
+    expect(accountPanel).toContain('--ce-text-inverse: var(--ce-action-primary-text);');
+    expect(accountPanel).toContain('--ce-status-error: var(--ce-action-primary-text);');
+    expect(accountPanel).toContain('--ce-status-success-text: var(--ce-action-primary-text);');
+    expect(accountPanel).toContain('--ce-focus-ring: var(--ce-action-primary-text);');
+    expect(accountPanel).toContain('linear-gradient(135deg, var(--ce-action-primary), var(--ce-action-primary-hover))');
+  });
+
+  it('keeps the light profile error text out of the Disconnect danger-gradient tokens', () => {
+    const panelBlocks = [...compiledAccountStylesheet.matchAll(/#accountModalPanel\s*\{([^}]+)\}/g)];
+    const civicPanel = panelBlocks.find(([, declarations]) => declarations.includes('--ce-panel-text:'))?.[1];
+    expect(civicPanel).toBeDefined();
+    expect(civicPanel).not.toContain('--ce-status-error:');
+    expect(civicPanel).not.toContain('--ce-status-danger:');
+    expect(compiledAccountStylesheet).toMatch(
+      /#accountModalPanel \.accountModalProfileShell\s*\{[^}]*--ce-status-error:\s*var\(--ce-action-primary-text\);/,
+    );
+  });
+
+  it('gives the Settings dropdown a full row on narrow screens while preserving the desktop grid', () => {
+    expect(compiledAccountStylesheet).toMatch(
+      /\.settingsQuickControlsGrid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
+    );
+    const mobileGrid = compiledAccountStylesheet.match(
+      /@media \(max-width: 480px\)\s*\{[\s\S]*?\.settingsQuickControlsGrid\s*\{([^}]+)\}/,
+    )?.[1];
+    expect(mobileGrid).toContain('grid-template-columns: 1fr;');
+  });
+
   it('opens the account modal when idle', () => {
     const launchAccountModal = jest.fn();
 

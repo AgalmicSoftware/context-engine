@@ -99,7 +99,6 @@ import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainBy
 import { createLogger } from 'utilities/logging.js';
 import {
   buildBookmarksRoutePath,
-  buildSettingsSessionHref,
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
@@ -1593,7 +1592,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
 
   renderSettingsControlRow = ({
-    activeSession = this.getSessionDescriptor(this.getActiveSessionSlug()),
     configOpen = false,
     onToggleConfig = null,
     configTestId = '',
@@ -1609,7 +1607,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     themeControl = null,
   }: any = {}) =>
     LoginSettingsControlRow({
-      activeSession,
       configOpen,
       onToggleConfig,
       configTestId,
@@ -1630,9 +1627,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       containerClassName,
       rowClassName,
       showSession,
-      sessionHref: buildSettingsSessionHref(activeSession.slug),
+      sessionControl: this.renderGlobalSessionSelector(),
       themeControl,
     });
+
+  renderGlobalSessionSelector = ({ testId = 'ce-web3modal-session-select' }: { testId?: string } = {}) => (
+    <GlobalSessionSelector
+      selection={this.getGlobalSessionSelection()}
+      sessionConfig={this.props.sessionConfig}
+      onChange={this.handleGlobalSessionSelectionChange}
+      testId={testId}
+    />
+  );
 
   handleActiveSessionChange = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
@@ -1927,11 +1933,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     />
   );
 
-  renderGlobalSessionSettings = ({
-    compact = false,
-    sessionSelectTestId = 'ce-web3modal-session-select',
-    scopePrefix = 'ce-web3modal-session-scope',
-  }: any = {}) => {
+  renderGlobalSessionSettings = ({ compact = false, scopePrefix = 'ce-web3modal-session-scope' }: any = {}) => {
     const sessionScanScope = this.getSessionScanScopeValue();
     const selectedSessionSlugs = this.getConfiguredSessionScanSlugs();
     const selectedSessionLabels = this.buildSessionScopeChipOptions({
@@ -1944,16 +1946,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
     return (
       <>
-        <GlobalSessionSelector
-          selection={this.getGlobalSessionSelection()}
-          sessionConfig={this.props.sessionConfig}
-          onChange={this.handleGlobalSessionSelectionChange}
-          testId={sessionSelectTestId}
-          className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}
-          labelClassName={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}
-          selectClassName={compact ? styles.preLoginSettingsInput : styles.aiSettingsSelect}
-        />
-
         <label className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}>
           <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>
             Selected-session scope
@@ -2018,7 +2010,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         openAiApiKey={openAiApiKey}
         sessionSettings={this.renderGlobalSessionSettings({
           compact: true,
-          sessionSelectTestId: 'ce-prelogin-session-select',
           scopePrefix: 'ce-prelogin-session-scope',
         })}
       />
@@ -2258,7 +2249,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       <div className={styles.aiSettingsGrid}>
                         {this.renderGlobalSessionSettings({
                           compact: false,
-                          sessionSelectTestId: 'ce-web3modal-session-select',
                           scopePrefix: 'ce-web3modal-session-scope',
                         })}
                       </div>
@@ -2451,6 +2441,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       overview,
       preLoginConfigOpen: this.state.preLoginConfigOpen,
       preLoginSettingsOpen: this.state.preLoginSettingsOpen,
+      sessionControl: this.renderGlobalSessionSelector({ testId: 'ce-prelogin-session-select' }),
       renderInlineNetworkSummary: this.renderInlineNetworkSummary,
       renderPreLoginConfigPanel: this.renderPreLoginConfigPanel,
       renderSettingsControlRow: this.renderSettingsControlRow,

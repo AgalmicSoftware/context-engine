@@ -171,8 +171,12 @@ export async function inspectStatsCounters(page) {
   const selector = page.getByTestId('ce-community-session-select');
   await selector.waitFor({ state: 'visible' });
   await selector.selectOption({ label: 'General' });
+  const sessionLink = page.getByTestId('ce-community-session-select-link');
+  assert.equal(await sessionLink.getAttribute('target'), '_blank', 'A concrete session opens in a new tab');
+  assert(new URL(await sessionLink.getAttribute('href'), page.url()).pathname.endsWith('/session'), 'General links to its session page');
   assert.equal(await page.getByTestId('ce-community-stat-sessions').count(), 0, 'Specific session scope hides the Sessions total');
   await selector.selectOption({ label: 'ALL' });
+  assert.equal(await sessionLink.isDisabled(), true, 'Aggregate scope has no single-session destination');
   for (const name of ['users', 'questions', 'surveys', 'groups', 'sessions']) {
     await page.getByTestId(`ce-community-stat-${name}`).waitFor({ state: 'visible' });
   }

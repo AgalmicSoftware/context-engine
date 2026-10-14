@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
 import { getSessionConfigBySlug } from '../../utilities/web3/chainGateway';
-import { readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
+import { buildCommunitySessionCatalog, readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import {
@@ -31,7 +34,7 @@ const GlobalSessionSelector = ({
 }: GlobalSessionSelectorProps) => {
   const selection = normalizeGlobalSessionSelection(selectionIn);
   const requiredSlugsKey = JSON.stringify(['', selection.primarySessionSlug, ...selection.selectedSessionSlugs]);
-  const [catalog, setCatalog] = useState<Array<{ slug: string; name: string }>>([]);
+  const [catalog, setCatalog] = useState<Array<{ slug: string; name: string; href?: string }>>([]);
   const readingCatalog = useRef(false);
   const refresh = useCallback(() => {
     // Registry reads may hydrate caches and notify other mounted views. Keep
@@ -45,6 +48,7 @@ const GlobalSessionSelector = ({
       ];
       const next = slugs.map((slug) => ({
         slug,
+        href: known.find((entry) => entry.slug === slug)?.href,
         name:
           known.find((entry) => entry.slug === slug)?.name ||
           String(getSessionConfigBySlug(slug)?.sessionName || '').trim(),
@@ -101,9 +105,34 @@ const GlobalSessionSelector = ({
           : selection.selectedSessionScope === 'list'
             ? selection.selectedSessionSlugs[0]
             : selection.primarySessionSlug;
+  const hasConcreteSelection = selection.selectedSessionScope !== 'all' && !isListSummary;
+  const exactConfigEntry =
+    sessionConfig &&
+    typeof sessionConfig === 'object' &&
+    'slug' in sessionConfig &&
+    normalizeSessionSlug(sessionConfig.slug) === value
+      ? buildCommunitySessionCatalog({ entries: [[value, sessionConfig]] })[0]
+      : undefined;
+  // An explicit Worker route can share a slug with a different cached authority.
+  // Only a validated Worker query overrides discovery; partial props retain it.
+  const exactWorkerHref =
+    exactConfigEntry?.kind === 'centralized' && exactConfigEntry.href.includes('?worker=')
+      ? exactConfigEntry.href
+      : null;
+  const sessionHref = hasConcreteSelection
+    ? value
+      ? exactWorkerHref ||
+        catalog.find((entry) => entry.slug === value)?.href ||
+        exactConfigEntry?.href ||
+        buildSettingsSessionHref(value)
+      : buildSettingsSessionHref('')
+    : null;
+  const sessionLabel = value
+    ? exactConfigEntry?.name || catalog.find((entry) => entry.slug === value)?.name || value
+    : 'General';
 
   return (
-    <label className={className}>
+    <div className={`${styles.globalSessionSelector} ${className}`}>
       <span className={labelClassName}>Session</span>
       <select
         aria-label="Session"
@@ -135,7 +164,31 @@ const GlobalSessionSelector = ({
           </option>
         ))}
       </select>
-    </label>
+      {sessionHref ? (
+        <a
+          href={sessionHref}
+          className={styles.globalSessionLink}
+          aria-label={`Open session ${sessionLabel}`}
+          title={`Open session ${sessionLabel}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid={`${testId}-link`}
+        >
+          <FontAwesomeIcon icon={faExternalLinkAlt} />
+        </a>
+      ) : (
+        <button
+          type="button"
+          className={styles.globalSessionLink}
+          disabled
+          aria-label="Select one session to open its page"
+          title="Select one session to open its page"
+          data-testid={`${testId}-link`}
+        >
+          <FontAwesomeIcon icon={faExternalLinkAlt} />
+        </button>
+      )}
+    </div>
   );
 };
 

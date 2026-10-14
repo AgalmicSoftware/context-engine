@@ -1,15 +1,10 @@
 import React from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './Account.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-type SessionDescriptor = {
-  label?: string;
-  slug?: string;
-};
 
 export const LoginSettingsConfigToggleControl = ({
   expanded = false,
@@ -32,35 +27,7 @@ export const LoginSettingsConfigToggleControl = ({
   </Button>
 );
 
-export const LoginSettingsSessionSummary = ({
-  activeSession = {},
-  sessionHref = '/session',
-}: {
-  activeSession?: SessionDescriptor;
-  sessionHref?: string;
-}): React.ReactElement => {
-  const label = activeSession.label || 'General';
-
-  return (
-    <div className={styles.settingsSessionSummary}>
-      <div className={styles.settingsSessionRoute} aria-label={`Active session: ${label}`}>
-        <span className={styles.settingsSessionLabel}>SESSION</span>
-        <span className={styles.settingsSessionName}>{label}</span>
-        <a
-          href={sessionHref}
-          className={styles.settingsSessionLink}
-          aria-label={`Open session ${label}`}
-          title={`Open session ${label}`}
-        >
-          <FontAwesomeIcon icon={faExternalLinkAlt} />
-        </a>
-      </div>
-    </div>
-  );
-};
-
 export const LoginSettingsControlRow = ({
-  activeSession = {},
   afterDemo = null,
   beforeConfig = null,
   betweenSessionAndTooltips = null,
@@ -71,12 +38,11 @@ export const LoginSettingsControlRow = ({
   layout = 'row',
   onToggleConfig = null,
   rowClassName = '',
-  sessionHref = '/session',
+  sessionControl = null,
   showSession = true,
   themeControl = null,
   tooltipsControl = null,
 }: {
-  activeSession?: SessionDescriptor;
   afterDemo?: React.ReactNode;
   beforeConfig?: React.ReactNode;
   betweenSessionAndTooltips?: React.ReactNode;
@@ -87,7 +53,7 @@ export const LoginSettingsControlRow = ({
   layout?: 'row' | 'quick-grid';
   onToggleConfig?: (() => void) | null;
   rowClassName?: string;
-  sessionHref?: string;
+  sessionControl?: React.ReactNode;
   showSession?: boolean;
   themeControl?: React.ReactNode;
   tooltipsControl?: React.ReactNode;
@@ -95,12 +61,9 @@ export const LoginSettingsControlRow = ({
   const configControl = (
     <LoginSettingsConfigToggleControl expanded={configOpen} onToggle={onToggleConfig} testId={configTestId} />
   );
-  const sessionControl = showSession ? (
-    <LoginSettingsSessionSummary activeSession={activeSession} sessionHref={sessionHref} />
-  ) : null;
   const quickControls = [
     { key: 'config', control: configControl },
-    { key: 'session', control: sessionControl },
+    { key: 'session', control: showSession ? sessionControl : null },
     { key: 'explainers', control: tooltipsControl },
     { key: 'demo', control: demoControl },
   ];
@@ -128,7 +91,7 @@ export const LoginSettingsControlRow = ({
       <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
         {beforeConfig}
         {configControl}
-        {sessionControl}
+        {showSession ? sessionControl : null}
         {betweenSessionAndTooltips}
         {tooltipsControl}
         {demoControl}

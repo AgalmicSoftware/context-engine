@@ -358,7 +358,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   const readPreloginSettingsControlLayout = async () =>
     page.getByTestId('ce-prelogin-settings-panel').evaluate((panel) => {
-      const session = document.querySelector('[aria-label^="Active session:"]');
+      const session = document.querySelector('[data-testid="ce-prelogin-session-select"]')?.parentElement;
       const config = panel.querySelector('[data-testid="ce-prelogin-config-toggle"]');
       const explainers = Array.from(panel.querySelectorAll('button')).find((button) =>
         button.getAttribute('aria-label')?.startsWith('Explainers '),
@@ -769,7 +769,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresPreloginControlLayout) {
-    const sessionSummary = page.locator('[aria-label^="Active session:"]').first();
+    const sessionSummary = page.getByTestId('ce-prelogin-session-select');
     await sessionSummary.waitFor({ state: 'visible' });
     assert.equal(
       await page.getByTestId('ce-prelogin-settings-panel').count(),

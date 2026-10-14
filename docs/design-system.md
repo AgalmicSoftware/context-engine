@@ -141,6 +141,10 @@ uses the light-surface response palette. The contrast checks cover text,
 controls, disabled actions, session chrome, and focus indicators; this is not a
 claim of complete accessibility certification.
 
+The Civic Account card uses a deep blue gradient with white account text and
+actions. Inline account fields keep dark backgrounds and light text, validation
+indicators, and focus outlines. This treatment is scoped to the Account card.
+
 The Stats tab includes a Sessions count across the app's discovered registry
 sessions, configured Worker sessions, and previously visited Worker sessions.
 Opening it shows centralized and decentralized totals and a scrollable list of
@@ -150,6 +154,12 @@ uses the other backend for supporting services. Missing authority metadata is
 shown as "Type unavailable." This directory is independent of the selected
 session scope used by the other Stats counts. Its five summary buttons wrap to
 three columns on narrow phones.
+Stats, Users Details, and Settings share one Session dropdown with an adjacent
+external-link icon. A concrete selection opens its session page in a new tab;
+General opens the general session, while ALL and multi-session selections leave
+the icon disabled. Worker links retain their validated discovery origin. Settings
+shows this same control in its quick summary and keeps only advanced scope
+editing behind Config.
 The Sessions dialog's header filter button opens type, creation-date range,
 last-activity range, and admin-address filters. These combine immediately and
 update the visible totals. Date ranges include both local calendar dates;
@@ -220,7 +230,8 @@ mobile and checks its visible control/text pairs at 4.5:1.
 
 When the bundled-theme selector is enabled, signed-in Settings exposes it
 directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
-controls. Signed-out Settings keeps it in the final `Appearance & colors`
+controls. At phone widths up to 480px, these controls stack into full-width rows
+so the Session dropdown remains readable. Signed-out Settings keeps it in the final `Appearance & colors`
 section. This selector changes the complete app theme; it is separate from a
 session's curated color scheme and does not accept arbitrary color values. Its
 default option reads `<theme label> (default)` for a valid embedded

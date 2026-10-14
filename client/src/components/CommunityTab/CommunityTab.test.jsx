@@ -250,10 +250,12 @@ describe('CommunityTab helpers', () => {
       syncPasskeyWalletChain = jest.fn();
       checkAndSendTestFundsIfNeeded = jest.fn();
       render() {
-        return this.renderGlobalSessionSettings({
-          sessionSelectTestId: 'settings-selector',
-          scopePrefix: 'settings-scope',
-        });
+        return (
+          <>
+            {this.renderGlobalSessionSelector({ testId: 'settings-selector' })}
+            {this.renderGlobalSessionSettings({ scopePrefix: 'settings-scope' })}
+          </>
+        );
       }
     }
     const Settings = connect((state) => state.sessionState, { updateGlobalSessionSelection })(SettingsView);

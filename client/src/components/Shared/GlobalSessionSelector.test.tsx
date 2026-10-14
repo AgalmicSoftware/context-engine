@@ -33,6 +33,150 @@ describe('GlobalSessionSelector', () => {
     selectedSessionSlugs: ['alpha', 'beta'],
   };
   afterEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.mocked(getAllSessionSlugs).mockReturnValue(['alpha', 'beta']);
+    jest
+      .mocked(getSessionConfigBySlug)
+      .mockImplementation((slug: string) => ({ slug, sessionName: `${slug} discussion` }));
+    jest.mocked(getAllDemoSessionConfigs).mockReturnValue([]);
+    jest.mocked(readSessionWorkerConfigCache).mockReturnValue({ bySession: {} });
+  });
+
+  it('links the selected concrete scope with base-path encoding and disables aggregate destinations', () => {
+    const publicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    const onChange = jest.fn();
+    const view = render(<GlobalSessionSelector selection={selection} onChange={onChange} testId="selector" />);
+    try {
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Select one session to open its page' })).toBeDisabled();
+      view.rerender(
+        <GlobalSessionSelector
+          selection={{ ...selection, selectedSessionScope: 'general' }}
+          onChange={onChange}
+          testId="selector"
+        />,
+      );
+      expect(screen.getByRole('link')).toHaveAttribute('href', '/ce/session');
+      view.rerender(
+        <GlobalSessionSelector
+          selection={{ ...selection, selectedSessionScope: 'list', selectedSessionSlugs: ['edge session'] }}
+          onChange={onChange}
+          testId="selector"
+        />,
+      );
+      expect(screen.getByRole('link')).toHaveAttribute('href', '/ce/session/edge%20session');
+      expect(screen.getByRole('link')).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(screen.getByRole('link')).toHaveAttribute('target', '_blank');
+      expect(screen.getByRole('link').closest('label')).toBeNull();
+      view.rerender(
+        <GlobalSessionSelector
+          selection={{ ...selection, selectedSessionScope: 'list' }}
+          onChange={onChange}
+          testId="selector"
+        />,
+      );
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Select one session to open its page' })).toBeDisabled();
+      expect(onChange).not.toHaveBeenCalled();
+    } finally {
+      if (publicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = publicUrl;
+    }
+  });
+
+  it('retains the catalog Worker discovery query in concrete session links', () => {
+    jest.mocked(getAllSessionSlugs).mockReturnValue([]);
+    jest.mocked(getAllDemoSessionConfigs).mockReturnValue([
+      [
+        'worker-link',
+        {
+          slug: 'worker-link',
+          sessionName: 'Worker Link',
+          corsWorkerUrl: 'https://worker.example',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      ],
+    ]);
+    render(
+      <GlobalSessionSelector
+        selection={{ primarySessionSlug: 'worker-link', selectedSessionScope: 'active' }}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Open session Worker Link' })).toHaveAttribute(
+      'href',
+      '/session/worker-link?worker=https%3A%2F%2Fworker.example',
+    );
+  });
+
+  it('uses exact supplied Worker config when catalog storage is unavailable, without leaking it to another session', () => {
+    jest.mocked(getAllSessionSlugs).mockReturnValue([]);
+    jest.mocked(getSessionConfigBySlug).mockReturnValue(null);
+    const sessionConfig = {
+      slug: 'worker-link',
+      sessionName: 'Worker Link',
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const view = render(
+      <GlobalSessionSelector
+        selection={{ primarySessionSlug: 'worker-link', selectedSessionScope: 'active' }}
+        sessionConfig={sessionConfig}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/session/worker-link?worker=https%3A%2F%2Fworker.example',
+    );
+    view.rerender(
+      <GlobalSessionSelector
+        selection={{ primarySessionSlug: 'other', selectedSessionScope: 'active' }}
+        sessionConfig={sessionConfig}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/session/other');
+  });
+
+  it('prefers the exact supplied Worker origin over a same-slug catalog entry while retaining discovery for partial config', () => {
+    jest.mocked(getAllSessionSlugs).mockReturnValue(['worker-link']);
+    const catalogConfig = {
+      slug: 'worker-link',
+      sessionName: 'Worker Link',
+      corsWorkerUrl: 'https://catalog-worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    jest.mocked(getSessionConfigBySlug).mockReturnValue(catalogConfig);
+    const view = render(
+      <GlobalSessionSelector
+        selection={{ primarySessionSlug: 'worker-link', selectedSessionScope: 'active' }}
+        sessionConfig={{ ...catalogConfig, corsWorkerUrl: 'https://route-worker.example' }}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/session/worker-link?worker=https%3A%2F%2Froute-worker.example',
+    );
+    view.rerender(
+      <GlobalSessionSelector
+        selection={{ primarySessionSlug: 'worker-link', selectedSessionScope: 'active' }}
+        sessionConfig={{ slug: 'worker-link' }}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/session/worker-link?worker=https%3A%2F%2Fcatalog-worker.example',
+    );
+  });
 
   it('offers ALL, General and named sessions, keeping a partial exact config from masking the catalog name', () => {
     const onChange = jest.fn();
