@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Load Questions in Tools from the selected session’s verified Worker, keeping
+  unresolved counts in a loading state and failed reads distinct from confirmed zero.
+
 - Bring the group creation form into view when opening it below the visible list.
 
 - Center the session loading message with larger text and a spinner while keeping

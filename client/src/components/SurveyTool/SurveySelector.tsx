@@ -1097,7 +1097,9 @@ export class SurveySelector extends Component<any, any> {
       <span className={styles.questionSelectorSummary}>
         <span className={styles.questionSelectorPrimary}>
           <span>{prefixLabel}</span>
-          <span className={styles.questionSelectorCount}>({count})</span>
+          {count > 0 || (!showSpinner && !showCacheError) ? (
+            <span className={styles.questionSelectorCount}>({count})</span>
+          ) : null}
         </span>
         {showEncryptedCount && encryptedCount > 0 && (
           <span className={styles.questionSelectorEncryptedBadge} {...encryptedBadgeProps}>

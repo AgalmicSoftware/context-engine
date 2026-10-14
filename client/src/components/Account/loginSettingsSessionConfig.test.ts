@@ -81,17 +81,15 @@ it('discovers catalog-only selections and leaves registry configs unchanged', as
 });
 
 it('rejects identity changes without silently replacing the pinned session', async () => {
-  jest
-    .mocked(upsertWorkerCanonicalSessionBootstrap)
-    .mockReturnValueOnce({
-      status: 'conflict',
-      cacheKey: 'synthetic-conflict',
-      config: null,
-      existingSessionIdHex: `0x${'ff'.repeat(16)}`,
-      sessionIdHex: sessionId,
-      existingWorkerOrigin: workerOrigin,
-      workerOrigin,
-    });
+  jest.mocked(upsertWorkerCanonicalSessionBootstrap).mockReturnValueOnce({
+    status: 'conflict',
+    cacheKey: 'synthetic-conflict',
+    config: null,
+    existingSessionIdHex: `0x${'ff'.repeat(16)}`,
+    sessionIdHex: sessionId,
+    existingWorkerOrigin: workerOrigin,
+    workerOrigin,
+  });
   await expect(resolveLoginSettingsSessionConfig(slug, hint)).rejects.toThrow(/identity/i);
   expect(markWorkerCanonicalSessionBootstrapVerified).not.toHaveBeenCalled();
 });

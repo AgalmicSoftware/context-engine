@@ -569,6 +569,15 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   _renderHomeRoute: (ctx: RouteRenderCtx) => {
     const { defaultSlug, defaultSessionCfg, defaultSessionChainId, defaultSessionNetwork, cacheInitializationError } =
       ctx;
+    const controller = getWorkerCanonicalRouteController(host);
+    const workerRoute = resolveMainSiteGroupWorkerRoute({
+      workerSessionSlug: defaultSlug,
+      sessionConfig: defaultSessionCfg,
+      searchStr: '',
+      controller,
+    });
+    const sessionLoadingView =
+      renderWorkerCanonicalRouteError(workerRoute) || renderWorkerCanonicalRouteBootstrap(workerRoute, controller);
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
         <div className={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
@@ -585,7 +594,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             demoMode={host.props.demoMode}
             demoSurfaceMode={host.props.demoSurfaceMode}
             activeSessionSlug={defaultSlug}
-            sessionConfig={defaultSessionCfg}
+            sessionConfig={workerRoute.kind === 'verified' ? workerRoute.sessionConfig : defaultSessionCfg}
+            sessionLoadingView={sessionLoadingView}
             network={defaultSessionNetwork}
             networkChainId={defaultSessionChainId}
             isAllCachesReady={host.state.isAllCachesReady}

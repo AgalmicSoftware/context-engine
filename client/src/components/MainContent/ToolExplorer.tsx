@@ -69,6 +69,7 @@ type ExpandedComponentState = {
 
 type ToolExplorerProps = {
   activeSessionSlug?: unknown;
+  sessionLoadingView?: React.ReactNode;
   demoSurfaceMode?: unknown;
   updateGlobalSessionSelection?: (selection: { primarySessionSlug: string; selectedSessionSlugs?: string[] }) => void;
   [key: string]: unknown;
@@ -268,6 +269,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         isSBTCacheReady: props.isSBTCacheReady,
         isSurveyCacheReady: props.isSurveyCacheReady,
         isQuestionCacheReady: props.isQuestionCacheReady,
+        cacheInitializationError: props.cacheInitializationError,
         isResponsesCacheReady: props.isResponsesCacheReady,
         questionResponsesNonce: props.questionResponsesNonce,
         questionScanProgress: props.questionScanProgress,
@@ -451,10 +453,11 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
             )}
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>
-              {React.createElement(expandedComponent.component, {
-                ...expandedChildProps,
-                ...(showGroupsHeaderActions ? { key: activeSessionSlug } : {}),
-              })}
+              {(expandedToolName === 'Questions' && props.sessionLoadingView) ||
+                React.createElement(expandedComponent.component, {
+                  ...expandedChildProps,
+                  ...(showGroupsHeaderActions ? { key: activeSessionSlug } : {}),
+                })}
             </Suspense>
           </div>
         ) : (

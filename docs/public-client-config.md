@@ -402,6 +402,13 @@ Omitting the field inherits that default. This is session configuration; there
 is no user Settings toggle, and the retired browser preference is ignored.
 Manual navigation remains available and submission remains explicit.
 
+## Worker questions in Tools
+
+The home Tools → Questions view verifies the selected Worker configuration before
+hydrating its questions. Switching sessions retains the open tool and loads the
+new session's data. The question selector omits an unknown zero while loading or
+after a cache error; a completed empty read displays zero.
+
 ## Worker session AI defaults and sponsorship
 
 Settings resolves directory selections through the session Worker's verified

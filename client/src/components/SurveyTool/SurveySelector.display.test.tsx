@@ -260,3 +260,14 @@ describe('SurveySelector display guards', () => {
     expect(nodeHasClassName(toolbar, styles.toolbarWithoutSubmit)).toBe(false);
   });
 });
+
+it.each([{ showSpinner: true }, { showCacheError: true }])(
+  'does not present an inconclusive zero as a confirmed count (%j)',
+  (status) => {
+    const subject = new SurveySelector({});
+    const view = render(subject.renderQuestionSelectorLabel({ count: 0, ...status }));
+    expect(screen.queryByText('(0)')).not.toBeInTheDocument();
+    view.rerender(subject.renderQuestionSelectorLabel({ count: 0 }));
+    expect(screen.getByText('(0)')).toBeInTheDocument();
+  },
+);

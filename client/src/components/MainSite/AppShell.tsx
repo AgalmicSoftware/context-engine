@@ -3018,7 +3018,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       })();
     }
 
-    if (sessionPathResolutionChanged && !isStaticNonCacheRoute(currPath)) {
+    const homeSessionChanged = currPath === '/' && prevProps.activeSessionSlug !== this.props.activeSessionSlug;
+    if ((sessionPathResolutionChanged || homeSessionChanged) && !isStaticNonCacheRoute(currPath)) {
       const workerRouteSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
       void this.initializeWorkerCanonicalCachesForGroup(workerRouteSlug, { resetReadiness: true });
     }

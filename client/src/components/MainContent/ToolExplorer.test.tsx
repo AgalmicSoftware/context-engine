@@ -313,6 +313,25 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', '');
   });
 
+  it('keeps Questions open while resolving its session and forwards an inconclusive cache state', async () => {
+    const props = { activeSessionSlug: 'edge', sessionLoadingView: <div role="status">Loading session</div> };
+    const view = renderToolExplorer(props);
+    fireEvent.click(screen.getByText('Questions'));
+    expect(screen.getByRole('status')).toHaveTextContent('Loading session');
+    expect(screen.queryByTestId('mock-survey-tool')).not.toBeInTheDocument();
+    view.rerender(
+      <ToolExplorer
+        activeSessionSlug="edge"
+        isQuestionCacheReady={false}
+        cacheInitializationError="Could not load questions"
+      />,
+    );
+    expect(await screen.findByTestId('mock-survey-tool')).toBeInTheDocument();
+    expect(mockSurveyTool).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isQuestionCacheReady: false, cacheInitializationError: 'Could not load questions' }),
+    );
+  });
+
   it('ignores selecting the current session and refreshes known options when focused', async () => {
     const updateGlobalSessionSelection = jest.fn();
     renderToolExplorer({
