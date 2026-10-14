@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.13] - 2026-10-13
+
+### Client — available when the site deploys
+
+- Keep the active session selection consistent across Stats, account settings,
+  Questions, Groups, and Context. Add a session filter to user details and link
+  question rows directly to their session report.
+- Simplify Stats counters and distribute four visible totals evenly. Make
+  Explorer help work by click, tap, or keyboard even when automatic explainers
+  are disabled, and keep navigation controls together when space permits.
+- Refine the white theme with clearer account controls, readable wordmarks,
+  softer Welcome artwork, larger mobile tabs, and a compact footer. Refresh
+  returning clients to the updated default theme once.
+- Add a collapsible setup graphic to Docs and shorten Groups help. Keep the
+  standalone benchmark Results help popup within narrow screens.
+
 ## [0.6.9] - 2026-10-13
 
 ### Client — available when the site deploys
