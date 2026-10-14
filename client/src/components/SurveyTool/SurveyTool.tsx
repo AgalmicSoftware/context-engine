@@ -114,6 +114,7 @@ type SurveyToolProps = {
   preventUrlChange?: boolean;
   miniMode?: boolean;
   hideEmbeddedDebugUi?: boolean;
+  toolbarTarget?: HTMLElement | null;
   isQuestionCacheReady?: boolean;
   isResponsesCacheReady?: boolean;
   isSurveyCacheReady?: boolean;
@@ -413,6 +414,7 @@ const renderSurveyToolContent = ({
         ensureLightSbtUniverse={props.ensureLightSbtUniverse}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
         embeddedSessionToolbar={Boolean(props.hideEmbeddedDebugUi && props.sessionSlugPinned)}
+        toolbarTarget={props.toolbarTarget}
       />
       <React.Suspense fallback={null}>
         <SurveyResults

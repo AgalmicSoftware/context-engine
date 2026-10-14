@@ -244,7 +244,7 @@ describe('ToolExplorer session propagation', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('places session selection at the right edge with tool actions on a separate row and readable narrow controls', () => {
+  it('preserves the default header layout and readable narrow session controls', () => {
     expect(compiledToolStyles).toMatch(/\.expandedHeaderSession\s*\{[^}]*justify-self:\s*end;/);
     expect(compiledToolStyles).toMatch(/\.expandedHeaderActions\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/);
     expect(compiledToolStyles).toMatch(
@@ -366,7 +366,7 @@ describe('ToolExplorer session propagation', () => {
   it('passes the inherited active session slug into the embedded SurveyTool', async () => {
     const sessionConfig = { slug: 'demo', storageProfile: { backend: 'cloudflare' } };
     const questionScanProgress = { slug: 'demo', phase: 'hydrate', discoveredQuestions: 3 };
-    renderToolExplorer({
+    const { container } = renderToolExplorer({
       sessionConfig,
       networkChainId: 84532,
       isResponsesCacheReady: true,
@@ -386,11 +386,13 @@ describe('ToolExplorer session propagation', () => {
         questionResponsesNonce: 7,
         questionScanProgress,
         preventUrlChange: true,
+        toolbarTarget: container.querySelector(`.${styles.expandedHeaderActions}`),
       }),
     );
+    expect(container.querySelector(`.${styles.expandedHeaderRow}`)).toHaveClass(styles.expandedHeaderCompact);
   });
 
-  it('keeps the tooltip beside Back while grouping Groups actions on the opposite side', async () => {
+  it('keeps Groups controls in the compact header and retains its create toggle', async () => {
     const { container } = renderToolExplorer({ activeSessionSlug: 'edge' });
 
     fireEvent.click(screen.getByText('Groups'));
@@ -407,6 +409,8 @@ describe('ToolExplorer session propagation', () => {
     expect(headerLead).toContainElement(screen.getByTestId('mock-explainer'));
     expect(headerActions).toContainElement(screen.getByRole('link', { name: /^View All$/i }));
     expect(headerActions).toContainElement(screen.getByRole('button', { name: /^Create$/i }));
+    expect(headerLead.parentElement).toHaveClass(styles.expandedHeaderCompact);
+    expect(headerActions.nextElementSibling).toContainElement(screen.getByLabelText('Active session'));
 
     expect(mockSBTsPage).toHaveBeenLastCalledWith(
       expect.objectContaining({

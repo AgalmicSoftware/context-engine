@@ -36,7 +36,7 @@ describe('SessionModeProfileField', () => {
       within(decentralizedRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['OpenAI API Key', 'Arweave wallet', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
+    ).toEqual(['OpenAI API Key', 'JWK', 'Ethereum RPC URL', 'Ethereum Gas (TX Fees)']);
     expect(screen.getByText('Session settings and responses are stored in Cloudflare.')).toBeInTheDocument();
     expect(
       screen.getByText(

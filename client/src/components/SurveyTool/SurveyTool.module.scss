@@ -1822,6 +1822,30 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+#surveysRow.explorerToolbar {
+  position: static;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+
+  #dropdownToggle,
+  #filterButton,
+  #showResultsButton,
+  #createSurveyButton {
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0 !important;
+    padding: 10px;
+    font-size: 1rem;
+  }
+}
+
 /* Survey/Question Dropdown item styling */
 .dropdownItem {
   color: var(--ce-color-black) !important;

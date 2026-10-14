@@ -1,6 +1,7 @@
 /** @file SurveySelector.tsx */
 
 import React, { Component } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'reactstrap';
 
 // Styles
@@ -1249,6 +1250,7 @@ export class SurveySelector extends Component<any, any> {
     const isEmbeddedSessionToolbar = Boolean(this.props.embeddedSessionToolbar);
     const toolbarClassName = [
       isEmbeddedSessionToolbar ? styles.embeddedSessionToolbar : '',
+      this.props.toolbarTarget ? styles.explorerToolbar : '',
       isEmbeddedSessionToolbar && !showHeaderSubmitButton ? styles.toolbarWithoutSubmit : '',
     ]
       .filter(Boolean)
@@ -1258,150 +1260,155 @@ export class SurveySelector extends Component<any, any> {
     const filterIconStyle = resolveSurveySelectorFilterIconStyle(isFilterActive);
     const questionDashboardKey = this.getQuestionCountContext().contextKey;
 
+    // Keep the controls and their state in this selector when Explorer provides a header slot.
+    const toolbar = (
+      <div id={styles.surveysRow} className={toolbarClassName || undefined} data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}>
+        <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
+          <DropdownToggle
+            id={styles.dropdownToggle}
+            data-testid={viewMode === 'questions' ? E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE : undefined}
+          >
+            {dropdownTitle}
+            {allowDropdownMenu && <FontAwesomeIcon icon={faCaretDown} id={styles.dropdownToggleCaret} />}
+          </DropdownToggle>
+
+          {allowDropdownMenu && (
+            <DropdownMenu id={styles.dropdownMenu}>
+              <DropdownItem
+                className={buildSurveySelectorDropdownItemClassName(styles, 'questions')}
+                onClick={() => this.selectOption('questions')}
+                active={viewMode === 'questions'}
+              >
+                {this.renderQuestionSelectorLabel({
+                  count: questionSelectorCounts.count,
+                  encryptedCount: questionSelectorCounts.encryptedCount,
+                  showEncryptedCount: selectorDropdownOpen,
+                  showSpinner: questionSelectorLoading,
+                  encryptedCountTestId: selectorDropdownOpen ? E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT : '',
+                })}
+              </DropdownItem>
+
+              {this.props.isSurveyCacheReady ? (
+                <>
+                  {surveys.map((survey: SurveySelectorSurveySummary, index: number) => {
+                    const surveyQuestionsLoaded = this.areSurveySpecificQuestionsLoaded(
+                      survey,
+                      networkID,
+                      parsedQuestionsCache,
+                    );
+                    const surveyDocumentURLs = this.getSurveyDocumentUrls(survey);
+                    const hasDocUrls = surveyDocumentURLs.length > 0;
+                    return (
+                      <DropdownItem
+                        className={buildSurveySelectorDropdownItemClassName(styles, 'survey')}
+                        key={index}
+                        onClick={() => this.selectSurvey(index)}
+                        active={viewMode === 'survey' && selectedSurveyIndex === index}
+                      >
+                        <span className={styles.surveyItemRow}>
+                          <span className={styles.surveyItemTitle}>{survey.title as React.ReactNode}</span>
+                          <span className={styles.surveyItemMeta}>
+                            {viewMode === 'survey' && selectedSurveyIndex === index && !surveyQuestionsLoaded && (
+                              <FontAwesomeIcon icon={faSpinner} spin className={styles.surveyItemSpinner} />
+                            )}
+                            {hasDocUrls && (
+                              <a
+                                href={surveyDocumentURLs[0]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={styles.surveyItemDocLink}
+                                onClick={(e: SurveySelectorStoppableEvent) => e.stopPropagation()}
+                                title={this.getSurveyDocumentLinkTitle(survey)}
+                              >
+                                <FontAwesomeIcon icon={faExternalLinkAlt} />
+                              </a>
+                            )}
+                          </span>
+                        </span>
+                      </DropdownItem>
+                    );
+                  })}
+
+                  {surveys.length === 0 && viewMode === 'survey' && (
+                    <DropdownItem disabled className={styles.dropdownItem}>
+                      No surveys found in cache.
+                    </DropdownItem>
+                  )}
+                </>
+              ) : (
+                <DropdownItem disabled className={styles.dropdownItem}>
+                  Surveys are still loading...
+                </DropdownItem>
+              )}
+            </DropdownMenu>
+          )}
+        </Dropdown>
+
+        {viewMode === 'questions' && (
+          <Button
+            id={styles.filterButton}
+            data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
+            onClick={this.toggleFilterModal}
+            style={filterButtonStyle}
+            aria-label="Filter questions"
+            title="Filter questions"
+          >
+            <FontAwesomeIcon icon={faFilter} id={styles.filterIcon} style={filterIconStyle} />
+            {isFilterActive && (
+              <span id={styles.clearFilterIconSpan} onClick={this.handleClearFilters}>
+                <FontAwesomeIcon icon={faTimes} id={styles.clearFilterIcon} />
+              </span>
+            )}
+          </Button>
+        )}
+
+        <Button onClick={this.toggleShowResults} id={styles.showResultsButton}>
+          Results
+        </Button>
+
+        <button
+          id={styles.createSurveyButton}
+          data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE}
+          onClick={this.toggleCreateMode}
+          style={SURVEY_SELECTOR_CREATE_BUTTON_STYLE}
+        >
+          <FontAwesomeIcon icon={createSurveyIcon} />
+        </button>
+
+        {showHeaderSubmitButton && (
+          <div className={styles.headerSubmitActions}>
+            <button
+              type="button"
+              className={buildSurveySelectorHeaderSubmitButtonClassName(styles)}
+              onClick={this.handleHeaderSubmitClick}
+              title="Submit responses"
+              data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
+              disabled={!!pendingSubmitStats.isSubmitting}
+            >
+              {headerSubmitLabel}
+              {pendingSubmitStats.isSubmitting && (
+                <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
+              )}
+            </button>
+            <button
+              type="button"
+              className={styles.pileIconButton}
+              onClick={this.handleHeaderRevertClick}
+              disabled={!!pendingSubmitStats.isSubmitting}
+              aria-label="Clear pending changes"
+              title="Clear changes"
+              data-ce-control-appearance="frameless"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+
     return (
       <div>
-        <div id={styles.surveysRow} className={toolbarClassName || undefined} data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}>
-          <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
-            <DropdownToggle
-              id={styles.dropdownToggle}
-              data-testid={viewMode === 'questions' ? E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE : undefined}
-            >
-              {dropdownTitle}
-              {allowDropdownMenu && <FontAwesomeIcon icon={faCaretDown} id={styles.dropdownToggleCaret} />}
-            </DropdownToggle>
-
-            {allowDropdownMenu && (
-              <DropdownMenu id={styles.dropdownMenu}>
-                <DropdownItem
-                  className={buildSurveySelectorDropdownItemClassName(styles, 'questions')}
-                  onClick={() => this.selectOption('questions')}
-                  active={viewMode === 'questions'}
-                >
-                  {this.renderQuestionSelectorLabel({
-                    count: questionSelectorCounts.count,
-                    encryptedCount: questionSelectorCounts.encryptedCount,
-                    showEncryptedCount: selectorDropdownOpen,
-                    showSpinner: questionSelectorLoading,
-                    encryptedCountTestId: selectorDropdownOpen ? E2E_TESTIDS.SURVEY_QUESTIONS_ENCRYPTED_COUNT : '',
-                  })}
-                </DropdownItem>
-
-                {this.props.isSurveyCacheReady ? (
-                  <>
-                    {surveys.map((survey: SurveySelectorSurveySummary, index: number) => {
-                      const surveyQuestionsLoaded = this.areSurveySpecificQuestionsLoaded(
-                        survey,
-                        networkID,
-                        parsedQuestionsCache,
-                      );
-                      const surveyDocumentURLs = this.getSurveyDocumentUrls(survey);
-                      const hasDocUrls = surveyDocumentURLs.length > 0;
-                      return (
-                        <DropdownItem
-                          className={buildSurveySelectorDropdownItemClassName(styles, 'survey')}
-                          key={index}
-                          onClick={() => this.selectSurvey(index)}
-                          active={viewMode === 'survey' && selectedSurveyIndex === index}
-                        >
-                          <span className={styles.surveyItemRow}>
-                            <span className={styles.surveyItemTitle}>{survey.title as React.ReactNode}</span>
-                            <span className={styles.surveyItemMeta}>
-                              {viewMode === 'survey' && selectedSurveyIndex === index && !surveyQuestionsLoaded && (
-                                <FontAwesomeIcon icon={faSpinner} spin className={styles.surveyItemSpinner} />
-                              )}
-                              {hasDocUrls && (
-                                <a
-                                  href={surveyDocumentURLs[0]}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={styles.surveyItemDocLink}
-                                  onClick={(e: SurveySelectorStoppableEvent) => e.stopPropagation()}
-                                  title={this.getSurveyDocumentLinkTitle(survey)}
-                                >
-                                  <FontAwesomeIcon icon={faExternalLinkAlt} />
-                                </a>
-                              )}
-                            </span>
-                          </span>
-                        </DropdownItem>
-                      );
-                    })}
-
-                    {surveys.length === 0 && viewMode === 'survey' && (
-                      <DropdownItem disabled className={styles.dropdownItem}>
-                        No surveys found in cache.
-                      </DropdownItem>
-                    )}
-                  </>
-                ) : (
-                  <DropdownItem disabled className={styles.dropdownItem}>
-                    Surveys are still loading...
-                  </DropdownItem>
-                )}
-              </DropdownMenu>
-            )}
-          </Dropdown>
-
-          {viewMode === 'questions' && (
-            <Button
-              id={styles.filterButton}
-              data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
-              onClick={this.toggleFilterModal}
-              style={filterButtonStyle}
-              aria-label="Filter questions"
-              title="Filter questions"
-            >
-              <FontAwesomeIcon icon={faFilter} id={styles.filterIcon} style={filterIconStyle} />
-              {isFilterActive && (
-                <span id={styles.clearFilterIconSpan} onClick={this.handleClearFilters}>
-                  <FontAwesomeIcon icon={faTimes} id={styles.clearFilterIcon} />
-                </span>
-              )}
-            </Button>
-          )}
-
-          <Button onClick={this.toggleShowResults} id={styles.showResultsButton}>
-            Results
-          </Button>
-
-          <button
-            id={styles.createSurveyButton}
-            data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE}
-            onClick={this.toggleCreateMode}
-            style={SURVEY_SELECTOR_CREATE_BUTTON_STYLE}
-          >
-            <FontAwesomeIcon icon={createSurveyIcon} />
-          </button>
-
-          {showHeaderSubmitButton && (
-            <div className={styles.headerSubmitActions}>
-              <button
-                type="button"
-                className={buildSurveySelectorHeaderSubmitButtonClassName(styles)}
-                onClick={this.handleHeaderSubmitClick}
-                title="Submit responses"
-                data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-                disabled={!!pendingSubmitStats.isSubmitting}
-              >
-                {headerSubmitLabel}
-                {pendingSubmitStats.isSubmitting && (
-                  <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
-                )}
-              </button>
-              <button
-                type="button"
-                className={styles.pileIconButton}
-                onClick={this.handleHeaderRevertClick}
-                disabled={!!pendingSubmitStats.isSubmitting}
-                aria-label="Clear pending changes"
-                title="Clear changes"
-                data-ce-control-appearance="frameless"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            </div>
-          )}
-        </div>
+        {this.props.toolbarTarget ? createPortal(toolbar, this.props.toolbarTarget) : toolbar}
 
         {/* Create survey */}
         {createSurveyMode && (

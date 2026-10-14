@@ -10,6 +10,7 @@ import {
 } from './SurveySelector';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 const syncClassSetState = (subject: any) => {
   subject.setState = jest.fn((next: any, cb?: () => void) => {
@@ -174,6 +175,40 @@ describe('SurveySelector display guards', () => {
     expect(toolbar).toBeTruthy();
     expect(nodeHasClassName(toolbar, styles.embeddedSessionToolbar)).toBe(true);
     expect(nodeHasClassName(toolbar, styles.toolbarWithoutSubmit)).toBe(true);
+  });
+
+  it('places one live toolbar in the Explorer header without moving its state ownership', () => {
+    const toolbarTarget = document.createElement('div');
+    document.body.appendChild(toolbarTarget);
+    const subject = new SurveySelector({
+      toolbarTarget,
+      preventUrlChange: true,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 11155420 },
+    });
+    syncClassSetState(subject);
+    subject.state = { ...subject.state, loading: false };
+    const getToolbarPortal = () => findElement(subject.render(), (node) => node?.containerInfo === toolbarTarget);
+    expect(getToolbarPortal()).toBeTruthy();
+    const rendered = render(getToolbarPortal());
+
+    expect(screen.getAllByTestId(E2E_TESTIDS.SURVEY_TOOLBAR)).toHaveLength(1);
+    expect(toolbarTarget).toContainElement(screen.getByTestId(E2E_TESTIDS.SURVEY_TOOLBAR));
+    expect(rendered.container).toBeEmptyDOMElement();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_CREATE_TOGGLE));
+    expect(subject.state.createSurveyMode).toBe(true);
+    rendered.rerender(getToolbarPortal());
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_CREATE_TOGGLE));
+    expect(subject.state.createSurveyMode).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Filter questions' }));
+    expect(subject.state.filterModalOpen).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Results' }));
+    expect(subject.state.showResults).toBe(true);
+
+    rendered.unmount();
+    expect(toolbarTarget).toBeEmptyDOMElement();
+    toolbarTarget.remove();
   });
 
   it('renders the SurveySelector header submit CTA with submitGlow when pending edits exist', () => {

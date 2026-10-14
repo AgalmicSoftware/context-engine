@@ -78,6 +78,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const [expandedComponent, setExpandedComponent] = useState<ExpandedComponentState>(null);
   const [createGroupSessionSlug, setCreateGroupSessionSlug] = useState<string | null>(null);
   const [dataToolMode, setDataToolMode] = useState('add');
+  const [questionsToolbarTarget, setQuestionsToolbarTarget] = useState<HTMLDivElement | null>(null);
   const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
   const demoSurfaceEnabled = props.demoSurfaceMode !== false;
@@ -167,6 +168,8 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
 
   const expandedToolName = expandedComponent?.data?.name || '';
   const showGroupsHeaderActions = expandedToolName === 'Groups';
+  const showQuestionsHeaderActions = expandedToolName === 'Questions';
+  const useCompactExpandedHeader = showGroupsHeaderActions || showQuestionsHeaderActions;
   const showDataHeaderActions = expandedToolName === 'Context';
   const expandedDemoCard = expandedComponent?.data?.status === 'future';
   const selectedDataSessionSlug = useMemo(
@@ -269,6 +272,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         ...(expandedToolName === 'Questions'
           ? {
               preventUrlChange: true,
+              toolbarTarget: questionsToolbarTarget,
             }
           : {}),
         ...(expandedToolName === 'Debate Map'
@@ -301,6 +305,22 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       }
     : null;
 
+  const expandedHeaderSession = (
+    <div className={styles.expandedHeaderSession}>
+      <ToolExplorerSessionControl
+        activeSessionSlug={showDataHeaderActions ? selectedDataSessionSlug : activeSessionSlug}
+        sessionConfig={
+          showDataHeaderActions
+            ? resolveToolSessionConfig(selectedDataSessionSlug, props.sessionConfig)
+            : activeSessionConfig
+        }
+        inheritedSessionSlug={showDataHeaderActions ? activeSessionSlug : undefined}
+        onUseInheritedSession={showDataHeaderActions ? resetDataSessionSelection : undefined}
+        onChange={showDataHeaderActions ? handleDataSessionSelect : handleActiveSessionChange}
+      />
+    </div>
+  );
+
   return (
     <>
       {showDemoCards ? (
@@ -318,7 +338,9 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       <Container className={`${styles.explorerContainer} ${useSparseGrid ? styles.explorerContainerSparse : ''}`}>
         {expandedComponent ? (
           <div className={styles.breadcrumbContainer}>
-            <div className={styles.expandedHeaderRow}>
+            <div
+              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''}`}
+            >
               <div className={styles.expandedHeaderLead}>
                 <button
                   type="button"
@@ -336,21 +358,12 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                 </div>
               </div>
 
-              <div className={styles.expandedHeaderSession}>
-                <ToolExplorerSessionControl
-                  activeSessionSlug={showDataHeaderActions ? selectedDataSessionSlug : activeSessionSlug}
-                  sessionConfig={
-                    showDataHeaderActions
-                      ? resolveToolSessionConfig(selectedDataSessionSlug, props.sessionConfig)
-                      : activeSessionConfig
-                  }
-                  inheritedSessionSlug={showDataHeaderActions ? activeSessionSlug : undefined}
-                  onUseInheritedSession={showDataHeaderActions ? resetDataSessionSelection : undefined}
-                  onChange={showDataHeaderActions ? handleDataSessionSelect : handleActiveSessionChange}
-                />
-              </div>
+              {!useCompactExpandedHeader && expandedHeaderSession}
 
-              <div className={styles.expandedHeaderActions}>
+              <div
+                className={styles.expandedHeaderActions}
+                ref={showQuestionsHeaderActions ? setQuestionsToolbarTarget : undefined}
+              >
                 {showGroupsHeaderActions && (
                   <>
                     <a
@@ -406,6 +419,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                   </a>
                 )}
               </div>
+              {useCompactExpandedHeader && expandedHeaderSession}
             </div>
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>

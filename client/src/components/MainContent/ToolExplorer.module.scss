@@ -468,6 +468,51 @@
   }
 }
 
+.expandedHeaderCompact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  .expandedHeaderLead {
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .expandedHeaderMeta {
+    min-height: 44px;
+  }
+
+  .headerActionButton {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 1rem;
+  }
+
+  .expandedHeaderActions {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .expandedHeaderSession {
+    flex: 1 1 210px;
+    width: auto;
+    max-width: 320px;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .expandedHeaderCompact .expandedHeaderSession {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
 // File: ToolExplorerPluginExplainer.tsx
 
 .title {

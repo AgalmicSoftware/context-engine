@@ -11,6 +11,33 @@ export async function inspectCivicExplorerContent(page) {
     await back.waitFor({ state: 'visible' });
     const control = page.getByTestId('ce-tool-explorer-active-session');
     await control.waitFor({ state: 'visible' });
+    if (name === 'Questions' || name === 'Groups') {
+      const action = page.getByTestId(name === 'Questions' ? 'ce-survey-toolbar' : 'ce-sbts-create-toggle');
+      await action.waitFor({ state: 'visible' });
+      assert.equal(await action.count(), 1, `${name}: only one action toolbar is mounted`);
+      const layout = await action.evaluate((element) => {
+        const row = element.closest('[class*="expandedHeaderRow_"]');
+        const rowRect = row?.getBoundingClientRect();
+        const regions = row ? Array.from(row.children).filter((child) => child.getBoundingClientRect().width > 0) : [];
+        return {
+          inHeader: Boolean(row),
+          viewport: innerWidth,
+          fits: Boolean(rowRect) && regions.every((child) => {
+            const rect = child.getBoundingClientRect();
+            return rect.left >= rowRect.left - 1 && rect.right <= rowRect.right + 1;
+          }),
+          centers: regions.map((child) => {
+            const rect = child.getBoundingClientRect();
+            return rect.top + rect.height / 2;
+          }),
+        };
+      });
+      assert(layout.inHeader, `${name}: actions share the Explorer header`);
+      assert(layout.fits, `${name}: wrapped header regions stay within the available width`);
+      if (layout.viewport >= 1100) {
+        assert(Math.max(...layout.centers) - Math.min(...layout.centers) < 2, `${name}: roomy desktop controls share one row`);
+      }
+    }
     const header = await control.evaluate((element) => {
       const wrapper = element.closest('[class*="expandedHeaderSession_"]');
       const row = wrapper?.closest('[class*="expandedHeaderRow_"]');
