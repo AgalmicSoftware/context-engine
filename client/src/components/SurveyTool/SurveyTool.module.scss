@@ -7248,3 +7248,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1;
   }
 }
+
+@media (min-width: 641px) {
+  .pileNavCounterText {
+    font-size: 1.125rem;
+  }
+}
