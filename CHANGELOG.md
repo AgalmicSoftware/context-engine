@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Route Context dictation and AI rewrite through the selected session's Worker,
+  including local session changes and returning to the global default.
 - Keep Back and Session above one Groups action row containing View All, Create,
   and Refresh.
 - Restore the Questions toolbar as a full-width bordered panel with evenly

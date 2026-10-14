@@ -10,12 +10,79 @@ import {
   makeSessionConfig,
   mockDocumentLibraryPanel,
   mockCorpusViewer,
+  mockAudioInput,
+  mockGetSessionConfigBySlug,
+  setAudioInputValue,
   getMockCorpusViewerModuleLoadCount,
   setupAudioSurveyGeneratorTestLifecycle,
 } from './AudioSurveyGenerator.testUtils';
 
 describe('AudioSurveyGenerator explorer view and session selector', () => {
   setupAudioSurveyGeneratorTestLifecycle();
+
+  it('routes voice input through the selected Context session and restores the global Worker on reset', async () => {
+    const provider = {};
+    const globalConfig = makeSessionConfig({ slug: 'edge', corsWorkerUrl: 'https://global.example' });
+    const localConfig = makeSessionConfig({ slug: 'rxc', corsWorkerUrl: 'https://context.example' });
+    mockGetSessionConfigBySlug.mockImplementation((slug) => (slug === 'rxc' ? localConfig : {}));
+    const renderContext = (sessionOverrideSlug, sessionOverrideTouched) =>
+      renderSubject(
+        <AudioSurveyGenerator
+          provider={provider}
+          account="0x123"
+          network={{ id: 11155420 }}
+          activeSessionSlug="edge"
+          sessionConfig={globalConfig}
+          sessionOverrideSlug={sessionOverrideSlug}
+          sessionOverrideTouched={sessionOverrideTouched}
+          hideInternalSessionSelector
+        />,
+      );
+    const expectVoiceSession = (slug, corsWorkerUrl) => {
+      expect(mockAudioInput).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionSlug: slug,
+          sessionConfig: expect.objectContaining({ slug, ...(corsWorkerUrl ? { corsWorkerUrl } : {}) }),
+          context: { account: '0x123', providerLike: provider, chainId: 11155420 },
+        }),
+      );
+      expect(mockAudioInput.mock.calls.at(-1)[0].sessionConfig.corsWorkerUrl).toBe(corsWorkerUrl);
+    };
+
+    await renderContext(null, false);
+    expectVoiceSession('edge', 'https://global.example');
+    setAudioInputValue('Keep this draft while switching sessions.');
+    await renderContext('rxc', true);
+    expectVoiceSession('rxc', 'https://context.example');
+    expect(container.querySelector('textarea').value).toBe('Keep this draft while switching sessions.');
+    await renderContext('no-worker', true);
+    expectVoiceSession('no-worker', undefined);
+    await renderContext(null, false);
+    expectVoiceSession('edge', 'https://global.example');
+  });
+
+  it('updates voice input when the standalone session selector changes', async () => {
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      makeSessionConfig({
+        slug,
+        corsWorkerUrl: `https://${slug}.example`,
+      }),
+    );
+    await renderSubject(
+      <AudioSurveyGenerator
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({ slug: 'edge', corsWorkerUrl: 'https://edge.example' })}
+      />,
+    );
+    toggleCheckbox(container.querySelector('[data-testid="ce-database-session-selector-toggle"]'));
+    toggleCheckbox(container.querySelector('[data-testid="ce-database-session-chip-rxc"]'));
+    expect(mockAudioInput).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'rxc',
+        sessionConfig: expect.objectContaining({ slug: 'rxc', corsWorkerUrl: 'https://rxc.example' }),
+      }),
+    );
+  });
 
   it('defers loading the demo corpus module until explorer view renders it', async () => {
     expect(getMockCorpusViewerModuleLoadCount()).toBe(0);
