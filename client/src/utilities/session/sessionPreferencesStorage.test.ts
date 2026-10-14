@@ -1,6 +1,8 @@
 import { DEFAULT_DEMO_SURFACE_MODE } from '../../variables/appConfig.js';
 import {
   persistDemoSurfaceMode,
+  persistPileAutoAdvanceEnabled,
+  readStoredPileAutoAdvanceEnabled,
   persistTooltipsEnabled,
   normalizeTooltipsEnabled,
   readStoredDemoSurfaceMode,
@@ -57,5 +59,29 @@ describe('sessionPreferencesStorage', () => {
 
     expect(readStoredDemoSurfaceMode()).toBe(DEFAULT_DEMO_SURFACE_MODE);
     expect(readStoredTooltipsEnabled()).toBe(true);
+  });
+});
+
+describe('pile auto-advance storage', () => {
+  afterEach(() => {
+    localStorage.clear();
+    jest.restoreAllMocks();
+  });
+  it.each([null, '{bad', 'null', '"false"', 'true'])('defaults to on for %s', (stored) => {
+    localStorage.clear();
+    if (stored !== null) localStorage.setItem('ce:pileAutoAdvanceEnabled', stored);
+    expect(readStoredPileAutoAdvanceEnabled()).toBe(true);
+  });
+  it('persists an explicit opt-out and tolerates unavailable storage', () => {
+    persistPileAutoAdvanceEnabled(false);
+    expect(readStoredPileAutoAdvanceEnabled()).toBe(false);
+    jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('unavailable');
+    });
+    jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('unavailable');
+    });
+    expect(readStoredPileAutoAdvanceEnabled()).toBe(true);
+    expect(() => persistPileAutoAdvanceEnabled(false)).not.toThrow();
   });
 });

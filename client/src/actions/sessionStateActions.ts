@@ -3,6 +3,7 @@ import {
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
+  TOGGLE_PILE_AUTO_ADVANCE,
   SET_DEMO_SURFACE_MODE,
   LOGIN_IN_PROGRESS,
   TOGGLE_DEMO_MODE,
@@ -72,6 +73,10 @@ export const toggleLoginModal =
       payload: modalIsOpen,
     });
   };
+
+export const togglePileAutoAdvance = (): SessionStateThunk => (dispatch) => {
+  dispatch({ type: TOGGLE_PILE_AUTO_ADVANCE });
+};
 
 export const toggleTooltips = (): SessionStateThunk => (dispatch) => {
   dispatch({

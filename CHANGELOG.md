@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Advance the question pile after binary and single-choice answers, with a saved
+  Auto-advance setting that defaults to On. Keep manual navigation available.
 - Keep the active session selection consistent across Stats, account settings,
   Questions, Groups, and Context. Add a session filter to user details and link
   question rows directly to their session report.

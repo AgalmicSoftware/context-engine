@@ -29,6 +29,7 @@ export const LoginSettingsConfigToggleControl = ({
 
 export const LoginSettingsControlRow = ({
   afterDemo = null,
+  autoAdvanceControl = null,
   beforeConfig = null,
   betweenSessionAndTooltips = null,
   configOpen = false,
@@ -44,6 +45,7 @@ export const LoginSettingsControlRow = ({
   tooltipsControl = null,
 }: {
   afterDemo?: React.ReactNode;
+  autoAdvanceControl?: React.ReactNode;
   beforeConfig?: React.ReactNode;
   betweenSessionAndTooltips?: React.ReactNode;
   configOpen?: boolean;
@@ -79,6 +81,7 @@ export const LoginSettingsControlRow = ({
             </div>
           ))}
         </div>
+        {autoAdvanceControl}
         {themeControl ? <div className={styles.settingsThemeQuickSlot}>{themeControl}</div> : null}
         {betweenSessionAndTooltips}
         {afterDemo}
@@ -97,6 +100,7 @@ export const LoginSettingsControlRow = ({
         {demoControl}
         {afterDemo}
       </div>
+      {autoAdvanceControl}
     </div>
   );
 };

@@ -39,3 +39,18 @@ export const persistTooltipsEnabled = (value: boolean): void => {
     localStorage.setItem(TOOLTIPS_ENABLED_STORAGE_KEY, JSON.stringify(normalizeTooltipsEnabled(value)));
   } catch (_) {}
 };
+
+// Only an explicit opt-out disables automatic navigation for existing users.
+export const readStoredPileAutoAdvanceEnabled = (): boolean => {
+  try {
+    return JSON.parse(localStorage.getItem('ce:pileAutoAdvanceEnabled') || 'true') !== false;
+  } catch (_) {
+    return true;
+  }
+};
+
+export const persistPileAutoAdvanceEnabled = (value: boolean): void => {
+  try {
+    localStorage.setItem('ce:pileAutoAdvanceEnabled', JSON.stringify(value !== false));
+  } catch (_) {}
+};

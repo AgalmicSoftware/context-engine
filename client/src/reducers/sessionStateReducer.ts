@@ -3,6 +3,7 @@ import {
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
+  TOGGLE_PILE_AUTO_ADVANCE,
   SET_DEMO_SURFACE_MODE,
   LOGIN_IN_PROGRESS,
   TOGGLE_DEMO_MODE,
@@ -21,6 +22,8 @@ import {
   persistTooltipsEnabled,
   readStoredDemoSurfaceMode,
   readStoredTooltipsEnabled,
+  readStoredPileAutoAdvanceEnabled,
+  persistPileAutoAdvanceEnabled,
 } from '../utilities/session/sessionPreferencesStorage.js';
 import { hasOwn } from '../utilities/shared/primitives.js';
 
@@ -43,6 +46,7 @@ export interface SessionState {
   afterLoginModalToggled: boolean;
   onboardingStep: number | null;
   tooltipsEnabled: boolean;
+  pileAutoAdvanceEnabled: boolean;
 }
 
 type SessionSelectionPayload = {
@@ -63,6 +67,7 @@ type SessionReducerAction =
   | { type: typeof CHANGE_FOCUSED_TAB; payload?: SessionState['focusedTab'] }
   | { type: typeof TOGGLE_LOGIN_MODAL; payload?: LoginModalPayload }
   | { type: typeof TOGGLE_TOOLTIPS }
+  | { type: typeof TOGGLE_PILE_AUTO_ADVANCE }
   | { type: typeof SET_DEMO_SURFACE_MODE; payload?: unknown }
   | { type: typeof LOGIN_IN_PROGRESS; payload?: LoginProgressPayload }
   | { type: typeof TOGGLE_DEMO_MODE; payload?: DemoModePayload }
@@ -90,6 +95,7 @@ const getInitialState = (): SessionState => ({
   afterLoginModalToggled: false,
   onboardingStep: null,
   tooltipsEnabled: readStoredTooltipsEnabled(),
+  pileAutoAdvanceEnabled: readStoredPileAutoAdvanceEnabled(),
 });
 
 const resolvePrimarySessionExplicitInput = (
@@ -137,6 +143,7 @@ export default function sessionStateReducer(
             : {}),
           demoSurfaceMode: readStoredDemoSurfaceMode(),
           tooltipsEnabled: readStoredTooltipsEnabled(),
+          pileAutoAdvanceEnabled: readStoredPileAutoAdvanceEnabled(),
         };
       }
     case CHANGE_FOCUSED_TAB:
@@ -236,6 +243,11 @@ export default function sessionStateReducer(
         ...state,
         onboardingStep: action.payload as SessionState['onboardingStep'],
       };
+    case TOGGLE_PILE_AUTO_ADVANCE: {
+      const pileAutoAdvanceEnabled = state.pileAutoAdvanceEnabled === false;
+      persistPileAutoAdvanceEnabled(pileAutoAdvanceEnabled);
+      return { ...state, pileAutoAdvanceEnabled };
+    }
     case TOGGLE_TOOLTIPS: {
       const nextTooltipsEnabled = !state.tooltipsEnabled;
       persistTooltipsEnabled(nextTooltipsEnabled);

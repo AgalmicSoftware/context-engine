@@ -451,7 +451,14 @@ const renderPileDeckWindow = ({
     const status = resolvePileCardStatusClassName(styles, offset);
 
     return (
-      <div key={q.id} className={buildPileCardClassName(styles, status)}>
+      <div
+        key={q.id}
+        className={buildPileCardClassName(styles, status)}
+        data-testid={offset === 0 ? 'ce-pile-active-question' : undefined}
+        tabIndex={offset === 0 ? -1 : undefined}
+        role={offset === 0 ? 'group' : undefined}
+        aria-label={offset === 0 ? `Question ${idx + 1} of ${pileQuestions.length}` : undefined}
+      >
         {offset === 0 ? renderActiveQuestion(q) : <div className={styles.pileCardInner}></div>}
       </div>
     );
