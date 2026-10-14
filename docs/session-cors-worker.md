@@ -1061,7 +1061,10 @@ referenced group appears, including when the participant belongs to other groups
 in the owning session. In OnePageSession, opening a card expands its details
 inside the Groups section without changing the URL or opening a tab. Back to
 Groups restores the compact card and keyboard focus. Standalone group links
-still open the dedicated detail page. The local collection's duplicate loading
+still open the dedicated detail page. Links include the owning `sessionSlug`
+(`/group/<groupId>?sessionSlug=<slug>&worker=<origin>`), so another active session
+does not change the group being opened. Legacy `sessionName` links remain valid.
+Session-wide member visibility names that session and its slug in the detail view. The local collection's duplicate loading
 and empty notices are omitted when linked groups are configured; loading errors remain
 visible. Linked-session verification and group discovery use the same readable
 “Loading groups…” notice. Full group details use a compact logo/header and place the membership

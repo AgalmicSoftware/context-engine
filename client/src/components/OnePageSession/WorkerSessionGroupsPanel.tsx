@@ -454,6 +454,7 @@ const WorkerSessionGroupsPanel = ({
           sessionConfig={sessionConfig}
           sessionId={canonicalSessionId}
           sessionSlug={canonicalSessionSlug}
+          sessionName={activeSessionName}
           refreshNonce={groupsRevision + refreshNonce}
           selectedGroupId={selectedGroupId}
           groupIdFilter={groupIdFilter}

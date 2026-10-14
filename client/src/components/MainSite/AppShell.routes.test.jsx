@@ -3039,12 +3039,15 @@ describe('AppShell route render smoke', () => {
   });
 
   it.each([
-    ['/group/participants', false],
-    ['/groups', false],
-    ['/group/participants', true],
-    ['/groups', true],
-    ['/sbts/group-worker', true],
-  ])('discovers the exact Worker session on %s (cached hint: %s)', async (path, cachedHint) => {
+    ['/group/participants', false, 'sessionName'],
+    ['/groups', false, 'sessionName'],
+    ['/group/participants', true, 'sessionName'],
+    ['/groups', true, 'sessionName'],
+    ['/sbts/group-worker', true, 'sessionName'],
+    ['/group/participants', false, 'sessionSlug'],
+    ['/group/participants', true, 'sessionSlug'],
+    ['/groups', false, 'sessionSlug'],
+  ])('discovers the exact Worker session on %s (cached hint: %s, query: %s)', async (path, cachedHint, queryKey) => {
     const workerOrigin = 'https://group-worker.example.com';
     const workerConfig = {
       slug: 'group-worker',
@@ -3071,7 +3074,8 @@ describe('AppShell route render smoke', () => {
     );
     const subject = createSubject({
       path,
-      search: `?sessionName=${workerConfig.slug}${cachedHint ? '' : `&worker=${encodeURIComponent(workerOrigin)}`}`,
+      search: `?${queryKey}=${workerConfig.slug}${cachedHint ? '' : `&worker=${encodeURIComponent(workerOrigin)}`}`,
+      activeSessionSlug: 'other-session',
       sessionConfig: null,
     });
     const view = render(subject.render());

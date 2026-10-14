@@ -332,7 +332,7 @@ describe('SBTsPage auto-feature flag', () => {
 
     expect(mockSBTsList).not.toHaveBeenCalled();
     expect(window.location.pathname).toBe('/group/public-reviewers');
-    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.search).toBe('?sessionSlug=demo-sh');
     expect(window.location.hash).toBe('');
     expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -378,7 +378,7 @@ describe('SBTsPage auto-feature flag', () => {
     );
 
     expect(window.location.pathname).toBe('/groups');
-    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.search).toBe('?sessionSlug=demo-sh');
     expect(window.location.hash).toBe(`#group-${legacyAddressGroupId}`);
     expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -392,50 +392,58 @@ describe('SBTsPage auto-feature flag', () => {
     );
   });
 
-  it('renders the canonical Worker detail route from its path group id and session query', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
-    const workerSessionConfig = {
-      slug: 'demo-sh',
-      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
-      sessionName: 'Demo Session',
-      groupCreationPolicy: 'participants',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
-    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    getDemoSessionConfigBySlug.mockImplementation((slug) =>
-      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
-    );
-    window.history.replaceState({}, '', '/group/public-reviewers?sessionName=demo-sh');
-
-    render(
-      <SBTsPage
-        provider="wagmi"
-        network={null}
-        account=""
-        loginComplete={false}
-        toggleLoginModal={jest.fn()}
-        isSBTCacheReady={false}
-        sessionSlug="demo-sh"
-        sessionConfig={null}
-        workerGroupId="public-reviewers"
-      />,
-    );
-
-    expect(window.location.pathname).toBe('/group/public-reviewers');
-    expect(window.location.search).toBe('?sessionName=demo-sh');
-    expect(window.location.hash).toBe('');
-    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        createOnly: false,
-        selectedGroupId: 'public-reviewers',
-        sessionConfig: workerSessionConfig,
+  it.each(['sessionSlug', 'sessionName'])(
+    'opens and canonicalizes the owning Worker detail session from %s while another session is active',
+    (queryKey) => {
+      const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+      const workerSessionConfig = {
+        slug: 'demo-sh',
+        sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
         sessionName: 'Demo Session',
-        sessionSlug: 'demo-sh',
-        showCreate: false,
-      }),
-    );
-  });
+        groupCreationPolicy: 'participants',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      };
+      contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+      contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+      getDemoSessionConfigBySlug.mockImplementation((slug) =>
+        String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+      );
+      window.history.replaceState(
+        {},
+        '',
+        `/group/public-reviewers?${queryKey}=demo-sh&worker=https%3A%2F%2Fworker.example&tab=members`,
+      );
+
+      render(
+        <SBTsPage
+          provider="wagmi"
+          network={null}
+          account=""
+          loginComplete={false}
+          toggleLoginModal={jest.fn()}
+          isSBTCacheReady={false}
+          sessionSlug="other-session"
+          activeSessionSlug="other-session"
+          sessionConfig={null}
+          workerGroupId="public-reviewers"
+        />,
+      );
+
+      expect(window.location.pathname).toBe('/group/public-reviewers');
+      expect(window.location.search).toBe('?sessionSlug=demo-sh&worker=https%3A%2F%2Fworker.example&tab=members');
+      expect(window.location.hash).toBe('');
+      expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          createOnly: false,
+          selectedGroupId: 'public-reviewers',
+          sessionConfig: workerSessionConfig,
+          sessionName: 'Demo Session',
+          sessionSlug: 'demo-sh',
+          showCreate: false,
+        }),
+      );
+    },
+  );
 
   it('fails closed instead of re-resolving a mismatched explicit standalone session config', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');

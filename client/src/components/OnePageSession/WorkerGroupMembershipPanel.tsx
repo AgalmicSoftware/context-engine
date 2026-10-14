@@ -49,6 +49,7 @@ export type WorkerGroupMembershipPanelProps = {
   sessionConfig?: unknown;
   sessionId?: string;
   sessionSlug?: string;
+  sessionName?: string;
   allowAnonymousGroupDiscovery?: boolean;
   onSignIn?: (groupId?: string) => void;
   joinAfterSignInGroupId?: string;
@@ -141,6 +142,7 @@ type WorkerGroupDetailViewProps = {
   onOpenMembers: () => void;
   onBack?: () => void;
   sessionConfig: unknown;
+  sessionName: string;
   sessionSlug: string;
   workerToken: string;
   workerUrl: string;
@@ -159,11 +161,13 @@ const WorkerGroupDetailView = ({
   onLoadMoreMembers,
   onOpenMembers,
   onBack,
+  sessionName,
   sessionConfig,
   sessionSlug,
   workerToken,
   workerUrl,
 }: WorkerGroupDetailViewProps) => {
+  const sessionLabel = sessionName && sessionName !== sessionSlug ? `${sessionName} (${sessionSlug})` : sessionSlug;
   const moreInfoId = `worker-group-more-info-${React.useId().replace(/:/g, '')}`;
   const safeGroupId = group.groupId.replace(/[^a-zA-Z0-9_-]/g, '-');
   const titleId = `worker-group-detail-${safeGroupId}-title`;
@@ -307,9 +311,13 @@ const WorkerGroupDetailView = ({
                 <span className={sbtPageStyles.label}>Join policy:</span>
                 <span>{group.joinMode === 'open' ? 'Open to participants' : 'Admin adds members'}</span>
               </p>
-              <p>
+              <p className={styles.workerGroupVisibility} data-testid="ce-worker-group-member-visibility">
                 <span className={sbtPageStyles.label}>Member visibility:</span>
-                <span>{group.memberVisibility.replace(/_/g, ' ')}</span>
+                <span>
+                  {group.memberVisibility === 'session'
+                    ? `Session: ${sessionLabel}`
+                    : group.memberVisibility.replace(/_/g, ' ')}
+                </span>
               </p>
               {group.adminAddress ? (
                 <p>
@@ -399,6 +407,7 @@ const WorkerGroupMembershipPanel = ({
   sessionConfig = null,
   sessionId: sessionIdProp = '',
   sessionSlug: sessionSlugProp = '',
+  sessionName = '',
   allowAnonymousGroupDiscovery = false,
   onSignIn,
   joinAfterSignInGroupId = '',
@@ -917,6 +926,7 @@ const WorkerGroupMembershipPanel = ({
             isActive={selectedGroup.joinMode === 'open' && !groupJoinHasEnded(selectedGroup)}
             memberListState={activeMemberListState}
             sessionConfig={sessionConfig}
+            sessionName={sessionName.trim()}
             sessionSlug={sessionSlug}
             workerToken={workerToken}
             workerUrl={workerUrl}

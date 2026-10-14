@@ -472,7 +472,8 @@ describe('SBTsList card rendering and navigation', () => {
     await waitFor(() => {
       const query = new URLSearchParams(window.location.search);
       expect(window.location.pathname).toBe('/groups');
-      expect(query.get('sessionName')).toBe('alpha');
+      expect(query.get('sessionSlug')).toBe('alpha');
+      expect(query.has('sessionName')).toBe(false);
       expect(query.get('view')).toBe('public');
     });
     fireEvent.click(createGroupButton);

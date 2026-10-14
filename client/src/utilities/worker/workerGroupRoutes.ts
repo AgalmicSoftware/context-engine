@@ -34,9 +34,16 @@ export const buildWorkerGroupsPath = ({
   if (!slug) return `${path}${hash}`;
 
   const params = new URLSearchParams();
-  params.set('sessionName', slug);
+  params.set('sessionSlug', slug);
   if (workerUrl) params.set('worker', parseSessionWorkerDiscoveryOrigin(workerUrl));
   return `${path}?${params.toString()}${hash}`;
+};
+
+// Older shared links called the slug "sessionName". An explicit slug wins
+// when both are present, so stale display names cannot change a group's owner.
+export const readWorkerGroupSessionSlugFromSearch = (search: unknown): string => {
+  const params = new URLSearchParams(String(search || ''));
+  return canonicalizeSessionSlug(params.get('sessionSlug') ?? params.get('sessionName') ?? '');
 };
 
 export const readWorkerGroupIdFromHash = (hash: unknown): string => {

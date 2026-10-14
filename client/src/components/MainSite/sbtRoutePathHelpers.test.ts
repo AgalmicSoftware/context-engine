@@ -98,3 +98,12 @@ it.each([
 ])('does not extract a user from an unrelated or noncanonical path: %s', (path) => {
   expect(getUserAddressFromPath(path, { isAddress })).toBeNull();
 });
+
+it.each(['/groups', '/sbts', '/group/shared-group'])(
+  'prefers the explicit session slug over the legacy query on %s',
+  (path) => {
+    expect(
+      getSbtListRouteSessionSlug(path, { normalizeSessionSlug, search: '?sessionSlug=Owner&sessionName=Other' }),
+    ).toBe('owner');
+  },
+);

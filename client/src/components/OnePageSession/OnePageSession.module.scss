@@ -602,6 +602,16 @@
   }
 }
 
+.workerGroupVisibility {
+  flex-wrap: wrap;
+  row-gap: 4px;
+
+  > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 .workerGroupDetailDescription {
   font-family: var(--ce-font-body);
 

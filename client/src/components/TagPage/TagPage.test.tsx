@@ -240,7 +240,7 @@ describe('Tag Explorer Worker groups', () => {
       expect.objectContaining({
         kind: 'worker',
         address: 'public-reviewers',
-        href: '/group/public-reviewers?sessionName=worker-session',
+        href: '/group/public-reviewers?sessionSlug=worker-session',
         name: 'Public reviewers',
         networkId: 'worker',
       }),
