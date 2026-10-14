@@ -1,4 +1,5 @@
 import CommunityTab from './CommunityTab';
+import { ModalBody, ModalHeader } from 'reactstrap';
 import { LoginSettingsSessionSummary } from '../Account/LoginSettingsControlRow';
 import * as polisReportModule from '../PolisReport/PolisReport';
 import {
@@ -1163,12 +1164,12 @@ describe('CommunityTab helpers', () => {
         ...instance.state,
         modalType: 'questions',
       };
-      const questionsTree = instance.renderModalContent();
+      const [questionsTree] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
       const [questionsAnchor] = collectTreeNodes(
         questionsTree,
         (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
       );
-      expect(questionsAnchor.props.href).toBe('/ce/questions');
+      expect(questionsAnchor.props.href).toBe('/ce/session/edge');
 
       instance.handleUserClick({ username: '0xabc' });
       instance.handleUserClick({ username: 'ada' });
@@ -1184,12 +1185,14 @@ describe('CommunityTab helpers', () => {
     }
   });
 
-  it('renders a beeswarm preview alongside the full questions link in modal content', () => {
+  it('keeps the questions preview in the body and links the active session from the Details header', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     instance.state = {
       ...instance.state,
       modalType: 'questions',
+      modalTitle: 'Questions Details',
     };
+    instance._getSelectedSessionSlugs = jest.fn(() => ['other-session', 'edge']);
     instance._beeswarmPoints = [
       {
         questionId: 'q1',
@@ -1202,13 +1205,11 @@ describe('CommunityTab helpers', () => {
       },
     ];
 
-    const tree = instance.renderModalContent();
-    const [plotNode] = collectTreeNodes(tree, (node) => node?.type === BeeswarmPlot);
-    const [anchorNode] = collectTreeNodes(tree, (node) => node?.type === 'a' && node?.props?.href === '/questions');
-    const modalChildren = Array.isArray(tree?.props?.children)
-      ? tree.props.children
-      : [tree?.props?.children].filter(Boolean);
-    const [topBarNode, plotWrapNode] = modalChildren;
+    const tree = instance.render();
+    const [header] = collectTreeNodes(tree, (node) => node.type === ModalHeader);
+    const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
+    const [plotNode] = collectTreeNodes(body, (node) => node.type === BeeswarmPlot);
+    const [anchorNode] = collectTreeNodes(header, (node) => node.type === 'a');
 
     expect(plotNode).toBeTruthy();
     expect(plotNode.props.points).toEqual(instance._beeswarmPoints);
@@ -1216,16 +1217,45 @@ describe('CommunityTab helpers', () => {
     expect(plotNode.props.height).toBe(240);
     expect(plotNode.props.showIdleSummary).toBe(false);
     expect(anchorNode).toBeTruthy();
+    expect(anchorNode.props.href).toBe('/session/edge');
     expect(collectNodeText(anchorNode)).toBe('View Full Questions');
     expect(anchorNode.props.target).toBeUndefined();
     expect(anchorNode.props.rel).toBeUndefined();
-    expect(topBarNode).toBeTruthy();
-    expect(plotWrapNode).toBeTruthy();
-    expect(
-      collectTreeNodes(topBarNode, (node) => node?.type === 'a' && node?.props?.href === '/questions'),
-    ).toHaveLength(1);
-    expect(collectTreeNodes(plotWrapNode, (node) => node?.type === BeeswarmPlot)).toHaveLength(1);
+    expect(collectTreeNodes(header, (node) => node.type === 'h5').map(collectNodeText)).toEqual(['Questions Details']);
+    expect(header.props.tag).toBe('div');
+    expect(header.props.toggle).toBe(instance.toggleModal);
+    expect(collectTreeNodes(body, (node) => node.type === 'a')).toHaveLength(0);
   });
+
+  it.each([
+    ['', '', '/session'],
+    ['general', '/ce/', '/ce/session'],
+    [' Edge Session ', '/ce/', '/ce/session/edge%20session'],
+  ])('uses the active session route for %p under base path %p', (activeSessionSlug, publicUrl, expectedHref) => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = publicUrl;
+    try {
+      const instance = new CommunityTab({ activeSessionSlug });
+      instance.state.modalType = 'questions';
+      instance._getSelectedSessionSlugs = jest.fn(() => ['different-session']);
+      const [header] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
+      expect(collectTreeNodes(header, (node) => node.type === 'a')[0].props.href).toBe(expectedHref);
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it.each(['users', 'surveys', 'sbtgroups', 'sessions'])(
+    'keeps the questions link out of the %s modal header',
+    (type) => {
+      const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+      instance.state.modalType = type;
+      const [header] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
+      expect(collectTreeNodes(header, (node) => node.type === 'a')).toHaveLength(0);
+      expect(header.props.tag).toBe(type === 'sessions' ? 'div' : 'h5');
+    },
+  );
 
   it('falls back to computed beeswarm points in the questions modal when no cached points exist', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });

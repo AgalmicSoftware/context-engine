@@ -2163,11 +2163,6 @@ class CommunityTab extends Component<any, any> {
     const points = this._getQuestionSwarmPoints();
     return (
       <div className={styles.questionsModalContent}>
-        <div className={styles.questionsModalTopBar}>
-          <a href={buildPublicRoute('/questions')} className={styles.questionsModalLink}>
-            View Full Questions
-          </a>
-        </div>
         <div className={styles.questionsModalPlot}>
           <BeeswarmPlot points={points} domain={COMMUNITY_BEESWARM_DOMAIN} height={240} showIdleSummary={false} />
         </div>
@@ -2529,8 +2524,8 @@ class CommunityTab extends Component<any, any> {
         >
           <ModalHeader
             toggle={this.toggleModal}
-            className={styles.modalHeader}
-            tag={this.state.modalType === 'sessions' ? 'div' : 'h5'}
+            className={`${styles.modalHeader} ${this.state.modalType === 'questions' ? styles.questionsModalHeader : ''}`}
+            tag={['sessions', 'questions'].includes(this.state.modalType) ? 'div' : 'h5'}
           >
             {this.state.modalType === 'sessions' ? (
               <div className={styles.sessionModalHeading}>
@@ -2550,6 +2545,17 @@ class CommunityTab extends Component<any, any> {
                   <FontAwesomeIcon icon={faFilter} />
                 </button>
               </div>
+            ) : this.state.modalType === 'questions' ? (
+              <>
+                <h5>{modalTitle}</h5>
+                <a
+                  href={buildSettingsSessionHref(this._resolveRouteSlug())}
+                  className={styles.questionsModalLink}
+                  data-testid="ce-community-questions-session-link"
+                >
+                  View Full Questions
+                </a>
+              </>
             ) : (
               modalTitle
             )}

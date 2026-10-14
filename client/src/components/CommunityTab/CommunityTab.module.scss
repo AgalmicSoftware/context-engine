@@ -757,10 +757,20 @@
   gap: 18px;
 }
 
-.questionsModalTopBar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+.modal .questionsModalHeader {
+  :global(.modal-title) {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  h5 {
+    font-size: 1em;
+  }
 }
 
 .questionsModalPlot {
@@ -793,6 +803,7 @@
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   color: var(--ce-color-white);
+  font-size: 1rem;
   font-weight: 700;
   text-decoration: none;
   transition:
@@ -952,16 +963,8 @@
 }
 
 @media (max-width: 768px) {
-  .questionsModalTopBar {
-    justify-content: stretch;
-  }
-
   .questionsModalPlot {
     padding: 14px;
-  }
-
-  .questionsModalLink {
-    width: 100%;
   }
 }
 
